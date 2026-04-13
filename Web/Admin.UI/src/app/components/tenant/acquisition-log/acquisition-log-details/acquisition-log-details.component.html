@@ -283,13 +283,17 @@
           Notes
         </div>
         <div>
-          <ul>
-            @for (note of acquisitionLog?.notes; track note) {
-              <li>
-                <span class="data-value">{{note}}</span>
-              </li>
-            }
-          </ul>
+          @if (notesLoading) {
+            <span class="data-value">Loading notes...</span>
+          } @else {
+            <ul>
+              @for (note of acquisitionLog?.notes; track note) {
+                <li>
+                  <span class="data-value">{{note}}</span>
+                </li>
+              }
+            </ul>
+          }
         </div>
       </div>
 

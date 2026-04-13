@@ -12,6 +12,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
@@ -21,7 +25,6 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -150,7 +153,6 @@ public class PatientCensusService : IPatientCensusService
                 ExecutionDate = DateTime.UtcNow,
                 Priority = AcquisitionPriority.Normal,
                 IsCensus = true,
-                ScheduledReport = new ScheduledReport()
             };
 
             facilityConfig.EHRPatientLists.ForEach(x =>
@@ -308,11 +310,7 @@ public class PatientCensusService : IPatientCensusService
 
         if (isFailed)
         {
-            if (log.Notes == null)
-            {
-                log.Notes = new List<string>();
-            }
-            log.Notes.Add($"[{DateTime.UtcNow}] Failed to retrieve patient list for facility {log.FacilityId}. See application logs for details.");
+            notes.Add($"[{DateTime.UtcNow}] Failed to retrieve patient list for facility {log.FacilityId}. See application logs for details.");
             log.Status = RequestStatus.Failed;
         }
         else
@@ -324,28 +322,20 @@ public class PatientCensusService : IPatientCensusService
 
         log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
         log.CompletionDate = System.DateTime.UtcNow;
-        log.ResourceAcquiredIds = results.SelectMany(x => x.PatientIds).ToList();
+        var acquiredIds = results.SelectMany(x => x.PatientIds).ToList();
 
-        // Ensure that the result of UpdateAsync is not null before assigning it to the log variable
-        var updatedLog = await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
         {
             Id = log.Id,
-            ResourceAcquiredIds = log.ResourceAcquiredIds,
+            ResourceAcquiredIds = acquiredIds,
             RetryAttempts = log.RetryAttempts,
             CompletionDate = log.CompletionDate,
             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
             ExecutionDate = log.ExecutionDate,
-            Notes = log.Notes,
+            NewNotes = notes.Count > 0 ? notes : null,
             Status = log.Status,
             TraceId = log.TraceId,
         }, cancellationToken);
-
-        if (updatedLog == null)
-        {
-            throw new InvalidOperationException("Failed to update the DataAcquisitionLog. The returned value is null.");
-        }
-
-        log = updatedLog;
 
         if (triggerMessage)
         {

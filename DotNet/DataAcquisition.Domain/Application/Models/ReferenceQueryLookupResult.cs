@@ -1,0 +1,37 @@
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+
+namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+
+/// <summary>
+/// Lightweight projection of a FhirQuery used by reference resource processing.
+/// Contains only the fields needed to merge reference IDs — avoids loading
+/// the full DataAcquisitionLog entity graph.
+/// </summary>
+public class ReferenceQueryLookupResult
+{
+    public Guid FhirQueryId { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
+    public FhirQueryType QueryType { get; set; }
+    public List<string> QueryParameters { get; set; } = [];
+
+    /// <summary>
+    /// Extracts the _id parameter values from <see cref="QueryParameters"/>,
+    /// matching the logic in <c>FhirQuery.IdQueryParameterValues</c>.
+    /// </summary>
+    public IEnumerable<string> IdQueryParameterValues
+    {
+        get
+        {
+            const string prefix = "_id=";
+            return (QueryParameters ?? [])
+                .Where(p => !string.IsNullOrEmpty(p) && p.StartsWith(prefix))
+                .Select(p => p[prefix.Length..])
+                .SelectMany(p => p.Split(','))
+                .Select(id => id?.Trim())
+                .Where(id => !string.IsNullOrWhiteSpace(id));
+        }
+    }
+}

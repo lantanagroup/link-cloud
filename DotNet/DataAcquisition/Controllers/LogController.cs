@@ -1,5 +1,6 @@
-using System.Net;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
@@ -7,12 +8,17 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.DataAcquisition.Filters;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Settings;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Net;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisition.Controllers;
 
@@ -25,13 +31,25 @@ public class LogController : Controller
     private readonly IDataAcquisitionLogService _logService;
     private readonly IDataAcquisitionLogManager _logManager;
     private readonly IDataAcquisitionLogQueries _logQueries;
+    private readonly IDataAcquisitionLogNotesQueries _logNotesQueries;
+    private readonly IReferenceResourcesQueries _referenceResourcesQueries;
 
-    public LogController(ILogger<LogController> logger, IDataAcquisitionLogService logService, IDataAcquisitionLogManager logManager, IDataAcquisitionLogQueries queries)
+    private const int DefaultCancelMinAgeHours = 24;
+
+    public LogController(
+        ILogger<LogController> logger,
+        IDataAcquisitionLogService logService,
+        IDataAcquisitionLogManager logManager,
+        IDataAcquisitionLogQueries queries,
+        IDataAcquisitionLogNotesQueries logNotesQueries,
+        IReferenceResourcesQueries referenceResourcesQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _logService = logService ?? throw new ArgumentNullException(nameof(logService));
         _logManager = logManager ?? throw new ArgumentNullException(nameof(logManager));
         _logQueries = queries ?? throw new ArgumentNullException(nameof(queries));
+        _logNotesQueries = logNotesQueries ?? throw new ArgumentNullException(nameof(logNotesQueries));
+        _referenceResourcesQueries = referenceResourcesQueries ?? throw new ArgumentNullException(nameof(referenceResourcesQueries));
     }
 
     /// <summary>
@@ -100,7 +118,8 @@ public class LogController : Controller
                         PageSize = queryParameters.PageSize,
                         SortBy = queryParameters.SortBy,
                         SortOrder = queryParameters.SortOrder,
-                        IncludeDeleted = queryParameters.IncludeDeleted
+                        IncludeDeleted = queryParameters.IncludeDeleted,
+                        CreatedBefore = queryParameters.CreatedBefore
                     }, cancellationToken);
 
                 return Ok(result);
@@ -173,7 +192,72 @@ public class LogController : Controller
     }
 
     /// <summary>
-    /// Get a list of data acquisition logs for a facility.
+    /// Get note entries for a data acquisition log entry.
+    /// </summary>
+    [HttpGet("{id}/notes")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetNotesForLog(
+        [FromRoute] long id,
+        CancellationToken cancellationToken = default)
+    {
+        if (id == default)
+            return BadRequest("ID cannot be null or zero.");
+
+        try
+        {
+            var notes = await _logNotesQueries.GetByLogIdAsync(id, cancellationToken);
+            return Ok(notes);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetNotesForLog"), ex,
+                "An exception occurred while attempting to get notes for log {id}", id);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Get reference resources for a data acquisition log entry.
+    /// </summary>
+    /// <param name="id">The ID of the log entry.</param>
+    /// <param name="pageNumber">Page number (1-based). Defaults to 1.</param>
+    /// <param name="pageSize">Page size. Defaults to 100.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    [HttpGet("{id}/reference-resources")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ReferenceResourcesModel>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> GetReferenceResourcesForLog(
+        [FromRoute] long id,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 100,
+        CancellationToken cancellationToken = default)
+    {
+        if (id == default)
+            return BadRequest("ID cannot be null or zero.");
+
+        try
+        {
+            var result = await _referenceResourcesQueries.SearchAsync(
+                new SearchReferenceResourcesModel
+                {
+                    DataAcquisitionLogId = id,
+                    PageNumber = pageNumber,
+                    PageSize = pageSize
+                }, cancellationToken);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetReferenceResourcesForLog"), ex,
+                "An exception occurred while attempting to get reference resources for log {id}", id);
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
     /// </summary>
     /// This endpoint retrieves a list of data acquisition logs.
     /// <param name="facilityId"></param>
@@ -385,9 +469,10 @@ public class LogController : Controller
         {
             try
             {
-                var updatedLog = await _logManager.UpdateAsync(updateModel, cancellationToken);
-
-                return Accepted(updatedLog);
+                updateModel.Id = long.Parse(id);
+                await _logManager.UpdateAsync(updateModel, cancellationToken);
+                var updated = _logQueries.GetAsync(updateModel.Id.Value, cancellationToken).Result;
+                return Accepted(updated);
             }
             catch (DataAcquisitionLogNotFoundException ex)
             {
@@ -675,6 +760,43 @@ public class LogController : Controller
     }
 
     /// <summary>
+    /// Cancel multiple data acquisition log entries.
+    /// </summary>
+    /// <param name="ids">The IDs of the logs to cancel.</param>
+    /// <param name="minAgeHours">Minimum age in hours a log must have to be eligible for cancellation. Defaults to 24.</param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>
+    /// A response indicating the result of the cancellation.
+    /// </returns>
+    [ValidateAntiForgeryOrBearerToken]
+    [HttpPost("cancel-bulk")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CancelBulk([FromBody] List<long> ids, [FromQuery] int minAgeHours = DefaultCancelMinAgeHours, CancellationToken cancellationToken = default)
+    {
+        if (ids == null || !ids.Any())
+        {
+            return BadRequest("IDs cannot be null or empty.");
+        }
+
+        if (minAgeHours < 0) 
+        { 
+            return BadRequest("minAgeHours must be zero or greater.");
+        }
+        try
+        {
+            var cancelledCount = await _logManager.CancelBulkAsync(ids, minAgeHours, cancellationToken);
+            return Accepted(new { requested = ids.Count, cancelled = cancelledCount, ineligible = ids.Count - cancelledCount });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "CancelBulk"), ex, "An Exception occurred while attempting to cancel logs in bulk.");
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
     /// Process data acquisition log entries based on search criteria.
     /// </summary>
     /// <returns>
@@ -723,6 +845,7 @@ public class LogController : Controller
                     AcquisitionPriority = queryParameters.Priority,
                     ResourceType = queryParameters.ResourceType,
                     IncludeDeleted = queryParameters.IncludeDeleted,
+                    CreatedBefore = queryParameters.CreatedBefore,
                     PageNumber = 1,
                     PageSize = int.MaxValue // Get all matching IDs
                 }, cancellationToken);
@@ -738,6 +861,195 @@ public class LogController : Controller
         catch (Exception ex)
         {
             _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "ProcessByFilter"), ex, "An Exception occurred while attempting to process logs by filter.");
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Cancel data acquisition log entries based on search criteria.
+    /// </summary>
+    /// <returns>
+    /// A response indicating the result of the cancellation.
+    /// </returns>
+    [ValidateAntiForgeryOrBearerToken]
+    [HttpPost("cancel-by-filter")]
+    [ProducesResponseType(StatusCodes.Status202Accepted)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CancelByFilter([FromBody] LogSearchParameters queryParameters, [FromQuery] int minAgeHours = DefaultCancelMinAgeHours, CancellationToken cancellationToken = default)
+    {
+        if (queryParameters == null)
+        {
+            return BadRequest("Query parameters are required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(queryParameters.FacilityId) &&
+            string.IsNullOrWhiteSpace(queryParameters.PatientId) &&
+            string.IsNullOrWhiteSpace(queryParameters.ReportId) &&
+            string.IsNullOrWhiteSpace(queryParameters.ResourceId) &&
+            !queryParameters.QueryPhase.HasValue &&
+            !queryParameters.QueryType.HasValue &&
+            (queryParameters.Statuses == null || !queryParameters.Statuses.Any()) &&
+            !queryParameters.Priority.HasValue &&
+            string.IsNullOrWhiteSpace(queryParameters.ResourceType))
+        {
+            return BadRequest("At least one filter criteria must be provided.");
+        }
+
+        try
+        {
+            var facilityId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.FacilityId);
+            var patientId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.PatientId);
+            var reportId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ReportId);
+            var resourceId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ResourceId);
+
+            var filter = new SearchDataAcquisitionLogRequest
+            {
+                FacilityId = facilityId,
+                PatientId = patientId,
+                ReportTrackingId = reportId,
+                ResourceId = resourceId,
+                QueryPhase = queryParameters.QueryPhase,
+                QueryType = queryParameters.QueryType,
+                RequestStatuses = queryParameters.Statuses,
+                AcquisitionPriority = queryParameters.Priority,
+                ResourceType = queryParameters.ResourceType,
+                IncludeDeleted = queryParameters.IncludeDeleted,
+                CreatedBefore = queryParameters.CreatedBefore
+            };
+
+            var (requested, cancelled) = await _logManager.CancelByFilterAsync(filter, minAgeHours, cancellationToken);
+
+            return Accepted(new { requested, cancelled, ineligible = requested - cancelled });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GenerateItems, "CancelByFilter"), ex, "An Exception occurred while attempting to cancel logs by filter.");
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Returns a lightweight summary of data acquisition activity for a report.
+    /// Totals, status counts and resource-type counts computed via DB aggregates.
+    /// Intended for dashboard polling and run monitoring.
+    /// </summary>
+    [HttpGet("report/{reportId}/summary")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(DataAcquisitionReportSummaryApiModel))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<DataAcquisitionReportSummaryApiModel>> GetReportSummary(
+        [FromRoute] string reportId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reportId))
+            return BadRequest($"{nameof(reportId)} cannot be null or empty.");
+
+        reportId = HtmlInputSanitizer.Sanitize(reportId).SanitizeAndRemove();
+
+        try
+        {
+            var summary = await _logQueries.GetDataAcquisitionLogStatisticsByReportAsync(reportId, cancellationToken);
+
+            return Ok(new DataAcquisitionReportSummaryApiModel
+            {
+                ReportId = reportId,
+                TotalLogs = summary.TotalLogs,
+                TotalPatients = summary.TotalPatients,
+                TotalCompletedPatients = summary.TotalCompletedPatients,
+                TotalResourcesAcquired = summary.TotalResourcesAcquired,
+                TotalRetryAttempts = summary.TotalRetryAttempts,
+                TotalCompletionTimeMs = summary.TotalCompletionTimeMilliseconds,
+                StatusCounts = summary.RequestStatusCounts.Select(s => new DataAcquisitionReportSummaryApiModel.StatusCountEntry
+                {
+                    Status = s.Key.ToString(),
+                    Count = s.Value
+                }).ToList(),
+                ResourceTypeCounts = summary.ResourceTypeCounts.Select(r => new DataAcquisitionReportSummaryApiModel.ResourceTypeCountEntry
+                {
+                    ResourceType = r.Key,
+                    Count = r.Value
+                }).ToList()
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetReportSummary"), ex,
+                "An exception occurred while attempting to get report summary for reportId {reportId}", reportId.Sanitize());
+            return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
+        }
+    }
+
+    /// <summary>
+    /// Get all ResourceAcquiredIds from completed logs for a facility/report pair.
+    /// Intended for automation reconciliation.
+    /// </summary>
+    [HttpGet("report/{reportId}/acquired-resource-ids")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<string>))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<List<string>>> GetAcquiredResourceIdsForReport(
+        [FromRoute] string reportId,
+        [FromQuery] string facilityId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(reportId))
+            return BadRequest("reportId cannot be null or empty.");
+
+        if (string.IsNullOrWhiteSpace(facilityId))
+            return BadRequest("facilityId cannot be null or empty.");
+
+        try
+        {
+            // Use the statistics query which already extracts resource IDs
+            // from the ResourceIds junction table for completed logs.
+            var statistics = await _logQueries.GetDataAcquisitionLogStatisticsByReportAsync(
+                reportId.SanitizeAndRemove(), cancellationToken);
+
+            // The statistics method aggregates resource type counts from completed logs' ResourceIds.
+            // We need the raw IDs, so query via SearchQueryLogSummary with full model to get them.
+            var pageNumber = 1;
+            const int pageSize = 500;
+            var results = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            while (true)
+            {
+                var page = await _logQueries.SearchAsync(new SearchDataAcquisitionLogRequest
+                {
+                    FacilityId = facilityId.SanitizeAndRemove(),
+                    ReportTrackingId = reportId.SanitizeAndRemove(),
+                    RequestStatuses = [RequestStatus.Completed],
+                    PageNumber = pageNumber,
+                    PageSize = pageSize,
+                    SortBy = "Id",
+                    SortOrder = LantanaGroup.Link.Shared.Application.Enums.SortOrder.Ascending
+                }, cancellationToken);
+
+                if (page?.Records == null || page.Records.Count == 0)
+                    break;
+
+                foreach (var log in page.Records)
+                {
+                    // For each completed log, fetch full detail to get resource IDs
+                    var full = await _logQueries.GetAsync(log.Id, cancellationToken);
+                    if (full?.ResourceAcquiredIds == null) continue;
+
+                    foreach (var id in full.ResourceAcquiredIds.Where(x => !string.IsNullOrWhiteSpace(x) && x.Contains('/')))
+                        results.Add(id);
+                }
+
+                if (page.Records.Count < pageSize)
+                    break;
+
+                pageNumber++;
+            }
+
+            return Ok(results.ToList());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(new EventId(LoggingIds.GetItem, "GetAcquiredResourceIdsForReport"), ex,
+                "An exception occurred while attempting to get acquired resource ids for report {reportId}", reportId.Sanitize());
             return Problem(title: "Internal Server Error", detail: ex.Message, statusCode: (int)HttpStatusCode.InternalServerError);
         }
     }

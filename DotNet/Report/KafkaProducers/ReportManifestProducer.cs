@@ -4,6 +4,7 @@ using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
@@ -25,6 +26,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
         private readonly BlobStorageService _blobStorageService;
         private readonly SubmitPayloadProducer _payloadSubmittedProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
+        private readonly IReportEntryManager _reportEntryManager;
 
 
         public ReportManifestProducer(
@@ -34,7 +36,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             ITenantApiService tenantApiService,
             BlobStorageService blobStorageService,
             SubmitPayloadProducer payloadSubmittedProducer,
-            AuditableEventOccurredProducer auditableEventOccurredProducer)
+            AuditableEventOccurredProducer auditableEventOccurredProducer,
+            IReportEntryManager reportEntryManager)
         {
             _logger = logger;
             _serviceScopeFactory = serviceScopeFactory;
@@ -43,6 +46,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _blobStorageService = blobStorageService;
             _payloadSubmittedProducer = payloadSubmittedProducer;
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
+            _reportEntryManager = reportEntryManager;
         }
 
         public virtual async Task<List<Resource>> Generate(ReportScheduleModel schedule)
@@ -63,7 +67,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             [
                 organization,
                 CreateDevice(),
-                CreatePatientList(reportEntries.Select(x => x.PatientId).ToList(), schedule.ReportStartDate, schedule.ReportEndDate),
+                CreatePatientList(reportEntries.Select(x => x.PatientId).ToList(), schedule.ReportStartDate.DateTime, schedule.ReportEndDate.DateTime),
             ];
 
             var reportName = _blobStorageService.GetReportName(schedule);
@@ -115,17 +119,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
-            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
-
-            var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.FacilityId == schedule.FacilityId && x.ReportScheduleId == schedule.Id);
-
-            foreach (var entry in reportEntries)
+            if (!await _reportEntryManager.AreAllEntriesCompleteAsync(schedule.FacilityId, schedule.Id))
             {
-                if ((entry.ReportingStatus == ReportingStatus.NotReportable || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && (entry.SubmissionStatus == SubmissionStatus.Submitted || entry.SubmissionStatus == SubmissionStatus.NotEligable))
-                {
-                    continue;
-                }
-
                 return false;
             }
 

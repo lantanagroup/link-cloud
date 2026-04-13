@@ -163,17 +163,84 @@ public class QuartzJobHelperTests
             .Returns((IJobDetail _, ITrigger __, CancellationToken ___) => System.Threading.Tasks.Task.FromResult(DateTimeOffset.UtcNow));
 
         var helper = new QuartzJobHelper(logger.Object, schedulerFactory.Object);
+        var newStartAt = DateTimeOffset.UtcNow.AddMinutes(5);
 
         await helper.RescheduleJob<TestJob>(
             identity: "job-reschedule",
             jobData: new Dictionary<string, object> { ["ReportScheduleId"] = Guid.NewGuid() },
-            newStartAt: DateTimeOffset.UtcNow.AddMinutes(5),
+            newStartAt: newStartAt,
             group: "group-reschedule",
             description: "rescheduled");
 
         Assert.Equal(2, calls.Count);
         Assert.Equal("delete", calls[0]);
         Assert.Equal("schedule", calls[1]);
+
         schedulerFactory.Verify(f => f.GetScheduler(It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ScheduleJob_PersistsGuidInJobDataMap_AndCanBeReadBack()
+    {
+        var logger = new Mock<ILogger<QuartzJobHelper>>();
+        var scheduler = new Mock<IScheduler>();
+        var schedulerFactory = new Mock<ISchedulerFactory>();
+
+        IJobDetail? capturedJob = null;
+
+        schedulerFactory
+            .Setup(f => f.GetScheduler(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(scheduler.Object);
+
+        scheduler
+            .Setup(s => s.ScheduleJob(It.IsAny<IJobDetail>(), It.IsAny<ITrigger>(), It.IsAny<CancellationToken>()))
+            .Callback<IJobDetail, ITrigger, CancellationToken>((job, _, _) => capturedJob = job)
+            .Returns((IJobDetail _, ITrigger __, CancellationToken ___) => System.Threading.Tasks.Task.FromResult(DateTimeOffset.UtcNow));
+
+        var helper = new QuartzJobHelper(logger.Object, schedulerFactory.Object);
+        var id = Guid.NewGuid();
+
+        await helper.ScheduleJob<TestJob>(
+            new Dictionary<string, object> { ["ReportScheduleId"] = id },
+            DateTimeOffset.UtcNow,
+            identity: "job-guid",
+            group: "group-guid");
+
+        Assert.NotNull(capturedJob);
+        Assert.Equal(id, capturedJob!.JobDataMap.GetObject<Guid?>("ReportScheduleId"));
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ScheduleJob_UsesProvidedCancellationToken_WhenResolvingSchedulerAndScheduling()
+    {
+        var logger = new Mock<ILogger<QuartzJobHelper>>();
+        var scheduler = new Mock<IScheduler>();
+        var schedulerFactory = new Mock<ISchedulerFactory>();
+
+        CancellationToken schedulerFactoryToken = default;
+        CancellationToken schedulerToken = default;
+
+        schedulerFactory
+            .Setup(f => f.GetScheduler(It.IsAny<CancellationToken>()))
+            .Callback<CancellationToken>(t => schedulerFactoryToken = t)
+            .ReturnsAsync(scheduler.Object);
+
+        scheduler
+            .Setup(s => s.ScheduleJob(It.IsAny<IJobDetail>(), It.IsAny<ITrigger>(), It.IsAny<CancellationToken>()))
+            .Callback<IJobDetail, ITrigger, CancellationToken>((_, _, t) => schedulerToken = t)
+            .Returns((IJobDetail _, ITrigger __, CancellationToken ___) => System.Threading.Tasks.Task.FromResult(DateTimeOffset.UtcNow));
+
+        var helper = new QuartzJobHelper(logger.Object, schedulerFactory.Object);
+        var cts = new CancellationTokenSource();
+
+        await helper.ScheduleJob<TestJob>(
+            new Dictionary<string, object>(),
+            DateTimeOffset.UtcNow,
+            identity: "job-token",
+            group: "group-token",
+            ct: cts.Token);
+
+        Assert.Equal(cts.Token, schedulerFactoryToken);
+        Assert.Equal(cts.Token, schedulerToken);
     }
 }

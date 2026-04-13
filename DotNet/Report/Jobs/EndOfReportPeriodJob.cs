@@ -1,12 +1,13 @@
-ï»¿using Confluent.Kafka;
+using Confluent.Kafka;
 using LantanaGroup.Link.Report.Data;
-using LantanaGroup.Link.Report.Data.Entities;
-using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.EntityFrameworkCore;
@@ -72,6 +73,15 @@ namespace LantanaGroup.Link.Report.Jobs
 
                 _logger.LogInformation("Executing EndOfReportPeriodJob for ScheduleId {ScheduleId}", schedule.Id);
 
+                // Mark the end-of-period flag BEFORE attempting to produce the manifest.
+                // ReportManifestProducer.Produce gates on EndOfReportPeriodJobHasRun — if
+                // all patient entries already reached a terminal state (e.g., discharge
+                // processing completed before the period ended), the flag must be true
+                // for the manifest to be generated on this call.
+                schedule.Status = ScheduleStatus.EndOfPeriod;
+                schedule.EndOfReportPeriodJobHasRun = true;
+                await reportScheduledManager.UpdateAsync(schedule, CancellationToken.None);
+
                 var manifestProduced = await reportManifestProducer.Produce(schedule);
 
                 if (!manifestProduced)
@@ -94,10 +104,6 @@ namespace LantanaGroup.Link.Report.Jobs
                         }
                     }
                 }
-
-                schedule.Status = ScheduleStatus.EndOfPeriod;
-                schedule.EndOfReportPeriodJobHasRun = true;
-                await reportScheduledManager.UpdateAsync(schedule, CancellationToken.None);
 
                 await _quartz.DeleteJob(
                     identity: context.JobDetail.Key.Name,
