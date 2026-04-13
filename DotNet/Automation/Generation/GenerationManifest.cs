@@ -1,4 +1,3 @@
-﻿using System.Text.Json;
 using System.Text.Json;
 
 namespace LantanaGroup.Automation.Generation;
@@ -6,7 +5,7 @@ namespace LantanaGroup.Automation.Generation;
 /// <summary>
 /// A complete, concrete manifest of everything that was generated. Built once at generation
 /// time and passed through to every validator so they can assert expected pipeline output
-/// against known inputs — without interrogating the pipeline's own data (self-affirming)
+/// against known inputs � without interrogating the pipeline's own data (self-affirming)
 /// or relying on brittle baselines.
 /// </summary>
 public sealed class GenerationManifest
@@ -43,7 +42,7 @@ public sealed class GenerationManifest
 
     /// <summary>
     /// The subset of <see cref="AcquiredResourceTypes"/> that come from <b>Parameter</b>
-    /// queries — direct, patient-scoped searches whose results are deterministic.
+    /// queries � direct, patient-scoped searches whose results are deterministic.
     /// Reference-query types (Location, Medication, Device, Specimen, etc.) are
     /// in <see cref="AcquiredResourceTypes"/> but not here.
     /// Set from <c>QueryPlanDefaults.GetParameterQueryResourceTypes()</c>.
@@ -76,14 +75,14 @@ public sealed class GenerationManifest
         = new Dictionary<string, HashSet<string>>();
 
     /// <summary>
-    /// Per-patient resource type → count map, derived from the generated bundles.
-    /// Key = patient ID, Value = { ResourceType → count }.
+    /// Per-patient resource type ? count map, derived from the generated bundles.
+    /// Key = patient ID, Value = { ResourceType ? count }.
     /// Shared infrastructure resources are stored under the empty-string key.
     /// </summary>
     public IReadOnlyDictionary<string, Dictionary<string, int>> ResourceCountsByPatientType { get; init; }
         = new Dictionary<string, Dictionary<string, int>>();
 
-    /// <summary>Aggregate resource type → count across all patients (excluding shared).</summary>
+    /// <summary>Aggregate resource type ? count across all patients (excluding shared).</summary>
     public IReadOnlyDictionary<string, int> TotalCountsByType { get; init; }
         = new Dictionary<string, int>();
 
@@ -106,7 +105,7 @@ public sealed class GenerationManifest
         if (string.Equals(resourceType, "Patient", StringComparison.OrdinalIgnoreCase))
             return true;
         if (AcquiredResourceTypes.Count == 0)
-            return true; // no filter configured — allow all
+            return true; // no filter configured � allow all
         return AcquiredResourceTypes.Contains(resourceType);
     }
 
@@ -128,10 +127,10 @@ public sealed class GenerationManifest
     /// contained list. PatientAggregator extracts those contained resources and writes them
     /// to the patient NDJSON in ABS and to the ReportResource DB.
     ///
-    /// Both Parameter-query types (Encounter, Condition, Observation, …) and Reference-query
-    /// types (Location, Medication, Device, Specimen) follow the same path: generated →
-    /// acquired → bundled → CQL-evaluated → contained → ABS. No tolerance or special-casing
-    /// is needed — the system is deterministic given the input data.
+    /// Both Parameter-query types (Encounter, Condition, Observation, �) and Reference-query
+    /// types (Location, Medication, Device, Specimen) follow the same path: generated ?
+    /// acquired ? bundled ? CQL-evaluated ? contained ? ABS. No tolerance or special-casing
+    /// is needed � the system is deterministic given the input data.
     /// </summary>
     public bool IsExpectedInAbs(string resourceType)
     {
@@ -146,16 +145,16 @@ public sealed class GenerationManifest
         if (CqlReferencedResourceTypes.Count > 0)
             return CqlReferencedResourceTypes.Contains(resourceType);
 
-        // Fallback when CQL analysis is unavailable — use Parameter-query heuristic
+        // Fallback when CQL analysis is unavailable � use Parameter-query heuristic
         if (ParameterQueryResourceTypes.Count > 0)
             return ParameterQueryResourceTypes.Contains(resourceType);
 
-        return true; // no filters configured — allow all acquired
+        return true; // no filters configured � allow all acquired
     }
 
     /// <summary>
-    /// Returns the per-patient resource type → count map filtered to only types
-    /// expected in ABS (generated ∩ acquired ∩ CQL-referenced).
+    /// Returns the per-patient resource type ? count map filtered to only types
+    /// expected in ABS (generated ? acquired ? CQL-referenced).
     /// </summary>
     public Dictionary<string, int>? GetExpectedAbsCountsForPatient(string patientId)
     {
@@ -172,7 +171,7 @@ public sealed class GenerationManifest
 
     /// <summary>
     /// Returns expected ABS resource keys for a patient using deterministic key-level logic:
-    /// simulated-acquired (when available) ∩ reachable CQL types.
+    /// simulated-acquired (when available) ? reachable CQL types.
     /// Falls back to generated keys when acquisition simulation is unavailable.
     /// </summary>
     public HashSet<string> GetExpectedAbsKeysForPatient(string patientId)
@@ -201,7 +200,7 @@ public sealed class GenerationManifest
     /// <summary>
     /// Returns all generated resource keys (Type/Id) for patient-scoped resources
     /// (excludes shared infrastructure under the empty-string key), filtered to only
-    /// types expected in ABS (acquired ∩ CQL-referenced).
+    /// types expected in ABS (acquired ? CQL-referenced).
     /// </summary>
     public HashSet<string> AllExpectedAbsPatientResourceKeys()
     {
@@ -234,7 +233,7 @@ public sealed class GenerationManifest
     }
 
     /// <summary>
-    /// Builds the <c>measureId → qualifying patient count</c> map used by
+    /// Builds the <c>measureId ? qualifying patient count</c> map used by
     /// <see cref="LantanaGroup.Link.Automation.Link.Validation.ReportDatabaseValidator"/>.
     /// </summary>
     public Dictionary<string, int> BuildQualifyingCountPerMeasure()
