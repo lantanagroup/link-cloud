@@ -141,6 +141,7 @@ var mongoClientSettings = MongoClientSettings.FromUrl(mongoUrl);
 
 builder.Services.AddSingleton<IMongoClient>(_ => new MongoClient(mongoClientSettings));
 builder.Services.AddSingleton(sp => sp.GetRequiredService<IMongoClient>().GetDatabase(mongoDatabaseName));
+builder.Services.AddSingleton<MongoIndexManager>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
@@ -164,6 +165,9 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchest
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
 
 var app = builder.Build();
+
+// -- Ensure MongoDB indexes (Cosmos DB compatible) --
+app.Services.GetRequiredService<MongoIndexManager>().EnsureAllIndexes();
 
 // -- Middleware --
 if (!app.Environment.IsDevelopment())
