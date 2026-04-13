@@ -78,6 +78,13 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel model, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(model);
+
+        if (string.IsNullOrWhiteSpace(model.FacilityId))
+        {
+            throw new ArgumentNullException(nameof(model.FacilityId));
+        }
+
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.CreateAsync");
         activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, model.CorrelationId);
