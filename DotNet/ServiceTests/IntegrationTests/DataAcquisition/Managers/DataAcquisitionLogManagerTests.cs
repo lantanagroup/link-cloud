@@ -9,16 +9,15 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
-using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
+using ScheduledFrequency = LantanaGroup.Link.Shared.Application.Models.Frequency;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Managers;
@@ -57,7 +56,7 @@ public class DataAcquisitionLogManagerTests
         dbContext.ScheduledReports.Add(new ScheduledReportEntity
         {
             ReportTrackingId = reportTrackingId,
-            Frequency = Frequency.Adhoc,
+            Frequency = ScheduledFrequency.Adhoc,
             StartDate = DateTime.UtcNow.AddDays(-1),
             EndDate = DateTime.UtcNow
         });
@@ -237,7 +236,7 @@ public class DataAcquisitionLogManagerTests
         dbContext.ScheduledReports.Add(new ScheduledReportEntity
         {
             ReportTrackingId = reportTrackingId,
-            Frequency = Frequency.Adhoc,
+            Frequency = ScheduledFrequency.Adhoc,
             StartDate = DateTime.UtcNow.AddDays(-1),
             EndDate = DateTime.UtcNow
         });
@@ -595,14 +594,14 @@ public class DataAcquisitionLogManagerTests
             new ScheduledReportEntity
             {
                 ReportTrackingId = matchReportTrackingId,
-                Frequency = Frequency.Adhoc,
+                Frequency = ScheduledFrequency.Adhoc,
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             },
             new ScheduledReportEntity
             {
                 ReportTrackingId = noMatchReportTrackingId,
-                Frequency = Frequency.Adhoc,
+                Frequency = ScheduledFrequency.Adhoc,
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             });

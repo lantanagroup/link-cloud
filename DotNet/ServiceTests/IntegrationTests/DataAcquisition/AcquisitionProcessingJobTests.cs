@@ -4,11 +4,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Jobs;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -19,6 +14,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Quartz;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using ScheduledFrequency = LantanaGroup.Link.Shared.Application.Models.Frequency;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition;
@@ -63,7 +61,7 @@ public class AcquisitionProcessingJobTests
         dbContext.ScheduledReports.Add(new ScheduledReportEntity
         {
             ReportTrackingId = reportTrackingId,
-            Frequency = Frequency.Adhoc,
+            Frequency = ScheduledFrequency.Adhoc,
             StartDate = DateTime.UtcNow.AddDays(-1),
             EndDate = DateTime.UtcNow
         });
@@ -407,7 +405,7 @@ public class AcquisitionProcessingJobTests
         dbContext.ScheduledReports.Add(new ScheduledReportEntity
         {
             ReportTrackingId = reportTrackingId,
-            Frequency = Frequency.Adhoc,
+            Frequency = ScheduledFrequency.Adhoc,
             StartDate = DateTime.UtcNow.AddDays(-1),
             EndDate = DateTime.UtcNow
         });
