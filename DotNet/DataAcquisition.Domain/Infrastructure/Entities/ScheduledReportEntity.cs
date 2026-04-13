@@ -1,5 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
-using LantanaGroup.Link.Shared.Application.Models;
+﻿using LantanaGroup.Link.Shared.Application.Models;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -13,11 +13,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 public class ScheduledReportEntity
 {
     [Key]
-    public long Id { get; set; }
-
-    [Required]
-    [MaxLength(256)]
-    public string ReportTrackingId { get; set; } = null!;
+    public Guid ReportTrackingId { get; set; }
 
     [Required]
     public Frequency Frequency { get; set; }

@@ -31,6 +31,9 @@ public sealed class StoreBackedServicePoller
         _logger = logger;
     }
 
+    public string FacilityId => _meta.FacilityId;
+    public string ReportId => _meta.ReportId;
+
     public async Task RunAsync(CancellationToken ct)
     {
         if (!Guid.TryParse(_meta.ReportId, out var scheduleId))
@@ -159,9 +162,8 @@ public sealed class StoreBackedServicePoller
     {
         var summary = await _reader.GetDataAcquisitionReportSummaryAsync(_meta.ReportId);
 
-        if (summary == null)
-            return;
-
+        // Always write — even when null — so stale data from a prior report
+        // (e.g., before regeneration cleared snapshots) is overwritten.
         await _store.SetDomainAsync(_meta.RunId, "acquisitionSummary", summary, ct);
     }
 

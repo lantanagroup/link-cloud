@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+ï»¿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
@@ -66,6 +66,7 @@ public class PatientDataService : IPatientDataService
     private readonly IFhirApiService _fhirApiService;
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
     private readonly IPatientCensusService _patientCensusService;
+    private readonly IScheduledReportManager _scheduledReportManager;
 
     public PatientDataService(
         IDatabase database,
@@ -79,7 +80,8 @@ public class PatientDataService : IPatientDataService
         IFhirApiService fhirApiService,
         IDistributedSemaphoreProvider distributedSemaphoreProvider,
         IServiceProvider serviceProvider,
-        IPatientCensusService patientCensusService)
+        IPatientCensusService patientCensusService,
+        IScheduledReportManager scheduledReportManager)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -98,6 +100,7 @@ public class PatientDataService : IPatientDataService
         _dataAcquisitionLogQueries = dataAcquisitionLogQueries ??
                                      throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
         _fhirApiService = fhirApiService ?? throw new ArgumentNullException(nameof(fhirApiService));
+        _scheduledReportManager = scheduledReportManager ?? throw new ArgumentNullException(nameof(scheduledReportManager));
         _distributedSemaphoreProvider = distributedSemaphoreProvider ??
                                         throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
         _patientCensusService = patientCensusService ?? throw new ArgumentNullException(nameof(patientCensusService));
@@ -248,6 +251,12 @@ public class PatientDataService : IPatientDataService
 
             foreach (var schedReport in request.ConsumeResult.Message.Value.ScheduledReports)
             {
+                // Ensure the ScheduledReport row exists (concurrency-safe, deduplicated by ReportTrackingId).
+                if (!string.IsNullOrWhiteSpace(schedReport.ReportTrackingId))
+                {
+                    await _scheduledReportManager.EnsureCreatedAsync(schedReport, cancellationToken);
+                }
+
                 if (request.QueryPlanType == QueryPlanType.Initial)
                 {
                     var priority = schedReport.Frequency == Frequency.Daily
@@ -270,7 +279,7 @@ public class PatientDataService : IPatientDataService
                                 QueryType = FhirQueryType.Read,
                                 QueryPhase =
                                     QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
-                                ScheduledReport = schedReport,
+                                ReportTrackingId = schedReport.ReportTrackingId,
                                 TraceId = traceAndSpanDelimited,
                                 FhirQuery = new List<CreateFhirQueryModel>
                                 {
@@ -329,7 +338,7 @@ public class PatientDataService : IPatientDataService
                 }
             }
 
-            // All logs committed — stamp the sibling count so workers know the full set exists.
+            // All logs committed â€” stamp the sibling count so workers know the full set exists.
             if (totalLogsCreated > 0)
             {
                 var queryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType);
@@ -360,7 +369,7 @@ public class PatientDataService : IPatientDataService
         //1. get log
         var log = await _dataAcquisitionLogQueries.GetAsync(request.logId, cancellationToken);
 
-        // Read facility config once — reused by the happy path and all error handlers
+        // Read facility config once â€” reused by the happy path and all error handlers
         FhirQueryConfigurationModel? fhirQueryConfiguration = null;
 
         try
@@ -462,7 +471,7 @@ public class PatientDataService : IPatientDataService
                     $"Log with ID {log.Id} is not in a queued state. Current status: {log.Status}");
             }
 
-            //2. atomically update to "Processing" — single DB write, no follow-up UpdateAsync needed
+            //2. atomically update to "Processing" â€” single DB write, no follow-up UpdateAsync needed
             var allowedStatuses = new List<RequestStatus> { RequestStatus.Queued };
             if (request.ignoreStatusConstraint && log.Status.HasValue)
             {

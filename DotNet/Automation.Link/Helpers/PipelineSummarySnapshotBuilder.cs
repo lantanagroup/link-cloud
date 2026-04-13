@@ -301,7 +301,14 @@ public class PipelineSummarySnapshotBuilder
             .Where(s => string.Equals(s.Status, "Completed", StringComparison.OrdinalIgnoreCase)
                         || string.Equals(s.Status, "Skipped", StringComparison.OrdinalIgnoreCase))
             .Sum(s => s.Count);
-        var dataAcqComplete = dataAcqTotalLogs > 0 && dataAcqTerminalLogs == dataAcqTotalLogs;
+
+        // DA is complete when all logs reached a terminal state.
+        // For regenerated reports there are zero DA logs (data is reused from the
+        // prior report). In that case, if downstream stages have already progressed
+        // (entries with measure reports exist), DA is implicitly complete.
+        var dataAcqExplicitlyComplete = dataAcqTotalLogs > 0 && dataAcqTerminalLogs == dataAcqTotalLogs;
+        var dataAcqImplicitlyComplete = dataAcqTotalLogs == 0 && entries.Any(e => e.MeasureReports.Count > 0);
+        var dataAcqComplete = dataAcqExplicitlyComplete || dataAcqImplicitlyComplete;
         var measureComplete = measureResources > 0;
 
         var hasValidationOutcome = entries.Any(e =>
