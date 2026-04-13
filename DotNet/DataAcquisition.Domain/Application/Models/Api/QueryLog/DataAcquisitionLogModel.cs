@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -56,7 +56,7 @@ public class DataAcquisitionLogModel
             IsCensus = log.IsCensus,
             PatientId = log.PatientId,
             ReportableEvent = log.ReportableEvent,
-            ReportTrackingId = log.ReportTrackingId,
+            ReportTrackingId = log.ReportTrackingId?.ToString().ToLowerInvariant(),
             CorrelationId = log.CorrelationId,
             FhirVersion = log.FhirVersion,
             QueryType = log.QueryType,
@@ -74,6 +74,9 @@ public class DataAcquisitionLogModel
                 QueryParameters = q.QueryParameters,
                 Paged = q.Paged,
                 DataAcquisitionLogId = q.DataAcquisitionLogId,
+                CensusTimeFrame = q.CensusTimeFrame,
+                CensusPatientStatus = q.CensusPatientStatus,
+                CensusListId = q.CensusListId,
                 ResourceReferenceTypes = q.ResourceReferenceTypes != null ? q.ResourceReferenceTypes.Select(rt => new ResourceReferenceTypeModel
                 {
                     Id = rt.Id,
@@ -98,7 +101,7 @@ public class DataAcquisitionLogModel
             ScheduledReport = log.ScheduledReportEntity != null
                 ? new ScheduledReport
                 {
-                    ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId,
+                    ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString().ToLowerInvariant(),
                     Frequency = log.ScheduledReportEntity.Frequency,
                     StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                     EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),

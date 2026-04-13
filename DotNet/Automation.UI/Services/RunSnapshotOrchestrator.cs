@@ -89,18 +89,32 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
     /// </summary>
     public async Task UpdateRunAsync(Guid runId, string facilityId, string reportId, CancellationToken ct = default)
     {
-        // Stop existing poller
+        // 1. Stop the existing poller FIRST so it cannot write stale domain data
+        //    after we clear snapshots. StopAsync awaits the current poll cycle, so
+        //    after this returns the old poller is guaranteed idle.
         if (_activePollers.TryRemove(runId, out var existingHandle))
         {
             await existingHandle.StopAsync();
-            _logger.LogInformation("Stopped existing poller for run {RunId} before re-registration", runId);
+            _logger.LogInformation("Stopped existing poller for run {RunId} before context switch", runId);
         }
 
-        // Clear old domain data so stale first-report data doesn't bleed through
+        // 2. Now safe to update meta and clear stale domain snapshots — no writer
+        //    can re-populate them with old-report data.
         await _store.UpdateRunMetaAsync(runId, facilityId, reportId, ct);
 
-        // The next reconciliation cycle will pick up the updated meta and start a new poller.
-        _logger.LogInformation("Updated run {RunId} to track new report {ReportId}", runId, reportId);
+        // 3. Immediately start a new poller bound to the regenerated report so the
+        //    UI doesn't have to wait up to 2s for the next reconciliation cycle.
+        var meta = new RunSnapshotMeta
+        {
+            RunId = runId,
+            FacilityId = facilityId,
+            ReportId = reportId,
+            StartedAt = DateTimeOffset.UtcNow,
+            IsActive = true
+        };
+        StartPoller(meta, ct);
+
+        _logger.LogInformation("Updated run {RunId} to track new report {ReportId} and started new poller", runId, reportId);
     }
 
     /// <summary>
@@ -145,6 +159,25 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
                 {
                     await completedHandle.StopAsync();
                     _logger.LogWarning("Restarting completed poller task for still-active run {RunId}", meta.RunId);
+                }
+            }
+
+            // If run identifiers changed (e.g., regenerate switched to a new reportId),
+            // force a poller restart so snapshots cannot oscillate between contexts.
+            if (_activePollers.TryGetValue(meta.RunId, out existingHandle)
+                && (!string.Equals(existingHandle.FacilityId, meta.FacilityId, StringComparison.Ordinal)
+                    || !string.Equals(existingHandle.ReportId, meta.ReportId, StringComparison.Ordinal)))
+            {
+                if (_activePollers.TryRemove(meta.RunId, out var staleHandle))
+                {
+                    await staleHandle.StopAsync();
+                    _logger.LogInformation(
+                        "Restarting poller for run {RunId} due to context change (facility: {OldFacility}->{NewFacility}, report: {OldReport}->{NewReport})",
+                        meta.RunId,
+                        staleHandle.FacilityId,
+                        meta.FacilityId,
+                        staleHandle.ReportId,
+                        meta.ReportId);
                 }
             }
 
@@ -215,6 +248,8 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
         IServiceScope scope,
         StoreBackedServicePoller poller)
     {
+        public string FacilityId => poller.FacilityId;
+        public string ReportId => poller.ReportId;
         public bool IsCompleted => pollerTask.IsCompleted;
 
         public Task FinalPollAsync() => poller.FinalPollAsync();

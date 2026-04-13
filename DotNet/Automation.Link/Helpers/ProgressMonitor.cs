@@ -15,6 +15,7 @@ public class ProgressMonitor
     private readonly PipelineProgressTracker? _progressTracker;
     private readonly PipelineDataReader _reader;
     private readonly LokiScraper? _lokiScraper;
+    private readonly bool _expectsDataAcquisition;
 
     private string? _lastScheduleStatus;
     private int _lastReportEntryCount;
@@ -43,6 +44,7 @@ public class ProgressMonitor
         _output = output;
         _lokiScraper = lokiScraper;
         _reader = reader;
+        _expectsDataAcquisition = expectsDataAcquisition;
         _progressTracker = expectedPatientCount > 0
             ? new PipelineProgressTracker(output, expectedPatientCount, reader, expectsDataAcquisition)
             : null;
@@ -59,7 +61,10 @@ public class ProgressMonitor
         var hasCriticalFailure = false;
 
         hasCriticalFailure |= await CheckReportProgress(facilityId, reportId);
-        hasCriticalFailure |= await CheckDataAcquisitionProgress(facilityId, reportId);
+        if (_expectsDataAcquisition)
+        {
+            hasCriticalFailure |= await CheckDataAcquisitionProgress(facilityId, reportId);
+        }
 
         if (_progressTracker != null)
         {

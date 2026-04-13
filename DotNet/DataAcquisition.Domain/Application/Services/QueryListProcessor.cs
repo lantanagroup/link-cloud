@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
@@ -219,7 +219,7 @@ public class QueryListProcessor : IQueryListProcessor
             {
                 // Reference resources are now fetched inline during normal log
                 // processing (in ProcessReferences). No separate log is needed.
-                _logger.LogDebug("Skipping separate log creation for reference query {ResourceType} � references are resolved inline.", ((ReferenceQueryConfig)queryConfig).ResourceType);
+                _logger.LogDebug("Skipping separate log creation for reference query {ResourceType} — references are resolved inline.", ((ReferenceQueryConfig)queryConfig).ResourceType);
             }
         }
 
@@ -245,7 +245,7 @@ public class QueryListProcessor : IQueryListProcessor
             FhirVersion = "R4",
             QueryPhase = QueryPhaseUtilities.ToDomain(request.QueryPlanType.ToString()),
             Status = RequestStatus.Pending,
-            ScheduledReport = scheduledReport,
+            ReportTrackingId = scheduledReport.ReportTrackingId,
             ExecutionDate = DateTime.UtcNow,
             FhirQuery = [fhirQuery],
             TraceId = traceAndSpanDelimited ?? string.Empty,

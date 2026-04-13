@@ -8,8 +8,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +18,7 @@ using Moq;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using ScheduledFrequency = LantanaGroup.Link.Shared.Application.Models.Frequency;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Services
@@ -71,7 +72,7 @@ namespace IntegrationTests.DataAcquisition.Services
             var tag = Guid.NewGuid().ToString("N");
             var facilityId = $"TestFacility_{tag}";
             var correlationId = Guid.NewGuid().ToString();
-            var reportTrackingId = $"TestReport_{tag}";
+            var reportTrackingId = Guid.NewGuid().ToString();
 
             // Pre-seed a canonical reference resource
             await refMgr.CreateBatchAsync(new[]
@@ -86,11 +87,20 @@ namespace IntegrationTests.DataAcquisition.Services
                 }
             });
 
+            dbContext.ScheduledReports.Add(new ScheduledReportEntity
+            {
+                ReportTrackingId = Guid.Parse(reportTrackingId),
+                Frequency = ScheduledFrequency.Adhoc,
+                StartDate = DateTime.UtcNow.AddDays(-1),
+                EndDate = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+
             var parentLog = await logManager.CreateAsync(new CreateDataAcquisitionLogModel
             {
                 FacilityId = facilityId,
                 CorrelationId = correlationId,
-                ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
+                ReportTrackingId = reportTrackingId,
                 QueryPhase = QueryPhase.Initial,
                 QueryType = FhirQueryType.Search,
                 Status = RequestStatus.Pending,
