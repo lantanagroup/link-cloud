@@ -62,11 +62,13 @@ if (!string.IsNullOrWhiteSpace(dataProtectionKeyRingPath))
 
 // -- Authentication / authorization --
 var enableAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+var useBearerForServiceCalls = builder.Configuration.GetValue<bool?>("Authentication:UseBearerForServiceCalls") ?? true;
 
-// Tell LinkSdk clients whether to attach bearer tokens on outbound calls.
+// Configure whether LinkSdk clients attach bearer tokens on outbound calls.
+// This is intentionally decoupled from inbound UI auth mode.
 builder.Services.Configure<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>(opts =>
 {
-    opts.AllowAnonymous = enableAnonymousAccess;
+    opts.AllowAnonymous = !useBearerForServiceCalls;
 });
 
 if (enableAnonymousAccess)
