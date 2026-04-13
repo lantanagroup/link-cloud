@@ -52,12 +52,35 @@ var dataProtectionBuilder = builder.Services
 
 if (!string.IsNullOrWhiteSpace(dataProtectionKeyRingPath))
 {
-    var effectiveKeyRingPath = Path.IsPathRooted(dataProtectionKeyRingPath)
+    var configuredKeyRingPath = Path.IsPathRooted(dataProtectionKeyRingPath)
         ? dataProtectionKeyRingPath
         : Path.Combine(builder.Environment.ContentRootPath, dataProtectionKeyRingPath);
 
-    Directory.CreateDirectory(effectiveKeyRingPath);
-    dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(effectiveKeyRingPath));
+    try
+    {
+        Directory.CreateDirectory(configuredKeyRingPath);
+
+        // Probe write access now so we fail over before runtime antiforgery/key writes.
+        var probePath = Path.Combine(configuredKeyRingPath, $".dp-write-test-{Guid.NewGuid():N}.tmp");
+        File.WriteAllText(probePath, "ok");
+        File.Delete(probePath);
+
+        dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(configuredKeyRingPath));
+    }
+    catch (Exception ex)
+    {
+        var fallbackKeyRingPath = Path.Combine(Path.GetTempPath(), "link-automation-ui-dataprotection");
+        try
+        {
+            Directory.CreateDirectory(fallbackKeyRingPath);
+            dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(fallbackKeyRingPath));
+            Console.WriteLine($"[WARN] DataProtection key ring path '{configuredKeyRingPath}' is not writable. Falling back to '{fallbackKeyRingPath}'. Error: {ex.Message}");
+        }
+        catch (Exception fallbackEx)
+        {
+            Console.WriteLine($"[WARN] Failed to configure DataProtection key persistence. Configured='{configuredKeyRingPath}', fallback='{fallbackKeyRingPath}'. Error: {fallbackEx.Message}");
+        }
+    }
 }
 
 // -- Authentication / authorization --
