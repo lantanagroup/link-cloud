@@ -94,20 +94,51 @@
     {
       "key": "InternalBlobStorage:BlobContainerName",
       "description": "The name of the blob container used for internal storage."
+    },
+    {
+      "key": "ServiceRegistry:TenantService:TenantServiceUrl",
+      "description": "The base URL for the Tenant Service."
+    },
+    {
+      "key": "ServiceRegistry:AccountServiceUrl",
+      "description": "The base URL for the Account Service."
+    },
+    {
+      "key": "ServiceRegistry:ReportServiceUrl",
+      "description": "The base URL for the Report Service."
+    },
+    {
+      "key": "ServiceRegistry:MeasureServiceUrl",
+      "description": "The base URL for the Measure Service."
+    },
+    {
+      "key": "ServiceRegistry:CensusServiceUrl",
+      "description": "The base URL for the Census Service."
+    },
+    {
+      "key": "ServiceRegistry:DataAcquisitionServiceUrl",
+      "description": "The base URL for the Data Acquisition Service."
+    },
+    {
+      "key": "ServiceRegistry:NormalizationServiceUrl",
+      "description": "The base URL for the Normalization Service."
+    },
+    {
+      "key": "ServiceRegistry:ValidationServiceUrl",
+      "description": "The base URL for the Validation Service."
+    },
+    {
+      "key": "ServiceRegistry:SubmissionServiceUrl",
+      "description": "The base URL for the Submission Service."
+    },
+    {
+      "key": "link.report.base-url",
+      "description": "The base URL for the Report Service (used by Java services)."
     }
   ],
   "services": {
-    "Account": [
-      {
-        "key": "ServiceRegistry:TenantService:TenantServiceUrl",
-        "description": "The base URL for the Tenant Service."
-      }
-    ],
+    "Account": [],
     "AdminBFF": [
-      {
-        "key": "ServiceRegistry:AccountServiceUrl",
-        "description": "The base URL for the Account Service used by the BFF."
-      },
       {
         "key": "Authentication:Schemas:Oauth2:ClientId",
         "description": "The OAuth2 client ID for the Admin BFF."
@@ -135,18 +166,38 @@
         "description": "The client ID for the Kafka connection."
       }
     ],
+    "AutomationUI": [
+      {
+        "key": "Automation:ExternalFhirServerBase",
+        "description": "The base URL for the external FHIR server used for testing."
+      },
+      {
+        "key": "Automation:InternalFhirServerBase",
+        "description": "The base URL for the internal FHIR server used for testing."
+      },
+      {
+        "key": "MongoDB:ConnectionString",
+        "description": "The MongoDB connection string for automation data."
+      },
+      {
+        "key": "MongoDB:DatabaseName",
+        "description": "The MongoDB database name for automation data."
+      }
+    ],
     "DataAcquisition": [
       {
         "key": "AcquisitionJobSettings:CronSchedule",
         "description": "The cron expression defining how often data acquisition jobs should run."
-      },
-      {
-        "key": "ServiceRegistry:TenantService:TenantServiceUrl",
-        "description": "The base URL for the Tenant Service used to validate facilities."
-      },
+      }
+    ],
+    "DataAcquisitionWorker": [
       {
         "key": "AcquisitionWorkerProcessorSettings:MaxConcurrentAcquisitions",
         "description": "The maximum number of concurrent data acquisition tasks."
+      },
+      {
+        "key": "AcquisitionWorkerProcessorSettings:WorkChannelCapacity",
+        "description": "The capacity of the internal work channel for acquisition tasks."
       }
     ],
     "Census": [
@@ -165,33 +216,16 @@
         "description": "Kafka bootstrap servers for the measure evaluation service."
       },
       {
-        "key": "link.report.base-url",
-        "description": "The base URL for the Report Service."
-      },
-      {
         "key": "authentication.authority",
         "description": "The OIDC authority URL for token validation."
       },
       {
-        "key": "internal-blob-storage:connection-string",
-        "description": "The connection string for blob storage used for internal data."
-      },
-      {
-        "key": "internal-blob-storage:blob-container-name",
-        "description": "The name of the blob container for internal measure data."
+        "key": "link.reportability-predicate",
+        "description": "Fully qualified class name of the reportability predicate to use."
       }
     ],
-    "Normalization": [
-      {
-        "key": "ServiceRegistry:TenantService:TenantServiceUrl",
-        "description": "The base URL for the Tenant Service."
-      }
-    ],
+    "Normalization": [],
     "Notification": [
-      {
-        "key": "ServiceRegistry:TenantService:TenantServiceUrl",
-        "description": "The base URL for the Tenant Service."
-      },
       {
         "key": "SmtpConnection:Host",
         "description": "The SMTP server hostname for sending notifications."
@@ -201,42 +235,12 @@
         "description": "The SMTP server port."
       }
     ],
-    "QueryDispatch": [
-      {
-        "key": "ServiceRegistry:TenantService:TenantServiceUrl",
-        "description": "The base URL for the Tenant Service."
-      }
-    ],
-    "Report": [
-      {
-        "key": "ServiceRegistry:TenantService:TenantServiceUrl",
-        "description": "The base URL for the Tenant Service."
-      },
-      {
-        "key": "InternalBlobStorage:ConnectionString",
-        "description": "The connection string for the internal Azure Blob Storage (or Azurite)."
-      },
-      {
-        "key": "InternalBlobStorage:BlobContainerName",
-        "description": "The name of the blob container used for internal storage."
-      }
-    ],
+    "QueryDispatch": [],
+    "Report": [],
     "Submission": [
-      {
-        "key": "ServiceRegistry:ReportServiceUrl",
-        "description": "The base URL for the Report Service."
-      },
       {
         "key": "SubmissionServiceConfig:SubmissionDirectory",
         "description": "The local or network path where submission files are stored."
-      },
-      {
-        "key": "InternalBlobStorage:ConnectionString",
-        "description": "The connection string for the internal Azure Blob Storage (or Azurite)."
-      },
-      {
-        "key": "InternalBlobStorage:BlobContainerName",
-        "description": "The name of the blob container used for internal storage."
       },
       {
         "key": "ExternalBlobStorage:ConnectionString",
@@ -247,12 +251,7 @@
         "description": "The name of the blob container used for external storage."
       }
     ],
-    "Tenant": [
-      {
-        "key": "ServiceRegistry:MeasureServiceUrl",
-        "description": "The base URL for the Measure Service (if applicable)."
-      }
-    ],
+    "Tenant": [],
     "Terminology": [
       {
         "key": "Terminology:Path",
@@ -289,12 +288,12 @@
         "description": "The Redis password."
       },
       {
-        "key": "internal-blob-storage:connection-string",
-        "description": "The connection string for blob storage used for internal validation data."
+        "key": "authentication.authority",
+        "description": "The OIDC authority URL for token validation."
       },
       {
-        "key": "internal-blob-storage:blob-container-name",
-        "description": "The name of the blob container for internal validation data."
+        "key": "link.terminology-service-url",
+        "description": "The base URL for the Terminology Service used for validation."
       }
     ]
   }
