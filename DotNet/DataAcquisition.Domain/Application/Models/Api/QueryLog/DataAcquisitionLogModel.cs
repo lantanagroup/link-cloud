@@ -56,7 +56,7 @@ public class DataAcquisitionLogModel
             IsCensus = log.IsCensus,
             PatientId = log.PatientId,
             ReportableEvent = log.ReportableEvent,
-            ReportTrackingId = log.ReportTrackingId != null ? log.ReportTrackingId.ToString() : null,
+            ReportTrackingId = log.ReportTrackingId?.ToString().ToLowerInvariant(),
             CorrelationId = log.CorrelationId,
             FhirVersion = log.FhirVersion,
             QueryType = log.QueryType,
@@ -101,7 +101,7 @@ public class DataAcquisitionLogModel
             ScheduledReport = log.ScheduledReportEntity != null
                 ? new ScheduledReport
                 {
-                    ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString(),
+                    ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString().ToLowerInvariant(),
                     Frequency = log.ScheduledReportEntity.Frequency,
                     StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                     EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),

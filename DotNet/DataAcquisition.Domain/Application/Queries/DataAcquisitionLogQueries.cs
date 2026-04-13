@@ -173,7 +173,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 IsCensus = l.IsCensus,
                 PatientId = l.PatientId,
                 ReportableEvent = l.ReportableEvent,
-                ReportTrackingId = l.ReportTrackingId != null ? l.ReportTrackingId.ToString() : null,
+                ReportTrackingId = l.ReportTrackingId != null ? l.ReportTrackingId.ToString().ToLower() : null,
                 CorrelationId = l.CorrelationId,
                 FhirVersion = l.FhirVersion,
                 QueryType = l.QueryType,
@@ -216,7 +216,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 Notes = null,
                 ScheduledReport = l.ScheduledReportEntity != null ? new ScheduledReport
                 {
-                    ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId.ToString(),
+                    ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
                     Frequency = l.ScheduledReportEntity.Frequency,
                     StartDate = DateTime.SpecifyKind(l.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                     EndDate = DateTime.SpecifyKind(l.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
@@ -307,7 +307,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         log.ReportableEvent,
                         ScheduledReport = log.ScheduledReportEntity != null ? new ScheduledReport
                         {
-                            ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString(),
+                            ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
                             Frequency = log.ScheduledReportEntity.Frequency,
                             StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                             EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
@@ -468,7 +468,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         RetryAttempts = log.RetryAttempts,
                         Status = log.Status,
                         IsDeleted = log.IsDeleted,
-                        ReportTrackingId = log.ReportTrackingId != null ? log.ReportTrackingId.ToString() : null
+                        ReportTrackingId = log.ReportTrackingId != null ? log.ReportTrackingId.ToString().ToLower() : null
                     };
                 }).ToList();
             }
@@ -503,7 +503,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 IsCensus = l.IsCensus,
                 PatientId = l.PatientId,
                 ReportableEvent = l.ReportableEvent,
-                ReportTrackingId = l.ReportTrackingId != null ? l.ReportTrackingId.ToString() : null,
+                ReportTrackingId = l.ReportTrackingId != null ? l.ReportTrackingId.ToString().ToLower() : null,
                 CorrelationId = l.CorrelationId,
                 FhirVersion = l.FhirVersion,
                 QueryType = l.QueryType,
@@ -895,7 +895,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         IsCensus = log.IsCensus,
                         PatientId = log.PatientId,
                         ReportableEvent = log.ReportableEvent,
-                        ReportTrackingId = log.ReportTrackingId != null ? log.ReportTrackingId.ToString() : null,
+                        ReportTrackingId = log.ReportTrackingId != null ? log.ReportTrackingId.ToString().ToLower() : null,
                         CorrelationId = log.CorrelationId,
                         FhirVersion = log.FhirVersion,
                         QueryType = log.QueryType,
@@ -910,7 +910,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         Notes = null,
                         ScheduledReport = log.ScheduledReportEntity != null ? new ScheduledReport
                         {
-                            ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString(),
+                            ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
                             Frequency = log.ScheduledReportEntity.Frequency,
                             StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                             EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),

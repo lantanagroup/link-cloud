@@ -812,7 +812,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 l.TraceId,
                 ScheduledReport = l.ScheduledReportEntity != null ? new ScheduledReport
                 {
-                    ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId.ToString(),
+                    ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
                     Frequency = l.ScheduledReportEntity.Frequency,
                     StartDate = DateTime.SpecifyKind(l.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                     EndDate = DateTime.SpecifyKind(l.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
