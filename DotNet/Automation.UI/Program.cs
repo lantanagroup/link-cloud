@@ -1,4 +1,4 @@
-﻿using Automation.UI.Services;
+using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -42,11 +42,13 @@ builder.Services.AddSingleton<ICreateSystemToken, CreateSystemToken>();
 
 // -- Authentication / authorization --
 var enableAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+var useBearerForServiceCalls = builder.Configuration.GetValue<bool?>("Authentication:UseBearerForServiceCalls") ?? true;
 
-// Tell LinkSdk clients whether to attach bearer tokens on outbound calls.
+// Configure whether LinkSdk clients attach bearer tokens on outbound calls.
+// This is intentionally decoupled from inbound UI auth mode.
 builder.Services.Configure<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>(opts =>
 {
-    opts.AllowAnonymous = enableAnonymousAccess;
+    opts.AllowAnonymous = !useBearerForServiceCalls;
 });
 
 if (enableAnonymousAccess)
@@ -93,7 +95,7 @@ else
             options.ClientSecret = oidcClientSecret;
             options.ResponseType = OpenIdConnectResponseType.Code;
             options.CallbackPath = oidcCallbackPath;
-            // Tokens are not saved in the cookie — service calls use system tokens
+            // Tokens are not saved in the cookie � service calls use system tokens
             // (ICreateSystemToken), not the user's token. Change only if user-delegated calls are added.
             options.SaveTokens = false;
             options.MapInboundClaims = false;
