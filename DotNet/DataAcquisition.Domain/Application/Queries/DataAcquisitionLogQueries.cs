@@ -173,7 +173,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 IsCensus = l.IsCensus,
                 PatientId = l.PatientId,
                 ReportableEvent = l.ReportableEvent,
-                ReportTrackingId = l.ReportTrackingId,
+                ReportTrackingId = l.ReportTrackingId != null ? l.ReportTrackingId.ToString().ToLower() : null,
                 CorrelationId = l.CorrelationId,
                 FhirVersion = l.FhirVersion,
                 QueryType = l.QueryType,
@@ -216,7 +216,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 Notes = null,
                 ScheduledReport = l.ScheduledReportEntity != null ? new ScheduledReport
                 {
-                    ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId,
+                    ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
                     Frequency = l.ScheduledReportEntity.Frequency,
                     StartDate = DateTime.SpecifyKind(l.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                     EndDate = DateTime.SpecifyKind(l.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
@@ -251,9 +251,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     !log.TailSent &&
                     log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value) &&
                     log.ReportTrackingId != null &&
-                    log.CorrelationId != null &&
-                    log.ReportStartDate != null &&
-                    log.ReportEndDate != null)
+                    log.CorrelationId != null)
                 .GroupBy(log => new
                 {
                     log.FacilityId,
@@ -264,7 +262,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 .Select(g => new
                 {
                     Key = g.Key,
-                    EarliestStart = g.Min(x => x.ReportStartDate)
+                    EarliestStart = g.Min(x => x.ScheduledReportEntity != null ? x.ScheduledReportEntity.StartDate : DateTime.MaxValue)
                 })
                 .OrderBy(x => x.EarliestStart)
                 .Take(100)
@@ -309,7 +307,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         log.ReportableEvent,
                         ScheduledReport = log.ScheduledReportEntity != null ? new ScheduledReport
                         {
-                            ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId,
+                            ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
                             Frequency = log.ScheduledReportEntity.Frequency,
                             StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                             EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
@@ -317,8 +315,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                                 ? log.ScheduledReportEntity.ReportTypes.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).ToList()
                                 : new List<string>()
                         } : null,
-                        log.ReportStartDate,
-                        log.ReportEndDate
                     })
                     .ToListAsync(cancellationToken);
 
@@ -472,7 +468,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         RetryAttempts = log.RetryAttempts,
                         Status = log.Status,
                         IsDeleted = log.IsDeleted,
-                        ReportTrackingId = log.ReportTrackingId
+                        ReportTrackingId = log.ReportTrackingId != null ? log.ReportTrackingId.ToString().ToLower() : null
                     };
                 }).ToList();
             }
@@ -507,7 +503,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 IsCensus = l.IsCensus,
                 PatientId = l.PatientId,
                 ReportableEvent = l.ReportableEvent,
-                ReportTrackingId = l.ReportTrackingId,
+                ReportTrackingId = l.ReportTrackingId != null ? l.ReportTrackingId.ToString().ToLower() : null,
                 CorrelationId = l.CorrelationId,
                 FhirVersion = l.FhirVersion,
                 QueryType = l.QueryType,
@@ -544,8 +540,13 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetDataAcquisitionLogStatisticsByReportAsync");
         activity?.SetTag(DiagnosticNames.ReportId, reportId);
 
+        if (!Guid.TryParse(reportId, out var reportTrackingIdGuid))
+        {
+            throw new ArgumentException("Report ID must be a valid GUID.", nameof(reportId));
+        }
+
         var baseQuery = _dbContext.DataAcquisitionLogs.AsNoTracking()
-            .Where(l => l.ReportTrackingId == reportId && !l.IsDeleted);
+            .Where(l => l.ReportTrackingId == reportTrackingIdGuid && !l.IsDeleted);
 
         // Scalar aggregates in a single DB pass
         var totals = await baseQuery
@@ -713,9 +714,14 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             throw new ArgumentNullException(nameof(reportId), "Report ID cannot be null or empty.");
         }
 
+        if (!Guid.TryParse(reportId, out var reportTrackingIdGuid))
+        {
+            throw new ArgumentException("Report ID must be a valid GUID.", nameof(reportId));
+        }
+
         var query = _dbContext.DataAcquisitionLogs
             .AsNoTracking()
-            .Where(log => log.ReportTrackingId == reportId);
+            .Where(log => log.ReportTrackingId == reportTrackingIdGuid);
 
         if (!string.IsNullOrWhiteSpace(patientId))
         {
@@ -753,10 +759,13 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         if (string.IsNullOrWhiteSpace(correlationId))
             throw new ArgumentNullException(nameof(correlationId), "Correlation ID cannot be null or empty.");
 
+        if (!Guid.TryParse(reportTrackingId, out var reportTrackingIdGuid))
+            throw new ArgumentException("Report Tracking ID must be a valid GUID.", nameof(reportTrackingId));
+
         return await _dbContext.DataAcquisitionLogResourceIds
             .AnyAsync(r =>
                 r.ResourceId == referenceId
-                && r.DataAcquisitionLog.ReportTrackingId == reportTrackingId
+                && r.DataAcquisitionLog.ReportTrackingId == reportTrackingIdGuid
                 && r.DataAcquisitionLog.FacilityId == facilityId
                 && r.DataAcquisitionLog.CorrelationId == correlationId,
                 cancellationToken);
@@ -798,7 +807,14 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         if (!string.IsNullOrEmpty(model.ReportTrackingId))
         {
-            query = query.Where(log => log.ReportTrackingId == model.ReportTrackingId);
+            if (Guid.TryParse(model.ReportTrackingId, out var parsedReportTrackingId))
+            {
+                query = query.Where(log => log.ReportTrackingId == parsedReportTrackingId);
+            }
+            else
+            {
+                query = query.Where(_ => false);
+            }
         }
 
         if (model.QueryPhase.HasValue)
@@ -879,7 +895,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         IsCensus = log.IsCensus,
                         PatientId = log.PatientId,
                         ReportableEvent = log.ReportableEvent,
-                        ReportTrackingId = log.ReportTrackingId,
+                        ReportTrackingId = log.ReportTrackingId != null ? log.ReportTrackingId.ToString().ToLower() : null,
                         CorrelationId = log.CorrelationId,
                         FhirVersion = log.FhirVersion,
                         QueryType = log.QueryType,
@@ -894,7 +910,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         Notes = null,
                         ScheduledReport = log.ScheduledReportEntity != null ? new ScheduledReport
                         {
-                            ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId,
+                            ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
                             Frequency = log.ScheduledReportEntity.Frequency,
                             StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                             EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),

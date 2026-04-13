@@ -1,12 +1,10 @@
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
-using LantanaGroup.Link.Shared.Application.Models;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
@@ -43,9 +41,7 @@ public class DataAcquisitionLog
 
     public long? CompletionTimeMilliseconds { get; set; }
 
-    public long? ScheduledReportId { get; set; }
-
-    [ForeignKey("ScheduledReportId")]
+    [ForeignKey("ReportTrackingId")]
     public virtual ScheduledReportEntity? ScheduledReportEntity { get; set; }
 
     public bool IsCensus { get; set; } = false;
@@ -56,12 +52,7 @@ public class DataAcquisitionLog
 
     public bool IsDeleted { get; set; } = false;
 
-    [MaxLength(128)]
-    public string? ReportTrackingId { get; set; }
-
-    public DateTime? ReportEndDate { get; set; }
-
-    public DateTime? ReportStartDate { get; set; }
+    public Guid? ReportTrackingId { get; set; }
 
     [StringLength(64)]
     public string? TraceId { get; set; }

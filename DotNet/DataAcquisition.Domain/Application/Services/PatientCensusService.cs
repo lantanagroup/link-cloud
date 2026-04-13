@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Utility;
@@ -153,7 +153,6 @@ public class PatientCensusService : IPatientCensusService
                 ExecutionDate = DateTime.UtcNow,
                 Priority = AcquisitionPriority.Normal,
                 IsCensus = true,
-                ScheduledReport = new ScheduledReport()
             };
 
             facilityConfig.EHRPatientLists.ForEach(x =>

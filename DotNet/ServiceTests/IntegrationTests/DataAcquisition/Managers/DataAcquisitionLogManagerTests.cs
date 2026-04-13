@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -9,16 +9,15 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
-using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
+using ScheduledFrequency = LantanaGroup.Link.Shared.Application.Models.Frequency;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Managers;
@@ -53,11 +52,21 @@ public class DataAcquisitionLogManagerTests
 
         var manager = CreateManager(scope);
         var queries = _fixture.ServiceProvider.CreateScope().ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        var reportTrackingId = Guid.NewGuid();
+        dbContext.ScheduledReports.Add(new ScheduledReportEntity
+        {
+            ReportTrackingId = reportTrackingId,
+            Frequency = ScheduledFrequency.Adhoc,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
         var createModel = new CreateDataAcquisitionLogModel
         {
             FacilityId = "TestFacility",
             CorrelationId = Guid.NewGuid().ToString(),
-            ScheduledReport = new ScheduledReport { ReportTrackingId = "TestReport", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
+            ReportTrackingId = reportTrackingId.ToString(),
             QueryPhase = QueryPhase.Initial,
             QueryType = FhirQueryType.Read,
             Status = RequestStatus.Pending,
@@ -114,7 +123,6 @@ public class DataAcquisitionLogManagerTests
         var createModel = new CreateDataAcquisitionLogModel()
         {
             FacilityId = null!,
-            ScheduledReport = null!,
             QueryType = FhirQueryType.Read,
             Status = RequestStatus.Pending,
             QueryPhase = QueryPhase.Initial
@@ -137,7 +145,7 @@ public class DataAcquisitionLogManagerTests
             FacilityId = "TestFacility",
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
-            ScheduledReportEntity = new ScheduledReportEntity { ReportTrackingId = "TestReport", StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
+            ScheduledReportEntity = new ScheduledReportEntity { ReportTrackingId = Guid.NewGuid(), StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
         };
         dbContext.DataAcquisitionLogs.Add(log);
         await dbContext.SaveChangesAsync();
@@ -220,10 +228,18 @@ public class DataAcquisitionLogManagerTests
         var tag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{tag}";
         var correlationId = $"TestCorr_{tag}";
-        var reportTrackingId = $"TestReport_{tag}";
+        var reportTrackingId = Guid.NewGuid();
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        dbContext.ScheduledReports.Add(new ScheduledReportEntity
+        {
+            ReportTrackingId = reportTrackingId,
+            Frequency = ScheduledFrequency.Adhoc,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        });
 
 
         var log1 = new DataAcquisitionLog
@@ -247,7 +263,7 @@ public class DataAcquisitionLogManagerTests
         var logIds = new List<long> { log1.Id, log2.Id };
 
         // Act
-        await manager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(logIds, facilityId, correlationId, reportTrackingId);
+        await manager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(logIds, facilityId, correlationId, reportTrackingId.ToString());
 
         // Assert
         using var assertScope = _fixture.ServiceProvider.CreateScope();
@@ -270,7 +286,7 @@ public class DataAcquisitionLogManagerTests
         var logIds = new List<long> { 999 };
 
         // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() => manager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(logIds, "TestFacility", "TestCorr", "TestReport"));
+        await Assert.ThrowsAsync<NotFoundException>(() => manager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(logIds, "TestFacility", "TestCorr", Guid.NewGuid().ToString()));
     }
 
     // ==================== CancelBulkAsync Tests ====================
@@ -572,8 +588,25 @@ public class DataAcquisitionLogManagerTests
         await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
 
-        var match = new DataAcquisitionLog { FacilityId = "F1", ReportTrackingId = "RPT-001", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
-        var noMatch = new DataAcquisitionLog { FacilityId = "F1", ReportTrackingId = "RPT-002", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var matchReportTrackingId = Guid.NewGuid();
+        var noMatchReportTrackingId = Guid.NewGuid();
+        dbContext.ScheduledReports.AddRange(
+            new ScheduledReportEntity
+            {
+                ReportTrackingId = matchReportTrackingId,
+                Frequency = ScheduledFrequency.Adhoc,
+                StartDate = DateTime.UtcNow.AddDays(-1),
+                EndDate = DateTime.UtcNow
+            },
+            new ScheduledReportEntity
+            {
+                ReportTrackingId = noMatchReportTrackingId,
+                Frequency = ScheduledFrequency.Adhoc,
+                StartDate = DateTime.UtcNow.AddDays(-1),
+                EndDate = DateTime.UtcNow
+            });
+        var match = new DataAcquisitionLog { FacilityId = "F1", ReportTrackingId = matchReportTrackingId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var noMatch = new DataAcquisitionLog { FacilityId = "F1", ReportTrackingId = noMatchReportTrackingId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
         dbContext.DataAcquisitionLogs.AddRange(match, noMatch);
         await dbContext.SaveChangesAsync();
 
@@ -581,7 +614,7 @@ public class DataAcquisitionLogManagerTests
 
         // Act
         var (requested, cancelled) = await manager.CancelByFilterAsync(
-            new SearchDataAcquisitionLogRequest { ReportTrackingId = "RPT-001" }, 24);
+            new SearchDataAcquisitionLogRequest { ReportTrackingId = matchReportTrackingId.ToString() }, 24);
 
         // Assert
         Assert.Equal(1, requested);

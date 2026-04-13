@@ -548,9 +548,6 @@ namespace DataAcquisition.Domain.Migrations
             migrationBuilder.DropTable(name: "DataAcquisitionLogResourceIds");
             migrationBuilder.DropTable(name: "DataAcquisitionLogNotes");
 
-            // Drop junction table
-            migrationBuilder.DropTable(name: "DataAcquisitionLogReferenceResource");
-
             // Restore ReferenceResources: unique index → non-unique, re-add FK column
             migrationBuilder.DropIndex(
                 name: "IX_ReferenceResources_Facility_Type_ResourceId",
@@ -600,6 +597,9 @@ namespace DataAcquisition.Domain.Migrations
                     GROUP BY [ReferenceResourceId]
                 ) j ON rr.[Id] = j.[ReferenceResourceId];
             ");
+
+            // Drop junction table (after data has been restored from it)
+            migrationBuilder.DropTable(name: "DataAcquisitionLogReferenceResource");
 
             // RCSI off
             migrationBuilder.Sql(@"

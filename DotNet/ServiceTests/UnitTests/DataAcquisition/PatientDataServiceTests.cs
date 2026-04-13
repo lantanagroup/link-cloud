@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
@@ -15,10 +15,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -27,6 +23,8 @@ using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Moq;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -53,6 +51,7 @@ public class PatientDataServiceTests
     private readonly Mock<IDistributedSemaphoreProvider> _mockDistributedSemaphoreProvider; // Added mock for the missing parameter
     private readonly Mock<IServiceProvider> _mockServiceProvider;
     private readonly Mock<IPatientCensusService> _mockPatientCensusService;
+    private readonly Mock<IScheduledReportManager> _mockScheduledReportManager;
 
     private readonly PatientDataService _service;
 
@@ -76,6 +75,7 @@ public class PatientDataServiceTests
         _mockDistributedSemaphoreProvider = new Mock<IDistributedSemaphoreProvider>(); // Added mock for the missing parameter
         _mockServiceProvider = new Mock<IServiceProvider>();
         _mockPatientCensusService = new Mock<IPatientCensusService>();
+        _mockScheduledReportManager = new Mock<IScheduledReportManager>();
 
         // Mock the semaphore and handle
         var mockSemaphore = new Mock<IDistributedSemaphore>();
@@ -103,7 +103,8 @@ public class PatientDataServiceTests
             _mockFhirApiService.Object,
             _mockDistributedSemaphoreProvider.Object,
             _mockServiceProvider.Object,
-            _mockPatientCensusService.Object
+            _mockPatientCensusService.Object,
+            _mockScheduledReportManager.Object
         );
     }
 
@@ -124,7 +125,7 @@ public class PatientDataServiceTests
                     Frequency = Frequency.Discharge,
                     StartDate = DateTime.UtcNow,
                     EndDate = DateTime.UtcNow.AddDays(1),
-                    ReportTrackingId = "tracking-1"
+                    ReportTrackingId = Guid.NewGuid().ToString()
                 }
             }
         };
@@ -223,7 +224,7 @@ public class PatientDataServiceTests
                     Frequency = Frequency.Discharge,
                     StartDate = DateTime.UtcNow,
                     EndDate = DateTime.UtcNow.AddDays(1),
-                    ReportTrackingId = "tracking-1"
+                    ReportTrackingId = Guid.NewGuid().ToString()
                 }
             }
         };

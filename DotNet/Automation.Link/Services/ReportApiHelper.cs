@@ -82,14 +82,14 @@ public class ReportApiHelper
         var timeoutLabel = hardTimeout == TimeSpan.MaxValue ? "no timeout" : $"hard timeout={hardTimeout.TotalSeconds:F0}s";
 
         // -------------------------------------------------------------------
-        //  Phase 1: Wait for MeasureReportsGenerated milestone
-        //  The pipeline must complete DA → Normalization → MeasureEval before
-        //  submission can happen. Do not burn submission poll retries before
-        //  this milestone is reached.
+        //  Phase 1: Wait for ReportEntriesCreated milestone
+        //  Start schedule polling as soon as report entries exist, instead of
+        //  waiting for downstream milestones that can be noisy during
+        //  regenerate/no-data-acquisition scenarios.
         // -------------------------------------------------------------------
         if (diagnostics != null)
         {
-            var milestoneToAwait = "MeasureReportsGenerated";
+            var milestoneToAwait = "ReportEntriesCreated";
             _output.WriteLine($"Waiting for pipeline milestone '{milestoneToAwait}' before polling submission (reportId={reportId}, {timeoutLabel})...");
 
             var milestoneReached = false;

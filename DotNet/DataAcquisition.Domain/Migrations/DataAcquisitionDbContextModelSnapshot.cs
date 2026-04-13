@@ -635,24 +635,14 @@ namespace DataAcquisition.Domain.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
-                    b.Property<DateTime?>("ReportEndDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("ReportStartDate")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("ReportTrackingId")
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                    b.Property<Guid?>("ReportTrackingId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<int?>("ReportableEvent")
                         .HasColumnType("int");
 
                     b.Property<int?>("RetryAttempts")
                         .HasColumnType("int");
-
-                    b.Property<long?>("ScheduledReportId")
-                        .HasColumnType("bigint");
 
                     b.Property<int?>("SiblingCount")
                         .HasColumnType("int");
@@ -674,7 +664,8 @@ namespace DataAcquisition.Domain.Migrations
                         .HasDatabaseName("IX_DataAcquisitionLogs_FacilityId_IsDeleted")
                         .HasFilter("[IsDeleted] = 1");
 
-                    b.HasIndex("ScheduledReportId");
+                    b.HasIndex("ReportTrackingId")
+                        .HasDatabaseName("IX_DataAcquisitionLog_ReportTrackingId");
 
                     b.HasIndex("ExecutionDate", "Id")
                         .IsDescending()
@@ -702,9 +693,19 @@ namespace DataAcquisition.Domain.Migrations
                         .HasDatabaseName("IX_DataAcquisitionLogs_InlineTail")
                         .HasFilter("[TailSent] = 0 AND [SiblingCount] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [QueryPhase] IS NOT NULL");
 
-                    b.HasIndex("TailSent", "FacilityId", "ReportTrackingId", "CorrelationId", "ReportStartDate", "ReportEndDate", "QueryPhase")
+                    b.HasIndex("TailSent", "FacilityId", "ReportTrackingId", "CorrelationId", "QueryPhase")
                         .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
-                        .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [ReportStartDate] IS NOT NULL AND [ReportEndDate] IS NOT NULL");
+                        .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TailSent", "Status"), new[] { "FacilityId", "ReportTrackingId", "CorrelationId", "QueryPhase", "TraceId", "PatientId", "ReportableEvent" });
+
+                    b.HasIndex("TailSent", "Status")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_TailSent_Status");
+
+                    b.HasIndex("IsDeleted", "Id")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_IsDeleted_Id");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("IsDeleted", "Id"), new[] { "Priority", "FacilityId", "PatientId", "ReportTrackingId", "FhirVersion", "QueryType", "QueryPhase", "ExecutionDate", "CreateDate", "RetryAttempts", "Status" });
 
                     b.ToTable("DataAcquisitionLog");
                 });
@@ -1040,11 +1041,9 @@ namespace DataAcquisition.Domain.Migrations
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ScheduledReportEntity", b =>
                 {
-                    b.Property<long>("Id")
+                    b.Property<Guid>("ReportTrackingId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
@@ -1056,11 +1055,6 @@ namespace DataAcquisition.Domain.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("ReportTrackingId")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
                     b.Property<string>("ReportTypes")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
@@ -1068,11 +1062,7 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("datetime2");
 
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReportTrackingId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_ScheduledReports_ReportTrackingId");
+                    b.HasKey("ReportTrackingId");
 
                     b.ToTable("ScheduledReports");
                 });
@@ -1266,7 +1256,8 @@ namespace DataAcquisition.Domain.Migrations
                 {
                     b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ScheduledReportEntity", "ScheduledReportEntity")
                         .WithMany("DataAcquisitionLogs")
-                        .HasForeignKey("ScheduledReportId");
+                        .HasForeignKey("ReportTrackingId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("ScheduledReportEntity");
                 });
