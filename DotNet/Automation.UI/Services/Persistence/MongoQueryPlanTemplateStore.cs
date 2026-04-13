@@ -1,5 +1,4 @@
 ﻿using System.Text.Json;
-using System.Text.Json;
 using Automation.UI.Models;
 using MongoDB.Driver;
 
@@ -24,6 +23,7 @@ public sealed class MongoQueryPlanTemplateStore : IQueryPlanTemplateStore
         var docs = await _collection.Find(FilterDefinition<QueryPlanTemplateDocument>.Empty)
             .SortBy(d => d.Name)
             .ToListAsync(ct);
+
         return docs.Select(ToModel).ToList();
     }
 
