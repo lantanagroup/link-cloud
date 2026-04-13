@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -12,12 +12,12 @@ namespace DataAcquisition.Domain.Migrations
     /// 
     /// Net schema changes from the pre-branch baseline:
     /// 
-    ///  1. RCSI — Enable Read Committed Snapshot Isolation (eliminates reader/writer deadlocks).
-    ///  2. ScheduledReports — Normalise ScheduledReport JSON → dedicated table + FK on DataAcquisitionLog.
-    ///  3. DataAcquisitionLogNotes — Normalise Notes JSON → dedicated child table.
-    ///  4. DataAcquisitionLogResourceIds — Normalise ResourceAcquiredIds JSON → dedicated child table.
-    ///  5. ReferenceResources — Max-length columns, unique composite index, remove DataAcquisitionLogId FK.
-    ///  6. DataAcquisitionLogReferenceResource — Junction table for the many-to-many relationship.
+    ///  1. RCSI � Enable Read Committed Snapshot Isolation (eliminates reader/writer deadlocks).
+    ///  2. ScheduledReports � Normalise ScheduledReport JSON ? dedicated table + FK on DataAcquisitionLog.
+    ///  3. DataAcquisitionLogNotes � Normalise Notes JSON ? dedicated child table.
+    ///  4. DataAcquisitionLogResourceIds � Normalise ResourceAcquiredIds JSON ? dedicated child table.
+    ///  5. ReferenceResources � Max-length columns, unique composite index, remove DataAcquisitionLogId FK.
+    ///  6. DataAcquisitionLogReferenceResource � Junction table for the many-to-many relationship.
     ///  7. SiblingCount column + IX_DataAcquisitionLogs_InlineTail index.
     ///  8. New performance indexes on DataAcquisitionLog.
     ///  9. Rebuild existing covering indexes to exclude the dropped columns.
@@ -28,9 +28,9 @@ namespace DataAcquisition.Domain.Migrations
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
             // 1. RCSI
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
             migrationBuilder.Sql(@"
                 DECLARE @dbname NVARCHAR(256) = DB_NAME();
                 DECLARE @sql NVARCHAR(MAX) = 
@@ -38,9 +38,9 @@ namespace DataAcquisition.Domain.Migrations
                 EXEC sp_executesql @sql;
             ", suppressTransaction: true);
 
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
             // 2. ScheduledReports table + FK on DataAcquisitionLog
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
             migrationBuilder.CreateTable(
                 name: "ScheduledReports",
                 columns: table => new
@@ -100,9 +100,9 @@ namespace DataAcquisition.Domain.Migrations
                 WHERE dal.[ScheduledReport] IS NOT NULL;
             ");
 
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
             // 3. DataAcquisitionLogNotes table
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
             migrationBuilder.CreateTable(
                 name: "DataAcquisitionLogNotes",
                 columns: table => new
@@ -129,7 +129,7 @@ namespace DataAcquisition.Domain.Migrations
                 table: "DataAcquisitionLogNotes",
                 column: "DataAcquisitionLogId");
 
-            // Migrate Notes JSON → child rows
+            // Migrate Notes JSON ? child rows
             migrationBuilder.Sql(@"
                 IF COL_LENGTH('DataAcquisitionLog', 'Notes') IS NOT NULL
                 BEGIN
@@ -141,9 +141,9 @@ namespace DataAcquisition.Domain.Migrations
                 END
             ");
 
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
             // 4. DataAcquisitionLogResourceIds table
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
             migrationBuilder.CreateTable(
                 name: "DataAcquisitionLogResourceIds",
                 columns: table => new
@@ -170,7 +170,7 @@ namespace DataAcquisition.Domain.Migrations
                 table: "DataAcquisitionLogResourceIds",
                 column: "DataAcquisitionLogId");
 
-            // Migrate ResourceAcquiredIds JSON → child rows
+            // Migrate ResourceAcquiredIds JSON ? child rows
             migrationBuilder.Sql(@"
                 IF COL_LENGTH('DataAcquisitionLog', 'ResourceAcquiredIds') IS NOT NULL
                 BEGIN
@@ -184,18 +184,18 @@ namespace DataAcquisition.Domain.Migrations
                 END
             ");
 
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
             // 5. SiblingCount column
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
             migrationBuilder.AddColumn<int>(
                 name: "SiblingCount",
                 table: "DataAcquisitionLog",
                 type: "int",
                 nullable: true);
 
-            // ═══════════════════════════════════════════════════════════════
-            // 6. ReferenceResources — max-length columns, unique index, junction table
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
+            // 6. ReferenceResources � max-length columns, unique index, junction table
+            // ???????????????????????????????????????????????????????????????
 
             // 6a. Alter columns from nvarchar(max) to bounded lengths
             migrationBuilder.AlterColumn<string>(
@@ -313,16 +313,81 @@ namespace DataAcquisition.Domain.Migrations
                 END
             ");
 
+            // 6e. Safety dedupe for legacy duplicate ReferenceResources rows.
+            //     Keep one row per (FacilityId, ResourceType, ResourceId), re-point junction rows,
+            //     then remove duplicates before creating the unique index.
+            migrationBuilder.Sql(@"
+                IF EXISTS (
+                    SELECT 1
+                    FROM [ReferenceResources]
+                    GROUP BY [FacilityId], [ResourceType], [ResourceId]
+                    HAVING COUNT(*) > 1)
+                BEGIN
+                    IF OBJECT_ID('tempdb..#ReferenceResourceDedupMap') IS NOT NULL
+                        DROP TABLE #ReferenceResourceDedupMap;
+
+                    ;WITH Ranked AS (
+                        SELECT
+                            rr.[Id],
+                            rr.[FacilityId],
+                            rr.[ResourceType],
+                            rr.[ResourceId],
+                            ROW_NUMBER() OVER (
+                                PARTITION BY rr.[FacilityId], rr.[ResourceType], rr.[ResourceId]
+                                ORDER BY rr.[CreateDate] ASC, rr.[Id] ASC
+                            ) AS rn,
+                            MIN(rr.[Id]) OVER (
+                                PARTITION BY rr.[FacilityId], rr.[ResourceType], rr.[ResourceId]
+                            ) AS [KeeperId]
+                        FROM [ReferenceResources] rr
+                    )
+                    SELECT
+                        r.[Id] AS [DuplicateId],
+                        r.[KeeperId]
+                    INTO #ReferenceResourceDedupMap
+                    FROM Ranked r
+                    WHERE r.rn > 1;
+
+                    IF OBJECT_ID('DataAcquisitionLogReferenceResource') IS NOT NULL
+                    BEGIN
+                        -- Remove rows that would violate the PK after remap.
+                        DELETE dalrr
+                        FROM [DataAcquisitionLogReferenceResource] dalrr
+                        INNER JOIN #ReferenceResourceDedupMap m
+                            ON dalrr.[ReferenceResourceId] = m.[DuplicateId]
+                        WHERE EXISTS (
+                            SELECT 1
+                            FROM [DataAcquisitionLogReferenceResource] existing
+                            WHERE existing.[DataAcquisitionLogId] = dalrr.[DataAcquisitionLogId]
+                              AND existing.[ReferenceResourceId] = m.[KeeperId]
+                        );
+
+                        -- Remap remaining duplicate references to the keeper row.
+                        UPDATE dalrr
+                        SET dalrr.[ReferenceResourceId] = m.[KeeperId]
+                        FROM [DataAcquisitionLogReferenceResource] dalrr
+                        INNER JOIN #ReferenceResourceDedupMap m
+                            ON dalrr.[ReferenceResourceId] = m.[DuplicateId];
+                    END
+
+                    -- Remove duplicate rows from ReferenceResources.
+                    DELETE rr
+                    FROM [ReferenceResources] rr
+                    INNER JOIN #ReferenceResourceDedupMap m
+                        ON rr.[Id] = m.[DuplicateId];
+                END
+            ");
+
             migrationBuilder.CreateIndex(
                 name: "IX_ReferenceResources_Facility_Type_ResourceId",
                 table: "ReferenceResources",
                 columns: new[] { "FacilityId", "ResourceType", "ResourceId" },
                 unique: true);
 
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
             // 7. Drop old JSON columns and rebuild all affected indexes
-            //    Order: drop indexes → drop columns → recreate indexes
-            // ═══════════════════════════════════════════════════════════════
+            //    Order: drop indexes ? drop columns ? recreate indexes
+            // ???????????????????????????????????????????????????????????????
 
             // 7a. Drop existing indexes that include any of the columns being removed
             migrationBuilder.Sql(@"
@@ -382,13 +447,13 @@ namespace DataAcquisition.Domain.Migrations
                 END
             ");
 
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
             // 8. Recreate / create all indexes on DataAcquisitionLog
             //    (now that all columns are in their final state)
-            // ═══════════════════════════════════════════════════════════════
+            // ???????????????????????????????????????????????????????????????
 
             // 8a. IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id
-            //     — no ScheduledReport, Notes, or ResourceAcquiredIds in INCLUDE
+            //     � no ScheduledReport, Notes, or ResourceAcquiredIds in INCLUDE
             migrationBuilder.CreateIndex(
                 name: "IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id",
                 table: "DataAcquisitionLog",
@@ -409,7 +474,7 @@ namespace DataAcquisition.Domain.Migrations
                     "PatientId", "Status", "RetryAttempts", "CompletionTimeMilliseconds"
                 });
 
-            // 8c. IX_DataAcquisitionLogs_IsDeleted_Id (new — default UI pagination)
+            // 8c. IX_DataAcquisitionLogs_IsDeleted_Id (new � default UI pagination)
             migrationBuilder.CreateIndex(
                 name: "IX_DataAcquisitionLogs_IsDeleted_Id",
                 table: "DataAcquisitionLog",
@@ -420,7 +485,7 @@ namespace DataAcquisition.Domain.Migrations
                     "ExecutionDate", "CreateDate", "RetryAttempts", "Status"
                 });
 
-            // 8d. IX_DataAcquisitionLogs_TailSent_Status (new — tailing query)
+            // 8d. IX_DataAcquisitionLogs_TailSent_Status (new � tailing query)
             migrationBuilder.CreateIndex(
                 name: "IX_DataAcquisitionLogs_TailSent_Status",
                 table: "DataAcquisitionLog",
@@ -431,7 +496,7 @@ namespace DataAcquisition.Domain.Migrations
                     "TraceId", "PatientId", "ReportableEvent", "ScheduledReportId"
                 });
 
-            // 8e. IX_DataAcquisitionLogs_InlineTail (new — inline tail completion check)
+            // 8e. IX_DataAcquisitionLogs_InlineTail (new � inline tail completion check)
             migrationBuilder.CreateIndex(
                 name: "IX_DataAcquisitionLogs_InlineTail",
                 table: "DataAcquisitionLog",
@@ -455,7 +520,7 @@ namespace DataAcquisition.Domain.Migrations
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            // ── Reverse order ──
+            // ?? Reverse order ??
 
             // Drop FK and new indexes
             migrationBuilder.DropForeignKey(
@@ -548,7 +613,7 @@ namespace DataAcquisition.Domain.Migrations
             migrationBuilder.DropTable(name: "DataAcquisitionLogResourceIds");
             migrationBuilder.DropTable(name: "DataAcquisitionLogNotes");
 
-            // Restore ReferenceResources: unique index → non-unique, re-add FK column
+            // Restore ReferenceResources: unique index ? non-unique, re-add FK column
             migrationBuilder.DropIndex(
                 name: "IX_ReferenceResources_Facility_Type_ResourceId",
                 table: "ReferenceResources");

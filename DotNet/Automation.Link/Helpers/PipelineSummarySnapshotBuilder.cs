@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
@@ -311,27 +311,12 @@ public class PipelineSummarySnapshotBuilder
         var dataAcqComplete = dataAcqExplicitlyComplete || dataAcqImplicitlyComplete;
         var measureComplete = measureResources > 0;
 
-        var hasValidationOutcome = entries.Any(e =>
-            string.Equals(e.ReportingStatus, "PassedValidation", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(e.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase));
-
-        var allEntriesValidationTerminal = entries.Count > 0 && entries.All(e =>
-            string.Equals(e.ReportingStatus, "PassedValidation", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(e.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(e.ReportingStatus, "NotReportable", StringComparison.OrdinalIgnoreCase));
-
-        var onlyNotReportable = entries.Count > 0 && entries.All(e =>
-            string.Equals(e.ReportingStatus, "NotReportable", StringComparison.OrdinalIgnoreCase));
-
-        var validationValidatorRan = snapshot.ValidatorResults.Any(v =>
-            v.Name.Contains("VALIDATION RESULTS", StringComparison.OrdinalIgnoreCase));
-
-        var dataAcquisitionStillActive = snapshot.DataAcquisition.StatusCounts.Any(s =>
-            s.Count > 0 && IsActiveAcquisitionStatus(s.Status));
-
-        var validationComplete = allEntriesValidationTerminal
-            && (hasValidationOutcome || onlyNotReportable || validationValidatorRan)
-            && !dataAcquisitionStillActive;
+        // Validation completion is inferred from resource reconciliation:
+        // once measure reports are generated and the report/validation resource
+        // count has caught up to MeasureEval's resource count, validation has
+        // completed processing for this run.
+        var validationComplete = measureComplete
+            && validationResources == measureResources;
 
         var submitted = string.Equals(scheduleStatus, "Submitted", StringComparison.OrdinalIgnoreCase);
         var effectiveValidatorResults = snapshot.ValidatorResults

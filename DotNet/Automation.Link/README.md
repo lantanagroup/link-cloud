@@ -1,5 +1,4 @@
 # Automation.Link
-# Automation.Link
 
 `Automation.Link` is the Link-specific orchestration and validation layer that turns the platform-agnostic `Automation` engine into a full end-to-end Link pipeline runner.
 
@@ -24,9 +23,9 @@ Think of `Automation` as the simulator and `Automation.Link` as the conductor + 
 
 ```
 Automation.Link
-|-- references Automation (generation, manifests, base helpers, config base classes)
-|-- references LinkSdk (service clients used for orchestration)
-`-- references Shared (domain models, enums, integration contracts)
+??? references Automation (generation, manifests, base helpers, config base classes)
+??? references LinkSdk (service clients used for orchestration)
+??? references Shared (domain models, enums, integration contracts)
 ```
 
 ---
@@ -93,7 +92,7 @@ Typical host-driven flow (`BackendE2ETests` or `Automation.UI`) composed through
   - `ProgressProbe`: runs `ProgressMonitor` and stall detection
   - `MilestoneProbe`: runs `MilestoneValidationOrchestrator`
 - `ProgressMonitor` + `PipelineProgressTracker`
-  - compute coarse progress across DA -> MeasureEval -> Validation -> Submission
+  - compute coarse progress across DA ? MeasureEval ? Validation ? Submission
   - identify stalled stage and stall duration
   - write human-readable diagnostics with status breakdowns
 - `LokiScraper` / `KafkaErrorMonitor`
@@ -216,8 +215,8 @@ Each validator is focused on one service boundary but shares a common goal: prov
 
 Primary consumers:
 
-- `Tests/BackendE2ETests` - CI/E2E orchestration host
-- `DotNet/Automation.UI` - interactive Razor-based run management host
+- `Tests/BackendE2ETests` — CI/E2E orchestration host
+- `DotNet/Automation.UI` — interactive Razor-based run management host
 
 ---
 

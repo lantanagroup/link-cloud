@@ -1,4 +1,4 @@
-﻿using Automation.UI.Models;
+using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link;
@@ -204,7 +204,7 @@ public class AutomationRunManager : IAutomationRunManager
 
     public async Task<PipelineSummarySnapshotBuilder.PipelineSummarySnapshot?> GetPipelineSnapshotAsync(Guid runId, CancellationToken cancellationToken = default)
     {
-        // Always read from Mongo — the poller writes domain data there,
+        // Always read from Mongo � the poller writes domain data there,
         // and logs are persisted as they're written. One data flow, no branching.
         var summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
 
@@ -340,7 +340,7 @@ public class AutomationRunManager : IAutomationRunManager
             List<string> expectedSubmittedPatientIds;
 
             // Use the first measure for generation context (profile-driven generation picks
-            // the most restrictive measure — patients qualifying for all measures must meet
+            // the most restrictive measure � patients qualifying for all measures must meet
             // the criteria of each). For multi-measure, GenerateWithProfiles handles the union.
             var primaryMeasure = state.Options.SelectedMeasures[0];
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
@@ -455,13 +455,13 @@ public class AutomationRunManager : IAutomationRunManager
                     throw new InvalidOperationException($"Expected report with id {reportId} to be submitted but it was not.");
             }
 
-            // ── RegenerateReport: the first report is just a prerequisite.
+            // ?? RegenerateReport: the first report is just a prerequisite.
             // Now trigger regeneration and track the *new* report through the full pipeline.
             if (state.Options.ReportMethod == ReportMethod.RegenerateReport)
             {
-                output.WriteLine("═══════════════════════════════════════════════════════════════");
+                output.WriteLine("???????????????????????????????????????????????????????????????");
                 output.WriteLine("Initial report submitted. Beginning REGENERATION phase...");
-                output.WriteLine("═══════════════════════════════════════════════════════════════");
+                output.WriteLine("???????????????????????????????????????????????????????????????");
 
                 // Flush stale domain data so the regenerated report starts fresh.
                 services.GetRequiredService<PipelineDataReader>().InvalidateCache();
@@ -516,7 +516,7 @@ public class AutomationRunManager : IAutomationRunManager
             // Flush stale cache from diagnostics polling so validators read authoritative data.
             services.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
-            // Regeneration reuses prior data acquisition — no new DA logs exist for the regenerated report.
+            // Regeneration reuses prior data acquisition � no new DA logs exist for the regenerated report.
             var expectDataAcquisitionData = state.Options.ReportMethod != ReportMethod.RegenerateReport;
 
             // Build the concrete generation manifest when profiles are available.
@@ -646,7 +646,6 @@ public class AutomationRunManager : IAutomationRunManager
                 var cfg = sp.GetRequiredService<AutomationConfig>();
                 return new FhirDataLoader(cfg.ExternalFhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
             })
-            .AddSingleton(sp => new LantanaGroup.Link.Automation.Link.Helpers.DatabaseConnectionFactory(sp.GetRequiredService<AutomationConfig>().Database))
             .AddSingleton<PipelineDataReader>();
 
         services.AddTransient<ValidationApiHelper>();
@@ -738,7 +737,7 @@ public class AutomationRunManager : IAutomationRunManager
                 ? [request.SelectedMeasure.Value]
                 : effectiveMeasures;
 
-        // Always expand profiles from cohorts — cohorts are the single source of truth.
+        // Always expand profiles from cohorts � cohorts are the single source of truth.
         profiles = ExpandProfilesFromCohorts(cohorts, request.Seed ?? defaults.Seed);
 
         return defaults with
