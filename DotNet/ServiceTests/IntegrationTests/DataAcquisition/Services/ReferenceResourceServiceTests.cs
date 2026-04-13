@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -85,6 +86,15 @@ namespace IntegrationTests.DataAcquisition.Services
                     QueryPhase = QueryPhase.Referential
                 }
             });
+
+            dbContext.ScheduledReports.Add(new ScheduledReportEntity
+            {
+                ReportTrackingId = Guid.Parse(reportTrackingId),
+                Frequency = Frequency.Adhoc,
+                StartDate = DateTime.UtcNow.AddDays(-1),
+                EndDate = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
 
             var parentLog = await logManager.CreateAsync(new CreateDataAcquisitionLogModel
             {

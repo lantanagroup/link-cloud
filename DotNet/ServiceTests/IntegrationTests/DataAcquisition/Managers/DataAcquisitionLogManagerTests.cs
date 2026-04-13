@@ -53,11 +53,21 @@ public class DataAcquisitionLogManagerTests
 
         var manager = CreateManager(scope);
         var queries = _fixture.ServiceProvider.CreateScope().ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        var reportTrackingId = Guid.NewGuid();
+        dbContext.ScheduledReports.Add(new ScheduledReportEntity
+        {
+            ReportTrackingId = reportTrackingId,
+            Frequency = Frequency.Adhoc,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
         var createModel = new CreateDataAcquisitionLogModel
         {
             FacilityId = "TestFacility",
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReport",
+            ReportTrackingId = reportTrackingId.ToString(),
             QueryPhase = QueryPhase.Initial,
             QueryType = FhirQueryType.Read,
             Status = RequestStatus.Pending,
@@ -223,6 +233,14 @@ public class DataAcquisitionLogManagerTests
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        dbContext.ScheduledReports.Add(new ScheduledReportEntity
+        {
+            ReportTrackingId = reportTrackingId,
+            Frequency = Frequency.Adhoc,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        });
 
 
         var log1 = new DataAcquisitionLog
@@ -573,6 +591,21 @@ public class DataAcquisitionLogManagerTests
 
         var matchReportTrackingId = Guid.NewGuid();
         var noMatchReportTrackingId = Guid.NewGuid();
+        dbContext.ScheduledReports.AddRange(
+            new ScheduledReportEntity
+            {
+                ReportTrackingId = matchReportTrackingId,
+                Frequency = Frequency.Adhoc,
+                StartDate = DateTime.UtcNow.AddDays(-1),
+                EndDate = DateTime.UtcNow
+            },
+            new ScheduledReportEntity
+            {
+                ReportTrackingId = noMatchReportTrackingId,
+                Frequency = Frequency.Adhoc,
+                StartDate = DateTime.UtcNow.AddDays(-1),
+                EndDate = DateTime.UtcNow
+            });
         var match = new DataAcquisitionLog { FacilityId = "F1", ReportTrackingId = matchReportTrackingId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
         var noMatch = new DataAcquisitionLog { FacilityId = "F1", ReportTrackingId = noMatchReportTrackingId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
         dbContext.DataAcquisitionLogs.AddRange(match, noMatch);
