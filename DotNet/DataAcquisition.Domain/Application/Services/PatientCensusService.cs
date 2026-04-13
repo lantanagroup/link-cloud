@@ -153,7 +153,6 @@ public class PatientCensusService : IPatientCensusService
                 ExecutionDate = DateTime.UtcNow,
                 Priority = AcquisitionPriority.Normal,
                 IsCensus = true,
-                ScheduledReport = null
             };
 
             facilityConfig.EHRPatientLists.ForEach(x =>

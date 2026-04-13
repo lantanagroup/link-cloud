@@ -82,37 +82,15 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, model.CorrelationId);
 
-        ScheduledReportEntity? scheduledReportEntity = null;
-        var reportTrackingId = model.ScheduledReport?.ReportTrackingId;
-
-        if (!string.IsNullOrWhiteSpace(reportTrackingId))
+        Guid? reportTrackingId = null;
+        if (!string.IsNullOrWhiteSpace(model.ReportTrackingId))
         {
-            // Find-or-create the normalised ScheduledReportEntity row.
-            scheduledReportEntity = await _dbContext.ScheduledReports
-                .FirstOrDefaultAsync(
-                    sr => sr.ReportTrackingId == reportTrackingId,
-                    cancellationToken);
-
-            if (scheduledReportEntity == null)
+            if (!Guid.TryParse(model.ReportTrackingId, out var parsedReportTrackingId))
             {
-                scheduledReportEntity = new ScheduledReportEntity
-                {
-                    ReportTrackingId = reportTrackingId,
-                    Frequency = model.ScheduledReport!.Frequency,
-                    StartDate = model.ScheduledReport.StartDate,
-                    EndDate = model.ScheduledReport.EndDate,
-                    ReportTypes = model.ScheduledReport.ReportTypes != null
-                        ? string.Join(",", model.ScheduledReport.ReportTypes)
-                        : null,
-                    CreateDate = DateTime.UtcNow,
-                };
-                _dbContext.ScheduledReports.Add(scheduledReportEntity);
-                await _dbContext.SaveChangesAsync(cancellationToken);
+                throw new ArgumentException("ReportTrackingId must be a valid GUID.", nameof(model.ReportTrackingId));
             }
-        }
-        else if (!model.IsCensus)
-        {
-            throw new ArgumentNullException("Required property ScheduledReport.ReportTrackingId must not be null or empty for non-census logs");
+
+            reportTrackingId = parsedReportTrackingId;
         }
 
         var log = new DataAcquisitionLog
@@ -145,12 +123,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                     ResourceType = r.ResourceType,
                 }).ToList()
             }).ToList(),
-            ScheduledReportId = scheduledReportEntity?.Id,
             CompletionDate = null,
             CompletionTimeMilliseconds = null,
-            ReportTrackingId = model.ScheduledReport?.ReportTrackingId,
-            ReportStartDate = model.ScheduledReport?.StartDate,
-            ReportEndDate = model.ScheduledReport?.EndDate,
+            ReportTrackingId = reportTrackingId,
             ExecutionDate = model.ExecutionDate,
             CorrelationId = model.CorrelationId,
             TraceId = model.TraceId,
@@ -270,13 +245,18 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             throw new ArgumentNullException(nameof(reportTrackingId), "Report tracking ID cannot be null or empty.");
         }
 
+        if (!Guid.TryParse(reportTrackingId, out var reportTrackingGuid))
+        {
+            throw new ArgumentException("Report tracking ID must be a valid GUID.", nameof(reportTrackingId));
+        }
+
         int totalUpdated = 0;
         int updated;
 
         do
         {
             updated = await _dbContext.DataAcquisitionLogs
-                .Where(l => l.ReportTrackingId == reportTrackingId && !l.IsDeleted)
+                .Where(l => l.ReportTrackingId == reportTrackingGuid && !l.IsDeleted)
                 .Take(SoftDeleteBatchSize)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(l => l.IsDeleted, true)
@@ -300,13 +280,18 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             throw new ArgumentNullException(nameof(reportTrackingId), "Report tracking ID cannot be null or empty.");
         }
 
+        if (!Guid.TryParse(reportTrackingId, out var reportTrackingGuid))
+        {
+            throw new ArgumentException("Report tracking ID must be a valid GUID.", nameof(reportTrackingId));
+        }
+
         int totalUpdated = 0;
         int updated;
 
         do
         {
             updated = await _dbContext.DataAcquisitionLogs
-                .Where(l => l.ReportTrackingId == reportTrackingId && l.IsDeleted)
+                .Where(l => l.ReportTrackingId == reportTrackingGuid && l.IsDeleted)
                 .Take(SoftDeleteBatchSize)
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(l => l.IsDeleted, false)
@@ -472,7 +457,16 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             query = query.Where(l => l.PatientId == filter.PatientId);
 
         if (!string.IsNullOrEmpty(filter.ReportTrackingId))
-            query = query.Where(l => l.ReportTrackingId == filter.ReportTrackingId);
+        {
+            if (Guid.TryParse(filter.ReportTrackingId, out var filterReportTrackingGuid))
+            {
+                query = query.Where(l => l.ReportTrackingId == filterReportTrackingGuid);
+            }
+            else
+            {
+                query = query.Where(_ => false);
+            }
+        }
 
         if (!string.IsNullOrEmpty(filter.ResourceId))
             query = query.Where(l => l.ResourceIds.Any(r => r.ResourceId == filter.ResourceId));
@@ -539,13 +533,18 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
         activity?.SetTag(DiagnosticNames.ReportTrackingId, reportTrackingId);
 
+        if (!Guid.TryParse(reportTrackingId, out var reportTrackingGuid))
+        {
+            throw new ArgumentException("Report tracking ID must be a valid GUID.", nameof(reportTrackingId));
+        }
+
         if (logIds == null || logIds.Count == 0) return;
 
         var updated = await _dbContext.DataAcquisitionLogs
             .Where(l => logIds.Contains(l.Id)
                 && l.FacilityId == facilityId
                 && l.CorrelationId == correlationId
-                && l.ReportTrackingId == reportTrackingId)
+                && l.ReportTrackingId == reportTrackingGuid)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(l => l.TailSent, true)
                 .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
@@ -806,7 +805,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 l.TraceId,
                 ScheduledReport = l.ScheduledReportEntity != null ? new ScheduledReport
                 {
-                    ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId,
+                    ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId.ToString(),
                     Frequency = l.ScheduledReportEntity.Frequency,
                     StartDate = DateTime.SpecifyKind(l.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                     EndDate = DateTime.SpecifyKind(l.ScheduledReportEntity.EndDate, DateTimeKind.Utc),

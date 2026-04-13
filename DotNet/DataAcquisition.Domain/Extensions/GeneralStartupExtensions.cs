@@ -241,6 +241,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
         services.AddTransient<IFhirQueryManager, FhirQueryManager>();
         services.AddTransient<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
+        services.AddTransient<IScheduledReportManager, ScheduledReportManager>();
         services.AddTransient<ISftpAcquisitionLogManager, SftpAcquisitionLogManager>();
         services.AddTransient<ISftpConfigurationManager, SftpConfigurationManager>();
     }

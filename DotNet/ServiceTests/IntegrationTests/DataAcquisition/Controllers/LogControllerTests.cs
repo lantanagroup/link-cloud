@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Controllers;
+﻿using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
@@ -52,7 +52,7 @@ public class LogControllerTests
         // Arrange
         var tag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{tag}";
-        var reportTrackingId = $"TestReportId_{tag}";
+        var reportTrackingId = Guid.NewGuid();
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -66,8 +66,6 @@ public class LogControllerTests
             CorrelationId = Guid.NewGuid().ToString(),
             ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
             QueryPhase = QueryPhase.Initial,
             Priority = AcquisitionPriority.Normal
         };

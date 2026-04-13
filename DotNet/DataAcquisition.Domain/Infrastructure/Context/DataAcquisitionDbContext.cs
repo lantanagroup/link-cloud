@@ -1,4 +1,4 @@
-using AppAny.Quartz.EntityFrameworkCore.Migrations;
+﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
@@ -161,6 +161,12 @@ public class DataAcquisitionDbContext : DbContext
                 .HasPrincipalKey(x => x.Id)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            entity.HasOne(x => x.ScheduledReportEntity)
+                .WithMany(x => x.DataAcquisitionLogs)
+                .HasForeignKey(x => x.ReportTrackingId)
+                .HasPrincipalKey(x => x.ReportTrackingId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             entity.Property(d => d.Status)
                 .HasConversion(new EnumToStringConverter<RequestStatus>())
                 .HasMaxLength(50);
@@ -226,9 +232,9 @@ public class DataAcquisitionDbContext : DbContext
                 .HasDatabaseName("IX_DataAcquisitionLogs_FacilityId_IsDeleted")
                 .HasFilter("[IsDeleted] = 1");
 
-            entity.HasIndex(e => new { e.TailSent, e.FacilityId, e.ReportTrackingId, e.CorrelationId, e.ReportStartDate, e.ReportEndDate, e.QueryPhase })
+            entity.HasIndex(e => new { e.TailSent, e.FacilityId, e.ReportTrackingId, e.CorrelationId, e.QueryPhase })
                 .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
-                .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [ReportStartDate] IS NOT NULL AND [ReportEndDate] IS NOT NULL");
+                .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL");
 
             entity.HasIndex(e => new { e.TailSent, e.SiblingCount, e.FacilityId, e.CorrelationId, e.QueryPhase, e.Status })
                 .HasDatabaseName("IX_DataAcquisitionLogs_InlineTail")
@@ -276,11 +282,7 @@ public class DataAcquisitionDbContext : DbContext
         //-------------------ScheduledReportEntity-------------------
         modelBuilder.Entity<ScheduledReportEntity>(entity =>
         {
-            entity.Property(e => e.Id).ValueGeneratedOnAdd();
-
-            entity.HasIndex(e => e.ReportTrackingId)
-                .IsUnique()
-                .HasDatabaseName("UX_ScheduledReports_ReportTrackingId");
+            entity.HasKey(e => e.ReportTrackingId);
 
             entity.Property(e => e.Frequency)
                 .HasConversion(new EnumToStringConverter<Frequency>());

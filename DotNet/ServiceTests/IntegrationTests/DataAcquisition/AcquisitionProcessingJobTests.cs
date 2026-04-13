@@ -44,7 +44,7 @@ public class AcquisitionProcessingJobTests
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
-        var reportTrackingId = $"TestReportId_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -67,11 +67,7 @@ public class AcquisitionProcessingJobTests
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
             PatientId = "Patient/123",
-            ScheduledReport = new ScheduledReport {
-                ReportTrackingId = reportTrackingId,
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            }
+            ReportTrackingId = reportTrackingId.ToString()
         };
 
         var log = await logManager.CreateAsync(createLog);
@@ -108,7 +104,7 @@ public class AcquisitionProcessingJobTests
 
         var testTag = Guid.NewGuid().ToString("N");
         var missingConfigFacilityId = $"MissingConfigFacility_{testTag}";
-        var reportTrackingId = $"TestReportId_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -122,8 +118,6 @@ public class AcquisitionProcessingJobTests
             CorrelationId = Guid.NewGuid().ToString(),
             ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
             ScheduledReportEntity = new ScheduledReportEntity {
                 ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -171,7 +165,7 @@ public class AcquisitionProcessingJobTests
 
         var testTag = Guid.NewGuid().ToString("N");
         var missingConfigFacilityId = $"MissingConfigFacility_{testTag}";
-        var reportTrackingId = $"TestReportId_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -185,8 +179,6 @@ public class AcquisitionProcessingJobTests
             CorrelationId = Guid.NewGuid().ToString(),
             ReportTrackingId = reportTrackingId,
             PatientId = "Patient/456",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
             ScheduledReportEntity = new ScheduledReportEntity
             {
                 ReportTrackingId = reportTrackingId,
@@ -228,7 +220,7 @@ public class AcquisitionProcessingJobTests
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
-        var reportTrackingId = $"TestReportId_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -250,8 +242,6 @@ public class AcquisitionProcessingJobTests
             CorrelationId = Guid.NewGuid().ToString(),
             ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
             ScheduledReportEntity = new ScheduledReportEntity {
                 ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -294,8 +284,8 @@ public class AcquisitionProcessingJobTests
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
-        var reportTrackingId1 = $"TestReportId_1_{testTag}";
-        var reportTrackingId2 = $"TestReportId_2_{testTag}";
+        Guid reportTrackingId1 = Guid.NewGuid();
+        Guid reportTrackingId2 = Guid.NewGuid();
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -318,8 +308,6 @@ public class AcquisitionProcessingJobTests
             CorrelationId = Guid.NewGuid().ToString(),
             ReportTrackingId = reportTrackingId1,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
             ScheduledReportEntity = new ScheduledReportEntity {
                 ReportTrackingId = reportTrackingId1,
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -336,8 +324,6 @@ public class AcquisitionProcessingJobTests
             CorrelationId = Guid.NewGuid().ToString(),
             ReportTrackingId = reportTrackingId2,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
             ScheduledReportEntity = new ScheduledReportEntity {
                 ReportTrackingId = reportTrackingId2,
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -394,7 +380,7 @@ public class AcquisitionProcessingJobTests
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
-        var reportTrackingId = $"TestReportId_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -500,7 +486,7 @@ public class AcquisitionProcessingJobTests
 
             for (int i = 1; i <= logsPerFacility; i++)
             {
-                var reportTrackingId = $"Report{f}_{i}_{testTag}";
+                Guid reportTrackingId = Guid.NewGuid();
 
                 var log = new DataAcquisitionLog
                 {
@@ -509,8 +495,6 @@ public class AcquisitionProcessingJobTests
                     CorrelationId = Guid.NewGuid().ToString(),
                     ReportTrackingId = reportTrackingId,
                     PatientId = $"Patient/{i}",
-                    ReportStartDate = DateTime.UtcNow.AddDays(-1),
-                    ReportEndDate = DateTime.UtcNow,
                     ScheduledReportEntity = new ScheduledReportEntity {
                         ReportTrackingId = reportTrackingId,
                         StartDate = DateTime.UtcNow.AddDays(-1),
@@ -563,6 +547,9 @@ public class AcquisitionProcessingJobTests
         var testTag = Guid.NewGuid().ToString("N");
         const int numFacilities = 3;
         const int pendingPerFacility = 30; const int failedRetryablePerFacility = 20; const int failedMaxRetriesPerFacility = 10; var facilities = new List<string>();
+        var pendingLogsByFacility = new Dictionary<string, List<DataAcquisitionLog>>();
+        var retryableLogsByFacility = new Dictionary<string, List<DataAcquisitionLog>>();
+        var maxRetryLogsByFacility = new Dictionary<string, List<DataAcquisitionLog>>();
 
         using var setupScope = _fixture.ServiceProvider.CreateScope();
         var dbContext = setupScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -572,6 +559,9 @@ public class AcquisitionProcessingJobTests
         {
             var facilityId = $"Facility{f}_{testTag}";
             facilities.Add(facilityId);
+            pendingLogsByFacility[facilityId] = new List<DataAcquisitionLog>();
+            retryableLogsByFacility[facilityId] = new List<DataAcquisitionLog>();
+            maxRetryLogsByFacility[facilityId] = new List<DataAcquisitionLog>();
 
             var config = new FhirQueryConfiguration
             {
@@ -584,7 +574,7 @@ public class AcquisitionProcessingJobTests
 
             for (int i = 1; i <= pendingPerFacility; i++)
             {
-                var reportTrackingId = $"Pending{f}_{i}_{testTag}";
+                Guid reportTrackingId = Guid.NewGuid();
                 var log = new DataAcquisitionLog
                 {
                     FacilityId = facilityId,
@@ -592,8 +582,6 @@ public class AcquisitionProcessingJobTests
                     CorrelationId = Guid.NewGuid().ToString(),
                     ReportTrackingId = reportTrackingId,
                     PatientId = $"Patient/{i}",
-                    ReportStartDate = DateTime.UtcNow.AddDays(-1),
-                    ReportEndDate = DateTime.UtcNow,
                     ScheduledReportEntity = new ScheduledReportEntity {
                         ReportTrackingId = reportTrackingId,
                         StartDate = DateTime.UtcNow.AddDays(-1),
@@ -602,11 +590,12 @@ public class AcquisitionProcessingJobTests
                 };
 
                 dbContext.DataAcquisitionLogs.Add(log);
+                pendingLogsByFacility[facilityId].Add(log);
             }
 
             for (int i = 1; i <= failedRetryablePerFacility; i++)
             {
-                var reportTrackingId = $"FailedRetry{f}_{i}_{testTag}";
+                Guid reportTrackingId = Guid.NewGuid();
                 var log = new DataAcquisitionLog
                 {
                     FacilityId = facilityId,
@@ -615,8 +604,6 @@ public class AcquisitionProcessingJobTests
                     CorrelationId = Guid.NewGuid().ToString(),
                     ReportTrackingId = reportTrackingId,
                     PatientId = $"Patient/{i + pendingPerFacility}",
-                    ReportStartDate = DateTime.UtcNow.AddDays(-1),
-                    ReportEndDate = DateTime.UtcNow,
                     ScheduledReportEntity = new ScheduledReportEntity {
                         ReportTrackingId = reportTrackingId,
                         StartDate = DateTime.UtcNow.AddDays(-1),
@@ -625,11 +612,12 @@ public class AcquisitionProcessingJobTests
                 };
 
                 dbContext.DataAcquisitionLogs.Add(log);
+                retryableLogsByFacility[facilityId].Add(log);
             }
 
             for (int i = 1; i <= failedMaxRetriesPerFacility; i++)
             {
-                var reportTrackingId = $"MaxRetry{f}_{i}_{testTag}";
+                Guid reportTrackingId = Guid.NewGuid();
                 var log = new DataAcquisitionLog
                 {
                     FacilityId = facilityId,
@@ -638,8 +626,6 @@ public class AcquisitionProcessingJobTests
                     CorrelationId = Guid.NewGuid().ToString(),
                     ReportTrackingId = reportTrackingId,
                     PatientId = $"Patient/{i + pendingPerFacility + failedRetryablePerFacility}",
-                    ReportStartDate = DateTime.UtcNow.AddDays(-1),
-                    ReportEndDate = DateTime.UtcNow,
                     ScheduledReportEntity = new ScheduledReportEntity {
                         ReportTrackingId = reportTrackingId,
                         StartDate = DateTime.UtcNow.AddDays(-1),
@@ -647,6 +633,7 @@ public class AcquisitionProcessingJobTests
                     }
                 };
                 dbContext.DataAcquisitionLogs.Add(log);
+                maxRetryLogsByFacility[facilityId].Add(log);
             }
         }
         await dbContext.SaveChangesAsync();
@@ -683,17 +670,20 @@ public class AcquisitionProcessingJobTests
 
             Assert.Equal(pendingPerFacility + failedRetryablePerFacility + failedMaxRetriesPerFacility, allLogs.Count);
 
-            var pendingLogs = allLogs.Where(l => l.ReportTrackingId.StartsWith("Pending") && l.ReportTrackingId.EndsWith($"_{testTag}")).ToList();
+            var pendingLogIds = pendingLogsByFacility[facilityId].Select(l => l.Id).ToHashSet();
+            var pendingLogs = allLogs.Where(l => pendingLogIds.Contains(l.Id)).ToList();
             Assert.All(pendingLogs, log => Assert.Equal(RequestStatus.Ready, log.Status));
 
-            var retryableLogs = allLogs.Where(l => l.ReportTrackingId.StartsWith("FailedRetry") && l.ReportTrackingId.EndsWith($"_{testTag}")).ToList();
+            var retryableLogIds = retryableLogsByFacility[facilityId].Select(l => l.Id).ToHashSet();
+            var retryableLogs = allLogs.Where(l => retryableLogIds.Contains(l.Id)).ToList();
             Assert.All(retryableLogs, log =>
             {
                 Assert.Equal(RequestStatus.Ready, log.Status);
                 Assert.Equal(1, log.RetryAttempts);
             });
 
-            var maxRetryLogs = allLogs.Where(l => l.ReportTrackingId.StartsWith("MaxRetry") && l.ReportTrackingId.EndsWith($"_{testTag}")).ToList();
+            var maxRetryLogIds = maxRetryLogsByFacility[facilityId].Select(l => l.Id).ToHashSet();
+            var maxRetryLogs = allLogs.Where(l => maxRetryLogIds.Contains(l.Id)).ToList();
             Assert.All(maxRetryLogs, log => Assert.Equal(RequestStatus.MaxRetriesReached, log.Status));
         }
     }
@@ -706,7 +696,7 @@ public class AcquisitionProcessingJobTests
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
-        var reportTrackingId = $"TestReportId_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -730,8 +720,6 @@ public class AcquisitionProcessingJobTests
             CorrelationId = Guid.NewGuid().ToString(),
             ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
             ScheduledReportEntity = new ScheduledReportEntity {
                 ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -774,7 +762,7 @@ public class AcquisitionProcessingJobTests
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
-        var reportTrackingId = $"TestReportId_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -812,8 +800,6 @@ public class AcquisitionProcessingJobTests
             CorrelationId = Guid.NewGuid().ToString(),
             ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
             ScheduledReportEntity = new ScheduledReportEntity {
                 ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -856,7 +842,7 @@ public class AcquisitionProcessingJobTests
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
-        var reportTrackingId = $"TestReportId_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -892,8 +878,6 @@ public class AcquisitionProcessingJobTests
             CorrelationId = Guid.NewGuid().ToString(),
             ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
             ScheduledReportEntity = new ScheduledReportEntity {
                 ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
@@ -936,7 +920,7 @@ public class AcquisitionProcessingJobTests
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
-        var reportTrackingId = $"TestReportId_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
 
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
@@ -968,8 +952,6 @@ public class AcquisitionProcessingJobTests
             CorrelationId = Guid.NewGuid().ToString(),
             ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
             ScheduledReportEntity = new ScheduledReportEntity {
                 ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),

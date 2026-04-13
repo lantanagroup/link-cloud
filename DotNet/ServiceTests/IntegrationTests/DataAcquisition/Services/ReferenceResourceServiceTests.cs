@@ -71,7 +71,7 @@ namespace IntegrationTests.DataAcquisition.Services
             var tag = Guid.NewGuid().ToString("N");
             var facilityId = $"TestFacility_{tag}";
             var correlationId = Guid.NewGuid().ToString();
-            var reportTrackingId = $"TestReport_{tag}";
+            var reportTrackingId = Guid.NewGuid().ToString();
 
             // Pre-seed a canonical reference resource
             await refMgr.CreateBatchAsync(new[]
@@ -90,7 +90,7 @@ namespace IntegrationTests.DataAcquisition.Services
             {
                 FacilityId = facilityId,
                 CorrelationId = correlationId,
-                ScheduledReport = new ScheduledReport { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
+                ReportTrackingId = reportTrackingId,
                 QueryPhase = QueryPhase.Initial,
                 QueryType = FhirQueryType.Search,
                 Status = RequestStatus.Pending,
