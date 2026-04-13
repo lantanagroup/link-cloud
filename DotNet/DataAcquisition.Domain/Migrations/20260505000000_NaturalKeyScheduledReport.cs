@@ -100,6 +100,12 @@ namespace DataAcquisition.Domain.Migrations
                 IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_Paging_Default')
                     DROP INDEX [IX_DataAcquisitionLogs_Paging_Default] ON [DataAcquisitionLog];
 
+                IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_TailSent_Status')
+                    DROP INDEX [IX_DataAcquisitionLogs_TailSent_Status] ON [DataAcquisitionLog];
+
+                IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_IsDeleted_Id')
+                    DROP INDEX [IX_DataAcquisitionLogs_IsDeleted_Id] ON [DataAcquisitionLog];
+
                 IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('ScheduledReports') AND name = 'UX_ScheduledReports_ReportTrackingId')
                     DROP INDEX [UX_ScheduledReports_ReportTrackingId] ON [ScheduledReports];
             ");
@@ -187,6 +193,28 @@ namespace DataAcquisition.Domain.Migrations
                 name: "IX_DataAcquisitionLog_ReportTrackingId",
                 table: "DataAcquisitionLog",
                 column: "ReportTrackingId");
+
+            // Recreate IX_DataAcquisitionLogs_TailSent_Status with updated INCLUDE list
+            // (removed ScheduledReportId, ReportStartDate, ReportEndDate — those columns no longer exist).
+            migrationBuilder.CreateIndex(
+                name: "IX_DataAcquisitionLogs_TailSent_Status",
+                table: "DataAcquisitionLog",
+                columns: new[] { "TailSent", "Status" })
+                .Annotation("SqlServer:Include", new[] {
+                    "FacilityId", "ReportTrackingId", "CorrelationId",
+                    "QueryPhase", "TraceId", "PatientId", "ReportableEvent"
+                });
+
+            // Recreate IX_DataAcquisitionLogs_IsDeleted_Id (ReportTrackingId column type changed to uniqueidentifier).
+            migrationBuilder.CreateIndex(
+                name: "IX_DataAcquisitionLogs_IsDeleted_Id",
+                table: "DataAcquisitionLog",
+                columns: new[] { "IsDeleted", "Id" })
+                .Annotation("SqlServer:Include", new[] {
+                    "Priority", "FacilityId", "PatientId", "ReportTrackingId",
+                    "FhirVersion", "QueryType", "QueryPhase",
+                    "ExecutionDate", "CreateDate", "RetryAttempts", "Status"
+                });
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
@@ -209,6 +237,12 @@ namespace DataAcquisition.Domain.Migrations
 
                 IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_Paging_Default')
                     DROP INDEX [IX_DataAcquisitionLogs_Paging_Default] ON [DataAcquisitionLog];
+
+                IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_TailSent_Status')
+                    DROP INDEX [IX_DataAcquisitionLogs_TailSent_Status] ON [DataAcquisitionLog];
+
+                IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_IsDeleted_Id')
+                    DROP INDEX [IX_DataAcquisitionLogs_IsDeleted_Id] ON [DataAcquisitionLog];
 
                 ALTER TABLE [DataAcquisitionLog] ALTER COLUMN [ReportTrackingId] nvarchar(128) NULL;
 
@@ -296,6 +330,28 @@ namespace DataAcquisition.Domain.Migrations
                     "Priority", "FacilityId", "IsCensus", "PatientId", "ReportableEvent",
                     "ReportTrackingId", "CorrelationId", "TraceId", "FhirVersion", "QueryType",
                     "QueryPhase", "Status", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds"
+                });
+
+            // Recreate IX_DataAcquisitionLogs_TailSent_Status (originally created in PerformanceTuningCollapsed)
+            migrationBuilder.CreateIndex(
+                name: "IX_DataAcquisitionLogs_TailSent_Status",
+                table: "DataAcquisitionLog",
+                columns: new[] { "TailSent", "Status" })
+                .Annotation("SqlServer:Include", new[] {
+                    "FacilityId", "ReportTrackingId", "CorrelationId",
+                    "ReportStartDate", "ReportEndDate", "QueryPhase",
+                    "TraceId", "PatientId", "ReportableEvent", "ScheduledReportId"
+                });
+
+            // Recreate IX_DataAcquisitionLogs_IsDeleted_Id (originally created in PerformanceTuningCollapsed)
+            migrationBuilder.CreateIndex(
+                name: "IX_DataAcquisitionLogs_IsDeleted_Id",
+                table: "DataAcquisitionLog",
+                columns: new[] { "IsDeleted", "Id" })
+                .Annotation("SqlServer:Include", new[] {
+                    "Priority", "FacilityId", "PatientId", "ReportTrackingId",
+                    "FhirVersion", "QueryType", "QueryPhase",
+                    "ExecutionDate", "CreateDate", "RetryAttempts", "Status"
                 });
         }
     }

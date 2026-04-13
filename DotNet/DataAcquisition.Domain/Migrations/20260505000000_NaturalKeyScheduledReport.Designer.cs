@@ -700,6 +700,16 @@ namespace DataAcquisition.Domain.Migrations
                         .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
                         .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL");
 
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TailSent", "Status"), new[] { "FacilityId", "ReportTrackingId", "CorrelationId", "QueryPhase", "TraceId", "PatientId", "ReportableEvent" });
+
+                    b.HasIndex("TailSent", "Status")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_TailSent_Status");
+
+                    b.HasIndex("IsDeleted", "Id")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_IsDeleted_Id");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("IsDeleted", "Id"), new[] { "Priority", "FacilityId", "PatientId", "ReportTrackingId", "FhirVersion", "QueryType", "QueryPhase", "ExecutionDate", "CreateDate", "RetryAttempts", "Status" });
+
                     b.ToTable("DataAcquisitionLog");
                 });
 

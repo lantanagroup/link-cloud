@@ -251,6 +251,36 @@ public class DataAcquisitionDbContext : DbContext
                     nameof(DataAcquisitionLog.CompletionTimeMilliseconds)
                 );
 
+            // Covers GetTailingMessages Phase-1 query (filters !TailSent, checks Status, groups by facility/tracking/correlation/phase).
+            entity.HasIndex(e => new { e.TailSent, e.Status })
+                .HasDatabaseName("IX_DataAcquisitionLogs_TailSent_Status")
+                .IncludeProperties(
+                    nameof(DataAcquisitionLog.FacilityId),
+                    nameof(DataAcquisitionLog.ReportTrackingId),
+                    nameof(DataAcquisitionLog.CorrelationId),
+                    nameof(DataAcquisitionLog.QueryPhase),
+                    nameof(DataAcquisitionLog.TraceId),
+                    nameof(DataAcquisitionLog.PatientId),
+                    nameof(DataAcquisitionLog.ReportableEvent)
+                );
+
+            // Covers default UI pagination on (IsDeleted, Id DESC).
+            entity.HasIndex(e => new { e.IsDeleted, e.Id })
+                .HasDatabaseName("IX_DataAcquisitionLogs_IsDeleted_Id")
+                .IncludeProperties(
+                    nameof(DataAcquisitionLog.Priority),
+                    nameof(DataAcquisitionLog.FacilityId),
+                    nameof(DataAcquisitionLog.PatientId),
+                    nameof(DataAcquisitionLog.ReportTrackingId),
+                    nameof(DataAcquisitionLog.FhirVersion),
+                    nameof(DataAcquisitionLog.QueryType),
+                    nameof(DataAcquisitionLog.QueryPhase),
+                    nameof(DataAcquisitionLog.ExecutionDate),
+                    nameof(DataAcquisitionLog.CreateDate),
+                    nameof(DataAcquisitionLog.RetryAttempts),
+                    nameof(DataAcquisitionLog.Status)
+                );
+
             });
 
             //-------------------DataAcquisitionLogResourceId-------------------
