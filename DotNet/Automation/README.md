@@ -1,5 +1,4 @@
 # Automation
-# Automation
 
 `Automation` is the platform-agnostic foundation library for synthetic FHIR generation, deterministic expectation modeling, and reusable automation helpers.
 
@@ -23,11 +22,11 @@ Think of this project as the reusable "simulation + expectation" core.
 ## Project structure
 
 ```
-Automation (this project - no Link dependencies)
-|-- Generation/          - FHIR R4 bundle generation + expectation models
-|-- Helpers/             - output abstractions, retry, monitoring, diagnostics
-|-- Configuration/       - base config classes
-`-- measures/            - embedded measure definition bundles (JSON)
+Automation (this project — no Link dependencies)
+??? Generation/          — FHIR R4 bundle generation + expectation models
+??? Helpers/             — output abstractions, retry, monitoring, diagnostics
+??? Configuration/       — base config classes
+??? measures/            — embedded measure definition bundles (JSON)
 ```
 
 ---
@@ -104,8 +103,8 @@ Universal inpatient resources (e.g., vitals, CBC/BMP, prophylaxis/PRN baselines)
 
 Each FHIR type has two generation modes:
 
-- `Generate(id, seed, ...)` - deterministic seed-based selection
-- `Create(id, callerValues, ...)` - explicit caller-controlled construction
+- `Generate(id, seed, ...)` — deterministic seed-based selection
+- `Create(id, callerValues, ...)` — explicit caller-controlled construction
 
 Factories include:
 
@@ -115,10 +114,10 @@ Factories include:
 
 Resources are linked during generation (not patched after the fact), for example:
 
-- `MedicationRequest.medication` -> `Reference(Medication/{id})`
-- `MedicationAdministration.request` -> `Reference(MedicationRequest/{id})`
-- `ImagingStudy.basedOn` -> `Reference(ServiceRequest/{id})`
-- `Provenance.target` -> `Reference(DiagnosticReport/{id})`
+- `MedicationRequest.medication` ? `Reference(Medication/{id})`
+- `MedicationAdministration.request` ? `Reference(MedicationRequest/{id})`
+- `ImagingStudy.basedOn` ? `Reference(ServiceRequest/{id})`
+- `Provenance.target` ? `Reference(DiagnosticReport/{id})`
 
 This yields a consistent patient graph that downstream processes can traverse deterministically.
 
@@ -145,7 +144,7 @@ Centralized code tables include SNOMED, ICD-10, RxNorm, LOINC, and CVX-backed se
 
 In practice:
 
-`PatientCohortDefinition` -> `PatientProfile` -> `FhirBundleGenerator` output -> `GenerationManifest` expectations.
+`PatientCohortDefinition` ? `PatientProfile` ? `FhirBundleGenerator` output ? `GenerationManifest` expectations.
 
 ---
 

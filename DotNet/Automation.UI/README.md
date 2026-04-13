@@ -1,5 +1,4 @@
 # Automation.UI
-# Automation.UI
 
 `Automation.UI` is the interactive web host for Link automation runs. It lets users start scenarios, watch run progress in real time, inspect pipeline state, and review validation outcomes without using a test runner directly.
 
@@ -29,17 +28,17 @@ It provides:
 
 ```
 Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
-|-- Controllers/                 - HTTP endpoints and view composition
-|-- Services/
-|   |-- AutomationRunManager     - run lifecycle orchestration
-|   |-- RunSnapshotOrchestrator  - manages background pollers per active run
-|   |-- StoreBackedServicePoller - polls pipeline domains and writes snapshots
-|   `-- RunHub                   - SignalR stream for run logs
-`-- Services/Persistence/
-    |-- MongoSnapshotStore       - run summaries, logs, per-domain snapshots
-    |-- MongoScenarioStore       - saved scenario templates
-    |-- MongoQueryPlanTemplateStore
-    `-- MongoIndexManager        - Cosmos/Mongo-compatible index initialization
+??? Controllers/                 — HTTP endpoints and view composition
+??? Services/
+?   ??? AutomationRunManager     — run lifecycle orchestration
+?   ??? RunSnapshotOrchestrator  — manages background pollers per active run
+?   ??? StoreBackedServicePoller — polls pipeline domains and writes snapshots
+?   ??? RunHub                   — SignalR stream for run logs
+??? Services/Persistence/
+    ??? MongoSnapshotStore       — run summaries, logs, per-domain snapshots
+    ??? MongoScenarioStore       — saved scenario templates
+    ??? MongoQueryPlanTemplateStore
+    ??? MongoIndexManager        — Cosmos/Mongo-compatible index initialization
 ```
 
 The design intentionally separates:
@@ -175,10 +174,10 @@ Collections:
 
 Inbound UI access and outbound service auth are intentionally decoupled.
 
-### Inbound (browser -> Automation.UI)
+### Inbound (browser ? Automation.UI)
 
-- `Authentication:EnableAnonymousAccess=true` -> UI auth bypass
-- `Authentication:EnableAnonymousAccess=false` -> OIDC cookie/session flow
+- `Authentication:EnableAnonymousAccess=true` ? UI auth bypass
+- `Authentication:EnableAnonymousAccess=false` ? OIDC cookie/session flow
 
 OIDC keys:
 
@@ -187,7 +186,7 @@ OIDC keys:
 - `Authentication:Schemas:OpenIdConnect:ClientSecret` (if required)
 - `Authentication:Schemas:OpenIdConnect:CallbackPath` (default `/signin-oidc`)
 
-### Outbound (Automation.UI -> Link services)
+### Outbound (Automation.UI ? Link services)
 
 - `Authentication:UseBearerForServiceCalls=true` (recommended)
   - LinkSdk attaches Link bearer tokens

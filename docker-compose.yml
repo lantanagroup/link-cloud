@@ -664,6 +664,8 @@ services:
     container_name: link-automation-ui
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+    volumes:
+      - automation_ui_keys:/keys/dataprotection
     ports:
       - "5256:5257"
     build:
@@ -971,4 +973,6 @@ volumes:
   terminology_data:
     driver: local
   sftp_data:
+    driver: local
+  automation_ui_keys:
     driver: local
