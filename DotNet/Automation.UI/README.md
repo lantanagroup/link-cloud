@@ -1,123 +1,227 @@
-﻿# Automation.UI
+# Automation.UI
+# Automation.UI
 
-`Automation.UI` is an ASP.NET Core Razor Pages web application that provides an interactive UI for running, monitoring, and inspecting Link automation test runs.
+`Automation.UI` is the interactive web host for Link automation runs. It lets users start scenarios, watch run progress in real time, inspect pipeline state, and review validation outcomes without using a test runner directly.
+
+It composes:
+
+- `Automation` (generation + expectation modeling)
+- `Automation.Link` (Link-specific orchestration, diagnostics, and validators)
+- `LinkSdk` (service API clients)
+
+---
+
+## What this project is
+
+At a high level, `Automation.UI` is a control plane and observability surface for end-to-end pipeline tests.
+
+It provides:
+
+1. **Scenario execution** (start, cancel, delete runs)
+2. **Live telemetry** (SignalR logs + status)
+3. **Persistent run history** (Mongo-backed state across restarts)
+4. **Snapshot-based inspection** (pipeline domains pre-aggregated for UI)
+5. **Validation-backed confidence** (report, ABS, DA, normalization, tenant, validation checks)
+
+---
 
 ## Architecture
 
 ```
-Automation.UI (Razor Pages web app)
-├── references Automation.Link (orchestration, validation, diagnostics)
-├── references Automation (FHIR generation, helpers, config)
-├── references LinkSdk (service API clients)
-├── references Shared (domain models, Kafka topics, DB entities)
-├── Controllers/         — MVC controllers
-├── Views/               — Razor views
-├── Models/              — view models and enums
-├── Services/            — run management, snapshot polling, persistence
-└── Services/Persistence — MongoDB-backed snapshot and run storage
+Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
+|-- Controllers/                 - HTTP endpoints and view composition
+|-- Services/
+|   |-- AutomationRunManager     - run lifecycle orchestration
+|   |-- RunSnapshotOrchestrator  - manages background pollers per active run
+|   |-- StoreBackedServicePoller - polls pipeline domains and writes snapshots
+|   `-- RunHub                   - SignalR stream for run logs
+`-- Services/Persistence/
+    |-- MongoSnapshotStore       - run summaries, logs, per-domain snapshots
+    |-- MongoScenarioStore       - saved scenario templates
+    |-- MongoQueryPlanTemplateStore
+    `-- MongoIndexManager        - Cosmos/Mongo-compatible index initialization
 ```
 
-## Features
+The design intentionally separates:
 
-### Run management
+- **Execution path** (`AutomationRunManager`) from
+- **Read path** (`ISnapshotStore` + poller snapshots)
 
-- **Start runs** — configure scenario kind, measure, patient count, resources per patient, seed, and patient eligibility profiles from the UI.
-- **Monitor runs** — real-time log streaming via SignalR (`RunHub`), pipeline snapshot polling, and status updates.
-- **View run details** — detailed run view with tabs for pipeline snapshot, data acquisition logs, and raw logs.
-- **Delete runs** — remove completed runs and their stored snapshots.
+so UI reads are fast and do not call backend services directly.
 
-### Scenario kinds
+---
 
-| Scenario | Description |
-|---|---|
-| `AdhocReportTest` | Single-patient ad-hoc report verification |
-| `MultiPatientTest` | Multi-patient volume scenario |
-| `MegaPatientTest` | High-volume stress scenario |
-| `Custom` | User-defined patient count and configuration |
+## End-to-end run workflow
 
-### Measure support
+`AutomationRunManager.ExecuteAsync(...)` coordinates the full lifecycle:
 
-Runs can target one or more measures:
+1. **Resolve request into run options**
+   - scenario defaults + custom overrides
+   - selected measures
+   - patient cohorts/profiles expansion
+2. **Generate FHIR input**
+   - uses `FhirBundleGenerator` (profile-driven when provided)
+3. **Load generated bundles**
+   - waits for FHIR readiness, uploads transaction bundles
+4. **Initialize validation dependencies**
+   - validation artifacts/categories
+5. **Load measure bundles**
+   - via `MeasureLoader.LoadAllAsync()` (supports multi-measure)
+6. **Ensure tenant/pipeline setup**
+   - facility, normalization config, query plans/config, query dispatch config
+7. **Generate report and monitor submission**
+   - starts `BackgroundDiagnosticsMonitor`
+   - polls until submission/critical failure/timeout
+8. **(Optional) regeneration path**
+   - regenerates report and switches pollers to the new report ID
+9. **Snapshot + artifact download + validation suite**
+   - full diagnostic snapshot
+   - external/internal ABS downloads
+   - validators: report DB, ABS manifest, DA DB, normalization DB, tenant DB, validation results
+10. **Cleanup**
+    - service-level and FHIR cleanup based on run config
 
-- NHSN Acute Care Hospital Monthly Initial Population
-- NHSN Acute Care Hospital Daily Initial Population
-- NHSN Glycemic Control Hypoglycemic Initial Population
+Run status transitions are persisted and broadcast in real time.
 
-### Pipeline snapshot
+---
 
-The UI polls pipeline state via `StoreBackedServicePoller` and persists snapshots to MongoDB. Snapshots include:
+## Core object/process relationships
 
-- Report schedule and entry state
-- Data acquisition log summaries (with reference log indicators)
-- Normalization operation results
-- MeasureEval population results
-- Validation results
+### `AutomationRunManager`
 
-### Data acquisition log drill-down
+Primary orchestrator. Owns run state, cancellation workflow, per-run DI container creation, validator invocation, and SignalR log/status broadcasts.
 
-The run detail page includes a modal for browsing DA logs with:
+### `RunSnapshotOrchestrator`
 
-- Paginated, sortable log table
-- Per-log detail view with FHIR query parameters and resource types
-- Reference log identification
+Background service that reconciles active runs from persistence and ensures each has exactly one poller.
 
-### API stability execution
+- starts pollers for newly active runs
+- restarts pollers when run context changes (e.g., regenerated report ID)
+- performs final poll on completion to flush terminal domain state
 
-- Includes an API stability run mode that validates broad service endpoint reachability and request/response compatibility via `LinkSdk` clients.
+### `StoreBackedServicePoller`
 
-## Controllers
+Per-run poller with one cadence for all key domains:
+
+- `schedule`
+- `entries`
+- `populations`
+- `acquisitionSummary`
+- `measureResources`
+- `validationResources`
+
+Each domain write is independent and fault-isolated. Failures are logged to run logs without taking down the whole poll cycle.
+
+### `ISnapshotStore` + Mongo stores
+
+Persistence abstraction used by both execution and UI reads:
+
+- run metadata and summaries
+- live + persisted log lines
+- per-domain snapshot payloads
+
+This enables restart-safe run history and multi-instance read sharing.
+
+---
+
+## Predictive ABS/resource validation model
+
+For profile-based runs, the UI host builds a deterministic `GenerationManifest` and enriches it with:
+
+- acquired resource types from effective query plan
+- parameter-query resource types
+- simulated acquired keys per patient (`QueryPlanAcquisitionSimulator`)
+- CQL-referenced resource types (`CqlResourceTypeExtractor`)
+
+That manifest is passed to `ReportAbsManifestValidator` and `ReportDatabaseValidator` to compare predicted vs actual output.
+
+This yields expectation checks driven by generated inputs and query/CQL semantics instead of static baselines.
+
+---
+
+## Controllers and user-facing workflows
 
 | Controller | Purpose |
 |---|---|
+| `RunsController` | Start/cancel/delete runs, run list/details/status, snapshot/API utilities |
+| `ScenariosController` | Manage saved run scenario templates |
+| `QueryPlansController` | Manage saved query plan templates and defaults |
+| `AccountController` | Login/logout/access-denied endpoints |
 | `HomeController` | Landing page |
-| `RunsController` | Run CRUD, pipeline snapshot, DA log proxy endpoints |
-| `AccountController` | Authentication (login/logout/access-denied) |
 
-## Services
+`RunsController` is the primary execution surface. Scenario/query-plan controllers provide reusable templates that feed run start requests.
 
-| Service | Purpose |
-|---|---|
-| `AutomationRunManager` | Orchestrates full run lifecycle — generation, loading, facility setup, report generation, polling, validation, cleanup |
-| `RunSnapshotOrchestrator` | Manages `StoreBackedServicePoller` instances per active run |
-| `StoreBackedServicePoller` | Background polling loop that persists pipeline state to MongoDB |
-| `RunAutomationOutput` | `IAutomationOutput` implementation that captures logs and pushes to SignalR |
-| `RunHub` | SignalR hub for real-time log streaming to connected clients |
+---
 
-`ConsoleAutomationOutput` is used as the base console writer where direct console output is needed.
+## Persistence model (MongoDB / Cosmos Mongo API)
 
-## Persistence (MongoDB)
+Collections:
 
-Run state and pipeline snapshots are persisted to MongoDB via `ISnapshotStore` / `MongoSnapshotStore`:
+- `automation_runs` - run summaries and status metadata
+- `automation_snapshots` - per-run, per-domain snapshot payloads
+- `automation_logs` - full run logs
+- `automation_scenarios` - user/system scenario templates
+- `automation_query_plan_templates` - query plan templates
 
-- `automation_runs` — run metadata, status, logs
-- `pipeline_snapshots` — per-run pipeline state snapshots
+`MongoIndexManager` initializes required indexes with Cosmos-safe behavior:
 
-Data persists across process restarts. Multiple UI instances can read the same data.
+- checks key-shape existence first
+- avoids modifying incompatible existing unique indexes
+- logs failures without blocking startup
 
-## Authentication
+---
 
-Supports two modes:
+## Authentication model
 
-- **OpenID Connect** — full OIDC flow with cookie-based sessions (production).
-- **Anonymous** — `Authentication:EnableAnonymousAccess=true` bypasses all auth (development).
+Inbound UI access and outbound service auth are intentionally decoupled.
 
-When anonymous mode is enabled, outbound `LinkSdk` calls are configured with `AllowAnonymous=true` and skip bearer token attachment.
+### Inbound (browser -> Automation.UI)
 
-## Configuration
+- `Authentication:EnableAnonymousAccess=true` -> UI auth bypass
+- `Authentication:EnableAnonymousAccess=false` -> OIDC cookie/session flow
 
-Primary configuration is via `appsettings.json` / `appsettings.Docker.json` / environment variables:
+OIDC keys:
+
+- `Authentication:Schemas:OpenIdConnect:Authority`
+- `Authentication:Schemas:OpenIdConnect:ClientId`
+- `Authentication:Schemas:OpenIdConnect:ClientSecret` (if required)
+- `Authentication:Schemas:OpenIdConnect:CallbackPath` (default `/signin-oidc`)
+
+### Outbound (Automation.UI -> Link services)
+
+- `Authentication:UseBearerForServiceCalls=true` (recommended)
+  - LinkSdk attaches Link bearer tokens
+- `Authentication:UseBearerForServiceCalls=false`
+  - outbound calls are anonymous
+
+Token generation settings come from `LinkTokenService` (not user OIDC tokens).
+
+---
+
+## Configuration overview
+
+Primary configuration sources:
+
+- `appsettings.json`
+- `appsettings.Docker.json`
+- environment variables
+- optional Azure App Configuration + Key Vault references
+
+Key sections:
 
 | Section | Purpose |
 |---|---|
-| `Automation` | `AutomationConfig` — API URLs, FHIR URLs, database connections, Kafka, auth |
-| `ServiceInformation` | Service name and version |
-| `MongoDB` | Connection string and database name for run/snapshot persistence |
-| `Authentication` | OIDC settings or anonymous bypass |
-| `LinkTokenService` | Signing key for service-to-service bearer tokens |
+| `Automation` | runtime orchestration settings (FHIR/AdminBFF/Loki/query behavior) |
+| `ServiceRegistry` | base URLs for Link services used by `LinkSdk` clients |
+| `MongoDB` | connection/database for UI persistence |
+| `Authentication` | inbound UI auth + outbound bearer toggle |
+| `LinkTokenService` | system-token signing/issuer settings for outbound service calls |
+
+---
 
 ## Running
 
-### Local development
+### Local
 
 ```bash
 dotnet run --project DotNet/Automation.UI/Automation.UI.csproj
@@ -129,11 +233,11 @@ dotnet run --project DotNet/Automation.UI/Automation.UI.csproj
 docker compose up automation-ui
 ```
 
-The Dockerfile is a multi-stage build that copies all required project references from the solution root.
+---
 
 ## Notes
 
 - Targets `.NET 8`.
-- Razor Pages / MVC hybrid (uses controllers with Razor views, not Razor Pages page model).
-- SignalR is used for real-time log push — the client subscribes to a run group via `RunHub.SubscribeRun(runId)`.
-- Snapshot/run state is persisted in MongoDB (`automation_runs`, `pipeline_snapshots`) and can be shared across multiple UI instances.
+- MVC + Razor views + SignalR (not Razor Pages `PageModel` routing).
+- `RunHub.SubscribeRun(runId)` groups clients for per-run log streaming.
+- Read path is store-backed by design; backend service polling is centralized in background pollers.
