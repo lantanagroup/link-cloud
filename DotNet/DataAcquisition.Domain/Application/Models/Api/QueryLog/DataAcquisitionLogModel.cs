@@ -74,6 +74,9 @@ public class DataAcquisitionLogModel
                 QueryParameters = q.QueryParameters,
                 Paged = q.Paged,
                 DataAcquisitionLogId = q.DataAcquisitionLogId,
+                CensusTimeFrame = q.CensusTimeFrame,
+                CensusPatientStatus = q.CensusPatientStatus,
+                CensusListId = q.CensusListId,
                 ResourceReferenceTypes = q.ResourceReferenceTypes != null ? q.ResourceReferenceTypes.Select(rt => new ResourceReferenceTypeModel
                 {
                     Id = rt.Id,
