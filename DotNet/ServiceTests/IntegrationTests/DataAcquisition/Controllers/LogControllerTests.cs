@@ -69,6 +69,13 @@ public class LogControllerTests
             QueryPhase = QueryPhase.Initial,
             Priority = AcquisitionPriority.Normal
         };
+        dbContext.ScheduledReports.Add(new ScheduledReportEntity
+        {
+            ReportTrackingId = reportTrackingId,
+            Frequency = Frequency.Adhoc,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        });
         dbContext.DataAcquisitionLogs.Add(log);
         await dbContext.SaveChangesAsync();
 

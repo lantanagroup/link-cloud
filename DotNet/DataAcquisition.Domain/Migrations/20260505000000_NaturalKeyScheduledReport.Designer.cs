@@ -1258,7 +1258,8 @@ namespace DataAcquisition.Domain.Migrations
                 {
                     b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ScheduledReportEntity", "ScheduledReportEntity")
                         .WithMany("DataAcquisitionLogs")
-                        .HasForeignKey("ReportTrackingId");
+                        .HasForeignKey("ReportTrackingId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("ScheduledReportEntity");
                 });

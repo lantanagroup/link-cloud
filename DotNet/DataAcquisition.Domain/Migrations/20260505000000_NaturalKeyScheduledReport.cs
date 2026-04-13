@@ -69,6 +69,16 @@ namespace DataAcquisition.Domain.Migrations
                 BEGIN
                     THROW 50002, 'ScheduledReports contains non-GUID ReportTrackingId values. Migration aborted.', 1;
                 END
+
+                IF EXISTS (
+                    SELECT 1
+                    FROM [ScheduledReports]
+                    WHERE [ReportTrackingId] IS NOT NULL
+                    GROUP BY TRY_CONVERT(uniqueidentifier, [ReportTrackingId])
+                    HAVING COUNT(*) > 1)
+                BEGIN
+                    THROW 50003, 'ScheduledReports contains duplicate ReportTrackingId values after GUID normalization. Migration aborted.', 1;
+                END
             ");
 
             // 3) Drop dependent constraints/indexes using old ScheduledReportId or ReportTrackingId(string) shape.

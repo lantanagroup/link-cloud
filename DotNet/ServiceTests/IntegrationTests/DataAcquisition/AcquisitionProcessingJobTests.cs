@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -59,6 +59,14 @@ public class AcquisitionProcessingJobTests
             MaxAcquisitionPullTime = null
         };
         dbContext.FhirQueryConfigurations.Add(config);
+
+        dbContext.ScheduledReports.Add(new ScheduledReportEntity
+        {
+            ReportTrackingId = reportTrackingId,
+            Frequency = Frequency.Adhoc,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        });
 
         var createLog = new CreateDataAcquisitionLogModel
         {
@@ -395,6 +403,14 @@ public class AcquisitionProcessingJobTests
             MaxRetries = 2
         };
         dbContext.FhirQueryConfigurations.Add(config);
+
+        dbContext.ScheduledReports.Add(new ScheduledReportEntity
+        {
+            ReportTrackingId = reportTrackingId,
+            Frequency = Frequency.Adhoc,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        });
 
         var log1 = new DataAcquisitionLog
         {
