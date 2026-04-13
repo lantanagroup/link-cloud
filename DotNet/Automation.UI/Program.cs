@@ -1,4 +1,4 @@
-﻿using Automation.UI.Services;
+using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -10,6 +10,8 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using MongoDB.Driver;
 
@@ -39,6 +41,24 @@ builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSe
 
 // -- Token services required by LinkSdk service clients for service-to-service calls --
 builder.Services.AddSingleton<ICreateSystemToken, CreateSystemToken>();
+
+// -- Data Protection key persistence (shared key ring across restarts/instances) --
+var dataProtectionAppName = builder.Configuration.GetValue<string>("DataProtection:ApplicationName") ?? "Link.Automation.UI";
+var dataProtectionKeyRingPath = builder.Configuration.GetValue<string>("DataProtection:KeyRingPath");
+
+var dataProtectionBuilder = builder.Services
+    .AddDataProtection()
+    .SetApplicationName(dataProtectionAppName);
+
+if (!string.IsNullOrWhiteSpace(dataProtectionKeyRingPath))
+{
+    var effectiveKeyRingPath = Path.IsPathRooted(dataProtectionKeyRingPath)
+        ? dataProtectionKeyRingPath
+        : Path.Combine(builder.Environment.ContentRootPath, dataProtectionKeyRingPath);
+
+    Directory.CreateDirectory(effectiveKeyRingPath);
+    dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(effectiveKeyRingPath));
+}
 
 // -- Authentication / authorization --
 var enableAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -93,7 +113,7 @@ else
             options.ClientSecret = oidcClientSecret;
             options.ResponseType = OpenIdConnectResponseType.Code;
             options.CallbackPath = oidcCallbackPath;
-            // Tokens are not saved in the cookie — service calls use system tokens
+            // Tokens are not saved in the cookie � service calls use system tokens
             // (ICreateSystemToken), not the user's token. Change only if user-delegated calls are added.
             options.SaveTokens = false;
             options.MapInboundClaims = false;
@@ -145,6 +165,17 @@ builder.Services.AddSingleton<MongoIndexManager>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
+builder.Services.AddHealthChecks();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedProto
+        | ForwardedHeaders.XForwardedHost;
+
+    // In container/cloud proxy scenarios, allow forwarded headers from the front-end proxy.
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // -- Pipeline data reader (scoped so each poller gets its own) --
 builder.Services.AddScoped<PipelineDataReader>();
@@ -169,6 +200,9 @@ var app = builder.Build();
 // -- Ensure MongoDB indexes (Cosmos DB compatible) --
 app.Services.GetRequiredService<MongoIndexManager>().EnsureAllIndexes();
 
+// -- Respect reverse-proxy forwarded headers before redirect/auth logic --
+app.UseForwardedHeaders();
+
 // -- Middleware --
 if (!app.Environment.IsDevelopment())
 {
@@ -189,5 +223,6 @@ app.MapControllerRoute(
     pattern: "{controller=Runs}/{action=Index}/{id?}");
 
 app.MapHub<RunHub>("/hubs/runs");
+app.MapHealthChecks("/health");
 
 app.Run();
