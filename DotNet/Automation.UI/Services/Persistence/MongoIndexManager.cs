@@ -1,4 +1,4 @@
-﻿using MongoDB.Bson;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Microsoft.Extensions.Logging;
 
@@ -27,7 +27,7 @@ public sealed class MongoIndexManager
 
     /// <summary>
     /// Ensures all indexes required by the Automation.UI stores exist.
-    /// Safe to call on every startup — idempotent.
+    /// Safe to call on every startup � idempotent.
     /// </summary>
     public void EnsureAllIndexes()
     {
@@ -37,7 +37,7 @@ public sealed class MongoIndexManager
         EnsureQueryPlanTemplateIndexes();
     }
 
-    // ── automation_runs ──────────────────────────────────────────────
+    // ?? automation_runs ??????????????????????????????????????????????
 
     private void EnsureRunIndexes()
     {
@@ -50,7 +50,7 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "IsActive", 1 } }, unique: false, "idx_isActive");
     }
 
-    // ── automation_snapshots ─────────────────────────────────────────
+    // ?? automation_snapshots ?????????????????????????????????????????
 
     private void EnsureSnapshotIndexes()
     {
@@ -61,7 +61,7 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "RunId", 1 }, { "Domain", 1 } }, unique: true, "idx_runId_domain_unique");
     }
 
-    // ── automation_scenarios ─────────────────────────────────────────
+    // ?? automation_scenarios ?????????????????????????????????????????
 
     private void EnsureScenarioIndexes()
     {
@@ -71,7 +71,7 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
     }
 
-    // ── automation_query_plan_templates ───────────────────────────────
+    // ?? automation_query_plan_templates ???????????????????????????????
 
     private void EnsureQueryPlanTemplateIndexes()
     {
@@ -81,7 +81,7 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────
+    // ?? Helpers ??????????????????????????????????????????????????????
 
     private void CreateIndexSafe(IMongoCollection<BsonDocument> collection, BsonDocument keys, bool unique, string name)
     {
@@ -89,7 +89,7 @@ public sealed class MongoIndexManager
         {
             if (HasIndexWithKeys(collection, keys))
             {
-                _logger.LogDebug("Index {IndexName} already exists on {Collection} — skipping.", name, collection.CollectionNamespace.CollectionName);
+                _logger.LogDebug("Index {IndexName} already exists on {Collection} � skipping.", name, collection.CollectionNamespace.CollectionName);
                 return;
             }
 
@@ -99,10 +99,17 @@ public sealed class MongoIndexManager
 
             _logger.LogInformation("Created index {IndexName} on {Collection}.", name, collection.CollectionNamespace.CollectionName);
         }
+        catch (MongoCommandException ex) when (ex.Code == 13 && ex.Message.Contains("unique index cannot be modified", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogInformation(
+                "Skipping index {IndexName} on {Collection}: Cosmos rejected unique index modification. Existing collection/index policy will be used.",
+                name,
+                collection.CollectionNamespace.CollectionName);
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex,
-                "Failed to create index {IndexName} on {Collection} — queries using this index may fall back to client-side evaluation.",
+                "Failed to create index {IndexName} on {Collection} - queries using this index may fall back to client-side evaluation.",
                 name, collection.CollectionNamespace.CollectionName);
         }
     }
@@ -115,12 +122,35 @@ public sealed class MongoIndexManager
         {
             if (index.TryGetValue("key", out var keyValue)
                 && keyValue.IsBsonDocument
-                && keyValue.AsBsonDocument.SequenceEqual(targetKeys))
+                && KeysEqual(keyValue.AsBsonDocument, targetKeys))
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static bool KeysEqual(BsonDocument existing, BsonDocument target)
+    {
+        if (existing.ElementCount != target.ElementCount)
+            return false;
+
+        var existingElements = existing.Elements.ToList();
+        var targetElements = target.Elements.ToList();
+
+        for (var i = 0; i < existingElements.Count; i++)
+        {
+            var left = existingElements[i];
+            var right = targetElements[i];
+
+            if (!string.Equals(left.Name, right.Name, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (left.Value.ToInt32() != right.Value.ToInt32())
+                return false;
+        }
+
+        return true;
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Automation.Link.Helpers;
+namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 /// <summary>
 /// Non-asserting, read-only snapshot of the pipeline's database state.
@@ -6,18 +6,16 @@
 /// </summary>
 public class PipelineSnapshot
 {
-    private readonly DatabaseConnectionFactory _dbFactory;
     private readonly PipelineDataReader _reader;
 
-    public PipelineSnapshot(DatabaseConnectionFactory dbFactory, PipelineDataReader reader)
+    public PipelineSnapshot(PipelineDataReader reader)
     {
-        _dbFactory = dbFactory;
         _reader = reader;
     }
 
     /// <summary>
     /// Writes a complete, non-asserting pipeline snapshot to test output.
-    /// Safe to call at any point — never throws.
+    /// Safe to call at any point � never throws.
     /// </summary>
     public async Task WriteFullSnapshotAsync(
         IAutomationOutput output,
@@ -226,95 +224,30 @@ public class PipelineSnapshot
     {
         try
         {
-            var connectionString = _dbFactory.GetConnectionString(DatabaseConnectionFactory.Databases.Validation);
-            await using var connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
-            await connection.OpenAsync();
-
-            // Count results by severity
-            var severityQuery = @"
-                SELECT severity, COUNT(*) as cnt
-                FROM result
-                WHERE facility_id = @facilityId AND report_id = @reportId
-                GROUP BY severity
-                ORDER BY severity";
-
-            await using var severityCmd = new Microsoft.Data.SqlClient.SqlCommand(severityQuery, connection);
-            severityCmd.Parameters.AddWithValue("@facilityId", facilityId);
-            severityCmd.Parameters.AddWithValue("@reportId", reportId);
-
-            var severityCounts = new List<string>();
-            var totalResults = 0;
-
-            await using (var reader = await severityCmd.ExecuteReaderAsync())
+            if (!Guid.TryParse(reportId, out var scheduleId))
             {
-                while (await reader.ReadAsync())
-                {
-                    var severity = reader.GetString(0);
-                    var count = reader.GetInt32(1);
-                    totalResults += count;
-                    severityCounts.Add($"{severity}={count}");
-                }
+                output.WriteLine("[Snapshot][Validation]          Invalid report ID; skipping validation snapshot.");
+                return;
             }
 
-            output.WriteLine($"[Snapshot][Validation]          {totalResults} result(s)" +
-                             (severityCounts.Count > 0 ? $" | {string.Join(", ", severityCounts)}" : ""));
+            var entries = await _reader.GetReportEntriesAsync(scheduleId);
+            var byReportingStatus = entries
+                .GroupBy(e => string.IsNullOrWhiteSpace(e.ReportingStatus) ? "Unknown" : e.ReportingStatus!)
+                .Select(g => $"{g.Key}={g.Count()}")
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
-            if (totalResults == 0) return;
+            output.WriteLine($"[Snapshot][Validation]          ReportingStatus: {string.Join(", ", byReportingStatus)}");
 
-            // Count results by patient
-            var patientQuery = @"
-                SELECT patient_id, COUNT(*) as cnt
-                FROM result
-                WHERE facility_id = @facilityId AND report_id = @reportId
-                GROUP BY patient_id";
+            var resourceCounts = await _reader.GetReportResourceCountsByPatientTypeAsync(scheduleId, facilityId);
+            var totalResources = resourceCounts.Sum(x => x.Count);
+            var patientCount = resourceCounts.Select(x => x.PatientId).Distinct(StringComparer.Ordinal).Count();
 
-            await using var patientCmd = new Microsoft.Data.SqlClient.SqlCommand(patientQuery, connection);
-            patientCmd.Parameters.AddWithValue("@facilityId", facilityId);
-            patientCmd.Parameters.AddWithValue("@reportId", reportId);
-
-            await using (var reader = await patientCmd.ExecuteReaderAsync())
-            {
-                while (await reader.ReadAsync())
-                {
-                    var patientId = reader.GetString(0);
-                    var count = reader.GetInt32(1);
-                    output.WriteLine($"[Snapshot][Validation]            Patient {patientId}: {count} result(s)");
-                }
-            }
-
-            // Top 5 error messages for quick diagnosis
-            var topErrorsQuery = @"
-                SELECT TOP 10 severity, message, COUNT(*) as cnt
-                FROM result
-                WHERE facility_id = @facilityId AND report_id = @reportId
-                  AND severity IN ('ERROR', 'FATAL')
-                GROUP BY severity, message
-                ORDER BY cnt DESC";
-
-            await using var errorsCmd = new Microsoft.Data.SqlClient.SqlCommand(topErrorsQuery, connection);
-            errorsCmd.Parameters.AddWithValue("@facilityId", facilityId);
-            errorsCmd.Parameters.AddWithValue("@reportId", reportId);
-
-            var hasErrors = false;
-            await using (var reader = await errorsCmd.ExecuteReaderAsync())
-            {
-                while (await reader.ReadAsync())
-                {
-                    if (!hasErrors)
-                    {
-                        output.WriteLine("[Snapshot][Validation]          Top errors:");
-                        hasErrors = true;
-                    }
-                    var severity = reader.GetString(0);
-                    var msg      = reader.GetString(1);
-                    var count    = reader.GetInt32(2);
-                    output.WriteLine($"[Snapshot][Validation]            [{severity}] x{count}: {msg}");
-                }
-            }
+            output.WriteLine($"[Snapshot][Validation]          Report resources: {totalResources} across {patientCount} patient(s)");
         }
         catch (Exception ex)
         {
-            output.WriteLine($"[Snapshot][Validation] Error querying Validation DB: {ex.Message}");
+            output.WriteLine($"[Snapshot][Validation] Error querying Validation API-derived snapshot: {ex.Message}");
         }
     }
 }
