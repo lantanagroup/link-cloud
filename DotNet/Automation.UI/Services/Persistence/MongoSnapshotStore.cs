@@ -14,8 +14,7 @@ namespace Automation.UI.Services.Persistence;
 ///   automation_snapshots  — per-run, per-domain polling data (upsert on RunId+Domain)
 ///   automation_logs       — full log output per run
 ///
-/// Indexing is managed externally (Cosmos DB auto-indexes; local Mongo
-/// works fine on small datasets without explicit indexes).
+/// Indexes are managed centrally by <see cref="MongoIndexManager"/>.
 /// </summary>
 public sealed class MongoSnapshotStore : ISnapshotStore
 {
@@ -30,27 +29,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         _snapshots = database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
         _logs = database.GetCollection<RunLogDocument>("automation_logs");
         _logger = logger;
-
-        EnsureIndexes();
-    }
-
-    private void EnsureIndexes()
-    {
-        try
-        {
-            _runs.Indexes.CreateOne(new CreateIndexModel<AutomationRunDocument>(
-                Builders<AutomationRunDocument>.IndexKeys.Descending(r => r.CreatedAt)));
-
-            _snapshots.Indexes.CreateOne(new CreateIndexModel<DomainSnapshotDocument>(
-                Builders<DomainSnapshotDocument>.IndexKeys
-                    .Ascending(s => s.RunId)
-                    .Ascending(s => s.Domain),
-                new CreateIndexOptions { Unique = true }));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to ensure MongoDB indexes — queries may be slower.");
-        }
     }
 
     // --- Run metadata ---
@@ -249,12 +227,31 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
         var filter = Builders<RunLogDocument>.Filter.Eq(l => l.RunId, runId);
 
-        var update = Builders<RunLogDocument>.Update
-            .PushEach(l => l.Lines, newLines)
-            .Set(l => l.UpdatedAt, DateTimeOffset.UtcNow)
-            .SetOnInsert(l => l.RunId, runId);
+        try
+        {
+            var update = Builders<RunLogDocument>.Update
+                .PushEach(l => l.Lines, newLines)
+                .Set(l => l.UpdatedAt, DateTimeOffset.UtcNow)
+                .SetOnInsert(l => l.RunId, runId);
 
-        await _logs.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, ct);
+            await _logs.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, ct);
+        }
+        catch (MongoCommandException)
+        {
+            // Cosmos DB may reject $push/$each in some configurations — fall back to read-modify-write.
+            var doc = await _logs.Find(filter).FirstOrDefaultAsync(ct);
+            if (doc == null)
+            {
+                doc = new RunLogDocument { RunId = runId, Lines = new List<string>(newLines), UpdatedAt = DateTimeOffset.UtcNow };
+                await _logs.InsertOneAsync(doc, cancellationToken: ct);
+            }
+            else
+            {
+                doc.Lines.AddRange(newLines);
+                doc.UpdatedAt = DateTimeOffset.UtcNow;
+                await _logs.ReplaceOneAsync(filter, doc, cancellationToken: ct);
+            }
+        }
     }
 
     public async Task<List<string>> GetLogsAsync(Guid runId, CancellationToken ct = default)
