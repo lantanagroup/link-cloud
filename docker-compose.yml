@@ -289,7 +289,7 @@ services:
       - otel-collector
 
   tempo:
-    image: grafana/tempo:latest
+    image: grafana/tempo:2.9.1
     command: [ "-config.file=/etc/tempo.yaml" ]
     container_name: tempo
     hostname: tempo
