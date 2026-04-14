@@ -49,28 +49,31 @@ namespace DataAcquisition.Domain.Migrations
                 IF COL_LENGTH('DataAcquisitionLog', 'ScheduledReportId') IS NULL
                     ALTER TABLE [DataAcquisitionLog] ADD [ScheduledReportId] bigint NULL;
 
-                INSERT INTO [ScheduledReports] ([ReportTrackingId], [Frequency], [StartDate], [EndDate], [ReportTypes], [CreateDate])
-                SELECT
-                    dal.[ReportTrackingId],
-                    COALESCE(NULLIF(JSON_VALUE(dal.[ScheduledReport], '$.Frequency'), ''), 'Adhoc'),
-                    COALESCE(TRY_CAST(JSON_VALUE(dal.[ScheduledReport], '$.StartDate') AS datetime2), dal.[ReportStartDate], '1900-01-01'),
-                    COALESCE(TRY_CAST(JSON_VALUE(dal.[ScheduledReport], '$.EndDate') AS datetime2), dal.[ReportEndDate], '1900-01-01'),
-                    (SELECT STRING_AGG(rt.[value], ',') FROM OPENJSON(dal.[ScheduledReport], '$.ReportTypes') rt),
-                    GETUTCDATE()
-                FROM (
-                    SELECT [ReportTrackingId], [ScheduledReport], [ReportStartDate], [ReportEndDate],
-                           ROW_NUMBER() OVER (PARTITION BY [ReportTrackingId] ORDER BY [Id]) AS rn
-                    FROM [DataAcquisitionLog]
-                    WHERE [ScheduledReport] IS NOT NULL AND [ReportTrackingId] IS NOT NULL
-                ) dal
-                WHERE dal.rn = 1
-                  AND NOT EXISTS (SELECT 1 FROM [ScheduledReports] sr WHERE sr.[ReportTrackingId] = dal.[ReportTrackingId]);
+                IF COL_LENGTH('DataAcquisitionLog', 'ScheduledReport') IS NOT NULL
+                BEGIN
+                    INSERT INTO [ScheduledReports] ([ReportTrackingId], [Frequency], [StartDate], [EndDate], [ReportTypes], [CreateDate])
+                    SELECT
+                        dal.[ReportTrackingId],
+                        COALESCE(NULLIF(JSON_VALUE(dal.[ScheduledReport], '$.Frequency'), ''), 'Adhoc'),
+                        COALESCE(TRY_CAST(JSON_VALUE(dal.[ScheduledReport], '$.StartDate') AS datetime2), dal.[ReportStartDate], '1900-01-01'),
+                        COALESCE(TRY_CAST(JSON_VALUE(dal.[ScheduledReport], '$.EndDate') AS datetime2), dal.[ReportEndDate], '1900-01-01'),
+                        (SELECT STRING_AGG(rt.[value], ',') FROM OPENJSON(dal.[ScheduledReport], '$.ReportTypes') rt),
+                        GETUTCDATE()
+                    FROM (
+                        SELECT [ReportTrackingId], [ScheduledReport], [ReportStartDate], [ReportEndDate],
+                               ROW_NUMBER() OVER (PARTITION BY [ReportTrackingId] ORDER BY [Id]) AS rn
+                        FROM [DataAcquisitionLog]
+                        WHERE [ScheduledReport] IS NOT NULL AND [ReportTrackingId] IS NOT NULL
+                    ) dal
+                    WHERE dal.rn = 1
+                      AND NOT EXISTS (SELECT 1 FROM [ScheduledReports] sr WHERE sr.[ReportTrackingId] = dal.[ReportTrackingId]);
 
-                UPDATE dal
-                SET dal.[ScheduledReportId] = sr.[Id]
-                FROM [DataAcquisitionLog] dal
-                INNER JOIN [ScheduledReports] sr ON dal.[ReportTrackingId] = sr.[ReportTrackingId]
-                WHERE dal.[ScheduledReport] IS NOT NULL AND dal.[ScheduledReportId] IS NULL;
+                    UPDATE dal
+                    SET dal.[ScheduledReportId] = sr.[Id]
+                    FROM [DataAcquisitionLog] dal
+                    INNER JOIN [ScheduledReports] sr ON dal.[ReportTrackingId] = sr.[ReportTrackingId]
+                    WHERE dal.[ScheduledReport] IS NOT NULL AND dal.[ScheduledReportId] IS NULL;
+                END
             ");
 
             // 3. DataAcquisitionLogNotes (idempotent)
