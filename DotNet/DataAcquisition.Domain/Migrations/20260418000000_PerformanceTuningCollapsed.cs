@@ -140,12 +140,26 @@ namespace DataAcquisition.Domain.Migrations
                     ALTER TABLE [DataAcquisitionLog] ADD [SiblingCount] int NULL;
             ");
 
-            // 6a. Alter columns
-            migrationBuilder.AlterColumn<string>(name: "FacilityId", table: "ReferenceResources", type: "nvarchar(256)", maxLength: 256, nullable: false);
-            migrationBuilder.AlterColumn<string>(name: "ResourceId", table: "ReferenceResources", type: "nvarchar(256)", maxLength: 256, nullable: false);
-            migrationBuilder.AlterColumn<string>(name: "ResourceType", table: "ReferenceResources", type: "nvarchar(128)", maxLength: 128, nullable: false);
+            // 6. ReferenceResources — max-length columns, unique index, junction table
+            //    All operations are now raw SQL + fully idempotent to prevent EF Core index conflicts in tests
 
-            // 6b. Junction table
+            // 6a. Drop existing index FIRST (defensive, safe even if index was never created)
+            migrationBuilder.Sql(@"
+                IF EXISTS (SELECT 1 FROM sys.indexes 
+                           WHERE object_id = OBJECT_ID('ReferenceResources') 
+                             AND name = 'IX_ReferenceResources_Facility_Type_ResourceId')
+                    DROP INDEX [IX_ReferenceResources_Facility_Type_ResourceId] ON [ReferenceResources];
+            ");
+
+            // 6b. Alter columns using raw SQL (EF fluent AlterColumn was triggering the internal DROP)
+            migrationBuilder.Sql(@"
+                -- Shorten columns (no-op and safe if they are already the new lengths)
+                ALTER TABLE [ReferenceResources] ALTER COLUMN [FacilityId] nvarchar(256) NOT NULL;
+                ALTER TABLE [ReferenceResources] ALTER COLUMN [ResourceId] nvarchar(256) NOT NULL;
+                ALTER TABLE [ReferenceResources] ALTER COLUMN [ResourceType] nvarchar(128) NOT NULL;
+            ");
+
+            // 6c. Junction table (idempotent)
             migrationBuilder.Sql(@"
                 IF OBJECT_ID('DataAcquisitionLogReferenceResource') IS NULL
                 BEGIN
@@ -160,7 +174,7 @@ namespace DataAcquisition.Domain.Migrations
                 END
             ");
 
-            // 6c. Migrate old FK data + robust drop
+            // 6d. Migrate old FK data + robust drop (unchanged)
             migrationBuilder.Sql(@"
                 IF COL_LENGTH('ReferenceResources', 'DataAcquisitionLogId') IS NOT NULL
                 BEGIN
@@ -199,13 +213,7 @@ namespace DataAcquisition.Domain.Migrations
                 END
             ");
 
-            // 6d. Drop old index safely
-            migrationBuilder.Sql(@"
-                IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('ReferenceResources') AND name = 'IX_ReferenceResources_Facility_Type_ResourceId')
-                    DROP INDEX [IX_ReferenceResources_Facility_Type_ResourceId] ON [ReferenceResources];
-            ");
-
-            // 6e. Deduplication - robust handling of junction table to prevent PK violations
+            // 6e. Deduplication (robust version from earlier fix)
             migrationBuilder.Sql(@"
                 IF EXISTS (SELECT 1 FROM [ReferenceResources] GROUP BY [FacilityId], [ResourceType], [ResourceId] HAVING COUNT(*) > 1)
                 BEGIN
@@ -223,7 +231,6 @@ namespace DataAcquisition.Domain.Migrations
 
                     IF OBJECT_ID('DataAcquisitionLogReferenceResource') IS NOT NULL
                     BEGIN
-                        -- Capture all relationships that need to be remapped (DISTINCT guarantees uniqueness)
                         IF OBJECT_ID('tempdb..#TempJunctionRemap') IS NOT NULL DROP TABLE #TempJunctionRemap;
                         
                         SELECT DISTINCT dalrr.[DataAcquisitionLogId], m.[KeeperId]
@@ -232,14 +239,11 @@ namespace DataAcquisition.Domain.Migrations
                         INNER JOIN #ReferenceResourceDedupMap m 
                             ON dalrr.[ReferenceResourceId] = m.[DuplicateId];
 
-                        -- Delete all existing references to DuplicateIds
                         DELETE dalrr 
                         FROM [DataAcquisitionLogReferenceResource] dalrr
                         INNER JOIN #ReferenceResourceDedupMap m 
                             ON dalrr.[ReferenceResourceId] = m.[DuplicateId];
 
-                        -- Re-insert the relationships pointing to KeeperId.
-                        -- The DISTINCT + NOT EXISTS guarantees we never violate PK_DataAcquisitionLogReferenceResource.
                         INSERT INTO [DataAcquisitionLogReferenceResource] ([DataAcquisitionLogId], [ReferenceResourceId])
                         SELECT tj.[DataAcquisitionLogId], tj.[KeeperId]
                         FROM #TempJunctionRemap tj
@@ -253,13 +257,12 @@ namespace DataAcquisition.Domain.Migrations
                         DROP TABLE #TempJunctionRemap;
                     END
 
-                    -- Finally delete the duplicate ReferenceResources rows
                     DELETE rr FROM [ReferenceResources] rr 
                     INNER JOIN #ReferenceResourceDedupMap m ON rr.[Id] = m.[DuplicateId];
                 END
             ");
 
-            // 6f. Create unique index (idempotent — will not fail migration if it already exists)
+            // 6f. Create unique index (idempotent)
             migrationBuilder.Sql(@"
                 IF NOT EXISTS (SELECT 1 FROM sys.indexes 
                                WHERE object_id = OBJECT_ID('ReferenceResources') 
