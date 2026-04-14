@@ -317,11 +317,12 @@ namespace DataAcquisition.Domain.Migrations
             //     Keep one row per (FacilityId, ResourceType, ResourceId), re-point junction rows,
             //     then remove duplicates before creating the unique index.
             migrationBuilder.Sql(@"
-                IF EXISTS (
+                 IF EXISTS (
                     SELECT 1
                     FROM [ReferenceResources]
                     GROUP BY [FacilityId], [ResourceType], [ResourceId]
-                    HAVING COUNT(*) > 1)
+                    HAVING COUNT(*) > 1
+                )
                 BEGIN
                     IF OBJECT_ID('tempdb..#ReferenceResourceDedupMap') IS NOT NULL
                         DROP TABLE #ReferenceResourceDedupMap;
@@ -336,8 +337,10 @@ namespace DataAcquisition.Domain.Migrations
                                 PARTITION BY rr.[FacilityId], rr.[ResourceType], rr.[ResourceId]
                                 ORDER BY rr.[CreateDate] ASC, rr.[Id] ASC
                             ) AS rn,
-                            MIN(rr.[Id]) OVER (
+                            -- This is the fix: use the SAME ordering as ROW_NUMBER
+                            FIRST_VALUE(rr.[Id]) OVER (
                                 PARTITION BY rr.[FacilityId], rr.[ResourceType], rr.[ResourceId]
+                                ORDER BY rr.[CreateDate] ASC, rr.[Id] ASC
                             ) AS [KeeperId]
                         FROM [ReferenceResources] rr
                     )
@@ -350,7 +353,7 @@ namespace DataAcquisition.Domain.Migrations
 
                     IF OBJECT_ID('DataAcquisitionLogReferenceResource') IS NOT NULL
                     BEGIN
-                        -- Remove rows that would violate the PK after remap.
+                        -- 1. Remove any rows that would violate the unique/PK constraint after remapping
                         DELETE dalrr
                         FROM [DataAcquisitionLogReferenceResource] dalrr
                         INNER JOIN #ReferenceResourceDedupMap m
@@ -362,7 +365,7 @@ namespace DataAcquisition.Domain.Migrations
                               AND existing.[ReferenceResourceId] = m.[KeeperId]
                         );
 
-                        -- Remap remaining duplicate references to the keeper row.
+                        -- 2. Remap the rest to the keeper
                         UPDATE dalrr
                         SET dalrr.[ReferenceResourceId] = m.[KeeperId]
                         FROM [DataAcquisitionLogReferenceResource] dalrr
@@ -370,7 +373,7 @@ namespace DataAcquisition.Domain.Migrations
                             ON dalrr.[ReferenceResourceId] = m.[DuplicateId];
                     END
 
-                    -- Remove duplicate rows from ReferenceResources.
+                    -- 3. Finally delete the duplicate rows (now safe)
                     DELETE rr
                     FROM [ReferenceResources] rr
                     INNER JOIN #ReferenceResourceDedupMap m
