@@ -28,7 +28,6 @@
   <ItemGroup>
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.*" />
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.*" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
     <PackageReference Include="JWT" Version="10.*" />
