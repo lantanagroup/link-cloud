@@ -202,7 +202,7 @@ namespace DataAcquisition.Domain.Migrations
                     DROP INDEX [IX_ReferenceResources_Facility_Type_ResourceId] ON [ReferenceResources];
             ");
 
-            // 6e. Deduplication
+            // 6e. Deduplication - robust handling of junction table to prevent PK violations
             migrationBuilder.Sql(@"
                 IF EXISTS (SELECT 1 FROM [ReferenceResources] GROUP BY [FacilityId], [ResourceType], [ResourceId] HAVING COUNT(*) > 1)
                 BEGIN
@@ -220,18 +220,39 @@ namespace DataAcquisition.Domain.Migrations
 
                     IF OBJECT_ID('DataAcquisitionLogReferenceResource') IS NOT NULL
                     BEGIN
-                        DELETE dalrr FROM [DataAcquisitionLogReferenceResource] dalrr
-                        INNER JOIN #ReferenceResourceDedupMap m ON dalrr.[ReferenceResourceId] = m.[DuplicateId]
-                        WHERE EXISTS (SELECT 1 FROM [DataAcquisitionLogReferenceResource] existing
-                                      WHERE existing.[DataAcquisitionLogId] = dalrr.[DataAcquisitionLogId]
-                                        AND existing.[ReferenceResourceId] = m.[KeeperId]);
-
-                        UPDATE dalrr SET dalrr.[ReferenceResourceId] = m.[KeeperId]
+                        -- Capture all relationships that need to be remapped (DISTINCT guarantees uniqueness)
+                        IF OBJECT_ID('tempdb..#TempJunctionRemap') IS NOT NULL DROP TABLE #TempJunctionRemap;
+                        
+                        SELECT DISTINCT dalrr.[DataAcquisitionLogId], m.[KeeperId]
+                        INTO #TempJunctionRemap
                         FROM [DataAcquisitionLogReferenceResource] dalrr
-                        INNER JOIN #ReferenceResourceDedupMap m ON dalrr.[ReferenceResourceId] = m.[DuplicateId];
+                        INNER JOIN #ReferenceResourceDedupMap m 
+                            ON dalrr.[ReferenceResourceId] = m.[DuplicateId];
+
+                        -- Delete all existing references to DuplicateIds
+                        DELETE dalrr 
+                        FROM [DataAcquisitionLogReferenceResource] dalrr
+                        INNER JOIN #ReferenceResourceDedupMap m 
+                            ON dalrr.[ReferenceResourceId] = m.[DuplicateId];
+
+                        -- Re-insert the relationships pointing to KeeperId.
+                        -- The DISTINCT + NOT EXISTS guarantees we never violate PK_DataAcquisitionLogReferenceResource.
+                        INSERT INTO [DataAcquisitionLogReferenceResource] ([DataAcquisitionLogId], [ReferenceResourceId])
+                        SELECT tj.[DataAcquisitionLogId], tj.[KeeperId]
+                        FROM #TempJunctionRemap tj
+                        WHERE NOT EXISTS (
+                            SELECT 1 
+                            FROM [DataAcquisitionLogReferenceResource] existing
+                            WHERE existing.[DataAcquisitionLogId] = tj.[DataAcquisitionLogId]
+                              AND existing.[ReferenceResourceId] = tj.[KeeperId]
+                        );
+
+                        DROP TABLE #TempJunctionRemap;
                     END
 
-                    DELETE rr FROM [ReferenceResources] rr INNER JOIN #ReferenceResourceDedupMap m ON rr.[Id] = m.[DuplicateId];
+                    -- Finally delete the duplicate ReferenceResources rows
+                    DELETE rr FROM [ReferenceResources] rr 
+                    INNER JOIN #ReferenceResourceDedupMap m ON rr.[Id] = m.[DuplicateId];
                 END
             ");
 
