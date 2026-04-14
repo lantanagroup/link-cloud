@@ -167,7 +167,19 @@ public class AutomationRunManager : IAutomationRunManager
     public async Task<AutomationRunSummary?> GetRunAsync(Guid runId, CancellationToken cancellationToken = default)
     {
         if (_runs.TryGetValue(runId, out var state))
-            return ToSummary(state);
+        {
+            AutomationRunSummary liveSummary;
+            List<string> liveLogs;
+            lock (state.Sync)
+            {
+                liveSummary = ToSummary(state);
+                liveLogs = state.Logs.ToList();
+            }
+
+            var persistedLogs = await _snapshotStore.GetLogsAsync(runId, cancellationToken);
+            liveSummary.Logs = MergeLogs(persistedLogs, liveLogs);
+            return liveSummary;
+        }
 
         var summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
         if (summary == null)
@@ -223,6 +235,9 @@ public class AutomationRunManager : IAutomationRunManager
                 logs = state.Logs.ToList();
             }
             status = state.Status;
+
+            var persistedLogs = await _snapshotStore.GetLogsAsync(runId, cancellationToken);
+            logs = MergeLogs(persistedLogs, logs);
         }
         else if (summary != null)
         {
@@ -300,6 +315,26 @@ public class AutomationRunManager : IAutomationRunManager
         }
     }
 
+    private static List<string> MergeLogs(IReadOnlyList<string> primary, IReadOnlyList<string> secondary)
+    {
+        var result = new List<string>(primary.Count + secondary.Count);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var line in primary)
+        {
+            if (seen.Add(line))
+                result.Add(line);
+        }
+
+        foreach (var line in secondary)
+        {
+            if (seen.Add(line))
+                result.Add(line);
+        }
+
+        return result;
+    }
+
     private async Task ExecuteAsync(MutableRunState state, CancellationToken cancellationToken)
     {
         state.Status = AutomationRunStatus.Running;
@@ -333,7 +368,9 @@ public class AutomationRunManager : IAutomationRunManager
 
             output.WriteLine($"Starting {state.Scenario} run: {state.RunId}");
             output.WriteLine($"Measure context: {string.Join(", ", state.Options.SelectedMeasures.Select(m => $"{ProfiledMeasureCatalog.GetDisplayName(m)} ({m})"))}");
-            output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, prefix={state.Options.Prefix}, seed={state.Options.Seed}");
+            // Ensure globally unique generated patient IDs per run.
+            var runScopedPrefix = BuildRunScopedPatientPrefix(state.Options.Prefix, state.RunId);
+            output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, prefix={runScopedPrefix}, seed={state.Options.Seed}");
 
             List<string> patientIds;
             List<(string Name, string Json)> bundles;
@@ -359,7 +396,7 @@ public class AutomationRunManager : IAutomationRunManager
                     selectedMeasures,
                     profiles,
                     state.Options.ResourcesPerPatient,
-                    state.Options.Prefix,
+                    runScopedPrefix,
                     state.Options.Seed,
                     generationConfig);
 
@@ -370,7 +407,7 @@ public class AutomationRunManager : IAutomationRunManager
             else
             {
                 (patientIds, bundles) = FhirBundleGenerator.Generate(
-                    output, state.Options.PatientCount, state.Options.ResourcesPerPatient, state.Options.Prefix, state.Options.Seed,
+                    output, state.Options.PatientCount, state.Options.ResourcesPerPatient, runScopedPrefix, state.Options.Seed,
                     generationConfig);
 
                 expectedSubmittedPatientIds = patientIds.ToList();
@@ -690,6 +727,17 @@ public class AutomationRunManager : IAutomationRunManager
             DownloadFileName = downloadFileName,
             LokiScrapeWindowMinutes = options.LokiScrapeWindowMinutes
         };
+    }
+
+    private static string BuildRunScopedPatientPrefix(string basePrefix, Guid runId)
+    {
+        var suffix = runId.ToString("N")[..8];
+        var safeBase = string.IsNullOrWhiteSpace(basePrefix) ? "Patient" : basePrefix.Trim();
+        var combined = $"{safeBase}-{suffix}";
+
+        return combined.Length <= 64
+            ? combined
+            : combined[..64];
     }
 
     private ResolvedRunOptions ResolveRunOptions(StartScenarioRequest request)
