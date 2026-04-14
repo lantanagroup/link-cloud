@@ -9,18 +9,11 @@ namespace DataAcquisition.Domain.Migrations
 {
     /// <summary>
     /// Single collapsed migration for the DataAcquisition performance-tuning branch.
-    /// 
-    /// Net schema changes from the pre-branch baseline:
-    /// 
-    ///  1. RCSI — Enable Read Committed Snapshot Isolation (eliminates reader/writer deadlocks).
-    ///  2. ScheduledReports — Normalise ScheduledReport JSON ? dedicated table + FK on DataAcquisitionLog.
-    ///  3. DataAcquisitionLogNotes — Normalise Notes JSON ? dedicated child table.
-    ///  4. DataAcquisitionLogResourceIds — Normalise ResourceAcquiredIds JSON ? dedicated child table.
-    ///  5. ReferenceResources — Max-length columns, unique composite index, remove DataAcquisitionLogId FK.
-    ///  6. DataAcquisitionLogReferenceResource — Junction table for the many-to-many relationship.
-    ///  7. SiblingCount column + IX_DataAcquisitionLogs_InlineTail index.
-    ///  8. New performance indexes on DataAcquisitionLog.
-    ///  9. Rebuild existing covering indexes to exclude the dropped columns.
+    ///
+    /// - All preparatory steps are fully idempotent and resilient.
+    /// - Final CreateIndex / AddForeignKey calls are wrapped so they do NOT fail the migration
+    ///   if the index or FK already exists (exactly what you asked for).
+    ///   They will still fail the migration for any other error.
     /// </summary>
     [DbContext(typeof(DataAcquisitionDbContext))]
     [Migration("20260418000000_PerformanceTuningCollapsed")]
@@ -28,150 +21,102 @@ namespace DataAcquisition.Domain.Migrations
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // ???????????????????????????????????????????????????????????????
             // 1. RCSI
-            // ???????????????????????????????????????????????????????????????
             migrationBuilder.Sql(@"
                 DECLARE @dbname NVARCHAR(256) = DB_NAME();
-                DECLARE @sql NVARCHAR(MAX) = 
+                DECLARE @sql NVARCHAR(MAX) =
                     N'ALTER DATABASE ' + QUOTENAME(@dbname) + N' SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE';
                 EXEC sp_executesql @sql;
             ", suppressTransaction: true);
 
-            // ???????????????????????????????????????????????????????????????
-            // 2. ScheduledReports table + FK on DataAcquisitionLog
-            // ???????????????????????????????????????????????????????????????
-            migrationBuilder.CreateTable(
-                name: "ScheduledReports",
-                columns: table => new
-                {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    ReportTrackingId = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: false),
-                    Frequency = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
-                    StartDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    EndDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ReportTypes = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
-                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ScheduledReports", x => x.Id);
-                });
-
-            migrationBuilder.CreateIndex(
-                name: "UX_ScheduledReports_ReportTrackingId",
-                table: "ScheduledReports",
-                column: "ReportTrackingId",
-                unique: true);
-
-            migrationBuilder.AddColumn<long>(
-                name: "ScheduledReportId",
-                table: "DataAcquisitionLog",
-                type: "bigint",
-                nullable: true);
-
-            // Populate ScheduledReports from existing JSON
+            // 2. ScheduledReports + column + data migration (idempotent)
             migrationBuilder.Sql(@"
+                IF OBJECT_ID('ScheduledReports') IS NULL
+                BEGIN
+                    CREATE TABLE [ScheduledReports] (
+                        [Id] bigint IDENTITY(1,1) NOT NULL,
+                        [ReportTrackingId] nvarchar(256) NOT NULL,
+                        [Frequency] nvarchar(50) NOT NULL,
+                        [StartDate] datetime2 NOT NULL,
+                        [EndDate] datetime2 NOT NULL,
+                        [ReportTypes] nvarchar(2000) NULL,
+                        [CreateDate] datetime2 NOT NULL,
+                        CONSTRAINT [PK_ScheduledReports] PRIMARY KEY CLUSTERED ([Id])
+                    );
+                    CREATE UNIQUE NONCLUSTERED INDEX [UX_ScheduledReports_ReportTrackingId] ON [ScheduledReports]([ReportTrackingId]);
+                END
+
+                IF COL_LENGTH('DataAcquisitionLog', 'ScheduledReportId') IS NULL
+                    ALTER TABLE [DataAcquisitionLog] ADD [ScheduledReportId] bigint NULL;
+
                 INSERT INTO [ScheduledReports] ([ReportTrackingId], [Frequency], [StartDate], [EndDate], [ReportTypes], [CreateDate])
                 SELECT
                     dal.[ReportTrackingId],
                     COALESCE(NULLIF(JSON_VALUE(dal.[ScheduledReport], '$.Frequency'), ''), 'Adhoc'),
                     COALESCE(TRY_CAST(JSON_VALUE(dal.[ScheduledReport], '$.StartDate') AS datetime2), dal.[ReportStartDate], '1900-01-01'),
                     COALESCE(TRY_CAST(JSON_VALUE(dal.[ScheduledReport], '$.EndDate') AS datetime2), dal.[ReportEndDate], '1900-01-01'),
-                    (
-                        SELECT STRING_AGG(rt.[value], ',')
-                        FROM OPENJSON(dal.[ScheduledReport], '$.ReportTypes') rt
-                    ),
+                    (SELECT STRING_AGG(rt.[value], ',') FROM OPENJSON(dal.[ScheduledReport], '$.ReportTypes') rt),
                     GETUTCDATE()
                 FROM (
-                    SELECT
-                        [ReportTrackingId], [ScheduledReport], [ReportStartDate], [ReportEndDate],
-                        ROW_NUMBER() OVER (PARTITION BY [ReportTrackingId] ORDER BY [Id]) AS rn
+                    SELECT [ReportTrackingId], [ScheduledReport], [ReportStartDate], [ReportEndDate],
+                           ROW_NUMBER() OVER (PARTITION BY [ReportTrackingId] ORDER BY [Id]) AS rn
                     FROM [DataAcquisitionLog]
                     WHERE [ScheduledReport] IS NOT NULL AND [ReportTrackingId] IS NOT NULL
                 ) dal
-                WHERE dal.rn = 1;
+                WHERE dal.rn = 1
+                  AND NOT EXISTS (SELECT 1 FROM [ScheduledReports] sr WHERE sr.[ReportTrackingId] = dal.[ReportTrackingId]);
 
                 UPDATE dal
                 SET dal.[ScheduledReportId] = sr.[Id]
                 FROM [DataAcquisitionLog] dal
                 INNER JOIN [ScheduledReports] sr ON dal.[ReportTrackingId] = sr.[ReportTrackingId]
-                WHERE dal.[ScheduledReport] IS NOT NULL;
+                WHERE dal.[ScheduledReport] IS NOT NULL AND dal.[ScheduledReportId] IS NULL;
             ");
 
-            // ???????????????????????????????????????????????????????????????
-            // 3. DataAcquisitionLogNotes table
-            // ???????????????????????????????????????????????????????????????
-            migrationBuilder.CreateTable(
-                name: "DataAcquisitionLogNotes",
-                columns: table => new
-                {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    DataAcquisitionLogId = table.Column<long>(type: "bigint", nullable: false),
-                    Note = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_DataAcquisitionLogNotes", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_DataAcquisitionLogNotes_DataAcquisitionLog_DataAcquisitionLogId",
-                        column: x => x.DataAcquisitionLogId,
-                        principalTable: "DataAcquisitionLog",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_DataAcquisitionLogNotes_DataAcquisitionLogId",
-                table: "DataAcquisitionLogNotes",
-                column: "DataAcquisitionLogId");
-
-            // Migrate Notes JSON ? child rows
+            // 3. DataAcquisitionLogNotes (idempotent)
             migrationBuilder.Sql(@"
+                IF OBJECT_ID('DataAcquisitionLogNotes') IS NULL
+                BEGIN
+                    CREATE TABLE [DataAcquisitionLogNotes] (
+                        [Id] bigint IDENTITY(1,1) NOT NULL,
+                        [DataAcquisitionLogId] bigint NOT NULL,
+                        [Note] nvarchar(max) NOT NULL,
+                        [CreateDate] datetime2 NOT NULL,
+                        CONSTRAINT [PK_DataAcquisitionLogNotes] PRIMARY KEY CLUSTERED ([Id]),
+                        CONSTRAINT [FK_DataAcquisitionLogNotes_DataAcquisitionLog_DataAcquisitionLogId]
+                            FOREIGN KEY ([DataAcquisitionLogId]) REFERENCES [DataAcquisitionLog]([Id]) ON DELETE CASCADE
+                    );
+                    CREATE NONCLUSTERED INDEX [IX_DataAcquisitionLogNotes_DataAcquisitionLogId] ON [DataAcquisitionLogNotes]([DataAcquisitionLogId]);
+                END
+
                 IF COL_LENGTH('DataAcquisitionLog', 'Notes') IS NOT NULL
                 BEGIN
                     INSERT INTO [DataAcquisitionLogNotes] ([DataAcquisitionLogId], [Note], [CreateDate])
                     SELECT dal.[Id], CAST(j.[value] AS nvarchar(max)), GETUTCDATE()
                     FROM [DataAcquisitionLog] dal
                     CROSS APPLY OPENJSON(dal.[Notes]) j
-                    WHERE dal.[Notes] IS NOT NULL AND ISJSON(dal.[Notes]) = 1;
+                    WHERE dal.[Notes] IS NOT NULL AND ISJSON(dal.[Notes]) = 1
+                      AND NOT EXISTS (SELECT 1 FROM [DataAcquisitionLogNotes] n 
+                                      WHERE n.[DataAcquisitionLogId] = dal.[Id] AND n.[Note] = CAST(j.[value] AS nvarchar(max)));
                 END
             ");
 
-            // ???????????????????????????????????????????????????????????????
-            // 4. DataAcquisitionLogResourceIds table
-            // ???????????????????????????????????????????????????????????????
-            migrationBuilder.CreateTable(
-                name: "DataAcquisitionLogResourceIds",
-                columns: table => new
-                {
-                    Id = table.Column<long>(type: "bigint", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    DataAcquisitionLogId = table.Column<long>(type: "bigint", nullable: false),
-                    ResourceId = table.Column<string>(type: "nvarchar(512)", maxLength: 512, nullable: false),
-                    CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_DataAcquisitionLogResourceIds", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_DataAcquisitionLogResourceIds_DataAcquisitionLog_DataAcquisitionLogId",
-                        column: x => x.DataAcquisitionLogId,
-                        principalTable: "DataAcquisitionLog",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_DataAcquisitionLogResourceIds_DataAcquisitionLogId",
-                table: "DataAcquisitionLogResourceIds",
-                column: "DataAcquisitionLogId");
-
-            // Migrate ResourceAcquiredIds JSON ? child rows
+            // 4. DataAcquisitionLogResourceIds (idempotent)
             migrationBuilder.Sql(@"
+                IF OBJECT_ID('DataAcquisitionLogResourceIds') IS NULL
+                BEGIN
+                    CREATE TABLE [DataAcquisitionLogResourceIds] (
+                        [Id] bigint IDENTITY(1,1) NOT NULL,
+                        [DataAcquisitionLogId] bigint NOT NULL,
+                        [ResourceId] nvarchar(512) NOT NULL,
+                        [CreateDate] datetime2 NOT NULL,
+                        CONSTRAINT [PK_DataAcquisitionLogResourceIds] PRIMARY KEY CLUSTERED ([Id]),
+                        CONSTRAINT [FK_DataAcquisitionLogResourceIds_DataAcquisitionLog_DataAcquisitionLogId]
+                            FOREIGN KEY ([DataAcquisitionLogId]) REFERENCES [DataAcquisitionLog]([Id]) ON DELETE CASCADE
+                    );
+                    CREATE NONCLUSTERED INDEX [IX_DataAcquisitionLogResourceIds_DataAcquisitionLogId] ON [DataAcquisitionLogResourceIds]([DataAcquisitionLogId]);
+                END
+
                 IF COL_LENGTH('DataAcquisitionLog', 'ResourceAcquiredIds') IS NOT NULL
                 BEGIN
                     INSERT INTO [DataAcquisitionLogResourceIds] ([DataAcquisitionLogId], [ResourceId], [CreateDate])
@@ -180,345 +125,202 @@ namespace DataAcquisition.Domain.Migrations
                     CROSS APPLY OPENJSON(dal.[ResourceAcquiredIds]) j
                     WHERE dal.[ResourceAcquiredIds] IS NOT NULL
                       AND dal.[ResourceAcquiredIds] <> '[]'
-                      AND dal.[ResourceAcquiredIds] <> 'null';
+                      AND dal.[ResourceAcquiredIds] <> 'null'
+                      AND NOT EXISTS (SELECT 1 FROM [DataAcquisitionLogResourceIds] r 
+                                      WHERE r.[DataAcquisitionLogId] = dal.[Id] AND r.[ResourceId] = j.[value]);
                 END
             ");
 
-            // ???????????????????????????????????????????????????????????????
-            // 5. SiblingCount column
-            // ???????????????????????????????????????????????????????????????
-            migrationBuilder.AddColumn<int>(
-                name: "SiblingCount",
-                table: "DataAcquisitionLog",
-                type: "int",
-                nullable: true);
+            // 5. SiblingCount
+            migrationBuilder.Sql(@"
+                IF COL_LENGTH('DataAcquisitionLog', 'SiblingCount') IS NULL
+                    ALTER TABLE [DataAcquisitionLog] ADD [SiblingCount] int NULL;
+            ");
 
-            // ???????????????????????????????????????????????????????????????
-            // 6. ReferenceResources — max-length columns, unique index, junction table
-            // ???????????????????????????????????????????????????????????????
+            // 6a. Alter columns
+            migrationBuilder.AlterColumn<string>(name: "FacilityId", table: "ReferenceResources", type: "nvarchar(256)", maxLength: 256, nullable: false);
+            migrationBuilder.AlterColumn<string>(name: "ResourceId", table: "ReferenceResources", type: "nvarchar(256)", maxLength: 256, nullable: false);
+            migrationBuilder.AlterColumn<string>(name: "ResourceType", table: "ReferenceResources", type: "nvarchar(128)", maxLength: 128, nullable: false);
 
-            // 6a. Alter columns from nvarchar(max) to bounded lengths
-            migrationBuilder.AlterColumn<string>(
-                name: "FacilityId",
-                table: "ReferenceResources",
-                type: "nvarchar(256)",
-                maxLength: 256,
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "nvarchar(max)");
+            // 6b. Junction table
+            migrationBuilder.Sql(@"
+                IF OBJECT_ID('DataAcquisitionLogReferenceResource') IS NULL
+                BEGIN
+                    CREATE TABLE [DataAcquisitionLogReferenceResource] (
+                        [DataAcquisitionLogId] bigint NOT NULL,
+                        [ReferenceResourceId] uniqueidentifier NOT NULL,
+                        CONSTRAINT [PK_DataAcquisitionLogReferenceResource] PRIMARY KEY CLUSTERED ([DataAcquisitionLogId], [ReferenceResourceId]),
+                        CONSTRAINT [FK_DataAcquisitionLogReferenceResource_DataAcquisitionLog_DataAcquisitionLogId] FOREIGN KEY ([DataAcquisitionLogId]) REFERENCES [DataAcquisitionLog]([Id]) ON DELETE CASCADE,
+                        CONSTRAINT [FK_DataAcquisitionLogReferenceResource_ReferenceResources_ReferenceResourceId] FOREIGN KEY ([ReferenceResourceId]) REFERENCES [ReferenceResources]([Id]) ON DELETE CASCADE
+                    );
+                    CREATE NONCLUSTERED INDEX [IX_DataAcquisitionLogReferenceResource_ReferenceResourceId] ON [DataAcquisitionLogReferenceResource]([ReferenceResourceId]);
+                END
+            ");
 
-            migrationBuilder.AlterColumn<string>(
-                name: "ResourceId",
-                table: "ReferenceResources",
-                type: "nvarchar(256)",
-                maxLength: 256,
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "nvarchar(max)");
-
-            migrationBuilder.AlterColumn<string>(
-                name: "ResourceType",
-                table: "ReferenceResources",
-                type: "nvarchar(128)",
-                maxLength: 128,
-                nullable: false,
-                oldClrType: typeof(string),
-                oldType: "nvarchar(max)");
-
-            // 6b. Create the junction table
-            migrationBuilder.CreateTable(
-                name: "DataAcquisitionLogReferenceResource",
-                columns: table => new
-                {
-                    DataAcquisitionLogId = table.Column<long>(type: "bigint", nullable: false),
-                    ReferenceResourceId = table.Column<Guid>(type: "uniqueidentifier", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_DataAcquisitionLogReferenceResource", x => new { x.DataAcquisitionLogId, x.ReferenceResourceId });
-                    table.ForeignKey(
-                        name: "FK_DataAcquisitionLogReferenceResource_DataAcquisitionLog_DataAcquisitionLogId",
-                        column: x => x.DataAcquisitionLogId,
-                        principalTable: "DataAcquisitionLog",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_DataAcquisitionLogReferenceResource_ReferenceResources_ReferenceResourceId",
-                        column: x => x.ReferenceResourceId,
-                        principalTable: "ReferenceResources",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateIndex(
-                name: "IX_DataAcquisitionLogReferenceResource_ReferenceResourceId",
-                table: "DataAcquisitionLogReferenceResource",
-                column: "ReferenceResourceId");
-
-            // 6c. Migrate existing FK relationships into junction table, then drop old FK/column
+            // 6c. Migrate old FK data + robust drop
             migrationBuilder.Sql(@"
                 IF COL_LENGTH('ReferenceResources', 'DataAcquisitionLogId') IS NOT NULL
                 BEGIN
                     INSERT INTO [DataAcquisitionLogReferenceResource] ([DataAcquisitionLogId], [ReferenceResourceId])
                     SELECT DISTINCT [DataAcquisitionLogId], [Id]
                     FROM [ReferenceResources]
-                    WHERE [DataAcquisitionLogId] IS NOT NULL;
+                    WHERE [DataAcquisitionLogId] IS NOT NULL
+                      AND NOT EXISTS (SELECT 1 FROM [DataAcquisitionLogReferenceResource] j 
+                                      WHERE j.[DataAcquisitionLogId] = [ReferenceResources].[DataAcquisitionLogId]
+                                        AND j.[ReferenceResourceId] = [ReferenceResources].[Id]);
 
-                    -- Drop FK constraints on DataAcquisitionLogId
                     DECLARE @fkName sysname;
-                    DECLARE @sql nvarchar(500);
-
-                    SELECT TOP 1 @fkName = fk.name
-                    FROM sys.foreign_keys fk
-                    INNER JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
-                    INNER JOIN sys.columns c ON c.object_id = fkc.parent_object_id AND c.column_id = fkc.parent_column_id
-                    WHERE fk.parent_object_id = OBJECT_ID('ReferenceResources')
-                      AND c.name = 'DataAcquisitionLogId';
-
-                    WHILE @fkName IS NOT NULL
+                    DECLARE @dropSql nvarchar(500);
+                    WHILE 1 = 1
                     BEGIN
-                        SET @sql = N'ALTER TABLE [ReferenceResources] DROP CONSTRAINT [' + @fkName + N']';
-                        EXEC sp_executesql @sql;
-
                         SET @fkName = NULL;
                         SELECT TOP 1 @fkName = fk.name
                         FROM sys.foreign_keys fk
                         INNER JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
                         INNER JOIN sys.columns c ON c.object_id = fkc.parent_object_id AND c.column_id = fkc.parent_column_id
-                        WHERE fk.parent_object_id = OBJECT_ID('ReferenceResources')
-                          AND c.name = 'DataAcquisitionLogId';
+                        WHERE fk.parent_object_id = OBJECT_ID('ReferenceResources') AND c.name = 'DataAcquisitionLogId';
+
+                        IF @fkName IS NULL BREAK;
+
+                        IF EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = @fkName)
+                        BEGIN
+                            SET @dropSql = N'ALTER TABLE [ReferenceResources] DROP CONSTRAINT [' + @fkName + N']';
+                            EXEC sp_executesql @dropSql;
+                        END
                     END
 
-                    -- Drop old index on DataAcquisitionLogId
-                    IF EXISTS (
-                        SELECT 1 FROM sys.indexes
-                        WHERE object_id = OBJECT_ID('ReferenceResources')
-                          AND name = 'IX_ReferenceResources_DataAcquisitionLogId')
-                    BEGIN
+                    IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('ReferenceResources') AND name = 'IX_ReferenceResources_DataAcquisitionLogId')
                         DROP INDEX [IX_ReferenceResources_DataAcquisitionLogId] ON [ReferenceResources];
-                    END
 
                     ALTER TABLE [ReferenceResources] DROP COLUMN [DataAcquisitionLogId];
                 END
             ");
 
-            // 6d. Create unique composite index (replaces old non-unique one if any)
+            // 6d. Drop old index safely
             migrationBuilder.Sql(@"
-                IF EXISTS (
-                    SELECT 1 FROM sys.indexes
-                    WHERE object_id = OBJECT_ID('ReferenceResources')
-                      AND name = 'IX_ReferenceResources_Facility_Type_ResourceId')
-                BEGIN
+                IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('ReferenceResources') AND name = 'IX_ReferenceResources_Facility_Type_ResourceId')
                     DROP INDEX [IX_ReferenceResources_Facility_Type_ResourceId] ON [ReferenceResources];
-                END
             ");
 
-            // 6e. Safety dedupe for legacy duplicate ReferenceResources rows.
-            //     Keep one row per (FacilityId, ResourceType, ResourceId), re-point junction rows,
-            //     then remove duplicates before creating the unique index.
+            // 6e. Deduplication
             migrationBuilder.Sql(@"
-                 IF EXISTS (
-                    SELECT 1
-                    FROM [ReferenceResources]
-                    GROUP BY [FacilityId], [ResourceType], [ResourceId]
-                    HAVING COUNT(*) > 1
-                )
+                IF EXISTS (SELECT 1 FROM [ReferenceResources] GROUP BY [FacilityId], [ResourceType], [ResourceId] HAVING COUNT(*) > 1)
                 BEGIN
-                    IF OBJECT_ID('tempdb..#ReferenceResourceDedupMap') IS NOT NULL
-                        DROP TABLE #ReferenceResourceDedupMap;
+                    IF OBJECT_ID('tempdb..#ReferenceResourceDedupMap') IS NOT NULL DROP TABLE #ReferenceResourceDedupMap;
 
                     ;WITH Ranked AS (
-                        SELECT
-                            rr.[Id],
-                            rr.[FacilityId],
-                            rr.[ResourceType],
-                            rr.[ResourceId],
-                            ROW_NUMBER() OVER (
-                                PARTITION BY rr.[FacilityId], rr.[ResourceType], rr.[ResourceId]
-                                ORDER BY rr.[CreateDate] ASC, rr.[Id] ASC
-                            ) AS rn,
-                            -- This is the fix: use the SAME ordering as ROW_NUMBER
-                            FIRST_VALUE(rr.[Id]) OVER (
-                                PARTITION BY rr.[FacilityId], rr.[ResourceType], rr.[ResourceId]
-                                ORDER BY rr.[CreateDate] ASC, rr.[Id] ASC
-                            ) AS [KeeperId]
+                        SELECT rr.[Id], rr.[FacilityId], rr.[ResourceType], rr.[ResourceId],
+                               ROW_NUMBER() OVER (PARTITION BY rr.[FacilityId], rr.[ResourceType], rr.[ResourceId] ORDER BY rr.[CreateDate] ASC, rr.[Id] ASC) AS rn,
+                               FIRST_VALUE(rr.[Id]) OVER (PARTITION BY rr.[FacilityId], rr.[ResourceType], rr.[ResourceId] ORDER BY rr.[CreateDate] ASC, rr.[Id] ASC) AS [KeeperId]
                         FROM [ReferenceResources] rr
                     )
-                    SELECT
-                        r.[Id] AS [DuplicateId],
-                        r.[KeeperId]
+                    SELECT r.[Id] AS [DuplicateId], r.[KeeperId]
                     INTO #ReferenceResourceDedupMap
-                    FROM Ranked r
-                    WHERE r.rn > 1;
+                    FROM Ranked r WHERE r.rn > 1;
 
                     IF OBJECT_ID('DataAcquisitionLogReferenceResource') IS NOT NULL
                     BEGIN
-                        -- 1. Remove any rows that would violate the unique/PK constraint after remapping
-                        DELETE dalrr
-                        FROM [DataAcquisitionLogReferenceResource] dalrr
-                        INNER JOIN #ReferenceResourceDedupMap m
-                            ON dalrr.[ReferenceResourceId] = m.[DuplicateId]
-                        WHERE EXISTS (
-                            SELECT 1
-                            FROM [DataAcquisitionLogReferenceResource] existing
-                            WHERE existing.[DataAcquisitionLogId] = dalrr.[DataAcquisitionLogId]
-                              AND existing.[ReferenceResourceId] = m.[KeeperId]
-                        );
+                        DELETE dalrr FROM [DataAcquisitionLogReferenceResource] dalrr
+                        INNER JOIN #ReferenceResourceDedupMap m ON dalrr.[ReferenceResourceId] = m.[DuplicateId]
+                        WHERE EXISTS (SELECT 1 FROM [DataAcquisitionLogReferenceResource] existing
+                                      WHERE existing.[DataAcquisitionLogId] = dalrr.[DataAcquisitionLogId]
+                                        AND existing.[ReferenceResourceId] = m.[KeeperId]);
 
-                        -- 2. Remap the rest to the keeper
-                        UPDATE dalrr
-                        SET dalrr.[ReferenceResourceId] = m.[KeeperId]
+                        UPDATE dalrr SET dalrr.[ReferenceResourceId] = m.[KeeperId]
                         FROM [DataAcquisitionLogReferenceResource] dalrr
-                        INNER JOIN #ReferenceResourceDedupMap m
-                            ON dalrr.[ReferenceResourceId] = m.[DuplicateId];
+                        INNER JOIN #ReferenceResourceDedupMap m ON dalrr.[ReferenceResourceId] = m.[DuplicateId];
                     END
 
-                    -- 3. Finally delete the duplicate rows (now safe)
-                    DELETE rr
-                    FROM [ReferenceResources] rr
-                    INNER JOIN #ReferenceResourceDedupMap m
-                        ON rr.[Id] = m.[DuplicateId];
+                    DELETE rr FROM [ReferenceResources] rr INNER JOIN #ReferenceResourceDedupMap m ON rr.[Id] = m.[DuplicateId];
                 END
             ");
 
-            migrationBuilder.CreateIndex(
-                name: "IX_ReferenceResources_Facility_Type_ResourceId",
-                table: "ReferenceResources",
-                columns: new[] { "FacilityId", "ResourceType", "ResourceId" },
-                unique: true);
-
-            // ???????????????????????????????????????????????????????????????
-            // 7. Drop old JSON columns and rebuild all affected indexes
-            //    Order: drop indexes ? drop columns ? recreate indexes
-            // ???????????????????????????????????????????????????????????????
-
-            // 7a. Drop existing indexes that include any of the columns being removed
+            // 6f. Create unique index (idempotent — will not fail migration if it already exists)
             migrationBuilder.Sql(@"
-                IF EXISTS (
-                    SELECT 1 FROM sys.indexes
-                    WHERE object_id = OBJECT_ID('DataAcquisitionLog')
-                      AND name = 'IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id')
-                BEGIN
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes 
+                               WHERE object_id = OBJECT_ID('ReferenceResources') 
+                                 AND name = 'IX_ReferenceResources_Facility_Type_ResourceId')
+                    CREATE UNIQUE NONCLUSTERED INDEX [IX_ReferenceResources_Facility_Type_ResourceId]
+                    ON [ReferenceResources] ([FacilityId], [ResourceType], [ResourceId]);
+            ");
+
+            // 7. Drop old JSON columns safely
+            migrationBuilder.Sql(@"
+                IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id')
                     DROP INDEX [IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id] ON [DataAcquisitionLog];
-                END
 
-                IF EXISTS (
-                    SELECT 1 FROM sys.indexes
-                    WHERE object_id = OBJECT_ID('DataAcquisitionLog')
-                      AND name = 'IX_DataAcquisitionLogs_TailSent_Status')
-                BEGIN
+                IF EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_TailSent_Status')
                     DROP INDEX [IX_DataAcquisitionLogs_TailSent_Status] ON [DataAcquisitionLog];
-                END
-            ");
 
-            // 7b. Drop the ScheduledReport JSON column
-            migrationBuilder.DropColumn(
-                name: "ScheduledReport",
-                table: "DataAcquisitionLog");
+                IF COL_LENGTH('DataAcquisitionLog', 'ScheduledReport') IS NOT NULL
+                    ALTER TABLE [DataAcquisitionLog] DROP COLUMN [ScheduledReport];
 
-            // 7c. Drop the Notes JSON column (with default constraint cleanup)
-            migrationBuilder.Sql(@"
                 IF COL_LENGTH('DataAcquisitionLog', 'Notes') IS NOT NULL
                 BEGIN
                     DECLARE @dfName sysname;
-                    SELECT @dfName = dc.[name]
-                    FROM sys.default_constraints dc
+                    SELECT @dfName = dc.[name] FROM sys.default_constraints dc
                     INNER JOIN sys.columns c ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id
                     WHERE dc.parent_object_id = OBJECT_ID('DataAcquisitionLog') AND c.[name] = 'Notes';
-
-                    IF @dfName IS NOT NULL
-                        EXEC('ALTER TABLE [DataAcquisitionLog] DROP CONSTRAINT [' + @dfName + ']');
-
+                    IF @dfName IS NOT NULL EXEC('ALTER TABLE [DataAcquisitionLog] DROP CONSTRAINT [' + @dfName + ']');
                     ALTER TABLE [DataAcquisitionLog] DROP COLUMN [Notes];
                 END
-            ");
 
-            // 7d. Drop the ResourceAcquiredIds JSON column
-            migrationBuilder.Sql(@"
                 IF COL_LENGTH('DataAcquisitionLog', 'ResourceAcquiredIds') IS NOT NULL
                 BEGIN
                     DECLARE @dfName2 sysname;
-                    SELECT @dfName2 = dc.[name]
-                    FROM sys.default_constraints dc
+                    SELECT @dfName2 = dc.[name] FROM sys.default_constraints dc
                     INNER JOIN sys.columns c ON dc.parent_object_id = c.object_id AND dc.parent_column_id = c.column_id
                     WHERE dc.parent_object_id = OBJECT_ID('DataAcquisitionLog') AND c.[name] = 'ResourceAcquiredIds';
-
-                    IF @dfName2 IS NOT NULL
-                        EXEC('ALTER TABLE [DataAcquisitionLog] DROP CONSTRAINT [' + @dfName2 + ']');
-
+                    IF @dfName2 IS NOT NULL EXEC('ALTER TABLE [DataAcquisitionLog] DROP CONSTRAINT [' + @dfName2 + ']');
                     ALTER TABLE [DataAcquisitionLog] DROP COLUMN [ResourceAcquiredIds];
                 END
             ");
 
-            // ???????????????????????????????????????????????????????????????
-            // 8. Recreate / create all indexes on DataAcquisitionLog
-            //    (now that all columns are in their final state)
-            // ???????????????????????????????????????????????????????????????
+            // 8. Final indexes and FK — now idempotent (will not fail migration if they already exist)
+            migrationBuilder.Sql(@"
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id')
+                    CREATE NONCLUSTERED INDEX [IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id]
+                    ON [DataAcquisitionLog] ([FacilityId], [Status], [ExecutionDate], [Id])
+                    INCLUDE ([Priority], [IsCensus], [PatientId], [ReportableEvent],
+                             [ReportTrackingId], [CorrelationId], [FhirVersion],
+                             [QueryType], [QueryPhase], [TraceId], [RetryAttempts],
+                             [CompletionDate], [CompletionTimeMilliseconds]);
 
-            // 8a. IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id
-            //     — no ScheduledReport, Notes, or ResourceAcquiredIds in INCLUDE
-            migrationBuilder.CreateIndex(
-                name: "IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id",
-                table: "DataAcquisitionLog",
-                columns: new[] { "FacilityId", "Status", "ExecutionDate", "Id" })
-                .Annotation("SqlServer:Include", new[] {
-                    "Priority", "IsCensus", "PatientId", "ReportableEvent",
-                    "ReportTrackingId", "CorrelationId", "FhirVersion",
-                    "QueryType", "QueryPhase", "TraceId", "RetryAttempts",
-                    "CompletionDate", "CompletionTimeMilliseconds"
-                });
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_ReportTrackingId_IsDeleted')
+                    CREATE NONCLUSTERED INDEX [IX_DataAcquisitionLogs_ReportTrackingId_IsDeleted]
+                    ON [DataAcquisitionLog] ([ReportTrackingId], [IsDeleted])
+                    INCLUDE ([PatientId], [Status], [RetryAttempts], [CompletionTimeMilliseconds]);
 
-            // 8b. IX_DataAcquisitionLogs_ReportTrackingId_IsDeleted (new)
-            migrationBuilder.CreateIndex(
-                name: "IX_DataAcquisitionLogs_ReportTrackingId_IsDeleted",
-                table: "DataAcquisitionLog",
-                columns: new[] { "ReportTrackingId", "IsDeleted" })
-                .Annotation("SqlServer:Include", new[] {
-                    "PatientId", "Status", "RetryAttempts", "CompletionTimeMilliseconds"
-                });
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_IsDeleted_Id')
+                    CREATE NONCLUSTERED INDEX [IX_DataAcquisitionLogs_IsDeleted_Id]
+                    ON [DataAcquisitionLog] ([IsDeleted], [Id])
+                    INCLUDE ([Priority], [FacilityId], [PatientId], [ReportTrackingId],
+                             [FhirVersion], [QueryType], [QueryPhase],
+                             [ExecutionDate], [CreateDate], [RetryAttempts], [Status]);
 
-            // 8c. IX_DataAcquisitionLogs_IsDeleted_Id (new — default UI pagination)
-            migrationBuilder.CreateIndex(
-                name: "IX_DataAcquisitionLogs_IsDeleted_Id",
-                table: "DataAcquisitionLog",
-                columns: new[] { "IsDeleted", "Id" })
-                .Annotation("SqlServer:Include", new[] {
-                    "Priority", "FacilityId", "PatientId", "ReportTrackingId",
-                    "FhirVersion", "QueryType", "QueryPhase",
-                    "ExecutionDate", "CreateDate", "RetryAttempts", "Status"
-                });
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_TailSent_Status')
+                    CREATE NONCLUSTERED INDEX [IX_DataAcquisitionLogs_TailSent_Status]
+                    ON [DataAcquisitionLog] ([TailSent], [Status])
+                    INCLUDE ([FacilityId], [ReportTrackingId], [CorrelationId],
+                             [ReportStartDate], [ReportEndDate], [QueryPhase],
+                             [TraceId], [PatientId], [ReportableEvent], [ScheduledReportId]);
 
-            // 8d. IX_DataAcquisitionLogs_TailSent_Status (new — tailing query)
-            migrationBuilder.CreateIndex(
-                name: "IX_DataAcquisitionLogs_TailSent_Status",
-                table: "DataAcquisitionLog",
-                columns: new[] { "TailSent", "Status" })
-                .Annotation("SqlServer:Include", new[] {
-                    "FacilityId", "ReportTrackingId", "CorrelationId",
-                    "ReportStartDate", "ReportEndDate", "QueryPhase",
-                    "TraceId", "PatientId", "ReportableEvent", "ScheduledReportId"
-                });
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_InlineTail')
+                    CREATE NONCLUSTERED INDEX [IX_DataAcquisitionLogs_InlineTail]
+                    ON [DataAcquisitionLog] ([TailSent], [SiblingCount], [FacilityId], [CorrelationId], [QueryPhase], [Status])
+                    WHERE [TailSent] = 0 AND [SiblingCount] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [QueryPhase] IS NOT NULL;
 
-            // 8e. IX_DataAcquisitionLogs_InlineTail (new — inline tail completion check)
-            migrationBuilder.CreateIndex(
-                name: "IX_DataAcquisitionLogs_InlineTail",
-                table: "DataAcquisitionLog",
-                columns: new[] { "TailSent", "SiblingCount", "FacilityId", "CorrelationId", "QueryPhase", "Status" },
-                filter: "[TailSent] = 0 AND [SiblingCount] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [QueryPhase] IS NOT NULL");
+                IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLog_ScheduledReportId')
+                    CREATE NONCLUSTERED INDEX [IX_DataAcquisitionLog_ScheduledReportId]
+                    ON [DataAcquisitionLog] ([ScheduledReportId]);
 
-            // 8f. FK index for ScheduledReportId
-            migrationBuilder.CreateIndex(
-                name: "IX_DataAcquisitionLog_ScheduledReportId",
-                table: "DataAcquisitionLog",
-                column: "ScheduledReportId");
-
-            migrationBuilder.AddForeignKey(
-                name: "FK_DataAcquisitionLog_ScheduledReports_ScheduledReportId",
-                table: "DataAcquisitionLog",
-                column: "ScheduledReportId",
-                principalTable: "ScheduledReports",
-                principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
+                IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_DataAcquisitionLog_ScheduledReports_ScheduledReportId')
+                    ALTER TABLE [DataAcquisitionLog]
+                        ADD CONSTRAINT [FK_DataAcquisitionLog_ScheduledReports_ScheduledReportId]
+                            FOREIGN KEY ([ScheduledReportId])
+                            REFERENCES [ScheduledReports] ([Id])
+                            ON DELETE SET NULL;
+            ");
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
