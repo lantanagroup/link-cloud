@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Automation.Configuration;
+using LantanaGroup.Automation.Configuration;
 using LantanaGroup.Automation.Helpers;
 using System.Collections.Concurrent;
 
@@ -14,14 +14,13 @@ using RestSharp;
 /// </summary>
 public class FhirDataLoader
 {
-    private readonly ConcurrentBag<string> _createdResources = new();
+    private readonly ConcurrentDictionary<string, byte> _createdResources = new(StringComparer.OrdinalIgnoreCase);
     private string? _authorization;
     private readonly RestClient _restClient;
     private readonly OAuthConfig? _oauthConfig;
     private readonly BasicAuthConfig? _basicAuthConfig;
 
     private const int MaxRetries = 3;
-    private const int MaxConcurrentUploads = 4;
     private static readonly TimeSpan InitialRetryDelay = TimeSpan.FromSeconds(2);
 
     public FhirDataLoader(string fhirServerBaseUrl, OAuthConfig? oauthConfig = null, BasicAuthConfig? basicAuthConfig = null)
@@ -145,7 +144,7 @@ public class FhirDataLoader
                         if (!string.IsNullOrEmpty(location))
                         {
                             var resourcePath = location.Split("/_history")[0];
-                            _createdResources.Add(resourcePath);
+                            _createdResources.TryAdd(resourcePath, 0);
                         }
                     }
                 }
@@ -159,14 +158,15 @@ public class FhirDataLoader
 
     public void DeleteResourcesWithExpunge(IAutomationOutput output)
     {
-        var total = _createdResources.Count;
+        var resourcesToDelete = _createdResources.Keys.ToList();
+        var total = resourcesToDelete.Count;
         output.WriteLine($"Expunging {total} tracked resource(s) from FHIR server...");
 
         var succeeded = 0;
         var failed = 0;
         var failures = new List<string>();
 
-        foreach (var resource in _createdResources)
+        foreach (var resource in resourcesToDelete)
         {
             var request = new RestRequest($"{resource}", Method.Delete);
             request.AddHeader("Content-Type", "application/fhir+json");
@@ -202,6 +202,8 @@ public class FhirDataLoader
             if (failed > failures.Count)
                 output.WriteLine($"  ... and {failed - failures.Count} more.");
         }
+
+        _createdResources.Clear();
     }
 
     public void ExpungeEverything(IAutomationOutput output)
@@ -241,44 +243,58 @@ public class FhirDataLoader
         IAutomationOutput output,
         IReadOnlyList<(string Name, string Json)> bundles)
     {
-        output.WriteLine($"Loading {bundles.Count} generated bundles onto FHIR server (concurrency={MaxConcurrentUploads})...");
+        // Keep bundle upload order deterministic. Uploading chunks out of order can
+        // produce transient reference failures (for example, resources that reference
+        // Patient entries created in earlier chunks).
+        var orderedBundles = bundles.ToList();
 
-        var successCount = 0;
-        var failCount = 0;
-        var completed = 0;
-        var semaphore = new SemaphoreSlim(MaxConcurrentUploads, MaxConcurrentUploads);
+        output.WriteLine($"Loading {orderedBundles.Count} generated bundles onto FHIR server (ordered, retry-on-failure=1)...");
 
-        var tasks = bundles.Select(async (bundle, index) =>
+        const int maxUploadPasses = 2;
+        for (var pass = 1; pass <= maxUploadPasses; pass++)
         {
-            await semaphore.WaitAsync();
-            try
+            var successCount = 0;
+            var failCount = 0;
+            var passCreatedResources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            output.WriteLine($"Upload pass {pass}/{maxUploadPasses}...");
+
+            for (var i = 0; i < orderedBundles.Count; i++)
             {
-                var (name, json) = bundle;
-                var progress = $"[{Interlocked.Increment(ref completed)}/{bundles.Count}]";
+                var (name, json) = orderedBundles[i];
+                var progress = $"[{i + 1}/{orderedBundles.Count}]";
                 var response = await PostBundleWithRetryAsync(json, name, progress, output);
 
                 if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
                 {
-                    Interlocked.Increment(ref failCount);
+                    failCount++;
                     output.WriteLine($"  {progress} FAILED {name}: {response.StatusCode} {response.Content}");
-                    return;
+                    continue;
                 }
 
-                Interlocked.Increment(ref successCount);
-                TrackCreatedResources(response.Content, name, progress, output);
+                successCount++;
+                TrackCreatedResources(response.Content, name, progress, output, passCreatedResources);
             }
-            finally
-            {
-                semaphore.Release();
-            }
-        }).ToArray();
 
-        await Task.WhenAll(tasks);
+            output.WriteLine($"Upload complete: {successCount} succeeded, {failCount} failed out of {orderedBundles.Count} bundles.");
 
-        output.WriteLine($"Upload complete: {successCount} succeeded, {failCount} failed out of {bundles.Count} bundles.");
+            if (failCount == 0)
+                return;
+
+            output.WriteLine("Upload had failures. Deleting uploaded resources from this pass before retry...");
+            DeleteSpecificResourcesWithExpunge(output, passCreatedResources);
+
+            if (pass == maxUploadPasses)
+                throw new InvalidOperationException("FHIR bundle upload failed after retry. Abandoning run.");
+        }
     }
 
-    private void TrackCreatedResources(string responseContent, string name, string progress, IAutomationOutput output)
+    private void TrackCreatedResources(
+        string responseContent,
+        string name,
+        string progress,
+        IAutomationOutput output,
+        ISet<string>? passCreatedResources = null)
     {
         try
         {
@@ -301,7 +317,8 @@ public class FhirDataLoader
                     if (!string.IsNullOrEmpty(location))
                     {
                         var resourcePath = location.Split("/_history")[0];
-                        _createdResources.Add(resourcePath);
+                        _createdResources.TryAdd(resourcePath, 0);
+                        passCreatedResources?.Add(resourcePath);
                     }
                 }
             }
@@ -310,6 +327,35 @@ public class FhirDataLoader
         {
             output.WriteLine($"  {progress} Error parsing response for {name}: {ex.Message}");
         }
+    }
+
+    private void DeleteSpecificResourcesWithExpunge(IAutomationOutput output, IEnumerable<string> resources)
+    {
+        var resourceList = resources.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (resourceList.Count == 0)
+            return;
+
+        var succeeded = 0;
+        var failed = 0;
+
+        foreach (var resource in resourceList)
+        {
+            var request = new RestRequest($"{resource}", Method.Delete);
+            request.AddHeader("Content-Type", "application/fhir+json");
+
+            if (!string.IsNullOrEmpty(_authorization))
+                request.AddHeader("Authorization", _authorization);
+
+            request.AddQueryParameter("_expunge", "true");
+
+            var response = _restClient.Execute(request);
+            if (response.IsSuccessful)
+                succeeded++;
+            else
+                failed++;
+        }
+
+        output.WriteLine($"Pass cleanup complete: {succeeded} deleted, {failed} failed out of {resourceList.Count}.");
     }
 
     private async Task<RestResponse> PostBundleWithRetryAsync(
