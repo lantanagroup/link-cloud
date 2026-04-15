@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
 
@@ -50,7 +51,7 @@ public class OAuth : IAuth
             request.Content = new FormUrlEncodedContent(parameters);
 
             var responseMessage = await _httpClient.SendAsync(request);
-
+            responseMessage.EnsureSuccessStatusCode();
             var responseBody = await responseMessage.Content.ReadAsStringAsync();
             var responseJson = System.Text.Json.JsonDocument.Parse(responseBody);
 
@@ -68,7 +69,7 @@ public class OAuth : IAuth
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error acquiring OAuth access token for facility {FacilityId}", facilityId);
+            _logger.LogError(ex, "Error acquiring OAuth access token for facility {FacilityId}", facilityId.SanitizeUntrustedString());
         }
 
         return (false, null);
