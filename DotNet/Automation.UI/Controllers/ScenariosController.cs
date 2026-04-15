@@ -1,4 +1,4 @@
-﻿using Automation.UI.Models;
+using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,6 +19,7 @@ public class ScenariosController(IScenarioStore scenarioStore, IQueryPlanTemplat
     public async Task<IActionResult> Create(CancellationToken cancellationToken)
     {
         var model = new TestScenarioDefinition();
+        await PopulateSavedScenariosAsync(cancellationToken);
         await PopulateQueryPlanTemplatesAsync(cancellationToken);
         return View("Edit", model);
     }
@@ -33,6 +34,8 @@ public class ScenariosController(IScenarioStore scenarioStore, IQueryPlanTemplat
         if (scenario.IsSystemScenario)
             return RedirectToAction(nameof(Details), new { id });
 
+        ViewBag.InitialScenarioId = id;
+        await PopulateSavedScenariosAsync(cancellationToken);
         await PopulateQueryPlanTemplatesAsync(cancellationToken);
         return View(scenario);
     }
@@ -190,5 +193,10 @@ public class ScenariosController(IScenarioStore scenarioStore, IQueryPlanTemplat
     private async Task PopulateQueryPlanTemplatesAsync(CancellationToken cancellationToken)
     {
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
+    }
+
+    private async Task PopulateSavedScenariosAsync(CancellationToken cancellationToken)
+    {
+        ViewBag.SavedScenarios = await scenarioStore.GetAllAsync(cancellationToken);
     }
 }

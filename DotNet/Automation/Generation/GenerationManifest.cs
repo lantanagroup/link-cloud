@@ -1,3 +1,4 @@
+using Hl7.Fhir.Model;
 using System.Text.Json;
 
 namespace LantanaGroup.Automation.Generation;
@@ -361,5 +362,123 @@ public sealed class GenerationManifest
             TotalCountsByType = totalsByType,
             TotalResourceCount = totalCount
         };
+    }
+
+    // ----- Incremental builder (pipeline-friendly) -----
+
+    /// <summary>
+    /// Accumulates manifest metadata incrementally from in-memory FHIR bundle entries
+    /// so the pipeline can build a manifest without retaining serialized JSON bundles.
+    /// Thread-safe for concurrent patient processing.
+    /// </summary>
+    public sealed class IncrementalBuilder
+    {
+        private readonly object _lock = new();
+        private readonly List<string> _patientIds = [];
+        private readonly List<PatientProfile> _profiles = [];
+        private readonly Dictionary<string, HashSet<string>> _keysByPatient = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, Dictionary<string, int>> _countsByPatientType = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> _totalsByType = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, HashSet<string>> _simulatedAcquiredKeys = new(StringComparer.Ordinal);
+        private int _totalCount;
+
+        /// <summary>
+        /// Records a batch of FHIR bundle entries for a single patient (or shared infrastructure).
+        /// Call once per patient with all entries for that patient.
+        /// <paramref name="ownerPatientId"/> should be empty-string for shared infrastructure entries.
+        /// </summary>
+        public void AddEntries(string ownerPatientId, IReadOnlyList<Bundle.EntryComponent> entries)
+        {
+            var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var typeCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entry in entries)
+            {
+                var url = entry.Request?.Url;
+                if (string.IsNullOrWhiteSpace(url) || !url.Contains('/'))
+                    continue;
+
+                var slashIdx = url.IndexOf('/');
+                var resourceType = url[..slashIdx];
+
+                keys.Add(url);
+                typeCounts[resourceType] = typeCounts.TryGetValue(resourceType, out var c) ? c + 1 : 1;
+            }
+
+            lock (_lock)
+            {
+                _totalCount += keys.Count;
+
+                if (!_keysByPatient.TryGetValue(ownerPatientId, out var existing))
+                {
+                    _keysByPatient[ownerPatientId] = keys;
+                }
+                else
+                {
+                    foreach (var k in keys) existing.Add(k);
+                }
+
+                if (!_countsByPatientType.TryGetValue(ownerPatientId, out var existingCounts))
+                {
+                    _countsByPatientType[ownerPatientId] = typeCounts;
+                }
+                else
+                {
+                    foreach (var (t, cnt) in typeCounts)
+                        existingCounts[t] = existingCounts.TryGetValue(t, out var ec) ? ec + cnt : cnt;
+                }
+
+                if (!string.IsNullOrEmpty(ownerPatientId))
+                {
+                    foreach (var (t, cnt) in typeCounts)
+                        _totalsByType[t] = _totalsByType.TryGetValue(t, out var tc) ? tc + cnt : cnt;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Records a patient ID and its profile. Must be called in order of patient generation.
+        /// </summary>
+        public void AddPatient(string patientId, PatientProfile profile)
+        {
+            lock (_lock)
+            {
+                _patientIds.Add(patientId);
+                _profiles.Add(profile);
+            }
+        }
+
+        /// <summary>
+        /// Records simulated acquisition results for a patient.
+        /// </summary>
+        public void SetSimulatedAcquiredKeys(string patientId, HashSet<string> acquiredKeys)
+        {
+            lock (_lock)
+            {
+                _simulatedAcquiredKeys[patientId] = acquiredKeys;
+            }
+        }
+
+        /// <summary>
+        /// Builds the final <see cref="GenerationManifest"/> from all accumulated data.
+        /// Call once after all patients have been processed.
+        /// </summary>
+        public GenerationManifest Build(IReadOnlyList<ProfiledMeasureType> selectedMeasures)
+        {
+            lock (_lock)
+            {
+                return new GenerationManifest
+                {
+                    PatientIds = _patientIds.ToList(),
+                    Profiles = _profiles.ToList(),
+                    SelectedMeasures = selectedMeasures,
+                    ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_keysByPatient, StringComparer.Ordinal),
+                    ResourceCountsByPatientType = new Dictionary<string, Dictionary<string, int>>(_countsByPatientType, StringComparer.Ordinal),
+                    TotalCountsByType = new Dictionary<string, int>(_totalsByType, StringComparer.OrdinalIgnoreCase),
+                    TotalResourceCount = _totalCount,
+                    SimulatedAcquiredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_simulatedAcquiredKeys, StringComparer.Ordinal)
+                };
+            }
+        }
     }
 }

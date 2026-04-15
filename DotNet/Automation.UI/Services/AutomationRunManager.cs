@@ -300,6 +300,62 @@ public class AutomationRunManager : IAutomationRunManager
         }
     }
 
+    public async Task<RunDashboardStats> GetDashboardStatsAsync(CancellationToken cancellationToken = default)
+    {
+        var allRuns = await _snapshotStore.GetAllRunSummariesAsync(cancellationToken);
+
+        // Merge in-memory active runs that may not yet be persisted
+        var inMemory = _runs.Values.Select(ToSummary).ToList();
+        var merged = allRuns
+            .Concat(inMemory.Where(m => allRuns.All(r => r.RunId != m.RunId)))
+            .ToList();
+
+        var stats = new RunDashboardStats
+        {
+            TotalRuns = merged.Count,
+            Succeeded = merged.Count(r => r.Status == AutomationRunStatus.Succeeded),
+            Failed = merged.Count(r => r.Status == AutomationRunStatus.Failed),
+            Cancelled = merged.Count(r => r.Status == AutomationRunStatus.Cancelled),
+            Running = merged.Count(r => r.Status == AutomationRunStatus.Running),
+            Queued = merged.Count(r => r.Status == AutomationRunStatus.Queued),
+        };
+
+        var completedWithDuration = merged
+            .Where(r => r.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed && r.FinishedAt.HasValue)
+            .Select(r => (r.FinishedAt!.Value - r.CreatedAt).TotalSeconds)
+            .Where(d => d > 0)
+            .ToList();
+
+        stats.AvgDurationSeconds = completedWithDuration.Count > 0
+            ? Math.Round(completedWithDuration.Average(), 1)
+            : 0;
+
+        // Last 14 days histogram
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-13).Date;
+        for (var d = cutoff; d <= DateTime.UtcNow.Date; d = d.AddDays(1))
+            stats.RunsPerDay[d.ToString("yyyy-MM-dd")] = new RunDayBucket();
+
+        foreach (var run in merged.Where(r => r.CreatedAt.Date >= cutoff))
+        {
+            var key = run.CreatedAt.Date.ToString("yyyy-MM-dd");
+            if (!stats.RunsPerDay.TryGetValue(key, out var bucket))
+            {
+                bucket = new RunDayBucket();
+                stats.RunsPerDay[key] = bucket;
+            }
+
+            switch (run.Status)
+            {
+                case AutomationRunStatus.Succeeded: bucket.Succeeded++; break;
+                case AutomationRunStatus.Failed: bucket.Failed++; break;
+                case AutomationRunStatus.Cancelled: bucket.Cancelled++; break;
+                default: bucket.Other++; break;
+            }
+        }
+
+        return stats;
+    }
+
     private async Task ExecuteAsync(MutableRunState state, CancellationToken cancellationToken)
     {
         state.Status = AutomationRunStatus.Running;
@@ -336,14 +392,16 @@ public class AutomationRunManager : IAutomationRunManager
             output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, prefix={state.Options.Prefix}, seed={state.Options.Seed}");
 
             List<string> patientIds;
-            List<(string Name, string Json)> bundles;
             List<string> expectedSubmittedPatientIds;
+            GenerationManifest? generationManifest = null;
 
             // Use the first measure for generation context (profile-driven generation picks
             // the most restrictive measure — patients qualifying for all measures must meet
             // the criteria of each). For multi-measure, GenerateWithProfiles handles the union.
             var primaryMeasure = state.Options.SelectedMeasures[0];
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
+
+            await fhirDataLoader.WaitForServerAsync(output);
 
             if (state.Options.PatientProfiles is { Count: > 0 })
             {
@@ -354,14 +412,27 @@ public class AutomationRunManager : IAutomationRunManager
                 var mixedCount = profiles.Count - qualAllCount - nqAllCount;
                 output.WriteLine($"Using measure-eligibility profiles: {qualAllCount} qualifying-all, {nqAllCount} non-qualifying-all, {mixedCount} mixed");
 
-                (patientIds, bundles) = FhirBundleGenerator.GenerateWithProfiles(
+                // Use the streaming pipeline: generate ? upload ? dispose per patient.
+                // The pipeline builds the manifest incrementally and runs acquisition
+                // simulation per-patient, so no serialized FHIR JSON is retained.
+                var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
                     output,
+                    fhirDataLoader,
                     selectedMeasures,
                     profiles,
                     state.Options.ResourcesPerPatient,
                     state.Options.Prefix,
                     state.Options.Seed,
-                    generationConfig);
+                    generationConfig,
+                    acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
+                    {
+                        QueryPlan = QueryPlanDefaults.GetDefaultAsInput(),
+                        ReportStart = scenarioConfig.StartDate,
+                        ReportEnd = scenarioConfig.EndDate
+                    });
+
+                patientIds = pipelineResult.PatientIds;
+                generationManifest = pipelineResult.Manifest;
 
                 expectedSubmittedPatientIds = patientIds
                     .Where((_, idx) => idx < profiles.Count && profiles[idx].QualifiesForAny(selectedMeasures))
@@ -369,21 +440,20 @@ public class AutomationRunManager : IAutomationRunManager
             }
             else
             {
-                (patientIds, bundles) = FhirBundleGenerator.Generate(
+                var (genPatientIds, bundles) = FhirBundleGenerator.Generate(
                     output, state.Options.PatientCount, state.Options.ResourcesPerPatient, state.Options.Prefix, state.Options.Seed,
                     generationConfig);
 
+                patientIds = genPatientIds;
                 expectedSubmittedPatientIds = patientIds.ToList();
+
+                await fhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
             }
 
             if (scenarioConfig.PatientIds.Count == 0)
                 scenarioConfig.PatientIds = patientIds;
 
             var expectedAllPatientIds = scenarioConfig.PatientIds;
-
-            await fhirDataLoader.WaitForServerAsync(output);
-
-            await fhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
 
             await validationHelper.InitializeArtifactsAsync();
             await validationHelper.InitializeCategoriesAsync();
@@ -406,6 +476,16 @@ public class AutomationRunManager : IAutomationRunManager
             var queryPlanInput = queryPlanResolution.Input;
             if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
                 output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
+
+            // Finalize manifest metadata now that we have measure IDs and query plan.
+            if (generationManifest != null)
+            {
+                generationManifest.MeasureIds = measureIds;
+                var effectiveQueryPlanInput = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
+                generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlanInput);
+                generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlanInput);
+                generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
+            }
 
             await FacilitySetupHelper.EnsureFacilityAsync(
                 services.GetRequiredService<IFacilityServiceClient>(),
@@ -519,27 +599,8 @@ public class AutomationRunManager : IAutomationRunManager
             // Regeneration reuses prior data acquisition — no new DA logs exist for the regenerated report.
             var expectDataAcquisitionData = state.Options.ReportMethod != ReportMethod.RegenerateReport;
 
-            // Build the concrete generation manifest when profiles are available.
-            GenerationManifest? generationManifest = null;
-            if (state.Options.PatientProfiles is { Count: > 0 })
-            {
-                generationManifest = GenerationManifest.Build(
-                    patientIds,
-                    bundles,
-                    state.Options.PatientProfiles,
-                    (IReadOnlyList<ProfiledMeasureType>)state.Options.SelectedMeasures);
-                generationManifest.MeasureIds = measureIds;
-                var effectiveQueryPlanInput = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
-                generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlanInput);
-                generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlanInput);
-                generationManifest.SimulatedAcquiredResourceKeysByPatient = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysByPatient(
-                    patientIds,
-                    bundles,
-                    effectiveQueryPlanInput,
-                    scenarioConfig.StartDate,
-                    scenarioConfig.EndDate);
-                generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
-            }
+            // Pipeline-built manifest already has all metadata; no need to re-parse bundles.
+            // For non-profile runs (no pipeline), generationManifest remains null.
 
             await reportAbsValidator.ValidateAllAsync(
                 internalAbsResources,
@@ -549,7 +610,7 @@ public class AutomationRunManager : IAutomationRunManager
                 scenarioConfig.EndDate,
                 facilityId,
                 reportId,
-                bundles,
+                generatedBundles: null,
                 expectedManifestPatientListIds: expectedAllPatientIds,
                 expectDataAcquisitionData: expectDataAcquisitionData,
                 manifest: generationManifest);
@@ -877,6 +938,7 @@ public class AutomationRunManager : IAutomationRunManager
     private async Task BroadcastStatus(MutableRunState state)
     {
         await _hub.Clients.Group(state.RunId.ToString()).SendAsync("status", ToSummary(state));
+        await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", ToSummary(state));
         await PersistRunSummaryAsync(state);
     }
 

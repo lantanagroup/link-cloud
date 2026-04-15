@@ -1,4 +1,4 @@
-﻿using Automation.UI.Models;
+using Automation.UI.Models;
 using LantanaGroup.Link.Automation.Link.Helpers;
 
 namespace Automation.UI.Services;
@@ -11,4 +11,5 @@ public interface IAutomationRunManager
     Task<AutomationRunSummary?> GetRunAsync(Guid runId, CancellationToken cancellationToken = default);
     Task<bool> DeleteRunAsync(Guid runId, CancellationToken cancellationToken = default);
     Task<PipelineSummarySnapshotBuilder.PipelineSummarySnapshot?> GetPipelineSnapshotAsync(Guid runId, CancellationToken cancellationToken = default);
+    Task<RunDashboardStats> GetDashboardStatsAsync(CancellationToken cancellationToken = default);
 }

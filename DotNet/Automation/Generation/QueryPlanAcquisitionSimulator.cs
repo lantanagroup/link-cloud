@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.Json;
 
 namespace LantanaGroup.Automation.Generation;
@@ -79,6 +79,109 @@ public static class QueryPlanAcquisitionSimulator
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// Simulates acquired resource keys for a single patient from pre-parsed resource entries.
+    /// Used by the pipeline to avoid retaining serialized bundle JSON across all patients.
+    /// </summary>
+    /// <param name="patientId">The patient ID being simulated.</param>
+    /// <param name="patientResourceEntries">
+    /// Pre-parsed resource entries as (ResourceType, ResourceId, Key, JsonElement) tuples.
+    /// These are built from the patient's in-memory FHIR entries before JSON is discarded.
+    /// </param>
+    /// <param name="sharedResourceEntries">
+    /// Shared infrastructure resources (Location, Medication, Device, etc.) that may be
+    /// referenced by the patient's resources.
+    /// </param>
+    /// <param name="queryPlan">The query plan to simulate.</param>
+    /// <param name="reportStart">Optional report period start date.</param>
+    /// <param name="reportEnd">Optional report period end date.</param>
+    public static HashSet<string> SimulateAcquiredKeysForPatient(
+        string patientId,
+        IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)> patientResourceEntries,
+        IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedResourceEntries,
+        QueryPlanInput queryPlan,
+        string? reportStart = null,
+        string? reportEnd = null)
+    {
+        var hasStart = DateTimeOffset.TryParse(reportStart, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var start);
+        var hasEnd = DateTimeOffset.TryParse(reportEnd, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var end);
+
+        // Build per-type index for this patient (patient resources + shared)
+        var typeMap = new Dictionary<string, List<GeneratedResource>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (resourceType, resourceId, key, resource) in patientResourceEntries)
+        {
+            if (!typeMap.TryGetValue(resourceType, out var list))
+            {
+                list = [];
+                typeMap[resourceType] = list;
+            }
+            list.Add(new GeneratedResource(patientId, resourceType, resourceId, key, resource));
+        }
+
+        if (sharedResourceEntries != null)
+        {
+            foreach (var (resourceType, resourceId, key, resource) in sharedResourceEntries)
+            {
+                if (!typeMap.TryGetValue(resourceType, out var list))
+                {
+                    list = [];
+                    typeMap[resourceType] = list;
+                }
+                list.Add(new GeneratedResource(patientId, resourceType, resourceId, key, resource));
+            }
+        }
+
+        // Wrap in the by-patient structure the private helpers expect
+        var byPatient = new Dictionary<string, Dictionary<string, List<GeneratedResource>>>(StringComparer.Ordinal)
+        {
+            [patientId] = typeMap
+        };
+
+        var acquired = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var acquiredByType = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var query in queryPlan.InitialQueries.Concat(queryPlan.SupplementalQueries))
+        {
+            if (string.IsNullOrWhiteSpace(query.ResourceType))
+                continue;
+
+            if (query.IsParameterQuery)
+            {
+                if (!typeMap.TryGetValue(query.ResourceType, out var candidates))
+                    continue;
+
+                foreach (var resource in candidates)
+                {
+                    if (!MatchesParameterQuery(resource, query, hasStart ? start : null, hasEnd ? end : null, acquiredByType))
+                        continue;
+
+                    acquired.Add(resource.Key);
+                    AddByType(acquiredByType, resource.ResourceType, resource.ResourceId);
+                }
+            }
+            else if (query.IsReferenceQuery)
+            {
+                if (!typeMap.TryGetValue(query.ResourceType, out var candidates) || candidates.Count == 0)
+                    continue;
+
+                var referencedIds = CollectReferencedIds(acquiredByType, query.ResourceType, byPatient, patientId);
+                if (referencedIds.Count == 0)
+                    continue;
+
+                foreach (var resource in candidates)
+                {
+                    if (!referencedIds.Contains(resource.ResourceId))
+                        continue;
+
+                    acquired.Add(resource.Key);
+                    AddByType(acquiredByType, resource.ResourceType, resource.ResourceId);
+                }
+            }
+        }
+
+        return acquired;
     }
 
     private static Dictionary<string, Dictionary<string, List<GeneratedResource>>> BuildGeneratedResourceIndex(

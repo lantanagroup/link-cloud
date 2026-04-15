@@ -1,7 +1,6 @@
-﻿using Automation.UI.Models;
+using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
-using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Sdk.Clients;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -12,29 +11,47 @@ namespace Automation.UI.Controllers;
 public class RunsController(
     IAutomationRunManager runManager,
     IScenarioStore scenarioStore,
-    IQueryPlanTemplateStore queryPlanTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
     ILogger<RunsController> logger) : Controller
 {
     [HttpGet]
-    public async Task<IActionResult> Index(int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(CancellationToken cancellationToken = default)
     {
-        var runs = await runManager.GetRunsPageAsync(pageNumber, pageSize, cancellationToken);
+        var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
+        var recentPage = await runManager.GetRunsPageAsync(1, 10, cancellationToken);
         var scenarios = await scenarioStore.GetAllAsync(cancellationToken);
-        var queryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
 
-        var allMeasures = Enum.GetValues<ProfiledMeasureType>().ToList();
-        var clinicalScenarios = ClinicalScenarioInfo.GetAll(allMeasures);
+        var activeRuns = recentPage.Runs
+            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+            .ToList();
 
-        var vm = new RunsIndexViewModel
+        var vm = new RunDashboardViewModel
         {
-            Runs = runs,
+            Stats = stats,
+            RecentRuns = recentPage.Runs,
+            ActiveRuns = activeRuns,
             SavedScenarios = scenarios,
-            ClinicalScenarios = clinicalScenarios,
-            QueryPlanTemplates = queryPlanTemplates
         };
 
         return View(vm);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DashboardStats(CancellationToken cancellationToken)
+    {
+        var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
+        var recentPage = await runManager.GetRunsPageAsync(1, 10, cancellationToken);
+
+        var activeRuns = recentPage.Runs
+            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+            .ToList();
+
+        return Json(new
+        {
+            stats,
+            recentRuns = recentPage.Runs,
+            activeRuns
+        });
     }
 
     [HttpPost]
@@ -55,8 +72,8 @@ public class RunsController(
             return RedirectToAction(nameof(Index));
         }
 
-        var runId = await runManager.StartAsync(request, cancellationToken);
-        return RedirectToAction(nameof(Details), new { id = runId });
+        await runManager.StartAsync(request, cancellationToken);
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpGet]
