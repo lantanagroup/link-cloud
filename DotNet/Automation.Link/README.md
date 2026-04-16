@@ -1,4 +1,4 @@
-# Automation.Link
+﻿# Automation.Link
 
 `Automation.Link` is the Link-specific orchestration and validation layer that turns the platform-agnostic `Automation` engine into a full end-to-end Link pipeline runner.
 
@@ -23,9 +23,9 @@ Think of `Automation` as the simulator and `Automation.Link` as the conductor + 
 
 ```
 Automation.Link
-??? references Automation (generation, manifests, base helpers, config base classes)
-??? references LinkSdk (service clients used for orchestration)
-??? references Shared (domain models, enums, integration contracts)
+├── references Automation (generation, manifests, base helpers, config base classes)
+├── references LinkSdk (service clients used for orchestration)
+└── references Shared (domain models, enums, integration contracts)
 ```
 
 ---
@@ -92,7 +92,7 @@ Typical host-driven flow (`BackendE2ETests` or `Automation.UI`) composed through
   - `ProgressProbe`: runs `ProgressMonitor` and stall detection
   - `MilestoneProbe`: runs `MilestoneValidationOrchestrator`
 - `ProgressMonitor` + `PipelineProgressTracker`
-  - compute coarse progress across DA ? MeasureEval ? Validation ? Submission
+  - compute coarse progress across DA → MeasureEval → Validation → Submission
   - identify stalled stage and stall duration
   - write human-readable diagnostics with status breakdowns
 - `LokiScraper` / `KafkaErrorMonitor`
@@ -118,6 +118,15 @@ Validators consume `PipelineDataReader` + artifacts and fail the run on invarian
   - validates Validation service API availability/results and exception-free logs
 - `MilestoneValidationOrchestrator`
   - lightweight idempotent stage checkpoints used during run-time monitoring
+
+### Validator isolation pattern
+
+When invoked from `Automation.UI`, validators are wrapped in a `RunValidator` helper that:
+- Catches exceptions per-validator so one failure doesn't prevent subsequent validators from running
+- Persists partial `validatorResults` snapshots after each validator completes
+- Enables partial results to be visible in the UI dashboard even if a later validator throws
+
+This is distinct from test-host invocation (`BackendE2ETests`) where validator failures are expected to throw and fail the test.
 
 ### 5) Cleanup layer
 
@@ -150,8 +159,11 @@ Validators consume `PipelineDataReader` + artifacts and fail the run on invarian
   - full non-asserting diagnostic snapshot output
 - `PipelineSummarySnapshotBuilder`
   - compact snapshot payloads used by UI polling surfaces
+  - builds domain-specific summaries (schedule, entries, populations, acquisition, measure resources, validation resources) for the `StoreBackedServicePoller`
 - `PipelineProgressTracker`
   - progress percentage + stall-stage computation
+  - tracks pipeline stages: DataAcquisition → MeasureEval → Validation → Submission
+  - computes per-stage completion percentages based on expected vs actual counts
 
 ## Setup and query plan utilities (`Helpers/`)
 
@@ -195,10 +207,12 @@ Each validator is focused on one service boundary but shares a common goal: prov
 
 - `AutomationRunSummary`
   - normalized run metadata/status payload consumed by hosts
+  - includes: RunId, RunName, Scenario, Status, PatientCount, ResourcesPerPatient, Seed, CreatedAt, FinishedAt, Duration, RunConfigurationJson
 - `AutomationRunStatus` / `AutomationScenarioKind`
   - run lifecycle and scenario identity enums
 - `ISnapshotStore` (from `Models/`)
   - abstraction used by hosts (notably UI) for run metadata, domain snapshots, and log persistence
+  - `GetAllRunSummariesAsync(since)` supports date filtering to bound collection scans
 
 ---
 
@@ -208,6 +222,7 @@ Each validator is focused on one service boundary but shares a common goal: prov
 - **Monitoring-first failure detection**: critical errors can short-circuit long polling loops
 - **Deterministic validation support**: validators can consume `GenerationManifest` to compare concrete expected vs actual state
 - **Host-agnostic composition**: the same project powers both automated tests and interactive UI flows
+- **Validator isolation**: UI host wraps validators to capture partial results; test host lets failures propagate
 
 ---
 
@@ -215,8 +230,8 @@ Each validator is focused on one service boundary but shares a common goal: prov
 
 Primary consumers:
 
-- `Tests/BackendE2ETests` � CI/E2E orchestration host
-- `DotNet/Automation.UI` � interactive Razor-based run management host
+- `Tests/BackendE2ETests` — CI/E2E orchestration host
+- `DotNet/Automation.UI` — interactive Razor-based run management host
 
 ---
 
