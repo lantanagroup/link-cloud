@@ -290,8 +290,6 @@ public class FhirDataLoader
         IReadOnlyList<(string Name, string Json)> bundles,
         string progressPrefix = "")
     {
-        var allSucceeded = true;
-
         for (var i = 0; i < bundles.Count; i++)
         {
             var (name, json) = bundles[i];
@@ -304,14 +302,23 @@ public class FhirDataLoader
             if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
             {
                 output.WriteLine($"  {progress} FAILED {name}: {response.StatusCode} {response.Content}");
-                allSucceeded = false;
-                continue;
+
+                // Abort the sequence — later bundles depend on earlier ones.
+                for (var j = i + 1; j < bundles.Count; j++)
+                {
+                    var skippedProgress = string.IsNullOrEmpty(progressPrefix)
+                        ? $"[{j + 1}/{bundles.Count}]"
+                        : $"{progressPrefix}[{j + 1}/{bundles.Count}]";
+                    output.WriteLine($"  {skippedProgress} SKIPPED {bundles[j].Name} (dependency failed)");
+                }
+
+                return false;
             }
 
             TrackCreatedResources(response.Content, name, progress, output);
         }
 
-        return allSucceeded;
+        return true;
     }
 
     private void TrackCreatedResources(string responseContent, string name, string progress, IAutomationOutput output)

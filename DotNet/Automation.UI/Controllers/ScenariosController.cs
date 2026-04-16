@@ -31,7 +31,7 @@ public class ScenariosController(IScenarioStore scenarioStore, IQueryPlanTemplat
 
         var existing = await scenarioStore.GetByIdAsync(model.Id, ct);
         if (existing is { IsSystemScenario: true })
-            return Forbid();
+            return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system scenario cannot be modified.");
 
         model.IsSystemScenario = false;
         model.UpdatedAt = DateTimeOffset.UtcNow;
@@ -49,7 +49,7 @@ public class ScenariosController(IScenarioStore scenarioStore, IQueryPlanTemplat
     {
         var scenario = await scenarioStore.GetByIdAsync(request.Id, ct);
         if (scenario == null) return NotFound();
-        if (scenario.IsSystemScenario) return Forbid();
+        if (scenario.IsSystemScenario) return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system scenario cannot be deleted.");
 
         await scenarioStore.DeleteAsync(request.Id, ct);
         return Ok();

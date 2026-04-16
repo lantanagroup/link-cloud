@@ -304,7 +304,8 @@ public class AutomationRunManager : IAutomationRunManager
 
     public async Task<RunDashboardStats> GetDashboardStatsAsync(CancellationToken cancellationToken = default)
     {
-        var allRuns = await _snapshotStore.GetAllRunSummariesAsync(cancellationToken);
+        var since = DateTimeOffset.UtcNow.AddDays(-14);
+        var allRuns = await _snapshotStore.GetAllRunSummariesAsync(since, cancellationToken);
 
         // Merge in-memory active runs that may not yet be persisted
         var inMemory = _runs.Values.Select(ToSummary).ToList();

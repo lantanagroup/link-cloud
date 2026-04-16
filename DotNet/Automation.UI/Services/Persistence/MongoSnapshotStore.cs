@@ -130,9 +130,13 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return new PagedRunResult(items, pageNumber, pageSize, total);
     }
 
-    public async Task<IReadOnlyList<AutomationRunSummary>> GetAllRunSummariesAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<AutomationRunSummary>> GetAllRunSummariesAsync(DateTimeOffset? since = null, CancellationToken ct = default)
     {
-        var docs = await _runs.Find(FilterDefinition<AutomationRunDocument>.Empty)
+        var filter = since.HasValue
+            ? Builders<AutomationRunDocument>.Filter.Gte(r => r.CreatedAt, since.Value)
+            : FilterDefinition<AutomationRunDocument>.Empty;
+
+        var docs = await _runs.Find(filter)
             .SortByDescending(r => r.CreatedAt)
             .ToListAsync(ct);
 

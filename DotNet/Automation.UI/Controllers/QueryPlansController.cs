@@ -54,7 +54,7 @@ public class QueryPlansController(IQueryPlanTemplateStore store) : Controller
 
         var existing = await store.GetByIdAsync(model.Id, ct);
         if (existing is { IsSystem: true })
-            return Forbid();
+            return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system plan cannot be modified.");
 
         model.IsSystem = false;
         model.UpdatedAt = DateTimeOffset.UtcNow;
@@ -67,8 +67,10 @@ public class QueryPlansController(IQueryPlanTemplateStore store) : Controller
     public async Task<IActionResult> DeleteInline([FromBody] IdRequest request, CancellationToken ct)
     {
         var template = await store.GetByIdAsync(request.Id, ct);
-        if (template is null or { IsSystem: true })
-            return Forbid();
+        if (template == null)
+            return NotFound();
+        if (template.IsSystem)
+            return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system plan cannot be deleted.");
 
         await store.DeleteAsync(request.Id, ct);
         return Ok();
