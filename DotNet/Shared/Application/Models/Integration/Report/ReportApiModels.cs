@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using System.Text.Json.Serialization;
 
@@ -7,16 +7,20 @@ namespace LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 public class ReportScheduleApiModel
 {
     public Guid Id { get; set; }
+    public DateTime? CreateDate { get; set; }
     public string FacilityId { get; set; } = string.Empty;
     public Frequency Frequency { get; set; }
     public string ReportType { get; set; } = string.Empty;
+    public List<string> ReportTypes { get; set; } = [];
     public DateTime ReportStartDate { get; set; }
     public DateTime ReportEndDate { get; set; }
+    public DateTime? SubmitReportDateTime { get; set; }
     public ScheduleStatus Status { get; set; }
     public AdHocType? AdHocType { get; set; }
     public bool EndOfReportPeriodJobHasRun { get; set; }
     public bool EnableSubmission { get; set; }
     public string? PayloadRootUri { get; set; }
+    public bool? IsDeleted { get; set; }
 }
 
 public class ReportEntryApiModel
