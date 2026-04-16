@@ -2,7 +2,7 @@ using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 using Task = System.Threading.Tasks.Task;
 
-namespace UnitTests.DataAcquisition.Services;
+namespace UnitTests.DataAcquisition.Auth;
 
 [Trait("Category", "UnitTests")]
 public class CustomHeaderAuthTests
