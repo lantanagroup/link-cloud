@@ -28,6 +28,7 @@ $failed-status: #a1030eb3;
 $failed-maxRetry-status: #a10303ff;
 $skipped-status: #ffbf00;
 $cancelled-status: #6b7280;
+$configuration-missing-status: #b45309;
 
 .status-pending {
     @extend .log-status;
@@ -79,6 +80,15 @@ $cancelled-status: #6b7280;
   background-color: color.adjust($failed-maxRetry-status, $lightness: 60%);
   color: $failed-maxRetry-status;
   box-shadow: 0 0 0 1px color.adjust($failed-maxRetry-status, $lightness: -10%);
+  padding: 6px 6px;
+  border-radius: 0.375rem;
+}
+
+.status-configurationMissing {
+  @extend .log-status;
+  background-color: color.adjust($configuration-missing-status, $lightness: 55%);
+  color: $configuration-missing-status;
+  box-shadow: 0 0 0 1px color.adjust($configuration-missing-status, $lightness: -10%);
   padding: 6px 6px;
   border-radius: 0.375rem;
 }

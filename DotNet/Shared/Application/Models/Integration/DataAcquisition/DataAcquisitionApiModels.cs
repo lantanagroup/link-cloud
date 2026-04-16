@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
@@ -134,7 +134,9 @@ public enum RequestStatus
     [StringValue("Configuration Required")]
     ConfigurationRequired,
     [StringValue("Cancelled")]
-    Cancelled
+    Cancelled,
+    [StringValue("Configuration Missing")]
+    ConfigurationMissing
 }
 
 public enum QueryPhase
