@@ -10,7 +10,6 @@ public class ReportScheduleApiModel
     public DateTime? CreateDate { get; set; }
     public string FacilityId { get; set; } = string.Empty;
     public Frequency Frequency { get; set; }
-    public string ReportType { get; set; } = string.Empty;
     public List<string> ReportTypes { get; set; } = [];
     public DateTime ReportStartDate { get; set; }
     public DateTime ReportEndDate { get; set; }
