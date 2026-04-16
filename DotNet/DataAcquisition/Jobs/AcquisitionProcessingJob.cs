@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -172,10 +172,10 @@ public class AcquisitionProcessingJob : IJob
                     if (!requests.Any()) break;
 
                     // Missing config is a configuration error, not a transient failure.
-                    // Move all affected logs directly to the terminal MaxRetriesReached status
+                    // Move all affected logs directly to the terminal ConfigurationMissing status
                     // so they are never re-queued, and record the reason as a note.
                     var allIds = requests.Select(r => r.Id).ToList();
-                    await dataAcquisitionLogManager.SetMaxRetriesReachedWithNoteBatchAsync(
+                    await dataAcquisitionLogManager.SetConfigurationMissingWithNoteBatchAsync(
                         allIds,
                         "FhirQueryConfiguration not found for this facility.",
                         cancellationToken);

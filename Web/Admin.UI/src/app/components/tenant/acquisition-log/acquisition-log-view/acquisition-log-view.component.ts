@@ -150,7 +150,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   selectedQueryPhaseFilter: string = 'Any';
   queryTypeFilterOptions: string[] = [ "Read", "Search", "BulkDataRequest", "BulkDataPoll" ];
   selectedQueryTypeFilter: string = 'Any';
-  statusFilterOptions: string[] = [ "Pending", "Ready", "Processing", "Completed", "Failed", "Cancelled", "MaxRetriesReached", "Skipped", "Queued"];
+  statusFilterOptions: string[] = [ "Pending", "Ready", "Processing", "Completed", "Failed", "Cancelled", "MaxRetriesReached", "ConfigurationMissing", "Skipped", "Queued"];
   selectedStatusFilter: string[] = [];
   targetPageNumber: number | null = null;
   selectedLogIds: Set<string> = new Set<string>();
@@ -173,7 +173,7 @@ export class AcquisitionLogViewComponent implements OnInit {
     private acquisitionLogService: AcquisitionLogService,
     private snackBar: MatSnackBar) { }
 
-  private readonly TERMINAL_STATUSES = ['Completed', 'MaxRetriesReached', 'Skipped', 'Cancelled'];
+  private readonly TERMINAL_STATUSES = ['Completed', 'MaxRetriesReached', 'ConfigurationMissing', 'Skipped', 'Cancelled'];
   cancelMinAgeHours: number = 0;
 
   private get cancelMinAgeMs(): number {
