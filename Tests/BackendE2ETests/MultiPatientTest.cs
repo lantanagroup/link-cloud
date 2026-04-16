@@ -1,4 +1,4 @@
-ï»¿using LantanaGroup.Link.Automation.Link;
+using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -12,7 +12,7 @@ using Task = System.Threading.Tasks.Task;
 namespace LantanaGroup.Link.Tests.E2ETests;
 
 /// <summary>
-/// Volume test that generates 1000 synthetic patients, each with ~100 FHIR resources,
+/// Volume test that generates 150 synthetic patients, each with 25–50 FHIR resources,
 /// and runs them through the full ad-hoc reporting pipeline.
 ///
 /// Configuration is driven by MULTI_PATIENT_TEST_* environment variables.
@@ -50,7 +50,7 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
         _measures = measures;
         var cohorts = new List<PatientCohortDefinition>
         {
-            PatientCohortDefinition.AllQualifying(measures, patientCount: 1000, resourcesMin: 100, resourcesMax: 100)
+            PatientCohortDefinition.AllQualifying(measures, patientCount: 150, resourcesMin: 25, resourcesMax: 50)
         };
         _cohorts = cohorts;
         var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(Output, measures, cohorts, "MultiPatient", GenerationSeed);

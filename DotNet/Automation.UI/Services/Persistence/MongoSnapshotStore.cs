@@ -59,11 +59,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
     }
 
-    public async Task CompleteRunAsync(Guid runId, CancellationToken ct = default)
+    public async Task CompleteRunAsync(Guid runId, string? duration = null, CancellationToken ct = default)
     {
         var update = Builders<AutomationRunDocument>.Update
             .Set(r => r.IsActive, false)
-            .Set(r => r.CompletedAt, DateTimeOffset.UtcNow);
+            .Set(r => r.CompletedAt, DateTimeOffset.UtcNow)
+            .Set(r => r.Duration, duration);
 
         await _runs.UpdateOneAsync(r => r.RunId == runId, update, cancellationToken: ct);
     }
@@ -174,6 +175,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             StartedAt = doc.StartedAt,
             FinishedAt = doc.FinishedAt,
             Error = doc.Error,
+            Duration = doc.Duration,
             FacilityId = doc.FacilityId,
             ReportId = doc.ReportId,
             Logs = []

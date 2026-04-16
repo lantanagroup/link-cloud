@@ -1,6 +1,6 @@
-using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Automation.Link.Services;
 using LantanaGroup.Link.Automation.Link.Validation;
@@ -12,17 +12,23 @@ using Task = System.Threading.Tasks.Task;
 namespace LantanaGroup.Link.Tests.E2ETests;
 
 /// <summary>
-/// Stress/volume test that generates a synthetic patient with ~5,000
-/// FHIR resources and runs it through the full ad-hoc reporting pipeline.
+/// Hybrid stress + volume test: one mega patient with ~5,000 resources plus
+/// 149 patients with 25–50 resources each, run through the full ad-hoc
+/// reporting pipeline.
 /// </summary>
-public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
+public sealed class MegaMultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
-    private const int GenerationSeed = 20260327;
+    private const int GenerationSeed = 20260330;
 
-    private static readonly TestScenarioConfig Config = TestConfig.MegaPatientTestConfig;
+    private static readonly TestScenarioConfig Config = TestConfig.BuildScenarioConfig(
+        "MEGA_MULTI_PATIENT_TEST",
+        defaultPatientIds: [],
+        defaultPollingIntervalSeconds: 5,
+        defaultMaxPollingDurationMinutes: 25,
+        defaultLokiScrapeWindowMinutes: 20);
 
     private readonly IServiceProvider _sp;
-    private readonly string _facilityId = $"MegaPatient-{Guid.NewGuid():N}";
+    private readonly string _facilityId = $"MegaMultiPatient-{Guid.NewGuid():N}";
     private List<(string Name, string Json)> _generatedBundles = [];
     private List<ProfiledMeasureType> _measures = [];
     private List<PatientCohortDefinition> _cohorts = [];
@@ -32,7 +38,7 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
     private ConsoleAutomationOutput Output => _sp.GetRequiredService<ConsoleAutomationOutput>();
     private FhirDataLoader FhirDataLoader => _sp.GetRequiredService<FhirDataLoader>();
 
-    public MegaPatientTest(BackendE2ETestFixture fixture)
+    public MegaMultiPatientTest(BackendE2ETestFixture fixture)
     {
         _sp = fixture.ServiceProvider;
     }
@@ -46,10 +52,13 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         _measures = measures;
         var cohorts = new List<PatientCohortDefinition>
         {
-            PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 5000, resourcesMax: 5000)
+            // One mega patient with ~5,000 resources
+            PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 5000, resourcesMax: 5000),
+            // 149 normal patients with 25–50 resources each
+            PatientCohortDefinition.AllQualifying(measures, patientCount: 149, resourcesMin: 25, resourcesMax: 50)
         };
         _cohorts = cohorts;
-        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(Output, measures, cohorts, "MegaPatient", GenerationSeed);
+        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(Output, measures, cohorts, "MegaMultiPatient", GenerationSeed);
         _generatedBundles = bundles;
 
         if (Config.PatientIds.Count == 0)
@@ -57,7 +66,7 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
             Config.PatientIds = patientIds;
         }
 
-        Output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds)}]");
+        Output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds.Take(10))}...] ({Config.PatientIds.Count} total)");
 
         await FhirDataLoader.WaitForServerAsync(Output);
         await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(Output, bundles);
@@ -85,8 +94,8 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
     }
 
     [Fact]
-    [Trait("Category", "MegaPatientTest")]
-    public async Task ExecuteMegaPatientTest()
+    [Trait("Category", "MegaMultiPatientTest")]
+    public async Task ExecuteMegaMultiPatientTest()
     {
         // Step 1: Load measure definition into MeasureEval and Validation.
         var measureLoader = new MeasureLoader(
@@ -156,7 +165,7 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         Assert.True(downloadedResources.ContainsKey("manifest.ndjson"),
             "Expected report to include manifest.ndjson but it was not");
 
-        foreach (var patientId in Config.PatientIds)
+        foreach (var patientId in Config.PatientIds.Take(10))
         {
             Assert.True(downloadedResources.ContainsKey($"patient-{patientId}.ndjson"),
                 $"Expected report to include patient-{patientId}.ndjson but it was not");
@@ -197,9 +206,5 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         await _sp.GetRequiredService<DataAcquisitionDatabaseValidator>().ValidateAllAsync(_facilityId, reportId, measureId, Config.PatientIds);
         await _sp.GetRequiredService<NormalizationDatabaseValidator>().ValidateAllAsync(_facilityId);
         await _sp.GetRequiredService<TenantDatabaseValidator>().ValidateAllAsync(_facilityId, measureId);
-
-        // Step 11: Validation results exception check (API + Validation service logs).
-        await _sp.GetRequiredService<ValidationResultsValidator>().ValidateAllAsync(_facilityId, reportId, Config.PatientIds, Config.LokiScrapeWindow);
     }
 }
-

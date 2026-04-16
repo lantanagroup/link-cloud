@@ -87,7 +87,9 @@ public class PipelineDataReader
         bool EndOfReportPeriodJobHasRun,
         string? PayloadRootUri,
         DateTime? ReportStartDate,
-        DateTime? ReportEndDate);
+        DateTime? ReportEndDate,
+        DateTime? CreateDate,
+        DateTime? SubmitReportDateTime);
 
     public record MeasureReportInfo(string? MeasureReportId, string? Status, string? ReportType, List<ResourceCountInfo> ResourceCounts);
     public record ResourceCountInfo(string ResourceType, int ResourceCount);
@@ -139,7 +141,9 @@ public class PipelineDataReader
                 record.EndOfReportPeriodJobHasRun,
                 record.PayloadRootUri,
                 record.ReportStartDate,
-                record.ReportEndDate);
+                record.ReportEndDate,
+                record.CreateDate,
+                record.SubmitReportDateTime);
         });
     }
 

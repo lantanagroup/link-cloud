@@ -1,4 +1,4 @@
-ï»¿using Hl7.Fhir.Model;
+using Hl7.Fhir.Model;
 using LantanaGroup.Automation.Generation.ResourceFactories;
 using LantanaGroup.Automation.Helpers;
 using System.Text.Json;
@@ -18,7 +18,7 @@ namespace LantanaGroup.Automation.Generation;
 public static class FhirBundleGenerator
 {
     public const int DefaultPatientCount = 1;
-    public const int DefaultResourcesPerPatient = 10_200;
+    public const int DefaultResourcesPerPatient = 5_000;
     private const int MaxEntriesPerBundle = 500;
 
     // Shared infrastructure IDs
@@ -58,7 +58,7 @@ public static class FhirBundleGenerator
                          (generationSeed.HasValue ? $" (seed={generationSeed.Value})" : string.Empty));
 
         // ------------------------------------------------------------------
-        // Shared infrastructure â€” uploaded once in the first chunk
+        // Shared infrastructure — uploaded once in the first chunk
         // ------------------------------------------------------------------
         var sharedEntries = new List<Bundle.EntryComponent>
         {
@@ -106,7 +106,7 @@ public static class FhirBundleGenerator
 
             var entries = new List<Bundle.EntryComponent>();
 
-            // Core anchors â€” order matters: Patient ? Device ? Encounter ? Diagnoses ? Care
+            // Core anchors — order matters: Patient ? Device ? Encounter ? Diagnoses ? Care
             var patient = PatientFactory.Generate(patientId, patientSeed, gpPractId);
             patient.ManagingOrganization = new ResourceReference($"Organization/{HospitalOrgId}", "General Test Hospital");
             entries.Add(Entry($"Patient/{patientId}", patient));
@@ -114,7 +114,7 @@ public static class FhirBundleGenerator
             entries.Add(Entry($"Device/{patientDeviceId}",
                 DeviceFactory.Generate(patientDeviceId, patientSeed, patientId)));
 
-            // Primary admission diagnosis â€” from the scenario
+            // Primary admission diagnosis — from the scenario
             entries.Add(Entry($"Condition/{primaryDxId}",
                 ConditionFactory.CreatePrimary(
                     primaryDxId, patientId, encounterId, encStart,
@@ -262,7 +262,7 @@ public static class FhirBundleGenerator
                          (generationSeed.HasValue ? $" (seed={generationSeed.Value})" : string.Empty));
 
         // ------------------------------------------------------------------
-        // Shared infrastructure â€” same as Generate(), plus outpatient location
+        // Shared infrastructure — same as Generate(), plus outpatient location
         // ------------------------------------------------------------------
         var sharedEntries = new List<Bundle.EntryComponent>
         {
@@ -288,7 +288,7 @@ public static class FhirBundleGenerator
         var sharedMedicationIds = GenerateSharedMedications(sharedEntries);
 
         // ------------------------------------------------------------------
-        // Per-patient generation â€” profile-driven
+        // Per-patient generation — profile-driven
         // ------------------------------------------------------------------
         for (var p = 0; p < profiles.Count; p++)
         {
@@ -341,7 +341,7 @@ public static class FhirBundleGenerator
 
             if (profile.RequiresInpatientEncounter())
             {
-                // Inpatient encounter â€” qualifies via class, type, and location
+                // Inpatient encounter — qualifies via class, type, and location
                 if (profile.RequiresHypoglycemicMedication())
                 {
                     entries.Add(Entry($"Encounter/{encounterId}",
@@ -383,7 +383,7 @@ public static class FhirBundleGenerator
             }
             else
             {
-                // Ambulatory encounter â€” class=AMB, outpatient location, outside measurement period
+                // Ambulatory encounter — class=AMB, outpatient location, outside measurement period
                 entries.Add(Entry($"Encounter/{encounterId}",
                     EncounterFactory.CreateAmbulatory(
                         encounterId, patientId, encStart, encEnd,
@@ -428,7 +428,7 @@ public static class FhirBundleGenerator
         }
 
         // ------------------------------------------------------------------
-        // Chunk into batch bundles â€” same as Generate()
+        // Chunk into batch bundles — same as Generate()
         // ------------------------------------------------------------------
         var bundles = new List<(string Name, string Json)>();
         var currentChunk = new List<Bundle.EntryComponent>(sharedEntries);
@@ -562,8 +562,8 @@ public static class FhirBundleGenerator
     /// not insulin and echocardiograms.
     ///
     /// Also builds natural clinical reference chains during generation:
-    /// ServiceRequest â†’ Specimen â†’ Observation â†’ DiagnosticReport,
-    /// MedicationRequest â†’ Medication, MedicationAdministration â†’ MedicationRequest.
+    /// ServiceRequest ? Specimen ? Observation ? DiagnosticReport,
+    /// MedicationRequest ? Medication, MedicationAdministration ? MedicationRequest.
     /// </summary>
     private static void GenerateScenarioDrivenResources(
         List<Bundle.EntryComponent> entries,
@@ -658,7 +658,7 @@ public static class FhirBundleGenerator
     }
 
     // ------------------------------------------------------------------
-    //  Scenario-aware resource generators â€” pick from scenario subsets
+    //  Scenario-aware resource generators — pick from scenario subsets
     //  and wire up reference chains during creation
     // ------------------------------------------------------------------
 
@@ -728,7 +728,7 @@ public static class FhirBundleGenerator
         var admin = MedicationAdministrationFactory.Create(id, patientId, encounterId, effective, seed, practId,
             v.RxCode, v.Display, v.RouteCode, v.RouteDisplay,
             v.DoseValue, v.DoseUnit, v.IndicationSnomed, v.IndicationDisplay, isIv, medRefId);
-        // Optional link: MedicationAdministration.request â†’ MedicationRequest
+        // Optional link: MedicationAdministration.request ? MedicationRequest
         if (includeLowValueOptionalReferences && medicationRequestIds.Count > 0)
             admin.Request = new ResourceReference($"MedicationRequest/{medicationRequestIds[seed % medicationRequestIds.Count]}");
         return admin;
@@ -781,7 +781,7 @@ public static class FhirBundleGenerator
         var study = ImagingStudyFactory.Create(id, patientId, encounterId, started, HospitalLocationId, practId,
             v.SnomedCode, v.Display, v.Modality,
             v.BodySiteCode, v.BodySiteDisplay, v.ReasonCode, v.ReasonDisplay);
-        // Optional link: ImagingStudy.basedOn â†’ ServiceRequest
+        // Optional link: ImagingStudy.basedOn ? ServiceRequest
         if (includeLowValueOptionalReferences && serviceRequestIds.Count > 0)
         {
             study.BasedOn ??= [];
@@ -806,7 +806,7 @@ public static class FhirBundleGenerator
     }
 
     /// <summary>
-    /// Generates shared hospital formulary Medication resources â€” one per
+    /// Generates shared hospital formulary Medication resources — one per
     /// <see cref="FhirGenerationCodes.Medications"/> entry. In a real EHR the
     /// formulary is facility-level; every patient's MedicationRequest /
     /// MedicationAdministration references the same Medication resource.
@@ -823,7 +823,7 @@ public static class FhirBundleGenerator
                 MedicationFactory.Create(medId, v.RxCode, v.Display, v.DoseValue, v.DoseUnit, v.RouteCode, v.RouteDisplay)));
         }
 
-        // Hypoglycemic-measure-specific insulin glargine (RxNorm 274783) â€”
+        // Hypoglycemic-measure-specific insulin glargine (RxNorm 274783) —
         // a separate clinical drug concept from the formulary entry above.
         sharedEntries.Add(Entry($"Medication/{HypoInsulinGlargineMedicationId}",
             MedicationFactory.Create(HypoInsulinGlargineMedicationId, "274783", "insulin glargine",

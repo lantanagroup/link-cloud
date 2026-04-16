@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <Folder Include="Services\Caching\" />
+    <Folder Include="Views\Account\" />
   </ItemGroup>
 
 </Project>

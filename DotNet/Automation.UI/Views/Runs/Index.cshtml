@@ -154,6 +154,7 @@
                         <th>Patients</th>
                         <th>Seed</th>
                         <th>Status</th>
+                        <th>Duration</th>
                         <th>Created</th>
                         <th>Finished</th>
                         <th></th>
@@ -172,6 +173,7 @@
                         <td>
                             <span class="badge run-status-badge @(run.Status == AutomationRunStatus.Succeeded ? "au-badge-success" : run.Status == AutomationRunStatus.Failed ? "au-badge-danger" : run.Status == AutomationRunStatus.Cancelled ? "au-badge-warning" : "au-badge-muted")" data-run-id="@run.RunId">@run.Status</span>
                         </td>
+                        <td class="small text-muted">@(run.Duration ?? "–")</td>
                         <td>@run.CreatedAt.LocalDateTime</td>
                         <td>@(run.FinishedAt?.LocalDateTime.ToString() ?? "—")</td>
                         <td class="text-nowrap">
@@ -415,6 +417,7 @@
                 '<td>' + (run.patientCount || 0) + '</td>' +
                 '<td>' + (run.seed || 0) + '</td>' +
                 '<td><span class="badge run-status-badge ' + badgeClass + '" data-run-id="' + run.runId + '">' + escapeHtml(statusStr) + '</span></td>' +
+                '<td class="small text-muted">' + escapeHtml(run.duration || '\u2013') + '</td>' +
                 '<td>' + formatLocalDate(run.createdAt) + '</td>' +
                 '<td>' + formatLocalDate(run.finishedAt) + '</td>' +
                 '<td class="text-nowrap"><div class="d-inline-flex gap-1 align-items-center run-actions" data-run-id="' + run.runId + '">' + actions + '</div></td>' +

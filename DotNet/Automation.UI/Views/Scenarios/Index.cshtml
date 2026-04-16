@@ -1,99 +1,549 @@
-﻿@model List<TestScenarioDefinition>
+@model List<TestScenarioDefinition>
 @{
-    ViewData["Title"] = "Saved Scenarios";
+    ViewData["Title"] = "Scenarios";
+    var queryPlanTemplates = (List<QueryPlanTemplate>?)ViewBag.QueryPlanTemplates ?? [];
+    var clinicalScenarios = ClinicalScenarioInfo.GetAll(Enum.GetValues<ProfiledMeasureType>().ToList());
 }
 
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h2>Saved Scenarios</h2>
-            <p class="text-muted mb-0">Create, edit, clone, and manage reusable test configurations.</p>
+    <h2 class="fw-bold mb-1"><i class="bi bi-collection-fill me-2"></i>Scenarios</h2>
+    <p class="text-muted mb-3">Create, edit, clone, and manage reusable test configurations.</p>
+
+    <div class="au-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list-ul me-2"></i>All Scenarios</span>
+            <button type="button" class="btn btn-sm btn-success" id="btnNewScenario">
+                <i class="bi bi-plus-lg"></i>
+            </button>
         </div>
-        <a asp-action="Create" class="btn btn-primary">
-            <i class="bi bi-plus-lg"></i> New Scenario
-        </a>
-    </div>
-
-    <div class="table-responsive">
-        <table class="table table-striped table-hover">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Report Method</th>
-                    <th>Measures</th>
-                    <th>Patients</th>
-                    <th>Resources/Patient</th>
-                    <th>Seed</th>
-                    <th>Type</th>
-                    <th>Updated</th>
-                    <th style="width: 220px;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var s in Model)
-                {
-                    var resourceRange = s.ResourcesPerPatientMin == s.ResourcesPerPatientMax
-                        ? s.ResourcesPerPatientMin.ToString()
-                        : $"{s.ResourcesPerPatientMin}–{s.ResourcesPerPatientMax}";
-
+        <div class="card-body p-0">
+            <table class="table au-table mb-0" id="scenarioTable">
+                <thead>
                     <tr>
-                        <td>
-                            <strong>@s.Name</strong>
-                            @if (!string.IsNullOrWhiteSpace(s.Description))
-                            {
-                                <br /><small class="text-muted">@s.Description</small>
-                            }
-                        </td>
-                        <td><span class="badge bg-info text-dark">@s.ReportMethod</span></td>
-                        <td>
-                            @foreach (var m in s.SelectedMeasures)
-                            {
-                                <span class="badge bg-secondary">@ProfiledMeasureCatalog.GetDisplayName(m)</span>
-                            }
-                        </td>
-                        <td>@(s.UseMeasureEligibilityProfiles ? s.PatientProfiles.Count : s.PatientCount)</td>
-                        <td>@resourceRange</td>
-                        <td><code>@s.Seed</code></td>
-                        <td>
-                            @if (s.IsSystemScenario)
-                            {
-                                <span class="badge bg-dark">System</span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-light text-dark border">Custom</span>
-                            }
-                        </td>
-                        <td>@s.UpdatedAt.LocalDateTime.ToString("g")</td>
-                        <td class="text-nowrap">
-                            <div class="d-inline-flex gap-1">
+                        <th>Name</th>
+                        <th>Method</th>
+                        <th>Measures</th>
+                        <th>Patients</th>
+                        <th>Resources</th>
+                        <th>Seed</th>
+                        <th>Type</th>
+                        <th>Updated</th>
+                        <th style="width:180px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Model)
+                    {
+                        var resourceRange = s.ResourcesPerPatientMin == s.ResourcesPerPatientMax
+                            ? s.ResourcesPerPatientMin.ToString()
+                            : $"{s.ResourcesPerPatientMin}\u2013{s.ResourcesPerPatientMax}";
+                        var patientCount = s.PatientCohorts.Count > 0
+                            ? s.PatientCohorts.Sum(c => c.PatientCount)
+                            : s.PatientCount;
+
+                        <tr data-id="@s.Id">
+                            <td>
+                                <strong>@s.Name</strong>
+                                @if (!string.IsNullOrWhiteSpace(s.Description))
+                                {
+                                    <br /><small class="text-muted">@s.Description</small>
+                                }
+                            </td>
+                            <td><span class="badge bg-light text-dark border">@s.ReportMethod</span></td>
+                            <td>
+                                @foreach (var m in s.SelectedMeasures)
+                                {
+                                    <span class="badge bg-secondary">@ProfiledMeasureCatalog.GetDisplayName(m)</span>
+                                }
+                            </td>
+                            <td>@patientCount</td>
+                            <td>@resourceRange</td>
+                            <td><code>@s.Seed</code></td>
+                            <td>
                                 @if (s.IsSystemScenario)
                                 {
-                                    <a asp-action="Details" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">View</a>
+                                    <span class="badge bg-dark">System</span>
                                 }
                                 else
                                 {
-                                    <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                                    <span class="badge bg-light text-dark border">Custom</span>
                                 }
-                                <form asp-action="Clone" method="post" class="d-inline m-0">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@s.Id" />
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Clone</button>
-                                </form>
-                                @if (!s.IsSystemScenario)
-                                {
-                                    <form asp-action="Delete" method="post" class="d-inline m-0">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="id" value="@s.Id" />
-                                        <button type="submit" class="btn btn-sm btn-outline-danger"
-                                                onclick="return confirm('Delete this scenario?');">Delete</button>
-                                    </form>
-                                }
-                            </div>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+                            </td>
+                            <td class="small text-muted">@s.UpdatedAt.LocalDateTime.ToString("g")</td>
+                            <td class="text-nowrap">
+                                <div class="d-inline-flex gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-primary btn-scenario-open" data-id="@s.Id" data-mode="@(s.IsSystemScenario ? "view" : "edit")">
+                                        @(s.IsSystemScenario ? "View" : "Edit")
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-scenario-clone" data-id="@s.Id">Clone</button>
+                                    @if (!s.IsSystemScenario)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-danger btn-scenario-delete" data-id="@s.Id">Delete</button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            @if (Model.Count == 0)
+            {
+                <div class="text-center text-muted py-4">No scenarios yet. Click <strong>+</strong> to create one.</div>
+            }
+        </div>
     </div>
 </div>
+
+@* ========== Scenario Editor Modal ========== *@
+<div id="scenarioModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;">
+    <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
+        <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:960px;display:flex;flex-direction:column;max-height:90vh;">
+            <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;flex-shrink:0;" class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0" id="modalTitle"><i class="bi bi-pencil-square me-2"></i>Scenario</h5>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-sm btn-success" id="btnModalSave" style="display:none;">
+                        <i class="bi bi-floppy me-1"></i>Save
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-light" id="btnModalClose">Close</button>
+                </div>
+            </div>
+            <div id="formErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
+            <div style="flex:1;overflow-y:auto;padding:1.25rem;" id="modalBody">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="ScenarioId" value="" />
+                <input type="hidden" id="IsSystemScenario" value="false" />
+
+                <div id="scenarioConfigArea" class="position-relative">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="ScenarioName">Name</label>
+                            <input class="form-control" id="ScenarioName" maxlength="120" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="ScenarioDescription">Description</label>
+                            <input class="form-control" id="ScenarioDescription" maxlength="500" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="ReportMethod">Report Method</label>
+                            <select class="form-select" id="ReportMethod">
+                                <option value="Adhoc">Adhoc</option>
+                                <option value="ScheduledReport">Scheduled Report</option>
+                                <option value="RegenerateReport">Regenerate Report</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Measures</label>
+                            <div class="form-check">
+                                <input class="form-check-input measure-checkbox" type="checkbox" id="measure_monthly" value="NhsnAcuteCareHospitalMonthlyInitialPopulation" checked />
+                                <label class="form-check-label" for="measure_monthly">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input measure-checkbox" type="checkbox" id="measure_daily" value="NhsnAcuteCareHospitalDailyInitialPopulation" />
+                                <label class="form-check-label" for="measure_daily">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input measure-checkbox" type="checkbox" id="measure_hypo" value="NhsnGlycemicControlHypoglycemicInitialPopulation" />
+                                <label class="form-check-label" for="measure_hypo">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="QueryPlanTemplate">Query Plan</label>
+                            <select class="form-select" id="QueryPlanTemplate">
+                                @foreach (var qp in queryPlanTemplates)
+                                {
+                                    var defaultLabel = qp.IsDefault ? " (Default)" : "";
+                                    var systemLabel = qp.IsSystem ? " [System]" : "";
+                                    <option value="@qp.Id" data-name="@qp.Name" data-is-default="@qp.IsDefault.ToString().ToLower()">@qp.Name@defaultLabel@systemLabel</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="Seed">Seed</label>
+                            <input class="form-control" type="number" min="1" id="Seed" value="20260329" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="PatientCount">Patient Count</label>
+                            <input class="form-control" type="number" id="PatientCount" value="10" readonly />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label" for="PatientPrefix">Prefix</label>
+                            <input class="form-control" type="text" id="PatientPrefix" value="CustomPatient" maxlength="64" />
+                        </div>
+                        <div class="col-12 d-flex gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="CleanupFhirData" checked />
+                                <label class="form-check-label" for="CleanupFhirData">Cleanup FHIR Data</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="CleanupServiceData" />
+                                <label class="form-check-label" for="CleanupServiceData">Cleanup Service Data</label>
+                            </div>
+                        </div>
+                        <div id="cohortBuilder" class="col-12">
+                            <div class="au-cohort-card mt-1">
+                                <div class="card-body">
+                                    <span class="fw-semibold"><i class="bi bi-people-fill me-1"></i>Cohorts</span>
+                                    <table class="table table-sm table-bordered mb-2 mt-2" id="cohortTable">
+                                        <thead>
+                                            <tr>
+                                                <th style="width:40px">#</th>
+                                                <th style="width:100px">Patients</th>
+                                                <th>Measure Eligibility</th>
+                                                <th style="width:90px">Res Min</th>
+                                                <th style="width:90px">Res Max</th>
+                                                <th>Clinical Profiles</th>
+                                                <th style="width:40px"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="cohortRows"></tbody>
+                                    </table>
+                                    <div class="d-flex gap-2" id="cohortActions">
+                                        <button type="button" class="btn btn-sm btn-outline-success" id="addQualifyingCohort">+ Qualifying</button>
+                                        <button type="button" class="btn btn-sm btn-outline-warning" id="addNonQualifyingCohort">+ Non-Qualifying</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="systemOverlay" class="position-absolute top-0 start-0 w-100 h-100 au-system-overlay" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="scenarioModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
+
+<script>
+(function () {
+    var clinicalScenarioCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        clinicalScenarios,
+        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+
+    var QUALIFYING = 'Qualifying', NON_QUALIFYING = 'NonQualifying';
+    var modal = document.getElementById('scenarioModal');
+    var backdrop = document.getElementById('scenarioModalBackdrop');
+    var modalTitle = document.getElementById('modalTitle');
+    var btnSave = document.getElementById('btnModalSave');
+    var overlay = document.getElementById('systemOverlay');
+    var idInput = document.getElementById('ScenarioId');
+    var isSystemInput = document.getElementById('IsSystemScenario');
+    var cohortRows = document.getElementById('cohortRows');
+    var cohortActions = document.getElementById('cohortActions');
+
+    var saveUrl = '@Url.Action("SaveInline", "Scenarios")';
+    var deleteUrl = '@Url.Action("DeleteInline", "Scenarios")';
+    var cloneUrl = '@Url.Action("CloneInline", "Scenarios")';
+    var getJsonUrl = '@Url.Action("GetJson", "Scenarios")';
+
+    function af() { var t = document.querySelector('input[name="__RequestVerificationToken"]'); return t ? t.value : ''; }
+    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function openModal() { modal.style.display = ''; backdrop.style.display = ''; }
+    function closeModal() { modal.style.display = 'none'; backdrop.style.display = 'none'; }
+    document.getElementById('btnModalClose').addEventListener('click', closeModal);
+    backdrop.addEventListener('click', closeModal);
+
+    function setEditable(e) {
+        overlay.style.display = e ? 'none' : '';
+        cohortActions.style.display = e ? '' : 'none';
+        btnSave.style.display = e ? '' : 'none';
+    }
+
+    // ---- Error display ----
+    var formErrors = document.getElementById('formErrors');
+    function showError(msg) { formErrors.textContent = msg; formErrors.style.display = ''; }
+    function clearErrors() { formErrors.style.display = 'none'; formErrors.textContent = ''; clearFieldErrors(); }
+    function markFieldError(id, msg) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add('is-invalid');
+        var fb = el.parentElement.querySelector('.invalid-feedback');
+        if (!fb) { fb = document.createElement('div'); fb.className = 'invalid-feedback'; el.parentElement.appendChild(fb); }
+        fb.textContent = msg; fb.style.display = 'block';
+    }
+    function clearFieldErrors() {
+        document.querySelectorAll('#scenarioConfigArea .is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
+        document.querySelectorAll('#scenarioConfigArea .invalid-feedback').forEach(function (el) { el.style.display = 'none'; });
+    }
+
+    // ---- AJAX helper (identical to QueryPlans) ----
+    async function postJson(url, body) {
+        var res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': af() },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            var errText = '';
+            try { errText = await res.text(); } catch (_) {}
+            throw new Error(errText || ('Server returned ' + res.status));
+        }
+        var ct = res.headers.get('content-type') || '';
+        return ct.indexOf('json') >= 0 ? res.json() : null;
+    }
+
+    // ---- Measure helpers ----
+    function selectedMeasureTypes() { return Array.prototype.map.call(document.querySelectorAll('.measure-checkbox:checked'), function (cb) { return cb.value; }); }
+    function sid(v) { return String(v || '').toLowerCase(); }
+
+    function defaultElig(isQ) {
+        var m = {}; selectedMeasureTypes().forEach(function (t) { m[t] = isQ ? QUALIFYING : NON_QUALIFYING; }); return m;
+    }
+    function normElig(raw) {
+        var n = {};
+        selectedMeasureTypes().forEach(function (m) {
+            if (!raw || !Object.prototype.hasOwnProperty.call(raw, m)) { n[m] = QUALIFYING; return; }
+            var v = raw[m]; n[m] = (v === QUALIFYING || v === 0 || v === '0') ? QUALIFYING : NON_QUALIFYING;
+        });
+        return n;
+    }
+    function cohortMatchesScenario(sc, elig) {
+        return selectedMeasureTypes().every(function (m) {
+            var d = Object.prototype.hasOwnProperty.call(elig, m) ? elig[m] : QUALIFYING;
+            var q = (sc.qualifiesForMeasureTypes || []).indexOf(m) >= 0;
+            return d === QUALIFYING ? q : !q;
+        });
+    }
+    function eligIds(elig) {
+        var n = normElig(elig);
+        return clinicalScenarioCatalog.filter(function (sc) { return cohortMatchesScenario(sc, n); }).map(function (sc) { return sid(sc.scenarioId); });
+    }
+
+    // ---- Cohort row builders ----
+    function buildEligEditor(elig) {
+        var sel = selectedMeasureTypes();
+        if (!sel.length) return '<span class="text-muted small">Select measures</span>';
+        return sel.map(function (m) {
+            var cb = document.querySelector('.measure-checkbox[value="' + m + '"]');
+            var lbl = cb ? (document.querySelector('label[for="' + cb.id + '"]') || { textContent: m }).textContent : m;
+            var cur = (Object.prototype.hasOwnProperty.call(elig, m) ? elig[m] : QUALIFYING);
+            return '<div class="form-check form-check-inline me-2 mb-1"><input class="form-check-input cohort-measure-eligibility" type="checkbox" data-measure="' + m + '" ' + (cur === QUALIFYING ? 'checked' : '') + ' /><label class="form-check-label small">' + esc(lbl) + '</label></div>';
+        }).join('');
+    }
+    function buildScenarioSelect(ids) {
+        var set = new Set((ids || []).map(sid)); var all = set.size === 0;
+        var opts = clinicalScenarioCatalog.map(function (sc) {
+            var id = sid(sc.scenarioId), lbl = sc.primaryDiagnosis + ' (' + sc.icdCode + ')';
+            return '<div class="form-check mb-1 cohort-scenario-item"><label class="form-check-label small"><input class="form-check-input cohort-scenario-option me-1" type="checkbox" value="' + id + '" ' + ((all || set.has(id)) ? 'checked' : '') + ' />' + esc(lbl) + '</label></div>';
+        }).join('');
+        return '<div class="dropdown cohort-scenarios-dropdown"><button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start cohort-scenarios-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside">All</button><div class="dropdown-menu p-2 w-100" style="max-height:200px;overflow:auto;">' + opts + '</div></div>';
+    }
+
+    function addCohortRow(count, elig, scenarios, rMin, rMax) {
+        var idx = cohortRows.children.length, ne = normElig(elig);
+        var sel = (scenarios && scenarios.length > 0) ? scenarios : eligIds(ne);
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td class="text-center align-middle">' + (idx + 1) + '</td>' +
+            '<td><input type="number" class="form-control form-control-sm cohort-count" min="1" value="' + (count || 1) + '" /></td>' +
+            '<td><div class="cohort-measure-editor">' + buildEligEditor(ne) + '</div></td>' +
+            '<td><input type="number" class="form-control form-control-sm cohort-min" min="1" value="' + (rMin || 50) + '" /></td>' +
+            '<td><input type="number" class="form-control form-control-sm cohort-max" min="1" value="' + (rMax || rMin || 100) + '" /></td>' +
+            '<td>' + buildScenarioSelect(sel) + '</td>' +
+            '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-cohort">&times;</button></td>';
+        cohortRows.appendChild(tr);
+        enforceDeps(tr); applyFilter(tr, readElig(tr)); updateSummary(tr); reindex(); syncCount();
+    }
+    function addDefault(count, isQ, rMin, rMax) { addCohortRow(count, defaultElig(!!isQ), null, rMin, rMax); }
+
+    function readElig(row) {
+        var v = {}; row.querySelectorAll('.cohort-measure-eligibility').forEach(function (cb) { v[cb.getAttribute('data-measure')] = cb.checked ? QUALIFYING : NON_QUALIFYING; });
+        return normElig(v);
+    }
+    function enforceDeps(row, ch) {
+        var hypo = row.querySelector('.cohort-measure-eligibility[data-measure="NhsnGlycemicControlHypoglycemicInitialPopulation"]');
+        var ach = row.querySelector('.cohort-measure-eligibility[data-measure="NhsnAcuteCareHospitalMonthlyInitialPopulation"]');
+        if (!hypo || !ach) return;
+        if (ch === 'NhsnGlycemicControlHypoglycemicInitialPopulation' && hypo.checked && !ach.checked) { ach.checked = true; return; }
+        if (ch === 'NhsnAcuteCareHospitalMonthlyInitialPopulation' && !ach.checked && hypo.checked) { hypo.checked = false; return; }
+        if (hypo.checked && !ach.checked) ach.checked = true;
+    }
+    function rerenderEditor(row) {
+        var ed = row.querySelector('.cohort-measure-editor'); if (!ed) return;
+        ed.innerHTML = buildEligEditor(readElig(row)); enforceDeps(row); applyFilter(row, readElig(row));
+    }
+    function applyFilter(row, elig) {
+        var allowed = new Set(eligIds(elig)), dd = row.querySelector('.cohort-scenarios-dropdown');
+        dd.querySelectorAll('.cohort-scenario-option').forEach(function (o) {
+            var ok = allowed.has(sid(o.value)); o.disabled = !ok;
+            var w = o.closest('.cohort-scenario-item'); if (w) w.style.display = ok ? '' : 'none';
+            if (!ok) o.checked = false;
+        });
+        if (!dd.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)').length)
+            dd.querySelectorAll('.cohort-scenario-option:not(:disabled)').forEach(function (o) { o.checked = true; });
+        updateSummary(row);
+    }
+    function updateSummary(row) {
+        var dd = row.querySelector('.cohort-scenarios-dropdown'); if (!dd) return;
+        var toggle = dd.querySelector('.cohort-scenarios-toggle');
+        var all = dd.querySelectorAll('.cohort-scenario-option:not(:disabled)');
+        var sel = dd.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)');
+        toggle.textContent = !all.length ? 'None' : sel.length === all.length ? 'All' : sel.length + ' selected';
+    }
+    function reindex() { Array.prototype.forEach.call(cohortRows.children, function (r, i) { r.querySelector('td:first-child').textContent = i + 1; }); }
+    function syncCount() {
+        var t = getCohorts().reduce(function (s, c) { return s + (c.patientCount || 0); }, 0);
+        document.getElementById('PatientCount').value = t > 0 ? t : 0;
+    }
+    function getCohorts() {
+        return Array.prototype.map.call(cohortRows.children, function (row) {
+            var min = parseInt(row.querySelector('.cohort-min').value || '50', 10);
+            var max = parseInt(row.querySelector('.cohort-max').value || String(min), 10);
+            if (max < min) { max = min; row.querySelector('.cohort-max').value = String(max); }
+            return {
+                patientCount: parseInt(row.querySelector('.cohort-count').value || '0', 10),
+                measureEligibilities: readElig(row),
+                eligibleClinicalScenarioIds: Array.prototype.map.call(row.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)'), function (cb) { return sid(cb.value); }).filter(Boolean),
+                resourcesPerPatientMin: min, resourcesPerPatientMax: max
+            };
+        }).filter(function (c) { return c.patientCount > 0; });
+    }
+
+    // ---- Cohort event handlers ----
+    document.getElementById('addQualifyingCohort').addEventListener('click', function () { addDefault(10, true, 50, 100); });
+    document.getElementById('addNonQualifyingCohort').addEventListener('click', function () { addDefault(10, false, 50, 100); });
+    cohortRows.addEventListener('click', function (e) { if (e.target.closest('.btn-remove-cohort')) { e.target.closest('tr').remove(); reindex(); syncCount(); } });
+    cohortRows.addEventListener('change', function (e) {
+        if (e.target.classList.contains('cohort-measure-eligibility')) { var r = e.target.closest('tr'); enforceDeps(r, e.target.getAttribute('data-measure')); applyFilter(r, readElig(r)); }
+        if (e.target.classList.contains('cohort-scenario-option')) updateSummary(e.target.closest('tr'));
+        if (e.target.classList.contains('cohort-count')) syncCount();
+    });
+    cohortRows.addEventListener('input', function () { syncCount(); });
+    document.querySelectorAll('.measure-checkbox').forEach(function (cb) {
+        cb.addEventListener('change', function () { Array.prototype.forEach.call(cohortRows.children, function (r) { rerenderEditor(r); }); });
+    });
+
+    // ---- Collect form into JSON payload ----
+    function collectModel() {
+        var cohorts = getCohorts();
+        var mins = cohorts.map(function (c) { return c.resourcesPerPatientMin || 50; });
+        var maxes = cohorts.map(function (c) { return c.resourcesPerPatientMax || 100; });
+        return {
+            id: idInput.value || null,
+            name: document.getElementById('ScenarioName').value,
+            description: document.getElementById('ScenarioDescription').value,
+            isSystemScenario: false,
+            reportMethod: document.getElementById('ReportMethod').value,
+            selectedMeasures: selectedMeasureTypes(),
+            seed: parseInt(document.getElementById('Seed').value || '20260329', 10),
+            patientCount: parseInt(document.getElementById('PatientCount').value || '0', 10),
+            resourcesPerPatientMin: mins.length > 0 ? Math.min.apply(null, mins) : 50,
+            resourcesPerPatientMax: maxes.length > 0 ? Math.max.apply(null, maxes) : 100,
+            patientPrefix: document.getElementById('PatientPrefix').value,
+            useMeasureEligibilityProfiles: true,
+            patientProfiles: [],
+            patientCohorts: cohorts,
+            selectedClinicalScenarioIds: [],
+            dischargeCount: 0,
+            dischargeQualifyingCount: 0,
+            dischargeNonQualifyingCount: 0,
+            cleanupServiceData: document.getElementById('CleanupServiceData').checked,
+            cleanupFhirData: document.getElementById('CleanupFhirData').checked,
+            queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null
+        };
+    }
+
+    // ---- Populate form from JSON ----
+    function populate(data) {
+        idInput.value = data.id || '';
+        isSystemInput.value = data.isSystemScenario ? 'true' : 'false';
+        document.getElementById('ScenarioName').value = data.name || '';
+        document.getElementById('ScenarioDescription').value = data.description || '';
+        document.getElementById('ReportMethod').value = data.reportMethod || 'Adhoc';
+        document.getElementById('Seed').value = data.seed || 20260329;
+        document.getElementById('PatientPrefix').value = data.patientPrefix || 'CustomPatient';
+        document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
+        document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;
+        var qp = document.getElementById('QueryPlanTemplate');
+        if (data.queryPlanTemplateId) qp.value = data.queryPlanTemplateId;
+        else { var d = qp.querySelector('[data-is-default="true"]'); if (d) qp.value = d.value; }
+        document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
+        var mMap = { 'NhsnAcuteCareHospitalMonthlyInitialPopulation': 'measure_monthly', 'NhsnAcuteCareHospitalDailyInitialPopulation': 'measure_daily', 'NhsnGlycemicControlHypoglycemicInitialPopulation': 'measure_hypo' };
+        (data.selectedMeasures || []).forEach(function (m) { var cb = document.getElementById(mMap[String(m)]); if (cb) cb.checked = true; });
+        cohortRows.innerHTML = '';
+        if (data.patientCohorts && data.patientCohorts.length > 0) {
+            data.patientCohorts.forEach(function (c) { addCohortRow(c.patientCount, c.measureEligibilities || defaultElig(true), c.eligibleClinicalScenarioIds || [], c.resourcesPerPatientMin || data.resourcesPerPatientMin || 50, c.resourcesPerPatientMax || data.resourcesPerPatientMax || 100); });
+        } else {
+            addDefault(data.patientCount || 10, true, data.resourcesPerPatientMin || 50, data.resourcesPerPatientMax || 100);
+        }
+        syncCount();
+    }
+
+    // ---- Open modal (matches QueryPlans openEditor pattern exactly) ----
+    async function openEditor(id, mode) {
+        clearErrors();
+        if (id) {
+            try {
+                var res = await fetch(getJsonUrl + '?id=' + encodeURIComponent(id));
+                if (!res.ok) throw new Error('Server returned ' + res.status);
+                var data = await res.json();
+                populate(data);
+                var isSystem = data.isSystemScenario === true;
+                var isView = mode === 'view' || isSystem;
+                modalTitle.innerHTML = '<i class="bi bi-' + (isView ? 'eye' : 'pencil-square') + ' me-2"></i>' + (isView ? 'View' : 'Edit') + ': ' + esc(data.name || 'Scenario') + (isSystem ? ' <span class="badge bg-secondary ms-2">System</span>' : '');
+                setEditable(!isView);
+                openModal();
+            } catch (err) {
+                showError('Failed to load scenario: ' + (err.message || 'Unknown error'));
+                openModal();
+            }
+        } else {
+            idInput.value = '';
+            isSystemInput.value = 'false';
+            modalTitle.innerHTML = '<i class="bi bi-plus-lg me-2"></i>New Scenario';
+            setEditable(true);
+            document.getElementById('ScenarioName').value = '';
+            document.getElementById('ScenarioDescription').value = '';
+            document.getElementById('ReportMethod').value = 'Adhoc';
+            document.getElementById('Seed').value = 20260329;
+            document.getElementById('PatientPrefix').value = 'CustomPatient';
+            document.getElementById('CleanupFhirData').checked = true;
+            document.getElementById('CleanupServiceData').checked = false;
+            document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
+            document.getElementById('measure_monthly').checked = true;
+            cohortRows.innerHTML = '';
+            addDefault(10, true, 50, 100);
+            syncCount();
+            openModal();
+        }
+    }
+
+    // ---- Save (matches QueryPlans pattern exactly) ----
+    btnSave.addEventListener('click', async function () {
+        clearErrors();
+        var model = collectModel();
+        var valid = true;
+        if (!(model.name || '').trim()) { markFieldError('ScenarioName', 'Name is required.'); valid = false; }
+        if (!model.selectedMeasures.length) { showError('At least one measure must be selected.'); valid = false; }
+        if (!model.patientCohorts.length) { showError('At least one cohort with patients > 0 is required.'); valid = false; }
+        if (!valid) return;
+        model.id = idInput.value || crypto.randomUUID();
+        try {
+            await postJson(saveUrl, model);
+            location.reload();
+        } catch (err) {
+            showError('Save failed: ' + (err.message || 'Unknown error'));
+        }
+    });
+
+    // ---- Table button handlers (matches QueryPlans pattern exactly) ----
+    document.getElementById('btnNewScenario').addEventListener('click', function () { openEditor(null, 'edit'); });
+
+    document.querySelectorAll('.btn-scenario-open').forEach(function (btn) {
+        btn.addEventListener('click', function () { openEditor(btn.getAttribute('data-id'), btn.getAttribute('data-mode')); });
+    });
+
+    document.querySelectorAll('.btn-scenario-clone').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            try { await postJson(cloneUrl, { id: btn.getAttribute('data-id') }); location.reload(); }
+            catch (err) { showError('Clone failed: ' + (err.message || 'Unknown error')); }
+        });
+    });
+
+    document.querySelectorAll('.btn-scenario-delete').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            if (!confirm('Delete this scenario?')) return;
+            try { await postJson(deleteUrl, { id: btn.getAttribute('data-id') }); location.reload(); }
+            catch (err) { showError('Delete failed: ' + (err.message || 'Unknown error')); }
+        });
+    });
+})();
+</script>

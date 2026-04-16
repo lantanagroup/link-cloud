@@ -2,12 +2,10 @@ using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Sdk.Clients;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automation.UI.Controllers;
 
-[Authorize]
 public class RunsController(
     IAutomationRunManager runManager,
     IScenarioStore scenarioStore,
@@ -266,6 +264,34 @@ public class RunsController(
             if (detailed == null)
                 return NotFound();
 
+            // Fetch reference resources linked to this log.
+            var referenceResourceIds = new List<string>();
+            try
+            {
+                var pageNum = 1;
+                const int refPageSize = 100;
+                while (true)
+                {
+                    var refPage = await dataAcqClient.GetReferenceResourcesForLogAsync(logId, refPageSize, pageNum, cancellationToken);
+                    var refRecords = refPage?.Records ?? [];
+                    if (refRecords.Count == 0)
+                        break;
+
+                    referenceResourceIds.AddRange(
+                        refRecords
+                            .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
+                            .Select(r => $"{r.ResourceType}/{r.ResourceId}"));
+
+                    if (refRecords.Count < refPageSize)
+                        break;
+                    pageNum++;
+                }
+            }
+            catch (Exception refEx)
+            {
+                logger.LogWarning(refEx, "Failed to load reference resources for log {LogId}", logId);
+            }
+
             return Json(new
             {
                 detailed.Id,
@@ -282,10 +308,13 @@ public class RunsController(
                 detailed.CompletionTimeMilliseconds,
                 ResourceTypes = (detailed.ResourceTypes ?? [])
                     .Concat(detailed.FhirQuery.SelectMany(q => q.ResourceTypes ?? []))
-                    .Where(rt => !string.IsNullOrWhiteSpace(rt))
+                    .Concat(referenceResourceIds
+                        .Select(r => r.Contains('/') ? r.Split('/')[0] : r)
+                        .Where(rt => !string.IsNullOrWhiteSpace(rt)))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList(),
                 ResourceAcquiredIds = detailed.ResourceAcquiredIds?.ToList() ?? new List<string>(),
+                ReferenceResourceIds = referenceResourceIds,
                 Notes = detailed.Notes?.ToList() ?? new List<string>()
             });
         }

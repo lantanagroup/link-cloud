@@ -249,6 +249,7 @@ public class AutomationRunManager : IAutomationRunManager
                 var acquisitionSummary = await SafeGetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, "acquisitionSummary", cancellationToken);
                 var measureResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "measureResources", cancellationToken) ?? [];
                 var validationResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "validationResources", cancellationToken) ?? [];
+                var validatorResults = await SafeGetDomainAsync<List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>>(runId, "validatorResults", cancellationToken);
 
                 _logger.LogDebug(
                     "[Snapshot][{RunId}] Domain data: schedule={HasSchedule}, entries={EntryCount}, populations={PopCount}, acqSummary={HasAcqSummary} (logs={AcqLogs}), measureRes={MeasureCount}, valRes={ValCount}",
@@ -268,7 +269,8 @@ public class AutomationRunManager : IAutomationRunManager
                     Populations = populations,
                     AcquisitionSummary = acquisitionSummary,
                     MeasureEvalResourceCounts = measureResources,
-                    ReportResourceCounts = validationResources
+                    ReportResourceCounts = validationResources,
+                    ValidatorResults = validatorResults
                 };
             });
 
@@ -602,30 +604,80 @@ public class AutomationRunManager : IAutomationRunManager
             // Pipeline-built manifest already has all metadata; no need to re-parse bundles.
             // For non-profile runs (no pipeline), generationManifest remains null.
 
-            await reportAbsValidator.ValidateAllAsync(
-                internalAbsResources,
-                expectedSubmittedPatientIds,
-                measureIds,
-                scenarioConfig.StartDate,
-                scenarioConfig.EndDate,
-                facilityId,
-                reportId,
-                generatedBundles: null,
-                expectedManifestPatientListIds: expectedAllPatientIds,
-                expectDataAcquisitionData: expectDataAcquisitionData,
-                manifest: generationManifest);
+            var validatorResults = new List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>();
 
-            await reportValidator.ValidateAllAsync(
-                facilityId,
-                reportId,
-                measureIds,
-                expectedAllPatientIds,
-                expectedSubmittedPatientIds: expectedSubmittedPatientIds,
-                manifest: generationManifest);
-            await dataAcqValidator.ValidateAllAsync(facilityId, reportId, measureIds[0], expectedAllPatientIds, expectDataAcquisitionData: expectDataAcquisitionData);
-            await normalizationValidator.ValidateAllAsync(facilityId);
-            await tenantValidator.ValidateAllAsync(facilityId, measureId);
-            await validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow);
+            async Task RunValidator(string name, Func<Task> action)
+            {
+                try
+                {
+                    await action();
+                    validatorResults.Add(new PipelineSummarySnapshotBuilder.ValidatorResultSnapshot
+                    {
+                        Name = name,
+                        Outcome = "Passed",
+                        IssueCount = 0
+                    });
+                }
+                catch (Exception ex)
+                {
+                    // Extract issue count from the conventional message format:
+                    // "... failed with N issue(s)."
+                    var issueCount = 0;
+                    var match = System.Text.RegularExpressions.Regex.Match(ex.Message, @"(\d+)\s+issue\(s\)");
+                    if (match.Success)
+                        int.TryParse(match.Groups[1].Value, out issueCount);
+
+                    validatorResults.Add(new PipelineSummarySnapshotBuilder.ValidatorResultSnapshot
+                    {
+                        Name = name,
+                        Outcome = "Failed",
+                        IssueCount = issueCount
+                    });
+                    // Re-throw so the run still fails as before.
+                    throw;
+                }
+                finally
+                {
+                    // Persist after each validator so partial results are visible
+                    // in the dashboard even if a later validator throws.
+                    await _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", validatorResults, CancellationToken.None);
+                }
+            }
+
+            await RunValidator("REPORT INTERNAL ABS MANIFEST VALIDATION", () =>
+                reportAbsValidator.ValidateAllAsync(
+                    internalAbsResources,
+                    expectedSubmittedPatientIds,
+                    measureIds,
+                    scenarioConfig.StartDate,
+                    scenarioConfig.EndDate,
+                    facilityId,
+                    reportId,
+                    generatedBundles: null,
+                    expectedManifestPatientListIds: expectedAllPatientIds,
+                    expectDataAcquisitionData: expectDataAcquisitionData,
+                    manifest: generationManifest));
+
+            await RunValidator("REPORT DATABASE VALIDATION", () =>
+                reportValidator.ValidateAllAsync(
+                    facilityId,
+                    reportId,
+                    measureIds,
+                    expectedAllPatientIds,
+                    expectedSubmittedPatientIds: expectedSubmittedPatientIds,
+                    manifest: generationManifest));
+
+            await RunValidator("DATA ACQUISITION DATABASE VALIDATION", () =>
+                dataAcqValidator.ValidateAllAsync(facilityId, reportId, measureIds[0], expectedAllPatientIds, expectDataAcquisitionData: expectDataAcquisitionData));
+
+            await RunValidator("NORMALIZATION DATABASE VALIDATION", () =>
+                normalizationValidator.ValidateAllAsync(facilityId));
+
+            await RunValidator("TENANT DATABASE VALIDATION", () =>
+                tenantValidator.ValidateAllAsync(facilityId, measureId));
+
+            await RunValidator("VALIDATION RESULTS (API)", () =>
+                validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow));
 
             await RunCleanupHelper.CleanupAfterRunAsync(
                 scenarioConfig,
