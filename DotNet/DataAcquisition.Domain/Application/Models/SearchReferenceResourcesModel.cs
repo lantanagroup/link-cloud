@@ -1,5 +1,8 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 
 namespace DataAcquisition.Domain.Application.Models
 {
@@ -8,6 +11,7 @@ namespace DataAcquisition.Domain.Application.Models
         public string? FacilityId { get; set; }
         public string? ResourceId { get; set; }
         public string? ResourceType { get; set; }
+        public List<string>? ResourceTypes { get; set; }
         public QueryPhase? QueryPhase { get; set; }
         public long? DataAcquisitionLogId { get; set; }
         public int PageNumber { get; set; } = 1;

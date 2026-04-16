@@ -1,0 +1,88 @@
+﻿@model List<Automation.UI.Models.QueryPlanTemplate>
+@{
+    ViewData["Title"] = "Query Plans";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="bi bi-diagram-3 me-2"></i>Query Plans</h2>
+    <a asp-action="Create" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New Query Plan</a>
+</div>
+
+<p class="text-muted mb-3">
+    Query plans control which FHIR resource types are acquired during data acquisition.
+    The <strong>default</strong> plan is used for new scenarios unless overridden.
+    System plans cannot be edited but can be cloned.
+</p>
+
+<div class="table-responsive">
+    <table class="table table-sm table-striped align-middle">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Acquired Resource Types</th>
+                <th>EHR</th>
+                <th class="text-center">Default</th>
+                <th class="text-center">System</th>
+                <th>Updated</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var t in Model)
+        {
+            var acquiredTypes = t.GetAcquiredResourceTypes();
+            <tr>
+                <td>
+                    <a asp-action="Details" asp-route-id="@t.Id" class="fw-semibold text-decoration-none">@t.Name</a>
+                </td>
+                <td>
+                    <small class="text-muted">@string.Join(", ", acquiredTypes.OrderBy(x => x))</small>
+                </td>
+                <td><small>@t.EhrDescription</small></td>
+                <td class="text-center">
+                    @if (t.IsDefault)
+                    {
+                        <span class="badge bg-success"><i class="bi bi-check-lg"></i> Default</span>
+                    }
+                </td>
+                <td class="text-center">
+                    @if (t.IsSystem)
+                    {
+                        <span class="badge bg-secondary">System</span>
+                    }
+                </td>
+                <td><small class="text-muted">@t.UpdatedAt.ToString("yyyy-MM-dd HH:mm")</small></td>
+                <td class="text-end">
+                    <div class="btn-group btn-group-sm">
+                        @if (!t.IsSystem)
+                        {
+                            <a asp-action="Edit" asp-route-id="@t.Id" class="btn btn-outline-primary btn-sm" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        }
+                        <form asp-action="Clone" asp-route-id="@t.Id" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" title="Clone"><i class="bi bi-copy"></i></button>
+                        </form>
+                        @if (!t.IsDefault)
+                        {
+                            <form asp-action="SetDefault" asp-route-id="@t.Id" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-outline-success btn-sm" title="Set as Default"><i class="bi bi-star"></i></button>
+                            </form>
+                        }
+                        @if (!t.IsSystem)
+                        {
+                            <form asp-action="Delete" asp-route-id="@t.Id" method="post" class="d-inline"
+                                  onsubmit="return confirm('Delete this query plan template?');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Delete"><i class="bi bi-trash"></i></button>
+                            </form>
+                        }
+                    </div>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>

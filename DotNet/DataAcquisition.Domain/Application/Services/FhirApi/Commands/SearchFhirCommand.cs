@@ -1,18 +1,20 @@
-﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -98,7 +100,17 @@ public class SearchFhirCommand : ISearchFhirCommand
             var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
-                fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+                if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)
+                {
+                    fhirClient.RequestHeaders.Authorization = authHeaderValue;
+                }
+                else if (authBuilderResults.authHeader is Dictionary<string, string> customHeaders)
+                {
+                    foreach (var header in customHeaders)
+                    {
+                        fhirClient.RequestHeaders.Add(header.Key, header.Value);
+                    }
+                }
             }
 
             Bundle? resultBundle = null;
@@ -191,7 +203,17 @@ public class SearchFhirCommand : ISearchFhirCommand
             var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
-                fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+                if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)
+                {
+                    fhirClient.RequestHeaders.Authorization = authHeaderValue;
+                }
+                else if (authBuilderResults.authHeader is Dictionary<string, string> customHeaders)
+                {
+                    foreach (var header in customHeaders)
+                    {
+                        fhirClient.RequestHeaders.Add(header.Key, header.Value);
+                    }
+                }
             }
 
             Bundle resultBundle;

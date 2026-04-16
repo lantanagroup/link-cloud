@@ -1,0 +1,410 @@
+﻿@model TestScenarioDefinition
+@{
+    ViewData["Title"] = Model.Id == Guid.Empty || string.IsNullOrWhiteSpace(Model.Name) ? "New Scenario" : $"Edit: {Model.Name}";
+    var qualifyingValue = (int)MeasureEligibility.Qualifying;
+    var nonQualifyingValue = (int)MeasureEligibility.NonQualifying;
+    var clinicalScenarios = ClinicalScenarioInfo.GetAll(Enum.GetValues<ProfiledMeasureType>().ToList());
+    var isNew = string.IsNullOrWhiteSpace(Model.Name);
+    var queryPlanTemplates = (List<QueryPlanTemplate>?)ViewBag.QueryPlanTemplates ?? [];
+}
+
+<div class="container mt-4">
+    <h2>@ViewData["Title"]</h2>
+
+    <form asp-controller="Scenarios" asp-action="Save" method="post" id="scenarioForm">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="Id" value="@(isNew ? Guid.NewGuid() : Model.Id)" />
+
+        <div class="card mb-3">
+            <div class="card-header">Scenario Identity</div>
+            <div class="card-body row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="Name">Name</label>
+                    <input class="form-control" type="text" id="Name" name="Name" value="@Model.Name"
+                           required maxlength="120" placeholder="My custom scenario" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label" for="Description">Description</label>
+                    <input class="form-control" type="text" id="Description" name="Description"
+                           value="@Model.Description" maxlength="500" placeholder="Optional notes" />
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Report Configuration</div>
+            <div class="card-body row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Report Method</label>
+                    <select class="form-select" name="ReportMethod" id="reportMethodSelect">
+                        @foreach (var rm in Enum.GetValues<ReportMethod>())
+                        {
+                            <option value="@rm" selected="@(rm == Model.ReportMethod)">@rm</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">Measures</label>
+                    <div class="form-text mb-2">Select one or more measures.</div>
+                    @foreach (var mt in Enum.GetValues<ProfiledMeasureType>())
+                    {
+                        var isChecked = Model.SelectedMeasures.Contains(mt);
+                        <div class="form-check">
+                            <input class="form-check-input measure-cb" type="checkbox"
+                                   name="SelectedMeasures" value="@mt" id="measure_@mt"
+                                   checked="@isChecked" />
+                            <label class="form-check-label" for="measure_@mt">
+                                @ProfiledMeasureCatalog.GetDisplayName(mt)
+                            </label>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Query Plan</div>
+            <div class="card-body row g-3">
+                <div class="col-md-6">
+                    <label class="form-label" for="QueryPlanTemplateId">Query Plan Template</label>
+                    <select class="form-select" name="QueryPlanTemplateId" id="QueryPlanTemplateId">
+                        <option value="">— Use default —</option>
+                        @foreach (var qp in queryPlanTemplates)
+                        {
+                            var defaultLabel = qp.IsDefault ? " (Default)" : "";
+                            var systemLabel = qp.IsSystem ? " [System]" : "";
+                            var isSelected = Model.QueryPlanTemplateId == qp.Id;
+                            <option value="@qp.Id" selected="@isSelected">@qp.Name@defaultLabel@systemLabel</option>
+                        }
+                    </select>
+                    <small class="text-muted">
+                        Controls which FHIR resource types are acquired during data acquisition.
+                        <a asp-controller="QueryPlans" asp-action="Index" target="_blank">Manage query plans</a>
+                    </small>
+                </div>
+                <div class="col-md-6" id="acquiredTypesPreview">
+                    @{
+                        var selectedTemplate = queryPlanTemplates.FirstOrDefault(t => t.Id == Model.QueryPlanTemplateId)
+                            ?? queryPlanTemplates.FirstOrDefault(t => t.IsDefault);
+                        var acquiredTypes = selectedTemplate?.GetAcquiredResourceTypes() ?? [];
+                    }
+                    <label class="form-label">Acquired Resource Types</label>
+                    <div id="acquiredTypesBadges">
+                        @if (acquiredTypes.Count > 0)
+                        {
+                            @foreach (var t in acquiredTypes.OrderBy(x => x))
+                            {
+                                <span class="badge bg-info text-dark me-1">@t</span>
+                            }
+                            <span class="badge bg-primary me-1">Patient</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted small">Select a query plan to see acquired types.</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Patient Pool</div>
+            <div class="card-body row g-3">
+                <div class="col-md-3">
+                    <label class="form-label" for="Seed">Seed <span class="au-info-icon" data-bs-toggle="tooltip" title="Deterministic seed for FHIR data generation. The same seed + patient configuration always produces identical patient data, making test results reproducible."><i class="bi bi-info-circle"></i></span></label>
+                    <input class="form-control" type="number" id="Seed" name="Seed" value="@Model.Seed" min="1" />
+                </div>
+                <div class="col-md-3" id="patientCountGroup">
+                    <label class="form-label" for="PatientCount">Patient Count</label>
+                    <input class="form-control" type="number" id="PatientCount" name="PatientCount"
+                           value="@Model.PatientCount" min="1" max="10000" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="ResourcesPerPatientMin">Resources/Patient Min</label>
+                    <input class="form-control" type="number" id="ResourcesPerPatientMin" name="ResourcesPerPatientMin"
+                           value="@Model.ResourcesPerPatientMin" min="1" max="50000" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="ResourcesPerPatientMax">Resources/Patient Max</label>
+                    <input class="form-control" type="number" id="ResourcesPerPatientMax" name="ResourcesPerPatientMax"
+                           value="@Model.ResourcesPerPatientMax" min="1" max="50000" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="PatientPrefix">Patient Prefix</label>
+                    <input class="form-control" type="text" id="PatientPrefix" name="PatientPrefix"
+                           value="@Model.PatientPrefix" maxlength="64" />
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Data Generation Mode <span class="au-info-icon" data-bs-toggle="tooltip" title="Controls how patient profiles are assigned. Standard mode randomly generates patients without eligibility guarantees. Measure Eligibility Profiles mode lets you specify exactly how many qualifying and non-qualifying patients to create for each measure, ensuring predictable population counts."><i class="bi bi-info-circle"></i></span></div>
+            <div class="card-body">
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="UseMeasureEligibilityProfiles"
+                           id="modeStandard" value="false"
+                           checked="@(!Model.UseMeasureEligibilityProfiles)" />
+                    <label class="form-check-label" for="modeStandard">Standard (random)</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="UseMeasureEligibilityProfiles"
+                           id="modeProfile" value="true"
+                           checked="@Model.UseMeasureEligibilityProfiles" />
+                    <label class="form-check-label" for="modeProfile">Measure Eligibility Profiles</label>
+                </div>
+
+                <!-- Quick Q/NQ controls (visible in both modes for Standard bulk setup) -->
+                <div id="quickQnq" class="mt-3 p-3 bg-light rounded" style="display:none;">
+                    <h6>Quick Qualifying / Non-Qualifying Setup</h6>
+                    <p class="text-muted small mb-2">
+                        Set the total number of qualifying and non-qualifying patients.
+                        Profiles will be generated automatically.
+                    </p>
+                    <div class="row g-2">
+                        <div class="col-auto">
+                            <label class="form-label">Qualifying</label>
+                            <input class="form-control form-control-sm" type="number" id="bulkQualifying"
+                                   value="@Model.PatientProfiles.Count(p => p.RequiresInpatientEncounter())"
+                                   min="0" max="10000" style="width:120px" />
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label">Non-Qualifying</label>
+                            <input class="form-control form-control-sm" type="number" id="bulkNonQualifying"
+                                   value="@Model.PatientProfiles.Count(p => !p.RequiresInpatientEncounter())"
+                                   min="0" max="10000" style="width:120px" />
+                        </div>
+                        <div class="col-auto d-flex align-items-end">
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="btnApplyBulk">Apply</button>
+                        </div>
+                    </div>
+
+                    <table class="table table-sm table-bordered mt-3 mb-2" id="profileTable">
+                        <thead>
+                            <tr>
+                                <th style="width:50px">#</th>
+                                <th>Eligibility</th>
+                                <th style="width:160px">Seed Offset</th>
+                                <th style="width:50px"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="profileRows"></tbody>
+                    </table>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-success" id="addQ">+ Qualifying</button>
+                        <button type="button" class="btn btn-sm btn-outline-warning" id="addNQ">+ Non-Qualifying</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Clinical Scenarios <span class="au-info-icon" data-bs-toggle="tooltip" title="Clinical scenarios define the diagnosis-driven profiles used during FHIR data generation. Each scenario maps to a specific ICD-10 diagnosis, service type, and associated clinical data patterns. Green badges indicate which measures the scenario qualifies for; gray badges indicate non-qualifying measures. When none are selected, scenarios are assigned automatically by seed."><i class="bi bi-info-circle"></i></span></div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    Select specific clinical scenarios to include. When none are selected, scenarios are
+                    assigned automatically by seed. Measure pass/fail indicators are based on all available measures.
+                </p>
+                <div class="row">
+                    @foreach (var cs in clinicalScenarios)
+                    {
+                        var isSelected = Model.SelectedClinicalScenarioIds.Contains(cs.ScenarioId, StringComparer.OrdinalIgnoreCase);
+                        var inputId = $"cs_{cs.ScenarioId.Replace("-", "")}";
+                        <div class="col-md-6 col-lg-4 mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       name="SelectedClinicalScenarioIds" value="@cs.ScenarioId"
+                                       id="@inputId" checked="@isSelected" />
+                                <label class="form-check-label" for="@inputId">
+                                    <strong>@cs.PrimaryDiagnosis</strong>
+                                    <br />
+                                    <small class="text-muted">@cs.IcdCode &middot; @cs.ServiceType</small>
+                                    <br />
+                                    @foreach (var q in cs.QualifiesForMeasures)
+                                    {
+                                        <span class="badge bg-success" style="font-size:0.65rem;">✓ @q</span>
+                                    }
+                                    @foreach (var f in cs.FailsForMeasures)
+                                    {
+                                        <span class="badge bg-secondary" style="font-size:0.65rem;">✗ @f</span>
+                                    }
+                                </label>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3" id="dischargeCard" style="display:none;">
+            <div class="card-header">Discharge Control <span class="badge bg-info text-dark">Scheduled Report only</span> <span class="au-info-icon" data-bs-toggle="tooltip" title="For scheduled reports, controls how many patients are discharged during the report period. Discharged patients will have their encounters closed with an end date within the period. The test dynamically extends the report period to allow time for discharge events."><i class="bi bi-info-circle"></i></span></div>
+            <div class="card-body row g-3">
+                <div class="col-md-4" id="dischargeCountGroup">
+                    <label class="form-label" for="DischargeCount">Patients to Discharge (Standard mode)</label>
+                    <input class="form-control" type="number" id="DischargeCount" name="DischargeCount"
+                           value="@Model.DischargeCount" min="0" max="10000" />
+                </div>
+                <div class="col-md-4" id="dischargeQGroup">
+                    <label class="form-label" for="DischargeQualifyingCount">Qualifying to Discharge</label>
+                    <input class="form-control" type="number" id="DischargeQualifyingCount" name="DischargeQualifyingCount"
+                           value="@Model.DischargeQualifyingCount" min="0" max="10000" />
+                </div>
+                <div class="col-md-4" id="dischargeNqGroup">
+                    <label class="form-label" for="DischargeNonQualifyingCount">Non-Qualifying to Discharge</label>
+                    <input class="form-control" type="number" id="DischargeNonQualifyingCount" name="DischargeNonQualifyingCount"
+                           value="@Model.DischargeNonQualifyingCount" min="0" max="10000" />
+                </div>
+                <div class="col-12">
+                    <small class="text-muted">
+                        The test will dynamically extend the report period to allow time for discharge events.
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">Housekeeping <span class="au-info-icon" data-bs-toggle="tooltip" title="Controls post-run cleanup behavior. These settings determine what test artifacts are removed after the run finishes, keeping your environment clean for subsequent runs."><i class="bi bi-info-circle"></i></span></div>
+            <div class="card-body">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="CleanupFhirData" value="true"
+                           id="CleanupFhirData" checked="@Model.CleanupFhirData" />
+                    <input type="hidden" name="CleanupFhirData" value="false" />
+                    <label class="form-check-label" for="CleanupFhirData">Cleanup FHIR Data (expunge FHIR server)</label>
+                </div>
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" name="CleanupServiceData" value="true"
+                           id="CleanupServiceData" checked="@Model.CleanupServiceData" />
+                    <input type="hidden" name="CleanupServiceData" value="false" />
+                    <label class="form-check-label" for="CleanupServiceData">Cleanup Service Data (facility config, reports, DA logs, query dispatch)</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 mb-4">
+            <button type="submit" class="btn btn-primary">Save Scenario</button>
+            <a asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+
+<script>
+    (function () {
+        var QUALIFYING = '@qualifyingValue';
+        var NON_QUALIFYING = '@nonQualifyingValue';
+        var profileRows = document.getElementById('profileRows');
+        var quickQnq = document.getElementById('quickQnq');
+        var patientCountGroup = document.getElementById('patientCountGroup');
+        var dischargeCard = document.getElementById('dischargeCard');
+        var reportMethodSelect = document.getElementById('reportMethodSelect');
+        var modeRadios = document.querySelectorAll('input[name="UseMeasureEligibilityProfiles"]');
+
+        function isProfileMode() {
+            var checked = document.querySelector('input[name="UseMeasureEligibilityProfiles"]:checked');
+            return checked && checked.value === 'true';
+        }
+
+        function toggleProfileUI() {
+            quickQnq.style.display = isProfileMode() ? 'block' : 'none';
+            patientCountGroup.style.display = isProfileMode() ? 'none' : '';
+        }
+
+        function toggleDischarge() {
+            var isScheduled = reportMethodSelect.value === 'ScheduledReport';
+            dischargeCard.style.display = isScheduled ? '' : 'none';
+        }
+
+        for (var i = 0; i < modeRadios.length; i++) {
+            modeRadios[i].addEventListener('change', toggleProfileUI);
+        }
+        reportMethodSelect.addEventListener('change', toggleDischarge);
+
+        function addProfileRow(eligibility, seedOffset) {
+            var idx = profileRows.children.length;
+            var isQ = (eligibility == QUALIFYING);
+            var label = isQ ? 'Qualifying' : 'Non-Qualifying';
+            var badgeClass = isQ ? 'bg-success' : 'bg-warning text-dark';
+            var seedVal = (seedOffset != null) ? seedOffset : '';
+
+            var tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td class="align-middle text-center">' + (idx + 1) + '</td>' +
+                '<td class="align-middle">' +
+                    '<span class="badge ' + badgeClass + '">' + label + '</span>' +
+                    '<input type="hidden" name="PatientProfiles[' + idx + '].Eligibility" value="' + eligibility + '" />' +
+                '</td>' +
+                '<td><input class="form-control form-control-sm" type="number" name="PatientProfiles[' + idx + '].SeedOffset" value="' + seedVal + '" placeholder="auto" /></td>' +
+                '<td class="align-middle text-center"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-row">&times;</button></td>';
+            profileRows.appendChild(tr);
+            reindexRows();
+        }
+
+        function reindexRows() {
+            var rows = profileRows.children;
+            for (var i = 0; i < rows.length; i++) {
+                var tr = rows[i];
+                tr.querySelector('td:first-child').textContent = i + 1;
+                var eligInput = tr.querySelector('input[type="hidden"]');
+                var seedInput = tr.querySelector('input[type="number"]');
+                eligInput.name = 'PatientProfiles[' + i + '].Eligibility';
+                seedInput.name = 'PatientProfiles[' + i + '].SeedOffset';
+            }
+        }
+
+        profileRows.addEventListener('click', function (e) {
+            if (e.target.closest('.btn-remove-row')) {
+                e.target.closest('tr').remove();
+                reindexRows();
+            }
+        });
+
+        document.getElementById('addQ').addEventListener('click', function () { addProfileRow(QUALIFYING, null); });
+        document.getElementById('addNQ').addEventListener('click', function () { addProfileRow(NON_QUALIFYING, null); });
+
+        document.getElementById('btnApplyBulk').addEventListener('click', function () {
+            var qCount = parseInt(document.getElementById('bulkQualifying').value) || 0;
+            var nqCount = parseInt(document.getElementById('bulkNonQualifying').value) || 0;
+            profileRows.innerHTML = '';
+            for (var i = 0; i < qCount; i++) addProfileRow(QUALIFYING, null);
+            for (var i = 0; i < nqCount; i++) addProfileRow(NON_QUALIFYING, null);
+        });
+
+        // Seed existing profiles from model
+        @foreach (var (profile, idx) in Model.PatientProfiles.Select((p, i) => (p, i)))
+        {
+            @:addProfileRow('@(profile.RequiresInpatientEncounter() ? (int)MeasureEligibility.Qualifying : (int)MeasureEligibility.NonQualifying)', @(profile.SeedOffset.HasValue ? profile.SeedOffset.Value.ToString() : "null"));
+        }
+
+        // Strip profiles on submit if in standard mode
+        document.getElementById('scenarioForm').addEventListener('submit', function () {
+            if (!isProfileMode()) {
+                profileRows.innerHTML = '';
+            }
+        });
+
+        toggleProfileUI();
+        toggleDischarge();
+
+        // Query plan acquired types preview
+        var qpSelect = document.getElementById('QueryPlanTemplateId');
+        var badgesContainer = document.getElementById('acquiredTypesBadges');
+        if (qpSelect && badgesContainer) {
+            qpSelect.addEventListener('change', function () {
+                var id = qpSelect.value;
+                if (!id) {
+                    badgesContainer.innerHTML = '<span class="text-muted small">Using system default query plan.</span>';
+                    return;
+                }
+                fetch('@Url.Action("AcquiredTypes", "QueryPlans")' + '?id=' + encodeURIComponent(id))
+                    .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+                    .then(function (types) {
+                        var html = '';
+                        types.forEach(function (t) { html += '<span class="badge bg-info text-dark me-1">' + t + '</span>'; });
+                        html += '<span class="badge bg-primary me-1">Patient</span>';
+                        badgesContainer.innerHTML = html;
+                    })
+                    .catch(function () {
+                        badgesContainer.innerHTML = '<span class="text-muted small">Unable to load resource types.</span>';
+                    });
+            });
+        }
+    })();
+</script>

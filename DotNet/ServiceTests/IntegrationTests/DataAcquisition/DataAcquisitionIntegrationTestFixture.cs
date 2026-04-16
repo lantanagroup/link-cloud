@@ -18,12 +18,14 @@ using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
-using Microsoft.Data.Sqlite;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
 using OpenTelemetry.Trace;
+using Testcontainers.MsSql;
+using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition
 {
@@ -33,11 +35,11 @@ namespace IntegrationTests.DataAcquisition
         // This class is a marker for the collection
     }
 
-    public class DataAcquisitionIntegrationTestFixture : IDisposable
+    public class DataAcquisitionIntegrationTestFixture : IAsyncLifetime
     {
-        public IServiceProvider ServiceProvider { get; private set; }
-        private readonly IHost _host;
-        private readonly string _dbPath;
+        public IServiceProvider ServiceProvider { get; private set; } = default!;
+        private IHost? _host;
+        private readonly MsSqlContainer _sqlContainer;
 
         public Mock<IProducer<long, ReadyToAcquire>> ReadyToAcquireProducerMock { get; private set; }
         public Mock<IProducer<ResourceKey, ResourceAcquired>> ResourceAcquiredProducerMock { get; private set; }
@@ -47,8 +49,32 @@ namespace IntegrationTests.DataAcquisition
             ReadyToAcquireProducerMock = new Mock<IProducer<long, ReadyToAcquire>>();
             ResourceAcquiredProducerMock = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
 
-            _dbPath = Path.Combine(Path.GetTempPath(), $"testdb_{Guid.NewGuid()}.db");
-            var sqliteConnectionString = $"Data Source={_dbPath};";
+            _sqlContainer = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
+                .Build();
+        }
+
+        public async Task InitializeAsync()
+        {
+            await _sqlContainer.StartAsync();
+
+            // The container's default connection string targets 'master'.
+            // Migrations that alter database-level settings (e.g. READ_COMMITTED_SNAPSHOT)
+            // cannot run against 'master', so point to a dedicated test database.
+            var csBuilder = new SqlConnectionStringBuilder(_sqlContainer.GetConnectionString())
+            {
+                InitialCatalog = "DataAcquisitionTest",
+                ConnectTimeout = 60
+            };
+            var connectionString = csBuilder.ConnectionString;
+
+            // Create the test database on the container
+            await using (var masterConn = new SqlConnection(_sqlContainer.GetConnectionString()))
+            {
+                await masterConn.OpenAsync();
+                await using var cmd = masterConn.CreateCommand();
+                cmd.CommandText = "CREATE DATABASE [DataAcquisitionTest];";
+                await cmd.ExecuteNonQueryAsync();
+            }
 
             var builder = Host.CreateApplicationBuilder();
 
@@ -58,13 +84,13 @@ namespace IntegrationTests.DataAcquisition
 
             // Setup ServiceInformation with the correct connection string
             builder.SetupServiceInformation(
-                "DataAcquisitionService", // Replace with your actual service name constant if available
+                "DataAcquisitionService",
                 assemblyVersion
             );
 
             builder.Services.AddDbContext<DataAcquisitionDbContext>(options =>
             {
-                options.UseSqlite(sqliteConnectionString);
+                options.UseSqlServer(connectionString);
             });
 
             // Register generic repositories for all required entities
@@ -94,6 +120,7 @@ namespace IntegrationTests.DataAcquisition
 
             // Register queries
             builder.Services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
+            builder.Services.AddScoped<IDataAcquisitionLogNotesQueries, DataAcquisitionLogNotesQueries>();
             builder.Services.AddScoped<IFhirQueryQueries, FhirQueryQueries>();
             builder.Services.AddScoped<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
             builder.Services.AddScoped<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
@@ -135,30 +162,24 @@ namespace IntegrationTests.DataAcquisition
             _host = builder.Build();
 
             // Start the host
-            _host.StartAsync().GetAwaiter().GetResult();
+            await _host.StartAsync();
             ServiceProvider = _host.Services;
 
-            // Ensure database is created and set PRAGMAs
+            // Apply migrations to create the SQL Server schema
             using var scope = ServiceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-            dbContext.Database.EnsureCreated();
-
-            // Set PRAGMAs
-            dbContext.Database.OpenConnection();
-            using var cmd = dbContext.Database.GetDbConnection().CreateCommand();
-            cmd.CommandText = "PRAGMA journal_mode = WAL;";
-            cmd.ExecuteNonQuery();
-            cmd.CommandText = "PRAGMA busy_timeout = 5000;";
-            cmd.ExecuteNonQuery();
-            dbContext.Database.CloseConnection();
+            await dbContext.Database.MigrateAsync();
         }
 
-        public void Dispose()
+        public async Task DisposeAsync()
         {
-            _host.StopAsync().GetAwaiter().GetResult();
-            _host.Dispose();
-            SqliteConnection.ClearAllPools();
-            if (File.Exists(_dbPath)) File.Delete(_dbPath);
+            if (_host is not null)
+            {
+                await _host.StopAsync();
+                _host.Dispose();
+            }
+
+            await _sqlContainer.DisposeAsync();
         }
     }
 }

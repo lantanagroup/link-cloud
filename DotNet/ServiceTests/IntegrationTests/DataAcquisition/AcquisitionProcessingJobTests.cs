@@ -1,27 +1,29 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.DataAcquisition.Jobs;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Quartz;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using ScheduledFrequency = LantanaGroup.Link.Shared.Application.Models.Frequency;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class AcquisitionProcessingJobTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
     private readonly IOptions<AcquisitionWorkerProcessorSettings> _settings;
@@ -38,35 +40,40 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Reset();
         _fixture.ResourceAcquiredProducerMock.Reset();
 
+        var testTag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TestFacility_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
+
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var config = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             MinAcquisitionPullTime = null,
             MaxAcquisitionPullTime = null
         };
         dbContext.FhirQueryConfigurations.Add(config);
 
+        dbContext.ScheduledReports.Add(new ScheduledReportEntity
+        {
+            ReportTrackingId = reportTrackingId,
+            Frequency = ScheduledFrequency.Adhoc,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        });
+
         var createLog = new CreateDataAcquisitionLogModel
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             QueryType = FhirQueryType.Read,
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
             PatientId = "Patient/123",
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
-                StartDate = DateTime.UtcNow.AddDays(-1),
-                EndDate = DateTime.UtcNow
-            }
+            ReportTrackingId = reportTrackingId.ToString()
         };
 
         var log = await logManager.CreateAsync(createLog);
@@ -75,7 +82,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -84,7 +91,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log.Id && msg.Value.FacilityId == "TestFacility"),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log.Id && msg.Value.FacilityId == facilityId),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -96,30 +103,29 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
     }
 
     [Fact]
-    public async Task ProcessPendingLogs_NoConfig_FailsLogs()
+    public async Task ProcessPendingLogs_NoConfig_SetsMaxRetriesReachedWithNoteImmediately()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
         _fixture.ResourceAcquiredProducerMock.Reset();
 
+        var testTag = Guid.NewGuid().ToString("N");
+        var missingConfigFacilityId = $"MissingConfigFacility_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
+
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
 
         var log = new DataAcquisitionLog
         {
-            FacilityId = "MissingConfigFacility",
+            FacilityId = missingConfigFacilityId,
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
+            ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
+            ScheduledReportEntity = new ScheduledReportEntity {
+                ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             }
@@ -132,7 +138,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -140,8 +146,8 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
-            It.IsAny<string>(),
-            It.IsAny<Message<long, ReadyToAcquire>>(),
+            KafkaTopic.ReadyToAcquire.ToString(),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.FacilityId == missingConfigFacilityId),
             It.IsAny<CancellationToken>()),
             Times.Never);
 
@@ -149,10 +155,67 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         var assertDbContext = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
         var updatedLog = await assertDbContext.DataAcquisitionLogs.FindAsync(log.Id);
-        Assert.Equal(RequestStatus.Failed, updatedLog.Status);
-        // Note: The bulk update in AcquisitionProcessingJob.ProcessFacilityPendingLogs (line 127)
-        // only updates Status and ModifyDate to maintain high performance.
-        // It does not add notes anymore.
+        Assert.Equal(RequestStatus.MaxRetriesReached, updatedLog.Status);
+
+        var note = await assertDbContext.DataAcquisitionLogNotes
+            .FirstOrDefaultAsync(n => n.DataAcquisitionLogId == log.Id);
+        Assert.NotNull(note);
+        Assert.Contains("FhirQueryConfiguration", note.Note);
+    }
+
+    [Fact]
+    public async Task ProcessPendingLogs_NoConfig_AlreadyFailedLog_AlsoSetsMaxRetriesReachedWithNote()
+    {
+        _fixture.ReadyToAcquireProducerMock.Reset();
+        _fixture.ResourceAcquiredProducerMock.Reset();
+
+        var testTag = Guid.NewGuid().ToString("N");
+        var missingConfigFacilityId = $"MissingConfigFacility_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
+
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // A log already in the Failed state (e.g. from a previous run under the old logic).
+        var failedLog = new DataAcquisitionLog
+        {
+            FacilityId = missingConfigFacilityId,
+            Status = RequestStatus.Failed,
+            RetryAttempts = 3,
+            CorrelationId = Guid.NewGuid().ToString(),
+            ReportTrackingId = reportTrackingId,
+            PatientId = "Patient/456",
+            ScheduledReportEntity = new ScheduledReportEntity
+            {
+                ReportTrackingId = reportTrackingId,
+                StartDate = DateTime.UtcNow.AddDays(-1),
+                EndDate = DateTime.UtcNow
+            }
+        };
+        dbContext.DataAcquisitionLogs.Add(failedLog);
+        await dbContext.SaveChangesAsync();
+
+        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
+        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
+
+        var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
+        var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
+
+        var jobContextMock = new Mock<IJobExecutionContext>();
+        jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
+        await job.Execute(jobContextMock.Object);
+
+        using var assertScope = _fixture.ServiceProvider.CreateScope();
+        var assertDbContext = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var updatedLog = await assertDbContext.DataAcquisitionLogs.FindAsync(failedLog.Id);
+        Assert.Equal(RequestStatus.MaxRetriesReached, updatedLog.Status);
+
+        var note = await assertDbContext.DataAcquisitionLogNotes
+            .FirstOrDefaultAsync(n => n.DataAcquisitionLogId == failedLog.Id);
+        Assert.NotNull(note);
+        Assert.Contains("FhirQueryConfiguration", note.Note);
     }
 
     [Fact]
@@ -161,15 +224,17 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Reset();
         _fixture.ResourceAcquiredProducerMock.Reset();
 
+        var testTag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TestFacility_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
+
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var config = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             MinAcquisitionPullTime = DateTime.UtcNow.AddHours(2).TimeOfDay,
             MaxAcquisitionPullTime = DateTime.UtcNow.AddHours(3).TimeOfDay
@@ -178,16 +243,13 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var log = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
+            ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
+            ScheduledReportEntity = new ScheduledReportEntity {
+                ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             }
@@ -200,7 +262,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -208,8 +270,8 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
-            It.IsAny<string>(),
-            It.IsAny<Message<long, ReadyToAcquire>>(),
+            KafkaTopic.ReadyToAcquire.ToString(),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.FacilityId == facilityId),
             It.IsAny<CancellationToken>()),
             Times.Never);
 
@@ -226,15 +288,18 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Reset();
         _fixture.ResourceAcquiredProducerMock.Reset();
 
+        var testTag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TestFacility_{testTag}";
+        Guid reportTrackingId1 = Guid.NewGuid();
+        Guid reportTrackingId2 = Guid.NewGuid();
+
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var config = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             MinAcquisitionPullTime = null,
             MaxAcquisitionPullTime = null
@@ -243,17 +308,14 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var log1 = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Status = RequestStatus.Failed,
             RetryAttempts = DataAcquisitionLog.MaxRetryAttempts - 1,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
+            ReportTrackingId = reportTrackingId1,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
+            ScheduledReportEntity = new ScheduledReportEntity {
+                ReportTrackingId = reportTrackingId1,
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             }
@@ -262,17 +324,14 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var log2 = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Status = RequestStatus.Failed,
             RetryAttempts = DataAcquisitionLog.MaxRetryAttempts,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
+            ReportTrackingId = reportTrackingId2,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
+            ScheduledReportEntity = new ScheduledReportEntity {
+                ReportTrackingId = reportTrackingId2,
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             }
@@ -285,7 +344,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -312,8 +371,8 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         Assert.Equal(RequestStatus.Ready, updatedLog1.Status);
         // Note: The bulk update in AcquisitionProcessingJob.ProcessFacilityPendingLogs (line 189)
         // only updates Status and ModifyDate to maintain high performance.
-        // It does not increment RetryAttempts or add notes anymore.
-        Assert.Equal(DataAcquisitionLog.MaxRetryAttempts - 1, updatedLog1.RetryAttempts);
+        // It increments retry attempts when failed logs are moved back to Ready.
+        Assert.Equal(DataAcquisitionLog.MaxRetryAttempts, updatedLog1.RetryAttempts);
 
         var updatedLog2 = await assertDbContext.DataAcquisitionLogs.FindAsync(log2.Id);
         Assert.Equal(RequestStatus.MaxRetriesReached, updatedLog2.Status);
@@ -325,15 +384,17 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Reset();
         _fixture.ResourceAcquiredProducerMock.Reset();
 
+        var testTag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TestFacility_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
+
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var config = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             MinAcquisitionPullTime = null,
             MaxAcquisitionPullTime = null,
@@ -341,26 +402,32 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         };
         dbContext.FhirQueryConfigurations.Add(config);
 
+        dbContext.ScheduledReports.Add(new ScheduledReportEntity
+        {
+            ReportTrackingId = reportTrackingId,
+            Frequency = ScheduledFrequency.Adhoc,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        });
+
         var log1 = new DataAcquisitionLog
         {
-            Id = 101,
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Status = RequestStatus.Failed,
             RetryAttempts = 1,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
+            ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123"
         };
         dbContext.DataAcquisitionLogs.Add(log1);
 
         var log2 = new DataAcquisitionLog
         {
-            Id = 102,
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Status = RequestStatus.Failed,
             RetryAttempts = 2,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
+            ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123"
         };
         dbContext.DataAcquisitionLogs.Add(log2);
@@ -371,7 +438,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -402,108 +469,24 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
     }
 
     [Fact]
-    public async Task ProcessPendingTailingMessages_ProducesMessagesAndUpdatesFlags()
+    public async Task ProcessPendingLogs_MultipleFacilitiesWithLargeLogCounts_ProcessesSequentiallyAndBatches()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
         _fixture.ResourceAcquiredProducerMock.Reset();
 
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
-        var correlationId = Guid.NewGuid().ToString();
-        var facilityId = "TestFacility";
-        var reportTrackingId = "TestReportId";
-
-        var scheduledReport = new ScheduledReport
-        {
-            ReportTrackingId = reportTrackingId,
-            StartDate = DateTime.UtcNow.AddDays(-1),
-            EndDate = DateTime.UtcNow
-        };
-
-        var log1 = new DataAcquisitionLog
-        {
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Completed,
-            TailSent = false,
-            TraceId = Guid.NewGuid().ToString(),
-            QueryPhase = QueryPhase.Initial,
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = scheduledReport
-        };
-        dbContext.DataAcquisitionLogs.Add(log1);
-
-        var log2 = new DataAcquisitionLog
-        {
-            FacilityId = facilityId,
-            CorrelationId = correlationId,
-            ReportTrackingId = reportTrackingId,
-            Status = RequestStatus.Completed,
-            TraceId = Guid.NewGuid().ToString(),
-            TailSent = false,
-            QueryPhase = QueryPhase.Initial,
-            PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = scheduledReport
-        };
-        dbContext.DataAcquisitionLogs.Add(log2);
-        await dbContext.SaveChangesAsync();
-
-        var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
-
-        var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
-        var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
-
-        var jobContextMock = new Mock<IJobExecutionContext>();
-        jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
-        await job.Execute(jobContextMock.Object);
-
-        _fixture.ResourceAcquiredProducerMock.Verify(
-            p => p.ProduceAsync(
-            KafkaTopic.ResourceAcquired.ToString(),
-            It.Is<Message<ResourceKey, ResourceAcquired>>(msg =>
-                msg.Key != null && msg.Key.FacilityId == facilityId && msg.Key.CorrelationId == correlationId &&
-                msg.Value.AcquisitionComplete == true &&
-                msg.Value.ScheduledReports.Any(sr => sr.ReportTrackingId == reportTrackingId)),
-            It.IsAny<CancellationToken>()),
-            Times.AtLeastOnce);
-
-        using var assertScope = _fixture.ServiceProvider.CreateScope();
-        var assertDbContext = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-
-        var updatedLog1 = await assertDbContext.DataAcquisitionLogs.FindAsync(log1.Id);
-        Assert.True(updatedLog1.TailSent);
-        var updatedLog2 = await assertDbContext.DataAcquisitionLogs.FindAsync(log2.Id);
-        Assert.True(updatedLog2.TailSent);
-    }
-
-    [Fact]
-    public async Task ProcessPendingLogs_MultipleFacilitiesWithLargeLogCounts_ProcessesInParallelAndBatches()
-    {
-        _fixture.ReadyToAcquireProducerMock.Reset();
-        _fixture.ResourceAcquiredProducerMock.Reset();
-
-        const int numFacilities = 4; const int logsPerFacility = 60; var facilities = new List<string>();
+        var testTag = Guid.NewGuid().ToString("N");
+        const int numFacilities = 4; const int logsPerFacility = 120; var facilities = new List<string>();
 
         using var setupScope = _fixture.ServiceProvider.CreateScope();
         var dbContext = setupScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        // Use a large time budget so this throughput test is not sensitive to CI machine speed.
+        var settings = Options.Create(new AcquisitionWorkerProcessorSettings { TimeBudgetPerRunSeconds = 300 });
+
 
         for (int f = 1; f <= numFacilities; f++)
         {
-            var facilityId = $"Facility{f}";
+            var facilityId = $"Facility{f}_{testTag}";
             facilities.Add(facilityId);
 
             var config = new FhirQueryConfiguration
@@ -517,18 +500,17 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
             for (int i = 1; i <= logsPerFacility; i++)
             {
+                Guid reportTrackingId = Guid.NewGuid();
+
                 var log = new DataAcquisitionLog
                 {
                     FacilityId = facilityId,
                     Status = RequestStatus.Pending,
                     CorrelationId = Guid.NewGuid().ToString(),
-                    ReportTrackingId = $"Report{i}",
+                    ReportTrackingId = reportTrackingId,
                     PatientId = $"Patient/{i}",
-                    ReportStartDate = DateTime.UtcNow.AddDays(-1),
-                    ReportEndDate = DateTime.UtcNow,
-                    ScheduledReport = new ScheduledReport
-                    {
-                        ReportTrackingId = $"Report{i}",
+                    ScheduledReportEntity = new ScheduledReportEntity {
+                        ReportTrackingId = reportTrackingId,
                         StartDate = DateTime.UtcNow.AddDays(-1),
                         EndDate = DateTime.UtcNow
                     }
@@ -543,7 +525,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -552,7 +534,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.IsAny<Message<long, ReadyToAcquire>>(),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.FacilityId.EndsWith($"_{testTag}")),
             It.IsAny<CancellationToken>()),
             Times.Exactly(numFacilities * logsPerFacility));
 
@@ -576,19 +558,24 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Reset();
         _fixture.ResourceAcquiredProducerMock.Reset();
 
+        var testTag = Guid.NewGuid().ToString("N");
         const int numFacilities = 3;
         const int pendingPerFacility = 30; const int failedRetryablePerFacility = 20; const int failedMaxRetriesPerFacility = 10; var facilities = new List<string>();
+        var pendingLogsByFacility = new Dictionary<string, List<DataAcquisitionLog>>();
+        var retryableLogsByFacility = new Dictionary<string, List<DataAcquisitionLog>>();
+        var maxRetryLogsByFacility = new Dictionary<string, List<DataAcquisitionLog>>();
 
         using var setupScope = _fixture.ServiceProvider.CreateScope();
         var dbContext = setupScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         for (int f = 1; f <= numFacilities; f++)
         {
-            var facilityId = $"Facility{f}";
+            var facilityId = $"Facility{f}_{testTag}";
             facilities.Add(facilityId);
+            pendingLogsByFacility[facilityId] = new List<DataAcquisitionLog>();
+            retryableLogsByFacility[facilityId] = new List<DataAcquisitionLog>();
+            maxRetryLogsByFacility[facilityId] = new List<DataAcquisitionLog>();
 
             var config = new FhirQueryConfiguration
             {
@@ -601,69 +588,66 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
             for (int i = 1; i <= pendingPerFacility; i++)
             {
+                Guid reportTrackingId = Guid.NewGuid();
                 var log = new DataAcquisitionLog
                 {
                     FacilityId = facilityId,
                     Status = RequestStatus.Pending,
                     CorrelationId = Guid.NewGuid().ToString(),
-                    ReportTrackingId = $"Pending{i}",
+                    ReportTrackingId = reportTrackingId,
                     PatientId = $"Patient/{i}",
-                    ReportStartDate = DateTime.UtcNow.AddDays(-1),
-                    ReportEndDate = DateTime.UtcNow,
-                    ScheduledReport = new ScheduledReport
-                    {
-                        ReportTrackingId = $"Pending{i}",
+                    ScheduledReportEntity = new ScheduledReportEntity {
+                        ReportTrackingId = reportTrackingId,
                         StartDate = DateTime.UtcNow.AddDays(-1),
                         EndDate = DateTime.UtcNow
                     }
                 };
 
                 dbContext.DataAcquisitionLogs.Add(log);
+                pendingLogsByFacility[facilityId].Add(log);
             }
 
             for (int i = 1; i <= failedRetryablePerFacility; i++)
             {
+                Guid reportTrackingId = Guid.NewGuid();
                 var log = new DataAcquisitionLog
                 {
                     FacilityId = facilityId,
                     Status = RequestStatus.Failed,
                     RetryAttempts = 0,
                     CorrelationId = Guid.NewGuid().ToString(),
-                    ReportTrackingId = $"FailedRetry{i}",
+                    ReportTrackingId = reportTrackingId,
                     PatientId = $"Patient/{i + pendingPerFacility}",
-                    ReportStartDate = DateTime.UtcNow.AddDays(-1),
-                    ReportEndDate = DateTime.UtcNow,
-                    ScheduledReport = new ScheduledReport
-                    {
-                        ReportTrackingId = $"FailedRetry{i}",
+                    ScheduledReportEntity = new ScheduledReportEntity {
+                        ReportTrackingId = reportTrackingId,
                         StartDate = DateTime.UtcNow.AddDays(-1),
                         EndDate = DateTime.UtcNow
                     }
                 };
 
                 dbContext.DataAcquisitionLogs.Add(log);
+                retryableLogsByFacility[facilityId].Add(log);
             }
 
             for (int i = 1; i <= failedMaxRetriesPerFacility; i++)
             {
+                Guid reportTrackingId = Guid.NewGuid();
                 var log = new DataAcquisitionLog
                 {
                     FacilityId = facilityId,
                     Status = RequestStatus.Failed,
                     RetryAttempts = DataAcquisitionLog.MaxRetryAttempts,
                     CorrelationId = Guid.NewGuid().ToString(),
-                    ReportTrackingId = $"MaxRetry{i}",
+                    ReportTrackingId = reportTrackingId,
                     PatientId = $"Patient/{i + pendingPerFacility + failedRetryablePerFacility}",
-                    ReportStartDate = DateTime.UtcNow.AddDays(-1),
-                    ReportEndDate = DateTime.UtcNow,
-                    ScheduledReport = new ScheduledReport
-                    {
-                        ReportTrackingId = $"MaxRetry{i}",
+                    ScheduledReportEntity = new ScheduledReportEntity {
+                        ReportTrackingId = reportTrackingId,
                         StartDate = DateTime.UtcNow.AddDays(-1),
                         EndDate = DateTime.UtcNow
                     }
                 };
                 dbContext.DataAcquisitionLogs.Add(log);
+                maxRetryLogsByFacility[facilityId].Add(log);
             }
         }
         await dbContext.SaveChangesAsync();
@@ -676,7 +660,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -685,7 +669,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.IsAny<Message<long, ReadyToAcquire>>(),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.FacilityId.EndsWith($"_{testTag}")),
             It.IsAny<CancellationToken>()),
             Times.Exactly(totalProcessable));
 
@@ -700,20 +684,20 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
             Assert.Equal(pendingPerFacility + failedRetryablePerFacility + failedMaxRetriesPerFacility, allLogs.Count);
 
-            var pendingLogs = allLogs.Where(l => l.ReportTrackingId.StartsWith("Pending")).ToList();
+            var pendingLogIds = pendingLogsByFacility[facilityId].Select(l => l.Id).ToHashSet();
+            var pendingLogs = allLogs.Where(l => pendingLogIds.Contains(l.Id)).ToList();
             Assert.All(pendingLogs, log => Assert.Equal(RequestStatus.Ready, log.Status));
 
-            var retryableLogs = allLogs.Where(l => l.ReportTrackingId.StartsWith("FailedRetry")).ToList();
+            var retryableLogIds = retryableLogsByFacility[facilityId].Select(l => l.Id).ToHashSet();
+            var retryableLogs = allLogs.Where(l => retryableLogIds.Contains(l.Id)).ToList();
             Assert.All(retryableLogs, log =>
             {
                 Assert.Equal(RequestStatus.Ready, log.Status);
-                // Note: The bulk update in AcquisitionProcessingJob.ProcessFacilityPendingLogs (line 189)
-                // only updates Status and ModifyDate to maintain high performance.
-                // It does not increment RetryAttempts anymore.
-                Assert.Equal(0, log.RetryAttempts);
+                Assert.Equal(1, log.RetryAttempts);
             });
 
-            var maxRetryLogs = allLogs.Where(l => l.ReportTrackingId.StartsWith("MaxRetry")).ToList();
+            var maxRetryLogIds = maxRetryLogsByFacility[facilityId].Select(l => l.Id).ToHashSet();
+            var maxRetryLogs = allLogs.Where(l => maxRetryLogIds.Contains(l.Id)).ToList();
             Assert.All(maxRetryLogs, log => Assert.Equal(RequestStatus.MaxRetriesReached, log.Status));
         }
     }
@@ -724,17 +708,19 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Reset();
         _fixture.ResourceAcquiredProducerMock.Reset();
 
+        var testTag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TestFacility_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
+
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var maxTime = new TimeSpan(23, 59, 59);
 
         var config = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             MinAcquisitionPullTime = TimeSpan.Zero,
             MaxAcquisitionPullTime = maxTime
@@ -743,16 +729,13 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var log = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
+            ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
+            ScheduledReportEntity = new ScheduledReportEntity {
+                ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             }
@@ -765,7 +748,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -774,7 +757,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log.Id && msg.Value.FacilityId == "TestFacility"),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log.Id && msg.Value.FacilityId == facilityId),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -791,11 +774,13 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Reset();
         _fixture.ResourceAcquiredProducerMock.Reset();
 
+        var testTag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TestFacility_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
+
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var current = DateTime.UtcNow.TimeOfDay;
         var buffer = TimeSpan.FromSeconds(30);
@@ -815,7 +800,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var config = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             MinAcquisitionPullTime = minPull,
             MaxAcquisitionPullTime = maxPull
@@ -824,16 +809,13 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var log = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
+            ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
+            ScheduledReportEntity = new ScheduledReportEntity {
+                ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             }
@@ -846,7 +828,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -854,8 +836,8 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
-            It.IsAny<string>(),
-            It.IsAny<Message<long, ReadyToAcquire>>(),
+            KafkaTopic.ReadyToAcquire.ToString(),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.FacilityId == facilityId),
             It.IsAny<CancellationToken>()),
             Times.Never);
 
@@ -872,11 +854,13 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Reset();
         _fixture.ResourceAcquiredProducerMock.Reset();
 
+        var testTag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TestFacility_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
+
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var current = DateTime.UtcNow.TimeOfDay;
         var noon = TimeSpan.FromHours(12);
@@ -894,7 +878,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var config = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             MinAcquisitionPullTime = minPull,
             MaxAcquisitionPullTime = maxPull
@@ -903,16 +887,13 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var log = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
+            ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
+            ScheduledReportEntity = new ScheduledReportEntity {
+                ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             }
@@ -925,7 +906,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -934,7 +915,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
             KafkaTopic.ReadyToAcquire.ToString(),
-            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log.Id && msg.Value.FacilityId == "TestFacility"),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Key == log.Id && msg.Value.FacilityId == facilityId),
             It.IsAny<CancellationToken>()),
             Times.Once);
 
@@ -951,11 +932,13 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         _fixture.ReadyToAcquireProducerMock.Reset();
         _fixture.ResourceAcquiredProducerMock.Reset();
 
+        var testTag = Guid.NewGuid().ToString("N");
+        var facilityId = $"TestFacility_{testTag}";
+        Guid reportTrackingId = Guid.NewGuid();
+
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var current = DateTime.UtcNow.TimeOfDay;
         var buffer = TimeSpan.FromSeconds(30);
@@ -969,7 +952,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var config = new FhirQueryConfiguration
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             FhirServerBaseUrl = "http://example.com",
             MinAcquisitionPullTime = minPull,
             MaxAcquisitionPullTime = maxPull
@@ -978,16 +961,13 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var log = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Status = RequestStatus.Pending,
             CorrelationId = Guid.NewGuid().ToString(),
-            ReportTrackingId = "TestReportId",
+            ReportTrackingId = reportTrackingId,
             PatientId = "Patient/123",
-            ReportStartDate = DateTime.UtcNow.AddDays(-1),
-            ReportEndDate = DateTime.UtcNow,
-            ScheduledReport = new ScheduledReport
-            {
-                ReportTrackingId = "TestReportId",
+            ScheduledReportEntity = new ScheduledReportEntity {
+                ReportTrackingId = reportTrackingId,
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             }
@@ -1000,7 +980,7 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, acquiredProducer, _settings);
+        var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
 
         var jobContextMock = new Mock<IJobExecutionContext>();
         jobContextMock.Setup(c => c.CancellationToken).Returns(CancellationToken.None);
@@ -1008,8 +988,8 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
 
         _fixture.ReadyToAcquireProducerMock.Verify(
             p => p.ProduceAsync(
-            It.IsAny<string>(),
-            It.IsAny<Message<long, ReadyToAcquire>>(),
+            KafkaTopic.ReadyToAcquire.ToString(),
+            It.Is<Message<long, ReadyToAcquire>>(msg => msg.Value.FacilityId == facilityId),
             It.IsAny<CancellationToken>()),
             Times.Never);
 
@@ -1020,3 +1000,4 @@ public class AcquisitionProcessingJobTests : IClassFixture<DataAcquisitionIntegr
         Assert.Equal(RequestStatus.Pending, updatedLog.Status);
     }
 }
+

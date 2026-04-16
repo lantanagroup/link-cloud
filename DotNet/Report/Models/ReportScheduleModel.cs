@@ -1,16 +1,18 @@
-﻿using LantanaGroup.Link.Report.Data.Entities;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 
 namespace LantanaGroup.Link.Report.Models;
+
 public class ReportScheduleModel
 {
     public Guid Id { get; set; }
     public DateTime CreateDate { get; set; }
     public DateTime? ModifyDate { get; set; }
     public string FacilityId { get; set; } = string.Empty;
-    public DateTime ReportStartDate { get; set; }
-    public DateTime ReportEndDate { get; set; }
+    public DateTimeOffset ReportStartDate { get; set; }
+    public DateTimeOffset ReportEndDate { get; set; }
     public DateTime? SubmitReportDateTime { get; set; }
     public bool EnableSubmission { get; set; } = true;
     public bool EndOfReportPeriodJobHasRun { get; set; } = false;
@@ -41,6 +43,27 @@ public class ReportScheduleModel
             SubmitReportDateTime = reportSchedule.SubmitReportDateTime,
             CreateDate = reportSchedule.CreateDate,
             ModifyDate = reportSchedule.ModifyDate,
+        };
+    }
+
+    public ReportScheduleApiModel ToApiModel()
+    {
+        return new ReportScheduleApiModel
+        {
+            Id = Id,
+            CreateDate = CreateDate,
+            FacilityId = FacilityId,
+            Frequency = Frequency,
+            ReportStartDate = ReportStartDate.UtcDateTime,
+            ReportEndDate = ReportEndDate.UtcDateTime,
+            SubmitReportDateTime = SubmitReportDateTime,
+            Status = Status,
+            AdHocType = AdHocType,
+            EndOfReportPeriodJobHasRun = EndOfReportPeriodJobHasRun,
+            EnableSubmission = EnableSubmission,
+            PayloadRootUri = PayloadRootUri,
+            ReportTypes = ReportTypes,
+            IsDeleted = IsDeleted,
         };
     }
 }

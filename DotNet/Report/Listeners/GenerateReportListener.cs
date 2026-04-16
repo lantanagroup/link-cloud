@@ -188,8 +188,8 @@ namespace LantanaGroup.Link.Report.Listeners
                         throw new DeadLetterException("No ReportSchedule found for the provided ID: " + value.ReportId.ToString());
                     }
 
-                    startDate = existing.ReportStartDate;
-                    endDate = existing.ReportEndDate;
+                    startDate = existing.ReportStartDate.DateTime;
+                    endDate = existing.ReportEndDate.DateTime;
                     reportTypes = existing.ReportTypes;
                 }
                 else
