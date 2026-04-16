@@ -28,6 +28,14 @@ public class AuthenticationConfiguration
 
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ClientSecret { get; set; }
+
+    [DataMember]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Scope { get; set; }
+
+    [DataMember]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? UserName { get; set; }
 
     [DataMember]

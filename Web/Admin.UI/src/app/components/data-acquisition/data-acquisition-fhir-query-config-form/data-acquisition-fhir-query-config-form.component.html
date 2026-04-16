@@ -242,9 +242,45 @@
               <mat-icon>close</mat-icon>
             </button>
             }
-            @if (authTypeControl.value != 'None' && authTypeControl.value != 'Basic') {
+            @if (clientIdControl.hasError('required')) {
             <mat-error>
               Client Id is <strong>required</strong>.
+            </mat-error>
+            }
+          </mat-form-field>
+        </div>
+        }
+
+        @if (authTypeControl.value === 'OAuth') {
+        <div class="form-input">
+          <mat-form-field appearance="outline" class="subject-input form-input ">
+            <mat-label>Client Secret</mat-label>
+            <input matInput formControlName="clientSecret" [readonly]="viewOnly" type="password" placeholder="Client Secret">
+            @if (clientSecretControl.value && !viewOnly) {
+            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearClientSecret()">
+              <mat-icon>close</mat-icon>
+            </button>
+            }
+            @if (clientSecretControl.hasError('required')) {
+            <mat-error>
+              Client Secret is <strong>required</strong>.
+            </mat-error>
+            }
+          </mat-form-field>
+        </div>
+
+        <div class="form-input">
+          <mat-form-field appearance="outline" class="subject-input form-input ">
+            <mat-label>Scope</mat-label>
+            <input matInput formControlName="scope" [readonly]="viewOnly" placeholder="Scope">
+            @if (scopeControl.value && !viewOnly) {
+            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearScope()">
+              <mat-icon>close</mat-icon>
+            </button>
+            }
+            @if (scopeControl.hasError('required')) {
+            <mat-error>
+              Scope is <strong>required</strong>.
             </mat-error>
             }
           </mat-form-field>
