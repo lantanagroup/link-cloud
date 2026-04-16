@@ -193,6 +193,7 @@ public static class GeneralStartupExtensions
         services.AddSingleton<EpicAuth>();
         services.AddSingleton<BasicAuth>();
         services.AddSingleton<CustomHeaderAuth>();
+        services.AddSingleton<OAuth>();
         services.AddSingleton<IAuthenticationRetrievalService, AuthenticationRetrievalService>();
     }
 

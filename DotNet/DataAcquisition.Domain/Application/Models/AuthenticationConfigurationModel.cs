@@ -28,6 +28,14 @@ public class AuthenticationConfigurationModel : IValidatableObject
 
     [DataMember]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ClientSecret { get; set; }
+
+    [DataMember]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Scope { get; set; }
+
+    [DataMember]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? UserName { get; set; }
 
     [DataMember]
@@ -61,6 +69,18 @@ public class AuthenticationConfigurationModel : IValidatableObject
                 yield return new ValidationResult("Audience is required for OAuth2 authentication.", new[] { nameof(Audience) });
         }
 
+        if (AuthType?.Equals(nameof(LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.AuthType.OAuth), StringComparison.OrdinalIgnoreCase) == true)
+        {
+            if (string.IsNullOrWhiteSpace(TokenUrl))
+                yield return new ValidationResult("TokenUrl is required for OAuth authentication.", new[] { nameof(TokenUrl) });
+            if (string.IsNullOrWhiteSpace(ClientId))
+                yield return new ValidationResult("ClientId is required for OAuth authentication.", new[] { nameof(ClientId) });
+            if (string.IsNullOrWhiteSpace(ClientSecret))
+                yield return new ValidationResult("ClientSecret is required for OAuth authentication.", new[] { nameof(ClientSecret) });
+            if (string.IsNullOrWhiteSpace(Scope))
+                yield return new ValidationResult("Scope is required for OAuth authentication.", new[] { nameof(Scope) });
+        }
+
         if (AuthType?.Equals("CustomHeaders", StringComparison.OrdinalIgnoreCase) == true)
         {
             if (CustomHeaders == null || !CustomHeaders.Any())
@@ -77,6 +97,8 @@ public class AuthenticationConfigurationModel : IValidatableObject
             TokenUrl = this.TokenUrl,
             Audience = this.Audience,
             ClientId = this.ClientId,
+            ClientSecret = this.ClientSecret,
+            Scope = this.Scope,
             UserName = this.UserName,
             Password = this.Password,
             CustomHeaders = this.CustomHeaders
@@ -95,6 +117,8 @@ public class AuthenticationConfigurationModel : IValidatableObject
             TokenUrl = config.TokenUrl,
             Audience = config.Audience,
             ClientId = config.ClientId,
+            ClientSecret = config.ClientSecret,
+            Scope = config.Scope,
             UserName = config.UserName,
             Password = config.Password,
             CustomHeaders = config.CustomHeaders
