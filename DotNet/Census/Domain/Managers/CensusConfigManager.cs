@@ -15,6 +15,8 @@ public interface ICensusConfigManager
     Task DeleteCensusConfigByFacilityId(string facilityId, CancellationToken cancellationToken = default);
     Task<CensusConfigEntity?> GetCensusConfigByFacilityId(string facilityId);
     Task<CensusConfigEntity> AddOrUpdateCensusConfig(CensusConfigModel entity, CancellationToken cancellationToken = default);
+    Task DisableFacility(string facilityId, CancellationToken cancellationToken = default);
+    Task EnableFacility(string facilityId, CancellationToken cancellationToken = default);
 }
 
 public class CensusConfigManager : ICensusConfigManager
@@ -138,5 +140,31 @@ public class CensusConfigManager : ICensusConfigManager
         }
 
         return existingEntity;
+    }
+
+    public async Task DisableFacility(string facilityId, CancellationToken cancellationToken = default)
+    {
+        var existing = await _censusConfigRepository.SingleOrDefaultAsync(c => c.FacilityID == facilityId, cancellationToken);
+        if (existing == null)
+            return;
+
+        existing.Enabled = false;
+        existing.ModifyDate = DateTime.UtcNow;
+
+        await _censusConfigRepository.UpdateAsync(existing, cancellationToken);
+        await _censusSchedulingRepo.DeleteJobsForFacility(facilityId, await _schedulerFactory.GetScheduler(cancellationToken));
+    }
+
+    public async Task EnableFacility(string facilityId, CancellationToken cancellationToken = default)
+    {
+        var existing = await _censusConfigRepository.SingleOrDefaultAsync(c => c.FacilityID == facilityId, cancellationToken);
+        if (existing == null)
+            return;
+
+        existing.Enabled = true;
+        existing.ModifyDate = DateTime.UtcNow;
+
+        await _censusConfigRepository.UpdateAsync(existing, cancellationToken);
+        await _censusSchedulingRepo.AddJobForFacility(existing, await _schedulerFactory.GetScheduler(cancellationToken));
     }
 }
