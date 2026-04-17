@@ -151,8 +151,19 @@ public class CensusConfigManager : ICensusConfigManager
         existing.Enabled = false;
         existing.ModifyDate = DateTime.UtcNow;
 
-        await _censusConfigRepository.UpdateAsync(existing, cancellationToken);
-        await _censusSchedulingRepo.DeleteJobsForFacility(facilityId, await _schedulerFactory.GetScheduler(cancellationToken));
+        await using var transaction = await _patienteventQueries.StartTransaction(cancellationToken);
+        try
+        {
+            await _censusConfigRepository.UpdateAsync(existing, cancellationToken);
+            await _censusSchedulingRepo.DeleteJobsForFacility(facilityId, await _schedulerFactory.GetScheduler(cancellationToken));
+            await _patienteventQueries.CommitTransaction(transaction, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception in CensusConfigManager.DisableFacility for facility {FacilityId}", facilityId);
+            await _patienteventQueries.RollbackTransaction(transaction, cancellationToken);
+            throw;
+        }
     }
 
     public async Task EnableFacility(string facilityId, CancellationToken cancellationToken = default)
@@ -164,7 +175,18 @@ public class CensusConfigManager : ICensusConfigManager
         existing.Enabled = true;
         existing.ModifyDate = DateTime.UtcNow;
 
-        await _censusConfigRepository.UpdateAsync(existing, cancellationToken);
-        await _censusSchedulingRepo.AddJobForFacility(existing, await _schedulerFactory.GetScheduler(cancellationToken));
+        await using var transaction = await _patienteventQueries.StartTransaction(cancellationToken);
+        try
+        {
+            await _censusConfigRepository.UpdateAsync(existing, cancellationToken);
+            await _censusSchedulingRepo.AddJobForFacility(existing, await _schedulerFactory.GetScheduler(cancellationToken));
+            await _patienteventQueries.CommitTransaction(transaction, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception in CensusConfigManager.EnableFacility for facility {FacilityId}", facilityId);
+            await _patienteventQueries.RollbackTransaction(transaction, cancellationToken);
+            throw;
+        }
     }
 }

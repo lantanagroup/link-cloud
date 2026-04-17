@@ -183,15 +183,21 @@ public class CensusConfigController : Controller
     /// Disables census scheduling for a facility and removes its cron jobs.
     /// </summary>
     /// <param name="facilityId"></param>
+    /// <param name="cancellationToken"></param>
     /// <returns>
     ///     No Content: 204
+    ///     Bad Request: 400
     ///     Server Error: 500
     /// </returns>
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpDelete("{facilityId}/jobs")]
     public async Task<IActionResult> DisableFacilityJobs(string facilityId, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            return BadRequest("FacilityID is required.");
+
         try
         {
             await _censusConfigManager.DisableFacility(facilityId, cancellationToken);
@@ -211,15 +217,21 @@ public class CensusConfigController : Controller
     /// Enables census scheduling for a facility and recreates its cron jobs.
     /// </summary>
     /// <param name="facilityId"></param>
+    /// <param name="cancellationToken"></param>
     /// <returns>
     ///     No Content: 204
+    ///     Bad Request: 400
     ///     Server Error: 500
     /// </returns>
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpPatch("{facilityId}/jobs/restore")]
     public async Task<IActionResult> EnableFacilityJobs(string facilityId, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            return BadRequest("FacilityID is required.");
+
         try
         {
             await _censusConfigManager.EnableFacility(facilityId, cancellationToken);
