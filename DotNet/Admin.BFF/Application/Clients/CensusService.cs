@@ -56,6 +56,29 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             }
         }
 
+        public async Task<HttpResponseMessage> DeleteCensusJobsAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Delete, $"api/census/config/{Uri.EscapeDataString(facilityId)}/jobs");
+            await SetAuthHeaderAsync(user, request);
+            return await _client.SendAsync(request, cancellationToken);
+        }
+
+        public async Task<HttpResponseMessage> RestoreCensusJobsAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Patch, $"api/census/config/{Uri.EscapeDataString(facilityId)}/jobs/restore");
+            await SetAuthHeaderAsync(user, request);
+            return await _client.SendAsync(request, cancellationToken);
+        }
+
+        private async Task SetAuthHeaderAsync(ClaimsPrincipal user, HttpRequestMessage request)
+        {
+            if (_authenticationSchemaConfig.Value.EnableAnonymousAccess) return;
+            using var scope = _scopeFactory.CreateScope();
+            var createLinkBearerToken = scope.ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+            var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+
         private void InitHttpClient()
         {
             //check if the service uri is set

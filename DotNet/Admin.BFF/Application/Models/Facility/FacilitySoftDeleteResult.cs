@@ -6,4 +6,5 @@ public class FacilitySoftDeleteResult
     public bool TenantDeleted { get; set; }
     public bool ReportSchedulesDeleted { get; set; }
     public bool AcquisitionLogsDeleted { get; set; }
+    public bool CensusJobsDeleted { get; set; }
 }

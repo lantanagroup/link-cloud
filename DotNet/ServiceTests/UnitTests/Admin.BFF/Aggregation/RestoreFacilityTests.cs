@@ -34,7 +34,8 @@ public class RestoreFacilityTests
                 TenantServiceUrl = "http://tenant/"
             },
             ReportServiceUrl = "http://report/",
-            DataAcquisitionServiceUrl = "http://da/"
+            DataAcquisitionServiceUrl = "http://da/",
+            CensusServiceUrl = "http://census/"
         });
 
         _authConfig = Options.Create(new AuthenticationSchemaConfig
@@ -49,22 +50,25 @@ public class RestoreFacilityTests
     // Helpers
     // ---------------------------------------------------------------------------
 
-    private (TenantService tenant, ReportService report, DataAcquisitionService da)
+    private (TenantService tenant, ReportService report, DataAcquisitionService da, CensusService census)
         BuildServices(MockHttpMessageHandler handler)
     {
         var tenantLogger = new Mock<ILogger<TenantService>>().Object;
         var reportLogger = new Mock<ILogger<ReportService>>().Object;
         var daLogger = new Mock<ILogger<DataAcquisitionService>>().Object;
+        var censusLogger = new Mock<ILogger<CensusService>>().Object;
 
         var tenantClient = new HttpClient(handler) { BaseAddress = new Uri("http://tenant/") };
         var reportClient = new HttpClient(handler) { BaseAddress = new Uri("http://report/") };
         var daClient = new HttpClient(handler) { BaseAddress = new Uri("http://da/") };
+        var censusClient = new HttpClient(handler) { BaseAddress = new Uri("http://census/") };
 
         var tenant = new TenantService(tenantLogger, tenantClient, _serviceRegistry, _authConfig, _mockScopeFactory.Object);
         var report = new ReportService(reportLogger, reportClient, _serviceRegistry, _authConfig, _mockScopeFactory.Object);
         var da = new DataAcquisitionService(daLogger, daClient, _serviceRegistry, _authConfig, _mockScopeFactory.Object);
+        var census = new CensusService(censusLogger, censusClient, _serviceRegistry, _authConfig, _mockScopeFactory.Object);
 
-        return (tenant, report, da);
+        return (tenant, report, da, census);
     }
 
     private static DefaultHttpContext BuildHttpContext() => new();
@@ -131,14 +135,20 @@ public class RestoreFacilityTests
                 request.RequestUri!.PathAndQuery.Contains("/restore"))
                 return NoContentResponse();
 
+            // Census jobs restore
+            if (request.Method == HttpMethod.Patch &&
+                request.RequestUri!.PathAndQuery.Contains("api/census/config/") &&
+                request.RequestUri!.PathAndQuery.Contains("/jobs/restore"))
+                return NoContentResponse();
+
             throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}");
         });
 
-        var (tenant, report, da) = BuildServices(handler);
+        var (tenant, report, da, census) = BuildServices(handler);
         var context = BuildHttpContext();
 
         // Act
-        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, FacilityId);
+        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, census, FacilityId);
 
         // Assert
         var statusCode = await ExecuteResultAsync(result);
@@ -162,11 +172,11 @@ public class RestoreFacilityTests
             throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}");
         });
 
-        var (tenant, report, da) = BuildServices(handler);
+        var (tenant, report, da, census) = BuildServices(handler);
         var context = BuildHttpContext();
 
         // Act
-        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, FacilityId);
+        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, census, FacilityId);
 
         // Assert
         var statusCode = await ExecuteResultAsync(result);
@@ -190,11 +200,11 @@ public class RestoreFacilityTests
             throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}");
         });
 
-        var (tenant, report, da) = BuildServices(handler);
+        var (tenant, report, da, census) = BuildServices(handler);
         var context = BuildHttpContext();
 
         // Act
-        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, FacilityId);
+        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, census, FacilityId);
 
         // Assert
         var statusCode = await ExecuteResultAsync(result);
@@ -234,11 +244,11 @@ public class RestoreFacilityTests
             throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}");
         });
 
-        var (tenant, report, da) = BuildServices(handler);
+        var (tenant, report, da, census) = BuildServices(handler);
         var context = BuildHttpContext();
 
         // Act
-        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, FacilityId);
+        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, census, FacilityId);
 
         // Assert
         var statusCode = await ExecuteResultAsync(result);
@@ -276,11 +286,11 @@ public class RestoreFacilityTests
             throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}");
         });
 
-        var (tenant, report, da) = BuildServices(handler);
+        var (tenant, report, da, census) = BuildServices(handler);
         var context = BuildHttpContext();
 
         // Act
-        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, FacilityId);
+        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, census, FacilityId);
 
         // Assert
         var statusCode = await ExecuteResultAsync(result);
@@ -335,11 +345,11 @@ public class RestoreFacilityTests
             throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}");
         });
 
-        var (tenant, report, da) = BuildServices(handler);
+        var (tenant, report, da, census) = BuildServices(handler);
         var context = BuildHttpContext();
 
         // Act
-        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, FacilityId);
+        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, census, FacilityId);
 
         // Assert
         var statusCode = await ExecuteResultAsync(result);
@@ -392,11 +402,11 @@ public class RestoreFacilityTests
             throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}");
         });
 
-        var (tenant, report, da) = BuildServices(handler);
+        var (tenant, report, da, census) = BuildServices(handler);
         var context = BuildHttpContext();
 
         // Act
-        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, FacilityId);
+        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, census, FacilityId);
 
         // Assert
         var statusCode = await ExecuteResultAsync(result);
@@ -422,11 +432,11 @@ public class RestoreFacilityTests
             throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}");
         });
 
-        var (tenant, report, da) = BuildServices(handler);
+        var (tenant, report, da, census) = BuildServices(handler);
         var context = BuildHttpContext();
 
         // Act
-        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, FacilityId);
+        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, census, FacilityId);
 
         // Assert
         var statusCode = await ExecuteResultAsync(result);
@@ -464,14 +474,167 @@ public class RestoreFacilityTests
             throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}");
         });
 
-        var (tenant, report, da) = BuildServices(handler);
+        var (tenant, report, da, census) = BuildServices(handler);
         var context = BuildHttpContext();
 
         // Act
-        await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, FacilityId);
+        await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, census, FacilityId);
 
         // Assert
         Assert.False(reportCalled, "Report service should not be called when tenant restore fails.");
         Assert.False(daCalled, "DA service should not be called when tenant restore fails.");
+    }
+
+    // ---------------------------------------------------------------------------
+    // Scenario 8: Census restore fails — returns 500 + rolls back all three
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Handle_CensusRestoreFails_Returns500AndRollsBackAll()
+    {
+        // Arrange
+        var tenantSoftDeleteCalled = false;
+        var reportSoftDeleteCalled = false;
+        var daSoftDeleteCalled = false;
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            // Tenant restore succeeds
+            if (request.Method == HttpMethod.Patch &&
+                request.RequestUri!.PathAndQuery.Contains("api/facility/restore/"))
+                return NoContentResponse();
+
+            // Report restore succeeds
+            if (request.Method == HttpMethod.Patch &&
+                request.RequestUri!.PathAndQuery.Contains("api/schedules/facility/") &&
+                request.RequestUri!.Query.Contains("deleted=false"))
+                return NoContentResponse();
+
+            // DA restore succeeds
+            if (request.Method == HttpMethod.Patch &&
+                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/") &&
+                request.RequestUri!.PathAndQuery.Contains("/restore"))
+                return NoContentResponse();
+
+            // Census restore fails
+            if (request.Method == HttpMethod.Patch &&
+                request.RequestUri!.PathAndQuery.Contains("api/census/config/") &&
+                request.RequestUri!.PathAndQuery.Contains("/jobs/restore"))
+                return StatusResponse(HttpStatusCode.ServiceUnavailable);
+
+            // DA rollback (soft-delete)
+            if (request.Method == HttpMethod.Delete &&
+                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/"))
+            {
+                daSoftDeleteCalled = true;
+                return NoContentResponse();
+            }
+
+            // Report rollback (soft-delete)
+            if (request.Method == HttpMethod.Patch &&
+                request.RequestUri!.PathAndQuery.Contains("api/schedules/facility/") &&
+                request.RequestUri!.Query.Contains("deleted=true"))
+            {
+                reportSoftDeleteCalled = true;
+                return NoContentResponse();
+            }
+
+            // Tenant rollback (soft-delete)
+            if (request.Method == HttpMethod.Delete &&
+                request.RequestUri!.PathAndQuery.Contains("api/facility/softDelete/"))
+            {
+                tenantSoftDeleteCalled = true;
+                return NoContentResponse();
+            }
+
+            throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}");
+        });
+
+        var (tenant, report, da, census) = BuildServices(handler);
+        var context = BuildHttpContext();
+
+        // Act
+        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, census, FacilityId);
+
+        // Assert
+        var statusCode = await ExecuteResultAsync(result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, statusCode);
+        Assert.True(daSoftDeleteCalled, "Expected DA rollback (soft-delete) to be called when census restore fails.");
+        Assert.True(reportSoftDeleteCalled, "Expected report schedule rollback (soft-delete) to be called when census restore fails.");
+        Assert.True(tenantSoftDeleteCalled, "Expected tenant rollback (soft-delete) to be called when census restore fails.");
+    }
+
+    // ---------------------------------------------------------------------------
+    // Scenario 9: Census restore throws — returns 500 + rolls back all three
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Handle_CensusRestoreThrows_Returns500AndRollsBackAll()
+    {
+        // Arrange
+        var tenantSoftDeleteCalled = false;
+        var reportSoftDeleteCalled = false;
+        var daSoftDeleteCalled = false;
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            if (request.Method == HttpMethod.Patch &&
+                request.RequestUri!.PathAndQuery.Contains("api/facility/restore/"))
+                return NoContentResponse();
+
+            if (request.Method == HttpMethod.Patch &&
+                request.RequestUri!.PathAndQuery.Contains("api/schedules/facility/") &&
+                request.RequestUri!.Query.Contains("deleted=false"))
+                return NoContentResponse();
+
+            if (request.Method == HttpMethod.Patch &&
+                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/") &&
+                request.RequestUri!.PathAndQuery.Contains("/restore"))
+                return NoContentResponse();
+
+            // Census restore throws
+            if (request.Method == HttpMethod.Patch &&
+                request.RequestUri!.PathAndQuery.Contains("api/census/config/") &&
+                request.RequestUri!.PathAndQuery.Contains("/jobs/restore"))
+                throw new HttpRequestException("Census service unavailable");
+
+            // DA rollback (soft-delete)
+            if (request.Method == HttpMethod.Delete &&
+                request.RequestUri!.PathAndQuery.Contains("api/data/acquisition-logs/facility/"))
+            {
+                daSoftDeleteCalled = true;
+                return NoContentResponse();
+            }
+
+            // Report rollback (soft-delete)
+            if (request.Method == HttpMethod.Patch &&
+                request.RequestUri!.PathAndQuery.Contains("api/schedules/facility/") &&
+                request.RequestUri!.Query.Contains("deleted=true"))
+            {
+                reportSoftDeleteCalled = true;
+                return NoContentResponse();
+            }
+
+            // Tenant rollback (soft-delete)
+            if (request.Method == HttpMethod.Delete &&
+                request.RequestUri!.PathAndQuery.Contains("api/facility/softDelete/"))
+            {
+                tenantSoftDeleteCalled = true;
+                return NoContentResponse();
+            }
+
+            throw new InvalidOperationException($"Unexpected request: {request.Method} {request.RequestUri}");
+        });
+
+        var (tenant, report, da, census) = BuildServices(handler);
+        var context = BuildHttpContext();
+
+        // Act
+        var result = await RestoreFacility.Handle(_loggerFactory, context, tenant, report, da, census, FacilityId);
+
+        // Assert
+        var statusCode = await ExecuteResultAsync(result);
+        Assert.Equal(StatusCodes.Status500InternalServerError, statusCode);
+        Assert.True(daSoftDeleteCalled, "Expected DA rollback (soft-delete) to be called when census restore throws.");
+        Assert.True(reportSoftDeleteCalled, "Expected report schedule rollback (soft-delete) to be called when census restore throws.");
+        Assert.True(tenantSoftDeleteCalled, "Expected tenant rollback (soft-delete) to be called when census restore throws.");
     }
 }
