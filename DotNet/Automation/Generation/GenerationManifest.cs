@@ -69,6 +69,22 @@ public sealed class GenerationManifest
         = new Dictionary<string, HashSet<string>>();
 
     /// <summary>
+    /// Resource keys (<c>Type/Id</c>) that were generated but are expected to be filtered
+    /// out by CQL SDE <c>where</c> clauses at the individual-resource level.
+    ///
+    /// Unlike <see cref="CqlReferencedResourceTypes"/> (which filters whole types),
+    /// this captures <b>per-resource</b> exclusions: e.g. a Condition that is "resolved"
+    /// when the CQL requires "active", or a Condition whose recordedDate falls outside
+    /// the encounter period.
+    ///
+    /// Keyed by patient ID. The prediction subtracts these keys from the expected set.
+    /// Built at generation time by replaying the known CQL filter criteria against each
+    /// generated resource's attributes.
+    /// </summary>
+    public IReadOnlyDictionary<string, HashSet<string>> CqlFilteredResourceKeysByPatient { get; set; }
+        = new Dictionary<string, HashSet<string>>();
+
+    /// <summary>
     /// Every resource key (<c>ResourceType/ResourceId</c>) from the generated FHIR bundles,
     /// keyed per patient. Shared infrastructure resources are stored under the empty-string key.
     /// </summary>
@@ -121,17 +137,21 @@ public sealed class GenerationManifest
     ///   <item>The measures' CQL <b>references</b> it (<see cref="CqlReferencedResourceTypes"/>).</item>
     /// </list>
     ///
-    /// <b>How the pipeline works:</b> Data Acquisition runs the query plan (Parameter +
-    /// Reference queries) and sends every acquired resource to MeasureEval. MeasureEval
-    /// bundles them all and evaluates the CQL. The CQL engine loads every resource whose
-    /// type appears in a <c>[ResourceType]</c> retrieve expression into the MeasureReport's
-    /// contained list. PatientAggregator extracts those contained resources and writes them
-    /// to the patient NDJSON in ABS and to the ReportResource DB.
+    /// <b>How the pipeline works:</b>
+    /// <list type="number">
+    ///   <item>Data Acquisition runs the query plan and sends every acquired resource to MeasureEval.</item>
+    ///   <item>MeasureEval bundles all acquired resources as <c>additionalData</c> and evaluates the CQL.</item>
+    ///   <item>The HAPI CQL engine places resources into <c>MeasureReport.contained</c> only when they
+    ///         are touched by a CQL <c>[ResourceType]</c> retrieve expression. Resources in
+    ///         <c>additionalData</c> whose type has no matching retrieve are <b>not</b> included
+    ///         in <c>contained</c>.</item>
+    ///   <item>MeasureEval's <c>normalize()</c> extracts <c>contained</c> resources and writes them
+    ///         (plus the MeasureReport itself) to the <c>.mr</c> file in ABS.</item>
+    ///   <item>PatientAggregator reads the <c>.mr</c> files and writes every resource from them
+    ///         to <c>patient-{id}.ndjson</c> in ABS and to the ReportResource DB.</item>
+    /// </list>
     ///
-    /// Both Parameter-query types (Encounter, Condition, Observation, etc.) and Reference-query
-    /// types (Location, Medication, Device, Specimen) follow the same path: generated ->
-    /// acquired -> bundled -> CQL-evaluated -> contained -> ABS. No tolerance or special-casing
-    /// is needed - the system is deterministic given the input data.
+    /// Therefore: Generated ∩ QP-Acquired ∩ CQL-Referenced = Expected in ABS.
     /// </summary>
     public bool IsExpectedInAbs(string resourceType)
     {
@@ -146,16 +166,13 @@ public sealed class GenerationManifest
         if (CqlReferencedResourceTypes.Count > 0)
             return CqlReferencedResourceTypes.Contains(resourceType);
 
-        // Fallback when CQL analysis is unavailable - use Parameter-query heuristic
-        if (ParameterQueryResourceTypes.Count > 0)
-            return ParameterQueryResourceTypes.Contains(resourceType);
-
-        return true; // no filters configured - allow all acquired
+        // Fallback when CQL analysis is unavailable — assume all acquired types pass
+        return true;
     }
 
     /// <summary>
     /// Returns the per-patient resource type -> count map filtered to only types
-    /// expected in ABS (generated -> acquired -> CQL-referenced).
+    /// expected in ABS (generated ∩ query-plan-acquired ∩ CQL-referenced).
     /// </summary>
     public Dictionary<string, int>? GetExpectedAbsCountsForPatient(string patientId)
     {
@@ -172,7 +189,8 @@ public sealed class GenerationManifest
 
     /// <summary>
     /// Returns expected ABS resource keys for a patient using deterministic key-level logic:
-    /// simulated-acquired (when available) + reachable CQL types.
+    /// simulated-acquired keys (when available) filtered to types that pass all three gates
+    /// (generated ∩ acquired ∩ CQL-referenced).
     /// Falls back to generated keys when acquisition simulation is unavailable.
     /// </summary>
     public HashSet<string> GetExpectedAbsKeysForPatient(string patientId)
@@ -187,12 +205,18 @@ public sealed class GenerationManifest
         if (sourceKeys == null)
             return [];
 
+        // Per-resource CQL filter exclusions (e.g. resolved Conditions, out-of-period recordedDate)
+        CqlFilteredResourceKeysByPatient.TryGetValue(patientId, out var cqlFiltered);
+
         var filtered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in sourceKeys)
         {
             var resourceType = GetResourceTypeFromKey(key);
-            if (IsExpectedInAbs(resourceType))
-                filtered.Add(key);
+            if (!IsExpectedInAbs(resourceType))
+                continue;
+            if (cqlFiltered != null && cqlFiltered.Contains(key))
+                continue;
+            filtered.Add(key);
         }
 
         return filtered;
@@ -278,6 +302,63 @@ public sealed class GenerationManifest
                 return i;
         }
         return -1;
+    }
+
+    // ----- Snapshot for UI persistence -----
+
+    /// <summary>
+    /// Creates a lightweight, serializable snapshot suitable for storage and display.
+    /// </summary>
+    public GenerationManifestSnapshot ToSnapshot()
+    {
+        var eligibility = new Dictionary<string, List<string>>();
+        for (var i = 0; i < PatientIds.Count && i < Profiles.Count; i++)
+        {
+            var qualifying = new List<string>();
+            foreach (var measure in SelectedMeasures)
+            {
+                if (Profiles[i].QualifiesFor(measure))
+                    qualifying.Add(measure.ToString());
+            }
+            eligibility[PatientIds[i]] = qualifying;
+        }
+
+        // Build predicted ABS counts per patient (generated ∩ acquired ∩ CQL-referenced)
+        var expectedAbsByPatient = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
+        var expectedAbsTotals = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var patientId in PatientIds)
+        {
+            var counts = GetExpectedAbsCountsForPatient(patientId);
+            if (counts != null && counts.Count > 0)
+            {
+                expectedAbsByPatient[patientId] = counts;
+                foreach (var (type, count) in counts)
+                    expectedAbsTotals[type] = expectedAbsTotals.TryGetValue(type, out var c) ? c + count : count;
+            }
+        }
+
+        return new GenerationManifestSnapshot
+        {
+            PatientCount = PatientIds.Count,
+            TotalResourceCount = TotalResourceCount,
+            PatientIds = PatientIds,
+            SelectedMeasures = SelectedMeasures.Select(m => m.ToString()).ToList(),
+            MeasureIds = MeasureIds,
+            AcquiredResourceTypes = AcquiredResourceTypes.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList(),
+            ParameterQueryResourceTypes = ParameterQueryResourceTypes.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList(),
+            CqlReferencedResourceTypes = CqlReferencedResourceTypes.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList(),
+            TotalCountsByType = TotalCountsByType.ToDictionary(kv => kv.Key, kv => kv.Value),
+            SharedInfrastructureCountsByType = ResourceCountsByPatientType
+                .Where(kv => string.IsNullOrEmpty(kv.Key))
+                .SelectMany(kv => kv.Value)
+                .ToDictionary(kv => kv.Key, kv => kv.Value),
+            ResourceCountsByPatient = ResourceCountsByPatientType
+                .Where(kv => !string.IsNullOrEmpty(kv.Key))
+                .ToDictionary(kv => kv.Key, kv => new Dictionary<string, int>(kv.Value)),
+            PatientEligibility = eligibility,
+            ExpectedAbsCountsByPatient = expectedAbsByPatient,
+            ExpectedAbsTotalCountsByType = expectedAbsTotals
+        };
     }
 
     // ----- Factory -----
@@ -459,6 +540,21 @@ public sealed class GenerationManifest
             }
         }
 
+        private readonly Dictionary<string, HashSet<string>> _cqlFilteredKeys = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Records resource keys that will be filtered out by CQL SDE where-clauses
+        /// at the individual-resource level for the given patient.
+        /// </summary>
+        public void SetCqlFilteredKeys(string patientId, HashSet<string> filteredKeys)
+        {
+            if (filteredKeys.Count == 0) return;
+            lock (_lock)
+            {
+                _cqlFilteredKeys[patientId] = filteredKeys;
+            }
+        }
+
         /// <summary>
         /// Builds the final <see cref="GenerationManifest"/> from all accumulated data.
         /// Call once after all patients have been processed.
@@ -476,7 +572,8 @@ public sealed class GenerationManifest
                     ResourceCountsByPatientType = new Dictionary<string, Dictionary<string, int>>(_countsByPatientType, StringComparer.Ordinal),
                     TotalCountsByType = new Dictionary<string, int>(_totalsByType, StringComparer.OrdinalIgnoreCase),
                     TotalResourceCount = _totalCount,
-                    SimulatedAcquiredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_simulatedAcquiredKeys, StringComparer.Ordinal)
+                    SimulatedAcquiredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_simulatedAcquiredKeys, StringComparer.Ordinal),
+                    CqlFilteredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_cqlFilteredKeys, StringComparer.Ordinal)
                 };
             }
         }

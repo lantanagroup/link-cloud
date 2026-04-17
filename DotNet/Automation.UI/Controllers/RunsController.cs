@@ -85,6 +85,38 @@ public class RunsController(
     }
 
     [HttpGet]
+    public async Task<IActionResult> Manifest(Guid id, CancellationToken cancellationToken)
+    {
+        var run = await runManager.GetRunAsync(id, cancellationToken);
+        if (run == null)
+            return NotFound();
+
+        var manifest = await runManager.GetGenerationManifestAsync(id, cancellationToken);
+        if (manifest == null)
+            return RedirectToAction(nameof(Details), new { id });
+
+        ViewBag.Run = run;
+        ViewBag.RunId = id;
+        return View("Manifest", manifest);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ManifestData(Guid id, CancellationToken cancellationToken)
+    {
+        var manifest = await runManager.GetGenerationManifestAsync(id, cancellationToken);
+        if (manifest == null) return NoContent();
+        return Json(manifest);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> AbsUploadData(Guid id, CancellationToken cancellationToken)
+    {
+        var abs = await runManager.GetAbsUploadSnapshotAsync(id, cancellationToken);
+        if (abs == null) return NoContent();
+        return Json(abs);
+    }
+
+    [HttpGet]
     public async Task<IActionResult> Status(Guid id, CancellationToken cancellationToken)
     {
         var run = await runManager.GetRunAsync(id, cancellationToken);
@@ -145,6 +177,16 @@ public class RunsController(
             return NoContent();
 
         return Json(snapshot);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GenerationManifest(Guid id, CancellationToken cancellationToken)
+    {
+        var manifest = await runManager.GetGenerationManifestAsync(id, cancellationToken);
+        if (manifest == null)
+            return NoContent();
+
+        return Json(manifest);
     }
 
     /// <summary>
@@ -214,7 +256,9 @@ public class RunsController(
                     Status = r.Status?.ToString(),
                     QueryPhase = r.QueryPhase?.ToString(),
                     IsReferenceLog = r.IsReferenceLog
-                                     || string.Equals(r.QueryPhase?.ToString(), "Referential", StringComparison.OrdinalIgnoreCase),
+                                     || string.Equals(r.QueryPhase?.ToString(), "Referential", StringComparison.OrdinalIgnoreCase)
+                                     || r.ReferenceResourceCount > 0,
+                    r.ReferenceResourceCount,
                     ResourceTypes = (r.ResourceTypes ?? [])
                         .Concat(r.FhirQuery.SelectMany(q => q.ResourceTypes ?? []))
                         .Where(rt => !string.IsNullOrWhiteSpace(rt))

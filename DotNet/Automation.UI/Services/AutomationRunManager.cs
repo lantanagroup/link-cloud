@@ -3,7 +3,9 @@ using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Automation.Link.Services;
 using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
@@ -51,6 +53,7 @@ public class AutomationRunManager : IAutomationRunManager
     {
         var runId = Guid.NewGuid();
         var options = ResolveRunOptions(request);
+
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
         var state = new MutableRunState(runId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
         _runs[runId] = state;
@@ -204,7 +207,7 @@ public class AutomationRunManager : IAutomationRunManager
 
     public async Task<PipelineSummarySnapshotBuilder.PipelineSummarySnapshot?> GetPipelineSnapshotAsync(Guid runId, CancellationToken cancellationToken = default)
     {
-        // Always read from Mongo — the poller writes domain data there,
+        // Always read from Mongo â€” the poller writes domain data there,
         // and logs are persisted as they're written. One data flow, no branching.
         var summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
 
@@ -300,6 +303,16 @@ public class AutomationRunManager : IAutomationRunManager
                 IsFinal = isFinal
             };
         }
+    }
+
+    public async Task<GenerationManifestSnapshot?> GetGenerationManifestAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        return await SafeGetDomainAsync<GenerationManifestSnapshot>(runId, "generationManifest", cancellationToken);
+    }
+
+    public async Task<AbsUploadSnapshot?> GetAbsUploadSnapshotAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        return await SafeGetDomainAsync<AbsUploadSnapshot>(runId, "absUpload", cancellationToken);
     }
 
     public async Task<RunDashboardStats> GetDashboardStatsAsync(CancellationToken cancellationToken = default)
@@ -399,7 +412,7 @@ public class AutomationRunManager : IAutomationRunManager
             GenerationManifest? generationManifest = null;
 
             // Use the first measure for generation context (profile-driven generation picks
-            // the most restrictive measure — patients qualifying for all measures must meet
+            // the most restrictive measure â€” patients qualifying for all measures must meet
             // the criteria of each). For multi-measure, GenerateWithProfiles handles the union.
             var primaryMeasure = state.Options.SelectedMeasures[0];
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
@@ -488,6 +501,9 @@ public class AutomationRunManager : IAutomationRunManager
                 generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlanInput);
                 generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlanInput);
                 generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
+
+                // Persist a lightweight manifest snapshot for the UI.
+                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), CancellationToken.None);
             }
 
             await FacilitySetupHelper.EnsureFacilityAsync(
@@ -587,6 +603,17 @@ public class AutomationRunManager : IAutomationRunManager
             var downloadedResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig);
             var internalAbsResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig, external: false);
 
+            // Capture a lightweight ABS upload snapshot for the manifest detail page.
+            try
+            {
+                var absSnapshot = AbsUploadSnapshot.Build(internalAbsResources);
+                await _snapshotStore.SetDomainAsync(state.RunId, "absUpload", absSnapshot, CancellationToken.None);
+            }
+            catch (Exception absEx)
+            {
+                output.WriteLine($"[WARN] Failed to build/store ABS upload snapshot: {absEx.Message}");
+            }
+
             if (!downloadedResources.ContainsKey("manifest.ndjson"))
                 throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
 
@@ -599,7 +626,7 @@ public class AutomationRunManager : IAutomationRunManager
             // Flush stale cache from diagnostics polling so validators read authoritative data.
             services.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
-            // Regeneration reuses prior data acquisition — no new DA logs exist for the regenerated report.
+            // Regeneration reuses prior data acquisition â€” no new DA logs exist for the regenerated report.
             var expectDataAcquisitionData = state.Options.ReportMethod != ReportMethod.RegenerateReport;
 
             // Pipeline-built manifest already has all metadata; no need to re-parse bundles.
@@ -851,7 +878,7 @@ public class AutomationRunManager : IAutomationRunManager
                 ? [request.SelectedMeasure.Value]
                 : effectiveMeasures;
 
-        // Always expand profiles from cohorts — cohorts are the single source of truth.
+        // Always expand profiles from cohorts â€” cohorts are the single source of truth.
         profiles = ExpandProfilesFromCohorts(cohorts, request.Seed ?? defaults.Seed);
 
         return defaults with

@@ -12,7 +12,7 @@ namespace LantanaGroup.Automation.Generation;
 ///   2. Manifest metadata accumulated from the in-memory objects
 ///   3. Serialized into transaction bundle chunks
 ///   4. Uploaded sequentially to the FHIR server (preserving resource dependency order)
-///   5. Disposed — no serialized JSON or FHIR objects retained after upload
+///   5. Disposed â€” no serialized JSON or FHIR objects retained after upload
 ///
 /// Multiple patients are processed concurrently (bounded by <see cref="MaxConcurrentPatients"/>)
 /// but each patient's chunks are uploaded in strict sequential order to preserve the
@@ -39,7 +39,7 @@ public static class FhirGenerationPipeline
         /// <summary>
         /// Fully-populated generation manifest built incrementally during the pipeline.
         /// Contains resource keys, counts, profiles, and (when configured) simulated
-        /// acquisition results — everything that <see cref="GenerationManifest.Build"/>
+        /// acquisition results â€” everything that <see cref="GenerationManifest.Build"/>
         /// would produce from retained bundles.
         /// </summary>
         public required GenerationManifest Manifest { get; init; }
@@ -93,9 +93,9 @@ public static class FhirGenerationPipeline
                          (generationSeed.HasValue ? $" (seed={generationSeed.Value})" : string.Empty));
 
         // ------------------------------------------------------------------
-        // Shared infrastructure — generated once, uploaded first
+        // Shared infrastructure â€” generated once, uploaded first
         // ------------------------------------------------------------------
-        var (sharedEntries, sharedPractitionerIds, sharedMedicationIds) = GenerateSharedInfrastructure(patientIdPrefix);
+        var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) = GenerateSharedInfrastructure(patientIdPrefix);
 
         // Upload shared infrastructure first
         var sharedBundles = ChunkEntries(sharedEntries, "shared", 0);
@@ -144,7 +144,8 @@ public static class FhirGenerationPipeline
                         sharedMedicationIds,
                         sharedSimEntries,
                         acquisitionSimulation,
-                        config);
+                        config,
+                        ids);
 
                     patientIds[patientIndex] = patientId;
                     Interlocked.Add(ref totalBundlesUploaded, bundleCount);
@@ -193,15 +194,16 @@ public static class FhirGenerationPipeline
         List<string> sharedMedicationIds,
         List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedSimEntries,
         AcquisitionSimulationConfig? acquisitionSimulation,
-        FhirGenerationConfig? config)
+        FhirGenerationConfig? config,
+        FhirBundleGenerator.SharedIds ids)
     {
         var patientSeed = baseSeed + (profile.SeedOffset ?? patientIndex);
-        var patientId = $"{patientIdPrefix}-{patientIndex + 1:D3}";
+        var patientId = ids.PatientId(patientIndex);
 
         // Generate entries using the same logic as FhirBundleGenerator.GenerateWithProfilesCore
         var entries = GeneratePatientEntries(
             profile, patientIndex, baseSeed, totalResourcesPerPatient, patientIdPrefix,
-            sharedPractitionerIds, sharedMedicationIds, measures, config);
+            sharedPractitionerIds, sharedMedicationIds, measures, config, ids);
 
         var scenario = FhirGenerationCodes.GetScenarioById(profile.ClinicalScenarioId)
                        ?? FhirGenerationCodes.GetScenarioBySeed(patientSeed);
@@ -240,6 +242,21 @@ public static class FhirGenerationPipeline
         manifestBuilder.AddPatient(patientId, profile);
         manifestBuilder.AddEntries(patientId, entries);
 
+        // Compute per-resource CQL SDE filter exclusions with measure-family profiles
+        var scenarioIdxForFilter = FhirGenerationCodes.GetScenarioArrayPosition(scenario);
+        var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(
+            measures,
+            patientId,
+            encounterId,
+            encStart,
+            encEnd,
+            scenarioIdxForFilter,
+            baseSeed,
+            patientIndex,
+            totalResourcesPerPatient,
+            config);
+        manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+
         // Run acquisition simulation BEFORE we serialize and discard
         if (acquisitionSimulation != null)
         {
@@ -258,7 +275,7 @@ public static class FhirGenerationPipeline
         // Serialize into chunks, upload sequentially, then discard
         var bundles = ChunkEntries(entries, patientId, 0);
 
-        // Entries list is no longer needed — allow GC before upload
+        // Entries list is no longer needed â€” allow GC before upload
         entries.Clear();
 
         var progress = $"[{patientId}] ";
@@ -266,7 +283,7 @@ public static class FhirGenerationPipeline
 
         var bundleCount = bundles.Count;
 
-        // Bundles are no longer needed — allow GC
+        // Bundles are no longer needed â€” allow GC
         bundles.Clear();
 
         return (patientId, profile, bundleCount);
@@ -285,10 +302,11 @@ public static class FhirGenerationPipeline
         List<string> sharedPractitionerIds,
         List<string> sharedMedicationIds,
         IReadOnlyList<ProfiledMeasureType> measures,
-        FhirGenerationConfig? config)
+        FhirGenerationConfig? config,
+        FhirBundleGenerator.SharedIds ids)
     {
         var patientSeed = baseSeed + (profile.SeedOffset ?? patientIndex);
-        var patientId = $"{patientIdPrefix}-{patientIndex + 1:D3}";
+        var patientId = ids.PatientId(patientIndex);
         var scenario = FhirGenerationCodes.GetScenarioById(profile.ClinicalScenarioId)
                        ?? FhirGenerationCodes.GetScenarioBySeed(patientSeed);
         var scenarioIdx = FhirGenerationCodes.GetScenarioArrayPosition(scenario);
@@ -317,7 +335,7 @@ public static class FhirGenerationPipeline
         var entries = new List<Bundle.EntryComponent>();
 
         var patient = PatientFactory.Generate(patientId, patientSeed, gpPractId);
-        patient.ManagingOrganization = new ResourceReference($"Organization/{FhirBundleGenerator.HospitalOrgId}", "General Test Hospital");
+        patient.ManagingOrganization = new ResourceReference($"Organization/{ids.Organization}", "General Test Hospital");
         entries.Add(Entry($"Patient/{patientId}", patient));
 
         entries.Add(Entry($"Device/{patientDeviceId}",
@@ -336,8 +354,8 @@ public static class FhirGenerationPipeline
                     EncounterFactory.Create(
                         encounterId, patientId, encStart, encEnd,
                         attendingPractId, admittingPractId,
-                        FhirBundleGenerator.EdLocationId, FhirBundleGenerator.IcuLocationId,
-                        FhirBundleGenerator.StepDownLocationId, FhirBundleGenerator.HospitalOrgId,
+                        ids.EdLocation, ids.IcuLocation,
+                        ids.StepDownLocation, ids.Organization,
                         primaryDxId,
                         "32485007", "Hospital admission (procedure)",
                         scenario.PrimaryDxSnomed, scenario.PrimaryDxDisplay, scenario.PrimaryDxIcd,
@@ -352,8 +370,8 @@ public static class FhirGenerationPipeline
                     EncounterFactory.Generate(
                         encounterId, patientId, encStart, encEnd,
                         attendingPractId, admittingPractId,
-                        FhirBundleGenerator.EdLocationId, FhirBundleGenerator.IcuLocationId,
-                        FhirBundleGenerator.StepDownLocationId, FhirBundleGenerator.HospitalOrgId,
+                        ids.EdLocation, ids.IcuLocation,
+                        ids.StepDownLocation, ids.Organization,
                         primaryDxId, scenario)));
             }
         }
@@ -362,26 +380,26 @@ public static class FhirGenerationPipeline
             entries.Add(Entry($"Encounter/{encounterId}",
                 EncounterFactory.CreateAmbulatory(
                     encounterId, patientId, encStart, encEnd,
-                    attendingPractId, FhirBundleGenerator.OutpatientLocationId,
-                    FhirBundleGenerator.HospitalOrgId,
+                    attendingPractId, ids.OutpatientLocation,
+                    ids.Organization,
                     primaryDxId,
                     scenario.PrimaryDxSnomed, scenario.PrimaryDxDisplay, scenario.PrimaryDxIcd)));
         }
 
         entries.Add(Entry($"CareTeam/{careTeamId}",
-            CareTeamFactory.Generate(careTeamId, patientId, encounterId, attendingPractId, encStart, FhirBundleGenerator.HospitalOrgId)));
+            CareTeamFactory.Generate(careTeamId, patientId, encounterId, attendingPractId, encStart, ids.Organization)));
 
         entries.Add(Entry($"CarePlan/{carePlanId}",
             CarePlanFactory.Generate(carePlanId, patientId, encounterId, careTeamId, encStart, patientSeed)));
 
         if (profile.RequiresHypoglycemicMedication())
         {
-            AddHypoglycemicQualifyingMedicationEntries(entries, patientId, encounterId, attendingPractId, patientSeed, encStart);
+            AddHypoglycemicQualifyingMedicationEntries(entries, patientId, encounterId, attendingPractId, patientSeed, encStart, ids);
         }
 
         GenerateScenarioDrivenResources(entries, scenarioIdx, patientId, encounterId,
             encStart, encEnd, primaryDxId, attendingPractId, careTeamId, patientIdPrefix,
-            totalResourcesPerPatient, baseSeed, patientIndex, sharedPractitionerIds, sharedMedicationIds, config);
+            totalResourcesPerPatient, baseSeed, patientIndex, sharedPractitionerIds, sharedMedicationIds, config, ids);
 
         return entries;
     }
@@ -390,33 +408,34 @@ public static class FhirGenerationPipeline
     //  Shared infrastructure generation
     // ------------------------------------------------------------------
 
-    private static (List<Bundle.EntryComponent> Entries, List<string> PractitionerIds, List<string> MedicationIds)
+    private static (List<Bundle.EntryComponent> Entries, List<string> PractitionerIds, List<string> MedicationIds, FhirBundleGenerator.SharedIds Ids)
         GenerateSharedInfrastructure(string patientIdPrefix)
     {
+        var ids = new FhirBundleGenerator.SharedIds(patientIdPrefix);
         var entries = new List<Bundle.EntryComponent>
         {
-            Entry($"Organization/{FhirBundleGenerator.HospitalOrgId}", OrganizationFactory.Generate(FhirBundleGenerator.HospitalOrgId)),
-            Entry($"Location/{FhirBundleGenerator.HospitalLocationId}", LocationFactory.Generate(FhirBundleGenerator.HospitalLocationId, "HOSP", "Main Hospital", FhirBundleGenerator.HospitalOrgId)),
-            Entry($"Location/{FhirBundleGenerator.IcuLocationId}", LocationFactory.Generate(FhirBundleGenerator.IcuLocationId, "ICU", "Intensive Care Unit", FhirBundleGenerator.HospitalOrgId)),
-            Entry($"Location/{FhirBundleGenerator.EdLocationId}", LocationFactory.Generate(FhirBundleGenerator.EdLocationId, "ER", "Emergency Department", FhirBundleGenerator.HospitalOrgId)),
-            Entry($"Location/{FhirBundleGenerator.StepDownLocationId}", LocationFactory.Generate(FhirBundleGenerator.StepDownLocationId, "HU", "Step-Down Unit", FhirBundleGenerator.HospitalOrgId)),
-            Entry($"Location/{FhirBundleGenerator.OutpatientLocationId}", LocationFactory.Create(FhirBundleGenerator.OutpatientLocationId, "OF", "Outpatient Clinic", FhirBundleGenerator.HospitalOrgId)),
-            Entry("Device/Gen-Device-PulseOx", DeviceFactory.Create("Gen-Device-PulseOx", "706689003", "Pulse oximeter", null)),
-            Entry("Device/Gen-Device-Ventilator", DeviceFactory.Create("Gen-Device-Ventilator", "706172005", "Ventilator", null)),
-            Entry("Device/Gen-Device-CPAP", DeviceFactory.Create("Gen-Device-CPAP", "10776007", "Continuous positive airway pressure device", null)),
+            Entry($"Organization/{ids.Organization}", OrganizationFactory.Generate(ids.Organization)),
+            Entry($"Location/{ids.HospitalLocation}", LocationFactory.Generate(ids.HospitalLocation, "HOSP", "Main Hospital", ids.Organization)),
+            Entry($"Location/{ids.IcuLocation}", LocationFactory.Generate(ids.IcuLocation, "ICU", "Intensive Care Unit", ids.Organization)),
+            Entry($"Location/{ids.EdLocation}", LocationFactory.Generate(ids.EdLocation, "ER", "Emergency Department", ids.Organization)),
+            Entry($"Location/{ids.StepDownLocation}", LocationFactory.Generate(ids.StepDownLocation, "HU", "Step-Down Unit", ids.Organization)),
+            Entry($"Location/{ids.OutpatientLocation}", LocationFactory.Create(ids.OutpatientLocation, "OF", "Outpatient Clinic", ids.Organization)),
+            Entry($"Device/{ids.DevicePulseOx}", DeviceFactory.Create(ids.DevicePulseOx, "706689003", "Pulse oximeter", null)),
+            Entry($"Device/{ids.DeviceVentilator}", DeviceFactory.Create(ids.DeviceVentilator, "706172005", "Ventilator", null)),
+            Entry($"Device/{ids.DeviceCPAP}", DeviceFactory.Create(ids.DeviceCPAP, "10776007", "Continuous positive airway pressure device", null)),
         };
 
         var practitionerIds = new List<string>();
         for (var pi = 0; pi < FhirGenerationCodes.Practitioners.Length; pi++)
         {
-            var practId = $"{patientIdPrefix}-Pract-{pi + 1:D3}";
+            var practId = ids.PractitionerId(pi);
             practitionerIds.Add(practId);
             entries.Add(Entry($"Practitioner/{practId}", PractitionerFactory.Generate(practId, pi)));
         }
 
-        var medicationIds = GenerateSharedMedications(entries);
+        var medicationIds = GenerateSharedMedications(entries, ids);
 
-        return (entries, practitionerIds, medicationIds);
+        return (entries, practitionerIds, medicationIds, ids);
     }
 
     // ------------------------------------------------------------------
@@ -477,7 +496,7 @@ public static class FhirGenerationPipeline
     }
 
     // ------------------------------------------------------------------
-    //  Helpers — delegated from FhirBundleGenerator (same logic)
+    //  Helpers â€” delegated from FhirBundleGenerator (same logic)
     // ------------------------------------------------------------------
 
     private static Bundle.EntryComponent Entry(string resourceUrl, Resource resource) => new()
@@ -535,7 +554,8 @@ public static class FhirGenerationPipeline
         int patientOrdinal,
         List<string> sharedPractitionerIds,
         List<string> sharedMedicationIds,
-        FhirGenerationConfig? config = null)
+        FhirGenerationConfig? config,
+        FhirBundleGenerator.SharedIds ids)
     {
         var medIndices = ScenarioResourceMap.GetMergedIndices(
             ScenarioResourceMap.UniversalMedicationIndices, ScenarioResourceMap.ScenarioMedicationIndices,
@@ -575,29 +595,29 @@ public static class FhirGenerationPipeline
             {
                 resourceIndex++;
                 var seed = baseSeed + (patientOrdinal * 31 + i);
-                var resourceId = $"{patientId}-{resourceType}-{resourceIndex:D5}";
+                var resourceId = $"{patientId}-{FhirBundleGenerator.AbbreviateResourceType(resourceType)}-{resourceIndex:D3}";
                 var offset = TimeSpan.FromMinutes((double)i / Math.Max(count, 1) * (encEnd - encStart).TotalMinutes);
                 var effectiveDate = encStart.Add(offset);
                 var practId = sharedPractitionerIds[Mod(seed, sharedPractitionerIds.Count)];
 
                 Resource resource = resourceType switch
                 {
-                    "Observation" => GenerateScenarioObservation(resourceId, patientId, encounterId, effectiveDate, seed, obsIndices, specimenIds, observationIds),
+                    "Observation" => GenerateScenarioObservation(resourceId, patientId, encounterId, effectiveDate, seed, obsIndices, specimenIds, observationIds, ids),
                     "Condition" => GenerateScenarioCondition(resourceId, patientId, encounterId, effectiveDate, encEnd, seed, condIndices, conditionIds),
-                    "Procedure" => GenerateScenarioProcedure(resourceId, patientId, encounterId, effectiveDate, seed, practId, procIndices, conditionIds),
+                    "Procedure" => GenerateScenarioProcedure(resourceId, patientId, encounterId, effectiveDate, seed, practId, procIndices, conditionIds, ids),
                     "MedicationRequest" => GenerateScenarioMedicationRequest(resourceId, patientId, encounterId, effectiveDate, seed, practId, medIndices, conditionIds, sharedMedicationIds, medicationRequestIds),
                     "MedicationAdministration" => GenerateScenarioMedicationAdministration(resourceId, patientId, encounterId, effectiveDate, seed, medIndices, sharedMedicationIds, medicationRequestIds, practId, includeLowValueOptionalReferences),
                     "DiagnosticReport" => GenerateScenarioDiagnosticReport(resourceId, patientId, encounterId, effectiveDate, seed, observationIds, specimenIds, practId, diagnosticReportIds),
-                    "ServiceRequest" => GenerateScenarioServiceRequest(resourceId, patientId, encounterId, effectiveDate, seed, practId, srIndices, conditionIds, serviceRequestIds),
+                    "ServiceRequest" => GenerateScenarioServiceRequest(resourceId, patientId, encounterId, effectiveDate, seed, practId, srIndices, conditionIds, serviceRequestIds, ids),
                     "Coverage" => CoverageFactory.Generate(resourceId, patientId, encStart, encEnd, seed),
                     "Specimen" => GenerateScenarioSpecimen(resourceId, patientId, effectiveDate, seed, specIndices, specimenIds, practId),
                     "AllergyIntolerance" => AllergyIntoleranceFactory.Generate(resourceId, patientId, encStart, seed, practId),
-                    "Immunization" => ImmunizationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, FhirBundleGenerator.HospitalLocationId),
-                    "ImagingStudy" => GenerateScenarioImagingStudy(resourceId, patientId, encounterId, effectiveDate, seed, imgIndices, serviceRequestIds, practId, includeLowValueOptionalReferences),
-                    "CareTeam" => CareTeamFactory.Generate(resourceId, patientId, encounterId, attendingPractId, effectiveDate, FhirBundleGenerator.HospitalOrgId),
+                    "Immunization" => ImmunizationFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, ids.HospitalLocation, ids.Organization),
+                    "ImagingStudy" => GenerateScenarioImagingStudy(resourceId, patientId, encounterId, effectiveDate, seed, imgIndices, serviceRequestIds, practId, includeLowValueOptionalReferences, ids),
+                    "CareTeam" => CareTeamFactory.Generate(resourceId, patientId, encounterId, attendingPractId, effectiveDate, ids.Organization),
                     "CarePlan" => CarePlanFactory.Generate(resourceId, patientId, encounterId, careTeamId, effectiveDate, seed),
-                    "DocumentReference" => DocumentReferenceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, FhirBundleGenerator.HospitalOrgId, attendingPractId),
-                    "Provenance" => GenerateScenarioProvenance(resourceId, patientId, encounterId, effectiveDate, practId, diagnosticReportIds, includeLowValueOptionalReferences),
+                    "DocumentReference" => DocumentReferenceFactory.Generate(resourceId, patientId, encounterId, effectiveDate, seed, ids.Organization, attendingPractId),
+                    "Provenance" => GenerateScenarioProvenance(resourceId, patientId, encounterId, effectiveDate, practId, diagnosticReportIds, includeLowValueOptionalReferences, ids),
                     _ => throw new InvalidOperationException($"Unknown resource type: {resourceType}")
                 };
 
@@ -605,7 +625,7 @@ public static class FhirGenerationPipeline
             }
         }
 
-        var listId = $"SyntheticList-{patientIdPrefix}-{patientId}";
+        var listId = $"SyntheticList-{patientId}";
         entries.Add(Entry($"List/{listId}",
             CensusListFactory.Generate(listId, patientId, patientIdPrefix, encStart)));
     }
@@ -616,14 +636,14 @@ public static class FhirGenerationPipeline
 
     private static Observation GenerateScenarioObservation(
         string id, string patientId, string encounterId, DateTime effective, int seed,
-        int[] obsIndices, List<string> specimenIds, List<string> observationIds)
+        int[] obsIndices, List<string> specimenIds, List<string> observationIds, FhirBundleGenerator.SharedIds ids)
     {
         var poolIdx = ScenarioResourceMap.PickIndex(obsIndices, seed, FhirGenerationCodes.Observations.Length);
         var v = FhirGenerationCodes.Observations[poolIdx];
         observationIds.Add(id);
         return ObservationFactory.Create(id, patientId, encounterId, effective,
             v.Code, v.Display, v.Category, v.Unit,
-            v.CritLow, v.NormLow, v.NormHigh, v.CritHigh, seed, specimenIds);
+            v.CritLow, v.NormLow, v.NormHigh, v.CritHigh, seed, specimenIds, ids.Organization);
     }
 
     private static Condition GenerateScenarioCondition(
@@ -639,12 +659,12 @@ public static class FhirGenerationPipeline
 
     private static Procedure GenerateScenarioProcedure(
         string id, string patientId, string encounterId, DateTime performed, int seed, string practId,
-        int[] procIndices, List<string> conditionIds)
+        int[] procIndices, List<string> conditionIds, FhirBundleGenerator.SharedIds ids)
     {
         var poolIdx = ScenarioResourceMap.PickIndex(procIndices, seed, FhirGenerationCodes.Procedures.Length);
         var v = FhirGenerationCodes.Procedures[poolIdx];
         return ProcedureFactory.Create(id, patientId, encounterId, performed, seed, practId,
-            FhirBundleGenerator.HospitalLocationId, FhirBundleGenerator.HospitalOrgId,
+            ids.HospitalLocation, ids.Organization,
             v.Code, v.Display, v.BodySiteCode, v.BodySiteDisplay,
             v.OutcomeCode, v.OutcomeDisplay,
             conditionIds.Count > 0 ? conditionIds[seed % conditionIds.Count] : null);
@@ -709,13 +729,13 @@ public static class FhirGenerationPipeline
 
     private static ServiceRequest GenerateScenarioServiceRequest(
         string id, string patientId, string encounterId, DateTime authored, int seed, string practId,
-        int[] srIndices, List<string> conditionIds, List<string> serviceRequestIds)
+        int[] srIndices, List<string> conditionIds, List<string> serviceRequestIds, FhirBundleGenerator.SharedIds ids)
     {
         var poolIdx = ScenarioResourceMap.PickIndex(srIndices, seed, FhirGenerationCodes.ServiceRequests.Length);
         var v = FhirGenerationCodes.ServiceRequests[poolIdx];
         var reasonConditionId = conditionIds.Count > 0 ? conditionIds[seed % conditionIds.Count] : null;
         var sr = ServiceRequestFactory.Create(id, patientId, encounterId, authored, seed, practId,
-            v.Code, v.Display, v.IsLab, v.System, reasonConditionId);
+            v.Code, v.Display, v.IsLab, v.System, reasonConditionId, ids.Organization);
         serviceRequestIds.Add(id);
         return sr;
     }
@@ -723,11 +743,11 @@ public static class FhirGenerationPipeline
     private static ImagingStudy GenerateScenarioImagingStudy(
         string id, string patientId, string encounterId, DateTime started, int seed,
         int[] imgIndices, List<string> serviceRequestIds, string practId,
-        bool includeLowValueOptionalReferences)
+        bool includeLowValueOptionalReferences, FhirBundleGenerator.SharedIds ids)
     {
         var poolIdx = ScenarioResourceMap.PickIndex(imgIndices, seed, FhirGenerationCodes.ImagingStudies.Length);
         var v = FhirGenerationCodes.ImagingStudies[poolIdx];
-        var study = ImagingStudyFactory.Create(id, patientId, encounterId, started, FhirBundleGenerator.HospitalLocationId, practId,
+        var study = ImagingStudyFactory.Create(id, patientId, encounterId, started, ids.HospitalLocation, practId,
             v.SnomedCode, v.Display, v.Modality,
             v.BodySiteCode, v.BodySiteDisplay, v.ReasonCode, v.ReasonDisplay);
         if (includeLowValueOptionalReferences && serviceRequestIds.Count > 0)
@@ -741,9 +761,9 @@ public static class FhirGenerationPipeline
     private static Provenance GenerateScenarioProvenance(
         string id, string patientId, string encounterId, DateTime recorded, string practId,
         List<string> diagnosticReportIds,
-        bool includeLowValueOptionalReferences)
+        bool includeLowValueOptionalReferences, FhirBundleGenerator.SharedIds ids)
     {
-        var prov = ProvenanceFactory.Create(id, patientId, encounterId, recorded, practId, FhirBundleGenerator.HospitalOrgId);
+        var prov = ProvenanceFactory.Create(id, patientId, encounterId, recorded, practId, ids.Organization);
         if (includeLowValueOptionalReferences && diagnosticReportIds.Count > 0)
         {
             prov.Target ??= [];
@@ -758,7 +778,8 @@ public static class FhirGenerationPipeline
         string encounterId,
         string practitionerId,
         int seed,
-        DateTime encounterStart)
+        DateTime encounterStart,
+        FhirBundleGenerator.SharedIds ids)
     {
         const string insulinRxNorm = "274783";
         const string insulinDisplay = "insulin glargine";
@@ -767,8 +788,8 @@ public static class FhirGenerationPipeline
         const string diabetesIndicationCode = "44054006";
         const string diabetesIndicationDisplay = "Diabetes mellitus type 2";
 
-        var medicationRequestId = $"{patientId}-MedicationRequest-ADD-001";
-        var medicationAdministrationId = $"{patientId}-MedicationAdministration-ADD-001";
+        var medicationRequestId = $"{patientId}-MedReq-A01";
+        var medicationAdministrationId = $"{patientId}-MedAdm-A01";
         var medicationTime = encounterStart.AddHours(1);
 
         entries.Add(Entry($"MedicationRequest/{medicationRequestId}",
@@ -777,7 +798,7 @@ public static class FhirGenerationPipeline
                 insulinRxNorm, insulinDisplay, subcutaneousRouteCode, subcutaneousRouteDisplay,
                 20, "[iU]", 1, false,
                 diabetesIndicationCode, diabetesIndicationDisplay,
-                null, FhirBundleGenerator.HypoInsulinGlargineMedicationId)));
+                null, ids.HypoInsulinGlargineMedication)));
 
         entries.Add(Entry($"MedicationAdministration/{medicationAdministrationId}",
             MedicationAdministrationFactory.Create(
@@ -785,25 +806,25 @@ public static class FhirGenerationPipeline
                 insulinRxNorm, insulinDisplay, subcutaneousRouteCode, subcutaneousRouteDisplay,
                 20, "[iU]",
                 diabetesIndicationCode, diabetesIndicationDisplay,
-                false, FhirBundleGenerator.HypoInsulinGlargineMedicationId)));
+                false, ids.HypoInsulinGlargineMedication)));
     }
 
-    private static List<string> GenerateSharedMedications(List<Bundle.EntryComponent> sharedEntries)
+    private static List<string> GenerateSharedMedications(List<Bundle.EntryComponent> sharedEntries, FhirBundleGenerator.SharedIds sharedIds)
     {
-        var ids = new List<string>(FhirGenerationCodes.Medications.Length + 1);
+        var medIds = new List<string>(FhirGenerationCodes.Medications.Length + 1);
         for (var i = 0; i < FhirGenerationCodes.Medications.Length; i++)
         {
             var v = FhirGenerationCodes.Medications[i];
-            var medId = $"Gen-Medication-{i + 1:D3}";
-            ids.Add(medId);
+            var medId = sharedIds.MedicationId(i);
+            medIds.Add(medId);
             sharedEntries.Add(Entry($"Medication/{medId}",
                 MedicationFactory.Create(medId, v.RxCode, v.Display, v.DoseValue, v.DoseUnit, v.RouteCode, v.RouteDisplay)));
         }
 
-        sharedEntries.Add(Entry($"Medication/{FhirBundleGenerator.HypoInsulinGlargineMedicationId}",
-            MedicationFactory.Create(FhirBundleGenerator.HypoInsulinGlargineMedicationId, "274783", "insulin glargine",
+        sharedEntries.Add(Entry($"Medication/{sharedIds.HypoInsulinGlargineMedication}",
+            MedicationFactory.Create(sharedIds.HypoInsulinGlargineMedication, "274783", "insulin glargine",
                 20, "[iU]", "34206005", "Subcutaneous route")));
 
-        return ids;
+        return medIds;
     }
 }

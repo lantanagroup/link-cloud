@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Automation.Generation;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Automation.Link.Validation;
@@ -525,24 +526,23 @@ public class ReportAbsManifestValidator
     ///   <item>We <b>generated</b> resources and uploaded them to the FHIR server.</item>
     ///   <item>Data Acquisition ran the query plan (Parameter + Reference queries) and
     ///         sent every acquired resource to MeasureEval via Kafka.</item>
-    ///   <item>MeasureEval stored them in its Resource repository, then bundled them all
-    ///         and evaluated the CQL. The CQL engine loaded every resource whose type
-    ///         matches a <c>[ResourceType]</c> retrieve expression into the MeasureReport's
-    ///         contained list.</item>
-    ///   <item>MeasureEval wrote the MeasureReport + contained resources to a per-measure
-    ///         <c>.mr</c> file in ABS blob storage.</item>
-    ///   <item>The Report service's PatientAggregator read the <c>.mr</c> files, deduped
-    ///         resources across measures, and wrote <c>patient-{id}.ndjson</c> to ABS.
-    ///         It also saved the same resource references to the ReportResource DB.</item>
+    ///   <item>MeasureEval bundled all acquired resources as <c>additionalData</c> and
+    ///         evaluated the CQL. The HAPI CQL engine places resources into
+    ///         <c>MeasureReport.contained</c> only when they are touched by a CQL
+    ///         <c>[ResourceType]</c> retrieve expression.</item>
+    ///   <item>MeasureEval's <c>normalize()</c> extracts <c>contained</c> resources and
+    ///         writes them (plus the MeasureReport) to a per-patient <c>.mr</c> file in ABS.</item>
+    ///   <item>The Report service's PatientAggregator reads the <c>.mr</c> files, dedupes
+    ///         resources across measures, and writes <c>patient-{id}.ndjson</c> to ABS.
+    ///         It also saves the same resource references to the ReportResource DB.</item>
     /// </list>
     ///
     /// A resource type is expected in ABS when: we generated it AND the query plan acquires
     /// it AND the CQL references it. The system is deterministic — no tolerance is needed.
     ///
-    /// Shared infrastructure resources (Location/Gen-*, Medication/Gen-*, Device/Gen-*)
-    /// are stored under the empty patient key in the manifest. They are excluded from
-    /// per-patient key validation because their IDs are rewritten by MeasureEval's normalize
-    /// step (the <c>#LCR-</c> prefix is stripped).
+    /// Shared infrastructure resources are stored under the empty patient key in the manifest.
+    /// They are excluded from per-patient key validation because their IDs are rewritten by
+    /// MeasureEval's normalize step (the <c>#LCR-</c> prefix is stripped).
     /// </summary>
     private void ValidateAbsResourceCountsAgainstManifest(
         GenerationManifest manifest,
