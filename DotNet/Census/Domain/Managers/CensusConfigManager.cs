@@ -4,6 +4,7 @@ using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Exceptions;
 using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Quartz;
 
@@ -160,7 +161,8 @@ public class CensusConfigManager : ICensusConfigManager
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Exception in CensusConfigManager.DisableFacility for facility {FacilityId}", facilityId);
+            var sanitizedFacilityId = facilityId.SanitizeAndRemove();
+            _logger.LogError(ex, "Exception in CensusConfigManager.DisableFacility for facility {FacilityId}", sanitizedFacilityId);
             await _patienteventQueries.RollbackTransaction(transaction, cancellationToken);
             throw;
         }
@@ -184,7 +186,8 @@ public class CensusConfigManager : ICensusConfigManager
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Exception in CensusConfigManager.EnableFacility for facility {FacilityId}", facilityId);
+            var sanitizedFacilityId = facilityId.SanitizeAndRemove();
+            _logger.LogError(ex, "Exception in CensusConfigManager.EnableFacility for facility {FacilityId}", sanitizedFacilityId);
             await _patienteventQueries.RollbackTransaction(transaction, cancellationToken);
             throw;
         }
