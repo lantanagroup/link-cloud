@@ -77,6 +77,9 @@ Primary execution surface. Provides the dashboard, run start/cancel/delete, and 
 | `DashboardStats` | GET | Returns `RunDashboardStats` JSON for AJAX refresh |
 | `Start` | POST | Start a new automation run from a scenario configuration |
 | `Details` | GET | Per-run detail page with live logs and pipeline state |
+| `Manifest` | GET | Generation Manifest deep-dive page for generated/predicted/actual analysis |
+| `ManifestData` | GET | JSON generation manifest snapshot for UI rendering |
+| `AbsUploadData` | GET | JSON ABS upload snapshot for Generated vs ABS comparison |
 | `Status` | GET | JSON run status for polling |
 | `Cancel` / `CancelJson` | POST | Cancel a running automation run |
 | `Delete` / `DeleteJson` | POST | Delete a run and its artifacts |
@@ -316,10 +319,29 @@ For profile-based runs, the UI host builds a deterministic `GenerationManifest` 
 - parameter-query resource types
 - simulated acquired keys per patient (`QueryPlanAcquisitionSimulator`)
 - CQL-referenced resource types (`CqlResourceTypeExtractor`)
+- per-resource CQL exclusions (`CqlFilterSimulator`, measure-family profiles)
 
 That manifest is passed to `ReportAbsManifestValidator` and `ReportDatabaseValidator` to compare predicted vs actual output.
 
 This yields expectation checks driven by generated inputs and query/CQL semantics instead of static baselines.
+
+### Generation Manifest page
+
+`Runs/Manifest` provides a deep-dive UX for this model:
+
+- **Overview tab**
+  - measure context, query-plan acquired types, CQL-referenced types
+  - generated resource distribution (patient + shared)
+- **Patients tab**
+  - per-patient generated counts and type badges
+- **Generated vs ABS tab**
+  - side-by-side prediction and actual ABS upload counts
+  - per-type and per-patient deltas
+  - pipeline explanation that distinguishes:
+    - type-level CQL reachability
+    - resource-level SDE filtering
+
+This page is intended to answer “what did we generate?”, “what did we predict?”, and “what did ABS actually contain?” with enough fidelity to debug drift quickly.
 
 ---
 

@@ -256,6 +256,7 @@ The incremental builder is used by `FhirGenerationPipeline` so manifest metadata
 - Tracks selected measure IDs and patient eligibility
 - Supports acquired-type filtering and expected-in-artifact filtering
 - Supports deterministic key-level prediction integration (`SimulatedAcquiredResourceKeysByPatient`)
+- Supports per-resource CQL exclusion integration (`CqlFilteredResourceKeysByPatient`)
 - Excludes pipeline-derived types (`MeasureReport`, `OperationOutcome`) from comparisons
 
 ### Related generation helpers
@@ -267,8 +268,29 @@ The incremental builder is used by `FhirGenerationPipeline` so manifest metadata
   - simulates which resources would be acquired by DataAcquisition for each patient
 - `CqlResourceTypeExtractor`
   - extracts CQL-retrieved resource types from measure bundles
+  - reachability roots include both population criteria and `supplementalData` criteria expressions (SDE roots)
+- `CqlFilterSimulator`
+  - measure-family profile architecture for per-resource CQL filtering
+  - applies SDE `where` semantics at resource level (not just type-level reachability)
+  - currently implemented:
+    - ACH family (`NhsnAcuteCareHospitalMonthlyInitialPopulation`, `NhsnAcuteCareHospitalDailyInitialPopulation`) Condition filtering
+    - Hypoglycemic family (`NhsnGlycemicControlHypoglycemicInitialPopulation`) Condition filtering
+  - extensible via `ICqlFilterProfile` for additional resource families (Coverage, Observation, ServiceRequest, etc.)
 
 Together, these allow host validators to compare actual pipeline artifacts against deterministic expectations derived from known inputs.
+
+### Prediction semantics (important)
+
+Expectation calculation is intentionally layered:
+
+1. **Generated keys** (what we created)
+2. **Acquired keys** (`QueryPlanAcquisitionSimulator`) — what DA should fetch
+3. **Type reachability** (`CqlResourceTypeExtractor`) — which resource types CQL can retrieve
+4. **Per-resource CQL filters** (`CqlFilterSimulator`) — rows excluded by SDE `where` conditions
+
+Final expected ABS set = generated ∩ acquired ∩ reachable-types − per-resource-CQL-exclusions.
+
+This preserves realistic data texture in generation while making predictions precise enough for validator/UI comparison.
 
 ---
 

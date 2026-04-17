@@ -69,7 +69,7 @@ Typical host-driven flow (`BackendE2ETests` or `Automation.UI`) composed through
 - `MeasureLoader`
   - loads measure definition resources into MeasureEval
   - loads validation artifacts into Validation service
-  - sanitizes orphaned supplementalData CQL expressions to prevent runtime failures
+  - preserves `Measure.supplementalData` as-authored in the measure bundle (no SDE stripping)
 
 ### 2) Data-read abstraction layer
 
@@ -108,6 +108,7 @@ Validators consume `PipelineDataReader` + artifacts and fail the run on invarian
 - `ReportAbsManifestValidator`
   - validates internal ABS artifacts (`manifest.ndjson`, `patient-*.ndjson`)
   - reconciles expected generated/acquired/CQL-reachable resources vs actual ABS output
+  - consumes per-resource CQL filter exclusions from `GenerationManifest` (for SDE `where`-clause semantics)
 - `DataAcquisitionDatabaseValidator`
   - validates query config/plans, acquisition logs, FHIR query rows, and reference resources
 - `NormalizationDatabaseValidator`
@@ -181,6 +182,7 @@ This is distinct from test-host invocation (`BackendE2ETests`) where validator f
   - supports `file://`, `resource://`, and `http(s)://` measure bundle sources
   - splits bundle resources by consumer (MeasureEval vs Validation)
   - tracks `MeasureIds` for multi-measure runs
+  - keeps supplemental data expressions intact so MeasureEval executes measure-authored SDE logic
 
 ## Validation suite (`Validation/`)
 
