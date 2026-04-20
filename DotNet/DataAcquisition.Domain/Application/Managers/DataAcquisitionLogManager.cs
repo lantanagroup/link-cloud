@@ -749,7 +749,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.TryCompleteTailAsync");
         activity?.SetTag(DiagnosticNames.ReportId, completedLogId);
 
-        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.ConfigurationMissing };
+        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled, RequestStatus.ConfigurationMissing };
 
         // Load group identity for the completed log (PK lookup)
         var groupInfo = await _dbContext.DataAcquisitionLogs.AsNoTracking()
