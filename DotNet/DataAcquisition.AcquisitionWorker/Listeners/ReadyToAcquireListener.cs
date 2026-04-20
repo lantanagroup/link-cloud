@@ -58,7 +58,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var processor = scope.ServiceProvider.GetRequiredService<AcquisitionProcessorBackgroundService>();
 
-        // ATOMIC STEP: Attempt to "claim" the log — single DB write, no read needed
+        // ATOMIC STEP: Attempt to "claim" the log - single DB write, no read needed
         var logId = value.LogId.Value;
         bool claimed = await logManager.TrySetLogToQueuedAsync(logId, cancellationToken);
 
@@ -83,7 +83,7 @@ public class ReadyToAcquireListener : BaseListener<ReadyToAcquire, long, ReadyTo
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to enqueue work item for LogId {LogId}. Attempting to revert status.", logId);
-            // Revert to Pending so the next scheduled trigger can try again — single atomic write, no read needed
+            // Revert to Pending so the next scheduled trigger can try again - single atomic write, no read needed
             bool compensationSucceeded = await logManager.TrySetLogStatusAsync(logId,
                 new List<RequestStatus> { RequestStatus.Queued }, RequestStatus.Pending, cancellationToken);
 
