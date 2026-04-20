@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.Json;
 
 namespace LantanaGroup.Automation.Generation;
@@ -11,139 +11,107 @@ public static class QueryPlanAcquisitionSimulator
 {
     private sealed record GeneratedResource(string PatientId, string ResourceType, string ResourceId, string Key, JsonElement Resource);
 
-    public static IReadOnlyDictionary<string, HashSet<string>> SimulateAcquiredKeysByPatient(
-        IReadOnlyList<string> patientIds,
-        IReadOnlyList<(string Name, string Json)> bundles,
+    /// <summary>
+    /// Simulates acquired resource keys for a single patient from pre-parsed resource entries.
+    /// Used by the pipeline to avoid retaining serialized bundle JSON across all patients.
+    /// </summary>
+    /// <param name="patientId">The patient ID being simulated.</param>
+    /// <param name="patientResourceEntries">
+    /// Pre-parsed resource entries as (ResourceType, ResourceId, Key, JsonElement) tuples.
+    /// These are built from the patient's in-memory FHIR entries before JSON is discarded.
+    /// </param>
+    /// <param name="sharedResourceEntries">
+    /// Shared infrastructure resources (Location, Medication, Device, etc.) that may be
+    /// referenced by the patient's resources.
+    /// </param>
+    /// <param name="queryPlan">The query plan to simulate.</param>
+    /// <param name="reportStart">Optional report period start date.</param>
+    /// <param name="reportEnd">Optional report period end date.</param>
+    public static HashSet<string> SimulateAcquiredKeysForPatient(
+        string patientId,
+        IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)> patientResourceEntries,
+        IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedResourceEntries,
         QueryPlanInput queryPlan,
         string? reportStart = null,
         string? reportEnd = null)
     {
-        var byPatient = BuildGeneratedResourceIndex(patientIds, bundles);
-
         var hasStart = DateTimeOffset.TryParse(reportStart, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var start);
         var hasEnd = DateTimeOffset.TryParse(reportEnd, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var end);
 
-        var results = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-        foreach (var patientId in patientIds)
+        // Build per-type index for this patient (patient resources + shared)
+        var typeMap = new Dictionary<string, List<GeneratedResource>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (resourceType, resourceId, key, resource) in patientResourceEntries)
         {
-            var acquired = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var acquiredByType = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var query in queryPlan.InitialQueries.Concat(queryPlan.SupplementalQueries))
+            if (!typeMap.TryGetValue(resourceType, out var list))
             {
-                if (string.IsNullOrWhiteSpace(query.ResourceType))
-                    continue;
-
-                if (query.IsParameterQuery)
-                {
-                    if (!byPatient.TryGetValue(patientId, out var patientResources)
-                        || !patientResources.TryGetValue(query.ResourceType, out var candidates))
-                    {
-                        continue;
-                    }
-
-                    foreach (var resource in candidates)
-                    {
-                        if (!MatchesParameterQuery(resource, query, hasStart ? start : null, hasEnd ? end : null, acquiredByType))
-                            continue;
-
-                        acquired.Add(resource.Key);
-                        AddByType(acquiredByType, resource.ResourceType, resource.ResourceId);
-                    }
-                }
-                else if (query.IsReferenceQuery)
-                {
-                    if (!byPatient.TryGetValue(patientId, out var patientResources)
-                        || !patientResources.TryGetValue(query.ResourceType, out var candidates)
-                        || candidates.Count == 0)
-                    {
-                        continue;
-                    }
-
-                    var referencedIds = CollectReferencedIds(acquiredByType, query.ResourceType, byPatient, patientId);
-                    if (referencedIds.Count == 0)
-                        continue;
-
-                    foreach (var resource in candidates)
-                    {
-                        if (!referencedIds.Contains(resource.ResourceId))
-                            continue;
-
-                        acquired.Add(resource.Key);
-                        AddByType(acquiredByType, resource.ResourceType, resource.ResourceId);
-                    }
-                }
+                list = [];
+                typeMap[resourceType] = list;
             }
-
-            results[patientId] = acquired;
+            list.Add(new GeneratedResource(patientId, resourceType, resourceId, key, resource));
         }
 
-        return results;
-    }
-
-    private static Dictionary<string, Dictionary<string, List<GeneratedResource>>> BuildGeneratedResourceIndex(
-        IReadOnlyList<string> patientIds,
-        IReadOnlyList<(string Name, string Json)> bundles)
-    {
-        var patientSet = patientIds.ToHashSet(StringComparer.Ordinal);
-        var index = new Dictionary<string, Dictionary<string, List<GeneratedResource>>>(StringComparer.Ordinal);
-
-        foreach (var (_, json) in bundles)
+        if (sharedResourceEntries != null)
         {
-            using var doc = JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty("entry", out var entries) || entries.ValueKind != JsonValueKind.Array)
-                continue;
-
-            foreach (var entry in entries.EnumerateArray())
+            foreach (var (resourceType, resourceId, key, resource) in sharedResourceEntries)
             {
-                if (!entry.TryGetProperty("resource", out var resource) || resource.ValueKind != JsonValueKind.Object)
-                    continue;
-                if (!entry.TryGetProperty("request", out var request) || request.ValueKind != JsonValueKind.Object)
-                    continue;
-                if (!request.TryGetProperty("url", out var urlProp) || urlProp.ValueKind != JsonValueKind.String)
-                    continue;
-
-                var key = urlProp.GetString();
-                if (string.IsNullOrWhiteSpace(key))
-                    continue;
-
-                var slash = key.IndexOf('/');
-                if (slash <= 0 || slash >= key.Length - 1)
-                    continue;
-
-                var resourceType = key[..slash];
-                var resourceId = key[(slash + 1)..];
-
-                var ownerPatientId = string.Empty;
-                foreach (var pid in patientSet)
-                {
-                    if (resourceId.StartsWith(pid, StringComparison.Ordinal))
-                    {
-                        ownerPatientId = pid;
-                        break;
-                    }
-                }
-
-                if (string.IsNullOrEmpty(ownerPatientId))
-                    continue;
-
-                if (!index.TryGetValue(ownerPatientId, out var typeMap))
-                {
-                    typeMap = new Dictionary<string, List<GeneratedResource>>(StringComparer.OrdinalIgnoreCase);
-                    index[ownerPatientId] = typeMap;
-                }
-
                 if (!typeMap.TryGetValue(resourceType, out var list))
                 {
                     list = [];
                     typeMap[resourceType] = list;
                 }
-
-                list.Add(new GeneratedResource(ownerPatientId, resourceType, resourceId, key, resource.Clone()));
+                list.Add(new GeneratedResource(patientId, resourceType, resourceId, key, resource));
             }
         }
 
-        return index;
+        // Wrap in the by-patient structure the private helpers expect
+        var byPatient = new Dictionary<string, Dictionary<string, List<GeneratedResource>>>(StringComparer.Ordinal)
+        {
+            [patientId] = typeMap
+        };
+
+        var acquired = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var acquiredByType = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var query in queryPlan.InitialQueries.Concat(queryPlan.SupplementalQueries))
+        {
+            if (string.IsNullOrWhiteSpace(query.ResourceType))
+                continue;
+
+            if (query.IsParameterQuery)
+            {
+                if (!typeMap.TryGetValue(query.ResourceType, out var candidates))
+                    continue;
+
+                foreach (var resource in candidates)
+                {
+                    if (!MatchesParameterQuery(resource, query, hasStart ? start : null, hasEnd ? end : null, acquiredByType))
+                        continue;
+
+                    acquired.Add(resource.Key);
+                    AddByType(acquiredByType, resource.ResourceType, resource.ResourceId);
+                }
+            }
+            else if (query.IsReferenceQuery)
+            {
+                if (!typeMap.TryGetValue(query.ResourceType, out var candidates) || candidates.Count == 0)
+                    continue;
+
+                var referencedIds = CollectReferencedIds(acquiredByType, query.ResourceType, byPatient, patientId);
+                if (referencedIds.Count == 0)
+                    continue;
+
+                foreach (var resource in candidates)
+                {
+                    if (!referencedIds.Contains(resource.ResourceId))
+                        continue;
+
+                    acquired.Add(resource.Key);
+                    AddByType(acquiredByType, resource.ResourceType, resource.ResourceId);
+                }
+            }
+        }
+
+        return acquired;
     }
 
     private static bool MatchesParameterQuery(

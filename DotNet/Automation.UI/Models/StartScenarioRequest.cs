@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Generation;
 using System.ComponentModel.DataAnnotations;
 
 namespace Automation.UI.Models;
@@ -55,7 +55,7 @@ public class StartScenarioRequest
 
     /// <summary>
     /// Per-patient eligibility profiles for measure-eligibility generation mode.
-    /// When provided, the Custom scenario uses <c>GenerateWithProfiles()</c> instead
+    /// When provided, the Custom scenario uses profile-driven pipeline generation instead
     /// of the standard <c>Generate()</c> code path. Each entry controls whether that
     /// patient qualifies for the measure's Initial Population.
     /// When null or empty, standard random generation is used.

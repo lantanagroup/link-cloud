@@ -1,5 +1,5 @@
-ï»¿/* ===================================================================
-   Automation.UI â€” Design System
+/* ===================================================================
+   Automation.UI — Design System
    =================================================================== */
 
 /* --- Tokens --- */
@@ -44,7 +44,7 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 .au-navbar .navbar-text { color: rgba(255,255,255,.7); }
 
 /* ===================================================================
-   Cards â€” the core container
+   Cards — the core container
    =================================================================== */
 .au-card {
   border: none;
@@ -65,7 +65,7 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 .au-card .card-body { padding: 1rem; }
 
 /* ===================================================================
-   Buttons â€” colour vocabulary
+   Buttons — colour vocabulary
    =================================================================== */
 .btn-au-action {
   background: var(--au-accent); color: #fff; border: none;
@@ -134,7 +134,7 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 }
 
 /* ===================================================================
-   Details â€” run summary grid
+   Details — run summary grid
    =================================================================== */
 .au-summary-item {
   display: flex;
@@ -206,10 +206,10 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 }
 
 /* ===================================================================
-   Tooltips â€” rely on Bootstrap but ensure dark style
+   Tooltips — rely on Bootstrap but ensure dark style
    =================================================================== */
 
-/* Info-icon tooltips: subtle (â“˜) indicators for contextual help */
+/* Info-icon tooltips: subtle (?) indicators for contextual help */
 .au-info-icon {
   color: var(--au-muted);
   font-size: .8em;
@@ -226,4 +226,27 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   .au-card .card-body { padding: .75rem; }
   .au-table { font-size: .8rem; }
   .au-summary-item { font-size: .8rem; }
+}
+
+/* ===================================================================
+   KPI dashboard cards
+   =================================================================== */
+.au-kpi-card {
+  background: #fff;
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+  padding: 1.25rem 1rem;
+  text-align: center;
+}
+.au-kpi-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.au-kpi-label {
+  font-size: .78rem;
+  color: var(--au-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-top: .3rem;
 }

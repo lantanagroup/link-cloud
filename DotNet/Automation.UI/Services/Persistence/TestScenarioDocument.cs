@@ -1,4 +1,4 @@
-﻿using MongoDB.Bson;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace Automation.UI.Services.Persistence;
@@ -37,6 +37,7 @@ public sealed class TestScenarioDocument
     public int DischargeQualifyingCount { get; set; }
     public int DischargeNonQualifyingCount { get; set; }
 
+    [BsonRepresentation(BsonType.String)]
     public Guid? QueryPlanTemplateId { get; set; }
 
     public bool CleanupServiceData { get; set; }

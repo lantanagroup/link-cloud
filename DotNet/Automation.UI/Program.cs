@@ -8,11 +8,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -42,113 +38,34 @@ builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSe
 // -- Token services required by LinkSdk service clients for service-to-service calls --
 builder.Services.AddSingleton<ICreateSystemToken, CreateSystemToken>();
 
-// -- Data Protection key persistence (shared key ring across restarts/instances) --
-var dataProtectionAppName = builder.Configuration.GetValue<string>("DataProtection:ApplicationName") ?? "Link.Automation.UI";
-var dataProtectionKeyRingPath = builder.Configuration.GetValue<string>("DataProtection:KeyRingPath");
-
-var dataProtectionBuilder = builder.Services
-    .AddDataProtection()
-    .SetApplicationName(dataProtectionAppName);
-
-if (!string.IsNullOrWhiteSpace(dataProtectionKeyRingPath))
-{
-    var configuredKeyRingPath = Path.IsPathRooted(dataProtectionKeyRingPath)
-        ? dataProtectionKeyRingPath
-        : Path.Combine(builder.Environment.ContentRootPath, dataProtectionKeyRingPath);
-
-    try
-    {
-        Directory.CreateDirectory(configuredKeyRingPath);
-
-        // Probe write access now so we fail over before runtime antiforgery/key writes.
-        var probePath = Path.Combine(configuredKeyRingPath, $".dp-write-test-{Guid.NewGuid():N}.tmp");
-        File.WriteAllText(probePath, "ok");
-        File.Delete(probePath);
-
-        dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(configuredKeyRingPath));
-    }
-    catch (Exception ex)
-    {
-        var fallbackKeyRingPath = Path.Combine(Path.GetTempPath(), "link-automation-ui-dataprotection");
-        try
-        {
-            Directory.CreateDirectory(fallbackKeyRingPath);
-            dataProtectionBuilder.PersistKeysToFileSystem(new DirectoryInfo(fallbackKeyRingPath));
-            Console.WriteLine($"[WARN] DataProtection key ring path '{configuredKeyRingPath}' is not writable. Falling back to '{fallbackKeyRingPath}'. Error: {ex.Message}");
-        }
-        catch (Exception fallbackEx)
-        {
-            Console.WriteLine($"[WARN] Failed to configure DataProtection key persistence. Configured='{configuredKeyRingPath}', fallback='{fallbackKeyRingPath}'. Error: {fallbackEx.Message}");
-        }
-    }
-}
-
-// -- Authentication / authorization --
-var enableAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+// -- Link bearer token configuration for inter-service calls via LinkSdk --
 var useBearerForServiceCalls = builder.Configuration.GetValue<bool?>("Authentication:UseBearerForServiceCalls") ?? true;
 
-// Configure whether LinkSdk clients attach bearer tokens on outbound calls.
-// This is intentionally decoupled from inbound UI auth mode.
 builder.Services.Configure<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>(opts =>
 {
     opts.AllowAnonymous = !useBearerForServiceCalls;
 });
 
-if (enableAnonymousAccess)
-{
-    // Development bypass: no schemes registered, all policies pass-through.
-    builder.Services.AddAuthorization(options =>
-    {
-        options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-            .RequireAssertion(_ => true)
-            .Build();
-    });
-}
-else
-{
-    var oidcAuthority = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:Authority")
-        ?? throw new InvalidOperationException("Authentication:Schemas:OpenIdConnect:Authority is required when anonymous access is disabled.");
-    var oidcClientId = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientId")
-        ?? throw new InvalidOperationException("Authentication:Schemas:OpenIdConnect:ClientId is required when anonymous access is disabled.");
-    var oidcClientSecret = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:ClientSecret") ?? "";
-    var oidcCallbackPath = builder.Configuration.GetValue<string>("Authentication:Schemas:OpenIdConnect:CallbackPath") ?? "/signin-oidc";
+// External authentication is handled at the infrastructure layer (domain-level
+// OAuth2 via reverse proxy / gateway). The app itself does not enforce
+// inbound authentication -- all authorization policies are pass-through.
+//
+// To avoid exposing the UI when deployed somewhere *without* that upstream
+// authentication in place, anonymous access is gated by an opt-in flag that
+// mirrors the convention used by `Admin.BFF` and other Link services
+// (`Authentication:EnableAnonymousAccess`, default = false). When the flag is
+// false, a terminal short-circuit middleware below returns 503 for all
+// non-health requests, so a misconfigured deployment fails closed rather than
+// serving the UI anonymously.
+var allowAnonymousAccess = builder.Configuration
+    .GetValue<bool>("Authentication:EnableAnonymousAccess");
 
-    builder.Services
-        .AddAuthentication(options =>
-        {
-            options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-            options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
-        })
-        .AddCookie(options =>
-        {
-            options.Cookie.HttpOnly = true;
-            options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-                ? CookieSecurePolicy.SameAsRequest
-                : CookieSecurePolicy.Always;
-            options.Cookie.SameSite = SameSiteMode.Lax;
-            options.LoginPath = "/Account/Login";
-            options.LogoutPath = "/Account/Logout";
-            options.ExpireTimeSpan = TimeSpan.FromHours(8);
-            options.SlidingExpiration = true;
-        })
-        .AddOpenIdConnect(options =>
-        {
-            options.Authority = oidcAuthority;
-            options.ClientId = oidcClientId;
-            options.ClientSecret = oidcClientSecret;
-            options.ResponseType = OpenIdConnectResponseType.Code;
-            options.CallbackPath = oidcCallbackPath;
-            // Tokens are not saved in the cookie — service calls use system tokens
-            // (ICreateSystemToken), not the user's token. Change only if user-delegated calls are added.
-            options.SaveTokens = false;
-            options.MapInboundClaims = false;
-            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
-            options.Scope.Add("email");
-            options.GetClaimsFromUserInfoEndpoint = true;
-        });
-
-    builder.Services.AddAuthorization();
-}
+builder.Services.AddAuthorization(options =>
+{
+    options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAssertion(_ => true)
+        .Build();
+});
 
 // -- LinkSdk service clients (all resolve URLs from ServiceRegistry) --
 builder.Services.AddLinkSdk();
@@ -228,6 +145,40 @@ app.Services.GetRequiredService<MongoIndexManager>().EnsureAllIndexes();
 // -- Respect reverse-proxy forwarded headers before redirect/auth logic --
 app.UseForwardedHeaders();
 
+// -- Anonymous-access guard --
+// When Authentication:EnableAnonymousAccess is false (the default), the UI must
+// not serve content because it has no built-in authentication. /health is
+// exempted so infrastructure probes keep working. Operators opt in by setting
+// the flag to true only after ensuring an upstream authenticating proxy is in
+// place (as is done for the docker-compose deployment).
+if (!allowAnonymousAccess)
+{
+    app.Logger.LogWarning(
+        "Authentication:EnableAnonymousAccess is false. All non-health requests will be rejected with 503. " +
+        "Set the flag to true only when deploying behind an authenticating proxy.");
+
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.Path.StartsWithSegments("/health"))
+        {
+            await next();
+            return;
+        }
+
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        context.Response.ContentType = "text/plain; charset=utf-8";
+        await context.Response.WriteAsync(
+            "Link Automation UI is not configured to serve requests in this environment. " +
+            "Set 'Authentication:EnableAnonymousAccess' to true only when deploying behind an authenticating proxy.");
+    });
+}
+else
+{
+    app.Logger.LogInformation(
+        "Authentication:EnableAnonymousAccess is true. The UI is accessible anonymously; " +
+        "upstream authentication is assumed to be in place.");
+}
+
 // -- Middleware --
 if (!app.Environment.IsDevelopment())
 {
@@ -240,7 +191,6 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
