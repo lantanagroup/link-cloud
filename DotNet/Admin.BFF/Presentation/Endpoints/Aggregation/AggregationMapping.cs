@@ -27,7 +27,7 @@ public static class AggregationMapping
             .WithOpenApi(x => new OpenApiOperation(x)
             {
                 Summary = "Soft Delete Facility",
-                Description = "Soft deletes a facility and its associated report schedules and acquisition logs. " +
+                Description = "Soft deletes a facility and its associated report schedules, acquisition logs, and census cron jobs. " +
                               "Returns 409 if reports are currently running. " +
                               "Returns 404 if the facility does not exist. " +
                               "If a downstream step fails, all completed steps are rolled back and 500 is returned."
@@ -43,7 +43,7 @@ public static class AggregationMapping
             .WithOpenApi(x => new OpenApiOperation(x)
             {
                 Summary = "Restore Facility",
-                Description = "Restores a soft-deleted facility and its associated report schedules and acquisition logs. " +
+                Description = "Restores a soft-deleted facility and its associated report schedules, acquisition logs, and census cron jobs. " +
                               "Returns 404 if the facility does not exist. " +
                               "If a downstream step fails, all completed steps are rolled back and 500 is returned."
             });
