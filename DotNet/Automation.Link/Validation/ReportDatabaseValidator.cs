@@ -66,7 +66,8 @@ public class ReportDatabaseValidator
             await ValidateScheduleReportTypes(scheduleId, expectedMeasureIds, errors);
             await ValidateReportEntries(scheduleId, facilityId, expectedPatientIds, expectedSubmitted, errors);
             await ValidateEntryMeasureReports(scheduleId, expectedMeasureIds, expectedPatientIds.Count, errors);
-            await ValidateReportResources(scheduleId, facilityId, expectedSubmitted, manifest, errors);
+            //LNK-5134: Writing to the ReportResources table is currently disabled
+            //await ValidateReportResources(scheduleId, facilityId, expectedSubmitted, manifest, errors);
             await ValidateReportPopulations(scheduleId, facilityId, expectedMeasureIds, qualifyingCountPerMeasure, errors);
         }
         catch (Exception ex)
