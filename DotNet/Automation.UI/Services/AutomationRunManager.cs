@@ -687,6 +687,17 @@ public class AutomationRunManager : IAutomationRunManager
                     expectDataAcquisitionData: expectDataAcquisitionData,
                     manifest: generationManifest));
 
+            // The ABS manifest validator enriches the manifest with downstream-derived
+            // predictions that are not known at generation time — most notably the
+            // per-patient OperationOutcome count (one OO is appended to the ABS blob for
+            // every patient whose ReportingStatus is FailedValidation). Re-persist the
+            // snapshot so the Runs dashboard shows the final, fully-enriched predictions
+            // rather than the pre-validation snapshot taken at line ~506.
+            if (generationManifest != null)
+            {
+                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), CancellationToken.None);
+            }
+
             await RunValidator("REPORT DATABASE VALIDATION", () =>
                 reportValidator.ValidateAllAsync(
                     facilityId,

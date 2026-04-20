@@ -48,7 +48,18 @@ builder.Services.Configure<BackendAuthenticationServiceExtension.LinkBearerServi
 
 // External authentication is handled at the infrastructure layer (domain-level
 // OAuth2 via reverse proxy / gateway). The app itself does not enforce
-// inbound authentication — all authorization policies are pass-through.
+// inbound authentication -- all authorization policies are pass-through.
+//
+// To avoid exposing the UI when deployed somewhere *without* that upstream
+// authentication in place, anonymous access is gated by an opt-in flag that
+// mirrors the convention used by `Admin.BFF` and other Link services
+// (`Authentication:EnableAnonymousAccess`, default = false). When the flag is
+// false, a terminal short-circuit middleware below returns 503 for all
+// non-health requests, so a misconfigured deployment fails closed rather than
+// serving the UI anonymously.
+var allowAnonymousAccess = builder.Configuration
+    .GetValue<bool>("Authentication:EnableAnonymousAccess");
+
 builder.Services.AddAuthorization(options =>
 {
     options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
@@ -133,6 +144,40 @@ app.Services.GetRequiredService<MongoIndexManager>().EnsureAllIndexes();
 
 // -- Respect reverse-proxy forwarded headers before redirect/auth logic --
 app.UseForwardedHeaders();
+
+// -- Anonymous-access guard --
+// When Authentication:EnableAnonymousAccess is false (the default), the UI must
+// not serve content because it has no built-in authentication. /health is
+// exempted so infrastructure probes keep working. Operators opt in by setting
+// the flag to true only after ensuring an upstream authenticating proxy is in
+// place (as is done for the docker-compose deployment).
+if (!allowAnonymousAccess)
+{
+    app.Logger.LogWarning(
+        "Authentication:EnableAnonymousAccess is false. All non-health requests will be rejected with 503. " +
+        "Set the flag to true only when deploying behind an authenticating proxy.");
+
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.Path.StartsWithSegments("/health"))
+        {
+            await next();
+            return;
+        }
+
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        context.Response.ContentType = "text/plain; charset=utf-8";
+        await context.Response.WriteAsync(
+            "Link Automation UI is not configured to serve requests in this environment. " +
+            "Set 'Authentication:EnableAnonymousAccess' to true only when deploying behind an authenticating proxy.");
+    });
+}
+else
+{
+    app.Logger.LogInformation(
+        "Authentication:EnableAnonymousAccess is true. The UI is accessible anonymously; " +
+        "upstream authentication is assumed to be in place.");
+}
 
 // -- Middleware --
 if (!app.Environment.IsDevelopment())
