@@ -9,6 +9,7 @@ namespace Automation.UI.Controllers;
 public class RunsController(
     IAutomationRunManager runManager,
     IScenarioStore scenarioStore,
+    IQueryPlanTemplateStore queryPlanTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
     ILogger<RunsController> logger) : Controller
 {
@@ -22,6 +23,9 @@ public class RunsController(
         var activeRuns = recentPage.Runs
             .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
             .ToList();
+
+        // Populate query plan templates for the shared scenario editor modal embedded in this view.
+        ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
 
         var vm = new RunDashboardViewModel
         {

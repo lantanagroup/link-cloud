@@ -5,7 +5,7 @@
     var stats = Model.Stats;
     var avgDuration = stats.AvgDurationSeconds > 0
         ? TimeSpan.FromSeconds(stats.AvgDurationSeconds).ToString(@"mm\:ss")
-        : "—";
+        : "â€”";
 }
 
 <div class="container mt-4">
@@ -130,9 +130,9 @@
                     </form>
                 </div>
                 <div class="col-md-2">
-                    <a asp-controller="Scenarios" asp-action="Create" class="btn btn-success w-100">
+                    <button type="button" class="btn btn-success w-100" id="btnNewScenarioFromRuns">
                         <i class="bi bi-plus-lg me-1"></i> New Scenario
-                    </a>
+                    </button>
                 </div>
                 <div class="col-md-2">
                     <a asp-controller="Scenarios" asp-action="Index" class="btn btn-outline-secondary w-100">
@@ -173,9 +173,9 @@
                         <td>
                             <span class="badge run-status-badge @(run.Status == AutomationRunStatus.Succeeded ? "au-badge-success" : run.Status == AutomationRunStatus.Failed ? "au-badge-danger" : run.Status == AutomationRunStatus.Cancelled ? "au-badge-warning" : "au-badge-muted")" data-run-id="@run.RunId">@run.Status</span>
                         </td>
-                        <td class="small text-muted">@(run.Duration ?? "–")</td>
+                        <td class="small text-muted">@(run.Duration ?? "â€“")</td>
                         <td>@run.CreatedAt.LocalDateTime</td>
-                        <td>@(run.FinishedAt?.LocalDateTime.ToString() ?? "—")</td>
+                        <td>@(run.FinishedAt?.LocalDateTime.ToString() ?? "â€”")</td>
                         <td class="text-nowrap">
                             <div class="d-inline-flex gap-1 align-items-center run-actions" data-run-id="@run.RunId">
                                 <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-au-action"><i class="bi bi-box-arrow-up-right"></i></a>
@@ -309,14 +309,14 @@
     }
 
     function formatDuration(seconds) {
-        if (!seconds || seconds <= 0) return '—';
+        if (!seconds || seconds <= 0) return 'â€”';
         var m = Math.floor(seconds / 60);
         var s = Math.round(seconds % 60);
         return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
     }
 
     function formatLocalDate(isoStr) {
-        if (!isoStr) return '—';
+        if (!isoStr) return 'â€”';
         try { return new Date(isoStr).toLocaleString(); }
         catch (e) { return isoStr; }
     }
@@ -502,6 +502,39 @@
         })
         .catch(function () { btn.disabled = false; btn.innerHTML = '<i class="bi bi-trash"></i>'; alert('Unable to delete.'); });
     });
+
+    // --- New Scenario (via shared scenario editor modal) ---
+    var btnNewScenarioFromRuns = document.getElementById('btnNewScenarioFromRuns');
+    if (btnNewScenarioFromRuns) {
+        btnNewScenarioFromRuns.addEventListener('click', function () {
+            if (typeof window.openScenarioEditor === 'function') {
+                window.openScenarioEditor(null, 'edit');
+            }
+        });
+    }
+
+    // When the shared editor saves a scenario, add/update its option and select it so
+    // the user can immediately run the newly created scenario.
+    document.addEventListener('scenario-editor:changed', function (e) {
+        var detail = e.detail || {};
+        if (detail.action !== 'saved' || !detail.id) return;
+        var sel = document.getElementById('quickLaunchSelect');
+        if (!sel) return;
+        var label = detail.name || 'Scenario';
+        var opt = sel.querySelector('option[value="' + detail.id + '"]');
+        if (opt) {
+            opt.textContent = label;
+        } else {
+            opt = document.createElement('option');
+            opt.value = detail.id;
+            opt.textContent = label;
+            sel.appendChild(opt);
+        }
+        sel.value = detail.id;
+        sel.dispatchEvent(new Event('change'));
+    });
 })();
 </script>
+
+@await Html.PartialAsync("_ScenarioEditorModal")
 }
