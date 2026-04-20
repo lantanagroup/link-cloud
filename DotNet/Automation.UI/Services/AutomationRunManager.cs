@@ -413,7 +413,7 @@ public class AutomationRunManager : IAutomationRunManager
 
             // Use the first measure for generation context (profile-driven generation picks
             // the most restrictive measure — patients qualifying for all measures must meet
-            // the criteria of each). For multi-measure, GenerateWithProfiles handles the union.
+            // the criteria of each). For multi-measure, the pipeline handles the union.
             var primaryMeasure = state.Options.SelectedMeasures[0];
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
 

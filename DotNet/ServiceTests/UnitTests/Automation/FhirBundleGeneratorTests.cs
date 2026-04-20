@@ -328,74 +328,8 @@ public class FhirBundleGeneratorTests
     }
 
     // ----------------------------------------------------------------------
-    //  Profile-driven generation (GenerateFromCohorts)
+    //  CQL filter simulator (data-driven, no generator coupling)
     // ----------------------------------------------------------------------
-
-    [Fact]
-    public void GenerateFromCohorts_AllQualifying_ProducesInpatientEncounters()
-    {
-        var output = new NullOutputHelper();
-        var measures = new List<ProfiledMeasureType>
-        {
-            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation
-        };
-        var cohorts = new List<PatientCohortDefinition>
-        {
-            PatientCohortDefinition.AllQualifying(measures, patientCount: 2, resourcesMin: 120, resourcesMax: 120)
-        };
-
-        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(
-            output, measures, cohorts, patientIdPrefix: "Cohort", generationSeed: 12345);
-
-        Assert.Equal(2, patientIds.Count);
-
-        var resources = FlattenResources(bundles);
-        foreach (var patientId in patientIds)
-        {
-            var enc = Assert.IsType<Encounter>(resources[$"Encounter/{patientId}-Enc-001"]);
-            // ACH-qualifying cohorts always produce inpatient-class encounters.
-            Assert.NotNull(enc.Class);
-            Assert.False(string.IsNullOrWhiteSpace(enc.Class!.Code));
-        }
-    }
-
-    // ----------------------------------------------------------------------
-    //  CQL filter extraction + simulator integration
-    // ----------------------------------------------------------------------
-
-    [Fact]
-    public void CqlFilterInputExtractor_FromBundles_ReadsActualConditionAttributes()
-    {
-        var output = new NullOutputHelper();
-        var measures = new List<ProfiledMeasureType>
-        {
-            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation
-        };
-        var cohorts = new List<PatientCohortDefinition>
-        {
-            PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 100, resourcesMax: 100)
-        };
-
-        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(
-            output, measures, cohorts, patientIdPrefix: "CqlExt", generationSeed: 4242);
-        var patientId = patientIds.Single();
-
-        var inputs = CqlFilterInputExtractor.ExtractFromBundles(patientIds, bundles);
-
-        Assert.True(inputs.TryGetValue(patientId, out var input));
-        Assert.NotNull(input);
-        Assert.Equal($"{patientId}-Enc-001", input!.EncounterId);
-        Assert.True(input.EncounterEnd > input.EncounterStart);
-        Assert.NotEmpty(input.Conditions);
-
-        // Every generated Condition context should come with at least one category code.
-        Assert.All(input.Conditions, c => Assert.NotEmpty(c.CategoryCodes));
-
-        // Encounter reference on per-patient Conditions should point to the encounter id.
-        Assert.All(input.Conditions, c =>
-            Assert.True(string.IsNullOrEmpty(c.EncounterReference)
-                        || c.EncounterReference.EndsWith(input.EncounterId, StringComparison.OrdinalIgnoreCase)));
-    }
 
     [Fact]
     public void CqlFilterSimulator_AchProfile_ExcludesOnlyConditionsFailingSdeRules()
@@ -463,37 +397,6 @@ public class FhirBundleGeneratorTests
             []);
 
         Assert.Empty(CqlFilterSimulator.ComputeFilteredKeys([], input));
-    }
-
-    [Fact]
-    public void GenerationManifest_Build_AutoPopulatesCqlFilteredKeys()
-    {
-        var output = new NullOutputHelper();
-        var measures = new List<ProfiledMeasureType>
-        {
-            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation
-        };
-        var cohorts = new List<PatientCohortDefinition>
-        {
-            PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 100, resourcesMax: 100)
-        };
-
-        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(
-            output, measures, cohorts, patientIdPrefix: "Man", generationSeed: 9999);
-        var profiles = PatientCohortDefinition.ExpandProfiles(cohorts, 9999);
-
-        var manifest = GenerationManifest.Build(patientIds, bundles, profiles, measures);
-
-        // Every key the manifest claims CQL will exclude must actually be a generated Condition key.
-        var allConditionKeys = manifest.ResourceKeysByPatient
-            .SelectMany(kv => kv.Value)
-            .Where(k => k.StartsWith("Condition/", StringComparison.OrdinalIgnoreCase))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var (_, excluded) in manifest.CqlFilteredResourceKeysByPatient)
-        {
-            Assert.All(excluded, k => Assert.Contains(k, allConditionKeys));
-        }
     }
 
     // ----------------------------------------------------------------------

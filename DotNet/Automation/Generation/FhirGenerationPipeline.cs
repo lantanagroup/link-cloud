@@ -200,7 +200,7 @@ public static class FhirGenerationPipeline
         var patientSeed = baseSeed + (profile.SeedOffset ?? patientIndex);
         var patientId = ids.PatientId(patientIndex);
 
-        // Generate entries using the same logic as FhirBundleGenerator.GenerateWithProfilesCore
+        // Generate entries using the same per-patient logic shared with FhirBundleGenerator.
         var entries = GeneratePatientEntries(
             profile, patientIndex, baseSeed, totalResourcesPerPatient, patientIdPrefix,
             sharedPractitionerIds, sharedMedicationIds, measures, config, ids);
@@ -285,7 +285,7 @@ public static class FhirGenerationPipeline
 
     /// <summary>
     /// Generates all FHIR bundle entries for a single patient using the same logic as
-    /// <see cref="FhirBundleGenerator.GenerateWithProfilesCore"/>.
+    /// Builds a single patient's FHIR bundle entries (profile-driven scenario + measure eligibility).
     /// </summary>
     private static List<Bundle.EntryComponent> GeneratePatientEntries(
         PatientProfile profile,

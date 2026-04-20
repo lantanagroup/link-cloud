@@ -144,16 +144,65 @@ public class ReportAbsManifestValidator
             {
                 ValidateGeneratedBundleReconciliation(generatedBundles, parsedPatientResources, errors);
             }
+            else if (manifest != null && manifest.ResourceKeysByPatient.Count > 0)
+            {
+                ValidateGeneratedManifestReconciliation(manifest, parsedPatientResources, errors);
+            }
         }
 
         // When a manifest is available, validate ABS resource counts against the concrete
         // generated input — no DB interrogation or baseline needed.
         if (manifest != null)
         {
+            // Populate the count-level expectation for OperationOutcome from the authoritative
+            // source: Report.ReportEntry.ReportingStatus. ValidationCompleteListener appends
+            // exactly one OperationOutcome to a patient's aggregate blob when its
+            // ValidationComplete.IsValid == false (status becomes FailedValidation).
+            if (!string.IsNullOrWhiteSpace(reportId) && Guid.TryParse(reportId, out var scheduleId))
+            {
+                await PopulateExpectedOperationOutcomesFromReportEntriesAsync(manifest, scheduleId);
+            }
+
             ValidateAbsResourceCountsAgainstManifest(manifest, parsedPatientResources, expectedSubmittedPatientIds, errors);
         }
 
         await FailIfNeededAsync(errors);
+    }
+
+    /// <summary>
+    /// Populates <see cref="GenerationManifest.ExpectedOperationOutcomeCountByPatient"/>
+    /// from Report DB entries. Every patient whose <c>ReportingStatus</c> is
+    /// <c>FailedValidation</c> gets exactly one OperationOutcome appended to their ABS
+    /// patient file by <c>ValidationCompleteListener.ProcessMessageAsync</c>.
+    /// </summary>
+    private async Task PopulateExpectedOperationOutcomesFromReportEntriesAsync(GenerationManifest manifest, Guid scheduleId)
+    {
+        try
+        {
+            var entries = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId);
+            var expected = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var entry in entries)
+            {
+                if (string.IsNullOrWhiteSpace(entry.PatientId))
+                    continue;
+
+                if (string.Equals(entry.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase))
+                    expected[entry.PatientId] = 1;
+            }
+
+            manifest.ExpectedOperationOutcomeCountByPatient = expected;
+
+            if (expected.Count > 0)
+            {
+                _output.WriteLine($"[ABS] Predicting 1 OperationOutcome for {expected.Count} patient(s) with FailedValidation status.");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Do not fail the validator on a DB read hiccup — just log. The strict check
+            // will then flag any unpredicted OperationOutcomes, which is the safe default.
+            _output.WriteLine($"[ABS][WARN] Could not read ReportEntry statuses to predict OperationOutcomes: {ex.Message}");
+        }
     }
 
     private void ValidateManifest(
@@ -518,6 +567,39 @@ public class ReportAbsManifestValidator
     }
 
     /// <summary>
+    /// Warning-only reconciliation of ABS against the in-memory <see cref="GenerationManifest"/>.
+    /// Used when the caller has a manifest but did not retain serialized bundles (streaming pipeline).
+    /// </summary>
+    private void ValidateGeneratedManifestReconciliation(
+        GenerationManifest manifest,
+        List<AbsResourceRecord> patientResources,
+        List<string> errors)
+    {
+        var generatedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (_, keys) in manifest.ResourceKeysByPatient)
+            foreach (var key in keys)
+                generatedKeys.Add(key);
+
+        var absNonDerivedKeys = patientResources
+            .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
+            .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
+            .Where(k => !IsDerivedType(k.Split('/')[0]))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingFromGenerated = absNonDerivedKeys
+            .Except(generatedKeys, StringComparer.OrdinalIgnoreCase)
+            .Take(50)
+            .ToList();
+
+        if (missingFromGenerated.Count > 0)
+        {
+            _output.WriteLine($"[WARN] ABS contains {missingFromGenerated.Count} resource(s) not present in the generation manifest:");
+            foreach (var missing in missingFromGenerated)
+                _output.WriteLine($"  [WARN] {missing}");
+        }
+    }
+
+    /// <summary>
     /// Validates that ABS patient artifacts contain the resources the pipeline should have
     /// produced, using the generation manifest as the source of truth.
     ///
@@ -568,14 +650,32 @@ public class ReportAbsManifestValidator
             absCountsByPatientType.TryGetValue(patientId, out var actualCounts);
             actualCounts ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var (resourceType, expectedCount) in expectedCounts)
+            // Strict prediction-vs-actual: every expected type must match exactly, and any
+            // type actually produced must have been predicted. Pipeline-derived types
+            // (MeasureReport, OperationOutcome) now contribute deterministic expectations
+            // via GenerationManifest.GetExpectedAbsCountsForPatient, so no tolerance is needed.
+            var allTypes = new HashSet<string>(expectedCounts.Keys, StringComparer.OrdinalIgnoreCase);
+            foreach (var t in actualCounts.Keys) allTypes.Add(t);
+
+            foreach (var resourceType in allTypes)
             {
+                expectedCounts.TryGetValue(resourceType, out var expectedCount);
                 actualCounts.TryGetValue(resourceType, out var actualCount);
+
+                if (actualCount == expectedCount)
+                    continue;
+
                 if (actualCount < expectedCount)
                 {
                     AddError(errors,
                         $"ABS patient={patientId}, type={resourceType}: " +
-                        $"expected>={expectedCount} (sim-acquired ∩ reachable-CQL), actual={actualCount}.");
+                        $"expected={expectedCount} (sim-acquired ∩ reachable-CQL + derived), actual={actualCount}.");
+                }
+                else
+                {
+                    AddError(errors,
+                        $"ABS patient={patientId}, type={resourceType}: " +
+                        $"expected={expectedCount}, actual={actualCount} (ABS has {actualCount - expectedCount} more than predicted).");
                 }
             }
         }

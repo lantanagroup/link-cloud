@@ -29,9 +29,8 @@ public sealed class MegaMultiPatientTest : IAsyncLifetime, IClassFixture<Backend
 
     private readonly IServiceProvider _sp;
     private readonly string _facilityId = $"MegaMultiPatient-{Guid.NewGuid():N}";
-    private List<(string Name, string Json)> _generatedBundles = [];
     private List<ProfiledMeasureType> _measures = [];
-    private List<PatientCohortDefinition> _cohorts = [];
+    private GenerationManifest? _generationManifest;
     private string? _reportId;
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
@@ -57,19 +56,33 @@ public sealed class MegaMultiPatientTest : IAsyncLifetime, IClassFixture<Backend
             // 149 normal patients with 25–50 resources each
             PatientCohortDefinition.AllQualifying(measures, patientCount: 149, resourcesMin: 25, resourcesMax: 50)
         };
-        _cohorts = cohorts;
-        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(Output, measures, cohorts, "MegaMultiPatient", GenerationSeed);
-        _generatedBundles = bundles;
+        var profiles = PatientCohortDefinition.ExpandProfiles(cohorts, GenerationSeed);
+
+        await FhirDataLoader.WaitForServerAsync(Output);
+
+        var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
+            Output,
+            FhirDataLoader,
+            measures,
+            profiles,
+            totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
+            patientIdPrefix: "MegaMultiPatient",
+            generationSeed: GenerationSeed,
+            acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
+            {
+                QueryPlan = QueryPlanBuilder.GetDefaultAsInput(),
+                ReportStart = Config.StartDate,
+                ReportEnd = Config.EndDate
+            });
+
+        _generationManifest = pipelineResult.Manifest;
 
         if (Config.PatientIds.Count == 0)
         {
-            Config.PatientIds = patientIds;
+            Config.PatientIds = pipelineResult.PatientIds;
         }
 
         Output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds.Take(10))}...] ({Config.PatientIds.Count} total)");
-
-        await FhirDataLoader.WaitForServerAsync(Output);
-        await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(Output, bundles);
 
         var validationApi = _sp.GetRequiredService<ValidationApiHelper>();
         await validationApi.InitializeArtifactsAsync();
@@ -176,18 +189,12 @@ public sealed class MegaMultiPatientTest : IAsyncLifetime, IClassFixture<Backend
         // Flush stale cache from diagnostics polling so validators read authoritative data.
         dataReader.InvalidateCache();
 
-        var profiles = PatientCohortDefinition.ExpandProfiles(_cohorts, GenerationSeed);
-        var generationManifest = GenerationManifest.Build(Config.PatientIds, _generatedBundles, profiles, _measures);
+        var generationManifest = _generationManifest
+            ?? throw new InvalidOperationException("Generation manifest was not produced by the pipeline.");
         generationManifest.MeasureIds = [measureId];
         var queryPlanInput = QueryPlanBuilder.GetDefaultAsInput();
         generationManifest.AcquiredResourceTypes = QueryPlanBuilder.GetAcquiredResourceTypes(queryPlanInput);
         generationManifest.ParameterQueryResourceTypes = QueryPlanBuilder.GetParameterQueryResourceTypes(queryPlanInput);
-        generationManifest.SimulatedAcquiredResourceKeysByPatient = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysByPatient(
-            Config.PatientIds,
-            _generatedBundles,
-            queryPlanInput,
-            Config.StartDate,
-            Config.EndDate);
         generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(_measures);
 
         await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
@@ -198,7 +205,7 @@ public sealed class MegaMultiPatientTest : IAsyncLifetime, IClassFixture<Backend
             Config.EndDate,
             _facilityId,
             reportId,
-            _generatedBundles,
+            generatedBundles: null,
             manifest: generationManifest);
 
         // Step 9-10: Strict database validation.

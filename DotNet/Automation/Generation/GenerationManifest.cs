@@ -12,8 +12,15 @@ namespace LantanaGroup.Automation.Generation;
 public sealed class GenerationManifest
 {
     /// <summary>
-    /// Resource types that are pipeline-derived (not from generation input).
-    /// These should never be compared between generated and actual data.
+    /// Resource types that are pipeline-derived (not produced by our FHIR generator).
+    /// They appear in ABS as a deterministic function of the pipeline, not of generated input:
+    /// <list type="bullet">
+    ///   <item><c>MeasureReport</c> — MeasureEval writes one per submitted patient per measure.</item>
+    ///   <item><c>OperationOutcome</c> — one per patient that fails validation. Normally 0;
+    ///         callers set <see cref="ExpectedOperationOutcomeCountByPatient"/> when failures are expected.</item>
+    /// </list>
+    /// These types are never compared key-for-key; instead a count-level prediction is added
+    /// (<see cref="GetExpectedAbsCountsForPatient"/>) so strict prediction-vs-actual reconciliation works.
     /// </summary>
     private static readonly HashSet<string> PipelineDerivedTypes =
         new(StringComparer.OrdinalIgnoreCase) { "MeasureReport", "OperationOutcome" };
@@ -83,6 +90,17 @@ public sealed class GenerationManifest
     /// </summary>
     public IReadOnlyDictionary<string, HashSet<string>> CqlFilteredResourceKeysByPatient { get; set; }
         = new Dictionary<string, HashSet<string>>();
+
+    /// <summary>
+    /// Per-patient count of expected <c>OperationOutcome</c> resources in ABS.
+    /// Defaults to 0 (strict: no validation failures expected).
+    ///
+    /// The Validation service emits one OperationOutcome per patient when validation fails.
+    /// Tests or post-run validators that know which patients failed can populate this map
+    /// to keep the strict prediction-vs-actual comparison passing.
+    /// </summary>
+    public IDictionary<string, int> ExpectedOperationOutcomeCountByPatient { get; set; }
+        = new Dictionary<string, int>(StringComparer.Ordinal);
 
     /// <summary>
     /// Every resource key (<c>ResourceType/ResourceId</c>) from the generated FHIR bundles,
@@ -172,26 +190,77 @@ public sealed class GenerationManifest
 
     /// <summary>
     /// Returns the per-patient resource type -> count map filtered to only types
-    /// expected in ABS (generated ∩ query-plan-acquired ∩ CQL-referenced).
+    /// expected in the ABS patient NDJSON artifact (generated ∩ query-plan-acquired ∩
+    /// CQL-referenced), plus deterministic pipeline-derived additions:
+    /// <list type="bullet">
+    ///   <item><c>Patient</c> — always 1 for patients that qualify for any selected measure
+    ///         (MeasureEval's CQL engine loads Patient implicitly, so it always lands in ABS).</item>
+    ///   <item><c>MeasureReport</c> — one per measure the patient qualifies for
+    ///         (MeasureEval writes exactly one MeasureReport per submitted patient per measure).</item>
+    ///   <item><c>OperationOutcome</c> — the caller-supplied expectation from
+    ///         <see cref="ExpectedOperationOutcomeCountByPatient"/> (default 0). Only present
+    ///         in the ABS blob; not persisted to ReportResource DB.</item>
+    /// </list>
     /// </summary>
     public Dictionary<string, int>? GetExpectedAbsCountsForPatient(string patientId)
+        => BuildExpectedCountsForPatient(patientId, AbsDestination.PatientNdjson);
+
+    /// <summary>
+    /// Returns the per-patient resource type -> count map expected in the <c>ReportResource</c>
+    /// database table. Same as <see cref="GetExpectedAbsCountsForPatient"/> except it excludes
+    /// resource types that are appended directly to the ABS blob by the Report service (bypassing
+    /// <c>PatientAggregator</c> and <c>ReportResourceManager</c>):
+    /// <list type="bullet">
+    ///   <item><c>OperationOutcome</c> — <c>ValidationCompleteListener</c> calls
+    ///         <c>AppendResourceToBlob</c> directly when <c>ValidationComplete.IsValid == false</c>,
+    ///         so the OO lands in <c>patient-{id}.ndjson</c> but is never inserted into
+    ///         <c>ReportResource</c>.</item>
+    /// </list>
+    /// </summary>
+    public Dictionary<string, int>? GetExpectedReportResourceCountsForPatient(string patientId)
+        => BuildExpectedCountsForPatient(patientId, AbsDestination.ReportResourceDb);
+
+    /// <summary>
+    /// Downstream persistence destinations for generated resources. The two destinations
+    /// differ only for types that are appended directly to the ABS blob by the Report
+    /// service (see <see cref="GetExpectedReportResourceCountsForPatient"/>).
+    /// </summary>
+    public enum AbsDestination
+    {
+        /// <summary>The patient NDJSON file in ABS (<c>patient-{id}.ndjson</c>).</summary>
+        PatientNdjson,
+        /// <summary>The <c>ReportResource</c> table in the Report database.</summary>
+        ReportResourceDb
+    }
+
+    private Dictionary<string, int>? BuildExpectedCountsForPatient(string patientId, AbsDestination destination)
     {
         var expectedKeys = GetExpectedAbsKeysForPatient(patientId);
-        if (expectedKeys.Count == 0)
-            return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-        return expectedKeys
+        var counts = expectedKeys
             .Select(GetResourceTypeFromKey)
             .Where(t => !string.IsNullOrWhiteSpace(t))
             .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+        // Pipeline-derived additions — count-level only because IDs are assigned downstream.
+        AddPipelineDerivedExpectedCounts(patientId, counts, destination);
+
+        return counts;
     }
 
     /// <summary>
     /// Returns expected ABS resource keys for a patient using deterministic key-level logic:
     /// simulated-acquired keys (when available) filtered to types that pass all three gates
-    /// (generated ∩ acquired ∩ CQL-referenced).
-    /// Falls back to generated keys when acquisition simulation is unavailable.
+    /// (generated ∩ acquired ∩ CQL-referenced). Falls back to generated keys when
+    /// acquisition simulation is unavailable.
+    ///
+    /// For patients qualifying for any selected measure, <c>Patient/{patientId}</c> is always
+    /// included — MeasureEval's CQL engine loads the Patient resource as an implicit anchor
+    /// even if the query plan has no explicit Patient query.
+    ///
+    /// Pipeline-derived resources (<c>MeasureReport</c>, <c>OperationOutcome</c>) are
+    /// intentionally <b>not</b> included here because their IDs are assigned downstream.
+    /// They contribute count-level expectations via <see cref="GetExpectedAbsCountsForPatient"/>.
     /// </summary>
     public HashSet<string> GetExpectedAbsKeysForPatient(string patientId)
     {
@@ -202,24 +271,70 @@ public sealed class GenerationManifest
         else if (ResourceKeysByPatient.TryGetValue(patientId, out var generated) && generated.Count > 0)
             sourceKeys = generated;
 
-        if (sourceKeys == null)
-            return [];
-
-        // Per-resource CQL filter exclusions (e.g. resolved Conditions, out-of-period recordedDate)
-        CqlFilteredResourceKeysByPatient.TryGetValue(patientId, out var cqlFiltered);
-
         var filtered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var key in sourceKeys)
+
+        if (sourceKeys != null)
         {
-            var resourceType = GetResourceTypeFromKey(key);
-            if (!IsExpectedInAbs(resourceType))
-                continue;
-            if (cqlFiltered != null && cqlFiltered.Contains(key))
-                continue;
-            filtered.Add(key);
+            // Per-resource CQL filter exclusions (e.g. resolved Conditions, out-of-period recordedDate)
+            CqlFilteredResourceKeysByPatient.TryGetValue(patientId, out var cqlFiltered);
+
+            foreach (var key in sourceKeys)
+            {
+                var resourceType = GetResourceTypeFromKey(key);
+                if (!IsExpectedInAbs(resourceType))
+                    continue;
+                if (cqlFiltered != null && cqlFiltered.Contains(key))
+                    continue;
+                filtered.Add(key);
+            }
         }
 
+        // MeasureEval's CQL engine always loads Patient as the context anchor, regardless
+        // of whether the query plan has an explicit Patient query. For any patient that
+        // qualifies for at least one selected measure, Patient/{id} is guaranteed in ABS.
+        if (QualifiesForAnySelectedMeasure(patientId))
+            filtered.Add($"Patient/{patientId}");
+
         return filtered;
+    }
+
+    /// <summary>
+    /// Adds count-level predictions for pipeline-derived resource types that have no
+    /// deterministic key-level prediction (IDs assigned downstream).
+    /// OperationOutcome is only added for the ABS blob destination — <c>ValidationCompleteListener</c>
+    /// appends it directly to the patient aggregate blob and it never reaches <c>ReportResource</c>.
+    /// </summary>
+    private void AddPipelineDerivedExpectedCounts(string patientId, Dictionary<string, int> counts, AbsDestination destination)
+    {
+        var qualifyingMeasureCount = CountQualifyingMeasuresForPatient(patientId);
+        if (qualifyingMeasureCount > 0)
+        {
+            // MeasureEval produces exactly one MeasureReport per patient per qualifying measure.
+            counts["MeasureReport"] = qualifyingMeasureCount;
+        }
+
+        if (destination == AbsDestination.PatientNdjson
+            && ExpectedOperationOutcomeCountByPatient != null
+            && ExpectedOperationOutcomeCountByPatient.TryGetValue(patientId, out var ooCount)
+            && ooCount > 0)
+        {
+            counts["OperationOutcome"] = ooCount;
+        }
+    }
+
+    private int CountQualifyingMeasuresForPatient(string patientId)
+    {
+        var idx = PatientIds.ToList().IndexOf(patientId);
+        if (idx < 0 || idx >= Profiles.Count) return 0;
+        var profile = Profiles[idx];
+        return SelectedMeasures.Count(m => profile.QualifiesFor(m));
+    }
+
+    private bool QualifiesForAnySelectedMeasure(string patientId)
+    {
+        var idx = PatientIds.ToList().IndexOf(patientId);
+        if (idx < 0 || idx >= Profiles.Count) return false;
+        return Profiles[idx].QualifiesForAny(SelectedMeasures);
     }
 
     /// <summary>
@@ -276,33 +391,6 @@ public sealed class GenerationManifest
                 result.Add(PatientIds[i]);
         }
         return result;
-    }
-
-    /// <summary>
-    /// Populates <see cref="CqlFilteredResourceKeysByPatient"/> by running the measure-family
-    /// <see cref="CqlFilterSimulator"/> against actual generated resource attributes parsed
-    /// from the transaction bundles. No seed/index replay.
-    ///
-    /// This is the batch-path equivalent of the incremental builder's per-patient
-    /// <c>SetCqlFilteredKeys</c> wiring used by <c>FhirGenerationPipeline</c>. Call once after
-    /// <see cref="Build"/> in hosts that don't go through the streaming pipeline.
-    /// </summary>
-    public void PopulateCqlFilteredKeys(IReadOnlyList<(string Name, string Json)> bundles)
-    {
-        if (SelectedMeasures.Count == 0 || PatientIds.Count == 0 || bundles == null || bundles.Count == 0)
-            return;
-
-        var inputsByPatient = CqlFilterInputExtractor.ExtractFromBundles(PatientIds, bundles);
-
-        var filtered = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-        foreach (var (patientId, input) in inputsByPatient)
-        {
-            var keys = CqlFilterSimulator.ComputeFilteredKeys(SelectedMeasures, input);
-            if (keys.Count > 0)
-                filtered[patientId] = keys;
-        }
-
-        CqlFilteredResourceKeysByPatient = filtered;
     }
 
     /// <summary>
@@ -386,96 +474,6 @@ public sealed class GenerationManifest
             ExpectedAbsCountsByPatient = expectedAbsByPatient,
             ExpectedAbsTotalCountsByType = expectedAbsTotals
         };
-    }
-
-    // ----- Factory -----
-
-    /// <summary>
-    /// Builds a manifest from the generated FHIR bundles and profile data.
-    /// Call once after <see cref="FhirBundleGenerator"/> returns.
-    /// </summary>
-    public static GenerationManifest Build(
-        IReadOnlyList<string> patientIds,
-        IReadOnlyList<(string Name, string Json)> bundles,
-        IReadOnlyList<PatientProfile> profiles,
-        IReadOnlyList<ProfiledMeasureType> selectedMeasures)
-    {
-        var keysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-        var countsByPatientType = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
-        var totalsByType = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var patientIdSet = patientIds.ToHashSet(StringComparer.Ordinal);
-        var totalCount = 0;
-
-        foreach (var (_, json) in bundles)
-        {
-            using var doc = JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty("entry", out var entries) || entries.ValueKind != JsonValueKind.Array)
-                continue;
-
-            foreach (var entry in entries.EnumerateArray())
-            {
-                if (!entry.TryGetProperty("request", out var request) || request.ValueKind != JsonValueKind.Object)
-                    continue;
-
-                var url = request.TryGetProperty("url", out var urlProp) && urlProp.ValueKind == JsonValueKind.String
-                    ? urlProp.GetString()
-                    : null;
-
-                if (string.IsNullOrWhiteSpace(url) || !url.Contains('/'))
-                    continue;
-
-                totalCount++;
-                var slashIdx = url.IndexOf('/');
-                var resourceType = url[..slashIdx];
-                var resourceId = url[(slashIdx + 1)..];
-
-                // Determine which patient this resource belongs to.
-                var ownerPatientId = string.Empty; // shared by default
-                foreach (var pid in patientIdSet)
-                {
-                    if (resourceId.StartsWith(pid, StringComparison.Ordinal))
-                    {
-                        ownerPatientId = pid;
-                        break;
-                    }
-                }
-
-                if (!keysByPatient.TryGetValue(ownerPatientId, out var keys))
-                {
-                    keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    keysByPatient[ownerPatientId] = keys;
-                }
-                keys.Add(url);
-
-                if (!countsByPatientType.TryGetValue(ownerPatientId, out var typeCounts))
-                {
-                    typeCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                    countsByPatientType[ownerPatientId] = typeCounts;
-                }
-                typeCounts[resourceType] = typeCounts.TryGetValue(resourceType, out var c) ? c + 1 : 1;
-
-                // Aggregate totals (patient resources only, not shared)
-                if (!string.IsNullOrEmpty(ownerPatientId))
-                    totalsByType[resourceType] = totalsByType.TryGetValue(resourceType, out var tc) ? tc + 1 : 1;
-            }
-        }
-
-        var manifest = new GenerationManifest
-        {
-            PatientIds = patientIds,
-            Profiles = profiles,
-            SelectedMeasures = selectedMeasures,
-            ResourceKeysByPatient = keysByPatient,
-            ResourceCountsByPatientType = countsByPatientType,
-            TotalCountsByType = totalsByType,
-            TotalResourceCount = totalCount
-        };
-
-        // Populate per-resource CQL SDE filter exclusions from the actual bundle contents.
-        // Safe to run eagerly — if no profile matches the measures, this is a no-op.
-        manifest.PopulateCqlFilteredKeys(bundles);
-
-        return manifest;
     }
 
     // ----- Incremental builder (pipeline-friendly) -----
