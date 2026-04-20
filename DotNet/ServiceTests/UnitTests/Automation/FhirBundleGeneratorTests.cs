@@ -399,6 +399,58 @@ public class FhirBundleGeneratorTests
         Assert.Empty(CqlFilterSimulator.ComputeFilteredKeys([], input));
     }
 
+    [Fact]
+    public void CqlFilterSimulator_MultiMeasure_IntersectsExclusions()
+    {
+        // MeasureEval evaluates each measure independently; PatientAggregator unions the
+        // contained resources across the per-measure .mr files. So a resource is only truly
+        // absent from ABS when EVERY applicable measure excludes it.
+        //
+        // ACH requires active + recordedDate < encounterEnd for problem-list items.
+        // Hypoglycemic only requires recordedDate <= encounterEnd.
+        // A resolved (non-active) problem-list Condition recorded during the encounter is
+        // excluded by ACH but INCLUDED by Hypoglycemic -> must NOT appear in the excluded set.
+
+        var encounterId = "P-Enc-001";
+        var encStart = new DateTime(2024, 5, 10, 0, 0, 0, DateTimeKind.Utc);
+        var encEnd = new DateTime(2024, 5, 15, 0, 0, 0, DateTimeKind.Utc);
+
+        var resolvedProblemDuringEncounter = new CqlFilterSimulator.ConditionContext(
+            "P-Condition-001",
+            IsActive: false,
+            RecordedDate: encStart.Date,
+            EncounterReference: $"Encounter/{encounterId}",
+            CategoryCodes: ["problem-list-item"]);
+
+        // This one is excluded by BOTH profiles: resolved problem-list-item recorded AFTER
+        // the encounter fails ACH (not active, date not strictly before end) AND fails
+        // Hypoglycemic (recordedDate > encounterEnd).
+        var resolvedProblemAfterEncounter = new CqlFilterSimulator.ConditionContext(
+            "P-Condition-002",
+            IsActive: false,
+            RecordedDate: encEnd.Date.AddDays(5),
+            EncounterReference: $"Encounter/{encounterId}",
+            CategoryCodes: ["problem-list-item"]);
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            PatientId: "P",
+            EncounterId: encounterId,
+            EncounterStart: encStart,
+            EncounterEnd: encEnd,
+            Conditions: [resolvedProblemDuringEncounter, resolvedProblemAfterEncounter]);
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            [
+                ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
+                ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
+            ],
+            input);
+
+        // Only excluded if BOTH measures exclude it.
+        Assert.DoesNotContain("Condition/P-Condition-001", excluded);
+        Assert.Contains("Condition/P-Condition-002", excluded);
+    }
+
     // ----------------------------------------------------------------------
     //  Helpers
     // ----------------------------------------------------------------------

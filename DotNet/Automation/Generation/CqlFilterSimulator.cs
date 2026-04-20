@@ -20,26 +20,38 @@ public static class CqlFilterSimulator
 
     /// <summary>
     /// Computes resource keys CQL SDE <c>where</c> clauses will exclude for the patient.
-    /// The result is the union across every profile that applies to the selected measures.
+    ///
+    /// The result is the <b>intersection</b> of exclusions across every profile applicable
+    /// to the selected measures — a resource is only truly absent from ABS when every
+    /// applicable measure excludes it. MeasureEval evaluates each measure independently and
+    /// writes one <c>.mr</c> file per measure; PatientAggregator unions the contained
+    /// resources across those files when producing the patient NDJSON. So if any one
+    /// measure includes the resource, it appears in ABS regardless of the others.
     /// </summary>
     public static HashSet<string> ComputeFilteredKeys(
         IReadOnlyList<ProfiledMeasureType> measures,
         PatientCqlInput input)
     {
-        var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         if (measures == null || measures.Count == 0 || input == null)
-            return excluded;
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        var applicableExclusions = new List<HashSet<string>>();
         foreach (var profile in Profiles)
         {
             if (!profile.AppliesToAny(measures))
                 continue;
-
-            foreach (var key in profile.ComputeExcludedKeys(input))
-                excluded.Add(key);
+            applicableExclusions.Add(profile.ComputeExcludedKeys(input));
         }
 
-        return excluded;
+        if (applicableExclusions.Count == 0)
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Intersect: keep only keys that every applicable profile excludes.
+        var intersection = new HashSet<string>(applicableExclusions[0], StringComparer.OrdinalIgnoreCase);
+        for (var i = 1; i < applicableExclusions.Count; i++)
+            intersection.IntersectWith(applicableExclusions[i]);
+
+        return intersection;
     }
 
     /// <summary>
