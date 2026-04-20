@@ -1,4 +1,4 @@
-ï»¿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using LantanaGroup.Link.Automation.Link.Helpers;
 
 namespace Automation.UI.Services;
@@ -8,7 +8,7 @@ namespace Automation.UI.Services;
 /// Periodically checks for active runs and ensures each one has a poller.
 /// When a run completes, its poller is stopped and removed.
 ///
-/// This is the single place that does API polling â€” the UI controllers
+/// This is the single place that does API polling — the UI controllers
 /// only read from <see cref="ISnapshotStore"/>.
 /// </summary>
 public sealed class RunSnapshotOrchestrator : BackgroundService
@@ -98,7 +98,7 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             _logger.LogInformation("Stopped existing poller for run {RunId} before context switch", runId);
         }
 
-        // 2. Now safe to update meta and clear stale domain snapshots â€” no writer
+        // 2. Now safe to update meta and clear stale domain snapshots — no writer
         //    can re-populate them with old-report data.
         await _store.UpdateRunMetaAsync(runId, facilityId, reportId, ct);
 
@@ -136,7 +136,30 @@ public sealed class RunSnapshotOrchestrator : BackgroundService
             }
         }
 
-        await _store.CompleteRunAsync(runId);
+        // Extract pipeline duration (report created ? submitted) from the persisted schedule.
+        string? duration = null;
+        try
+        {
+            var schedule = await _store.GetDomainAsync<PipelineDataReader.ReportScheduleInfo>(runId, "schedule");
+            if (schedule?.Data is { CreateDate: not null, SubmitReportDateTime: not null })
+            {
+                var span = schedule.Data.SubmitReportDateTime.Value - schedule.Data.CreateDate.Value;
+                if (span.TotalSeconds >= 1)
+                    duration = span.TotalHours >= 1
+                        ? $"{(int)span.TotalHours}h {span.Minutes}m {span.Seconds}s"
+                        : span.TotalMinutes >= 1
+                            ? $"{(int)span.TotalMinutes}m {span.Seconds}s"
+                            : $"{span.Seconds}s";
+                else
+                    duration = "< 1s";
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Could not extract pipeline duration for run {RunId}", runId);
+        }
+
+        await _store.CompleteRunAsync(runId, duration);
 
         if (_activePollers.TryRemove(runId, out var handle))
         {
