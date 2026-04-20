@@ -244,11 +244,20 @@ public static class FhirGenerationPipeline
 
         // Compute per-resource CQL SDE filter exclusions from the actual generated resources
         // (inspects in-memory Encounter + Condition attributes — no seed replay).
+        //
+        // Filter rules apply only for measures this patient qualifies for. A non-qualifying
+        // measure's MeasureReport does not contain the patient's resources, so its SDE
+        // semantics do not contribute to the intersection of exclusions that determines
+        // whether a resource reaches ABS.
         var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
         if (cqlInput != null)
         {
-            var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(measures, cqlInput);
-            manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+            var qualifyingMeasures = measures.Where(profile.QualifiesFor).ToList();
+            if (qualifyingMeasures.Count > 0)
+            {
+                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+            }
         }
 
         // Run acquisition simulation BEFORE we serialize and discard

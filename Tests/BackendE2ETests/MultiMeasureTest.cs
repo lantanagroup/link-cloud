@@ -89,13 +89,15 @@ public sealed class MultiMeasureTest : IAsyncLifetime, IClassFixture<BackendE2ET
                     [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying,
                     [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation] = MeasureEligibility.NonQualifying
                 },
+                // Match the UI's MultiMeasureTest scenario (ScenarioSeedService): any ACH-qualifying
+                // scenario is permitted for this cohort. The MeasureEligibilities dict above tells
+                // the generator to suppress Hypo-qualifying resources (insulin, hypoglycemic obs)
+                // even when the chosen scenario could otherwise qualify for Hypo.
                 EligibleClinicalScenarioIds =
                 [
                     ..ClinicalScenarioEligibility.GetEligibleScenarioIds(
-                    [
-                        ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
-                        ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
-                    ], MeasureEligibility.NonQualifying)
+                        [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+                        MeasureEligibility.Qualifying)
                 ],
                 ResourcesPerPatientMin = 250,
                 ResourcesPerPatientMax = 250
