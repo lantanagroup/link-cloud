@@ -12,7 +12,7 @@ using Task = System.Threading.Tasks.Task;
 namespace LantanaGroup.Link.Tests.E2ETests;
 
 /// <summary>
-/// Volume test that generates 150 synthetic patients, each with 25–50 FHIR resources,
+/// Volume test that generates 150 synthetic patients, each with 25â€“50 FHIR resources,
 /// and runs them through the full ad-hoc reporting pipeline.
 ///
 /// Configuration is driven by MULTI_PATIENT_TEST_* environment variables.

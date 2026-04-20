@@ -6,6 +6,9 @@ namespace LantanaGroup.Automation.Generation;
 /// Type-level reachability (<c>[ResourceType]</c>) is handled elsewhere. This simulator focuses on
 /// per-resource exclusions where CQL retrieves a type but includes only rows matching additional
 /// predicates (status/date/category/reference constraints).
+///
+/// Operates on <b>actual extracted resource attributes</b> (via <see cref="CqlFilterInputExtractor"/>)
+/// rather than seed replay, so it stays accurate even if generator internals drift.
 /// </summary>
 public static class CqlFilterSimulator
 {
@@ -16,71 +19,46 @@ public static class CqlFilterSimulator
     ];
 
     /// <summary>
-    /// Computes resource keys excluded by measure-specific CQL filters for a patient.
-    /// The result is a union across all selected measures (multi-measure runs).
+    /// Computes resource keys CQL SDE <c>where</c> clauses will exclude for the patient.
+    /// The result is the union across every profile that applies to the selected measures.
     /// </summary>
     public static HashSet<string> ComputeFilteredKeys(
         IReadOnlyList<ProfiledMeasureType> measures,
-        string patientId,
-        string encounterId,
-        DateTime encStart,
-        DateTime encEnd,
-        int scenarioIdx,
-        int baseSeed,
-        int patientOrdinal,
-        int totalResourcesPerPatient,
-        FhirGenerationConfig? config)
+        PatientCqlInput input)
     {
-        if (measures == null || measures.Count == 0)
-            return [];
-
-        var context = new PatientFilterContext(
-            patientId,
-            encounterId,
-            encStart,
-            encEnd,
-            scenarioIdx,
-            baseSeed,
-            patientOrdinal,
-            totalResourcesPerPatient,
-            config,
-            measures);
-
         var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (measures == null || measures.Count == 0 || input == null)
+            return excluded;
+
         foreach (var profile in Profiles)
         {
             if (!profile.AppliesToAny(measures))
                 continue;
 
-            foreach (var key in profile.ComputeExcludedKeys(context))
+            foreach (var key in profile.ComputeExcludedKeys(input))
                 excluded.Add(key);
         }
 
         return excluded;
     }
 
-    public sealed record PatientFilterContext(
+    /// <summary>
+    /// Extracted per-patient inputs used by the simulator.
+    /// Build via <see cref="CqlFilterInputExtractor"/>.
+    /// </summary>
+    public sealed record PatientCqlInput(
         string PatientId,
         string EncounterId,
         DateTime EncounterStart,
         DateTime EncounterEnd,
-        int ScenarioIndex,
-        int BaseSeed,
-        int PatientOrdinal,
-        int TotalResourcesPerPatient,
-        FhirGenerationConfig? Config,
-        IReadOnlyList<ProfiledMeasureType> Measures);
+        IReadOnlyList<ConditionContext> Conditions);
 
     public interface ICqlFilterProfile
     {
         bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
-        HashSet<string> ComputeExcludedKeys(PatientFilterContext context);
+        HashSet<string> ComputeExcludedKeys(PatientCqlInput input);
     }
 
-    /// <summary>
-    /// Base helper for profiles that filter Condition resources.
-    /// Replays only the Condition branch of generation deterministically.
-    /// </summary>
     private abstract class ConditionFilterProfileBase : ICqlFilterProfile
     {
         public abstract bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
@@ -90,62 +68,21 @@ public static class CqlFilterSimulator
             DateTime encounterEnd,
             string encounterId);
 
-        public HashSet<string> ComputeExcludedKeys(PatientFilterContext context)
+        public HashSet<string> ComputeExcludedKeys(PatientCqlInput input)
         {
-            var distribution = (context.Config ?? new FhirGenerationConfig()).ResourceDistribution
-                .Select(kv => (kv.Key, kv.Value)).ToArray();
-
-            var condIndices = ScenarioResourceMap.GetMergedIndices(
-                ScenarioResourceMap.UniversalConditionIndices,
-                ScenarioResourceMap.ScenarioConditionIndices,
-                context.ScenarioIndex,
-                FhirGenerationCodes.Conditions.Length);
-
             var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var resourceIndex = 0;
-
-            foreach (var (resourceType, fraction) in distribution)
+            foreach (var c in input.Conditions)
             {
-                var count = Math.Max(1, (int)(context.TotalResourcesPerPatient * fraction));
-
-                for (var i = 0; i < count; i++)
-                {
-                    resourceIndex++;
-                    if (!string.Equals(resourceType, "Condition", StringComparison.Ordinal))
-                        continue;
-
-                    var seed = context.BaseSeed + (context.PatientOrdinal * 31 + i);
-                    var resourceId = $"{context.PatientId}-{FhirBundleGenerator.AbbreviateResourceType(resourceType)}-{resourceIndex:D3}";
-                    var offset = TimeSpan.FromMinutes((double)i / Math.Max(count, 1) * (context.EncounterEnd - context.EncounterStart).TotalMinutes);
-                    var effectiveDate = context.EncounterStart.Add(offset);
-
-                    var poolIdx = ScenarioResourceMap.PickIndex(condIndices, seed, FhirGenerationCodes.Conditions.Length);
-                    var v = FhirGenerationCodes.Conditions[poolIdx];
-                    var isActive = seed % 5 != 0;
-
-                    var categories = new List<string> { "problem-list-item" };
-                    if (v.Category == "encounter-diagnosis") categories.Add("encounter-diagnosis");
-                    else if (v.Category == "health-concern") categories.Add("health-concern");
-
-                    var condition = new ConditionContext(
-                        resourceId,
-                        isActive,
-                        effectiveDate.Date,
-                        context.EncounterId,
-                        categories);
-
-                    if (!IncludeCondition(condition, context.EncounterEnd, context.EncounterId))
-                        excluded.Add($"Condition/{resourceId}");
-                }
+                if (!IncludeCondition(c, input.EncounterEnd, input.EncounterId))
+                    excluded.Add($"Condition/{c.ResourceId}");
             }
-
             return excluded;
         }
     }
 
     /// <summary>
     /// ACH Monthly + ACH Daily SDE Condition semantics:
-    /// - problem-list-item requires active + recordedDate before encounter end
+    /// - problem-list-item requires active + recordedDate strictly before encounter end date
     /// - OR encounter-diagnosis/health-concern tied to the encounter
     /// </summary>
     private sealed class AchConditionFilterProfile : ConditionFilterProfileBase
@@ -160,7 +97,7 @@ public static class CqlFilterSimulator
                 return true;
 
             if ((c.HasCategory("encounter-diagnosis") || c.HasCategory("health-concern"))
-                && string.Equals(c.EncounterReference, encounterId, StringComparison.OrdinalIgnoreCase))
+                && EncounterMatches(c.EncounterReference, encounterId))
             {
                 return true;
             }
@@ -173,8 +110,6 @@ public static class CqlFilterSimulator
     /// Hypoglycemic SDE Condition semantics:
     /// - conditions overlapping Initial Population period are included
     /// - no active-status constraint in this measure's SDE Condition define.
-    ///
-    /// We approximate overlap using recordedDate within encounter period date window.
     /// </summary>
     private sealed class HypoglycemicConditionFilterProfile : ConditionFilterProfileBase
     {
@@ -183,12 +118,14 @@ public static class CqlFilterSimulator
 
         protected override bool IncludeCondition(ConditionContext c, DateTime encounterEnd, string encounterId)
         {
-            // Generated Conditions are all encounter-scoped with onset in the encounter timeline.
-            // Treat recordedDate <= encounter end date as overlapping for prediction purposes.
             return c.RecordedDate <= encounterEnd.Date;
         }
     }
 
+    /// <summary>
+    /// CQL-relevant attributes of a generated Condition resource.
+    /// Extracted from the actual generated FHIR content (no seed replay).
+    /// </summary>
     public sealed record ConditionContext(
         string ResourceId,
         bool IsActive,
@@ -198,5 +135,19 @@ public static class CqlFilterSimulator
     {
         public bool HasCategory(string code) =>
             CategoryCodes.Any(c => string.Equals(c, code, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Compares a Condition.encounter reference (may be "Encounter/{id}" or just "{id}")
+    /// against the patient's encounter id.
+    /// </summary>
+    private static bool EncounterMatches(string? encounterReference, string encounterId)
+    {
+        if (string.IsNullOrWhiteSpace(encounterReference))
+            return false;
+
+        var slash = encounterReference.IndexOf('/');
+        var refId = slash >= 0 ? encounterReference[(slash + 1)..] : encounterReference;
+        return string.Equals(refId, encounterId, StringComparison.OrdinalIgnoreCase);
     }
 }

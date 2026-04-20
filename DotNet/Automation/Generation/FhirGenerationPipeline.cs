@@ -242,20 +242,14 @@ public static class FhirGenerationPipeline
         manifestBuilder.AddPatient(patientId, profile);
         manifestBuilder.AddEntries(patientId, entries);
 
-        // Compute per-resource CQL SDE filter exclusions with measure-family profiles
-        var scenarioIdxForFilter = FhirGenerationCodes.GetScenarioArrayPosition(scenario);
-        var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(
-            measures,
-            patientId,
-            encounterId,
-            encStart,
-            encEnd,
-            scenarioIdxForFilter,
-            baseSeed,
-            patientIndex,
-            totalResourcesPerPatient,
-            config);
-        manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+        // Compute per-resource CQL SDE filter exclusions from the actual generated resources
+        // (inspects in-memory Encounter + Condition attributes — no seed replay).
+        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
+        if (cqlInput != null)
+        {
+            var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(measures, cqlInput);
+            manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+        }
 
         // Run acquisition simulation BEFORE we serialize and discard
         if (acquisitionSimulation != null)

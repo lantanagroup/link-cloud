@@ -597,7 +597,7 @@ public static class FhirBundleGenerator
         return JsonSerializer.Serialize(bundle, FhirSerializerOptions.ForFhirWithoutValidation());
     }
 
-    private static DateTime EncounterStart(int index)
+    internal static DateTime EncounterStart(int index)
     {
         const int baseYear = 2023;
         const int baseMonth = 1;
@@ -608,7 +608,7 @@ public static class FhirBundleGenerator
         return new DateTime(year, month, 1 + dayOffset, 6 + (index % 6), 0, 0, DateTimeKind.Utc);
     }
 
-    private static DateTime EncounterEnd(int index) =>
+    internal static DateTime EncounterEnd(int index) =>
         EncounterStart(index).AddDays(2 + ((index * 7) % 20)).AddHours(4);
 
     /// <summary>
@@ -889,5 +889,5 @@ public static class FhirBundleGenerator
         return medIds;
     }
 
-    private static int Mod(int value, int modulus) => ((value % modulus) + modulus) % modulus;
+    internal static int Mod(int value, int modulus) => ((value % modulus) + modulus) % modulus;
 }

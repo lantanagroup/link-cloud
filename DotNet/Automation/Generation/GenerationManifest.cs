@@ -279,6 +279,33 @@ public sealed class GenerationManifest
     }
 
     /// <summary>
+    /// Populates <see cref="CqlFilteredResourceKeysByPatient"/> by running the measure-family
+    /// <see cref="CqlFilterSimulator"/> against actual generated resource attributes parsed
+    /// from the transaction bundles. No seed/index replay.
+    ///
+    /// This is the batch-path equivalent of the incremental builder's per-patient
+    /// <c>SetCqlFilteredKeys</c> wiring used by <c>FhirGenerationPipeline</c>. Call once after
+    /// <see cref="Build"/> in hosts that don't go through the streaming pipeline.
+    /// </summary>
+    public void PopulateCqlFilteredKeys(IReadOnlyList<(string Name, string Json)> bundles)
+    {
+        if (SelectedMeasures.Count == 0 || PatientIds.Count == 0 || bundles == null || bundles.Count == 0)
+            return;
+
+        var inputsByPatient = CqlFilterInputExtractor.ExtractFromBundles(PatientIds, bundles);
+
+        var filtered = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        foreach (var (patientId, input) in inputsByPatient)
+        {
+            var keys = CqlFilterSimulator.ComputeFilteredKeys(SelectedMeasures, input);
+            if (keys.Count > 0)
+                filtered[patientId] = keys;
+        }
+
+        CqlFilteredResourceKeysByPatient = filtered;
+    }
+
+    /// <summary>
     /// Returns all generated resource keys (Type/Id) across all patients, excluding shared
     /// infrastructure entries. Includes ALL generated types (not filtered by query plan).
     /// For ABS-expected keys, use <see cref="AllExpectedAbsPatientResourceKeys"/>.
@@ -433,7 +460,7 @@ public sealed class GenerationManifest
             }
         }
 
-        return new GenerationManifest
+        var manifest = new GenerationManifest
         {
             PatientIds = patientIds,
             Profiles = profiles,
@@ -443,6 +470,12 @@ public sealed class GenerationManifest
             TotalCountsByType = totalsByType,
             TotalResourceCount = totalCount
         };
+
+        // Populate per-resource CQL SDE filter exclusions from the actual bundle contents.
+        // Safe to run eagerly — if no profile matches the measures, this is a no-op.
+        manifest.PopulateCqlFilteredKeys(bundles);
+
+        return manifest;
     }
 
     // ----- Incremental builder (pipeline-friendly) -----

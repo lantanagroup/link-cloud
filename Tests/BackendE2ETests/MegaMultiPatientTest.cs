@@ -13,7 +13,7 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 
 /// <summary>
 /// Hybrid stress + volume test: one mega patient with ~5,000 resources plus
-/// 149 patients with 25–50 resources each, run through the full ad-hoc
+/// 149 patients with 25â€“50 resources each, run through the full ad-hoc
 /// reporting pipeline.
 /// </summary>
 public sealed class MegaMultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
@@ -54,7 +54,7 @@ public sealed class MegaMultiPatientTest : IAsyncLifetime, IClassFixture<Backend
         {
             // One mega patient with ~5,000 resources
             PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 5000, resourcesMax: 5000),
-            // 149 normal patients with 25–50 resources each
+            // 149 normal patients with 25â€“50 resources each
             PatientCohortDefinition.AllQualifying(measures, patientCount: 149, resourcesMin: 25, resourcesMax: 50)
         };
         _cohorts = cohorts;
