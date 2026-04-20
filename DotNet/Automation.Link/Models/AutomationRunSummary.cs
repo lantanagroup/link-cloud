@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Automation.Link.Models;
+namespace LantanaGroup.Link.Automation.Link.Models;
 
 public class AutomationRunSummary
 {
@@ -14,6 +14,8 @@ public class AutomationRunSummary
     public DateTimeOffset? StartedAt { get; set; }
     public DateTimeOffset? FinishedAt { get; set; }
     public string? Error { get; set; }
+    /// <summary>Human-readable pipeline duration (report created ? submitted).</summary>
+    public string? Duration { get; set; }
     public string? FacilityId { get; set; }
     public string? ReportId { get; set; }
     public string? RunConfigurationJson { get; set; }

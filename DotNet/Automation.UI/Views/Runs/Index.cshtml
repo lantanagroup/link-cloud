@@ -1,11 +1,16 @@
-﻿@model Automation.UI.Models.RunsIndexViewModel
+@model Automation.UI.Models.RunDashboardViewModel
 @{
     ViewData["Title"] = "Automation Runs";
+
+    var stats = Model.Stats;
+    var avgDuration = stats.AvgDurationSeconds > 0
+        ? TimeSpan.FromSeconds(stats.AvgDurationSeconds).ToString(@"mm\:ss")
+        : "—";
 }
 
 <div class="container mt-4">
-    <h2 class="fw-bold mb-1"><i class="bi bi-lightning-charge-fill me-2"></i>Automation</h2>
-    <p class="text-muted mb-3">Configure tests, save them, and run them.</p>
+    <h2 class="fw-bold mb-1"><i class="bi bi-lightning-charge-fill me-2"></i>Automation Runs</h2>
+    <p class="text-muted mb-3">Dashboard overview, quick-launch tests, and run history.</p>
 
     @if (TempData["RunStartError"] is string runStartError && !string.IsNullOrWhiteSpace(runStartError))
     {
@@ -15,16 +20,89 @@
         </div>
     }
 
-    <div class="au-card">
-        <div class="card-header"><i class="bi bi-gear-fill me-2"></i>Start Test</div>
-        <div class="card-body">
-            @Html.AntiForgeryToken()
+    @* ========== KPI Summary Cards ========== *@
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="au-kpi-card">
+                <div class="au-kpi-value @(stats.Running + stats.Queued > 0 ? "text-primary" : "")" id="kpiActive">@(stats.Running + stats.Queued)</div>
+                <div class="au-kpi-label">Currently Active</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="au-kpi-card">
+                <div class="au-kpi-value" id="kpiTotal">@stats.TotalRuns</div>
+                <div class="au-kpi-label">Total Runs</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="au-kpi-card">
+                <div class="au-kpi-value @(stats.SuccessRate >= 80 ? "text-success" : stats.SuccessRate >= 50 ? "text-warning" : "text-danger")" id="kpiSuccessRate">@stats.SuccessRate%</div>
+                <div class="au-kpi-label">Success Rate</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="au-kpi-card">
+                <div class="au-kpi-value" id="kpiAvgDuration">@avgDuration</div>
+                <div class="au-kpi-label">Avg Duration</div>
+            </div>
+        </div>
+    </div>
 
-            <div class="row g-2 align-items-end mb-3">
+    @* ========== Charts Row ========== *@
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="au-card h-100">
+                <div class="card-header"><i class="bi bi-pie-chart-fill me-2"></i>Status Breakdown</div>
+                <div class="card-body d-flex align-items-center justify-content-center" style="min-height:240px;">
+                    <canvas id="statusDoughnut"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="au-card h-100">
+                <div class="card-header"><i class="bi bi-bar-chart-fill me-2"></i>Runs Per Day (Last 14 Days)</div>
+                <div class="card-body" style="min-height:240px;">
+                    <canvas id="runsPerDayChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ========== Active Runs ========== *@
+    <div class="au-card mb-4" id="activeRunsCard" style="@(Model.ActiveRuns.Count == 0 ? "display:none;" : "")">
+        <div class="card-header bg-primary text-white"><i class="bi bi-activity me-2"></i>Active Runs</div>
+        <div class="card-body">
+            <div class="row g-2" id="activeRunsGrid">
+                @foreach (var run in Model.ActiveRuns)
+                {
+                    var elapsed = DateTimeOffset.UtcNow - run.CreatedAt;
+                    <div class="col-md-4">
+                        <div class="border rounded p-3">
+                            <div class="fw-semibold">@run.RunName</div>
+                            <div class="small text-muted">@run.PatientCount patients &middot; seed @run.Seed</div>
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <span class="badge au-badge-muted">@run.Status</span>
+                                <span class="small text-muted">@elapsed.ToString(@"mm\:ss") elapsed</span>
+                            </div>
+                            <a href="@Url.Action("Details", "Runs", new { id = run.RunId })" class="btn btn-sm btn-au-action mt-2 w-100">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>View Details
+                            </a>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* ========== Quick-Launch ========== *@
+    <div class="au-card mb-4">
+        <div class="card-header"><i class="bi bi-play-circle me-2"></i>Quick Launch</div>
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
                 <div class="col-md-6">
-                    <label class="form-label fw-bold" for="savedScenarioSelect">Select Test</label>
-                    <select class="form-select" id="savedScenarioSelect">
-                        <option value="">-- Select a test --</option>
+                    <label class="form-label fw-bold" for="quickLaunchSelect">Select a saved scenario to run</label>
+                    <select class="form-select" id="quickLaunchSelect">
+                        <option value="">-- Select a scenario --</option>
                         @foreach (var s in Model.SavedScenarios)
                         {
                             var suffix = s.IsSystemScenario ? " [System]" : "";
@@ -33,164 +111,39 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <button type="button" class="btn btn-success w-100" id="btnNewScenario">
-                        <i class="bi bi-plus-lg"></i> New
+                    <form asp-action="Start" method="post" id="quickLaunchForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="Scenario" value="@AutomationScenarioKind.Custom" />
+                        <input type="hidden" name="ScenarioName" id="qlScenarioName" value="" />
+                        <input type="hidden" name="RunConfigurationJson" id="qlRunConfigJson" value="" />
+                        <input type="hidden" name="ReportMethod" id="qlReportMethod" value="Adhoc" />
+                        <input type="hidden" name="Seed" id="qlSeed" value="20260329" />
+                        <input type="hidden" name="PatientCount" id="qlPatientCount" value="10" />
+                        <input type="hidden" name="ResourcesPerPatient" id="qlResourcesPerPatient" value="250" />
+                        <input type="hidden" name="PatientPrefix" id="qlPatientPrefix" value="CustomPatient" />
+                        <input type="hidden" name="CleanupFhirData" value="true" />
+                        <input type="hidden" name="CleanupServiceData" value="false" />
+                        <input type="hidden" name="QueryPlanTemplateId" id="qlQueryPlanTemplateId" value="" />
+                        <button type="submit" class="btn btn-au-run w-100" id="qlRunButton" disabled>
+                            <i class="bi bi-play-fill me-1"></i> Run
+                        </button>
+                    </form>
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-success w-100" id="btnNewScenarioFromRuns">
+                        <i class="bi bi-plus-lg me-1"></i> New Scenario
                     </button>
+                </div>
+                <div class="col-md-2">
+                    <a asp-controller="Scenarios" asp-action="Index" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-journal-text me-1"></i> Manage
+                    </a>
                 </div>
             </div>
-
-            <form asp-action="Start" method="post" id="runForm" style="display:none;">
-                @Html.AntiForgeryToken()
-                <input type="hidden" name="Scenario" value="@AutomationScenarioKind.Custom" />
-                <input type="hidden" name="ReportMethod" id="ReportMethodHidden" value="Adhoc" />
-                <input type="hidden" name="ScenarioName" id="ScenarioNameHidden" value="" />
-                <input type="hidden" name="RunConfigurationJson" id="RunConfigurationJson" value="" />
-
-                <div class="au-scenario-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0" id="scenarioHeaderTitle"><i class="bi bi-file-earmark-play me-2"></i>New Test</h5>
-                    <div class="d-flex gap-2" id="scenarioHeaderActions">
-                        <button type="button" class="btn btn-success btn-sm" id="btnSaveScenario">
-                            <i class="bi bi-floppy"></i> Save
-                        </button>
-                        <button type="button" class="btn btn-danger btn-sm" id="btnDeleteScenario" style="display:none;">
-                            <i class="bi bi-x-lg"></i> Delete
-                        </button>
-                    </div>
-                </div>
-
-                <input type="hidden" id="ScenarioId" value="" />
-                <input type="hidden" id="IsSystemScenario" value="false" />
-
-                <div id="scenarioConfigArea" class="position-relative">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label" for="ScenarioName">Test Name</label>
-                        <input class="form-control" id="ScenarioName" maxlength="120" value="New Scenario" />
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label" for="ScenarioDescription">Description</label>
-                        <input class="form-control" id="ScenarioDescription" maxlength="500" />
-                    </div>
-
-                    <div class="col-md-4">
-                        <label class="form-label" for="ReportMethod">Report Method <span class="au-info-icon" data-bs-toggle="tooltip" data-bs-placement="right" title="Adhoc: generates an on-demand report for a single period. Scheduled Report: simulates a recurring report schedule with census events and discharge processing. Regenerate Report: re-runs measure evaluation on previously acquired data without re-acquiring from FHIR."><i class="bi bi-info-circle"></i></span></label>
-                        <select class="form-select" id="ReportMethod">
-                            <option value="Adhoc">Adhoc</option>
-                            <option value="ScheduledReport">Scheduled Report</option>
-                            <option value="RegenerateReport">Regenerate Report</option>
-                        </select>
-                    </div>
-
-                    <div class="col-md-8">
-                        <label class="form-label">Measures <span class="au-info-icon" data-bs-toggle="tooltip" data-bs-placement="right" title="CQL-based NHSN quality measures evaluated by MeasureEval. Each measure has its own eligibility criteria — patients must have the right encounter types, diagnoses, and clinical data to qualify. Select multiple to run a multi-measure test where patients may qualify for different subsets."><i class="bi bi-info-circle"></i></span></label>
-                        <div class="form-check">
-                            <input class="form-check-input measure-checkbox" type="checkbox" id="measure_monthly" name="SelectedMeasures" value="NhsnAcuteCareHospitalMonthlyInitialPopulation" checked />
-                            <label class="form-check-label" for="measure_monthly">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input measure-checkbox" type="checkbox" id="measure_daily" name="SelectedMeasures" value="NhsnAcuteCareHospitalDailyInitialPopulation" />
-                            <label class="form-check-label" for="measure_daily">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input measure-checkbox" type="checkbox" id="measure_hypo" name="SelectedMeasures" value="NhsnGlycemicControlHypoglycemicInitialPopulation" />
-                            <label class="form-check-label" for="measure_hypo">@ProfiledMeasureCatalog.GetDisplayName(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)</label>
-                        </div>
-                    </div>
-
-                    <div class="col-md-4">
-                        <label class="form-label" for="QueryPlanTemplate">Query Plan</label>
-                        <select class="form-select" id="QueryPlanTemplate">
-                            @foreach (var qp in Model.QueryPlanTemplates)
-                            {
-                                var defaultLabel = qp.IsDefault ? " (Default)" : "";
-                                var systemLabel = qp.IsSystem ? " [System]" : "";
-                                <option value="@qp.Id" data-name="@qp.Name" data-is-default="@qp.IsDefault.ToString().ToLower()">@qp.Name@defaultLabel@systemLabel</option>
-                            }
-                        </select>
-                        <small class="text-muted">Controls which FHIR resource types are acquired. <a asp-controller="QueryPlans" asp-action="Index" target="_blank">Manage</a></small>
-                        <input type="hidden" name="QueryPlanTemplateId" id="QueryPlanTemplateId" value="" />
-                    </div>
-
-                    <div class="col-md-3">
-                        <label class="form-label" for="Seed">Seed <span class="au-info-icon" data-bs-toggle="tooltip" data-bs-placement="right" title="Deterministic seed for FHIR data generation. The same seed + cohort configuration always produces identical patient data, making test results reproducible across runs."><i class="bi bi-info-circle"></i></span></label>
-                        <input class="form-control" type="number" min="1" id="Seed" name="Seed" value="20260329" />
-                    </div>
-                    <div class="col-md-3" id="patientCountGroup">
-                        <label class="form-label" for="PatientCount">Patient Count (derived from cohorts)</label>
-                        <input class="form-control" type="number" min="1" max="10000" id="PatientCount" name="PatientCount" value="10" readonly />
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label" for="PatientPrefix">Patient Prefix <span class="au-info-icon" data-bs-toggle="tooltip" data-bs-placement="right" title="Prefix for generated patient IDs (e.g. 'CustomPatient' → CustomPatient-001, CustomPatient-002). Also used as the FHIR resource ID prefix. Use distinct prefixes to avoid collisions between concurrent runs."><i class="bi bi-info-circle"></i></span></label>
-                        <input class="form-control" type="text" id="PatientPrefix" name="PatientPrefix" value="CustomPatient" maxlength="64" />
-                    </div>
-                    <input type="hidden" id="ResourcesPerPatient" name="ResourcesPerPatient" value="250" />
-
-                    <div class="col-md-3 d-flex align-items-end">
-                        <div>
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="CleanupFhirData" name="CleanupFhirData" value="true" checked />
-                                <input type="hidden" name="CleanupFhirData" value="false" />
-                                <label class="form-check-label" for="CleanupFhirData">Cleanup FHIR Data <span class="au-info-icon" data-bs-toggle="tooltip" title="When checked, deletes all generated FHIR resources from the FHIR server after the run completes. Recommended for repeated testing to avoid stale data accumulation."><i class="bi bi-info-circle"></i></span></label>
-                            </div>
-                            <div class="form-check mt-2">
-                                <input class="form-check-input" type="checkbox" id="CleanupServiceData" name="CleanupServiceData" value="true" />
-                                <input type="hidden" name="CleanupServiceData" value="false" />
-                                <label class="form-check-label" for="CleanupServiceData">Cleanup Service Data <span class="au-info-icon" data-bs-toggle="tooltip" title="When checked, removes all service-side data created by this run: facility configuration, tenant settings, report schedules, data acquisition logs, and query dispatch entries. Use when you want a clean slate between runs."><i class="bi bi-info-circle"></i></span></label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="cohortBuilder" class="col-12">
-                        <div class="au-cohort-card mt-2">
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-start mb-2">
-                                    <div>
-                                        <span class="fw-semibold"><i class="bi bi-people-fill me-1"></i>Cohorts <span class="au-info-icon" data-bs-toggle="tooltip" data-bs-placement="right" title="Cohorts define groups of patients with shared characteristics. Each cohort specifies: how many patients to generate, which measures they should qualify for (via Measure Eligibility checkboxes), a resource count range per patient, and which clinical scenarios (diagnosis profiles) to draw from. Add multiple cohorts to create a mixed patient population — e.g. one qualifying cohort and one non-qualifying cohort."><i class="bi bi-info-circle"></i></span></span>
-                                        <p class="text-muted small mb-0 mt-1">
-                                            Each cohort defines patient count, per-measure eligibility, and resource range.
-                                        </p>
-                                    </div>
-                                    <span class="badge bg-secondary" data-bs-toggle="tooltip" title="Hypoglycemic eligibility requires ACH Monthly eligibility. Checking Hypo auto-checks ACH. Unchecking ACH auto-unchecks Hypo.">
-                                        <i class="bi bi-info-circle"></i> Eligibility Rules
-                                    </span>
-                                </div>
-
-                                <table class="table table-sm table-bordered mb-2" id="cohortTable">
-                                    <thead>
-                                        <tr>
-                                            <th style="width:50px">#</th>
-                                            <th style="width:180px">Patient Count</th>
-                                            <th style="width:360px">Measure Eligibility <span class="au-info-icon" data-bs-toggle="tooltip" title="Check a measure to make this cohort's patients qualify for it (generate matching encounter types, diagnoses, and clinical data). Uncheck to generate non-qualifying patients for that measure. The clinical profile pool below automatically filters to show only scenarios compatible with your eligibility selections."><i class="bi bi-info-circle"></i></span></th>
-                                            <th style="width:140px">Res/Patient Min <span class="au-info-icon" data-bs-toggle="tooltip" title="Minimum number of FHIR resources generated per patient (Observations, Conditions, Procedures, etc). The actual count is randomized between Min and Max using the test seed."><i class="bi bi-info-circle"></i></span></th>
-                                            <th style="width:140px">Res/Patient Max</th>
-                                            <th>Clinical Profile Pool <span class="au-info-icon" data-bs-toggle="tooltip" title="Clinical diagnosis profiles available for this cohort. Each profile defines a primary diagnosis (ICD-10 code), service type, and associated clinical data patterns. The pool auto-filters based on Measure Eligibility — only profiles that produce qualifying/non-qualifying results for the selected measures are shown. Select specific profiles or leave all checked for maximum variety."><i class="bi bi-info-circle"></i></span></th>
-                                            <th style="width:50px"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="cohortRows"></tbody>
-                                </table>
-                                <div id="cohortValidationErrors" class="small text-danger mb-2"></div>
-                                <div class="d-flex gap-2">
-                                    <button type="button" class="btn btn-sm btn-outline-success" id="addQualifyingCohort">+ Qualifying Cohort</button>
-                                    <button type="button" class="btn btn-sm btn-outline-warning" id="addNonQualifyingCohort">+ Non-Qualifying Cohort</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-                <div id="systemScenarioOverlay" class="position-absolute top-0 start-0 w-100 h-100 au-system-overlay" style="display:none;"></div>
-                </div>
-
-                <div class="d-flex justify-content-end mt-3">
-                    <button class="btn btn-au-run" type="submit" id="runButton" disabled>
-                        <i class="bi bi-play-fill me-1"></i> Run Test
-                    </button>
-                </div>
-            </form>
         </div>
     </div>
 
+    @* ========== Recent Runs Table ========== *@
     <div class="au-card">
         <div class="card-header"><i class="bi bi-clock-history me-2"></i>Recent Runs</div>
         <div class="table-responsive">
@@ -201,13 +154,14 @@
                         <th>Patients</th>
                         <th>Seed</th>
                         <th>Status</th>
+                        <th>Duration</th>
                         <th>Created</th>
                         <th>Finished</th>
                         <th></th>
                     </tr>
                 </thead>
-                <tbody>
-                @foreach (var run in Model.Runs.Runs)
+                <tbody id="recentRunsBody">
+                @foreach (var run in Model.RecentRuns)
                 {
                     <tr>
                         <td>
@@ -219,8 +173,9 @@
                         <td>
                             <span class="badge run-status-badge @(run.Status == AutomationRunStatus.Succeeded ? "au-badge-success" : run.Status == AutomationRunStatus.Failed ? "au-badge-danger" : run.Status == AutomationRunStatus.Cancelled ? "au-badge-warning" : "au-badge-muted")" data-run-id="@run.RunId">@run.Status</span>
                         </td>
+                        <td class="small text-muted">@(run.Duration ?? "–")</td>
                         <td>@run.CreatedAt.LocalDateTime</td>
-                        <td>@(run.FinishedAt?.LocalDateTime.ToString() ?? "-")</td>
+                        <td>@(run.FinishedAt?.LocalDateTime.ToString() ?? "—")</td>
                         <td class="text-nowrap">
                             <div class="d-inline-flex gap-1 align-items-center run-actions" data-run-id="@run.RunId">
                                 <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-au-action"><i class="bi bi-box-arrow-up-right"></i></a>
@@ -242,786 +197,344 @@
     </div>
 </div>
 
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
 <script>
 (function () {
-    var clinicalScenarioCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
-        Model.ClinicalScenarios,
-        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
-    var QUALIFYING = 'Qualifying';
-    var NON_QUALIFYING = 'NonQualifying';
-    var runForm = document.getElementById('runForm');
-    var selector = document.getElementById('savedScenarioSelect');
-    var scenarioIdInput = document.getElementById('ScenarioId');
-    var isSystemInput = document.getElementById('IsSystemScenario');
-    var scenarioNameHidden = document.getElementById('ScenarioNameHidden');
-    var runConfigurationJsonHidden = document.getElementById('RunConfigurationJson');
-    var title = document.getElementById('scenarioHeaderTitle');
-    var headerActions = document.getElementById('scenarioHeaderActions');
-    var saveButton = document.getElementById('btnSaveScenario');
-    var deleteButton = document.getElementById('btnDeleteScenario');
-    var runButton = document.getElementById('runButton');
-    var systemScenarioOverlay = document.getElementById('systemScenarioOverlay');
-    var cohortRows = document.getElementById('cohortRows');
+    var detailsBaseUrl = '@Url.Action("Details", "Runs", new { id = "__ID__" })';
+    var dashboardStatsUrl = '@Url.Action("DashboardStats", "Runs")';
+    var scenarioJsonUrl = '@Url.Action("GetJson", "Scenarios")';
+    var cancelUrl = '@Url.Action("CancelJson", "Runs")';
+    var deleteUrl = '@Url.Action("DeleteJson", "Runs")';
 
-    function setConfigEditable(editable) {
-        systemScenarioOverlay.style.display = editable ? 'none' : '';
+    // --- KPI elements ---
+    var kpiActive = document.getElementById('kpiActive');
+    var kpiTotal = document.getElementById('kpiTotal');
+    var kpiSuccessRate = document.getElementById('kpiSuccessRate');
+    var kpiAvgDuration = document.getElementById('kpiAvgDuration');
+
+    // --- Chart instances ---
+    var statusChart = null;
+    var barChart = null;
+
+    // --- Chart.js: Status Doughnut ---
+    var statusCtx = document.getElementById('statusDoughnut');
+    if (statusCtx) {
+        statusChart = new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Succeeded', 'Failed', 'Cancelled', 'Running', 'Queued'],
+                datasets: [{
+                    data: [@stats.Succeeded, @stats.Failed, @stats.Cancelled, @stats.Running, @stats.Queued],
+                    backgroundColor: ['#28a745', '#dc3545', '#ffc107', '#4da3ff', '#6c757d'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10, font: { size: 12 } } }
+                },
+                cutout: '55%'
+            }
+        });
+    }
+
+    // --- Chart.js: Runs Per Day (Stacked Bar) ---
+    var initialRunsPerDay = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        stats.RunsPerDay.OrderBy(kvp => kvp.Key).ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+
+    function dayLabelsFromMap(map) {
+        return Object.keys(map).map(function (d) {
+            var parts = d.split('-');
+            return parts[1] + '/' + parts[2];
+        });
+    }
+
+    var barCtx = document.getElementById('runsPerDayChart');
+    if (barCtx) {
+        barChart = new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels: dayLabelsFromMap(initialRunsPerDay),
+                datasets: [
+                    { label: 'Succeeded', data: Object.values(initialRunsPerDay).map(function (b) { return b.succeeded; }), backgroundColor: '#28a745' },
+                    { label: 'Failed',    data: Object.values(initialRunsPerDay).map(function (b) { return b.failed; }),    backgroundColor: '#dc3545' },
+                    { label: 'Cancelled', data: Object.values(initialRunsPerDay).map(function (b) { return b.cancelled; }), backgroundColor: '#ffc107' },
+                    { label: 'Other',     data: Object.values(initialRunsPerDay).map(function (b) { return b.other; }),     backgroundColor: '#6c757d' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10, font: { size: 12 } } }
+                },
+                scales: {
+                    x: { stacked: true },
+                    y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, precision: 0 } }
+                }
+            }
+        });
+    }
+
+    // --- Helpers ---
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+
+    function statusBadgeClass(status) {
+        var s = String(status || '').toLowerCase();
+        if (s === 'succeeded' || s === '3') return 'au-badge-success';
+        if (s === 'failed' || s === '4') return 'au-badge-danger';
+        if (s === 'cancelled' || s === '2') return 'au-badge-warning';
+        return 'au-badge-muted';
+    }
+
+    function isTerminal(status) {
+        var s = String(status || '').toLowerCase();
+        return s === 'succeeded' || s === 'failed' || s === 'cancelled' || s === '3' || s === '4' || s === '2';
+    }
+
+    function isActive(status) {
+        var s = String(status || '').toLowerCase();
+        return s === 'running' || s === 'queued' || s === '0' || s === '1';
+    }
+
+    function formatDuration(seconds) {
+        if (!seconds || seconds <= 0) return '—';
+        var m = Math.floor(seconds / 60);
+        var s = Math.round(seconds % 60);
+        return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    function formatLocalDate(isoStr) {
+        if (!isoStr) return '—';
+        try { return new Date(isoStr).toLocaleString(); }
+        catch (e) { return isoStr; }
     }
 
     function antiforgeryToken() {
-        var token = document.querySelector('input[name="__RequestVerificationToken"]');
+        var token = document.querySelector('#quickLaunchForm input[name="__RequestVerificationToken"]');
         return token ? token.value : '';
     }
 
-    function ensureVisible() {
-        runForm.style.display = '';
+    // --- Live update from server data ---
+    function refreshDashboard() {
+        fetch(dashboardStatsUrl)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                updateKpis(data.stats);
+                updateCharts(data.stats);
+                updateActiveRuns(data.activeRuns || []);
+                updateRecentRunsTable(data.recentRuns || []);
+            })
+            .catch(function (err) { console.error('Dashboard refresh failed', err); });
     }
 
-    function resetToNewScenario() {
-        ensureVisible();
-        scenarioIdInput.value = '';
-        isSystemInput.value = 'false';
-        title.textContent = 'New Test';
-        headerActions.style.display = '';
-        saveButton.disabled = false;
-        deleteButton.style.display = 'none';
-        setConfigEditable(true);
+    function updateKpis(s) {
+        if (!s) return;
+        var active = (s.running || 0) + (s.queued || 0);
+        kpiActive.textContent = active;
+        kpiActive.className = 'au-kpi-value' + (active > 0 ? ' text-primary' : '');
+        kpiTotal.textContent = s.totalRuns || 0;
 
-        document.getElementById('ScenarioName').value = 'New Scenario';
-        document.getElementById('ScenarioDescription').value = '';
-        document.getElementById('ReportMethod').value = 'Adhoc';
-        document.getElementById('Seed').value = 20260329;
-        document.getElementById('PatientCount').value = 10;
-        document.getElementById('ResourcesPerPatient').value = 250;
-        document.getElementById('PatientPrefix').value = 'CustomPatient';
-        document.getElementById('CleanupFhirData').checked = true;
-        document.getElementById('CleanupServiceData').checked = false;
+        var rate = s.successRate || 0;
+        kpiSuccessRate.textContent = rate + '%';
+        kpiSuccessRate.className = 'au-kpi-value ' + (rate >= 80 ? 'text-success' : rate >= 50 ? 'text-warning' : 'text-danger');
 
-        document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
-        document.getElementById('measure_monthly').checked = true;
-
-        cohortRows.innerHTML = '';
-        addDefaultCohort(10, true, 50, 100);
-        syncPatientCountFromCohorts();
-        validateRunForm();
+        kpiAvgDuration.textContent = formatDuration(s.avgDurationSeconds);
     }
 
-    function scenarioQualifiesForMeasure(scenario, measureType) {
-        var q = scenario.qualifiesForMeasureTypes || [];
-        return q.indexOf(measureType) >= 0;
+    function updateCharts(s) {
+        if (statusChart) {
+            statusChart.data.datasets[0].data = [s.succeeded || 0, s.failed || 0, s.cancelled || 0, s.running || 0, s.queued || 0];
+            statusChart.update();
+        }
+        if (barChart && s.runsPerDay) {
+            var sorted = Object.keys(s.runsPerDay).sort();
+            var values = sorted.map(function (k) { return s.runsPerDay[k]; });
+            barChart.data.labels = sorted.map(function (d) { var p = d.split('-'); return p[1] + '/' + p[2]; });
+            barChart.data.datasets[0].data = values.map(function (b) { return b.succeeded || 0; });
+            barChart.data.datasets[1].data = values.map(function (b) { return b.failed || 0; });
+            barChart.data.datasets[2].data = values.map(function (b) { return b.cancelled || 0; });
+            barChart.data.datasets[3].data = values.map(function (b) { return b.other || 0; });
+            barChart.update();
+        }
     }
 
-    function selectedMeasureTypes() {
-        return Array.prototype.map.call(document.querySelectorAll('.measure-checkbox:checked'), function (cb) { return cb.value; });
-    }
-
-    function scenarioIdFromValue(v) {
-        return String(v || '').toLowerCase();
-    }
-
-    function defaultMeasureEligibilities(isQualifying) {
-        var map = {};
-        selectedMeasureTypes().forEach(function (m) {
-            map[m] = isQualifying ? QUALIFYING : NON_QUALIFYING;
-        });
-        return map;
-    }
-
-    function normalizeMeasureEligibilities(raw) {
-        var normalized = {};
-        selectedMeasureTypes().forEach(function (m) {
-            if (!raw || !Object.prototype.hasOwnProperty.call(raw, m)) {
-                normalized[m] = QUALIFYING;
-                return;
-            }
-            var v = raw[m];
-            if (v === QUALIFYING || v === 0 || v === '0') {
-                normalized[m] = QUALIFYING;
-            } else {
-                normalized[m] = NON_QUALIFYING;
-            }
-        });
-        return normalized;
-    }
-
-    function cohortQualifiesForScenario(scenario, measureEligibilities) {
-        var selected = selectedMeasureTypes();
-        return selected.every(function (m) {
-            var desired = Object.prototype.hasOwnProperty.call(measureEligibilities, m)
-                ? measureEligibilities[m]
-                : QUALIFYING;
-            var scenarioQualifies = scenarioQualifiesForMeasure(scenario, m);
-            return desired === QUALIFYING ? scenarioQualifies : !scenarioQualifies;
-        });
-    }
-
-    function eligibleScenarioIdsForMeasureEligibilities(measureEligibilities) {
-        var normalized = normalizeMeasureEligibilities(measureEligibilities);
-        return clinicalScenarioCatalog
-            .filter(function (sc) { return cohortQualifiesForScenario(sc, normalized); })
-            .map(function (sc) { return scenarioIdFromValue(sc.scenarioId); });
-    }
-
-    function buildMeasureEligibilityEditor(measureEligibilities) {
-        var selected = selectedMeasureTypes();
-        if (selected.length === 0)
-            return '<span class="text-muted small">Select one or more measures</span>';
-
-        return selected.map(function (m) {
-            var checkbox = document.querySelector('.measure-checkbox[value="' + m + '"]');
-            var label = checkbox
-                ? (document.querySelector('label[for="' + checkbox.id + '"]') || { textContent: m }).textContent
-                : m;
-            var current = Object.prototype.hasOwnProperty.call(measureEligibilities, m)
-                ? measureEligibilities[m]
-                : QUALIFYING;
-            return '<div class="form-check form-check-inline me-3 mb-1">' +
-                '<input class="form-check-input cohort-measure-eligibility" type="checkbox" data-measure="' + m + '" ' + (current === QUALIFYING ? 'checked' : '') + ' />' +
-                '<label class="form-check-label small">' + label + '</label>' +
-            '</div>';
+    function updateActiveRuns(runs) {
+        var card = document.getElementById('activeRunsCard');
+        var grid = document.getElementById('activeRunsGrid');
+        if (!runs || runs.length === 0) {
+            card.style.display = 'none';
+            grid.innerHTML = '';
+            return;
+        }
+        card.style.display = '';
+        grid.innerHTML = runs.map(function (run) {
+            var created = new Date(run.createdAt);
+            var elapsed = Math.max(0, Math.round((Date.now() - created.getTime()) / 1000));
+            var em = Math.floor(elapsed / 60);
+            var es = elapsed % 60;
+            var elapsedStr = String(em).padStart(2, '0') + ':' + String(es).padStart(2, '0');
+            var url = detailsBaseUrl.replace('__ID__', run.runId);
+            return '<div class="col-md-4"><div class="border rounded p-3">' +
+                '<div class="fw-semibold">' + escapeHtml(run.runName) + '</div>' +
+                '<div class="small text-muted">' + (run.patientCount || 0) + ' patients &middot; seed ' + (run.seed || 0) + '</div>' +
+                '<div class="d-flex justify-content-between align-items-center mt-2">' +
+                '<span class="badge au-badge-muted">' + escapeHtml(String(run.status)) + '</span>' +
+                '<span class="small text-muted">' + elapsedStr + ' elapsed</span>' +
+                '</div>' +
+                '<a href="' + url + '" class="btn btn-sm btn-au-action mt-2 w-100"><i class="bi bi-box-arrow-up-right me-1"></i>View Details</a>' +
+                '</div></div>';
         }).join('');
     }
 
-    function buildScenarioMultiSelect(selectedIndices) {
-        var selectedSet = new Set((selectedIndices || []).map(scenarioIdFromValue));
-        var selectAllByDefault = selectedSet.size === 0;
-
-        var options = clinicalScenarioCatalog.map(function (sc) {
-            var id = scenarioIdFromValue(sc.scenarioId);
-            var label = sc.primaryDiagnosis + ' (' + sc.icdCode + ')';
-            var checked = (selectAllByDefault || selectedSet.has(id)) ? 'checked' : '';
-            return '<div class="form-check mb-1 cohort-scenario-item">' +
-                '<label class="form-check-label small">' +
-                '<input class="form-check-input cohort-scenario-option me-2" type="checkbox" value="' + id + '" ' + checked + ' />' +
-                label +
-                '</label>' +
-                '</div>';
+    function updateRecentRunsTable(runs) {
+        var tbody = document.getElementById('recentRunsBody');
+        if (!tbody) return;
+        tbody.innerHTML = runs.map(function (run) {
+            var statusStr = String(run.status || '');
+            var badgeClass = statusBadgeClass(statusStr);
+            var url = detailsBaseUrl.replace('__ID__', run.runId);
+            var actions = '<a href="' + url + '" class="btn btn-sm btn-au-action"><i class="bi bi-box-arrow-up-right"></i></a>';
+            if (isActive(statusStr)) {
+                actions += ' <button type="button" class="btn btn-sm btn-outline-warning btn-cancel-run" data-run-id="' + run.runId + '"><i class="bi bi-x-circle"></i></button>';
+            }
+            if (isTerminal(statusStr)) {
+                actions += ' <button type="button" class="btn btn-sm btn-outline-danger btn-delete-run" data-run-id="' + run.runId + '"><i class="bi bi-trash"></i></button>';
+            }
+            return '<tr>' +
+                '<td><div class="fw-semibold">' + escapeHtml(run.runName) + '</div><code class="small text-muted">' + run.runId + '</code></td>' +
+                '<td>' + (run.patientCount || 0) + '</td>' +
+                '<td>' + (run.seed || 0) + '</td>' +
+                '<td><span class="badge run-status-badge ' + badgeClass + '" data-run-id="' + run.runId + '">' + escapeHtml(statusStr) + '</span></td>' +
+                '<td class="small text-muted">' + escapeHtml(run.duration || '\u2013') + '</td>' +
+                '<td>' + formatLocalDate(run.createdAt) + '</td>' +
+                '<td>' + formatLocalDate(run.finishedAt) + '</td>' +
+                '<td class="text-nowrap"><div class="d-inline-flex gap-1 align-items-center run-actions" data-run-id="' + run.runId + '">' + actions + '</div></td>' +
+                '</tr>';
         }).join('');
-
-        return '<div class="dropdown cohort-scenarios-dropdown">' +
-            '<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start cohort-scenarios-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside">All scenarios selected</button>' +
-            '<div class="dropdown-menu p-2 w-100 cohort-scenarios-menu" style="max-height:220px;overflow:auto;">' + options + '</div>' +
-            '</div>';
     }
 
-    function addCohortRow(patientCount, measureEligibilities, scenarios, resourcesMin, resourcesMax) {
-        var idx = cohortRows.children.length;
-        var normalizedEligibilities = normalizeMeasureEligibilities(measureEligibilities);
-        var scenarioSelection = (scenarios && scenarios.length > 0)
-            ? scenarios
-            : eligibleScenarioIdsForMeasureEligibilities(normalizedEligibilities);
-        var tr = document.createElement('tr');
-        tr.innerHTML =
-            '<td class="text-center align-middle">' + (idx + 1) + '</td>' +
-            '<td><input type="number" class="form-control form-control-sm cohort-count" min="1" value="' + (patientCount || 1) + '" /></td>' +
-            '<td><div class="cohort-measure-editor">' + buildMeasureEligibilityEditor(normalizedEligibilities) + '</div></td>' +
-            '<td><input type="number" class="form-control form-control-sm cohort-min" min="1" value="' + (resourcesMin || 50) + '" /></td>' +
-            '<td><input type="number" class="form-control form-control-sm cohort-max" min="1" value="' + (resourcesMax || resourcesMin || 100) + '" /></td>' +
-            '<td>' + buildScenarioMultiSelect(scenarioSelection) + '</td>' +
-            '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-cohort">&times;</button></td>';
-        cohortRows.appendChild(tr);
-        enforceEligibilityDependencies(tr);
-        applyEligibilityFilterToRow(tr, readRowMeasureEligibilities(tr));
-        updateScenarioDropdownSummary(tr);
-        reindexCohorts();
-        syncPatientCountFromCohorts();
-        validateRunForm();
-    }
+    // --- SignalR connection ---
+    var connection = new signalR.HubConnectionBuilder()
+        .withUrl('/hubs/runs')
+        .withAutomaticReconnect()
+        .build();
 
-    function selectedOptionsAsStrings(containerElement) {
-        if (!containerElement) return [];
-        return Array.prototype.map.call(
-            containerElement.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)'),
-            function (cb) { return scenarioIdFromValue(cb.value); })
-            .filter(function (v) { return !!v; });
-    }
+    connection.on('dashboardUpdate', function () {
+        refreshDashboard();
+    });
 
-    function updateScenarioDropdownSummary(row) {
-        var dropdown = row.querySelector('.cohort-scenarios-dropdown');
-        if (!dropdown) return;
+    connection.start()
+        .then(function () { return connection.invoke('SubscribeDashboard'); })
+        .catch(function (err) { console.error('[signalr] Dashboard connection failed', err); });
 
-        var toggle = dropdown.querySelector('.cohort-scenarios-toggle');
-        var allowed = dropdown.querySelectorAll('.cohort-scenario-option:not(:disabled)');
-        var selected = dropdown.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)');
+    // --- Quick Launch ---
+    var selector = document.getElementById('quickLaunchSelect');
+    var runBtn = document.getElementById('qlRunButton');
 
-        if (allowed.length === 0) {
-            toggle.textContent = 'No eligible scenarios';
-            return;
-        }
-
-        if (selected.length === 0) {
-            toggle.textContent = 'Select scenarios';
-            return;
-        }
-
-        if (selected.length === allowed.length) {
-            toggle.textContent = 'All scenarios selected';
-            return;
-        }
-
-        toggle.textContent = selected.length + ' scenario(s) selected';
-    }
-
-    function readRowMeasureEligibilities(row) {
-        var values = {};
-        row.querySelectorAll('.cohort-measure-eligibility').forEach(function (cb) {
-            var measure = cb.getAttribute('data-measure');
-            values[measure] = cb.checked ? QUALIFYING : NON_QUALIFYING;
-        });
-        return normalizeMeasureEligibilities(values);
-    }
-
-    function enforceEligibilityDependencies(row, changedMeasure) {
-        var hypo = row.querySelector('.cohort-measure-eligibility[data-measure="NhsnGlycemicControlHypoglycemicInitialPopulation"]');
-        var ach = row.querySelector('.cohort-measure-eligibility[data-measure="NhsnAcuteCareHospitalMonthlyInitialPopulation"]');
-
-        if (!hypo || !ach) return;
-
-        // Directional UX rules:
-        // - checking Hypo auto-checks ACH
-        // - unchecking ACH auto-unchecks Hypo
-        if (changedMeasure === 'NhsnGlycemicControlHypoglycemicInitialPopulation' && hypo.checked && !ach.checked) {
-            ach.checked = true;
-            return;
-        }
-
-        if (changedMeasure === 'NhsnAcuteCareHospitalMonthlyInitialPopulation' && !ach.checked && hypo.checked) {
-            hypo.checked = false;
-            return;
-        }
-
-        // General safety normalization.
-        if (hypo.checked && !ach.checked)
-            ach.checked = true;
-    }
-
-    function rerenderCohortMeasureEditor(row) {
-        var editor = row.querySelector('.cohort-measure-editor');
-        if (!editor) return;
-        var current = readRowMeasureEligibilities(row);
-        editor.innerHTML = buildMeasureEligibilityEditor(current);
-        enforceEligibilityDependencies(row);
-        applyEligibilityFilterToRow(row, readRowMeasureEligibilities(row));
-    }
-
-    function applyEligibilityFilterToRow(row, measureEligibilities) {
-        var allowed = new Set(eligibleScenarioIdsForMeasureEligibilities(measureEligibilities));
-        var dropdown = row.querySelector('.cohort-scenarios-dropdown');
-        var options = dropdown.querySelectorAll('.cohort-scenario-option');
-
-        Array.prototype.forEach.call(options, function (opt) {
-            var id = scenarioIdFromValue(opt.value);
-            var isAllowed = allowed.has(id);
-            var wrapper = opt.closest('.cohort-scenario-item');
-            opt.disabled = !isAllowed;
-            if (wrapper) {
-                wrapper.style.display = isAllowed ? '' : 'none';
-            }
-            if (!isAllowed) {
-                opt.checked = false;
-            }
-        });
-
-        if (selectedOptionsAsStrings(dropdown).length === 0) {
-            Array.prototype.forEach.call(options, function (opt) {
-                if (!opt.disabled) {
-                    opt.checked = true;
-                }
-            });
-        }
-
-        updateScenarioDropdownSummary(row);
-    }
-
-    function addDefaultCohort(patientCount, isQualifying, resourcesMin, resourcesMax) {
-        var eligibilities = defaultMeasureEligibilities(!!isQualifying);
-        addCohortRow(patientCount, eligibilities, eligibleScenarioIdsForMeasureEligibilities(eligibilities), resourcesMin, resourcesMax);
-    }
-
-    function reindexCohorts() {
-        Array.prototype.forEach.call(cohortRows.children, function (row, i) {
-            row.querySelector('td:first-child').textContent = i + 1;
-        });
-    }
-
-    function getCohorts() {
-        return Array.prototype.map.call(cohortRows.children, function (row) {
-            var min = parseInt(row.querySelector('.cohort-min').value || '50', 10);
-            var max = parseInt(row.querySelector('.cohort-max').value || String(min), 10);
-            if (max < min) {
-                max = min;
-                row.querySelector('.cohort-max').value = String(max);
-            }
-            var measureEligibilities = readRowMeasureEligibilities(row);
-            return {
-                patientCount: parseInt(row.querySelector('.cohort-count').value || '0', 10),
-                measureEligibilities: measureEligibilities,
-                eligibleClinicalScenarioIds: selectedOptionsAsStrings(row.querySelector('.cohort-scenarios-dropdown')),
-                resourcesPerPatientMin: min,
-                resourcesPerPatientMax: max
-            };
-        }).filter(function (c) { return c.patientCount > 0; });
-    }
-
-    function validateCohortEligibilityGraph(cohorts) {
-        var errors = [];
-        var hypo = 'NhsnGlycemicControlHypoglycemicInitialPopulation';
-        var ach = 'NhsnAcuteCareHospitalMonthlyInitialPopulation';
-
-        cohorts.forEach(function (cohort, index) {
-            var map = cohort.measureEligibilities || {};
-            if (Object.prototype.hasOwnProperty.call(map, hypo)
-                && Object.prototype.hasOwnProperty.call(map, ach)
-                && map[hypo] === QUALIFYING
-                && map[ach] !== QUALIFYING) {
-                errors.push('Cohort ' + (index + 1) + ': Cannot qualify for Hypoglycemic while non-qualifying for ACH Monthly (ACH is a prerequisite).');
-            }
-        });
-
-        return errors;
-    }
-
-    function renderCohortValidationErrors(errors) {
-        var container = document.getElementById('cohortValidationErrors');
-        if (!container) return;
-        if (!errors || errors.length === 0) {
-            container.textContent = '';
-            return;
-        }
-        container.innerHTML = errors.map(function (e) { return '<div>' + e + '</div>'; }).join('');
-    }
-
-    function syncPatientCountFromCohorts() {
-        var total = getCohorts().reduce(function (sum, c) { return sum + (c.patientCount || 0); }, 0);
-        document.getElementById('PatientCount').value = total > 0 ? total : 0;
-    }
-
-    function isRunFormValid() {
-        if (isSystemInput.value === 'true') {
-            renderCohortValidationErrors([]);
-            return true;
-        }
-
-        var testName = (document.getElementById('ScenarioName').value || '').trim();
-        var prefix = (document.getElementById('PatientPrefix').value || '').trim();
-        var seed = parseInt(document.getElementById('Seed').value || '0', 10);
-        var cohorts = getCohorts();
-        var hasMeasures = selectedMeasureTypes().length > 0;
-        var hasPatients = cohorts.reduce(function (sum, c) { return sum + (c.patientCount || 0); }, 0) > 0;
-        var graphErrors = validateCohortEligibilityGraph(cohorts);
-        var cohortsHaveScenarioSelection = Array.prototype.every.call(cohortRows.children, function (row) {
-            var selectedIds = selectedOptionsAsStrings(row.querySelector('.cohort-scenarios-dropdown'));
-            return selectedIds.length > 0;
-        });
-
-        renderCohortValidationErrors(graphErrors);
-
-        return testName.length > 0
-            && prefix.length > 0
-            && Number.isFinite(seed)
-            && seed > 0
-            && hasMeasures
-            && hasPatients
-            && cohortsHaveScenarioSelection
-            && graphErrors.length === 0;
-    }
-
-    function validateRunForm() {
-        var isValid = isRunFormValid();
-        runButton.disabled = !isValid;
-        return isValid;
-    }
-
-    function loadScenario(id) {
+    selector.addEventListener('change', function () {
+        var id = selector.value;
+        runBtn.disabled = !id;
         if (!id) return;
 
-        fetch('@Url.Action("GetJson", "Scenarios")' + '?id=' + encodeURIComponent(id))
+        fetch(scenarioJsonUrl + '?id=' + encodeURIComponent(id))
             .then(function (r) { return r.json(); })
             .then(function (s) {
-                ensureVisible();
-                scenarioIdInput.value = s.id;
-                isSystemInput.value = s.isSystemScenario ? 'true' : 'false';
-                title.textContent = s.name || 'Test';
-                if (s.isSystemScenario) {
-                    headerActions.style.display = 'none';
-                    saveButton.disabled = true;
-                    deleteButton.style.display = 'none';
-                    setConfigEditable(false);
-                } else {
-                    headerActions.style.display = '';
-                    saveButton.disabled = false;
-                    deleteButton.style.display = '';
-                    setConfigEditable(true);
-                }
-
-                document.getElementById('ScenarioName').value = s.name || '';
-                document.getElementById('ScenarioDescription').value = s.description || '';
-                document.getElementById('ReportMethod').value = s.reportMethod || 'Adhoc';
-                document.getElementById('Seed').value = s.seed || 20260329;
-                document.getElementById('PatientCount').value = s.patientCount || 10;
-                document.getElementById('ResourcesPerPatient').value = s.resourcesPerPatientMin || 250;
-                document.getElementById('PatientPrefix').value = s.patientPrefix || 'CustomPatient';
-                document.getElementById('CleanupFhirData').checked = s.cleanupFhirData !== false;
-                document.getElementById('CleanupServiceData').checked = !!s.cleanupServiceData;
-
-                // Query Plan Template
-                var qpSelect = document.getElementById('QueryPlanTemplate');
-                if (s.queryPlanTemplateId) {
-                    qpSelect.value = s.queryPlanTemplateId;
-                } else {
-                    // Select the default option
-                    var defaultOpt = qpSelect.querySelector('[data-is-default="true"]');
-                    if (defaultOpt) qpSelect.value = defaultOpt.value;
-                }
-
-                document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
-                (s.selectedMeasures || []).forEach(function (m) {
-                    var key = String(m);
-                    var idMap = {
-                        'NhsnAcuteCareHospitalMonthlyInitialPopulation': 'measure_monthly',
-                        'NhsnAcuteCareHospitalDailyInitialPopulation': 'measure_daily',
-                        'NhsnGlycemicControlHypoglycemicInitialPopulation': 'measure_hypo'
-                    };
-                    var cb = document.getElementById(idMap[key]);
-                    if (cb) cb.checked = true;
-                });
-
-                cohortRows.innerHTML = '';
-                if (s.patientCohorts && s.patientCohorts.length > 0) {
-                    s.patientCohorts.forEach(function (c) {
-                        addCohortRow(
-                            c.patientCount,
-                            c.measureEligibilities || defaultMeasureEligibilities(true),
-                            c.eligibleClinicalScenarioIds || [],
-                            c.resourcesPerPatientMin || s.resourcesPerPatientMin || 50,
-                            c.resourcesPerPatientMax || s.resourcesPerPatientMax || 100);
-                    });
-                } else {
-                    addDefaultCohort(
-                        s.patientCount || 10,
-                        true,
-                        s.resourcesPerPatientMin || 50,
-                        s.resourcesPerPatientMax || 100);
-                }
-                syncPatientCountFromCohorts();
-                validateRunForm();
+                document.getElementById('qlScenarioName').value = s.name || 'Scenario';
+                document.getElementById('qlReportMethod').value = s.reportMethod || 'Adhoc';
+                document.getElementById('qlSeed').value = s.seed || 20260329;
+                document.getElementById('qlPatientCount').value = s.patientCount || 10;
+                document.getElementById('qlResourcesPerPatient').value = s.resourcesPerPatientMax || 250;
+                document.getElementById('qlPatientPrefix').value = s.patientPrefix || 'CustomPatient';
+                document.getElementById('qlQueryPlanTemplateId').value = s.queryPlanTemplateId || '';
+                document.getElementById('qlRunConfigJson').value = JSON.stringify(s);
             });
-    }
-
-    function selectedMeasures() {
-        return Array.prototype.map.call(document.querySelectorAll('.measure-checkbox:checked'), function (cb) { return cb.value; });
-    }
-
-    function buildScenarioPayload() {
-        var cohorts = getCohorts();
-        var cohortMins = cohorts.map(function (c) { return c.resourcesPerPatientMin || 50; });
-        var cohortMaxes = cohorts.map(function (c) { return c.resourcesPerPatientMax || 100; });
-        var queryPlanSelect = document.getElementById('QueryPlanTemplate');
-        var selectedQueryPlanOption = queryPlanSelect && queryPlanSelect.selectedOptions && queryPlanSelect.selectedOptions.length > 0
-            ? queryPlanSelect.selectedOptions[0]
-            : null;
-
-        return {
-            id: scenarioIdInput.value || null,
-            name: document.getElementById('ScenarioName').value,
-            description: document.getElementById('ScenarioDescription').value,
-            isSystemScenario: isSystemInput.value === 'true',
-            reportMethod: document.getElementById('ReportMethod').value,
-            selectedMeasures: selectedMeasures(),
-            seed: parseInt(document.getElementById('Seed').value || '20260329', 10),
-            patientCount: parseInt(document.getElementById('PatientCount').value || '0', 10),
-            resourcesPerPatientMin: cohortMins.length > 0 ? Math.min.apply(null, cohortMins) : 50,
-            resourcesPerPatientMax: cohortMaxes.length > 0 ? Math.max.apply(null, cohortMaxes) : 100,
-            patientPrefix: document.getElementById('PatientPrefix').value,
-            useMeasureEligibilityProfiles: true,
-            patientProfiles: [],
-            patientCohorts: cohorts,
-            selectedClinicalScenarioIds: [],
-            dischargeCount: 0,
-            dischargeQualifyingCount: 0,
-            dischargeNonQualifyingCount: 0,
-            cleanupServiceData: document.getElementById('CleanupServiceData').checked,
-            cleanupFhirData: document.getElementById('CleanupFhirData').checked,
-            queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null,
-            queryPlanTemplateName: selectedQueryPlanOption
-                ? (selectedQueryPlanOption.getAttribute('data-name') || selectedQueryPlanOption.textContent || '').trim()
-                : null
-        };
-    }
-
-    function upsertScenario(notifyOnSuccess) {
-        var id = scenarioIdInput.value || crypto.randomUUID();
-        var payload = buildScenarioPayload();
-        payload.id = id;
-        payload.isSystemScenario = false;
-
-        return fetch('@Url.Action("SaveInline", "Scenarios")', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': antiforgeryToken()
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(function (r) {
-            if (!r.ok) throw new Error('Failed to save scenario');
-            return r.json();
-        })
-        .then(function (res) {
-            scenarioIdInput.value = res.id;
-            headerActions.style.display = '';
-            saveButton.disabled = false;
-            deleteButton.style.display = '';
-            setConfigEditable(true);
-            var currentId = res.id;
-            var existing = Array.prototype.find.call(selector.options, function (o) { return o.value === currentId; });
-            if (!existing) {
-                var opt = document.createElement('option');
-                opt.value = currentId;
-                opt.textContent = document.getElementById('ScenarioName').value;
-                selector.appendChild(opt);
-            } else {
-                existing.textContent = document.getElementById('ScenarioName').value;
-            }
-            selector.value = currentId;
-            title.textContent = document.getElementById('ScenarioName').value;
-            if (notifyOnSuccess) {
-                alert('Test saved.');
-            }
-            return res.id;
-        });
-    }
-
-    function saveScenario() {
-        upsertScenario(true)
-            .catch(function (e) {
-                console.error(e);
-                alert('Unable to save test.');
-            });
-    }
-
-    function deleteScenario() {
-        var id = scenarioIdInput.value;
-        if (!id) return;
-        if (isSystemInput.value === 'true') {
-            alert('System scenarios cannot be deleted.');
-            return;
-        }
-        if (!confirm('Delete this scenario?')) return;
-
-        fetch('@Url.Action("DeleteInline", "Scenarios")', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': antiforgeryToken()
-            },
-            body: JSON.stringify({ id: id })
-        })
-        .then(function (r) {
-            if (!r.ok) throw new Error('Failed to delete scenario');
-            Array.prototype.forEach.call(selector.options, function (o) {
-                if (o.value === id) o.remove();
-            });
-            selector.value = '';
-            resetToNewScenario();
-        })
-        .catch(function (e) {
-            console.error(e);
-            alert('Unable to delete scenario.');
-        });
-    }
-
-    function buildPatientProfilesForRun() {
-        // Patient profiles are expanded server-side from cohort definitions
-        // (see ResolveRunOptions / ExpandProfilesFromCohorts). No per-patient
-        // hidden inputs are needed — the cohort data travels inside
-        // RunConfigurationJson, and PatientCount / ResourcesPerPatient cover
-        // the top-level values.
-        syncPatientCountFromCohorts();
-    }
-
-    document.getElementById('btnNewScenario').addEventListener('click', resetToNewScenario);
-    selector.addEventListener('change', function () { loadScenario(selector.value); });
-    document.getElementById('btnSaveScenario').addEventListener('click', saveScenario);
-    document.getElementById('btnDeleteScenario').addEventListener('click', deleteScenario);
-
-    document.getElementById('addQualifyingCohort').addEventListener('click', function () {
-        addDefaultCohort(10, true, 50, 100);
-    });
-    document.getElementById('addNonQualifyingCohort').addEventListener('click', function () {
-        addDefaultCohort(10, false, 50, 100);
     });
 
-    cohortRows.addEventListener('click', function (e) {
-        if (e.target.closest('.btn-remove-cohort')) {
-            e.target.closest('tr').remove();
-            reindexCohorts();
-            syncPatientCountFromCohorts();
-        }
-    });
-
-    cohortRows.addEventListener('change', function (e) {
-        if (e.target.classList.contains('cohort-measure-eligibility')) {
-            var row = e.target.closest('tr');
-            enforceEligibilityDependencies(row, e.target.getAttribute('data-measure'));
-            applyEligibilityFilterToRow(row, readRowMeasureEligibilities(row));
-        }
-        if (e.target.classList.contains('cohort-scenario-option')) {
-            var optionRow = e.target.closest('tr');
-            updateScenarioDropdownSummary(optionRow);
-        }
-        if (e.target.classList.contains('cohort-count')) {
-            syncPatientCountFromCohorts();
-        }
-        validateRunForm();
-    });
-
-    cohortRows.addEventListener('input', function () {
-        syncPatientCountFromCohorts();
-        validateRunForm();
-    });
-
-    document.querySelectorAll('.measure-checkbox').forEach(function (cb) {
-        cb.addEventListener('change', function () {
-            Array.prototype.forEach.call(cohortRows.children, function (row) {
-                rerenderCohortMeasureEditor(row);
-            });
-            validateRunForm();
-        });
-    });
-
-    ['ScenarioName', 'PatientPrefix', 'Seed'].forEach(function (id) {
-        var el = document.getElementById(id);
-        if (el) {
-            el.addEventListener('input', validateRunForm);
-            el.addEventListener('change', validateRunForm);
-        }
-    });
-
-    runForm.addEventListener('submit', async function (e) {
-        e.preventDefault();
-
-        if (!validateRunForm()) {
-            alert('Please complete all required fields before running.');
-            return;
-        }
-
-        // Derive ResourcesPerPatient from cohort max values (cohorts own min/max now).
-        var cohorts = getCohorts();
-        var cohortMaxes = cohorts.map(function (c) { return c.resourcesPerPatientMax || 100; });
-        var effectiveResources = cohortMaxes.length > 0 ? Math.max.apply(null, cohortMaxes) : 250;
-        document.getElementById('ResourcesPerPatient').value = effectiveResources;
-        buildPatientProfilesForRun();
-
-        var runtimePayload = buildScenarioPayload();
-        runtimePayload.id = scenarioIdInput.value || null;
-        runtimePayload.isSystemScenario = isSystemInput.value === 'true';
-        scenarioNameHidden.value = runtimePayload.name || 'Scenario';
-        document.getElementById('ReportMethodHidden').value = document.getElementById('ReportMethod').value || 'Adhoc';
-        document.getElementById('QueryPlanTemplateId').value = document.getElementById('QueryPlanTemplate').value || '';
-        runConfigurationJsonHidden.value = JSON.stringify(runtimePayload);
-
-        if (runtimePayload.isSystemScenario !== true) {
-            try {
-                await upsertScenario(false);
-                runtimePayload.id = scenarioIdInput.value || runtimePayload.id;
-                runConfigurationJsonHidden.value = JSON.stringify(runtimePayload);
-            } catch (err) {
-                console.error(err);
-                alert('Unable to save test before running. Please fix and try again.');
-                return;
-            }
-        }
-
-        runForm.submit();
-    });
-
-    validateRunForm();
-
-    // --- AJAX Cancel for run rows ---
+    // --- AJAX Cancel ---
     document.addEventListener('click', function (e) {
         var btn = e.target.closest('.btn-cancel-run');
         if (!btn) return;
-
-        if (!confirm('Cancel this running test and cleanup all related service/FHIR data?')) return;
-
+        if (!confirm('Cancel this running test?')) return;
         var runId = btn.getAttribute('data-run-id');
-
         btn.disabled = true;
-        btn.textContent = 'Cancelling…';
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
 
-        fetch('@Url.Action("CancelJson", "Runs")', {
+        fetch(cancelUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': antiforgeryToken()
-            },
+            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': antiforgeryToken() },
             body: JSON.stringify({ id: runId })
         })
         .then(function (r) { return r.json(); })
-        .then(function () {
-            var badge = document.querySelector('.run-status-badge[data-run-id="' + runId + '"]');
-            if (badge) {
-                badge.textContent = 'Cancelled';
-                badge.className = 'badge run-status-badge bg-warning text-dark';
-            }
-
-            var actionsDiv = btn.closest('.run-actions');
-            if (actionsDiv) {
-                btn.remove();
-                var deleteBtn = document.createElement('button');
-                deleteBtn.type = 'button';
-                deleteBtn.className = 'btn btn-sm btn-outline-danger btn-delete-run';
-                deleteBtn.setAttribute('data-run-id', runId);
-                deleteBtn.textContent = 'Delete';
-                actionsDiv.appendChild(deleteBtn);
-            }
-        })
-        .catch(function (err) {
-            console.error('Cancel failed', err);
-            btn.disabled = false;
-            btn.textContent = 'Cancel';
-            alert('Unable to cancel the run. Please try again.');
-        });
+        .then(function () { refreshDashboard(); })
+        .catch(function () { btn.disabled = false; btn.innerHTML = '<i class="bi bi-x-circle"></i>'; alert('Unable to cancel.'); });
     });
 
-    // --- AJAX Delete for run rows ---
+    // --- AJAX Delete ---
     document.addEventListener('click', function (e) {
         var btn = e.target.closest('.btn-delete-run');
         if (!btn) return;
-
-        if (!confirm('Delete this run and all persisted data?')) return;
-
+        if (!confirm('Delete this run?')) return;
         var runId = btn.getAttribute('data-run-id');
-
         btn.disabled = true;
-        btn.textContent = 'Deleting…';
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
 
-        fetch('@Url.Action("DeleteJson", "Runs")', {
+        fetch(deleteUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': antiforgeryToken()
-            },
+            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': antiforgeryToken() },
             body: JSON.stringify({ id: runId })
         })
         .then(function (r) { return r.json(); })
         .then(function (result) {
-            if (result.success) {
-                var row = btn.closest('tr');
-                if (row) row.remove();
-            } else {
-                btn.disabled = false;
-                btn.textContent = 'Delete';
-                alert('Unable to delete the run. It may still be active.');
-            }
+            if (result.success) { refreshDashboard(); }
+            else { btn.disabled = false; btn.innerHTML = '<i class="bi bi-trash"></i>'; alert('Unable to delete.'); }
         })
-        .catch(function (err) {
-            console.error('Delete failed', err);
-            btn.disabled = false;
-            btn.textContent = 'Delete';
-            alert('Unable to delete the run. Please try again.');
-        });
+        .catch(function () { btn.disabled = false; btn.innerHTML = '<i class="bi bi-trash"></i>'; alert('Unable to delete.'); });
     });
 
+    // --- New Scenario (via shared scenario editor modal) ---
+    var btnNewScenarioFromRuns = document.getElementById('btnNewScenarioFromRuns');
+    if (btnNewScenarioFromRuns) {
+        btnNewScenarioFromRuns.addEventListener('click', function () {
+            if (typeof window.openScenarioEditor === 'function') {
+                window.openScenarioEditor(null, 'edit');
+            }
+        });
+    }
+
+    // When the shared editor saves a scenario, add/update its option and select it so
+    // the user can immediately run the newly created scenario.
+    document.addEventListener('scenario-editor:changed', function (e) {
+        var detail = e.detail || {};
+        if (detail.action !== 'saved' || !detail.id) return;
+        var sel = document.getElementById('quickLaunchSelect');
+        if (!sel) return;
+        var label = detail.name || 'Scenario';
+        var opt = sel.querySelector('option[value="' + detail.id + '"]');
+        if (opt) {
+            opt.textContent = label;
+        } else {
+            opt = document.createElement('option');
+            opt.value = detail.id;
+            opt.textContent = label;
+            sel.appendChild(opt);
+        }
+        sel.value = detail.id;
+        sel.dispatchEvent(new Event('change'));
+    });
 })();
 </script>
+
+@await Html.PartialAsync("_ScenarioEditorModal")
+}

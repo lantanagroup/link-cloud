@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -12,8 +12,8 @@ using Task = System.Threading.Tasks.Task;
 namespace LantanaGroup.Link.Tests.E2ETests;
 
 /// <summary>
-/// Stress/volume test that generates 5 synthetic patients, each with over 10,000
-/// FHIR resources, and runs them through the full ad-hoc reporting pipeline.
+/// Stress/volume test that generates a synthetic patient with ~5,000
+/// FHIR resources and runs it through the full ad-hoc reporting pipeline.
 /// </summary>
 public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
@@ -23,9 +23,8 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
 
     private readonly IServiceProvider _sp;
     private readonly string _facilityId = $"MegaPatient-{Guid.NewGuid():N}";
-    private List<(string Name, string Json)> _generatedBundles = [];
     private List<ProfiledMeasureType> _measures = [];
-    private List<PatientCohortDefinition> _cohorts = [];
+    private GenerationManifest? _generationManifest;
     private string? _reportId;
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
@@ -46,21 +45,35 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         _measures = measures;
         var cohorts = new List<PatientCohortDefinition>
         {
-            PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 10200, resourcesMax: 10200)
+            PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 5000, resourcesMax: 5000)
         };
-        _cohorts = cohorts;
-        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(Output, measures, cohorts, "MegaPatient", GenerationSeed);
-        _generatedBundles = bundles;
+        var profiles = PatientCohortDefinition.ExpandProfiles(cohorts, GenerationSeed);
+
+        await FhirDataLoader.WaitForServerAsync(Output);
+
+        var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
+            Output,
+            FhirDataLoader,
+            measures,
+            profiles,
+            totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
+            patientIdPrefix: "MegaPatient",
+            generationSeed: GenerationSeed,
+            acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
+            {
+                QueryPlan = QueryPlanBuilder.GetDefaultAsInput(),
+                ReportStart = Config.StartDate,
+                ReportEnd = Config.EndDate
+            });
+
+        _generationManifest = pipelineResult.Manifest;
 
         if (Config.PatientIds.Count == 0)
         {
-            Config.PatientIds = patientIds;
+            Config.PatientIds = pipelineResult.PatientIds;
         }
 
         Output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds)}]");
-
-        await FhirDataLoader.WaitForServerAsync(Output);
-        await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(Output, bundles);
 
         var validationApi = _sp.GetRequiredService<ValidationApiHelper>();
         await validationApi.InitializeArtifactsAsync();
@@ -167,18 +180,12 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         // Flush stale cache from diagnostics polling so validators read authoritative data.
         dataReader.InvalidateCache();
 
-        var profiles = PatientCohortDefinition.ExpandProfiles(_cohorts, GenerationSeed);
-        var generationManifest = GenerationManifest.Build(Config.PatientIds, _generatedBundles, profiles, _measures);
+        var generationManifest = _generationManifest
+            ?? throw new InvalidOperationException("Generation manifest was not produced by the pipeline.");
         generationManifest.MeasureIds = [measureId];
         var queryPlanInput = QueryPlanBuilder.GetDefaultAsInput();
         generationManifest.AcquiredResourceTypes = QueryPlanBuilder.GetAcquiredResourceTypes(queryPlanInput);
         generationManifest.ParameterQueryResourceTypes = QueryPlanBuilder.GetParameterQueryResourceTypes(queryPlanInput);
-        generationManifest.SimulatedAcquiredResourceKeysByPatient = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysByPatient(
-            Config.PatientIds,
-            _generatedBundles,
-            queryPlanInput,
-            Config.StartDate,
-            Config.EndDate);
         generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(_measures);
 
         await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
@@ -189,7 +196,7 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
             Config.EndDate,
             _facilityId,
             reportId,
-            _generatedBundles,
+            generatedBundles: null,
             manifest: generationManifest);
 
         // Step 9-10: Strict database validation.

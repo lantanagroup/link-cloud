@@ -1,4 +1,4 @@
-ï»¿using System.Text.Json;
+using System.Text.Json;
 using MongoDB.Driver;
 using Microsoft.Extensions.Logging;
 
@@ -10,9 +10,9 @@ namespace Automation.UI.Services.Persistence;
 /// Cosmos DB for MongoDB API (deployed environments).
 ///
 /// Collections:
-///   automation_runs       â€” lightweight run metadata
-///   automation_snapshots  â€” per-run, per-domain polling data (upsert on RunId+Domain)
-///   automation_logs       â€” full log output per run
+///   automation_runs       — lightweight run metadata
+///   automation_snapshots  — per-run, per-domain polling data (upsert on RunId+Domain)
+///   automation_logs       — full log output per run
 ///
 /// Indexes are managed centrally by <see cref="MongoIndexManager"/>.
 /// </summary>
@@ -59,11 +59,12 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
     }
 
-    public async Task CompleteRunAsync(Guid runId, CancellationToken ct = default)
+    public async Task CompleteRunAsync(Guid runId, string? duration = null, CancellationToken ct = default)
     {
         var update = Builders<AutomationRunDocument>.Update
             .Set(r => r.IsActive, false)
-            .Set(r => r.CompletedAt, DateTimeOffset.UtcNow);
+            .Set(r => r.CompletedAt, DateTimeOffset.UtcNow)
+            .Set(r => r.Duration, duration);
 
         await _runs.UpdateOneAsync(r => r.RunId == runId, update, cancellationToken: ct);
     }
@@ -129,6 +130,19 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return new PagedRunResult(items, pageNumber, pageSize, total);
     }
 
+    public async Task<IReadOnlyList<AutomationRunSummary>> GetAllRunSummariesAsync(DateTimeOffset? since = null, CancellationToken ct = default)
+    {
+        var filter = since.HasValue
+            ? Builders<AutomationRunDocument>.Filter.Gte(r => r.CreatedAt, since.Value)
+            : FilterDefinition<AutomationRunDocument>.Empty;
+
+        var docs = await _runs.Find(filter)
+            .SortByDescending(r => r.CreatedAt)
+            .ToListAsync(ct);
+
+        return docs.Select(ToSummary).ToList();
+    }
+
     public async Task DeleteRunAsync(Guid runId, CancellationToken ct = default)
     {
         await _runs.DeleteOneAsync(r => r.RunId == runId, ct);
@@ -165,6 +179,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             StartedAt = doc.StartedAt,
             FinishedAt = doc.FinishedAt,
             Error = doc.Error,
+            Duration = doc.Duration,
             FacilityId = doc.FacilityId,
             ReportId = doc.ReportId,
             Logs = []
@@ -238,7 +253,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
         catch (MongoCommandException)
         {
-            // Cosmos DB may reject $push/$each in some configurations â€” fall back to read-modify-write.
+            // Cosmos DB may reject $push/$each in some configurations — fall back to read-modify-write.
             var doc = await _logs.Find(filter).FirstOrDefaultAsync(ct);
             if (doc == null)
             {

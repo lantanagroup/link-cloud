@@ -1,10 +1,7 @@
-﻿using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
@@ -124,7 +121,7 @@ public static class FacilitySetupHelper
         string ehrDescription,
         QueryPlanInput? externalQueryPlan = null)
     {
-        // Query plans are keyed by (facilityId, type) — not per measure.
+        // Query plans are keyed by (facilityId, type) � not per measure.
         // Create each plan type once using the first measure as the plan name.
         var planName = measureIds.Count > 0 ? measureIds[0] : null;
         await EnsureQueryPlanAsync(dataAcqClient, output, facilityId, planName, ehrDescription, "Discharge", externalQueryPlan);

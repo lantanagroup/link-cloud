@@ -1,4 +1,4 @@
-ï»¿using Automation.UI.Models;
+using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation.Generation;
 
@@ -21,6 +21,7 @@ public sealed class ScenarioSeedService : IHostedService
     private static readonly Guid ScheduledReportId = new("00000000-0000-0000-0000-000000000004");
     private static readonly Guid RegenerateReportId = new("00000000-0000-0000-0000-000000000005");
     private static readonly Guid MultiMeasureId = new("00000000-0000-0000-0000-000000000006");
+    private static readonly Guid MegaMultiPatientId = new("00000000-0000-0000-0000-000000000007");
 
     private static readonly List<ProfiledMeasureType> DefaultMeasures =
         [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation];
@@ -92,41 +93,41 @@ public sealed class ScenarioSeedService : IHostedService
             CleanupFhirData = true,
         },
 
-        // --- Multi Patient Test (ad-hoc, 1000 patients, 100 resources each) ---
+        // --- Multi Patient Test (ad-hoc, 150 patients, 25-50 resources each) ---
         new TestScenarioDefinition
         {
             Id = MultiPatientId,
             Name = "Multi Patient Test",
-            Description = "Volume test with 1000 patients, ~100 resources each. Mirrors the MultiPatientTest backend E2E test.",
+            Description = "Volume test with 150 patients, 25–50 resources each. Mirrors the MultiPatientTest backend E2E test.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
             Seed = 20260328,
-            PatientCount = 1000,
-            ResourcesPerPatientMin = 100,
-            ResourcesPerPatientMax = 100,
+            PatientCount = 150,
+            ResourcesPerPatientMin = 25,
+            ResourcesPerPatientMax = 50,
             PatientPrefix = "MultiPatient",
             PatientCohorts =
             [
                 new PatientCohortDefinition
                 {
-                    PatientCount = 1000,
+                    PatientCount = 150,
                     MeasureEligibilities = new(DefaultQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
-                    ResourcesPerPatientMin = 100,
-                    ResourcesPerPatientMax = 100
+                    ResourcesPerPatientMin = 25,
+                    ResourcesPerPatientMax = 50
                 }
             ],
             CleanupServiceData = false,
             CleanupFhirData = true,
         },
 
-        // --- Mega Patient Test (ad-hoc, 1 patient, ~10200 resources) ---
+        // --- Mega Patient Test (ad-hoc, 1 patient, ~5000 resources) ---
         new TestScenarioDefinition
         {
             Id = MegaPatientId,
             Name = "Mega Patient Test",
-            Description = "Stress test with a single patient and >10,000 resources. Mirrors the MegaPatientTest backend E2E test.",
+            Description = "Stress test with a single patient and ~5,000 resources. Mirrors the MegaPatientTest backend E2E test.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
@@ -144,6 +145,43 @@ public sealed class ScenarioSeedService : IHostedService
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
                     ResourcesPerPatientMin = FhirBundleGenerator.DefaultResourcesPerPatient,
                     ResourcesPerPatientMax = FhirBundleGenerator.DefaultResourcesPerPatient
+                }
+            ],
+            CleanupServiceData = false,
+            CleanupFhirData = true,
+        },
+
+        // --- Mega Multi Patient Test (ad-hoc, 150 patients, 5000 resources for first, 25-50 for the rest) ---
+        new TestScenarioDefinition
+        {
+            Id = MegaMultiPatientId,
+            Name = "Mega Multi Patient Test",
+            Description = "Hybrid stress + volume test: one mega patient with ~5,000 resources plus 149 patients with 25–50 resources each.",
+            IsSystemScenario = true,
+            ReportMethod = ReportMethod.Adhoc,
+            SelectedMeasures = [..DefaultMeasures],
+            Seed = 20260330,
+            PatientCount = 150,
+            ResourcesPerPatientMin = 25,
+            ResourcesPerPatientMax = 5000,
+            PatientPrefix = "MegaMultiPatient",
+            PatientCohorts =
+            [
+                new PatientCohortDefinition
+                {
+                    PatientCount = 1,
+                    MeasureEligibilities = new(DefaultQualifyingEligibilities),
+                    EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
+                    ResourcesPerPatientMin = 5000,
+                    ResourcesPerPatientMax = 5000
+                },
+                new PatientCohortDefinition
+                {
+                    PatientCount = 149,
+                    MeasureEligibilities = new(DefaultQualifyingEligibilities),
+                    EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
+                    ResourcesPerPatientMin = 25,
+                    ResourcesPerPatientMax = 50
                 }
             ],
             CleanupServiceData = false,

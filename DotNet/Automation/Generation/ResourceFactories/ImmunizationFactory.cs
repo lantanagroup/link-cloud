@@ -8,10 +8,10 @@ public static class ImmunizationFactory
     /// <summary>Generate an Immunization from the pool using a seed index.</summary>
     public static Immunization Generate(
         string id, string patientId, string encounterId,
-        DateTime occurrence, int seed, string locationId)
+        DateTime occurrence, int seed, string locationId, string organizationId)
     {
         var v = FhirGenerationCodes.Immunizations[seed % FhirGenerationCodes.Immunizations.Length];
-        return Create(id, patientId, encounterId, occurrence, seed, locationId, v.CvxCode, v.Display, v.DoseML);
+        return Create(id, patientId, encounterId, occurrence, seed, locationId, organizationId, v.CvxCode, v.Display, v.DoseML);
     }
 
     /// <summary>Create an Immunization with caller-supplied vaccine values.</summary>
@@ -22,6 +22,7 @@ public static class ImmunizationFactory
         DateTime occurrence,
         int seed,
         string locationId,
+        string organizationId,
         string cvxCode,
         string display,
         double doseMl) => new()
@@ -49,7 +50,7 @@ public static class ImmunizationFactory
             new Immunization.PerformerComponent
             {
                 Function = CC("http://terminology.hl7.org/CodeSystem/v2-0443", "AP", "Administering Provider"),
-                Actor    = Ref($"Organization/{FhirBundleGenerator.HospitalOrgId}", "General Test Hospital")
+                Actor    = Ref($"Organization/{organizationId}", "General Test Hospital")
             }
         ],
             DoseQuantity = new Quantity { Value = (decimal)doseMl, Unit = "mL", System = "http://unitsofmeasure.org", Code = "mL" },

@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -213,9 +213,10 @@ public class ReportDatabaseValidator
         }
 
         // When the manifest is available, validate per-patient resource type counts.
-        // ReportResource is populated by PatientAggregator from MeasureEval's MeasureReport
-        // contained resources — the same data that goes into ABS patient NDJSON files.
-        // Expected types = generated ∩ acquired ∩ CQL-referenced.
+        // ReportResource is populated by PatientAggregator from the MeasureReport contained
+        // resources captured in the per-measure .mr file. Unlike the ABS patient NDJSON, the
+        // ReportResource table never receives OperationOutcome rows — ValidationCompleteListener
+        // appends those directly to the blob, bypassing the aggregation flow.
         if (manifest != null)
         {
             var dbCountsByPatient = resources
@@ -227,22 +228,37 @@ public class ReportDatabaseValidator
 
             foreach (var patientId in expectedPatientIds)
             {
-                var expectedCounts = manifest.GetExpectedAbsCountsForPatient(patientId);
+                var expectedCounts = manifest.GetExpectedReportResourceCountsForPatient(patientId);
                 if (expectedCounts == null)
                     continue;
 
                 dbCountsByPatient.TryGetValue(patientId, out var actualCounts);
                 actualCounts ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-                foreach (var (resourceType, expectedCount) in expectedCounts)
+                // Strict prediction-vs-actual: every expected type must match exactly, and any
+                // type actually present must have been predicted.
+                var allTypes = new HashSet<string>(expectedCounts.Keys, StringComparer.OrdinalIgnoreCase);
+                foreach (var t in actualCounts.Keys) allTypes.Add(t);
+
+                foreach (var resourceType in allTypes)
                 {
+                    expectedCounts.TryGetValue(resourceType, out var expectedCount);
                     actualCounts.TryGetValue(resourceType, out var actualCount);
+
+                    if (actualCount == expectedCount)
+                        continue;
+
                     if (actualCount < expectedCount)
                     {
                         AddError(errors,
                             $"ReportResource count for patient={patientId}, type={resourceType}: " +
-                            $"expected>={expectedCount} (sim-acquired ∩ reachable-CQL), " +
-                            $"actual={actualCount}.");
+                            $"expected={expectedCount} (sim-acquired ∩ reachable-CQL + derived), actual={actualCount}.");
+                    }
+                    else
+                    {
+                        AddError(errors,
+                            $"ReportResource count for patient={patientId}, type={resourceType}: " +
+                            $"expected={expectedCount}, actual={actualCount} (DB has {actualCount - expectedCount} more than predicted).");
                     }
                 }
             }
