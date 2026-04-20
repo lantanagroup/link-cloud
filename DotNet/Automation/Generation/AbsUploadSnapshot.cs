@@ -15,10 +15,10 @@ public sealed class AbsUploadSnapshot
     /// <summary>Patient IDs that had artifacts in the upload.</summary>
     public IReadOnlyList<string> PatientIds { get; init; } = [];
 
-    /// <summary>Aggregate resource type → count across all patient artifacts.</summary>
+    /// <summary>Aggregate resource type ? count across all patient artifacts.</summary>
     public IReadOnlyDictionary<string, int> TotalCountsByType { get; init; } = new Dictionary<string, int>();
 
-    /// <summary>Per-patient resource type → count.</summary>
+    /// <summary>Per-patient resource type ? count.</summary>
     public IReadOnlyDictionary<string, Dictionary<string, int>> ResourceCountsByPatient { get; init; }
         = new Dictionary<string, Dictionary<string, int>>();
 
@@ -45,19 +45,15 @@ public sealed class AbsUploadSnapshot
         {
             foreach (var line in manifestNdjson.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
-                try
+                using var doc = JsonDocument.Parse(line);
+                var rt = doc.RootElement.TryGetProperty("resourceType", out var rtProp)
+                    ? rtProp.GetString() : null;
+                if (!string.IsNullOrWhiteSpace(rt))
                 {
-                    using var doc = JsonDocument.Parse(line);
-                    var rt = doc.RootElement.TryGetProperty("resourceType", out var rtProp)
-                        ? rtProp.GetString() : null;
-                    if (!string.IsNullOrWhiteSpace(rt))
-                    {
-                        manifestCount++;
-                        if (!manifestTypes.Contains(rt))
-                            manifestTypes.Add(rt);
-                    }
+                    manifestCount++;
+                    if (!manifestTypes.Contains(rt))
+                        manifestTypes.Add(rt);
                 }
-                catch { /* skip malformed lines */ }
             }
         }
 
@@ -77,18 +73,14 @@ public sealed class AbsUploadSnapshot
 
             foreach (var line in ndjson.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
-                try
-                {
-                    using var doc = JsonDocument.Parse(line);
-                    var rt = doc.RootElement.TryGetProperty("resourceType", out var rtProp)
-                        ? rtProp.GetString() : null;
-                    if (string.IsNullOrWhiteSpace(rt)) continue;
+                using var doc = JsonDocument.Parse(line);
+                var rt = doc.RootElement.TryGetProperty("resourceType", out var rtProp)
+                    ? rtProp.GetString() : null;
+                if (string.IsNullOrWhiteSpace(rt)) continue;
 
-                    totalCount++;
-                    patientCounts[rt] = patientCounts.TryGetValue(rt, out var c) ? c + 1 : 1;
-                    totalsByType[rt] = totalsByType.TryGetValue(rt, out var tc) ? tc + 1 : 1;
-                }
-                catch { /* skip malformed lines */ }
+                totalCount++;
+                patientCounts[rt] = patientCounts.TryGetValue(rt, out var c) ? c + 1 : 1;
+                totalsByType[rt] = totalsByType.TryGetValue(rt, out var tc) ? tc + 1 : 1;
             }
 
             countsByPatient[patientId] = patientCounts;

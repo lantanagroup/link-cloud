@@ -1,4 +1,4 @@
-﻿# Automation.Link
+# Automation.Link
 
 `Automation.Link` is the Link-specific orchestration and validation layer that turns the
 platform-agnostic `Automation` engine into a full end-to-end Link pipeline runner.
@@ -9,11 +9,11 @@ clients.
 
 This README is aimed at three audiences:
 
-- **Product owners / project managers** � sections 1 and 2 describe the project's
+- **Product owners / project managers** -- sections 1 and 2 describe the project's
   responsibilities and where it sits in the larger system.
-- **QA** � sections 3 and 5 describe the monitoring and validation surfaces, and what failure
+- **QA** -- sections 3 and 5 describe the monitoring and validation surfaces, and what failure
   messages mean.
-- **Developers** � sections 4 through 9 walk through each component and extension point.
+- **Developers** -- sections 4 through 9 walk through each component and extension point.
 
 ---
 
@@ -58,21 +58,21 @@ Automation.Link
 A typical host-driven flow (`BackendE2ETests` or `Automation.UI`) composed through
 `Automation.Link`:
 
-1. **Load measures** � `MeasureLoader.LoadAllAsync(�)` loads measure bundles into MeasureEval
+1. **Load measures** -- `MeasureLoader.LoadAllAsync(...)` loads measure bundles into MeasureEval
    and Validation.
 2. **Ensure tenant/facility and acquisition config**
-   - `FacilitySetupHelper.EnsureFacilityAsync(�)`
-   - `EnsureNormalizationConfigAsync(�)`
-   - `EnsureQueryPlansAsync(�)`
-   - `EnsureQueryConfigAsync(�)`
-   - `EnsureQueryDispatchConfigAsync(�)`
-3. **Generate and submit report** � `ReportApiHelper.GenerateReportAsync(�)` (or the
-   regeneration flow); then `ReportApiHelper.CheckSubmissionStatusAsync(�)`.
-4. **Monitor pipeline in background** � `BackgroundDiagnosticsMonitor` + probes continuously
+   - `FacilitySetupHelper.EnsureFacilityAsync(...)`
+   - `EnsureNormalizationConfigAsync(...)`
+   - `EnsureQueryPlansAsync(...)`
+   - `EnsureQueryConfigAsync(...)`
+   - `EnsureQueryDispatchConfigAsync(...)`
+3. **Generate and submit report** -- `ReportApiHelper.GenerateReportAsync(...)` (or the
+   regeneration flow); then `ReportApiHelper.CheckSubmissionStatusAsync(...)`.
+4. **Monitor pipeline in background** -- `BackgroundDiagnosticsMonitor` + probes continuously
    inspect Loki/Kafka/progress/milestones.
-5. **Read snapshots and validate state** � `PipelineSnapshot` /
+5. **Read snapshots and validate state** -- `PipelineSnapshot` /
    `PipelineSummarySnapshotBuilder`, then validators under `Validation/`.
-6. **Cleanup** � `RunCleanupHelper.CleanupAfterRunAsync(�)`.
+6. **Cleanup** -- `RunCleanupHelper.CleanupAfterRunAsync(...)`.
 
 ---
 
@@ -80,50 +80,50 @@ A typical host-driven flow (`BackendE2ETests` or `Automation.UI`) composed throu
 
 ### 4.1 Setup and execution layer (`Services/`, `Helpers/`)
 
-- **`ReportApiHelper`** � start report generation/regeneration, compute adaptive polling
+- **`ReportApiHelper`** -- start report generation/regeneration, compute adaptive polling
   timeouts, download submission ZIP artifacts.
-- **`FacilitySetupHelper`** � idempotent setup/teardown of tenant + facility +
+- **`FacilitySetupHelper`** -- idempotent setup/teardown of tenant + facility +
   acquisition + normalization + query-dispatch configuration.
-- **`MeasureLoader`** � load measure resources from `file://`, `resource://`, or
+- **`MeasureLoader`** -- load measure resources from `file://`, `resource://`, or
   `http(s)://` sources. Splits resources by consumer (MeasureEval vs Validation) and tracks
   `MeasureIds` for multi-measure runs. **Preserves `Measure.supplementalData` as authored** so
   MeasureEval executes measure-authored SDE logic.
-- **`QueryPlanBuilder`** � converts `QueryPlanInput` into DataAcquisition wire format;
+- **`QueryPlanBuilder`** -- converts `QueryPlanInput` into DataAcquisition wire format;
   delegates canonical defaults and acquired-type extraction to `Automation.QueryPlanDefaults`.
-- **`AdminBffClientFactory`** � builds authenticated Admin BFF clients for flows that require
+- **`AdminBffClientFactory`** -- builds authenticated Admin BFF clients for flows that require
   BFF endpoints.
-- **`ValidationApiHelper`** � initializes validation artifacts and categories with retry +
+- **`ValidationApiHelper`** -- initializes validation artifacts and categories with retry +
   Loki diagnostics hooks.
 
 ### 4.2 Data-read abstraction layer
 
-- **`PipelineDataReader`** � central read-only facade over service APIs. Returns strongly typed
+- **`PipelineDataReader`** -- central read-only facade over service APIs. Returns strongly typed
   records for schedules, entries, populations, DA summaries, normalization ops, facility
   state, etc. Includes an 8-second TTL cache that collapses duplicate high-frequency queries
   across diagnostics, validators, and UI pollers.
-- **`DatabaseConnectionFactory`** � direct DB connection string helper for validators that
+- **`DatabaseConnectionFactory`** -- direct DB connection string helper for validators that
   need SQL access (notably Validation DB checks).
 
 ### 4.3 Monitoring and diagnostics layer (`Monitoring/`)
 
-- **`BackgroundDiagnosticsMonitor`** � hosts a probe-driven monitor loop, emits
+- **`BackgroundDiagnosticsMonitor`** -- hosts a probe-driven monitor loop, emits
   `AutomationMonitorEvent`, supports streaming events and milestone waits, and exposes
   `HasCriticalFailure` so hosts can short-circuit polling.
 - **Probes**
-  - `LokiErrorProbe` � scans service logs for exceptions and errors.
-  - `KafkaErrorProbe` � flags retry/DLQ topics as critical failures.
-  - `ProgressProbe` � runs `ProgressMonitor` and stall detection.
-  - `MilestoneProbe` � runs `MilestoneValidationOrchestrator`.
-- **`ProgressMonitor` + `PipelineProgressTracker`** � compute coarse progress across
-  DataAcquisition � MeasureEval � Validation � Submission, identify the stalled stage,
+  - `LokiErrorProbe` -- scans service logs for exceptions and errors.
+  - `KafkaErrorProbe` -- flags retry/DLQ topics as critical failures.
+  - `ProgressProbe` -- runs `ProgressMonitor` and stall detection.
+  - `MilestoneProbe` -- runs `MilestoneValidationOrchestrator`.
+- **`ProgressMonitor` + `PipelineProgressTracker`** -- compute coarse progress across
+  DataAcquisition -> MeasureEval -> Validation -> Submission, identify the stalled stage,
   compute stall duration, and write human-readable diagnostics with per-status breakdowns.
-- **`LokiScraper`, `KafkaErrorMonitor`** � infrastructure-specific signal collectors used by
+- **`LokiScraper`, `KafkaErrorMonitor`** -- infrastructure-specific signal collectors used by
   probes and retry diagnostics.
 
 ### 4.4 Pipeline snapshots (`Helpers/`)
 
-- **`PipelineSnapshot`** � full non-asserting diagnostic snapshot output.
-- **`PipelineSummarySnapshotBuilder`** � compact snapshot payloads used by UI polling surfaces
+- **`PipelineSnapshot`** -- full non-asserting diagnostic snapshot output.
+- **`PipelineSummarySnapshotBuilder`** -- compact snapshot payloads used by UI polling surfaces
   (schedule, entries, populations, acquisition, measure resources, validation resources).
   Consumed by `Automation.UI.StoreBackedServicePoller`.
 
@@ -152,7 +152,7 @@ strict mode holds.
 
 ### 5.2 Validators
 
-- **`ReportAbsManifestValidator`** � validates internal ABS artifacts (`manifest.ndjson`,
+- **`ReportAbsManifestValidator`** -- validates internal ABS artifacts (`manifest.ndjson`,
   `patient-*.ndjson`). Reconciles expected vs actual resources using
   `GenerationManifest.GetExpectedAbsCountsForPatient(patientId)`.
 
@@ -162,25 +162,25 @@ strict mode holds.
   `ValidationCompleteListener.ProcessMessageAsync` appends exactly one OperationOutcome to the
   patient ABS blob when `ValidationComplete.IsValid == false`.
 
-- **`ReportDatabaseValidator`** � validates schedule, report entries, report types,
+- **`ReportDatabaseValidator`** -- validates schedule, report entries, report types,
   populations, and report resource persistence. Uses
   `GenerationManifest.GetExpectedReportResourceCountsForPatient(patientId)`, which omits
   OperationOutcome because those resources are appended directly to the ABS blob and never
   reach the `ReportResource` table.
 
-- **`DataAcquisitionDatabaseValidator`** � validates query config/plans, acquisition logs,
+- **`DataAcquisitionDatabaseValidator`** -- validates query config/plans, acquisition logs,
   FHIR query rows, and reference resources.
 
-- **`NormalizationDatabaseValidator`** � validates operations, operation resource types, and
+- **`NormalizationDatabaseValidator`** -- validates operations, operation resource types, and
   operation sequencing.
 
-- **`TenantDatabaseValidator`** � validates facility persistence and scheduled report
+- **`TenantDatabaseValidator`** -- validates facility persistence and scheduled report
   configuration.
 
-- **`ValidationResultsValidator`** � validates Validation service API availability/results
+- **`ValidationResultsValidator`** -- validates Validation service API availability/results
   and exception-free logs.
 
-- **`MilestoneValidationOrchestrator`** � lightweight idempotent stage checkpoints used
+- **`MilestoneValidationOrchestrator`** -- lightweight idempotent stage checkpoints used
   during run-time monitoring.
 
 ### 5.3 Validator isolation pattern
@@ -199,7 +199,7 @@ expected to throw and fail the test.
 
 ## 6. Cleanup
 
-- **`RunCleanupHelper`** � standard post-run cleanup path shared by hosts. Supports
+- **`RunCleanupHelper`** -- standard post-run cleanup path shared by hosts. Supports
   cancellation-specific cleanup ordering:
   1. Cancel DA work.
   2. Soft-delete run artifacts.
@@ -213,9 +213,9 @@ service data for inspection) is expressible.
 
 ## 7. Configuration (`Configuration/`)
 
-- **`AutomationConfig`** � Link-specific runtime settings (service URLs, FHIR endpoints,
+- **`AutomationConfig`** -- Link-specific runtime settings (service URLs, FHIR endpoints,
   OAuth/basic auth, DB/Kafka settings, query behavior).
-- **`TestScenarioConfig`** � scenario-specific runtime parameters (measure bundle locations,
+- **`TestScenarioConfig`** -- scenario-specific runtime parameters (measure bundle locations,
   patient IDs, polling windows, cleanup flags).
 
 Both extend base classes in `Automation.Configuration`.
@@ -224,13 +224,13 @@ Both extend base classes in `Automation.Configuration`.
 
 ## 8. Key models
 
-- **`AutomationRunSummary`** � normalized run metadata/status payload consumed by hosts.
+- **`AutomationRunSummary`** -- normalized run metadata/status payload consumed by hosts.
   Fields include: `RunId`, `RunName`, `Scenario`, `Status`, `PatientCount`,
   `ResourcesPerPatient`, `Seed`, `CreatedAt`, `FinishedAt`, `Duration`,
   `RunConfigurationJson`.
-- **`AutomationRunStatus` / `AutomationScenarioKind`** � run lifecycle and scenario identity
+- **`AutomationRunStatus` / `AutomationScenarioKind`** -- run lifecycle and scenario identity
   enums.
-- **`ISnapshotStore`** � abstraction used by hosts (notably the UI) for run metadata, domain
+- **`ISnapshotStore`** -- abstraction used by hosts (notably the UI) for run metadata, domain
   snapshots, and log persistence. `GetAllRunSummariesAsync(since)` supports date filtering to
   bound collection scans.
 
@@ -238,15 +238,15 @@ Both extend base classes in `Automation.Configuration`.
 
 ## 9. Runtime behavior characteristics
 
-- **Idempotent setup-first design** � facility and query configuration methods are safe to
+- **Idempotent setup-first design** -- facility and query configuration methods are safe to
   call repeatedly.
-- **Monitoring-first failure detection** � critical errors can short-circuit long polling
+- **Monitoring-first failure detection** -- critical errors can short-circuit long polling
   loops.
-- **Deterministic validation** � validators consume `GenerationManifest` to compare concrete
+- **Deterministic validation** -- validators consume `GenerationManifest` to compare concrete
   expected vs actual state.
-- **Host-agnostic composition** � the same project powers both automated tests and
+- **Host-agnostic composition** -- the same project powers both automated tests and
   interactive UI flows.
-- **Validator isolation under the UI** � partial results flow to the dashboard even when
+- **Validator isolation under the UI** -- partial results flow to the dashboard even when
   later validators throw.
 
 ---
@@ -255,8 +255,8 @@ Both extend base classes in `Automation.Configuration`.
 
 Primary consumers:
 
-- **`Tests/BackendE2ETests`** � CI/E2E orchestration host.
-- **`DotNet/Automation.UI`** � interactive Razor MVC host for run management.
+- **`Tests/BackendE2ETests`** -- CI/E2E orchestration host.
+- **`DotNet/Automation.UI`** -- interactive Razor MVC host for run management.
 
 ---
 

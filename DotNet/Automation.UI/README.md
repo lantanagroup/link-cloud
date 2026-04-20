@@ -1,8 +1,8 @@
-﻿# Automation.UI
+# Automation.UI
 
 `Automation.UI` is the interactive web host for Link automation runs. It lets users create and
 manage test scenarios, configure FHIR query plans, start runs, watch progress in real time,
-inspect pipeline state, and review validation outcomes � all from a browser.
+inspect pipeline state, and review validation outcomes -- all from a browser.
 
 It composes:
 
@@ -12,11 +12,11 @@ It composes:
 
 This README is aimed at three audiences:
 
-- **Product owners / project managers** � sections 1�4 describe what the UI does and how
+- **Product owners / project managers** -- sections 1-4 describe what the UI does and how
   users interact with it.
-- **QA** � sections 5�7 describe the dashboard, run inspection, and the strict
+- **QA** -- sections 5-7 describe the dashboard, run inspection, and the strict
   prediction-vs-actual report surface.
-- **Developers** � sections 8�12 describe the code structure, persistence model, and
+- **Developers** -- sections 8-12 describe the code structure, persistence model, and
   extension points.
 
 ---
@@ -26,15 +26,15 @@ This README is aimed at three audiences:
 At a high level, `Automation.UI` is a control plane and observability surface for end-to-end
 pipeline tests. It provides:
 
-1. **Scenario management** � create, edit, clone, and delete reusable test configurations.
-2. **Query plan management** � define which FHIR resource types are acquired during data
+1. **Scenario management** -- create, edit, clone, and delete reusable test configurations.
+2. **Query plan management** -- define which FHIR resource types are acquired during data
    acquisition.
-3. **Scenario execution** � start, cancel, and delete runs.
-4. **Live telemetry** � SignalR-driven logs, status, and dashboard updates.
-5. **Dashboard analytics** � KPIs, success rates, 14-day run histograms.
-6. **Persistent run history** � MongoDB-backed state across restarts.
-7. **Snapshot-based inspection** � pipeline domains pre-aggregated for UI rendering.
-8. **Validation-backed confidence** � report, ABS, DA, normalization, tenant, validation
+3. **Scenario execution** -- start, cancel, and delete runs.
+4. **Live telemetry** -- SignalR-driven logs, status, and dashboard updates.
+5. **Dashboard analytics** -- KPIs, success rates, 14-day run histograms.
+6. **Persistent run history** -- MongoDB-backed state across restarts.
+7. **Snapshot-based inspection** -- pipeline domains pre-aggregated for UI rendering.
+8. **Validation-backed confidence** -- report, ABS, DA, normalization, tenant, validation
    checks.
 
 ---
@@ -56,7 +56,7 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 |   +-- QueryPlans/Index.cshtml query plan list + inline modal editor
 |   +-- Shared/_ScenarioEditorModal.cshtml   reusable scenario editor (markup + JS)
 +-- Models/
-|   +-- RunDashboardViewModel, RunDashboardStats, TestScenarioDefinition, �
+|   +-- RunDashboardViewModel, RunDashboardStats, TestScenarioDefinition, --
 +-- Services/
 |   +-- AutomationRunManager    run lifecycle orchestration
 |   +-- RunSnapshotOrchestrator background pollers per active run
@@ -103,13 +103,13 @@ APIs.
 | `DataAcquisitionLogDetail` | GET | Individual DA log entry detail. |
 
 The dashboard's **quick-launch** dropdown is populated from saved scenarios. Clicking the
-**+ New Scenario** button on the Runs page opens the shared scenario editor modal inline � a
+**+ New Scenario** button on the Runs page opens the shared scenario editor modal inline -- a
 saved scenario is automatically appended to the dropdown and selected, so the user can run the
 newly authored scenario without navigating away.
 
 ### 3.2 `ScenariosController`
 
-Manages saved test scenario templates. All editing is inline via JSON endpoints � there are
+Manages saved test scenario templates. All editing is inline via JSON endpoints -- there are
 no separate Create/Edit/Details pages.
 
 | Action | Method | Purpose |
@@ -152,10 +152,10 @@ Redirects to `Runs/Index`.
 
 All management views follow a **single-page inline editing** pattern:
 
-1. **List table** � shows all items with summary columns.
-2. **Modal editor** � opens over the list for create/edit/view.
-3. **IIFE script block** � self-contained JavaScript at the bottom of the page.
-4. **JSON AJAX** � all mutations use `fetch()` POST with `Content-Type: application/json` and
+1. **List table** -- shows all items with summary columns.
+2. **Modal editor** -- opens over the list for create/edit/view.
+3. **IIFE script block** -- self-contained JavaScript at the bottom of the page.
+4. **JSON AJAX** -- all mutations use `fetch()` POST with `Content-Type: application/json` and
    the antiforgery token header.
 
 URLs for AJAX endpoints are generated server-side via `@Url.Action("Action", "Controller")`
@@ -228,9 +228,9 @@ the UI scenario and the backend test produces bit-for-bit identical FHIR input:
 | System scenario | Seed | Patients | Resources |
 |---|---:|---:|---:|
 | Adhoc Report Test | 20260326 | 1 | 1000 |
-| Multi Patient Test | 20260328 | 150 | 25�50 |
+| Multi Patient Test | 20260328 | 150 | 25-50 |
 | Mega Patient Test | 20260327 | 1 | 5000 |
-| Mega Multi Patient Test | 20260330 | 150 | 5000 / 25�50 |
+| Mega Multi Patient Test | 20260330 | 150 | 5000 / 25-50 |
 | Scheduled Report Test | 20260326 | 1 | 1000 |
 | Regenerate Report Test | 20260401 | 1 | 100 |
 | Multi Measure Test | 20260420 | 2 | 250 |
@@ -241,11 +241,11 @@ These scenarios match `Tests/BackendE2ETests` entry by entry (see that project's
 
 Each cohort defines a group of patients sharing:
 
-- **Patient count** � how many patients to generate.
-- **Measure eligibility** � per-measure qualifying / non-qualifying checkboxes.
-- **Clinical profiles** � which of the 16 clinical scenarios to draw from (filtered by
+- **Patient count** -- how many patients to generate.
+- **Measure eligibility** -- per-measure qualifying / non-qualifying checkboxes.
+- **Clinical profiles** -- which of the 16 clinical scenarios to draw from (filtered by
   eligibility).
-- **Resource range** � min/max resources per patient.
+- **Resource range** -- min/max resources per patient.
 
 The editor enforces measure eligibility constraints in the UI:
 
@@ -284,7 +284,7 @@ streaming on the run details page and real-time dashboard KPI updates without po
 
 ## 7. End-to-end run workflow
 
-`AutomationRunManager.ExecuteAsync(�)` coordinates the full lifecycle:
+`AutomationRunManager.ExecuteAsync(...)` coordinates the full lifecycle:
 
 1. **Resolve request into run options**
    - Scenario defaults + custom overrides.
@@ -295,21 +295,21 @@ streaming on the run details page and real-time dashboard KPI updates without po
    - `GenerationManifest` is built incrementally during generation.
    - `QueryPlanAcquisitionSimulator` runs per-patient.
    - `CqlFilterSimulator` runs per-patient over the patient's qualifying measures only.
-3. **Initialize validation dependencies** � validation artifacts and categories.
-4. **Load measure bundles** � `MeasureLoader.LoadAllAsync()` (supports multi-measure).
-5. **Ensure tenant/pipeline setup** � facility, normalization config, query plans/config,
+3. **Initialize validation dependencies** -- validation artifacts and categories.
+4. **Load measure bundles** -- `MeasureLoader.LoadAllAsync()` (supports multi-measure).
+5. **Ensure tenant/pipeline setup** -- facility, normalization config, query plans/config,
    query dispatch config.
 6. **Generate report and monitor submission**
    - Start `BackgroundDiagnosticsMonitor`.
    - Poll until submission / critical failure / timeout.
-7. **(Optional) regeneration path** � regenerate report and switch pollers to the new report
+7. **(Optional) regeneration path** -- regenerate report and switch pollers to the new report
    ID.
 8. **Snapshot + artifact download + validation suite**
    - Full diagnostic snapshot.
    - External/internal ABS downloads.
    - Validators run via `RunValidator` wrapper with per-validator error isolation.
    - Partial `validatorResults` persisted after each validator completes.
-9. **Cleanup** � service-level and FHIR cleanup based on run config.
+9. **Cleanup** -- service-level and FHIR cleanup based on run config.
 
 ### Validation orchestration
 
@@ -346,10 +346,10 @@ See `DotNet/Automation/README.md` section 7 for the full prediction formula.
 
 `Runs/Manifest` provides a deep-dive UX for this model:
 
-- **Overview tab** � measure context, query-plan acquired types, CQL-referenced types,
+- **Overview tab** -- measure context, query-plan acquired types, CQL-referenced types,
   generated resource distribution (patient + shared).
-- **Patients tab** � per-patient generated counts and type badges.
-- **Generated vs ABS tab** � side-by-side prediction and actual ABS upload counts, per-type
+- **Patients tab** -- per-patient generated counts and type badges.
+- **Generated vs ABS tab** -- side-by-side prediction and actual ABS upload counts, per-type
   and per-patient deltas, pipeline explanation distinguishing type-level CQL reachability
   from resource-level SDE filtering, and explicit rows for pipeline-derived types (Patient,
   MeasureReport, OperationOutcome) whose counts are predicted deterministically.
@@ -408,11 +408,11 @@ This enables restart-safe run history and multi-instance read sharing.
 
 Collections:
 
-- `automation_runs` � run summaries and status metadata.
-- `automation_snapshots` � per-run, per-domain snapshot payloads.
-- `automation_logs` � full run logs.
-- `automation_scenarios` � user and system scenario templates.
-- `automation_query_plan_templates` � query plan templates.
+- `automation_runs` -- run summaries and status metadata.
+- `automation_snapshots` -- per-run, per-domain snapshot payloads.
+- `automation_logs` -- full run logs.
+- `automation_scenarios` -- user and system scenario templates.
+- `automation_query_plan_templates` -- query plan templates.
 
 ### Document conventions
 
@@ -434,10 +434,10 @@ Initializes required indexes with Cosmos-safe behavior:
 
 ## 11. Authentication model
 
-### Inbound (browser � Automation.UI)
+### Inbound (browser -- Automation.UI)
 
 External authentication is handled at the infrastructure layer (domain-level OAuth2 via
-reverse proxy or gateway). The application itself does not enforce inbound authentication �
+reverse proxy or gateway). The application itself does not enforce inbound authentication --
 all authorization policies are pass-through:
 
 ```csharp
@@ -449,11 +449,11 @@ builder.Services.AddAuthorization(options =>
 });
 ```
 
-### Outbound (Automation.UI � Link services)
+### Outbound (Automation.UI -- Link services)
 
-- `Authentication:UseBearerForServiceCalls=true` (recommended) � LinkSdk attaches Link bearer
+- `Authentication:UseBearerForServiceCalls=true` (recommended) -- LinkSdk attaches Link bearer
   tokens via `ICreateSystemToken`.
-- `Authentication:UseBearerForServiceCalls=false` � outbound calls are anonymous.
+- `Authentication:UseBearerForServiceCalls=false` -- outbound calls are anonymous.
 
 Token generation settings come from `LinkTokenService` configuration (not user tokens).
 
@@ -494,7 +494,7 @@ dotnet run --project DotNet/Automation.UI/Automation.UI.csproj
 docker compose up automation-ui
 ```
 
-Port mapping: host `5256` � container `5257`.
+Port mapping: host `5256` -- container `5257`.
 
 ---
 
@@ -502,12 +502,12 @@ Port mapping: host `5256` � container `5257`.
 
 - Targets `.NET 8`.
 - MVC + Razor views + SignalR (not Razor Pages `PageModel` routing, despite the workspace
-  characteristics hint � the project uses classic MVC controllers and `@Html.PartialAsync`).
+  characteristics hint -- the project uses classic MVC controllers and `@Html.PartialAsync`).
 - `RunHub.SubscribeRun(runId)` groups clients for per-run log streaming;
   `RunHub.SubscribeDashboard()` groups clients for dashboard-wide status updates.
 - The read path is store-backed by design; backend service polling is centralized in
   background pollers.
-- All management views use a single-page inline modal editing pattern � no multi-page form
+- All management views use a single-page inline modal editing pattern -- no multi-page form
   workflows. The scenario editor is a single reusable partial shared between the Scenarios
   and Runs pages.
 - System scenarios and system query plans are seeded at startup and cannot be modified, only

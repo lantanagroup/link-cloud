@@ -1,4 +1,4 @@
-﻿# Automation
+# Automation
 
 `Automation` is the platform-agnostic foundation library for deterministic synthetic FHIR
 generation, predictive pipeline modeling, and reusable automation primitives. It has no
@@ -7,11 +7,11 @@ orchestration.
 
 This README is the comprehensive reference for the project. It is aimed at three audiences:
 
-- **Product owners / project managers** � sections 1 and 2 explain what the project produces
+- **Product owners / project managers** -- sections 1 and 2 explain what the project produces
   and why it exists.
-- **QA** � sections 3 and 4 explain how generation is configured and what determinism
+- **QA** -- sections 3 and 4 explain how generation is configured and what determinism
   guarantees are in place.
-- **Developers** � sections 5 through 9 walk through every extensible surface and the
+- **Developers** -- sections 5 through 9 walk through every extensible surface and the
   mathematical model that drives predictions.
 
 ---
@@ -37,16 +37,16 @@ clients, and presentation on top.
 
 Although orchestration happens in host projects, `Automation` is designed around this lifecycle:
 
-1. **Input selection** � choose patient count, cohorts, profiles, measures, seed.
-2. **Deterministic generation** � produce clinically coherent FHIR resources and transaction
+1. **Input selection** -- choose patient count, cohorts, profiles, measures, seed.
+2. **Deterministic generation** -- produce clinically coherent FHIR resources and transaction
    bundles.
-3. **Streaming upload** � upload each patient's data as it is generated (no full dataset in
+3. **Streaming upload** -- upload each patient's data as it is generated (no full dataset in
    memory).
-4. **Manifest construction** � build concrete generated resource-key and resource-count maps
+4. **Manifest construction** -- build concrete generated resource-key and resource-count maps
    incrementally.
-5. **Acquisition + CQL reachability modeling** � determine which generated resources are
+5. **Acquisition + CQL reachability modeling** -- determine which generated resources are
    expected to be acquired and to appear in final artifacts.
-6. **Validation support** � expose stable contracts and derived expectations that validators can
+6. **Validation support** -- expose stable contracts and derived expectations that validators can
    compare against actual pipeline output.
 
 This design avoids brittle static baselines and favors deterministic, input-derived
@@ -73,12 +73,12 @@ Automation (no Link dependencies)
 
 Orchestrates deterministic synthetic FHIR R4 transaction bundle generation. Core properties:
 
-- **Scenario-driven** � each patient is assigned one of 16 clinical scenarios.
-- **Seed-deterministic** � same inputs always yield the same resource graph.
-- **Measure-aware** � profile-driven generation can intentionally produce qualifying and
+- **Scenario-driven** -- each patient is assigned one of 16 clinical scenarios.
+- **Seed-deterministic** -- same inputs always yield the same resource graph.
+- **Measure-aware** -- profile-driven generation can intentionally produce qualifying and
   non-qualifying cohorts per measure.
-- **Multi-measure capable** � patients can be shaped for one or many measures.
-- **Chunked output** � bundles are split at 500 entries to stay within FHIR transaction limits.
+- **Multi-measure capable** -- patients can be shaped for one or many measures.
+- **Chunked output** -- bundles are split at 500 entries to stay within FHIR transaction limits.
 
 Suitable for small test datasets where holding everything in memory is acceptable.
 
@@ -91,15 +91,15 @@ logic in a streaming pipeline that:
    and uploads it.
 2. **Processes patients concurrently** (bounded by `MaxConcurrentPatients = 4`) but uploads
    each patient's chunks **sequentially** to preserve FHIR resource dependency order
-   (Patient � Encounter � Observations).
-3. **Builds the `GenerationManifest` incrementally** � resource keys and counts are recorded
+   (Patient -> Encounter -> Observations).
+3. **Builds the `GenerationManifest` incrementally** -- resource keys and counts are recorded
    from in-memory FHIR objects before serialization.
 4. **Runs `QueryPlanAcquisitionSimulator` per-patient** (when configured) before discarding
    FHIR data.
 5. **Runs `CqlFilterSimulator` per-patient** over the patient's *qualifying* measures only, so
    non-qualifying measure SDE rules do not falsely constrain prediction.
-6. **Retains no serialized JSON after upload** � memory stays proportional to
-   `MaxConcurrentPatients � resources-per-patient`, not the full run size.
+6. **Retains no serialized JSON after upload** -- memory stays proportional to
+   `MaxConcurrentPatients -- resources-per-patient`, not the full run size.
 
 `FhirGenerationPipeline.PipelineResult` contains ordered patient IDs, a fully populated
 `GenerationManifest` (keys, counts, profiles, simulated acquisition results, CQL exclusions),
@@ -130,12 +130,12 @@ and the total bundle upload count.
 
 | Measure | Qualifying scenarios |
 |---|---|
-| ACH Monthly Initial Population | All 16 � every inpatient encounter qualifies. |
-| ACH Daily Initial Population | All 16 � same as Monthly. |
+| ACH Monthly Initial Population | All 16 -- every inpatient encounter qualifies. |
+| ACH Daily Initial Population | All 16 -- same as Monthly. |
 | Glycemic Control Hypoglycemic | Only #8 (DKA) and #14 (Diabetic Hypoglycemia). |
 
 Because ACH qualifies every inpatient encounter, "non-qualifying for ACH" is not currently a
-meaningful cohort state � all clinical scenarios produce qualifying encounters. Non-qualifying
+meaningful cohort state -- all clinical scenarios produce qualifying encounters. Non-qualifying
 is meaningful only for the Hypoglycemic measure (which is why `MultiMeasureTest` has an
 ACH-qualifying-but-Hypo-non-qualifying cohort).
 
@@ -150,8 +150,8 @@ scenarios.
 
 Each FHIR resource type has two generation modes:
 
-- `Generate(id, seed, �)` � deterministic seed-based selection.
-- `Create(id, callerValues, �)` � explicit caller-controlled construction.
+- `Generate(id, seed, ...)` -- deterministic seed-based selection.
+- `Create(id, callerValues, ...)` -- explicit caller-controlled construction.
 
 Factories: `PatientFactory`, `EncounterFactory`, `ConditionFactory`, `MedicationRequestFactory`,
 `MedicationFactory`, `MedicationAdministrationFactory`, `ObservationFactory`, `ProcedureFactory`,
@@ -165,11 +165,11 @@ Factories: `PatientFactory`, `EncounterFactory`, `ConditionFactory`, `Medication
 Resources are linked during generation (not patched after), so the bundles contain a coherent
 patient graph that downstream processes traverse deterministically. Examples:
 
-- `MedicationRequest.medication` � `Reference(Medication/{id})`
-- `MedicationAdministration.request` � `Reference(MedicationRequest/{id})`
-- `ImagingStudy.basedOn` � `Reference(ServiceRequest/{id})`
-- `Provenance.target` � `Reference(DiagnosticReport/{id})`
-- `ServiceRequest` � `Specimen` � `Observation` � `DiagnosticReport` chain.
+- `MedicationRequest.medication` -- `Reference(Medication/{id})`
+- `MedicationAdministration.request` -- `Reference(MedicationRequest/{id})`
+- `ImagingStudy.basedOn` -- `Reference(ServiceRequest/{id})`
+- `Provenance.target` -- `Reference(DiagnosticReport/{id})`
+- `ServiceRequest` -> `Specimen` -> `Observation` -> `DiagnosticReport` chain.
 
 ### 4.8 Clinical terminology source (`FhirGenerationCodes`)
 
@@ -186,13 +186,13 @@ service requests, and related artifacts.
 | Method | Behavior |
 |---|---|
 | `UploadBundlesParallelAsync` | Concurrent upload with bounded parallelism. Used when dependency order is irrelevant (e.g., independent patients in batch mode). |
-| `UploadBundlesSequentiallyAsync` | Strict sequential upload. **Aborts on first failure** � logs remaining bundles as skipped and returns `false`. Preserves resource dependency order (Patient � Encounter � Observations). |
+| `UploadBundlesSequentiallyAsync` | Strict sequential upload. **Aborts on first failure** -- logs remaining bundles as skipped and returns `false`. Preserves resource dependency order (Patient -> Encounter -> Observations). |
 
 Support methods:
 
-- `PostBundleWithRetryAsync` � retries failed POSTs with configurable delay.
-- `TrackCreatedResources` � parses FHIR transaction response to record created resource IDs.
-- `WaitForFhirReadyAsync` � polls FHIR server health endpoint before starting uploads.
+- `PostBundleWithRetryAsync` -- retries failed POSTs with configurable delay.
+- `TrackCreatedResources` -- parses FHIR transaction response to record created resource IDs.
+- `WaitForFhirReadyAsync` -- polls FHIR server health endpoint before starting uploads.
 
 The sequential upload abort behavior is intentional: if a Patient bundle fails, dependent
 Encounter and Observation bundles would fail with referential integrity errors anyway. Aborting
@@ -206,10 +206,10 @@ early keeps the server in a clean state.
 
 Compact cohort inputs defining a group of patients:
 
-- `PatientCount` � how many patients to generate.
-- `MeasureEligibilities` � per-measure `Qualifying` / `NonQualifying` map.
-- `EligibleClinicalScenarioIds` � which clinical scenarios to draw from (empty = all).
-- `ResourcesPerPatientMin` / `ResourcesPerPatientMax` � resource count range.
+- `PatientCount` -- how many patients to generate.
+- `MeasureEligibilities` -- per-measure `Qualifying` / `NonQualifying` map.
+- `EligibleClinicalScenarioIds` -- which clinical scenarios to draw from (empty = all).
+- `ResourcesPerPatientMin` / `ResourcesPerPatientMax` -- resource count range.
 
 ### 6.2 `PatientProfile`
 
@@ -244,9 +244,9 @@ and exposes helper logic for "what should appear downstream" calculations.
 
 Two construction modes:
 
-1. **Batch** � `GenerationManifest.Build(patientIds, profiles, bundles, �)` processes retained
+1. **Batch** -- `GenerationManifest.Build(patientIds, profiles, bundles, ...)` processes retained
    bundle data after generation completes.
-2. **Incremental** � `GenerationManifest.IncrementalBuilder` accumulates entries per patient
+2. **Incremental** -- `GenerationManifest.IncrementalBuilder` accumulates entries per patient
    during streaming pipeline execution, then finalizes. Used by `FhirGenerationPipeline` so
    manifest metadata is captured from in-memory FHIR objects before they are serialized and
    discarded.
@@ -257,9 +257,9 @@ Two construction modes:
 - Selected measure IDs and per-patient eligibility.
 - Query-plan acquired resource types (+ parameter-query subset).
 - CQL-referenced resource types (from `CqlResourceTypeExtractor`).
-- `SimulatedAcquiredResourceKeysByPatient` � deterministic key-level acquisition replay.
-- `CqlFilteredResourceKeysByPatient` � per-resource SDE exclusions.
-- `ExpectedOperationOutcomeCountByPatient` � post-hoc hook populated by
+- `SimulatedAcquiredResourceKeysByPatient` -- deterministic key-level acquisition replay.
+- `CqlFilteredResourceKeysByPatient` -- per-resource SDE exclusions.
+- `ExpectedOperationOutcomeCountByPatient` -- post-hoc hook populated by
   `ReportAbsManifestValidator` from `ReportEntry.ReportingStatus`.
 
 ### 7.3 Prediction formula
@@ -291,7 +291,7 @@ pipeline-derived additions:
 
 OperationOutcome is excluded from the DB prediction because
 `ValidationCompleteListener.ProcessMessageAsync` appends it directly to the ABS blob via
-`PatientAggregator.AppendResourceToBlob(�)`, bypassing `PatientAggregator`'s aggregation +
+`PatientAggregator.AppendResourceToBlob(...)`, bypassing `PatientAggregator`'s aggregation +
 `ReportResourceManager.AddAsyncWithAggregateResult` flow. It never reaches the table.
 
 ### 7.5 CQL filter simulator semantics
@@ -310,24 +310,24 @@ influence the intersection.
 
 Current profiles:
 
-- `AchConditionFilterProfile` � `problem-list-item` requires `active` + `recordedDate <
+- `AchConditionFilterProfile` -- `problem-list-item` requires `active` + `recordedDate <
   encounterEnd`; `encounter-diagnosis` / `health-concern` must reference the inpatient
   encounter.
-- `HypoglycemicConditionFilterProfile` � `recordedDate <= encounterEnd` (no active constraint).
+- `HypoglycemicConditionFilterProfile` -- `recordedDate <= encounterEnd` (no active constraint).
 
 Extensible via `ICqlFilterProfile` for additional families (Coverage, Observation,
 ServiceRequest, etc.).
 
 ### 7.6 Related helpers
 
-- `QueryPlanDefaults` � canonical default query-plan definition and acquired-type extraction.
-- `QueryPlanAcquisitionSimulator` � deterministic replay of parameter/reference query
+- `QueryPlanDefaults` -- canonical default query-plan definition and acquired-type extraction.
+- `QueryPlanAcquisitionSimulator` -- deterministic replay of parameter/reference query
   semantics against generated bundles; simulates which resources DataAcquisition would acquire
   for each patient.
-- `CqlResourceTypeExtractor` � extracts CQL-retrieved resource types from measure bundles.
+- `CqlResourceTypeExtractor` -- extracts CQL-retrieved resource types from measure bundles.
   Reachability roots include both population criteria expressions and `supplementalData`
   criteria expressions (SDE roots).
-- `CqlFilterInputExtractor` � walks generated entries to build the `PatientCqlInput` that the
+- `CqlFilterInputExtractor` -- walks generated entries to build the `PatientCqlInput` that the
   simulator consumes (Encounter period, Condition attributes, etc.).
 
 Together, these allow host validators to compare actual pipeline artifacts against
@@ -354,12 +354,12 @@ Reusable framework-level primitives consumed by higher-level host orchestrators:
 
 ## 9. Configuration (`Configuration/`)
 
-- `AutomationConfigBase` � common runtime settings (FHIR endpoints, cleanup toggles, auth
+- `AutomationConfigBase` -- common runtime settings (FHIR endpoints, cleanup toggles, auth
   modes).
-- `TestScenarioConfigBase` � scenario execution settings (measure inputs, patient IDs, polling
+- `TestScenarioConfigBase` -- scenario execution settings (measure inputs, patient IDs, polling
   windows, timeouts).
-- `OAuthConfig` � OAuth2 client-credentials configuration.
-- `BasicAuthConfig` � basic-auth credentials configuration.
+- `OAuthConfig` -- OAuth2 client-credentials configuration.
+- `BasicAuthConfig` -- basic-auth credentials configuration.
 
 Host projects extend these base classes for environment- or service-specific needs.
 
@@ -369,10 +369,10 @@ Host projects extend these base classes for environment- or service-specific nee
 
 `Automation` is consumed by:
 
-- **`Automation.Link`** � adds Link service clients, facility/report orchestration, pipeline
+- **`Automation.Link`** -- adds Link service clients, facility/report orchestration, pipeline
   validators, and monitoring probes.
-- **`Automation.UI`** � interactive Razor MVC host for running and monitoring scenarios.
-- **`BackendE2ETests`** � automated test-host composition.
+- **`Automation.UI`** -- interactive Razor MVC host for running and monitoring scenarios.
+- **`BackendE2ETests`** -- automated test-host composition.
 
 This layering keeps generation and expectation logic reusable and testable without
 infrastructure coupling.

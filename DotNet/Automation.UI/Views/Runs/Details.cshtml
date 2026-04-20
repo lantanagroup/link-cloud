@@ -35,7 +35,7 @@
             <div id="errorRow" class="mt-3" style="display:none;"><div class="alert alert-danger mb-0 py-2 small"><i class="bi bi-exclamation-triangle-fill me-1"></i><span id="error">@(Model.Error ?? "-")</span></div></div>
             <span id="finalizingBadge" class="badge rounded-pill bg-secondary text-white mt-2" style="display:none;">
                 <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" style="width:.7rem;height:.7rem;"></span>
-                Finalizing…
+                Finalizing�
             </span>
         </div>
     </div>
@@ -323,7 +323,7 @@
                 <div class="sticky-top bg-white border-bottom px-3 py-2" style="z-index:2;">
                     <div class="row g-2 align-items-center">
                         <div class="col">
-                            <input type="text" class="form-control form-control-sm" id="exModalSearch" placeholder="Search exceptions…">
+                            <input type="text" class="form-control form-control-sm" id="exModalSearch" placeholder="Search exceptions�">
                         </div>
                         <div class="col-auto">
                             <span class="badge bg-secondary" id="exModalVisibleCount">0</span>
@@ -395,7 +395,7 @@
         const runId = '@Model.RunId';
         const runConfigurationJson = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.RunConfigurationJson ?? string.Empty));
         const snapshotUrl = '@Url.Action("PipelineSnapshot", "Runs")';
-        const manifestUrl = '@Url.Action("GenerationManifest", "Runs")';
+        const manifestUrl = '@Url.Action("ManifestData", "Runs")';
         const logBox = document.getElementById('logBox');
         let dataAcqErrors = [];
         let measureErrors = [];
@@ -445,7 +445,7 @@
             if (!confirm('Delete this run and all persisted data?')) return;
 
             btn.disabled = true;
-            btn.textContent = 'Deleting…';
+            btn.textContent = 'Deleting�';
 
             fetch('@Url.Action("DeleteJson", "Runs")', {
                 method: 'POST',
@@ -488,7 +488,7 @@
                 if (!confirm('Cancel this running test and cleanup all related service/FHIR data?')) return;
 
                 cancelBtn.disabled = true;
-                cancelBtn.textContent = 'Cancelling…';
+                cancelBtn.textContent = 'Cancelling�';
 
                 fetch('@Url.Action("CancelJson", "Runs")', {
                     method: 'POST',
@@ -1037,7 +1037,7 @@
                 cleaned = cleaned.slice(levelMatch[0].length);
             }
 
-            // Split on ||| delimiter — left side is summary, right side is full detail
+            // Split on ||| delimiter � left side is summary, right side is full detail
             let summary = cleaned;
             let detail = '';
             const tripleIdx = cleaned.indexOf('|||');
@@ -1048,19 +1048,19 @@
 
             let headline = summary;
             if (!detail) {
-                // No triple-pipe detail — try splitting on first pipe for headline/detail
+                // No triple-pipe detail � try splitting on first pipe for headline/detail
                 const pipeIdx = summary.indexOf(' | ');
                 if (pipeIdx > 0) {
                     headline = summary.slice(0, pipeIdx).trim();
                     detail = summary.slice(pipeIdx + 3).trim();
                 } else if (summary.length > 120) {
-                    headline = summary.slice(0, 120).trim() + '…';
+                    headline = summary.slice(0, 120).trim() + '�';
                     detail = summary;
                 }
             } else {
                 // Shorten the summary for the collapsed header
                 if (summary.length > 160) {
-                    headline = summary.slice(0, 160).trim() + '…';
+                    headline = summary.slice(0, 160).trim() + '�';
                 }
             }
 
@@ -1142,7 +1142,7 @@
         }
 
         function truncate(str, len) {
-            return str.length > len ? str.slice(0, len) + '…' : str;
+            return str.length > len ? str.slice(0, len) + '�' : str;
         }
 
         document.getElementById('exModalSearch').addEventListener('input', applyExModalFilter);
@@ -1538,7 +1538,7 @@
             document.getElementById('daLogFlyout').style.right = '-560px';
         });
 
-        // ─── Generation Manifest ───────────────────────────────────
+        // ??? Generation Manifest ???????????????????????????????????
         const manifestPageUrl = '@Url.Action("Manifest", "Runs")';
 
         function tryShowManifestButton() {

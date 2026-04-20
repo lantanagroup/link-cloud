@@ -183,16 +183,6 @@ public class RunsController(
         return Json(snapshot);
     }
 
-    [HttpGet]
-    public async Task<IActionResult> GenerationManifest(Guid id, CancellationToken cancellationToken)
-    {
-        var manifest = await runManager.GetGenerationManifestAsync(id, cancellationToken);
-        if (manifest == null)
-            return NoContent();
-
-        return Json(manifest);
-    }
-
     /// <summary>
     /// Proxy endpoint for DA log drill-down. Returns a paged list of DA logs
     /// for the run's facility/report so the detail modal can paginate.

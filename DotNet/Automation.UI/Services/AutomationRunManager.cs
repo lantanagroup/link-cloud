@@ -207,7 +207,7 @@ public class AutomationRunManager : IAutomationRunManager
 
     public async Task<PipelineSummarySnapshotBuilder.PipelineSummarySnapshot?> GetPipelineSnapshotAsync(Guid runId, CancellationToken cancellationToken = default)
     {
-        // Always read from Mongo â€” the poller writes domain data there,
+        // Always read from Mongo — the poller writes domain data there,
         // and logs are persisted as they're written. One data flow, no branching.
         var summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
 
@@ -322,8 +322,9 @@ public class AutomationRunManager : IAutomationRunManager
 
         // Merge in-memory active runs that may not yet be persisted
         var inMemory = _runs.Values.Select(ToSummary).ToList();
+        var persistedRunIds = new HashSet<Guid>(allRuns.Select(r => r.RunId));
         var merged = allRuns
-            .Concat(inMemory.Where(m => allRuns.All(r => r.RunId != m.RunId)))
+            .Concat(inMemory.Where(m => !persistedRunIds.Contains(m.RunId)))
             .ToList();
 
         var stats = new RunDashboardStats
@@ -412,7 +413,7 @@ public class AutomationRunManager : IAutomationRunManager
             GenerationManifest? generationManifest = null;
 
             // Use the first measure for generation context (profile-driven generation picks
-            // the most restrictive measure â€” patients qualifying for all measures must meet
+            // the most restrictive measure — patients qualifying for all measures must meet
             // the criteria of each). For multi-measure, the pipeline handles the union.
             var primaryMeasure = state.Options.SelectedMeasures[0];
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
@@ -626,7 +627,7 @@ public class AutomationRunManager : IAutomationRunManager
             // Flush stale cache from diagnostics polling so validators read authoritative data.
             services.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
-            // Regeneration reuses prior data acquisition â€” no new DA logs exist for the regenerated report.
+            // Regeneration reuses prior data acquisition — no new DA logs exist for the regenerated report.
             var expectDataAcquisitionData = state.Options.ReportMethod != ReportMethod.RegenerateReport;
 
             // Pipeline-built manifest already has all metadata; no need to re-parse bundles.
@@ -878,7 +879,7 @@ public class AutomationRunManager : IAutomationRunManager
                 ? [request.SelectedMeasure.Value]
                 : effectiveMeasures;
 
-        // Always expand profiles from cohorts â€” cohorts are the single source of truth.
+        // Always expand profiles from cohorts — cohorts are the single source of truth.
         profiles = ExpandProfilesFromCohorts(cohorts, request.Seed ?? defaults.Seed);
 
         return defaults with

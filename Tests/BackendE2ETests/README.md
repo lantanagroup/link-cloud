@@ -1,4 +1,4 @@
-﻿# BackendE2ETests
+# BackendE2ETests
 
 End-to-end integration tests that exercise the full Link reporting pipeline against a running
 Link environment (FHIR server, DataAcquisition, Normalization, MeasureEval, Validation, Report,
@@ -43,18 +43,18 @@ identical FHIR input.
 | Suite | What it exercises | Seed | Patients | Resources |
 |---|---|---:|---:|---:|
 | `AdhocReportTest` | Single-patient ad-hoc reporting happy path. | 20260326 | 1 | 1000 |
-| `MultiPatientTest` | Volume scenario across many patients. | 20260328 | 150 | 25�50 |
+| `MultiPatientTest` | Volume scenario across many patients. | 20260328 | 150 | 25-50 |
 | `MegaPatientTest` | Single-patient stress test (thousands of resources). | 20260327 | 1 | 5000 |
-| `MegaMultiPatientTest` | Hybrid: one mega patient + 149 normal patients. | 20260330 | 150 | 5000 / 25�50 |
+| `MegaMultiPatientTest` | Hybrid: one mega patient + 149 normal patients. | 20260330 | 150 | 5000 / 25-50 |
 | `ReportScheduledWorkflowTest` | Scheduled (non-ad-hoc) report generation workflow. | 20260326 | 1 | 1000 |
 | `RegenerateReportTest` | Report regeneration after initial submission. | 20260401 | 1 | 100 |
 | `MultiMeasureTest` | ACH Monthly + Glycemic Control (Hypoglycemic) simultaneously; one patient qualifies for both, one for ACH only. | 20260420 | 2 | 250 |
-| `ApiStabilityTest` | Exercises service API surfaces (Tenant, Census, DataAcquisition, Normalization, QueryDispatch) without running a full report pipeline. | � | � | � |
+| `ApiStabilityTest` | Exercises service API surfaces (Tenant, Census, DataAcquisition, Normalization, QueryDispatch) without running a full report pipeline. | Yes | Yes | Yes |
 
 ### Why backend and UI scenarios share configuration
 
 Both hosts call into the same `Automation` generator with the same inputs. If the UI passes, the
-backend test should pass with the same data and the same expectations � and vice versa. When a
+backend test should pass with the same data and the same expectations -- and vice versa. When a
 discrepancy is investigated, any developer can reproduce either test run from either host and
 get the exact same FHIR bundles. The `Automation.UI` **Scenarios** page is therefore a
 user-friendly mirror of this test suite.
@@ -67,14 +67,14 @@ All data-generating tests follow the same flow:
 
 1. **Generate FHIR data** via `FhirGenerationPipeline.GenerateAndUploadAsync(...)`
    - Uses the test's seed, patient cohorts, and selected measures.
-   - Streams bundles to FHIR in dependency-safe order (Patient � Encounter � Observations).
+   - Streams bundles to FHIR in dependency-safe order (Patient -> Encounter -> Observations).
    - Builds a `GenerationManifest` incrementally, recording every `Type/Id` key generated.
    - Runs `QueryPlanAcquisitionSimulator` against each patient to record simulated-acquired keys.
    - Runs `CqlFilterSimulator` to record keys that will be filtered out by measure SDE semantics.
 
 2. **Load measures** into MeasureEval and Validation via `MeasureLoader.LoadAllAsync(...)`.
 
-3. **Ensure facility/config** via `FacilitySetupHelper` (idempotent � safe to run repeatedly):
+3. **Ensure facility/config** via `FacilitySetupHelper` (idempotent -- safe to run repeatedly):
    tenant + facility + normalization ops + query plans + query config + query dispatch config.
 
 4. **Start report generation** via `ReportApiHelper.GenerateReportAsync(...)` (or the
@@ -114,7 +114,7 @@ and then add deterministic pipeline-derived counts:
 |---|---|
 | `Patient` | 1 per patient qualifying for any selected measure (MeasureEval loads Patient implicitly). |
 | `MeasureReport` | One per patient per qualifying measure (MeasureEval writes exactly one per pair). |
-| `OperationOutcome` | 1 for every patient whose `ReportEntry.ReportingStatus == FailedValidation`. ABS-only � bypasses the `ReportResource` table by design. |
+| `OperationOutcome` | 1 for every patient whose `ReportEntry.ReportingStatus == FailedValidation`. ABS-only -- bypasses the `ReportResource` table by design. |
 
 When multiple measures are selected and a patient only qualifies for some of them,
 `CqlFilterSimulator` intersects only the rule-sets of the patient's *qualifying* measures
@@ -166,8 +166,8 @@ variables are below; suite-specific variables use the prefix shown in each test'
 | `ADMIN_BFF_BASE_URL` | Admin BFF base URL | `http://localhost:8063/api` |
 | `LOKI_BASE_URL` | Loki base URL for log scraping | `http://localhost:3100` |
 | `E2E_GENERATED_FHIR_OUTPUT_PATH` | Override for where generated FHIR bundle snapshots land | `<test-dir>/generated-fhir-snapshots/<TestName>` |
-| `<PREFIX>_CLEANUP_FHIR_DATA` | `true`/`false` � expunge generated FHIR resources after the run | `true` |
-| `<PREFIX>_CLEANUP_SERVICE_DATA` | `true`/`false` � remove facility/report/DA/query-dispatch rows after the run | `false` |
+| `<PREFIX>_CLEANUP_FHIR_DATA` | `true`/`false` -- expunge generated FHIR resources after the run | `true` |
+| `<PREFIX>_CLEANUP_SERVICE_DATA` | `true`/`false` -- remove facility/report/DA/query-dispatch rows after the run | `false` |
 
 Cleanup is conservative by default: FHIR data is expunged to keep the server lean, but service
 data is preserved so investigators can inspect the run state after a failure.
@@ -180,7 +180,7 @@ Every data-generating test writes its bundles to disk for post-run inspection. T
 directory is either `E2E_GENERATED_FHIR_OUTPUT_PATH` or
 `generated-fhir-snapshots/<TestName>` below the test runtime output directory.
 
-Writes are hash-gated � if the current run's content hash matches the previous run's, the files
+Writes are hash-gated -- if the current run's content hash matches the previous run's, the files
 are skipped. This keeps the snapshots useful as diffable artifacts (any content drift shows up
 immediately) without flooding source control with identical outputs.
 
@@ -190,11 +190,11 @@ immediately) without flooding source control with identical outputs.
 
 Each test captures real-time diagnostics through `BackgroundDiagnosticsMonitor`:
 
-- **LokiErrorProbe** � scans service logs for exceptions/errors.
-- **KafkaErrorProbe** � flags retry/DLQ topics.
-- **ProgressProbe** � computes pipeline progress (DA � MeasureEval � Validation � Submission)
+- **LokiErrorProbe** -- scans service logs for exceptions/errors.
+- **KafkaErrorProbe** -- flags retry/DLQ topics.
+- **ProgressProbe** -- computes pipeline progress (DA -> MeasureEval -> Validation -> Submission)
   and detects stalls.
-- **MilestoneProbe** � records idempotent progress checkpoints.
+- **MilestoneProbe** -- records idempotent progress checkpoints.
 
 Human-readable lines are written to test output. Cadence-driven "heartbeat" events are
 suppressed; only meaningful pipeline transitions, issues, and stop/failure signals surface.
@@ -220,7 +220,7 @@ Three common failure modes and what they mean:
 |---|---|
 | `expected=N, actual=M (ABS has M-N more than predicted)` | Something landed in ABS that the prediction model didn't expect. The generator, query plan, or CQL filter simulator is drifting from reality. |
 | `expected=N, actual<N` or `missing expected resource` | Something we expected was filtered, dropped, or never written. Usually a CQL retrieve missing, a normalization op deleting a resource, or DA skipping a query. |
-| `ReportResource count�type=OperationOutcome` deviation | OperationOutcome is ABS-only; ReportResource prediction excludes it by design. If DB has an OO, something is writing through `ReportResourceManager` unexpectedly. |
+| `ReportResource count-type=OperationOutcome` deviation | OperationOutcome is ABS-only; ReportResource prediction excludes it by design. If DB has an OO, something is writing through `ReportResourceManager` unexpectedly. |
 
 These messages are designed to point an investigator at the exact boundary that drifted.
 
@@ -236,7 +236,7 @@ BackendE2ETests
 +-- references Shared           (domain models, enums, integration contracts)
 ```
 
-No direct Link service dependencies � everything flows through `Automation.Link` helpers and
+No direct Link service dependencies -- everything flows through `Automation.Link` helpers and
 `LinkSdk` clients.
 
 ---
@@ -252,5 +252,5 @@ No direct Link service dependencies � everything flows through `Automation.Lin
 - The strict prediction model is defined in `GenerationManifest` (see `Automation/README.md`)
   and consumed by validators in `Automation.Link/Validation/` (see `Automation.Link/README.md`).
 - Each backend test has a matching system scenario in `Automation.UI` with identical seed,
-  patient count, resource range, and prefix � so UI and backend runs are reproducible from
+  patient count, resource range, and prefix -- so UI and backend runs are reproducible from
   either host.

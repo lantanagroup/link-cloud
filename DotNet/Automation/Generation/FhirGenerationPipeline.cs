@@ -12,7 +12,7 @@ namespace LantanaGroup.Automation.Generation;
 ///   2. Manifest metadata accumulated from the in-memory objects
 ///   3. Serialized into transaction bundle chunks
 ///   4. Uploaded sequentially to the FHIR server (preserving resource dependency order)
-///   5. Disposed â€” no serialized JSON or FHIR objects retained after upload
+///   5. Disposed — no serialized JSON or FHIR objects retained after upload
 ///
 /// Multiple patients are processed concurrently (bounded by <see cref="MaxConcurrentPatients"/>)
 /// but each patient's chunks are uploaded in strict sequential order to preserve the
@@ -39,7 +39,7 @@ public static class FhirGenerationPipeline
         /// <summary>
         /// Fully-populated generation manifest built incrementally during the pipeline.
         /// Contains resource keys, counts, profiles, and (when configured) simulated
-        /// acquisition results â€” everything that <see cref="GenerationManifest.Build"/>
+        /// acquisition results — everything that <see cref="GenerationManifest.Build"/>
         /// would produce from retained bundles.
         /// </summary>
         public required GenerationManifest Manifest { get; init; }
@@ -65,6 +65,18 @@ public static class FhirGenerationPipeline
     /// server as it's generated, and returns a manifest with all metadata needed for validation.
     /// No serialized FHIR JSON is retained after this method returns.
     /// </summary>
+    /// <param name="patientIdPrefix">
+    /// Human-readable label used as the base of every generated resource ID. The pipeline
+    /// appends a short per-run suffix to this value to guarantee that concurrent runs
+    /// (e.g. multiple tests queued rapidly from the UI) cannot collide on shared-infrastructure
+    /// or per-patient FHIR resource IDs. Use <paramref name="runId"/> to supply a specific suffix.
+    /// </param>
+    /// <param name="runId">
+    /// Optional explicit run identifier appended to <paramref name="patientIdPrefix"/> to form
+    /// the effective FHIR ID prefix. When <c>null</c> (default) a fresh short GUID suffix is
+    /// generated so every invocation is isolated. Provide a stable value only when reproducing
+    /// a specific run for debugging.
+    /// </param>
     public static async Task<PipelineResult> GenerateAndUploadAsync(
         IAutomationOutput output,
         FhirDataLoader fhirDataLoader,
@@ -74,12 +86,24 @@ public static class FhirGenerationPipeline
         string patientIdPrefix = "ProfilePatient",
         int? generationSeed = null,
         FhirGenerationConfig? config = null,
-        AcquisitionSimulationConfig? acquisitionSimulation = null)
+        AcquisitionSimulationConfig? acquisitionSimulation = null,
+        string? runId = null)
     {
         if (measures == null || measures.Count == 0)
             throw new ArgumentException("At least one measure is required.", nameof(measures));
         if (profiles == null || profiles.Count == 0)
             throw new ArgumentException("At least one patient profile is required.", nameof(profiles));
+
+        // Guarantee per-run ID uniqueness so concurrent pipeline invocations never collide
+        // on shared-infrastructure or per-patient FHIR resource IDs. Every resource generated
+        // downstream (Organization, Location, Practitioner, Medication, Patient, Encounter,
+        // Condition, Observation, ...) is derived from this effective prefix via
+        // FhirBundleGenerator.SharedIds, so uniqueness here isolates the entire run.
+        var effectiveRunId = string.IsNullOrWhiteSpace(runId)
+            ? Guid.NewGuid().ToString("N")[..8]
+            : runId!.Trim();
+        var effectivePrefix = $"{patientIdPrefix}-{effectiveRunId}";
+        patientIdPrefix = effectivePrefix;
 
         var baseSeed = generationSeed.GetValueOrDefault();
         var manifestBuilder = new GenerationManifest.IncrementalBuilder();
@@ -89,11 +113,11 @@ public static class FhirGenerationPipeline
         var mixedEligibilityCount = profiles.Count - qualifyingAllCount - nonQualifyingAllCount;
         output.WriteLine($"[Pipeline] Generating {profiles.Count} profiled patients ({qualifyingAllCount} qualifying-all, " +
                          $"{nonQualifyingAllCount} non-qualifying-all, {mixedEligibilityCount} mixed) " +
-                         $"with ~{totalResourcesPerPatient} resources each..." +
-                         (generationSeed.HasValue ? $" (seed={generationSeed.Value})" : string.Empty));
+                         $"with ~{totalResourcesPerPatient} resources each, prefix='{effectivePrefix}'" +
+                         (generationSeed.HasValue ? $", seed={generationSeed.Value}" : string.Empty) + "...");
 
         // ------------------------------------------------------------------
-        // Shared infrastructure â€” generated once, uploaded first
+        // Shared infrastructure — generated once, uploaded first
         // ------------------------------------------------------------------
         var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) = GenerateSharedInfrastructure(patientIdPrefix);
 
@@ -243,7 +267,7 @@ public static class FhirGenerationPipeline
         manifestBuilder.AddEntries(patientId, entries);
 
         // Compute per-resource CQL SDE filter exclusions from the actual generated resources
-        // (inspects in-memory Encounter + Condition attributes â€” no seed replay).
+        // (inspects in-memory Encounter + Condition attributes — no seed replay).
         //
         // Filter rules apply only for measures this patient qualifies for. A non-qualifying
         // measure's MeasureReport does not contain the patient's resources, so its SDE
@@ -278,7 +302,7 @@ public static class FhirGenerationPipeline
         // Serialize into chunks, upload sequentially, then discard
         var bundles = ChunkEntries(entries, patientId, 0);
 
-        // Entries list is no longer needed â€” allow GC before upload
+        // Entries list is no longer needed — allow GC before upload
         entries.Clear();
 
         var progress = $"[{patientId}] ";
@@ -286,7 +310,7 @@ public static class FhirGenerationPipeline
 
         var bundleCount = bundles.Count;
 
-        // Bundles are no longer needed â€” allow GC
+        // Bundles are no longer needed — allow GC
         bundles.Clear();
 
         return (patientId, profile, bundleCount);
@@ -499,7 +523,7 @@ public static class FhirGenerationPipeline
     }
 
     // ------------------------------------------------------------------
-    //  Helpers â€” delegated from FhirBundleGenerator (same logic)
+    //  Helpers — delegated from FhirBundleGenerator (same logic)
     // ------------------------------------------------------------------
 
     private static Bundle.EntryComponent Entry(string resourceUrl, Resource resource) => new()
