@@ -167,6 +167,16 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
         }
 
+        /// <summary>
+        /// Daniel - 3/2026: This function exists to build the population list when a reportScheduled event is consumed. This helps in a few ways:
+        ///     1. In the case where all evaluated measure reports for a facility do not meet the criteria of the measure, a population record already exists with a count set to 0.
+        ///     2. The admin UI doesn't have to add logic to render 0 count populations.
+        ///     3. When generating a manifest, logic doesn't need to be added to figure out if there was a 0 count for any of the reported measures. 
+        /// It's assumed that each developed measure will at least have 'initial-population' as a Population Id. This logic would need to change if that assumption is no longer true.
+        /// </summary>
+        /// <param name="reportSchedule"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         public async Task<List<ReportPopulationModel>> AddWithReportScheduleAsync(ReportScheduleModel reportSchedule, CancellationToken cancellationToken)
         {
             List<ReportPopulation> models = new();
