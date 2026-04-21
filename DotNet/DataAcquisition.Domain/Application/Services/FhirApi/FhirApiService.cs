@@ -125,7 +125,7 @@ public class FhirApiService : IFhirApiService
                 ResourceType = resource.TypeName,
                 ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
                 PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
-                QueryType = log.QueryPhase.ToString(),
+                QueryType = MapQueryPhaseForWire(log.QueryPhase),
                 ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
             }, log.FacilityId, log.CorrelationId, cancellationToken);
 
@@ -272,7 +272,7 @@ public class FhirApiService : IFhirApiService
                         ResourceType = resource.TypeName,
                         ScheduledReports = new List<ScheduledReport> { log.ScheduledReport },
                         PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
-                        QueryType = log.QueryPhase.ToString(),
+                        QueryType = MapQueryPhaseForWire(log.QueryPhase),
                         ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
                     }, log.FacilityId, log.CorrelationId, cancellationToken);
                 }
@@ -376,6 +376,24 @@ public class FhirApiService : IFhirApiService
         }
         return searchParams;
     }
+
+    /// <summary>
+    /// Translates a <see cref="QueryPhase"/> into the string value expected by downstream
+    /// consumers on the <c>ResourceAcquired</c> / <c>ResourceNormalized</c> wire contract.
+    /// The Java <c>measureeval</c> service's <c>QueryType</c> enum only accepts
+    /// <c>INITIAL</c> and <c>SUPPLEMENTAL</c>; emitting <c>Referential</c> would cause a
+    /// Jackson deserialization failure and dead-letter the event. Reference resources
+    /// are semantically supplemental data acquired after the primary phase, so we map
+    /// <see cref="QueryPhase.Referential"/> onto <see cref="QueryPhase.Supplemental"/>
+    /// for the wire. Initial stays Initial; everything else (Polling, Monitoring) is
+    /// not currently produced from this code path and falls through to its raw name.
+    /// </summary>
+    private static string MapQueryPhaseForWire(QueryPhase? queryPhase) => queryPhase switch
+    {
+        QueryPhase.Referential => QueryPhase.Supplemental.ToString(),
+        null => string.Empty,
+        _ => queryPhase.Value.ToString(),
+    };
 
     private async Task GenerateResourceAcquiredMessage(ResourceAcquired resourceAcquired, string facilityId, string correlationId, CancellationToken cancellationToken = default)
     {

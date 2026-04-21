@@ -1,4 +1,5 @@
 using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
@@ -113,7 +114,8 @@ namespace IntegrationTests.DataAcquisition.Services
                 QueryType = FhirQueryType.Read,
                 Status = initialStatus,
                 Priority = AcquisitionPriority.Normal,
-                ReportableEvent = ReportableEvent.Adhoc
+                ReportableEvent = ReportableEventToQueryPlanTypeFactory
+                    .GenerateReportableEventFromQueryPlanType(frequency)
             });
 
             if (pending.Count > 0)

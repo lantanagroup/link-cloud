@@ -1,4 +1,5 @@
 using DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -151,7 +152,6 @@ public class ReferentialPhasePromoter : IReferentialPhasePromoter
                 l.ReportableEvent,
                 l.TraceId,
                 l.Priority,
-                Frequency = l.ScheduledReportEntity != null ? (LantanaGroup.Link.Shared.Application.Models.Frequency?)l.ScheduledReportEntity.Frequency : null,
             })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -164,20 +164,40 @@ public class ReferentialPhasePromoter : IReferentialPhasePromoter
             return 0;
         }
 
-        if (seedLog.Frequency == null)
+        if (seedLog.ReportableEvent == null)
         {
             _logger.LogWarning(
-                "ReferentialPhasePromoter.PromoteAsync: Initial-phase log for facility {FacilityId} correlation {CorrelationId} has no ScheduledReport; cannot resolve a query plan. Leaving {Count} pending reference id(s) in place for retry.",
+                "ReferentialPhasePromoter.PromoteAsync: Initial-phase log for facility {FacilityId} correlation {CorrelationId} has no ReportableEvent; cannot resolve a query plan. Leaving {Count} pending reference id(s) in place for retry.",
                 facilityId, correlationId, pending.Count);
             return 0;
         }
 
-        var queryPlan = await _queryPlanQueries.GetAsync(facilityId, seedLog.Frequency.Value, cancellationToken);
+        // Resolve the query-plan Frequency the same way the primary acquisition path does
+        // (PatientDataService): from the log's ReportableEvent. The ScheduledReport.Frequency
+        // (e.g. Adhoc) is not necessarily the QueryPlan.Type that was actually used to
+        // execute the primary acquisition — for example ReportableEvent.Adhoc maps to
+        // Frequency.Discharge for plan lookup. Using the ScheduledReport.Frequency directly
+        // would miss the matching plan and cause the staged ids to be dropped.
+        Frequency planFrequency;
+        try
+        {
+            planFrequency = ReportableEventToQueryPlanTypeFactory
+                .GenerateQueryPlanTypeFromReportableEvent(seedLog.ReportableEvent.Value);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex,
+                "ReferentialPhasePromoter.PromoteAsync: cannot map ReportableEvent {ReportableEvent} to a query plan Frequency for facility {FacilityId} correlation {CorrelationId}; leaving {Count} pending reference id(s) in place for retry.",
+                seedLog.ReportableEvent, facilityId, correlationId, pending.Count);
+            return 0;
+        }
+
+        var queryPlan = await _queryPlanQueries.GetAsync(facilityId, planFrequency, cancellationToken);
         if (queryPlan == null)
         {
             _logger.LogWarning(
-                "ReferentialPhasePromoter.PromoteAsync: no query plan found for facility {FacilityId} frequency {Frequency}; dropping {Count} pending reference id(s).",
-                facilityId, seedLog.Frequency.Value, pending.Count);
+                "ReferentialPhasePromoter.PromoteAsync: no query plan found for facility {FacilityId} frequency {Frequency} (from ReportableEvent {ReportableEvent}); dropping {Count} pending reference id(s).",
+                facilityId, planFrequency, seedLog.ReportableEvent, pending.Count);
             await PurgePendingAsync(facilityId, correlationId, cancellationToken);
             return 0;
         }
@@ -241,6 +261,12 @@ public class ReferentialPhasePromoter : IReferentialPhasePromoter
                 var fhirQueryType = MapOperationType(group.Config!.OperationType);
                 var paged = group.Config.Paged > 0 ? group.Config.Paged : (int?)null;
 
+                // Persist the batched ids as a single "_id=a,b,c" entry on QueryParameters.
+                // The FhirQuery entity stores ids only via QueryParameters; the read-side
+                // FhirQueryModel.IdQueryParameterValues is rehydrated from this row by
+                // DataAcquisitionLogQueries.GetAsync for the executor to consume.
+                var idsParam = $"_id={string.Join(',', group.Ids)}";
+
                 var createModel = new CreateDataAcquisitionLogModel
                 {
                     FacilityId = facilityId,
@@ -265,8 +291,7 @@ public class ReferentialPhasePromoter : IReferentialPhasePromoter
                             QueryType = fhirQueryType,
                             Paged = paged,
                             ResourceTypes = new List<ResourceType> { parsedResourceType },
-                            QueryParameters = new List<string>(),
-                            IdQueryParameterValues = group.Ids,
+                            QueryParameters = new List<string> { idsParam },
                         }
                     },
                 };

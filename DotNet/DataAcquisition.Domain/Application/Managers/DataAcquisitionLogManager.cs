@@ -111,7 +111,6 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             FhirQueries = model.FhirQuery.Select(q => new FhirQuery
             {
                 FacilityId = model.FacilityId,
-                IdQueryParameterValues = q.IdQueryParameterValues,
                 IsReference = q.IsReference,
                 MeasureId = q.MeasureId,
                 QueryParameters = q.QueryParameters,
