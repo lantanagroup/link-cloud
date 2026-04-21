@@ -525,7 +525,15 @@ public class ReferenceResourceService : IReferenceResourceService
 
         var resourceParam = command.CreateParameter();
         resourceParam.ParameterName = "@resource";
-        resourceParam.Value = $"ReferenceLog:{primaryLog.FacilityId}:{primaryLog.CorrelationId}:{primaryLog.QueryPhase}:{resourceType}";
+        // The lock scope is the (facility, correlation, phase) group, NOT per-resource-type.
+        // Broader serialization is required because GetOrCreateAndAppendAsync also calls
+        // IncrementSiblingCountAsync, which performs a wide UPDATE over every log row in
+        // the group. Two transactions holding different per-type app locks would each
+        // try to lock the other's newly-inserted ref-log row inside that wide UPDATE,
+        // producing a SQL Server deadlock. Locking at the group level removes the cross-
+        // transaction contention entirely; the throughput cost is negligible because
+        // ref-log work per group is fast and only happens when primaries finish.
+        resourceParam.Value = $"ReferenceLog:{primaryLog.FacilityId}:{primaryLog.CorrelationId}:{primaryLog.QueryPhase}";
         command.Parameters.Add(resourceParam);
 
         var timeoutParam = command.CreateParameter();
@@ -542,7 +550,7 @@ public class ReferenceResourceService : IReferenceResourceService
         var resultObj = await command.ExecuteScalarAsync(cancellationToken);
         var result = Convert.ToInt32(resultObj);
         if (result < 0)
-            throw new InvalidOperationException($"Unable to acquire SQL app lock for resource type '{resourceType}'. sp_getapplock result={result}.");
+            throw new InvalidOperationException($"Unable to acquire SQL app lock for reference-log group '{primaryLog.FacilityId}:{primaryLog.CorrelationId}:{primaryLog.QueryPhase}' (resourceType='{resourceType}'). sp_getapplock result={result}.");
     }
 
     private static ReferenceQueryConfig? ResolveReferenceQueryConfig(QueryPlanModel plan, string resourceType)
