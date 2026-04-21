@@ -1,46 +1,65 @@
-ï»¿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using IndexAttribute = Microsoft.EntityFrameworkCore.IndexAttribute;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 /// <summary>
-/// Staging table for reference resource IDs discovered during concurrent patient processing.
-/// Each row represents a single reference ID found by one patient worker.
-/// This eliminates the write-hot-row contention on the shared FhirQuery.QueryParameters column
-/// that previously caused deadlocks and timeouts under high concurrency.
+/// Correlation-scoped staging table for reference resource IDs discovered by primary
+/// (non-reference) data acquisition logs during their processing.
 ///
-/// When the reference log is ready to execute, all pending IDs for its FhirQuery are
-/// collected in a single read and merged into the FhirQuery.QueryParameters at that point.
+/// Each row represents a single <c>(FacilityId, CorrelationId, ResourceType, ResourceId)</c>
+/// tuple that a primary log wants the referential phase to acquire. The unique index on
+/// that tuple gives cross-primary deduplication with no write-hot-row contention.
+///
+/// When all primary-phase logs in a correlation reach a terminal status, a promoter
+/// drains these rows into one referential <see cref="DataAcquisitionLog"/> per
+/// resource type (with its <see cref="FhirQuery"/> pre-populated from the query-plan
+/// <c>ReferenceQueryConfig</c>), deletes the staging rows, and lets the normal
+/// acquisition pipeline execute the referential queries — batched by <c>Paged</c> and
+/// honoring <c>Search</c> vs <c>SearchPost</c> from the config.
 /// </summary>
 [Table("PendingReferenceIds")]
+[Index(nameof(FacilityId), nameof(CorrelationId), nameof(ResourceType), nameof(ResourceId),
+       IsUnique = true, Name = "UX_PendingReferenceIds_Facility_Correlation_Type_Id")]
+[Index(nameof(FacilityId), nameof(CorrelationId),
+       Name = "IX_PendingReferenceIds_Facility_Correlation")]
 public class PendingReferenceId
 {
     [Key]
     public long Id { get; set; }
 
     /// <summary>
-    /// The FhirQuery (reference log's query) that these IDs will be merged into.
-    /// </summary>
-    [Required]
-    public Guid FhirQueryId { get; set; }
-
-    [ForeignKey(nameof(FhirQueryId))]
-    public virtual FhirQuery FhirQuery { get; set; } = null!;
-
-    /// <summary>
-    /// The reference resource ID (e.g. "Location/Gen-Location-ICU", "Medication/med-123").
-    /// Stored as the bare ID without the resource type prefix.
+    /// Facility that owns this pending reference.
     /// </summary>
     [Required]
     [MaxLength(256)]
-    public string ResourceId { get; set; } = string.Empty;
+    public string FacilityId { get; set; } = string.Empty;
 
     /// <summary>
-    /// The resource type (e.g. "Location", "Medication") for efficient grouping.
+    /// Correlation id of the primary-phase acquisition that discovered the reference.
+    /// Promotion into a referential log is scoped per <c>(FacilityId, CorrelationId)</c>.
+    /// </summary>
+    [Required]
+    [MaxLength(64)]
+    public string CorrelationId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The reference resource type (e.g. "Location", "Medication") used to group ids
+    /// into per-type referential queries at promotion time.
     /// </summary>
     [Required]
     [MaxLength(128)]
     public string ResourceType { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The bare reference resource id (e.g. "Gen-Location-ICU", "med-123"), without
+    /// the resource-type prefix.
+    /// </summary>
+    [Required]
+    [MaxLength(256)]
+    public string ResourceId { get; set; } = string.Empty;
 
     public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 }

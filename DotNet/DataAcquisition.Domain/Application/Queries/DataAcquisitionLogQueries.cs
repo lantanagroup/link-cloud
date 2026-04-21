@@ -448,31 +448,18 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     .Select(q => q.DataAcquisitionLogId)
                     .ToHashSet();
 
-                // Fetch reference resource types linked via the skip-navigation.
-                // DataAcquisitionLogReferenceResource is a shared-type entity and cannot
-                // be accessed via a typed DbSet; query through the DataAcquisitionLog
-                // navigation property instead.
-                var refResourceTypesByLogId = await _dbContext.DataAcquisitionLogs
-                    .AsNoTracking()
-                    .Where(l => logIds.Contains(l.Id))
-                    .SelectMany(l => l.ReferenceResources.Select(r => new { LogId = l.Id, r.ResourceType }))
-                    .GroupBy(x => x.LogId)
-                    .ToDictionaryAsync(
-                        g => g.Key,
-                        g => g.Select(x => x.ResourceType).Distinct().ToList(),
-                        cancellationToken);
-
                 records = pageLogs.Select(log =>
                 {
                     firstQueryByLogId.TryGetValue(log.Id, out var fhirQuery);
                     allQueryResourceTypesByLogId.TryGetValue(log.Id, out var allQueryTypes);
-                    refResourceTypesByLogId.TryGetValue(log.Id, out var refTypes);
 
-                    // Merge FhirQuery resource types + reference resource types.
-                    var resourceTypes = (allQueryTypes ?? fhirQuery?.ResourceTypes?.Select(rt => rt.ToString()).ToList() ?? new List<string>())
-                        .Concat(refTypes ?? [])
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList();
+                    // Referential-phase logs now exist as first-class rows with their
+                    // own FhirQueryResourceTypes, so the primary log's resource types
+                    // are strictly what its own FhirQueries declare. No synthesis off
+                    // the ReferenceResources junction.
+                    var resourceTypes = allQueryTypes
+                        ?? fhirQuery?.ResourceTypes?.Select(rt => rt.ToString()).ToList()
+                        ?? new List<string>();
 
                     string? resourceId;
 
@@ -489,8 +476,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         resourceId = string.Empty;
                     }
 
-                    var isReferenceLog = logsWithReferenceQuery.Contains(log.Id)
-                        || (refTypes != null && refTypes.Count > 0);
+                    var isReferenceLog = logsWithReferenceQuery.Contains(log.Id);
 
                     return new QueryLogSummaryModel
                     {
@@ -639,39 +625,17 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         foreach (var qp in queryPhaseCounts)
             statistics.QueryPhaseCounts[qp.Phase] = qp.Count;
 
-        // Resource type counts + total from ResourceIds junction table.
-        // Include reference resources linked to completed logs when they are stored
-        // separately in ReferenceResources.
+        // Resource type counts + total. Under the referential-phase promoter design,
+        // reference resources acquired by a referential log are recorded in both
+        // DataAcquisitionLogResourceIds AND DataAcquisitionLogReferenceResource on
+        // that same log, so walking ResourceIds across all completed logs counts
+        // every resource — primary and reference — exactly once.
         var completedResourceIds = await baseQuery
             .Where(l => l.Status == RequestStatus.Completed)
             .SelectMany(l => l.ResourceIds.Select(r => r.ResourceId))
             .ToListAsync(cancellationToken);
 
-        var completedReferenceResourceIds = await baseQuery
-            .Where(l => l.Status == RequestStatus.Completed)
-            .SelectMany(l => l.ReferenceResources.Select(r => r.ResourceType + "/" + r.ResourceId))
-            .ToListAsync(cancellationToken);
-
-        var completedLogs = new List<string>(completedResourceIds.Count + completedReferenceResourceIds.Count);
-        completedLogs.AddRange(completedResourceIds);
-
-        // Avoid double-counting resources that already exist in ResourceIds.
-        var existingResourceSet = completedResourceIds
-            .Where(r => !string.IsNullOrWhiteSpace(r))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var referenceResourceId in completedReferenceResourceIds)
-        {
-            if (string.IsNullOrWhiteSpace(referenceResourceId))
-                continue;
-
-            if (existingResourceSet.Contains(referenceResourceId))
-                continue;
-
-            completedLogs.Add(referenceResourceId);
-        }
-
-        foreach (var resource in completedLogs)
+        foreach (var resource in completedResourceIds)
         {
             if (string.IsNullOrWhiteSpace(resource)) continue;
             var slashIdx = resource.IndexOf('/');

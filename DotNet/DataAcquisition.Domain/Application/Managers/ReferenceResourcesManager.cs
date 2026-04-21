@@ -1,4 +1,4 @@
-ï»¿using DataAcquisition.Domain.Application.Models;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -14,12 +14,22 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IReferenceResourcesManager
 {
-    Task<ReferenceResourcesModel> CreateAsync(CreateReferenceResourcesModel model, CancellationToken cancellationToken = default);
-    Task<ReferenceResourcesModel> UpdateAsync(UpdateReferenceResourcesModel model, CancellationToken cancellationToken = default);
     Task CreateBatchAsync(IReadOnlyList<CreateReferenceResourcesModel> models, CancellationToken cancellationToken = default);
-    Task UpdateBatchAsync(IReadOnlyList<UpdateReferenceResourcesModel> models, CancellationToken cancellationToken = default);
 
     Task LinkToLogAsync(long dataAcquisitionLogId, IReadOnlyList<Guid> referenceResourceIds, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Stage discovered reference resource ids onto the <c>PendingReferenceIds</c> table for
+    /// later promotion into a referential-phase <see cref="DataAcquisitionLog"/>.
+    /// Deduplicates against existing staging rows and is safe to call concurrently from
+    /// multiple primary-phase workers; the unique index on the staging table is the
+    /// authoritative dedupe, and this method swallows the narrow race-window conflicts.
+    /// </summary>
+    Task StagePendingReferencesAsync(
+        string facilityId,
+        string correlationId,
+        IReadOnlyList<(string ResourceType, string ResourceId)> references,
+        CancellationToken cancellationToken = default);
 }
 
 public class ReferenceResourcesManager : IReferenceResourcesManager
@@ -37,64 +47,6 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-    }
-
-    public async Task<ReferenceResourcesModel> CreateAsync(CreateReferenceResourcesModel model, CancellationToken cancellationToken = default)
-    {
-        using var activity = ServiceActivitySource.Instance.StartActivity("ReferenceResourcesManager.CreateAsync");
-        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
-        activity?.SetTag(DiagnosticNames.ResourceId, model.ResourceId);
-        activity?.SetTag(DiagnosticNames.ResourceType, model.ResourceType);
-
-        if (model == null) throw new ArgumentNullException(nameof(model));
-
-        var entity = new ReferenceResources
-        {
-            FacilityId = model.FacilityId,
-            ResourceId = model.ResourceId,
-            ResourceType = model.ResourceType,
-            ReferenceResource = model.ReferenceResource,
-            QueryPhase = model.QueryPhase,
-            CreateDate = DateTime.UtcNow,
-            ModifyDate = DateTime.UtcNow
-        };
-
-        entity = await _database.ReferenceResourcesRepository.AddAsync(entity);
-        await _database.ReferenceResourcesRepository.SaveChangesAsync(cancellationToken);
-
-        return ReferenceResourcesModel.FromDomain(entity);
-    }
-
-    public async Task<ReferenceResourcesModel> UpdateAsync(UpdateReferenceResourcesModel model, CancellationToken cancellationToken = default)
-    {
-        using var activity = ServiceActivitySource.Instance.StartActivity("ReferenceResourcesManager.UpdateAsync");
-        activity?.SetTag(DiagnosticNames.ResourceId, model.Id);
-        activity?.SetTag(DiagnosticNames.ResourceType, model.ResourceType);
-
-        if (model == null) throw new ArgumentNullException(nameof(model));
-
-        var modifyDate = DateTime.UtcNow;
-
-        var updated = await _dbContext.ReferenceResources
-            .Where(r => r.Id == model.Id)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(r => r.QueryPhase, model.QueryPhase)
-                .SetProperty(r => r.ResourceType, model.ResourceType)
-                .SetProperty(r => r.ReferenceResource, model.ReferenceResource)
-                .SetProperty(r => r.ModifyDate, modifyDate),
-            cancellationToken);
-
-        if (updated == 0)
-            throw new KeyNotFoundException($"ReferenceResources with ID {model.Id} not found.");
-
-        return new ReferenceResourcesModel
-        {
-            Id = model.Id,
-            QueryPhase = model.QueryPhase,
-            ResourceType = model.ResourceType,
-            ReferenceResource = model.ReferenceResource,
-            ModifyDate = modifyDate
-        };
     }
 
     public async Task CreateBatchAsync(IReadOnlyList<CreateReferenceResourcesModel> models, CancellationToken cancellationToken = default)
@@ -223,26 +175,6 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
             yield return source.Skip(i).Take(size).ToList();
     }
 
-    public async Task UpdateBatchAsync(IReadOnlyList<UpdateReferenceResourcesModel> models, CancellationToken cancellationToken = default)
-    {
-        if (models == null || models.Count == 0)
-            return;
-
-        var modifyDate = DateTime.UtcNow;
-
-        foreach (var model in models)
-        {
-            await _dbContext.ReferenceResources
-                .Where(r => r.Id == model.Id)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(r => r.QueryPhase, model.QueryPhase)
-                    .SetProperty(r => r.ResourceType, model.ResourceType)
-                    .SetProperty(r => r.ReferenceResource, model.ReferenceResource)
-                    .SetProperty(r => r.ModifyDate, modifyDate),
-                cancellationToken);
-        }
-    }
-
     public async Task LinkToLogAsync(long dataAcquisitionLogId, IReadOnlyList<Guid> referenceResourceIds, CancellationToken cancellationToken = default)
     {
         if (referenceResourceIds == null || referenceResourceIds.Count == 0)
@@ -268,6 +200,111 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
                 log.ReferenceResources.Add(resource);
 
             await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task StagePendingReferencesAsync(
+        string facilityId,
+        string correlationId,
+        IReadOnlyList<(string ResourceType, string ResourceId)> references,
+        CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("ReferenceResourcesManager.StagePendingReferencesAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
+
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentException("FacilityId is required.", nameof(facilityId));
+        if (string.IsNullOrWhiteSpace(correlationId))
+            throw new ArgumentException("CorrelationId is required.", nameof(correlationId));
+        if (references == null || references.Count == 0)
+            return;
+
+        // In-memory dedupe of the input batch.
+        var deduped = references
+            .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
+            .Distinct()
+            .ToList();
+
+        if (deduped.Count == 0)
+            return;
+
+        // Pre-read existing staging rows for this correlation so we skip the vast majority
+        // of inserts in the steady-state case. The unique index on
+        // (FacilityId, CorrelationId, ResourceType, ResourceId) is the authoritative
+        // dedupe; this read is an optimization.
+        var resourceIds = deduped.Select(r => r.ResourceId).Distinct().ToList();
+        var existing = new HashSet<(string Type, string Id)>();
+
+        foreach (var idChunk in Chunk(resourceIds, ExistenceCheckChunkSize))
+        {
+            var rows = await _dbContext.PendingReferenceIds
+                .AsNoTracking()
+                .Where(p => p.FacilityId == facilityId
+                         && p.CorrelationId == correlationId
+                         && idChunk.Contains(p.ResourceId))
+                .Select(p => new { p.ResourceType, p.ResourceId })
+                .ToListAsync(cancellationToken);
+
+            foreach (var r in rows)
+                existing.Add((r.ResourceType, r.ResourceId));
+        }
+
+        var toInsert = deduped
+            .Where(r => !existing.Contains((r.ResourceType, r.ResourceId)))
+            .Select(r => new PendingReferenceId
+            {
+                FacilityId = facilityId,
+                CorrelationId = correlationId,
+                ResourceType = r.ResourceType,
+                ResourceId = r.ResourceId,
+                CreateDate = DateTime.UtcNow
+            })
+            .ToList();
+
+        if (toInsert.Count == 0)
+            return;
+
+        foreach (var chunk in Chunk(toInsert, InsertChunkSize))
+        {
+            try
+            {
+                _dbContext.PendingReferenceIds.AddRange(chunk);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                _dbContext.ChangeTracker.Clear();
+            }
+            catch (DbUpdateException batchEx)
+            {
+                // A concurrent stager inserted overlapping rows between our pre-read
+                // and our write, violating the unique index. Fall back to row-by-row
+                // inserts, swallowing only unique-violation conflicts so surviving
+                // rows still land.
+                _dbContext.ChangeTracker.Clear();
+                _logger.LogDebug(batchEx,
+                    "StagePendingReferencesAsync: batch insert collided with a concurrent stager for correlation {CorrelationId}; falling back to per-row inserts.",
+                    correlationId);
+
+                foreach (var row in chunk)
+                {
+                    try
+                    {
+                        _dbContext.PendingReferenceIds.Add(row);
+                        await _dbContext.SaveChangesAsync(cancellationToken);
+                    }
+                    catch (DbUpdateException rowEx)
+                    {
+                        // Duplicate already present — safe to skip. Log at debug so noise
+                        // stays low but races are still diagnosable.
+                        _logger.LogDebug(rowEx,
+                            "StagePendingReferencesAsync: skipping duplicate pending reference {ResourceType}/{ResourceId} for correlation {CorrelationId}.",
+                            row.ResourceType, row.ResourceId, correlationId);
+                    }
+                    finally
+                    {
+                        _dbContext.ChangeTracker.Clear();
+                    }
+                }
+            }
         }
     }
 }

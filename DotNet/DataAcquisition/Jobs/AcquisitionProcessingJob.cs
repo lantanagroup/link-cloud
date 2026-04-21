@@ -2,6 +2,7 @@ using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -43,6 +44,7 @@ public class AcquisitionProcessingJob : IJob
         {
             await FailStalledQueuedLogs(context.CancellationToken);
             await ResetStalledProcessingLogs(context.CancellationToken);
+            await PromoteReadyReferentialPhases(context.CancellationToken);
 
             // Start the stopwatch AFTER housekeeping so the full time budget
             // is available for the primary work of dispatching pending logs.
@@ -106,6 +108,35 @@ public class AcquisitionProcessingJob : IJob
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error occurred while resetting stalled processing logs.");
+        }
+    }
+
+    private async Task PromoteReadyReferentialPhases(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var promoter = scope.ServiceProvider.GetRequiredService<IReferentialPhasePromoter>();
+
+            int promoted = await promoter.FindAndPromoteReadyCorrelationsAsync(
+                _settings.MaxReferentialPromotionsPerRun,
+                cancellationToken);
+
+            if (promoted > 0)
+            {
+                _logger.LogInformation(
+                    "Promoted {count} correlation(s) from staged reference ids into referential-phase data acquisition logs.",
+                    promoted);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Referential-phase promotion was cancelled.");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while promoting staged reference ids into referential-phase logs.");
         }
     }
 

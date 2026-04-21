@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
@@ -217,9 +217,11 @@ public class QueryListProcessor : IQueryListProcessor
             }
             else if (builtQuery is ReferenceQueryFactoryResult)
             {
-                // Reference resources are now fetched inline during normal log
-                // processing (in ProcessReferences). No separate log is needed.
-                _logger.LogDebug("Skipping separate log creation for reference query {ResourceType} — references are resolved inline.", ((ReferenceQueryConfig)queryConfig).ResourceType);
+                // Reference resources are staged during primary-phase bundle processing
+                // (see ReferenceResourceService.ProcessReferences) and promoted into their
+                // own referential-phase DataAcquisitionLog entries by the
+                // ReferentialPhasePromoter. No log is created here.
+                _logger.LogDebug("Skipping log creation during plan iteration for reference query {ResourceType} � will be staged and promoted.", ((ReferenceQueryConfig)queryConfig).ResourceType);
             }
         }
 

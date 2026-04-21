@@ -1,4 +1,4 @@
-﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
+using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
@@ -44,6 +44,7 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<DataAcquisitionLogNote> DataAcquisitionLogNotes { get; set; }
     public DbSet<DataAcquisitionLogResourceId> DataAcquisitionLogResourceIds { get; set; }
     public DbSet<ScheduledReportEntity> ScheduledReports { get; set; }
+    public DbSet<PendingReferenceId> PendingReferenceIds { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,4 +1,4 @@
-ï»¿using Confluent.Kafka;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
@@ -39,29 +39,15 @@ namespace IntegrationTests.DataAcquisition.Services
             var logger = new Mock<ILogger<ReferenceResourceService>>().Object;
             var refMgr = scope.ServiceProvider.GetRequiredService<IReferenceResourcesManager>();
             var refQueries = scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>();
-            var readFhirCommand = new Mock<IReadFhirCommand>().Object;
-            var kafkaProducerMock = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
-            kafkaProducerMock
-                .Setup(p => p.ProduceAsync(
-                    It.IsAny<string>(),
-                    It.IsAny<Message<ResourceKey, ResourceAcquired>>(),
-                    It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new DeliveryResult<ResourceKey, ResourceAcquired>());
-
-            var kafkaProducer = kafkaProducerMock.Object;
-            var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
             return new ReferenceResourceService(
                 logger,
                 refQueries,
-                refMgr,
-                readFhirCommand,
-                kafkaProducer,
-                dbContext);
+                refMgr);
         }
 
         [Fact]
-        public async Task ProcessReferences_CachesAndLinksExistingResources()
+        public async Task ProcessReferences_StagesDiscoveredIdsIntoPendingReferenceIds()
         {
             // Arrange
             using var scope = _fixture.ServiceProvider.CreateScope();
@@ -74,7 +60,9 @@ namespace IntegrationTests.DataAcquisition.Services
             var correlationId = Guid.NewGuid().ToString();
             var reportTrackingId = Guid.NewGuid().ToString();
 
-            // Pre-seed a canonical reference resource
+            // Pre-seed a canonical reference resource — under the new flow this has no
+            // effect on the primary-phase ProcessReferences behavior (cache lookups and
+            // junction linking are deferred to the promoter / referential log execution).
             await refMgr.CreateBatchAsync(new[]
             {
                 new CreateReferenceResourcesModel
@@ -106,14 +94,16 @@ namespace IntegrationTests.DataAcquisition.Services
                 Status = RequestStatus.Pending,
                 Priority = AcquisitionPriority.Normal,
                 ReportableEvent = ReportableEvent.Adhoc
-
             });
 
             var logModel = await scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>().GetAsync(parentLog.Id);
 
             var refResources = new List<ResourceReference>
             {
-                new ResourceReference { Reference = "Location/test-loc-1" }
+                new ResourceReference { Reference = "Location/test-loc-1" },
+                // duplicate reference should be deduped by the staging unique index
+                new ResourceReference { Reference = "Location/test-loc-1" },
+                new ResourceReference { Reference = "Medication/med-9" }
             };
 
             var fhirQueryConfig = new FhirQueryConfigurationModel
@@ -123,17 +113,92 @@ namespace IntegrationTests.DataAcquisition.Services
 
             var service = CreateService(scope);
 
-            // Act â€” the resource already exists in cache, so no FHIR fetch needed
+            // Act — new flow: only stages ids onto PendingReferenceIds, no FHIR reads,
+            // no junction links on the primary log, no Kafka publish.
             await service.ProcessReferences(logModel, refResources, fhirQueryConfig);
 
-            // Assert â€” the resource should be linked to the log via junction table
+            // Assert — primary log has NO reference-resource junction rows.
             var linkedResources = await dbContext.DataAcquisitionLogs
+                .AsNoTracking()
                 .Where(l => l.Id == parentLog.Id)
                 .SelectMany(l => l.ReferenceResources)
                 .ToListAsync();
 
-            Assert.Single(linkedResources);
-            Assert.Equal("test-loc-1", linkedResources[0].ResourceId);
+            Assert.Empty(linkedResources);
+
+            // Assert — staging table has one row per distinct (ResourceType, ResourceId)
+            // for this correlation.
+            var pending = await dbContext.PendingReferenceIds
+                .AsNoTracking()
+                .Where(p => p.FacilityId == facilityId && p.CorrelationId == correlationId)
+                .OrderBy(p => p.ResourceType).ThenBy(p => p.ResourceId)
+                .ToListAsync();
+
+            Assert.Equal(2, pending.Count);
+            Assert.Equal("Location", pending[0].ResourceType);
+            Assert.Equal("test-loc-1", pending[0].ResourceId);
+            Assert.Equal("Medication", pending[1].ResourceType);
+            Assert.Equal("med-9", pending[1].ResourceId);
+        }
+
+        [Fact]
+        public async Task ProcessReferences_IsIdempotentAcrossRepeatedCalls()
+        {
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+            var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
+
+            var tag = Guid.NewGuid().ToString("N");
+            var facilityId = $"TestFacility_{tag}";
+            var correlationId = Guid.NewGuid().ToString();
+            var reportTrackingId = Guid.NewGuid().ToString();
+
+            dbContext.ScheduledReports.Add(new ScheduledReportEntity
+            {
+                ReportTrackingId = Guid.Parse(reportTrackingId),
+                Frequency = ScheduledFrequency.Adhoc,
+                StartDate = DateTime.UtcNow.AddDays(-1),
+                EndDate = DateTime.UtcNow
+            });
+            await dbContext.SaveChangesAsync();
+
+            var parentLog = await logManager.CreateAsync(new CreateDataAcquisitionLogModel
+            {
+                FacilityId = facilityId,
+                CorrelationId = correlationId,
+                ReportTrackingId = reportTrackingId,
+                QueryPhase = QueryPhase.Initial,
+                QueryType = FhirQueryType.Search,
+                Status = RequestStatus.Pending,
+                Priority = AcquisitionPriority.Normal,
+                ReportableEvent = ReportableEvent.Adhoc
+            });
+
+            var logModel = await scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>().GetAsync(parentLog.Id);
+
+            var refResources = new List<ResourceReference>
+            {
+                new ResourceReference { Reference = "Location/loc-42" }
+            };
+
+            var fhirQueryConfig = new FhirQueryConfigurationModel
+            {
+                FhirServerBaseUrl = "http://localhost/fhir"
+            };
+
+            var service = CreateService(scope);
+
+            await service.ProcessReferences(logModel, refResources, fhirQueryConfig);
+            await service.ProcessReferences(logModel, refResources, fhirQueryConfig);
+
+            var pendingCount = await dbContext.PendingReferenceIds
+                .AsNoTracking()
+                .CountAsync(p => p.FacilityId == facilityId
+                              && p.CorrelationId == correlationId
+                              && p.ResourceType == "Location"
+                              && p.ResourceId == "loc-42");
+
+            Assert.Equal(1, pendingCount);
         }
     }
 }

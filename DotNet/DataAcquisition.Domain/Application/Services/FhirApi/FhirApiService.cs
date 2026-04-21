@@ -203,6 +203,7 @@ public class FhirApiService : IFhirApiService
         activity?.SetTag(DiagnosticNames.ReportId, log.Id);
         activity?.SetTag(DiagnosticNames.ResourceType, resourceType.ToString());
 
+        var isReferenceLog = fhirQuery.IsReference.GetValueOrDefault();
         var resourceIds = new List<string>();
         try
         {
@@ -218,9 +219,16 @@ public class FhirApiService : IFhirApiService
                             fhirQuery.QueryType),
                             cancellationToken))
             {
-                var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
-
-                await _referenceResourceService.ProcessReferences(log, refResources, fhirQueryConfiguration, cancellationToken);
+                // Reference discovery only runs for primary-phase logs. Reference-phase
+                // logs must not re-stage ids discovered inside their own fetched
+                // reference resources — that would re-enter the promoter loop for this
+                // correlation forever. (Chained-reference discovery is out of scope;
+                // matches historical single-level behavior.)
+                if (!isReferenceLog)
+                {
+                    var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
+                    await _referenceResourceService.ProcessReferences(log, refResources, fhirQueryConfiguration, cancellationToken);
+                }
 
                 var resources = bundle.Entry
                     .Where(e => e.Resource != null && e.Resource.TypeName != "OperationOutcome")
@@ -245,6 +253,14 @@ public class FhirApiService : IFhirApiService
                 }
 
                 resourceIds.AddRange(resources.Select(r => $"{r.TypeName}/{r.Id}"));
+
+                // When this is a reference-phase log, persist each fetched resource into
+                // the canonical ReferenceResources cache (upsert) and junction it to the
+                // log so subsequent correlations can cache-hit without a FHIR round trip.
+                if (isReferenceLog && resources.Count > 0)
+                {
+                    await PersistAcquiredReferenceResourcesAsync(log, resources, cancellationToken);
+                }
 
                 foreach (var resource in resources)
                 {
@@ -280,6 +296,69 @@ public class FhirApiService : IFhirApiService
                 throw new OpOutcomeException(note, ex);
             }
             throw;
+        }
+    }
+
+    private async Task PersistAcquiredReferenceResourcesAsync(
+        DataAcquisitionLogModel log,
+        IReadOnlyList<Resource> resources,
+        CancellationToken cancellationToken)
+    {
+        var toCreate = new List<CreateReferenceResourcesModel>(resources.Count);
+        foreach (var resource in resources)
+        {
+            if (resource == null || string.IsNullOrWhiteSpace(resource.Id) || string.IsNullOrWhiteSpace(resource.TypeName))
+                continue;
+
+            string serialized;
+            try
+            {
+                serialized = JsonSerializer.Serialize(resource, _options);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "PersistAcquiredReferenceResourcesAsync: failed to serialize {ResourceType}/{ResourceId} for log {LogId}; skipping cache persist.",
+                    resource.TypeName, resource.Id, log.Id);
+                continue;
+            }
+
+            toCreate.Add(new CreateReferenceResourcesModel
+            {
+                FacilityId = log.FacilityId,
+                ResourceId = resource.Id,
+                ResourceType = resource.TypeName,
+                ReferenceResource = serialized,
+                QueryPhase = QueryPhase.Referential,
+            });
+        }
+
+        if (toCreate.Count == 0)
+            return;
+
+        // Upsert canonical cache rows (unique index on facility+type+id; existing rows
+        // are left untouched so cross-correlation cache sharing remains authoritative).
+        await _referenceResourceManager.CreateBatchAsync(toCreate, cancellationToken);
+
+        // Link the canonical rows to THIS log. Lookups happen per-ResourceType because
+        // SearchReferenceResourcesModel scopes by ResourceType.
+        var canonicalIds = new List<Guid>(toCreate.Count);
+        foreach (var byType in toCreate.GroupBy(c => c.ResourceType, StringComparer.Ordinal))
+        {
+            var resourceIds = byType.Select(c => c.ResourceId).ToList();
+            var rows = (await _referenceResourcesQueries.SearchAsync(new SearchReferenceResourcesModel
+            {
+                FacilityId = log.FacilityId,
+                ResourceType = byType.Key,
+                ResourceIds = resourceIds,
+                PageSize = int.MaxValue
+            })).Records;
+            canonicalIds.AddRange(rows.Select(r => r.Id));
+        }
+
+        if (canonicalIds.Count > 0)
+        {
+            await _referenceResourceManager.LinkToLogAsync(log.Id, canonicalIds, cancellationToken);
         }
     }
 
