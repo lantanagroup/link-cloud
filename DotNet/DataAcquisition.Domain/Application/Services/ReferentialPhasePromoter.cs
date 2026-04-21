@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using System.Data;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
@@ -47,6 +48,19 @@ public class ReferentialPhasePromoter : IReferentialPhasePromoter
         RequestStatus.ConfigurationMissing,
     };
 
+    private const int LockTimeoutMs = 30000;
+
+    /// <summary>
+    /// Multiplier applied to <c>maxCorrelationsPerRun</c> when scanning candidate
+    /// <c>(facility, correlation)</c> pairs out of <c>PendingReferenceIds</c>. The
+    /// scan is intentionally oversized so non-terminal correlations cannot fill the
+    /// per-tick budget and starve terminal-ready ones &mdash; the budget is enforced
+    /// <em>after</em> the terminality / already-promoted filter. Capped at
+    /// <see cref="MaxEligibilityScanWindow"/> to bound DB cost on large backlogs.
+    /// </summary>
+    private const int EligibilityScanMultiplier = 10;
+    private const int MaxEligibilityScanWindow = 1000;
+
     private readonly ILogger<ReferentialPhasePromoter> _logger;
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly IQueryPlanQueries _queryPlanQueries;
@@ -70,17 +84,30 @@ public class ReferentialPhasePromoter : IReferentialPhasePromoter
 
         if (maxCorrelationsPerRun <= 0) maxCorrelationsPerRun = 50;
 
-        // Distinct (facility, correlation) candidates with staged references.
+        // Fetch an oversized, deterministically-ordered window of candidate
+        // (facility, correlation) pairs that have staged refs, then enforce the
+        // per-tick budget AFTER terminal-eligibility filtering. Applying Take()
+        // before the filter would let non-terminal correlations consume the entire
+        // budget and starve terminal-ready ones behind them in the same window.
+        int scanWindow = Math.Min(
+            checked(maxCorrelationsPerRun * EligibilityScanMultiplier),
+            MaxEligibilityScanWindow);
+
         var candidates = await _dbContext.PendingReferenceIds.AsNoTracking()
             .GroupBy(p => new { p.FacilityId, p.CorrelationId })
             .Select(g => new { g.Key.FacilityId, g.Key.CorrelationId })
-            .Take(maxCorrelationsPerRun)
+            .OrderBy(g => g.FacilityId)
+            .ThenBy(g => g.CorrelationId)
+            .Take(scanWindow)
             .ToListAsync(cancellationToken);
 
         if (candidates.Count == 0)
             return 0;
 
-        int promoted = 0;
+        // First pass: select up to maxCorrelationsPerRun candidates that are actually
+        // ready to promote. Already-promoted correlations are purged in-line (they
+        // don't count against the budget, since they did no real work).
+        var ready = new List<(string FacilityId, string CorrelationId)>(maxCorrelationsPerRun);
         foreach (var c in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -95,6 +122,19 @@ public class ReferentialPhasePromoter : IReferentialPhasePromoter
                 await PurgePendingAsync(c.FacilityId, c.CorrelationId, cancellationToken);
                 continue;
             }
+
+            ready.Add((c.FacilityId, c.CorrelationId));
+            if (ready.Count >= maxCorrelationsPerRun)
+                break;
+        }
+
+        if (ready.Count == 0)
+            return 0;
+
+        int promoted = 0;
+        foreach (var c in ready)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
 
             try
             {
@@ -137,6 +177,20 @@ public class ReferentialPhasePromoter : IReferentialPhasePromoter
 
         if (pending.Count == 0)
             return 0;
+
+        // Defensive gate: refuse to promote while the Initial phase is still in flight.
+        // FindAndPromoteReadyCorrelationsAsync already filters on this, but PromoteAsync
+        // is public on IReferentialPhasePromoter and may be called directly. Mirror the
+        // sweeper's behavior and leave the pending rows in place so the next tick can
+        // retry once Initial reaches a terminal status — do NOT purge here, those rows
+        // still represent valid work.
+        if (!await IsInitialPhaseTerminalAsync(facilityId, correlationId, cancellationToken))
+        {
+            _logger.LogInformation(
+                "ReferentialPhasePromoter.PromoteAsync: Initial phase is not terminal for facility {FacilityId} correlation {CorrelationId}; leaving {Count} pending reference id(s) for retry.",
+                facilityId, correlationId, pending.Count);
+            return 0;
+        }
 
         // Find a representative primary-phase log so we can copy correlation-scoped
         // metadata (ReportTrackingId, ReportableEvent, TraceId, ScheduledReport/Frequency).
@@ -232,9 +286,15 @@ public class ReferentialPhasePromoter : IReferentialPhasePromoter
         // Transactional promotion. Inside the transaction we re-check idempotency so
         // a concurrent promoter running for the same correlation (e.g. the reactive
         // path racing the janitor sweep) can't create duplicate referential logs.
+        // ReadCommitted alone isn't sufficient — two concurrent promoters could each
+        // pass the existence check before either commits, then both insert. We serialize
+        // on a per-correlation SQL application lock; LockOwner='Transaction' means SQL
+        // releases the lock automatically when this transaction commits or rolls back.
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
         try
         {
+            await AcquireCorrelationLockAsync(facilityId, correlationId, cancellationToken);
+
             if (await ReferentialLogExistsAsync(facilityId, correlationId, cancellationToken))
             {
                 await PurgePendingAsync(facilityId, correlationId, cancellationToken);
@@ -318,6 +378,52 @@ public class ReferentialPhasePromoter : IReferentialPhasePromoter
 
     // ---------- helpers ----------
 
+    /// <summary>
+    /// Serializes promotion of a single <c>(facility, correlation)</c> across competing
+    /// promoters via a SQL application lock scoped to the active transaction. Mirrors
+    /// <c>ReferenceResourcesManager.AcquireLockAsync</c>; <c>LockOwner='Transaction'</c>
+    /// means SQL Server releases the lock automatically when the transaction commits or
+    /// rolls back, so the existing try/catch around the transaction is sufficient —
+    /// no separate <c>finally</c> release is required.
+    /// </summary>
+    private async Task AcquireCorrelationLockAsync(string facilityId, string correlationId, CancellationToken cancellationToken)
+    {
+        var connection = _dbContext.Database.GetDbConnection();
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = @"
+            DECLARE @result int;
+            EXEC @result = sp_getapplock
+                @Resource = @resource,
+                @LockMode = 'Exclusive',
+                @LockOwner = 'Transaction',
+                @LockTimeout = @lockTimeoutMs,
+                @DbPrincipal = 'public';
+            SELECT @result;";
+
+        var resourceParam = command.CreateParameter();
+        resourceParam.ParameterName = "@resource";
+        resourceParam.Value = $"ReferentialPhase:{facilityId}:{correlationId}";
+        command.Parameters.Add(resourceParam);
+
+        var timeoutParam = command.CreateParameter();
+        timeoutParam.ParameterName = "@lockTimeoutMs";
+        timeoutParam.Value = LockTimeoutMs;
+        command.Parameters.Add(timeoutParam);
+
+        var dbTransaction = _dbContext.Database.CurrentTransaction?.GetDbTransaction()
+            ?? throw new InvalidOperationException("AcquireCorrelationLockAsync must be called within an active transaction.");
+
+        command.Transaction = dbTransaction;
+
+        var resultObj = await command.ExecuteScalarAsync(cancellationToken);
+        var result = Convert.ToInt32(resultObj);
+
+        if (result < 0)
+            throw new InvalidOperationException(
+                $"Unable to acquire SQL app lock for ReferentialPhase:{facilityId}:{correlationId}. sp_getapplock result={result}.");
+    }
+
     private async Task<bool> IsInitialPhaseTerminalAsync(string facilityId, string correlationId, CancellationToken cancellationToken)
     {
         // Must have at least one Initial-phase log AND no non-terminal Initial-phase logs.
@@ -347,7 +453,8 @@ public class ReferentialPhasePromoter : IReferentialPhasePromoter
         return _dbContext.DataAcquisitionLogs.AsNoTracking()
             .AnyAsync(l => l.FacilityId == facilityId
                         && l.CorrelationId == correlationId
-                        && l.QueryPhase == QueryPhase.Referential,
+                        && l.QueryPhase == QueryPhase.Referential
+                        && !l.IsDeleted,
                 cancellationToken);
     }
 

@@ -370,5 +370,45 @@ namespace IntegrationTests.DataAcquisition.Services
                 .CountAsync(p => p.FacilityId == facilityId && p.CorrelationId == correlationId);
             Assert.Equal(0, remaining);
         }
+
+        [Fact]
+        public async Task PromoteAsync_DoesNotPromoteOrPurgeWhenInitialPhaseIsNotTerminal()
+        {
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+            // Initial-phase log is still Processing — non-terminal. Pending refs must
+            // remain in place so the next tick can retry once Initial completes.
+            var (facilityId, correlationId, _) = await SeedCorrelationAsync(
+                scope,
+                ScheduledFrequency.Daily,
+                RequestStatus.Processing,
+                new[]
+                {
+                    ("Location", "loc-1"),
+                    ("Location", "loc-2"),
+                });
+
+            var promoter = CreatePromoter(scope);
+
+            // Act
+            var created = await promoter.PromoteAsync(facilityId, correlationId);
+
+            // Assert — no referential log was created
+            Assert.Equal(0, created);
+
+            var referentialLogCount = await dbContext.DataAcquisitionLogs
+                .AsNoTracking()
+                .CountAsync(l => l.FacilityId == facilityId
+                              && l.CorrelationId == correlationId
+                              && l.QueryPhase == QueryPhase.Referential);
+            Assert.Equal(0, referentialLogCount);
+
+            // Pending rows are preserved (NOT purged) so the next tick can retry.
+            var remainingPending = await dbContext.PendingReferenceIds
+                .AsNoTracking()
+                .CountAsync(p => p.FacilityId == facilityId && p.CorrelationId == correlationId);
+            Assert.Equal(2, remainingPending);
+        }
     }
 }
