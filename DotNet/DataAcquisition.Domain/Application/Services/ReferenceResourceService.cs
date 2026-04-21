@@ -314,6 +314,7 @@ public class ReferenceResourceService : IReferenceResourceService
                 .ToList();
             nonIdParams.Add($"_id={string.Join(',', missingIds)}");
             fhirQuery.QueryParameters = nonIdParams;
+            fhirQuery.IdQueryParameterValues = missingIds.ToList();
         }
 
         var notes = cachedRows.Count > 0

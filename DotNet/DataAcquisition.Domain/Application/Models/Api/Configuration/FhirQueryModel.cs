@@ -1,8 +1,5 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 
 namespace DataAcquisition.Domain.Application.Models;
@@ -19,7 +16,26 @@ public class FhirQueryModel
     public int? Paged { get; set; }
     public long DataAcquisitionLogId { get; set; }
     public string? MeasureId { get; set; }
-    public IEnumerable<string> IdQueryParameterValues { get; set; } = new List<string>();
+    public IEnumerable<string> IdQueryParameterValues
+    {
+        get
+        {
+            const string prefix = "_id=";
+            return (QueryParameters ?? [])
+                .Where(p => p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .Select(p => p.Substring(prefix.Length))
+                .SelectMany(p => p.Split(','))
+                .Where(id => !string.IsNullOrWhiteSpace(id));
+        }
+        set
+        {
+            const string prefix = "_id=";
+            QueryParameters = (QueryParameters ?? [])
+                .Where(p => !p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .Append($"{prefix}{string.Join(',', (value ?? []).Where(id => !string.IsNullOrWhiteSpace(id)))}")
+                .ToList();
+        }
+    }
     public TimeFrame? CensusTimeFrame { get; set; } = null;
     public ListType? CensusPatientStatus { get; set; } = null;
     public string? CensusListId { get; set; } = null;

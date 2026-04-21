@@ -33,6 +33,22 @@ namespace UnitTests.DataAcquisition;
 public class FhirApiServiceTests
 {
     [Fact]
+    public void FhirQueryModel_IdQueryParameterValues_StaysInSyncWithQueryParameters()
+    {
+        var model = new FhirQueryModel
+        {
+            QueryParameters = new List<string> { "status=active", "_id=loc-1,loc-2" }
+        };
+
+        Assert.Equal(new[] { "loc-1", "loc-2" }, model.IdQueryParameterValues.ToList());
+
+        model.IdQueryParameterValues = new[] { "med-1", "med-2" };
+
+        Assert.Equal(new[] { "status=active", "_id=med-1,med-2" }, model.QueryParameters);
+        Assert.Equal(new[] { "med-1", "med-2" }, model.IdQueryParameterValues.ToList());
+    }
+
+    [Fact]
     public async Task CheckIfReferenceResourceHasBeenSent_ResourceAlreadySent_ReturnsTrueAndSkipsReprocessing()
     {
         var mockLogQueries = new Mock<IDataAcquisitionLogQueries>();
