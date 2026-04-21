@@ -320,7 +320,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             // Phase 2: For each candidate group, verify that it has zero
             //          non-terminal logs (i.e. all logs are finished).
 
-            // Phase 1 — narrow candidate groups via terminal-status logs only.
+            // Phase 1 ï¿½ narrow candidate groups via terminal-status logs only.
             var candidateGroups = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                 .Where(log =>
                     !log.TailSent &&
@@ -347,7 +347,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             if (candidateGroups.Count == 0)
                 return [];
 
-            // Phase 2 — for each candidate, check if ANY non-terminal log exists.
+            // Phase 2 for each candidate, check if ANY non-terminal log exists.
             var results = new List<TailingMessageModel>();
 
             foreach (var group in candidateGroups)
@@ -366,7 +366,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 if (hasIncomplete)
                     continue;
 
-                // All logs are terminal — collect data for the tail message
+                // All logs are terminal collect data for the tail message
                 var groupLogs = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                     .Where(log =>
                         !log.TailSent &&
@@ -802,7 +802,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 slowest.CompletionTimeMilliseconds!.Value);
         }
 
-        // Per-resource-type completion time aggregation – lightweight projection
+        // Per-resource-type completion time aggregation lightweight projection
         var completionTimes = await baseQuery
             .Where(l => l.CompletionTimeMilliseconds != null)
             .Select(l => new
