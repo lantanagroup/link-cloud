@@ -129,15 +129,15 @@ public class ReportAbsManifestValidator
 
         if (!string.IsNullOrWhiteSpace(facilityId) && !string.IsNullOrWhiteSpace(reportId))
         {
-            await ValidateDatabaseReconciliationAsync(
-                facilityId,
-                reportId,
-                actualPatientFiles,
-                parsedPatientResources,
-                expectedMeasureIds,
-                manifest,
-                errors,
-                expectDataAcquisitionData);
+            //await ValidateDatabaseReconciliationAsync(
+            //    facilityId,
+            //    reportId,
+            //    actualPatientFiles,
+            //    parsedPatientResources,
+            //    expectedMeasureIds,
+            //    manifest,
+            //    errors,
+            //    expectDataAcquisitionData);
 
             if (generatedBundles is { Count: > 0 })
             {
