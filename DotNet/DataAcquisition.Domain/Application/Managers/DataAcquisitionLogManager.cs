@@ -54,6 +54,16 @@ public interface IDataAcquisitionLogManager
     Task<int> StampSiblingCountAsync(string facilityId, string correlationId, QueryPhase queryPhase, int siblingCount, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Atomically grows the SiblingCount on every log in a (FacilityId, CorrelationId, QueryPhase)
+    /// group by <paramref name="delta"/>. If a log's SiblingCount is currently null it is set to
+    /// <paramref name="delta"/>; otherwise it is incremented. Used when same-phase reference logs
+    /// are added to an existing phase mid-execution so the tail completion check
+    /// (<see cref="TryCompleteTailAsync"/>) waits for the new siblings before producing the
+    /// AcquisitionComplete tail.
+    /// </summary>
+    Task<int> IncrementSiblingCountAsync(string facilityId, string correlationId, QueryPhase queryPhase, int delta, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Atomically checks whether all sibling logs in a group are terminal
     /// and the SiblingCount matches. If so, marks TailSent = true and
     /// returns the data needed to produce the tail Kafka message.
@@ -106,6 +116,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             Status = model.Status,
             FacilityId = model.FacilityId,
             QueryPhase = model.QueryPhase,
+            ReferenceResourceType = model.ReferenceResourceType,
             FhirVersion = model.FhirVersion,
             QueryType = model.QueryType,
             FhirQueries = model.FhirQuery.Select(q => new FhirQuery
@@ -726,6 +737,25 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         return updated;
     }
 
+    public async Task<int> IncrementSiblingCountAsync(string facilityId, string correlationId, QueryPhase queryPhase, int delta, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.IncrementSiblingCountAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
+
+        if (delta <= 0)
+            return 0;
+
+        return await _dbContext.DataAcquisitionLogs
+            .Where(l => l.FacilityId == facilityId
+                && l.CorrelationId == correlationId
+                && l.QueryPhase == queryPhase)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(l => l.SiblingCount, l => (l.SiblingCount ?? 0) + delta)
+                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                cancellationToken);
+    }
+
     public async Task<int> StampSiblingCountAsync(string facilityId, string correlationId, QueryPhase queryPhase, int siblingCount, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.StampSiblingCountAsync");
@@ -807,30 +837,6 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         if (claimed == 0)
         {
             return null; // Another worker already sent the tail.
-        }
-
-        // Referential is an internal-only phase: its purpose is to fetch reference
-        // resources discovered during the Initial phase and stream them into
-        // MeasureEval's per-correlation bundle as ordinary ResourceAcquired records.
-        // It must NOT send a tail (AcquisitionComplete=true) Kafka message because
-        // QueryPhaseUtilities.ToWireQueryType coerces Referential to "Supplemental"
-        // on the wire. Java MeasureEval would interpret that tail as the SUPPLEMENTAL
-        // acquisition completing and run a SUPPLEMENTAL evaluation, producing an
-        // extra MeasureReportGenerated event before the real Supplemental phase
-        // tail arrives. The downstream Report service then aggregates twice,
-        // doubling ReportResource rows and ReportPopulation MeasureReportPopulations
-        // while the ABS patient blob is overwritten by the last write — manifesting
-        // as the ReportResource->ABS / MeasureEval->ReportResource count mismatches
-        // observed in the AdHoc validator.
-        //
-        // We still claim the tail above so TailMessageRecoveryJob does not keep
-        // retrying these logs; we just skip producing the Kafka tail message here.
-        if (groupInfo.QueryPhase == QueryPhase.Referential)
-        {
-            _logger.LogDebug(
-                "TryCompleteTailAsync: suppressing tail emission for Referential phase (FacilityId={FacilityId}, CorrelationId={CorrelationId}). Reference resources are delivered as individual ResourceAcquired records and the Supplemental-phase tail will trigger MeasureEval evaluation.",
-                groupInfo.FacilityId, groupInfo.CorrelationId);
-            return null;
         }
 
         // Read the data we need for the tail Kafka message.

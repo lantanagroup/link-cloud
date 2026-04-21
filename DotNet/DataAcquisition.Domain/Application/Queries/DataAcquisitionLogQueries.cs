@@ -175,6 +175,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 ReportableEvent = l.ReportableEvent,
                 ReportTrackingId = l.ReportTrackingId != null ? l.ReportTrackingId.ToString().ToLower() : null,
                 CorrelationId = l.CorrelationId,
+                ReferenceResourceType = l.ReferenceResourceType,
                 FhirVersion = l.FhirVersion,
                 QueryType = l.QueryType,
                 QueryPhase = l.QueryPhase,
@@ -245,7 +246,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             // Phase 2: For each candidate group, verify that it has zero
             //          non-terminal logs (i.e. all logs are finished).
 
-            // Phase 1 — narrow candidate groups via terminal-status logs only.
+            // Phase 1 â€” narrow candidate groups via terminal-status logs only.
             var candidateGroups = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                 .Where(log =>
                     !log.TailSent &&
@@ -272,7 +273,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             if (candidateGroups.Count == 0)
                 return [];
 
-            // Phase 2 — for each candidate, check if ANY non-terminal log exists.
+            // Phase 2 â€” for each candidate, check if ANY non-terminal log exists.
             var results = new List<TailingMessageModel>();
 
             foreach (var group in candidateGroups)
@@ -291,7 +292,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 if (hasIncomplete)
                     continue;
 
-                // All logs are terminal — collect data for the tail message
+                // All logs are terminal â€” collect data for the tail message
                 var groupLogs = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                     .Where(log =>
                         !log.TailSent &&
@@ -453,10 +454,10 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     firstQueryByLogId.TryGetValue(log.Id, out var fhirQuery);
                     allQueryResourceTypesByLogId.TryGetValue(log.Id, out var allQueryTypes);
 
-                    // Referential-phase logs now exist as first-class rows with their
-                    // own FhirQueryResourceTypes, so the primary log's resource types
-                    // are strictly what its own FhirQueries declare. No synthesis off
-                    // the ReferenceResources junction.
+                    // Reference logs exist as first-class rows with their
+                    // own FhirQueryResourceTypes, so the log's resource types are strictly
+                    // what its own FhirQueries declare. No synthesis off the
+                    // ReferenceResources junction.
                     var resourceTypes = allQueryTypes
                         ?? fhirQuery?.ResourceTypes?.Select(rt => rt.ToString()).ToList()
                         ?? new List<string>();
@@ -625,11 +626,11 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         foreach (var qp in queryPhaseCounts)
             statistics.QueryPhaseCounts[qp.Phase] = qp.Count;
 
-        // Resource type counts + total. Under the referential-phase promoter design,
-        // reference resources acquired by a referential log are recorded in both
-        // DataAcquisitionLogResourceIds AND DataAcquisitionLogReferenceResource on
-        // that same log, so walking ResourceIds across all completed logs counts
-        // every resource — primary and reference — exactly once.
+        // Resource type counts + total. Reference logs are first-class
+        // log rows in the same QueryPhase as their primary; their fetched ids are
+        // recorded in DataAcquisitionLogResourceIds just like any primary log, so
+        // walking ResourceIds across all completed logs counts every resource â€”
+        // primary and reference â€” exactly once.
         var completedResourceIds = await baseQuery
             .Where(l => l.Status == RequestStatus.Completed)
             .SelectMany(l => l.ResourceIds.Select(r => r.ResourceId))
@@ -691,7 +692,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 slowest.CompletionTimeMilliseconds!.Value);
         }
 
-        // Per-resource-type completion time aggregation – lightweight projection
+        // Per-resource-type completion time aggregation â€“ lightweight projection
         var completionTimes = await baseQuery
             .Where(l => l.CompletionTimeMilliseconds != null)
             .Select(l => new
@@ -885,12 +886,29 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         CancellationToken cancellationToken = default)
     {
         designagtedExecutionTime ??= DateTime.UtcNow;
+        var terminalStatuses = new[]
+        {
+            RequestStatus.Completed,
+            RequestStatus.MaxRetriesReached,
+            RequestStatus.Skipped,
+            RequestStatus.Cancelled,
+            RequestStatus.ConfigurationMissing,
+        };
 
         var query = from log in _dbContext.DataAcquisitionLogs.AsNoTracking()
                     where log.FacilityId == facilityId
                           && (lastId == null || log.Id > lastId)
                           && (log.ExecutionDate == null || log.ExecutionDate <= designagtedExecutionTime)
                           && (log.Status == null || statuses.Contains(log.Status.Value))
+                          && (log.ReferenceResourceType == null
+                              || (log.CorrelationId != null
+                                  && log.QueryPhase != null
+                                  && !_dbContext.DataAcquisitionLogs.Any(sibling =>
+                                      sibling.FacilityId == log.FacilityId
+                                      && sibling.CorrelationId == log.CorrelationId
+                                      && sibling.QueryPhase == log.QueryPhase
+                                      && sibling.ReferenceResourceType == null
+                                      && (sibling.Status == null || !terminalStatuses.Contains(sibling.Status.Value)))))
                     orderby log.Id
                     select new DataAcquisitionLogModel
                     {
@@ -902,6 +920,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         ReportableEvent = log.ReportableEvent,
                         ReportTrackingId = log.ReportTrackingId != null ? log.ReportTrackingId.ToString().ToLower() : null,
                         CorrelationId = log.CorrelationId,
+                        ReferenceResourceType = log.ReferenceResourceType,
                         FhirVersion = log.FhirVersion,
                         QueryType = log.QueryType,
                         QueryPhase = log.QueryPhase,

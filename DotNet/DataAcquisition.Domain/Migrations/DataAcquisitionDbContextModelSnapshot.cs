@@ -635,6 +635,10 @@ namespace DataAcquisition.Domain.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("ReferenceResourceType")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
                     b.Property<Guid?>("ReportTrackingId")
                         .HasColumnType("uniqueidentifier");
 
@@ -690,6 +694,11 @@ namespace DataAcquisition.Domain.Migrations
                         .HasDatabaseName("IX_DataAcquisitionLogs_TailSent_Status");
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TailSent", "Status"), new[] { "FacilityId", "ReportTrackingId", "CorrelationId", "QueryPhase", "TraceId", "PatientId", "ReportableEvent" });
+
+                    b.HasIndex("FacilityId", "CorrelationId", "QueryPhase", "ReferenceResourceType")
+                        .IsUnique()
+                        .HasDatabaseName("UX_DataAcquisitionLogs_ReferenceLogKey")
+                        .HasFilter("[CorrelationId] IS NOT NULL AND [QueryPhase] IS NOT NULL AND [ReferenceResourceType] IS NOT NULL");
 
                     b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id")
                         .HasDatabaseName("IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id");
@@ -927,6 +936,9 @@ namespace DataAcquisition.Domain.Migrations
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
+                    b.Property<long>("DataAcquisitionLogId")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("FacilityId")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -944,9 +956,9 @@ namespace DataAcquisition.Domain.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex(new[] { "FacilityId", "CorrelationId" }, "IX_PendingReferenceIds_Facility_Correlation");
+                    b.HasIndex(new[] { "DataAcquisitionLogId" }, "IX_PendingReferenceIds_DataAcquisitionLogId");
 
-                    b.HasIndex(new[] { "FacilityId", "CorrelationId", "ResourceType", "ResourceId" }, "UX_PendingReferenceIds_Facility_Correlation_Type_Id")
+                    b.HasIndex(new[] { "DataAcquisitionLogId", "ResourceId" }, "UX_PendingReferenceIds_Log_ResourceId")
                         .IsUnique();
 
                     b.ToTable("PendingReferenceIds");
@@ -1342,6 +1354,18 @@ namespace DataAcquisition.Domain.Migrations
                         .HasConstraintName("FK_FhirQueryResourceType_FhirQuery");
 
                     b.Navigation("FhirQuery");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.PendingReferenceId", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", "DataAcquisitionLog")
+                        .WithMany()
+                        .HasForeignKey("DataAcquisitionLogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_PendingReferenceIds_DataAcquisitionLog");
+
+                    b.Navigation("DataAcquisitionLog");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ResourceReferenceType", b =>

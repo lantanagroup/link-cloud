@@ -33,8 +33,8 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 
 public interface IFhirApiService
 {
-    Task<IReadOnlyCollection<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, FhirQueryConfigurationModel fhirQueryConfiguration, CancellationToken cancellationToken = default);
-    Task<IReadOnlyCollection<string>> ExecuteSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, FhirQueryConfigurationModel fhirQueryConfiguration, ResourceType resourceType, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, FhirQueryConfigurationModel fhirQueryConfiguration, DiscoveredReferenceAccumulator? referenceAccumulator = null, CancellationToken cancellationToken = default);
+    Task<IReadOnlyCollection<string>> ExecuteSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, FhirQueryConfigurationModel fhirQueryConfiguration, ResourceType resourceType, DiscoveredReferenceAccumulator? referenceAccumulator = null, CancellationToken cancellationToken = default);
 }
 
 public class FhirApiService : IFhirApiService
@@ -43,7 +43,6 @@ public class FhirApiService : IFhirApiService
 
     private readonly IReferenceResourcesManager _referenceResourceManager;
     private readonly IReferenceResourcesQueries _referenceResourcesQueries;
-    private readonly IReferenceResourceService _referenceResourceService;
     private readonly IReadFhirCommand _readFhirCommand;
     private readonly ISearchFhirCommand _searchFhirCommand;
     private readonly IProducer<ResourceKey, ResourceAcquired> _kafkaProducer;
@@ -52,7 +51,6 @@ public class FhirApiService : IFhirApiService
     public FhirApiService(
         IReferenceResourcesManager referenceResourceManager,
         IReferenceResourcesQueries referenceResourcesQueries,
-        IReferenceResourceService referenceResourceService,
         ISearchFhirCommand searchFhirCommand,
         IReadFhirCommand readFhirCommand,
         IProducer<ResourceKey, ResourceAcquired> kafkaProducer,
@@ -60,7 +58,6 @@ public class FhirApiService : IFhirApiService
     {
         _referenceResourceManager = referenceResourceManager;
         _referenceResourcesQueries = referenceResourcesQueries;
-        _referenceResourceService = referenceResourceService;
         _searchFhirCommand = searchFhirCommand;
         _readFhirCommand = readFhirCommand;
         _kafkaProducer = kafkaProducer;
@@ -68,7 +65,7 @@ public class FhirApiService : IFhirApiService
     }
 
     #region Interface Implementation
-    public async Task<IReadOnlyCollection<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, FhirQueryConfigurationModel fhirQueryConfiguration, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyCollection<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, FhirQueryConfigurationModel fhirQueryConfiguration, DiscoveredReferenceAccumulator? referenceAccumulator = null, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirApiService.ExecuteRead");
         activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
@@ -83,13 +80,13 @@ public class FhirApiService : IFhirApiService
             : [resourceType == ResourceType.Patient ? log.PatientId.SplitReference() : log.ResourceId];
         foreach (string resourceIdToAcquire in resourceIdsToAcquire)
         {
-            var ids = await ExecuteRead(log, fhirQuery, resourceType, resourceIdToAcquire, fhirQueryConfiguration, cancellationToken);
+            var ids = await ExecuteRead(log, fhirQuery, resourceType, resourceIdToAcquire, fhirQueryConfiguration, referenceAccumulator, cancellationToken);
             resourceIds.AddRange(ids);
         }
         return resourceIds;
     }
 
-    private async Task<IReadOnlyCollection<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, string resourceIdToAcquire, FhirQueryConfigurationModel fhirQueryConfiguration, CancellationToken cancellationToken = default)
+    private async Task<IReadOnlyCollection<string>> ExecuteRead(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, ResourceType resourceType, string resourceIdToAcquire, FhirQueryConfigurationModel fhirQueryConfiguration, DiscoveredReferenceAccumulator? referenceAccumulator, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirApiService.ExecuteReadInternal");
         activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
@@ -115,17 +112,20 @@ public class FhirApiService : IFhirApiService
 
             InsertDateExtension(resource);
 
-            // Reference discovery only runs for the Initial primary-phase pass — matches
-            // the historical pre-performance-improvement behavior. Supplemental-phase
-            // bundles must not stage refs: ReferentialPhasePromoter is gated on a single
-            // Referential log per correlation, so any ids staged after that log exists
-            // would be silently purged by PurgePendingAsync and never fetched. Reference
-            // logs themselves also skip discovery to avoid an infinite promoter loop.
-            if (!fhirQuery.IsReference.GetValueOrDefault() && log.QueryPhase == QueryPhase.Initial)
+            // Reference discovery: accumulate discovered ref ids into the per-execution
+            // accumulator. Drained once at the end of the primary log's execution by
+            // ReferenceResourceService.FetchAndPersistAsync, which creates a single
+            // batched reference-fetch DataAcquisitionLog per (correlation, type) for
+            // cache misses (executed inline, retried by the AcquisitionProcessingJob on
+            // failure) and a separate audit-only Completed log for cache hits.
+            //
+            // Skip when this log IS itself a reference fetch (`IsReference`) â€” its
+            // results are already canonical and re-extracting would chain-discover
+            // refs of refs.
+            if (!fhirQuery.IsReference.GetValueOrDefault() && referenceAccumulator != null)
             {
-                //get references
                 var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
-                await _referenceResourceService.ProcessReferences(log, refResources, fhirQueryConfiguration, cancellationToken);
+                AccumulateDiscoveredReferences(refResources, referenceAccumulator);
             }
 
             await GenerateResourceAcquiredMessage(new ResourceAcquired
@@ -164,7 +164,7 @@ public class FhirApiService : IFhirApiService
         }
     }
 
-    public async Task<IReadOnlyCollection<string>> ExecuteSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, FhirQueryConfigurationModel fhirQueryConfiguration, ResourceType resourceType, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyCollection<string>> ExecuteSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, FhirQueryConfigurationModel fhirQueryConfiguration, ResourceType resourceType, DiscoveredReferenceAccumulator? referenceAccumulator = null, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirApiService.ExecuteSearch");
         activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
@@ -190,7 +190,7 @@ public class FhirApiService : IFhirApiService
             {
                 var batchIds = resourceIdsToAcquire.Skip(batchStart).Take(batchSize);
                 var searchParams = BuildSearchParams([$"_id={string.Join(',', batchIds)}"]);
-                var ids = await ExecutePagingSearch(log, fhirQuery, searchParams, fhirQueryConfiguration, resourceType, cancellationToken);
+                var ids = await ExecutePagingSearch(log, fhirQuery, searchParams, fhirQueryConfiguration, resourceType, referenceAccumulator, cancellationToken);
                 resourceIds.AddRange(ids);
             }
             return resourceIds;
@@ -198,13 +198,13 @@ public class FhirApiService : IFhirApiService
         else
         {
             var searchParams = BuildSearchParams(fhirQuery.QueryParameters);
-            return await ExecutePagingSearch(log, fhirQuery, searchParams, fhirQueryConfiguration, resourceType, cancellationToken);
+            return await ExecutePagingSearch(log, fhirQuery, searchParams, fhirQueryConfiguration, resourceType, referenceAccumulator, cancellationToken);
         }
     }
     #endregion
 
     #region Private Methods
-    private async Task<List<string>> ExecutePagingSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, SearchParams searchParams, FhirQueryConfigurationModel fhirQueryConfiguration, ResourceType resourceType, CancellationToken cancellationToken = default)
+    private async Task<List<string>> ExecutePagingSearch(DataAcquisitionLogModel log, FhirQueryModel fhirQuery, SearchParams searchParams, FhirQueryConfigurationModel fhirQueryConfiguration, ResourceType resourceType, DiscoveredReferenceAccumulator? referenceAccumulator, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirApiService.ExecutePagingSearch");
         activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
@@ -228,19 +228,14 @@ public class FhirApiService : IFhirApiService
                             fhirQuery.QueryType),
                             cancellationToken))
             {
-                // Reference discovery only runs for Initial primary-phase logs — matches
-                // the historical pre-performance-improvement behavior. Reference-phase
-                // logs must not re-stage ids discovered inside their own fetched
-                // reference resources (would re-enter the promoter loop for this
-                // correlation forever), and Supplemental-phase logs must not stage refs
-                // either: ReferentialPhasePromoter is gated on a single Referential log
-                // per correlation, so any ids staged after that log exists are silently
-                // purged by PurgePendingAsync and never fetched. (Chained-reference
-                // discovery is out of scope; matches historical single-level behavior.)
-                if (!isReferenceLog && log.QueryPhase == QueryPhase.Initial)
+                // Reference discovery: collect ref ids from this bundle into the per-
+                // execution accumulator. Drained at end of primary log execution by
+                // ReferenceResourceService.FetchAndPersistAsync. Reference-fetch logs
+                // skip extraction so we don't chain-discover refs of refs.
+                if (!isReferenceLog && referenceAccumulator != null)
                 {
                     var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
-                    await _referenceResourceService.ProcessReferences(log, refResources, fhirQueryConfiguration, cancellationToken);
+                    AccumulateDiscoveredReferences(refResources, referenceAccumulator);
                 }
 
                 var resources = bundle.Entry
@@ -342,7 +337,7 @@ public class FhirApiService : IFhirApiService
                 ResourceId = resource.Id,
                 ResourceType = resource.TypeName,
                 ReferenceResource = serialized,
-                QueryPhase = QueryPhase.Referential,
+                QueryPhase = log.QueryPhase ?? QueryPhase.Initial,
             });
         }
 
@@ -432,6 +427,31 @@ public class FhirApiService : IFhirApiService
                 Url = DataAcquisitionConstants.Extension.DateReceivedExtensionUri,
                 Value = new FhirDateTime(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"))
             });
+        }
+    }
+
+    /// <summary>
+    /// Adds parseable <c>Type/Id</c> references from the discovered ResourceReferences into
+    /// the per-execution accumulator. Invalid / unparseable references are silently skipped
+    /// â€” the bundle extractor is the gatekeeper for which reference types are eligible.
+    /// </summary>
+    private static void AccumulateDiscoveredReferences(
+        IReadOnlyList<ResourceReference> refResources,
+        DiscoveredReferenceAccumulator accumulator)
+    {
+        if (refResources == null || refResources.Count == 0)
+            return;
+
+        foreach (var rr in refResources)
+        {
+            if (string.IsNullOrWhiteSpace(rr?.Reference))
+                continue;
+
+            var identity = new ResourceIdentity(rr.Reference);
+            if (string.IsNullOrWhiteSpace(identity.ResourceType) || string.IsNullOrWhiteSpace(identity.Id))
+                continue;
+
+            accumulator.Add(identity.ResourceType, identity.Id);
         }
     }
     #endregion

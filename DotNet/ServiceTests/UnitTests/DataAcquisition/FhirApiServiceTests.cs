@@ -88,7 +88,6 @@ public class FhirApiServiceTests
         // Arrange: Mock all dependencies for FhirApiService
         var referenceResourceManager = new Mock<IReferenceResourcesManager>();
         var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
-        var referenceResourceService = new Mock<IReferenceResourceService>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
@@ -97,7 +96,6 @@ public class FhirApiServiceTests
         var service = new FhirApiService(
             referenceResourceManager.Object,
             referenceResourceQueries.Object,
-            referenceResourceService.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
             kafkaProducer.Object,
@@ -128,7 +126,6 @@ public class FhirApiServiceTests
         // Arrange: Mock all dependencies for FhirApiService
         var referenceResourceManager = new Mock<IReferenceResourcesManager>();
         var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
-        var referenceResourceService = new Mock<IReferenceResourceService>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
@@ -137,7 +134,6 @@ public class FhirApiServiceTests
         var service = new FhirApiService(
             referenceResourceManager.Object,
             referenceResourceQueries.Object,
-            referenceResourceService.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
             kafkaProducer.Object,
@@ -182,7 +178,6 @@ public class FhirApiServiceTests
         // Arrange: Mock all dependencies for FhirApiService
         var referenceResourceManager = new Mock<IReferenceResourcesManager>();
         var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
-        var referenceResourceService = new Mock<IReferenceResourceService>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
@@ -191,7 +186,6 @@ public class FhirApiServiceTests
         var service = new FhirApiService(
             referenceResourceManager.Object,
             referenceResourceQueries.Object,
-            referenceResourceService.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
             kafkaProducer.Object,
@@ -237,7 +231,6 @@ public class FhirApiServiceTests
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
-            new Mock<IReferenceResourceService>().Object,
             new Mock<ISearchFhirCommand>().Object,
             readFhirCommand.Object,
             new Mock<IProducer<ResourceKey, ResourceAcquired>>().Object,
@@ -266,7 +259,6 @@ public class FhirApiServiceTests
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
-            new Mock<IReferenceResourceService>().Object,
             searchFhirCommand.Object,
             new Mock<IReadFhirCommand>().Object,
             new Mock<IProducer<ResourceKey, ResourceAcquired>>().Object,
@@ -296,7 +288,6 @@ public class FhirApiServiceTests
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
-            new Mock<IReferenceResourceService>().Object,
             searchFhirCommand.Object,
             new Mock<IReadFhirCommand>().Object,
             kafkaProducer.Object,
@@ -354,7 +345,6 @@ public class FhirApiServiceTests
         // Arrange: Mock all dependencies for FhirApiService
         var referenceResourceManager = new Mock<IReferenceResourcesManager>();
         var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
-        var referenceResourceService = new Mock<IReferenceResourceService>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
@@ -404,7 +394,6 @@ public class FhirApiServiceTests
         var service = new FhirApiService(
             referenceResourceManager.Object,
             referenceResourceQueries.Object,
-            referenceResourceService.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
             kafkaProducer.Object,

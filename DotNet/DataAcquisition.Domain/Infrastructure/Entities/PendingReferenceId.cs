@@ -6,29 +6,24 @@ using IndexAttribute = Microsoft.EntityFrameworkCore.IndexAttribute;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 /// <summary>
-/// Correlation-scoped staging table for reference resource IDs discovered by primary
-/// (non-reference) data acquisition logs during their processing.
+/// Durable per-log bag of discovered reference resource IDs.
 ///
-/// Each row represents a single <c>(FacilityId, CorrelationId, ResourceType, ResourceId)</c>
-/// tuple that a primary log wants the referential phase to acquire. The unique index on
-/// that tuple gives cross-primary deduplication with no write-hot-row contention.
-///
-/// When all primary-phase logs in a correlation reach a terminal status, a promoter
-/// drains these rows into one referential <see cref="DataAcquisitionLog"/> per
-/// resource type (with its <see cref="FhirQuery"/> pre-populated from the query-plan
-/// <c>ReferenceQueryConfig</c>), deletes the staging rows, and lets the normal
-/// acquisition pipeline execute the referential queries — batched by <c>Paged</c> and
-/// honoring <c>Search</c> vs <c>SearchPost</c> from the config.
+/// A single same-phase reference <see cref="DataAcquisitionLog"/> is created per
+/// <c>(FacilityId, CorrelationId, QueryPhase, ResourceType)</c>. As primary logs
+/// discover references, their ids are appended here against that one log. The normal
+/// pending-log workflow later executes the reference log once all non-reference logs in
+/// the phase are terminal.
 /// </summary>
 [Table("PendingReferenceIds")]
-[Index(nameof(FacilityId), nameof(CorrelationId), nameof(ResourceType), nameof(ResourceId),
-       IsUnique = true, Name = "UX_PendingReferenceIds_Facility_Correlation_Type_Id")]
-[Index(nameof(FacilityId), nameof(CorrelationId),
-       Name = "IX_PendingReferenceIds_Facility_Correlation")]
+[Index(nameof(DataAcquisitionLogId), nameof(ResourceId),
+       IsUnique = true, Name = "UX_PendingReferenceIds_Log_ResourceId")]
+[Index(nameof(DataAcquisitionLogId), Name = "IX_PendingReferenceIds_DataAcquisitionLogId")]
 public class PendingReferenceId
 {
     [Key]
     public long Id { get; set; }
+
+    public long DataAcquisitionLogId { get; set; }
 
     /// <summary>
     /// Facility that owns this pending reference.
@@ -38,16 +33,15 @@ public class PendingReferenceId
     public string FacilityId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Correlation id of the primary-phase acquisition that discovered the reference.
-    /// Promotion into a referential log is scoped per <c>(FacilityId, CorrelationId)</c>.
+    /// Correlation id of the report run that owns the reference log.
     /// </summary>
     [Required]
     [MaxLength(64)]
     public string CorrelationId { get; set; } = string.Empty;
 
     /// <summary>
-    /// The reference resource type (e.g. "Location", "Medication") used to group ids
-    /// into per-type referential queries at promotion time.
+    /// The reference resource type (e.g. "Location", "Medication") associated with the
+    /// owning reference log.
     /// </summary>
     [Required]
     [MaxLength(128)]
@@ -62,4 +56,7 @@ public class PendingReferenceId
     public string ResourceId { get; set; } = string.Empty;
 
     public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+
+    [ForeignKey(nameof(DataAcquisitionLogId))]
+    public DataAcquisitionLog DataAcquisitionLog { get; set; } = null!;
 }

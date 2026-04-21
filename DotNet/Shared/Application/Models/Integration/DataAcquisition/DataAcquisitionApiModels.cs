@@ -145,8 +145,6 @@ public enum QueryPhase
     Initial,
     [StringValue("Supplemental")]
     Supplemental,
-    [StringValue("Referential")]
-    Referential,
     [StringValue("Polling")]
     Polling,
     [StringValue("Monitoring")]
@@ -161,7 +159,6 @@ public static class QueryPhaseExtensions
         {
             "initial" => QueryPhase.Initial,
             "supplemental" => QueryPhase.Supplemental,
-            "referential" => QueryPhase.Referential,
             "polling" => QueryPhase.Polling,
             "monitoring" => QueryPhase.Monitoring,
             _ => throw new ArgumentException($"Invalid value: {queryPhaseStr}")
@@ -185,17 +182,14 @@ public static class QueryPhaseUtilities
     /// Translates a <see cref="QueryPhase"/> into the string value safe to put on the
     /// downstream <c>ResourceAcquired</c> / <c>ResourceNormalized</c> wire contract.
     /// The Java <c>measureeval</c> service's <c>QueryType</c> enum only declares
-    /// <c>INITIAL</c> and <c>SUPPLEMENTAL</c>; emitting any other value (notably
-    /// <c>Referential</c>) causes a Jackson deserialization failure that dead-letters
-    /// the message. Reference-phase resources are semantically supplemental once they
-    /// leave Data Acquisition, so they are coerced to <see cref="QueryPhase.Supplemental"/>
-    /// here. Initial passes through; null becomes empty. Other phases (Polling,
-    /// Monitoring) are not currently produced on this contract and fall through to
-    /// their raw name so a real bug surfaces loudly rather than being silently rewritten.
+    /// <c>INITIAL</c> and <c>SUPPLEMENTAL</c>; emitting any other value causes a Jackson
+    /// deserialization failure that dead-letters the message. Initial / Supplemental pass
+    /// through; null becomes empty. Other phases (Polling, Monitoring) are not currently
+    /// produced on this contract and fall through to their raw name so a real bug surfaces
+    /// loudly rather than being silently rewritten.
     /// </summary>
     public static string ToWireQueryType(QueryPhase? queryPhase) => queryPhase switch
     {
-        QueryPhase.Referential => QueryPhase.Supplemental.ToString(),
         null => string.Empty,
         _ => queryPhase.Value.ToString(),
     };

@@ -1,14 +1,9 @@
 using DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.Logging;
 using System.Data;
-using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -17,19 +12,6 @@ public interface IReferenceResourcesManager
     Task CreateBatchAsync(IReadOnlyList<CreateReferenceResourcesModel> models, CancellationToken cancellationToken = default);
 
     Task LinkToLogAsync(long dataAcquisitionLogId, IReadOnlyList<Guid> referenceResourceIds, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Stage discovered reference resource ids onto the <c>PendingReferenceIds</c> table for
-    /// later promotion into a referential-phase <see cref="DataAcquisitionLog"/>.
-    /// Deduplicates against existing staging rows and is safe to call concurrently from
-    /// multiple primary-phase workers; the unique index on the staging table is the
-    /// authoritative dedupe, and this method swallows the narrow race-window conflicts.
-    /// </summary>
-    Task StagePendingReferencesAsync(
-        string facilityId,
-        string correlationId,
-        IReadOnlyList<(string ResourceType, string ResourceId)> references,
-        CancellationToken cancellationToken = default);
 }
 
 public class ReferenceResourcesManager : IReferenceResourcesManager
@@ -38,14 +20,10 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
     private const int LockTimeoutMs = 30000;
     private const int ExistenceCheckChunkSize = 800;
 
-    private readonly ILogger<ReferenceResourcesManager> _logger;
-    private readonly IDatabase _database;
     private readonly DataAcquisitionDbContext _dbContext;
 
-    public ReferenceResourcesManager(ILogger<ReferenceResourcesManager> logger, IDatabase database, DataAcquisitionDbContext dbContext)
+    public ReferenceResourcesManager(DataAcquisitionDbContext dbContext)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
@@ -201,128 +179,5 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
 
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
-    }
-
-    public async Task StagePendingReferencesAsync(
-        string facilityId,
-        string correlationId,
-        IReadOnlyList<(string ResourceType, string ResourceId)> references,
-        CancellationToken cancellationToken = default)
-    {
-        using var activity = ServiceActivitySource.Instance.StartActivity("ReferenceResourcesManager.StagePendingReferencesAsync");
-        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
-        activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
-
-        if (string.IsNullOrWhiteSpace(facilityId))
-            throw new ArgumentException("FacilityId is required.", nameof(facilityId));
-        if (string.IsNullOrWhiteSpace(correlationId))
-            throw new ArgumentException("CorrelationId is required.", nameof(correlationId));
-        if (references == null || references.Count == 0)
-            return;
-
-        // In-memory dedupe of the input batch.
-        var deduped = references
-            .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
-            .Distinct()
-            .ToList();
-
-        if (deduped.Count == 0)
-            return;
-
-        // Pre-read existing staging rows for this correlation so we skip the vast majority
-        // of inserts in the steady-state case. The unique index on
-        // (FacilityId, CorrelationId, ResourceType, ResourceId) is the authoritative
-        // dedupe; this read is an optimization.
-        var resourceIds = deduped.Select(r => r.ResourceId).Distinct().ToList();
-        var existing = new HashSet<(string Type, string Id)>();
-
-        foreach (var idChunk in Chunk(resourceIds, ExistenceCheckChunkSize))
-        {
-            var rows = await _dbContext.PendingReferenceIds
-                .AsNoTracking()
-                .Where(p => p.FacilityId == facilityId
-                         && p.CorrelationId == correlationId
-                         && idChunk.Contains(p.ResourceId))
-                .Select(p => new { p.ResourceType, p.ResourceId })
-                .ToListAsync(cancellationToken);
-
-            foreach (var r in rows)
-                existing.Add((r.ResourceType, r.ResourceId));
-        }
-
-        var toInsert = deduped
-            .Where(r => !existing.Contains((r.ResourceType, r.ResourceId)))
-            .Select(r => new PendingReferenceId
-            {
-                FacilityId = facilityId,
-                CorrelationId = correlationId,
-                ResourceType = r.ResourceType,
-                ResourceId = r.ResourceId,
-                CreateDate = DateTime.UtcNow
-            })
-            .ToList();
-
-        if (toInsert.Count == 0)
-            return;
-
-        foreach (var chunk in Chunk(toInsert, InsertChunkSize))
-        {
-            try
-            {
-                _dbContext.PendingReferenceIds.AddRange(chunk);
-                await _dbContext.SaveChangesAsync(cancellationToken);
-                _dbContext.ChangeTracker.Clear();
-            }
-            catch (DbUpdateException batchEx) when (IsUniqueConstraintViolation(batchEx))
-            {
-                // A concurrent stager inserted overlapping rows between our pre-read
-                // and our write, violating the unique index. Fall back to row-by-row
-                // inserts, swallowing only unique-violation conflicts so surviving
-                // rows still land. Any other DbUpdateException (FK violation, conversion
-                // error, connection failure, etc.) is rethrown by the catch filter so the
-                // caller's retry path can decide how to handle it instead of silently
-                // dropping data.
-                _dbContext.ChangeTracker.Clear();
-                _logger.LogDebug(batchEx,
-                    "StagePendingReferencesAsync: batch insert collided with a concurrent stager for correlation {CorrelationId}; falling back to per-row inserts.",
-                    correlationId);
-
-                foreach (var row in chunk)
-                {
-                    try
-                    {
-                        _dbContext.PendingReferenceIds.Add(row);
-                        await _dbContext.SaveChangesAsync(cancellationToken);
-                    }
-                    catch (DbUpdateException rowEx) when (IsUniqueConstraintViolation(rowEx))
-                    {
-                        // Duplicate already present — safe to skip. Log at debug so noise
-                        // stays low but races are still diagnosable. Non-uniqueness
-                        // DbUpdateExceptions are not caught here and propagate up.
-                        _logger.LogDebug(rowEx,
-                            "StagePendingReferencesAsync: skipping duplicate pending reference {ResourceType}/{ResourceId} for correlation {CorrelationId}.",
-                            row.ResourceType, row.ResourceId, correlationId);
-                    }
-                    finally
-                    {
-                        _dbContext.ChangeTracker.Clear();
-                    }
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Detects whether a <see cref="DbUpdateException"/> represents a SQL Server
-    /// unique-constraint / unique-index violation. Mirrors
-    /// <c>ScheduledReportManager.IsUniqueConstraintViolation</c> so the staging path
-    /// only swallows true uniqueness races and lets every other DB failure bubble.
-    /// </summary>
-    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
-    {
-        // SQL Server error 2601 = unique index violation, 2627 = unique constraint violation.
-        var message = ex.InnerException?.Message ?? ex.Message;
-        return message.Contains("2601") || message.Contains("2627")
-            || message.Contains("UNIQUE constraint", StringComparison.OrdinalIgnoreCase);
     }
 }

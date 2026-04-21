@@ -15,11 +15,4 @@ public class AcquisitionWorkerProcessorSettings
     public int TimeBudgetPerRunSeconds { get; set; } = 60;
     public int StalledQueuedThresholdMinutes { get; set; } = 15;
     public int StalledProcessingThresholdMinutes { get; set; } = 240;
-
-    /// <summary>
-    /// Upper bound on how many (facility, correlation) pairs the referential-phase
-    /// promoter will process per <see cref="DataAcquisition.Jobs.AcquisitionProcessingJob"/>
-    /// tick. Keeps the housekeeping pass bounded on large backlogs.
-    /// </summary>
-    public int MaxReferentialPromotionsPerRun { get; set; } = 50;
 }

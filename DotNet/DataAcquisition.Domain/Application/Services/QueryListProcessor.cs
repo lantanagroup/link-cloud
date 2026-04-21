@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
@@ -217,11 +217,10 @@ public class QueryListProcessor : IQueryListProcessor
             }
             else if (builtQuery is ReferenceQueryFactoryResult)
             {
-                // Reference resources are staged during primary-phase bundle processing
-                // (see ReferenceResourceService.ProcessReferences) and promoted into their
-                // own referential-phase DataAcquisitionLog entries by the
-                // ReferentialPhasePromoter. No log is created here.
-                _logger.LogDebug("Skipping log creation during plan iteration for reference query {ResourceType} — will be staged and promoted.", ((ReferenceQueryConfig)queryConfig).ResourceType);
+                // Reference queries are not scheduled up front. Reference ids are discovered
+                // while primary logs execute and are accumulated into the single durable
+                // same-phase reference log for the correlation/resource type.
+                _logger.LogDebug("Skipping up-front log creation for reference query {ResourceType}; execution is driven by primary-log reference discovery.", ((ReferenceQueryConfig)queryConfig).ResourceType);
             }
         }
 
