@@ -2,8 +2,6 @@ using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
-using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
-using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 
 namespace LantanaGroup.Link.Report.Models;
 
@@ -53,15 +51,19 @@ public class ReportScheduleModel
         return new ReportScheduleApiModel
         {
             Id = Id,
+            CreateDate = CreateDate,
             FacilityId = FacilityId,
             Frequency = Frequency,
             ReportStartDate = ReportStartDate.UtcDateTime,
             ReportEndDate = ReportEndDate.UtcDateTime,
+            SubmitReportDateTime = SubmitReportDateTime,
             Status = Status,
             AdHocType = AdHocType,
             EndOfReportPeriodJobHasRun = EndOfReportPeriodJobHasRun,
             EnableSubmission = EnableSubmission,
             PayloadRootUri = PayloadRootUri,
+            ReportTypes = ReportTypes,
+            IsDeleted = IsDeleted,
         };
     }
 }

@@ -1,4 +1,4 @@
-﻿@model LantanaGroup.Link.Automation.Link.Models.AutomationRunSummary
+@model LantanaGroup.Link.Automation.Link.Models.AutomationRunSummary
 @{
     ViewData["Title"] = "Run Details";
 }
@@ -25,19 +25,31 @@
     <div class="au-card">
         <div class="card-header"><i class="bi bi-clipboard-data me-2"></i>Run Summary</div>
         <div class="card-body">
-            <div class="row g-3 mb-3" id="runSummaryGrid">
+            <div class="row g-3" id="runSummaryGrid">
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Status</span><span class="au-value" id="status">@Model.Status</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Facility</span><code class="au-value" id="facilityId">@(Model.FacilityId ?? "-")</code></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Started</span><span class="au-value" id="started">@(Model.StartedAt?.ToString("u") ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value" id="finished">@(Model.FinishedAt?.ToString("u") ?? "-")</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Pipeline Duration</span><span class="au-value" id="pipelineDuration">@(Model.Duration ?? "-")</span></div></div>
             </div>
-            <div class="row g-3 mb-2" id="runConfigProps"></div>
-            <div id="errorRow" class="mb-2" style="display:none;"><div class="alert alert-danger mb-0 py-2 small"><i class="bi bi-exclamation-triangle-fill me-1"></i><span id="error">@(Model.Error ?? "-")</span></div></div>
-            <span id="finalizingBadge" class="badge rounded-pill text-bg-info mb-2" style="display:none;">
+            <div id="errorRow" class="mt-3" style="display:none;"><div class="alert alert-danger mb-0 py-2 small"><i class="bi bi-exclamation-triangle-fill me-1"></i><span id="error">@(Model.Error ?? "-")</span></div></div>
+            <span id="finalizingBadge" class="badge rounded-pill bg-secondary text-white mt-2" style="display:none;">
                 <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" style="width:.7rem;height:.7rem;"></span>
-                Finalizing…
+                Finalizing�
             </span>
-            <div id="cohortSummaryCard" style="display:none;">
+        </div>
+    </div>
+
+    <div class="au-card" id="testConfigCard" style="display:none;">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-gear me-2"></i>Test Configuration</span>
+            <a href="#" class="btn btn-sm" id="btnViewManifest" style="display:none; background:var(--au-accent); color:#fff; font-weight:600;">
+                <i class="bi bi-card-checklist me-1"></i>Generation Manifest
+            </a>
+        </div>
+        <div class="card-body">
+            <div class="row g-3" id="runConfigProps"></div>
+            <div id="cohortSummaryCard" class="mt-3" style="display:none;">
                 <div class="fw-semibold small mb-1"><i class="bi bi-people-fill me-1"></i>Cohorts</div>
                 <div id="cohortSummaryBody"></div>
             </div>
@@ -75,6 +87,9 @@
                                     <div class="col-md-6"><strong>End:</strong> <span id="scheduleEnd">-</span></div>
                                     <div class="col-md-6"><strong>Adhoc Type:</strong> <span id="scheduleAdhoc">-</span></div>
                                     <div class="col-md-6"><strong>Status:</strong> <span id="scheduleStatusPill" class="badge bg-secondary">-</span></div>
+                                    <div class="col-md-6"><strong>Report Created:</strong> <span id="scheduleCreated">-</span></div>
+                                    <div class="col-md-6"><strong>Submitted:</strong> <span id="scheduleSubmitted">-</span></div>
+                                    <div class="col-md-6"><strong>Duration:</strong> <span id="scheduleDuration" class="fw-semibold">-</span></div>
                                 </div>
                             </div>
                         </div>
@@ -308,7 +323,7 @@
                 <div class="sticky-top bg-white border-bottom px-3 py-2" style="z-index:2;">
                     <div class="row g-2 align-items-center">
                         <div class="col">
-                            <input type="text" class="form-control form-control-sm" id="exModalSearch" placeholder="Search exceptions…">
+                            <input type="text" class="form-control form-control-sm" id="exModalSearch" placeholder="Search exceptions�">
                         </div>
                         <div class="col-auto">
                             <span class="badge bg-secondary" id="exModalVisibleCount">0</span>
@@ -372,6 +387,7 @@
     </div>
 </div>
 
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
 <script>
@@ -379,6 +395,7 @@
         const runId = '@Model.RunId';
         const runConfigurationJson = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.RunConfigurationJson ?? string.Empty));
         const snapshotUrl = '@Url.Action("PipelineSnapshot", "Runs")';
+        const manifestUrl = '@Url.Action("ManifestData", "Runs")';
         const logBox = document.getElementById('logBox');
         let dataAcqErrors = [];
         let measureErrors = [];
@@ -428,7 +445,7 @@
             if (!confirm('Delete this run and all persisted data?')) return;
 
             btn.disabled = true;
-            btn.textContent = 'Deleting…';
+            btn.textContent = 'Deleting�';
 
             fetch('@Url.Action("DeleteJson", "Runs")', {
                 method: 'POST',
@@ -471,7 +488,7 @@
                 if (!confirm('Cancel this running test and cleanup all related service/FHIR data?')) return;
 
                 cancelBtn.disabled = true;
-                cancelBtn.textContent = 'Cancelling…';
+                cancelBtn.textContent = 'Cancelling�';
 
                 fetch('@Url.Action("CancelJson", "Runs")', {
                     method: 'POST',
@@ -554,7 +571,7 @@
                 'selectedClinicalScenarioIds', 'dischargeCount',
                 'dischargeQualifyingCount', 'dischargeNonQualifyingCount',
                 'resourcesPerPatientMin', 'resourcesPerPatientMax',
-                'queryPlanTemplateId'
+                'queryPlanTemplateId', 'updatedAt'
             ]);
 
             const labels = {
@@ -592,15 +609,8 @@
 
                 const label = labels[k] || toLabel(k);
                 const col = document.createElement('div');
-                const isCleanupKey = k === 'cleanupServiceData' || k === 'cleanupFhirData';
-
-                if (isCleanupKey) {
-                    col.className = 'col-12';
-                    col.innerHTML = `<div class="au-summary-item"><span class="au-value">${escapeHtml(label)}: ${display}</span></div>`;
-                } else {
-                    col.className = 'col-md-3';
-                    col.innerHTML = `<div class="au-summary-item"><span class="au-label">${escapeHtml(label)}</span><span class="au-value">${display}</span></div>`;
-                }
+                col.className = 'col-md-3';
+                col.innerHTML = `<div class="au-summary-item"><span class="au-label">${escapeHtml(label)}</span><span class="au-value">${display}</span></div>`;
                 container.appendChild(col);
             });
 
@@ -608,6 +618,12 @@
             if (errorRow && errorSpan) {
                 const hasError = errorSpan.textContent && errorSpan.textContent !== '-';
                 errorRow.style.display = hasError ? '' : 'none';
+            }
+
+            // Show the test config card if any properties were rendered.
+            const testConfigCard = document.getElementById('testConfigCard');
+            if (testConfigCard && container.children.length > 0) {
+                testConfigCard.style.display = '';
             }
 
             // Render cohort summary as a compact table.
@@ -975,7 +991,7 @@
             flyout.style.right = '0';
         }
 
-        // ── Service Exception Modal ──
+        // ?? Service Exception Modal ??
         let _exModalAllItems = [];
         let _exModalGroups = [];
         let _exModalActiveGroup = null;
@@ -1021,7 +1037,7 @@
                 cleaned = cleaned.slice(levelMatch[0].length);
             }
 
-            // Split on ||| delimiter — left side is summary, right side is full detail
+            // Split on ||| delimiter � left side is summary, right side is full detail
             let summary = cleaned;
             let detail = '';
             const tripleIdx = cleaned.indexOf('|||');
@@ -1032,19 +1048,19 @@
 
             let headline = summary;
             if (!detail) {
-                // No triple-pipe detail — try splitting on first pipe for headline/detail
+                // No triple-pipe detail � try splitting on first pipe for headline/detail
                 const pipeIdx = summary.indexOf(' | ');
                 if (pipeIdx > 0) {
                     headline = summary.slice(0, pipeIdx).trim();
                     detail = summary.slice(pipeIdx + 3).trim();
                 } else if (summary.length > 120) {
-                    headline = summary.slice(0, 120).trim() + '…';
+                    headline = summary.slice(0, 120).trim() + '�';
                     detail = summary;
                 }
             } else {
                 // Shorten the summary for the collapsed header
                 if (summary.length > 160) {
-                    headline = summary.slice(0, 160).trim() + '…';
+                    headline = summary.slice(0, 160).trim() + '�';
                 }
             }
 
@@ -1126,7 +1142,7 @@
         }
 
         function truncate(str, len) {
-            return str.length > len ? str.slice(0, len) + '…' : str;
+            return str.length > len ? str.slice(0, len) + '�' : str;
         }
 
         document.getElementById('exModalSearch').addEventListener('input', applyExModalFilter);
@@ -1154,6 +1170,7 @@
 
                 const snapshotIsFinal = snapshot.isFinal === true || snapshot.IsFinal === true;
 
+                probeManifest();
                 renderMilestones(snapshot.report?.milestones || []);
                 renderValidatorResults(snapshot.validatorResults || []);
 
@@ -1165,6 +1182,9 @@
                 document.getElementById('scheduleStart').textContent = schedule?.startDate || '-';
                 document.getElementById('scheduleEnd').textContent = schedule?.endDate || '-';
                 document.getElementById('scheduleAdhoc').textContent = schedule?.adHocType || '-';
+                document.getElementById('scheduleCreated').textContent = schedule?.reportCreated || '-';
+                document.getElementById('scheduleSubmitted').textContent = schedule?.submittedAt || '-';
+                document.getElementById('scheduleDuration').textContent = schedule?.duration || '-';
 
                 const statusPill = document.getElementById('scheduleStatusPill');
                 statusPill.className = `badge ${getScheduleStatusClass(schedule?.scheduleStatus)}`;
@@ -1288,6 +1308,7 @@
             document.getElementById('error').textContent = run.error || '-';
             document.getElementById('started').textContent = run.startedAt || '-';
             document.getElementById('finished').textContent = run.finishedAt || '-';
+            document.getElementById('pipelineDuration').textContent = run.duration || '-';
             currentFinishedAt = run.finishedAt || currentFinishedAt;
 
             if ((isRunComplete(currentRunStatus) || !!currentFinishedAt) && !runCompletedAtMs) {
@@ -1324,6 +1345,19 @@
         if (!isRunComplete(currentRunStatus) && !currentFinishedAt)
             snapshotTimer = setInterval(refreshSnapshot, 2000);
 
+        // Probe for manifest availability (repeated until found).
+        let manifestButtonVisible = false;
+        function probeManifest() {
+            if (manifestButtonVisible) return;
+            fetch(`${manifestUrl}?id=${runId}`).then(r => {
+                if (r.ok && r.status !== 204) {
+                    manifestButtonVisible = true;
+                    tryShowManifestButton();
+                }
+            }).catch(() => {});
+        }
+        probeManifest();
+
         // --- DA Log Drill-Down Modal ---
         const dataAcqLogsUrl = '@Url.Action("DataAcquisitionLogs", "Runs")';
         const dataAcqLogDetailUrl = '@Url.Action("DataAcquisitionLogDetail", "Runs")';
@@ -1348,7 +1382,7 @@
                     continue;
                 }
 
-                el.textContent = daSortOrder === 'Ascending' ? '▲' : '▼';
+                el.textContent = daSortOrder === 'Ascending' ? '\u25B2' : '\u25BC';
             }
         }
 
@@ -1384,6 +1418,7 @@
                     const status = r.status ?? r.Status ?? '-';
                     const phase = r.queryPhase ?? r.QueryPhase ?? '-';
                     const isReference = r.isReferenceLog === true || r.IsReferenceLog === true;
+                    const refCount = r.referenceResourceCount ?? r.ReferenceResourceCount ?? 0;
                     const resourceTypes = r.resourceTypes || r.ResourceTypes || [];
                     const patient = r.patientId ?? r.PatientId ?? '-';
                     const logId = r.id ?? r.Id;
@@ -1396,10 +1431,10 @@
                         <td class="small">${escapeHtml(patient)}</td>
                         <td class="small ${statusClass}">${escapeHtml(status)}</td>
                         <td class="small">${escapeHtml(phase)}</td>
-                        <td class="small">${isReference ? '<span class="badge bg-info text-dark">Reference</span>' : '<span class="text-muted">-</span>'}</td>
+                        <td class="small">${refCount > 0 ? `<span class="badge" style="background:var(--au-accent);color:#fff;">${refCount} ref</span>` : isReference ? '<span class="badge bg-light text-dark border">Ref</span>' : '<span class="text-muted">-</span>'}</td>
                         <td class="small" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(resourceTypes.join(', '))}">${escapeHtml(resourceTypes.join(', ') || '-')}</td>
                         <td class="small">
-                            <button type="button" class="btn btn-sm btn-outline-secondary da-detail-btn" data-logid="${logId}" title="View details">🗒️</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary da-detail-btn" data-logid="${logId}" title="View details"><i class="bi bi-file-text"></i></button>
                         </td>
                     </tr>`;
                 }).join('');
@@ -1436,6 +1471,7 @@
                 const d = await res.json();
                 const notes = d.notes || d.Notes || [];
                 const resources = d.resourceAcquiredIds || d.ResourceAcquiredIds || [];
+                const referenceResources = d.referenceResourceIds || d.ReferenceResourceIds || [];
                 const resourceTypes = d.resourceTypes || d.ResourceTypes || [];
                 const isReference = d.isReferenceLog === true || d.IsReferenceLog === true;
                 const referenceResourceCount = d.referenceResourceCount ?? d.ReferenceResourceCount ?? 0;
@@ -1462,6 +1498,10 @@
                         <div class="small text-muted mb-1">Resources (${resources.length})</div>
                         <pre style="max-height:200px;overflow:auto;background:#f8f9fa;padding:8px;">${escapeHtml(resources.join('\n') || '(none)')}</pre>
                     </div>
+                    ${referenceResources.length > 0 ? `<div class="mb-3">
+                        <div class="small text-muted mb-1"><span class="badge bg-light text-dark border me-1">Ref</span>Reference Resources (${referenceResources.length})</div>
+                        <pre style="max-height:200px;overflow:auto;background:#f0f8ff;padding:8px;">${escapeHtml(referenceResources.join('\n'))}</pre>
+                    </div>` : ''}
                     <div>
                         <div class="small text-muted mb-1">Notes (${notes.length})</div>
                         <pre style="max-height:260px;overflow:auto;background:#f8f9fa;padding:8px;">${escapeHtml(notes.join('\n') || '(none)')}</pre>
@@ -1497,5 +1537,19 @@
         document.getElementById('closeDaLogFlyout').addEventListener('click', () => {
             document.getElementById('daLogFlyout').style.right = '-560px';
         });
+
+        // ??? Generation Manifest ???????????????????????????????????
+        const manifestPageUrl = '@Url.Action("Manifest", "Runs")';
+
+        function tryShowManifestButton() {
+            var btn = document.getElementById('btnViewManifest');
+            if (btn) {
+                btn.style.display = '';
+                btn.href = `${manifestPageUrl}?id=${runId}`;
+            }
+            // Ensure the parent card is visible even if no config properties were rendered.
+            var card = document.getElementById('testConfigCard');
+            if (card) card.style.display = '';
+        }
     })();
 </script>

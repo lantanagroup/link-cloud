@@ -51,7 +51,7 @@ export class TableCommandComponent implements OnInit, OnDestroy {
   isOpen = false;
 
   get isCancelEligible(): boolean {
-    if (['MaxRetriesReached', 'Completed', 'Cancelled', 'Skipped'].includes(this.status)) return false;
+    if (['MaxRetriesReached', 'ConfigurationMissing', 'Completed', 'Cancelled', 'Skipped'].includes(this.status)) return false;
     if (this.cancelMinAgeHours === 0) return true;
     if (!this.createDate) return false;
     // Match backend: CreateDate <= UtcNow.AddHours(-minAgeHours)
