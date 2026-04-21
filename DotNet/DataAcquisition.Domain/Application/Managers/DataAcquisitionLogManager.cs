@@ -54,16 +54,6 @@ public interface IDataAcquisitionLogManager
     Task<int> StampSiblingCountAsync(string facilityId, string correlationId, QueryPhase queryPhase, int siblingCount, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Atomically grows the SiblingCount on every log in a (FacilityId, CorrelationId, QueryPhase)
-    /// group by <paramref name="delta"/>. If a log's SiblingCount is currently null it is set to
-    /// <paramref name="delta"/>; otherwise it is incremented. Used when same-phase reference logs
-    /// are added to an existing phase mid-execution so the tail completion check
-    /// (<see cref="TryCompleteTailAsync"/>) waits for the new siblings before producing the
-    /// AcquisitionComplete tail.
-    /// </summary>
-    Task<int> IncrementSiblingCountAsync(string facilityId, string correlationId, QueryPhase queryPhase, int delta, CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// Atomically checks whether all sibling logs in a group are terminal
     /// and the SiblingCount matches. If so, marks TailSent = true and
     /// returns the data needed to produce the tail Kafka message.
@@ -737,25 +727,6 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         return updated;
     }
 
-    public async Task<int> IncrementSiblingCountAsync(string facilityId, string correlationId, QueryPhase queryPhase, int delta, CancellationToken cancellationToken = default)
-    {
-        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.IncrementSiblingCountAsync");
-        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
-        activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
-
-        if (delta <= 0)
-            return 0;
-
-        return await _dbContext.DataAcquisitionLogs
-            .Where(l => l.FacilityId == facilityId
-                && l.CorrelationId == correlationId
-                && l.QueryPhase == queryPhase)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(l => l.SiblingCount, l => (l.SiblingCount ?? 0) + delta)
-                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                cancellationToken);
-    }
-
     public async Task<int> StampSiblingCountAsync(string facilityId, string correlationId, QueryPhase queryPhase, int siblingCount, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.StampSiblingCountAsync");
@@ -802,7 +773,23 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             return null;
         }
 
-        // Count terminal siblings. 
+        // Tail threshold is derived from the live count of stamped siblings rather
+        // than the SiblingCount value on any single row. Same-phase reference logs
+        // are added mid-flow and stamp ONLY their own row (single-row UPDATE) to
+        // avoid deadlocking with this method's wide TailSent UPDATE; that means a
+        // single row's SiblingCount can lag behind the true group size, but the
+        // count of stamped rows is always authoritative.
+        var stampedSiblingCount = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+            .CountAsync(l =>
+                l.SiblingCount != null
+                && l.CorrelationId != null
+                && l.QueryPhase != null
+                && l.FacilityId == groupInfo.FacilityId
+                && l.CorrelationId == groupInfo.CorrelationId
+                && l.QueryPhase == groupInfo.QueryPhase,
+                cancellationToken);
+
+        // Count terminal siblings.
         var terminalCount = await _dbContext.DataAcquisitionLogs.AsNoTracking()
             .CountAsync(l =>
                 !l.TailSent
@@ -816,7 +803,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 && terminalStatuses.Contains(l.Status.Value),
                 cancellationToken);
 
-        if (terminalCount < groupInfo.SiblingCount)
+        if (terminalCount < stampedSiblingCount)
         {
             return null;
         }

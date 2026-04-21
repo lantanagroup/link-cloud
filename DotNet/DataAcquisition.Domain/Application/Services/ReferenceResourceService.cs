@@ -396,12 +396,30 @@ public class ReferenceResourceService : IReferenceResourceService
                 referenceLogId = createdLog.Id;
                 created = true;
 
-                await _dataAcquisitionLogManager.IncrementSiblingCountAsync(
-                    primaryLog.FacilityId,
-                    primaryLog.CorrelationId!,
-                    primaryLog.QueryPhase!.Value,
-                    delta: 1,
-                    cancellationToken);
+                // Stamp ONLY the new reference log's SiblingCount with a single-row
+                // UPDATE so it participates in TryCompleteTailAsync's count-based tail
+                // gate. We deliberately avoid the previous wide-range UPDATE over every
+                // log in the (facility, correlation, phase) group: that wide UPDATE
+                // deadlocked with TryCompleteTailAsync's wide TailSent UPDATE on the
+                // same range. The exact stamped value is not significant for the tail
+                // threshold (which now COUNTs stamped siblings instead of trusting one
+                // row's value); we use the post-insert sibling count purely for human
+                // readability when inspecting the row.
+                var stampedSiblingCount = await _dbContext.DataAcquisitionLogs
+                    .AsNoTracking()
+                    .CountAsync(
+                        l => l.FacilityId == primaryLog.FacilityId
+                            && l.CorrelationId == primaryLog.CorrelationId
+                            && l.QueryPhase == primaryLog.QueryPhase
+                            && l.SiblingCount != null,
+                        cancellationToken);
+
+                await _dbContext.DataAcquisitionLogs
+                    .Where(l => l.Id == referenceLogId)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(l => l.SiblingCount, stampedSiblingCount + 1)
+                        .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                        cancellationToken);
             }
 
             var existingPendingIds = await _dbContext.PendingReferenceIds
@@ -526,13 +544,13 @@ public class ReferenceResourceService : IReferenceResourceService
         var resourceParam = command.CreateParameter();
         resourceParam.ParameterName = "@resource";
         // The lock scope is the (facility, correlation, phase) group, NOT per-resource-type.
-        // Broader serialization is required because GetOrCreateAndAppendAsync also calls
-        // IncrementSiblingCountAsync, which performs a wide UPDATE over every log row in
-        // the group. Two transactions holding different per-type app locks would each
-        // try to lock the other's newly-inserted ref-log row inside that wide UPDATE,
-        // producing a SQL Server deadlock. Locking at the group level removes the cross-
-        // transaction contention entirely; the throughput cost is negligible because
-        // ref-log work per group is fast and only happens when primaries finish.
+        // Broader serialization is required because GetOrCreateAndAppendAsync also performs
+        // a single-row UPDATE that stamps the new ref log's SiblingCount based on a live
+        // count of stamped siblings. Per-type locking would let two transactions read the
+        // same count and assign duplicate stamps; a single per-group lock makes the
+        // read-then-stamp sequence linearizable across resource types within the group.
+        // The throughput cost is negligible because ref-log work per group is fast and
+        // only happens when primaries finish.
         resourceParam.Value = $"ReferenceLog:{primaryLog.FacilityId}:{primaryLog.CorrelationId}:{primaryLog.QueryPhase}";
         command.Parameters.Add(resourceParam);
 
