@@ -68,7 +68,7 @@ public class ReadyToAcquireListenerTests
     }
 
     [Fact]
-    public async Task ExecuteListenerAsync_WhenEnqueueFailsAndCompensationSucceeds_ThrowsTransientException()
+    public async Task ExecuteListenerAsync_WhenEnqueueFailsAndCompensationSucceeds_ReturnsWithoutThrowing()
     {
         var logManagerMock = new Mock<IDataAcquisitionLogManager>();
         logManagerMock
@@ -89,8 +89,11 @@ public class ReadyToAcquireListenerTests
 
         var listener = CreateListener(logManagerMock, processor);
 
-        await Assert.ThrowsAsync<TransientException>(() =>
-            listener.InvokeExecuteListenerAsync(CreateConsumeResult(789, "facility-c"), CancellationToken.None));
+        // After successful compensation the listener must NOT throw TransientException, otherwise
+        // the message would be re-published to the -Retry topic and cause an infinite backpressure
+        // loop (see LNK-5129). The log is already reverted to Pending and will be re-triggered by
+        // the scheduled acquisition job.
+        await listener.InvokeExecuteListenerAsync(CreateConsumeResult(789, "facility-c"), CancellationToken.None);
 
         logManagerMock.Verify(m => m.TrySetLogStatusAsync(
             789,
