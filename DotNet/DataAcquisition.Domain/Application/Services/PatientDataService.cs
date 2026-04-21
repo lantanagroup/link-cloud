@@ -480,7 +480,7 @@ public class PatientDataService : IPatientDataService
 
             var successfullyUpdatedLog = await _dataAcquisitionLogManager.TrySetLogStatusAsync(log.Id,
                 allowedStatuses, RequestStatus.Processing,
-                cancellationToken);
+                cancellationToken: cancellationToken);
 
             if (successfullyUpdatedLog)
             {
@@ -595,6 +595,33 @@ public class PatientDataService : IPatientDataService
                     ExecutionDate = log.ExecutionDate,
                     NewNotes = newNotes.Count > 0 ? newNotes : null,
                     Status = log.Status,
+                }, cancellationToken);
+            }
+            else
+            {
+                // Diagnostic: the atomic Queued->Processing transition didn't
+                // match any row. Record what we observed so the log does not
+                // disappear silently (previously this branch was a no-op).
+                var currentDbStatus = (await _dataAcquisitionLogQueries.GetAsync(log.Id, cancellationToken))?.Status;
+
+                _logger.LogWarning(
+                    "Queued->Processing transition skipped for LogId {LogId}. " +
+                    "Fetched status was {FetchedStatus}; current DB status is {DbStatus}.",
+                    log.Id, log.Status, currentDbStatus);
+
+                var diagnosticNote =
+                    $"[{DateTime.UtcNow:O}] Queued->Processing transition skipped. " +
+                    $"Fetched status={log.Status}, DB status={currentDbStatus}.";
+
+                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                {
+                    Id = log.Id,
+                    NewNotes = [diagnosticNote],
+                    RetryAttempts = log.RetryAttempts,
+                    TraceId = log.TraceId,
+                    ExecutionDate = log.ExecutionDate,
+                    CompletionDate = log.CompletionDate,
+                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
                 }, cancellationToken);
             }
         }

@@ -4,11 +4,6 @@ using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -43,7 +38,7 @@ public class ReadyToAcquireListenerTests
 
         Assert.Equal(0, processor.EnqueueCallCount);
         logManagerMock.Verify(m => m.TrySetLogToQueuedAsync(123, It.IsAny<CancellationToken>()), Times.Once);
-        logManagerMock.Verify(m => m.TrySetLogStatusAsync(It.IsAny<long>(), It.IsAny<List<DaRequestStatus>>(), It.IsAny<DaRequestStatus>(), It.IsAny<CancellationToken>()), Times.Never);
+        logManagerMock.Verify(m => m.TrySetLogStatusAsync(It.IsAny<long>(), It.IsAny<List<DaRequestStatus>>(), It.IsAny<DaRequestStatus>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -64,7 +59,7 @@ public class ReadyToAcquireListenerTests
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
             listener.InvokeExecuteListenerAsync(CreateConsumeResult(456, "facility-b"), CancellationToken.None));
 
-        logManagerMock.Verify(m => m.TrySetLogStatusAsync(It.IsAny<long>(), It.IsAny<List<DaRequestStatus>>(), It.IsAny<DaRequestStatus>(), It.IsAny<CancellationToken>()), Times.Never);
+        logManagerMock.Verify(m => m.TrySetLogStatusAsync(It.IsAny<long>(), It.IsAny<List<DaRequestStatus>>(), It.IsAny<DaRequestStatus>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -79,6 +74,7 @@ public class ReadyToAcquireListenerTests
                 789,
                 It.Is<List<DaRequestStatus>>(s => s.Count == 1 && s[0] == DaRequestStatus.Queued),
                 DaRequestStatus.Pending,
+                It.IsAny<string?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
@@ -96,6 +92,7 @@ public class ReadyToAcquireListenerTests
             789,
             It.Is<List<DaRequestStatus>>(s => s.Count == 1 && s[0] == DaRequestStatus.Queued),
             DaRequestStatus.Pending,
+            It.IsAny<string?>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -111,6 +108,7 @@ public class ReadyToAcquireListenerTests
                 999,
                 It.Is<List<DaRequestStatus>>(s => s.Count == 1 && s[0] == DaRequestStatus.Queued),
                 DaRequestStatus.Pending,
+                It.IsAny<string?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
@@ -128,6 +126,7 @@ public class ReadyToAcquireListenerTests
             999,
             It.Is<List<DaRequestStatus>>(s => s.Count == 1 && s[0] == DaRequestStatus.Queued),
             DaRequestStatus.Pending,
+            It.IsAny<string?>(),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 

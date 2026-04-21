@@ -8,11 +8,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -40,7 +37,7 @@ public interface IDataAcquisitionLogManager
     Task<int> RestoreByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
     Task ThrottleFacilityAcquisitions(string facilityId, DateTime executionDate, CancellationToken cancellationToken = default);
-    Task<bool> TrySetLogStatusAsync(long logId, List<RequestStatus> validCurrentStatuses, RequestStatus newStatus, CancellationToken cancellationToken = default);
+    Task<bool> TrySetLogStatusAsync(long logId, List<RequestStatus> validCurrentStatuses, RequestStatus newStatus, string? note = null, CancellationToken cancellationToken = default);
     Task<bool> TrySetLogToQueuedAsync(long logId, CancellationToken cancellationToken);
     Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
     Task<int> ResetStalledProcessingLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
@@ -590,6 +587,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<bool> TrySetLogStatusAsync(long logId, List<RequestStatus> validCurrentStatuses,
         RequestStatus newStatus,
+        string? note = null,
         CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.TrySetLogStatusAsync");
@@ -602,13 +600,24 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                     .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
                 cancellationToken);
 
+        if (rowsAffected > 0 && !string.IsNullOrWhiteSpace(note))
+        {
+            _dbContext.DataAcquisitionLogNotes.Add(new DataAcquisitionLogNote
+            {
+                DataAcquisitionLogId = logId,
+                Note = note,
+                CreateDate = DateTime.UtcNow
+            });
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
         return rowsAffected > 0;
     }
 
     public async Task<bool> TrySetLogToQueuedAsync(long logId, CancellationToken cancellationToken)
     {
         return await TrySetLogStatusAsync(logId, [RequestStatus.Ready, RequestStatus.Pending], RequestStatus.Queued,
-            cancellationToken);
+            cancellationToken: cancellationToken);
     }
 
     public async Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)

@@ -68,8 +68,17 @@ public class ReadFhirCommand : IReadFhirCommand
         if (request.fhirQueryConfiguration == null)
             throw new ArgumentNullException(nameof(request.fhirQueryConfiguration), "FhirQueryConfiguration cannot be null.");
 
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.fhirQueryConfiguration.GetMaxConcurrentRequestsOrDefault(), _distributedLockSettings.Expiration, cancellationToken))
+        var maxConcurrent = request.fhirQueryConfiguration.GetMaxConcurrentRequestsOrDefault();
+        var semWaitStart = DateTime.UtcNow;
+        _logger.LogDebug(
+            "Semaphore: Read acquire attempt facility={FacilityId} resource={ResourceType}/{ResourceId} maxConcurrent={MaxConcurrent}",
+            request.facilityId, request.resourceType, request.resourceId, maxConcurrent);
+        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
+            var semAcquiredAt = DateTime.UtcNow;
+            _logger.LogDebug(
+                "Semaphore: Read acquired facility={FacilityId} resource={ResourceType}/{ResourceId} waitMs={WaitMs}",
+                request.facilityId, request.resourceType, request.resourceId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
             // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
             var innerHandler = new HttpClientHandler();
             var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
@@ -119,6 +128,9 @@ public class ReadFhirCommand : IReadFhirCommand
                 throw new Exception($"Resource not found. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}; Full location: {location}");
             }
 
+            _logger.LogDebug(
+                "Semaphore: Read releasing facility={FacilityId} resource={ResourceType}/{ResourceId} holdMs={HoldMs}",
+                request.facilityId, request.resourceType, request.resourceId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
             return readResource;
         }
     }

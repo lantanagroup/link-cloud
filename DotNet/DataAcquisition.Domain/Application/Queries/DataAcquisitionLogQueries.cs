@@ -83,6 +83,14 @@ public interface IDataAcquisitionLogQueries
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// For each resource type in <paramref name="resourceTypes"/>, returns the ones that still
+    /// have at least one non-terminal DataAcquisitionLog for the given correlation + facility.
+    /// A resource type with no matching logs at all is NOT returned.
+    /// </summary>
+    Task<List<string>> GetNonTerminalDependencyResourceTypes(string correlationId, string facilityId,
+        List<string> resourceTypes, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Safety-net query: finds one representative log ID per group that is
     /// fully terminal, has SiblingCount stamped, but TailSent is still false
     /// and the last ModifyDate is older than <paramref name="minAge"/>.
@@ -144,6 +152,73 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         }
 
         return result;
+    }
+
+    public async Task<List<string>> GetNonTerminalDependencyResourceTypes(string correlationId, string facilityId,
+        List<string> resourceTypes, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetNonTerminalDependencyResourceTypes");
+        activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
+        if (string.IsNullOrWhiteSpace(correlationId) || string.IsNullOrWhiteSpace(facilityId) ||
+            resourceTypes is null || resourceTypes.Count == 0)
+        {
+            return [];
+        }
+
+        var terminalStatuses = new[]
+        {
+            RequestStatus.Completed, RequestStatus.Skipped, RequestStatus.MaxRetriesReached, RequestStatus.Cancelled
+        };
+
+        // Parse supplied strings to the ResourceType enum. Anything that doesn't parse is skipped.
+        var parsed = new List<(string Original, ResourceType Parsed)>();
+        foreach (var rt in resourceTypes.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (Enum.TryParse<ResourceType>(rt, ignoreCase: true, out var parsedType))
+            {
+                parsed.Add((rt, parsedType));
+            }
+            else
+            {
+                _logger.LogWarning("Could not parse dependency resource type {ResourceType}; treating as non-blocking.", rt);
+            }
+        }
+
+        if (parsed.Count == 0)
+            return [];
+
+        var parsedTypes = parsed.Select(p => p.Parsed).Distinct().ToList();
+
+        // Find which resource types have at least one non-terminal log in this correlation/facility.
+        // Also collect which types have any log at all (so missing types fail-open).
+        var logStatusByType = await (
+            from log in _dbContext.DataAcquisitionLogs.AsNoTracking()
+            join query in _dbContext.FhirQueries on log.Id equals query.DataAcquisitionLogId
+            join resourceTypeEntry in _dbContext.FhirQueryResourceTypes on query.Id equals resourceTypeEntry.FhirQueryId
+            where log.FacilityId == facilityId
+                  && log.CorrelationId == correlationId
+                  && parsedTypes.Contains(resourceTypeEntry.ResourceType)
+            select new { resourceTypeEntry.ResourceType, log.Status })
+            .ToListAsync(cancellationToken);
+
+        if (logStatusByType.Count == 0)
+            return [];
+
+        var blocking = new HashSet<ResourceType>();
+        foreach (var grouping in logStatusByType.GroupBy(x => x.ResourceType))
+        {
+            var hasNonTerminal = grouping.Any(g =>
+                g.Status is null || !terminalStatuses.Contains(g.Status.Value));
+            if (hasNonTerminal)
+                blocking.Add(grouping.Key);
+        }
+
+        return parsed
+            .Where(p => blocking.Contains(p.Parsed))
+            .Select(p => p.Original)
+            .ToList();
     }
 
     public async Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default)
