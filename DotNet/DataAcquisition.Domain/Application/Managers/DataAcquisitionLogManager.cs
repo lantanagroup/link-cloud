@@ -847,7 +847,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             {
                 AcquisitionComplete = true,
                 PatientId = representative.PatientId ?? string.Empty,
-                QueryType = groupInfo.QueryPhase.ToString()!,
+                QueryType = QueryPhaseUtilities.ToWireQueryType(groupInfo.QueryPhase),
                 ReportableEvent = representative.ReportableEvent ?? default,
                 ScheduledReports = representative.ScheduledReport != null
                     ? new List<ScheduledReport> { representative.ScheduledReport }

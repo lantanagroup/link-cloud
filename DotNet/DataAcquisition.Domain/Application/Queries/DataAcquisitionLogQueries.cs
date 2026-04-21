@@ -332,7 +332,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     ResourceAcquired = new ResourceAcquired
                     {
                         PatientId = first.PatientId ?? string.Empty,
-                        QueryType = group.QueryPhase.ToString() ?? string.Empty,
+                        QueryType = QueryPhaseUtilities.ToWireQueryType(group.QueryPhase),
                         ReportableEvent = first.ReportableEvent ?? default,
                         AcquisitionComplete = true,
                         ScheduledReports = new List<ScheduledReport>
