@@ -47,21 +47,18 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security
 
         /// <summary>
         /// Masks a potentially sensitive string for logging by sanitizing control
-        /// characters and redacting all but the trailing 4 characters. Short values
-        /// are fully redacted. Null/empty values return an empty string.
+        /// characters and fully redacting the value. Null/empty values return an empty string.
         /// </summary>
         /// <remarks>
-        /// Security: Prevents PII/PHI leakage via log output while preserving just
-        /// enough of the tail for humans to correlate entries during triage.
+        /// Security: Prevents PII/PHI leakage via log output by ensuring no cleartext
+        /// characters from the original value are emitted.
         /// </remarks>
         public static string MaskForLog(this string? value)
         {
             var sanitized = value.SanitizeUntrustedString();
             if (string.IsNullOrEmpty(sanitized))
                 return string.Empty;
-            if (sanitized.Length <= 4)
-                return "****";
-            return new string('*', sanitized.Length - 4) + sanitized[^4..];
+            return new string('*', sanitized.Length);
         }
     }
 }
