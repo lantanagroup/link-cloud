@@ -18,9 +18,9 @@ public interface IAcquisitionDependencyChecker
     Task<DependencyCheckResult> CheckDependenciesAsync(DataAcquisitionLogModel log, CancellationToken cancellationToken = default);
 }
 
-public record DependencyCheckResult(bool AreDependenciesMet, List<string> BlockingResourceTypes)
+public record DependencyCheckResult(bool AreDependenciesMet, IReadOnlyList<string> BlockingResourceTypes)
 {
-    public static DependencyCheckResult Met { get; } = new(true, new List<string>());
+    public static DependencyCheckResult Met { get; } = new(true, Array.Empty<string>());
 }
 
 public class AcquisitionDependencyChecker : IAcquisitionDependencyChecker
@@ -114,7 +114,7 @@ public class AcquisitionDependencyChecker : IAcquisitionDependencyChecker
             .Select(kvp => kvp.Value)
             .OfType<ParameterQueryConfig>()
             .Where(cfg => !string.IsNullOrWhiteSpace(cfg.ResourceType) && logResourceTypes.Contains(cfg.ResourceType))
-            .SelectMany(cfg => cfg.Parameters)
+            .SelectMany(cfg => cfg.Parameters ?? Enumerable.Empty<IParameter>())
             .OfType<ResourceIdsParameter>()
             .Select(p => p.Resource)
             .Where(r => !string.IsNullOrWhiteSpace(r))

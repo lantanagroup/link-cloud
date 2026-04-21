@@ -89,13 +89,13 @@ public class SearchFhirCommand : ISearchFhirCommand
         var semWaitStart = DateTime.UtcNow;
         _logger.LogDebug(
             "Semaphore: SearchPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
-            request.facilityId, request.resourceType, request.correlationId, maxConcurrent);
+            request.facilityId.SanitizeUntrustedString(), request.resourceType, request.correlationId.SanitizeUntrustedString(), maxConcurrent);
         using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
             var semAcquiredAt = DateTime.UtcNow;
             _logger.LogDebug(
                 "Semaphore: SearchPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
-                request.facilityId, request.resourceType, request.correlationId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
+                request.facilityId.SanitizeUntrustedString(), request.resourceType, request.correlationId.SanitizeUntrustedString(), (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
 
             // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
             var innerHandler = new HttpClientHandler();
@@ -180,7 +180,7 @@ public class SearchFhirCommand : ISearchFhirCommand
 
             _logger.LogDebug(
                 "Semaphore: SearchPaging releasing facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} holdMs={HoldMs}",
-                request.facilityId, request.resourceType, request.correlationId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
+                request.facilityId.SanitizeUntrustedString(), request.resourceType, request.correlationId.SanitizeUntrustedString(), (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
         }
 
     }
@@ -206,13 +206,13 @@ public class SearchFhirCommand : ISearchFhirCommand
         var semWaitStart = DateTime.UtcNow;
         _logger.LogDebug(
             "Semaphore: SearchNonPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
-            request.facilityId, request.resourceType, request.correlationId, maxConcurrent);
+            request.facilityId.SanitizeUntrustedString(), request.resourceType, request.correlationId.SanitizeUntrustedString(), maxConcurrent);
         using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
             var semAcquiredAt = DateTime.UtcNow;
             _logger.LogDebug(
                 "Semaphore: SearchNonPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
-                request.facilityId, request.resourceType, request.correlationId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
+                request.facilityId.SanitizeUntrustedString(), request.resourceType, request.correlationId.SanitizeUntrustedString(), (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
 
             // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
             var innerHandler = new HttpClientHandler();
@@ -253,7 +253,7 @@ public class SearchFhirCommand : ISearchFhirCommand
             IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
             _logger.LogDebug(
                 "Semaphore: SearchNonPaging releasing facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} holdMs={HoldMs}",
-                request.facilityId, request.resourceType, request.correlationId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
+                request.facilityId.SanitizeUntrustedString(), request.resourceType, request.correlationId.SanitizeUntrustedString(), (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
             return resultBundle;
         }
     }

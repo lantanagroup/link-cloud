@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -72,13 +73,13 @@ public class ReadFhirCommand : IReadFhirCommand
         var semWaitStart = DateTime.UtcNow;
         _logger.LogDebug(
             "Semaphore: Read acquire attempt facility={FacilityId} resource={ResourceType}/{ResourceId} maxConcurrent={MaxConcurrent}",
-            request.facilityId, request.resourceType, request.resourceId, maxConcurrent);
+            request.facilityId.SanitizeUntrustedString(), request.resourceType, request.resourceId.SanitizeUntrustedString(), maxConcurrent);
         using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
             var semAcquiredAt = DateTime.UtcNow;
             _logger.LogDebug(
                 "Semaphore: Read acquired facility={FacilityId} resource={ResourceType}/{ResourceId} waitMs={WaitMs}",
-                request.facilityId, request.resourceType, request.resourceId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
+                request.facilityId.SanitizeUntrustedString(), request.resourceType, request.resourceId.SanitizeUntrustedString(), (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
             // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
             var innerHandler = new HttpClientHandler();
             var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
@@ -130,7 +131,7 @@ public class ReadFhirCommand : IReadFhirCommand
 
             _logger.LogDebug(
                 "Semaphore: Read releasing facility={FacilityId} resource={ResourceType}/{ResourceId} holdMs={HoldMs}",
-                request.facilityId, request.resourceType, request.resourceId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
+                request.facilityId.SanitizeUntrustedString(), request.resourceType, request.resourceId.SanitizeUntrustedString(), (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
             return readResource;
         }
     }

@@ -599,30 +599,14 @@ public class PatientDataService : IPatientDataService
             }
             else
             {
-                // Diagnostic: the atomic Queued->Processing transition didn't
-                // match any row. Record what we observed so the log does not
-                // disappear silently (previously this branch was a no-op).
+                // Diagnostic: the atomic Queued->Processing transition didn't match any row.
                 var currentDbStatus = (await _dataAcquisitionLogQueries.GetAsync(log.Id, cancellationToken))?.Status;
 
                 _logger.LogWarning(
                     "Queued->Processing transition skipped for LogId {LogId}. " +
-                    "Fetched status was {FetchedStatus}; current DB status is {DbStatus}.",
+                    "Fetched status was {FetchedStatus}; current DB status is {DbStatus}. " +
+                    "Another worker likely owns this log now.",
                     log.Id, log.Status, currentDbStatus);
-
-                var diagnosticNote =
-                    $"[{DateTime.UtcNow:O}] Queued->Processing transition skipped. " +
-                    $"Fetched status={log.Status}, DB status={currentDbStatus}.";
-
-                await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                {
-                    Id = log.Id,
-                    NewNotes = [diagnosticNote],
-                    RetryAttempts = log.RetryAttempts,
-                    TraceId = log.TraceId,
-                    ExecutionDate = log.ExecutionDate,
-                    CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                }, cancellationToken);
             }
         }
         catch (OpOutcomeException ex)
