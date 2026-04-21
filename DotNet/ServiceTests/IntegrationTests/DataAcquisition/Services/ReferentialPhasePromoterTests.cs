@@ -410,5 +410,55 @@ namespace IntegrationTests.DataAcquisition.Services
                 .CountAsync(p => p.FacilityId == facilityId && p.CorrelationId == correlationId);
             Assert.Equal(2, remainingPending);
         }
+
+        [Fact]
+        public async Task FindAndPromoteReadyCorrelations_DoesNotStarveTerminalCorrelationsBehindNonTerminalBacklog()
+        {
+            // Regression: previously the candidate query applied Take(maxCorrelationsPerRun)
+            // BEFORE the terminality filter, so a backlog of non-terminal staged correlations
+            // could consume the per-tick budget and indefinitely starve a terminal-ready one.
+            // Fixed by oversizing the scan window and applying Take() AFTER filtering.
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+            const int maxCorrelationsPerRun = 3;
+            const int nonTerminalBacklog = maxCorrelationsPerRun + 2; // strictly more than the budget
+
+            // Seed N+2 non-terminal correlations, each with a staged reference.
+            for (var i = 0; i < nonTerminalBacklog; i++)
+            {
+                await SeedCorrelationAsync(
+                    scope,
+                    ScheduledFrequency.Daily,
+                    RequestStatus.Pending, // non-terminal
+                    new[] { ("Location", $"loc-noise-{i}") });
+            }
+
+            // Seed exactly one terminal-ready correlation that must not be starved.
+            var (readyFacilityId, readyCorrelationId, _) = await SeedCorrelationAsync(
+                scope,
+                ScheduledFrequency.Daily,
+                RequestStatus.Completed,
+                new[] { ("Location", "loc-ready-1") });
+
+            var promoter = CreatePromoter(scope);
+
+            // Act
+            await promoter.FindAndPromoteReadyCorrelationsAsync(maxCorrelationsPerRun);
+
+            // Assert — the terminal-ready correlation was promoted regardless of the
+            // non-terminal backlog ahead of it.
+            var readyReferentialCount = await dbContext.DataAcquisitionLogs
+                .AsNoTracking()
+                .CountAsync(l => l.FacilityId == readyFacilityId
+                              && l.CorrelationId == readyCorrelationId
+                              && l.QueryPhase == QueryPhase.Referential);
+            Assert.Equal(1, readyReferentialCount);
+
+            var readyPendingRemaining = await dbContext.PendingReferenceIds
+                .AsNoTracking()
+                .CountAsync(p => p.FacilityId == readyFacilityId && p.CorrelationId == readyCorrelationId);
+            Assert.Equal(0, readyPendingRemaining);
+        }
     }
 }

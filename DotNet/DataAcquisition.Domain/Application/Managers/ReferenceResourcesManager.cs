@@ -273,12 +273,15 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
                 await _dbContext.SaveChangesAsync(cancellationToken);
                 _dbContext.ChangeTracker.Clear();
             }
-            catch (DbUpdateException batchEx)
+            catch (DbUpdateException batchEx) when (IsUniqueConstraintViolation(batchEx))
             {
                 // A concurrent stager inserted overlapping rows between our pre-read
                 // and our write, violating the unique index. Fall back to row-by-row
                 // inserts, swallowing only unique-violation conflicts so surviving
-                // rows still land.
+                // rows still land. Any other DbUpdateException (FK violation, conversion
+                // error, connection failure, etc.) is rethrown by the catch filter so the
+                // caller's retry path can decide how to handle it instead of silently
+                // dropping data.
                 _dbContext.ChangeTracker.Clear();
                 _logger.LogDebug(batchEx,
                     "StagePendingReferencesAsync: batch insert collided with a concurrent stager for correlation {CorrelationId}; falling back to per-row inserts.",
@@ -291,10 +294,11 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
                         _dbContext.PendingReferenceIds.Add(row);
                         await _dbContext.SaveChangesAsync(cancellationToken);
                     }
-                    catch (DbUpdateException rowEx)
+                    catch (DbUpdateException rowEx) when (IsUniqueConstraintViolation(rowEx))
                     {
                         // Duplicate already present — safe to skip. Log at debug so noise
-                        // stays low but races are still diagnosable.
+                        // stays low but races are still diagnosable. Non-uniqueness
+                        // DbUpdateExceptions are not caught here and propagate up.
                         _logger.LogDebug(rowEx,
                             "StagePendingReferencesAsync: skipping duplicate pending reference {ResourceType}/{ResourceId} for correlation {CorrelationId}.",
                             row.ResourceType, row.ResourceId, correlationId);
@@ -306,5 +310,19 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Detects whether a <see cref="DbUpdateException"/> represents a SQL Server
+    /// unique-constraint / unique-index violation. Mirrors
+    /// <c>ScheduledReportManager.IsUniqueConstraintViolation</c> so the staging path
+    /// only swallows true uniqueness races and lets every other DB failure bubble.
+    /// </summary>
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        // SQL Server error 2601 = unique index violation, 2627 = unique constraint violation.
+        var message = ex.InnerException?.Message ?? ex.Message;
+        return message.Contains("2601") || message.Contains("2627")
+            || message.Contains("UNIQUE constraint", StringComparison.OrdinalIgnoreCase);
     }
 }
