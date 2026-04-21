@@ -1,12 +1,9 @@
-﻿using Automation.UI.Services.Persistence;
 using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automation.UI.Controllers;
 
-[Authorize]
 public class QueryPlansController(IQueryPlanTemplateStore store) : Controller
 {
     [HttpGet]
@@ -17,60 +14,73 @@ public class QueryPlansController(IQueryPlanTemplateStore store) : Controller
     }
 
     [HttpGet]
-    public IActionResult Create()
+    public IActionResult GetDefaults()
     {
-        // Pre-populate with system defaults so the user has a starting point.
         var defaults = QueryPlanDefaults.GetDefaultAsInput();
         var model = new QueryPlanTemplate
         {
+            Id = Guid.NewGuid(),
             Name = "New Query Plan",
             EhrDescription = defaults.EhrDescription ?? "Epic",
             LookBack = defaults.LookBack ?? "P0D",
             InitialQueries = defaults.InitialQueries.Select(ToQueryEntry).ToList(),
             SupplementalQueries = defaults.SupplementalQueries.Select(ToQueryEntry).ToList()
         };
-        return View("Edit", model);
+        return Json(model);
     }
 
     [HttpGet]
-    public async Task<IActionResult> Edit(Guid id, CancellationToken ct)
+    public async Task<IActionResult> GetJson(Guid id, CancellationToken ct)
     {
         var template = await store.GetByIdAsync(id, ct);
         if (template == null) return NotFound();
-        if (template.IsSystem) return RedirectToAction(nameof(Details), new { id });
-        return View(template);
+        return Json(template);
     }
 
     [HttpGet]
-    public async Task<IActionResult> Details(Guid id, CancellationToken ct)
+    public async Task<IActionResult> AcquiredTypes(Guid id, CancellationToken ct)
     {
         var template = await store.GetByIdAsync(id, ct);
         if (template == null) return NotFound();
-        return View(template);
+        return Json(template.GetAcquiredResourceTypes().OrderBy(t => t).ToList());
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Save(QueryPlanTemplate model, CancellationToken ct)
+    public async Task<IActionResult> SaveInline([FromBody] QueryPlanTemplate model, CancellationToken ct)
     {
-        if (!ModelState.IsValid)
-            return View("Edit", model);
+        if (string.IsNullOrWhiteSpace(model.Name))
+            return BadRequest("Query plan name is required.");
 
         var existing = await store.GetByIdAsync(model.Id, ct);
         if (existing is { IsSystem: true })
-            return RedirectToAction(nameof(Details), new { id = model.Id });
+            return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system plan cannot be modified.");
 
         model.IsSystem = false;
         model.UpdatedAt = DateTimeOffset.UtcNow;
         await store.UpsertAsync(model, ct);
-        return RedirectToAction(nameof(Index));
+        return Json(new { id = model.Id });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Clone(Guid id, CancellationToken ct)
+    public async Task<IActionResult> DeleteInline([FromBody] IdRequest request, CancellationToken ct)
     {
-        var source = await store.GetByIdAsync(id, ct);
+        var template = await store.GetByIdAsync(request.Id, ct);
+        if (template == null)
+            return NotFound();
+        if (template.IsSystem)
+            return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system plan cannot be deleted.");
+
+        await store.DeleteAsync(request.Id, ct);
+        return Ok();
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CloneInline([FromBody] IdRequest request, CancellationToken ct)
+    {
+        var source = await store.GetByIdAsync(request.Id, ct);
         if (source == null) return NotFound();
 
         var clone = new QueryPlanTemplate
@@ -88,39 +98,23 @@ public class QueryPlansController(IQueryPlanTemplateStore store) : Controller
         };
 
         await store.UpsertAsync(clone, ct);
-        return RedirectToAction(nameof(Edit), new { id = clone.Id });
+        return Json(new { id = clone.Id });
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> SetDefault(Guid id, CancellationToken ct)
+    public async Task<IActionResult> SetDefaultInline([FromBody] IdRequest request, CancellationToken ct)
     {
-        var template = await store.GetByIdAsync(id, ct);
+        var template = await store.GetByIdAsync(request.Id, ct);
         if (template == null) return NotFound();
 
-        await store.SetDefaultAsync(id, ct);
-        return RedirectToAction(nameof(Index));
+        await store.SetDefaultAsync(request.Id, ct);
+        return Ok();
     }
 
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    public sealed class IdRequest
     {
-        var template = await store.GetByIdAsync(id, ct);
-        if (template is null or { IsSystem: true })
-            return RedirectToAction(nameof(Index));
-
-        await store.DeleteAsync(id, ct);
-        return RedirectToAction(nameof(Index));
-    }
-
-    /// <summary>Returns the acquired resource types for a template (JSON API for AJAX).</summary>
-    [HttpGet]
-    public async Task<IActionResult> AcquiredTypes(Guid id, CancellationToken ct)
-    {
-        var template = await store.GetByIdAsync(id, ct);
-        if (template == null) return NotFound();
-        return Json(template.GetAcquiredResourceTypes().OrderBy(t => t).ToList());
+        public Guid Id { get; set; }
     }
 
     private static QueryEntry ToQueryEntry(QueryPlanQueryEntry src) => new()

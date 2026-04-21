@@ -1,14 +1,11 @@
-﻿using Automation.UI.Models;
+using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
-using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Sdk.Clients;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automation.UI.Controllers;
 
-[Authorize]
 public class RunsController(
     IAutomationRunManager runManager,
     IScenarioStore scenarioStore,
@@ -17,24 +14,46 @@ public class RunsController(
     ILogger<RunsController> logger) : Controller
 {
     [HttpGet]
-    public async Task<IActionResult> Index(int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(CancellationToken cancellationToken = default)
     {
-        var runs = await runManager.GetRunsPageAsync(pageNumber, pageSize, cancellationToken);
+        var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
+        var recentPage = await runManager.GetRunsPageAsync(1, 10, cancellationToken);
         var scenarios = await scenarioStore.GetAllAsync(cancellationToken);
-        var queryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
 
-        var allMeasures = Enum.GetValues<ProfiledMeasureType>().ToList();
-        var clinicalScenarios = ClinicalScenarioInfo.GetAll(allMeasures);
+        var activeRuns = recentPage.Runs
+            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+            .ToList();
 
-        var vm = new RunsIndexViewModel
+        // Populate query plan templates for the shared scenario editor modal embedded in this view.
+        ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
+
+        var vm = new RunDashboardViewModel
         {
-            Runs = runs,
+            Stats = stats,
+            RecentRuns = recentPage.Runs,
+            ActiveRuns = activeRuns,
             SavedScenarios = scenarios,
-            ClinicalScenarios = clinicalScenarios,
-            QueryPlanTemplates = queryPlanTemplates
         };
 
         return View(vm);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DashboardStats(CancellationToken cancellationToken)
+    {
+        var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
+        var recentPage = await runManager.GetRunsPageAsync(1, 10, cancellationToken);
+
+        var activeRuns = recentPage.Runs
+            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+            .ToList();
+
+        return Json(new
+        {
+            stats,
+            recentRuns = recentPage.Runs,
+            activeRuns
+        });
     }
 
     [HttpPost]
@@ -55,8 +74,8 @@ public class RunsController(
             return RedirectToAction(nameof(Index));
         }
 
-        var runId = await runManager.StartAsync(request, cancellationToken);
-        return RedirectToAction(nameof(Details), new { id = runId });
+        await runManager.StartAsync(request, cancellationToken);
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpGet]
@@ -67,6 +86,38 @@ public class RunsController(
             return NotFound();
 
         return View(run);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Manifest(Guid id, CancellationToken cancellationToken)
+    {
+        var run = await runManager.GetRunAsync(id, cancellationToken);
+        if (run == null)
+            return NotFound();
+
+        var manifest = await runManager.GetGenerationManifestAsync(id, cancellationToken);
+        if (manifest == null)
+            return RedirectToAction(nameof(Details), new { id });
+
+        ViewBag.Run = run;
+        ViewBag.RunId = id;
+        return View("Manifest", manifest);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> ManifestData(Guid id, CancellationToken cancellationToken)
+    {
+        var manifest = await runManager.GetGenerationManifestAsync(id, cancellationToken);
+        if (manifest == null) return NoContent();
+        return Json(manifest);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> AbsUploadData(Guid id, CancellationToken cancellationToken)
+    {
+        var abs = await runManager.GetAbsUploadSnapshotAsync(id, cancellationToken);
+        if (abs == null) return NoContent();
+        return Json(abs);
     }
 
     [HttpGet]
@@ -199,7 +250,9 @@ public class RunsController(
                     Status = r.Status?.ToString(),
                     QueryPhase = r.QueryPhase?.ToString(),
                     IsReferenceLog = r.IsReferenceLog
-                                     || string.Equals(r.QueryPhase?.ToString(), "Referential", StringComparison.OrdinalIgnoreCase),
+                                     || string.Equals(r.QueryPhase?.ToString(), "Referential", StringComparison.OrdinalIgnoreCase)
+                                     || r.ReferenceResourceCount > 0,
+                    r.ReferenceResourceCount,
                     ResourceTypes = (r.ResourceTypes ?? [])
                         .Concat(r.FhirQuery.SelectMany(q => q.ResourceTypes ?? []))
                         .Where(rt => !string.IsNullOrWhiteSpace(rt))
@@ -249,6 +302,34 @@ public class RunsController(
             if (detailed == null)
                 return NotFound();
 
+            // Fetch reference resources linked to this log.
+            var referenceResourceIds = new List<string>();
+            try
+            {
+                var pageNum = 1;
+                const int refPageSize = 100;
+                while (true)
+                {
+                    var refPage = await dataAcqClient.GetReferenceResourcesForLogAsync(logId, refPageSize, pageNum, cancellationToken);
+                    var refRecords = refPage?.Records ?? [];
+                    if (refRecords.Count == 0)
+                        break;
+
+                    referenceResourceIds.AddRange(
+                        refRecords
+                            .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
+                            .Select(r => $"{r.ResourceType}/{r.ResourceId}"));
+
+                    if (refRecords.Count < refPageSize)
+                        break;
+                    pageNum++;
+                }
+            }
+            catch (Exception refEx)
+            {
+                logger.LogWarning(refEx, "Failed to load reference resources for log {LogId}", logId);
+            }
+
             return Json(new
             {
                 detailed.Id,
@@ -265,10 +346,13 @@ public class RunsController(
                 detailed.CompletionTimeMilliseconds,
                 ResourceTypes = (detailed.ResourceTypes ?? [])
                     .Concat(detailed.FhirQuery.SelectMany(q => q.ResourceTypes ?? []))
-                    .Where(rt => !string.IsNullOrWhiteSpace(rt))
+                    .Concat(referenceResourceIds
+                        .Select(r => r.Contains('/') ? r.Split('/')[0] : r)
+                        .Where(rt => !string.IsNullOrWhiteSpace(rt)))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList(),
                 ResourceAcquiredIds = detailed.ResourceAcquiredIds?.ToList() ?? new List<string>(),
+                ReferenceResourceIds = referenceResourceIds,
                 Notes = detailed.Notes?.ToList() ?? new List<string>()
             });
         }

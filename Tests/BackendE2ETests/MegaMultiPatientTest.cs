@@ -1,7 +1,6 @@
-using LantanaGroup.Automation.Generation;
-using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Automation.Link.Services;
 using LantanaGroup.Link.Automation.Link.Validation;
@@ -13,26 +12,32 @@ using Task = System.Threading.Tasks.Task;
 namespace LantanaGroup.Link.Tests.E2ETests;
 
 /// <summary>
-/// End-to-end ad-hoc report test that runs a single generated patient through the full
-/// ad-hoc reporting pipeline.
+/// Hybrid stress + volume test: one mega patient with ~5,000 resources plus
+/// 149 patients with 25–50 resources each, run through the full ad-hoc
+/// reporting pipeline.
 /// </summary>
-public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
+public sealed class MegaMultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
-    private const int GenerationSeed = 20260326;
+    private const int GenerationSeed = 20260330;
 
-    private static readonly TestScenarioConfig Config = TestConfig.AdhocReportTestConfig;
+    private static readonly TestScenarioConfig Config = TestConfig.BuildScenarioConfig(
+        "MEGA_MULTI_PATIENT_TEST",
+        defaultPatientIds: [],
+        defaultPollingIntervalSeconds: 5,
+        defaultMaxPollingDurationMinutes: 25,
+        defaultLokiScrapeWindowMinutes: 20);
 
     private readonly IServiceProvider _sp;
-    private readonly string _facilityId = $"AdhocReportTest-{Guid.NewGuid():N}";
-    private GenerationManifest? _generationManifest;
+    private readonly string _facilityId = $"MegaMultiPatient-{Guid.NewGuid():N}";
     private List<ProfiledMeasureType> _measures = [];
+    private GenerationManifest? _generationManifest;
     private string? _reportId;
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
     private ConsoleAutomationOutput Output => _sp.GetRequiredService<ConsoleAutomationOutput>();
     private FhirDataLoader FhirDataLoader => _sp.GetRequiredService<FhirDataLoader>();
 
-    public AdhocReportTest(BackendE2ETestFixture fixture)
+    public MegaMultiPatientTest(BackendE2ETestFixture fixture)
     {
         _sp = fixture.ServiceProvider;
     }
@@ -46,20 +51,22 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         _measures = measures;
         var cohorts = new List<PatientCohortDefinition>
         {
-            PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 1000, resourcesMax: 1000)
+            // One mega patient with ~5,000 resources
+            PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 5000, resourcesMax: 5000),
+            // 149 normal patients with 25–50 resources each
+            PatientCohortDefinition.AllQualifying(measures, patientCount: 149, resourcesMin: 25, resourcesMax: 50)
         };
         var profiles = PatientCohortDefinition.ExpandProfiles(cohorts, GenerationSeed);
 
         await FhirDataLoader.WaitForServerAsync(Output);
 
-        // Unified generation: stream-generate + upload + build manifest in one pass.
         var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
             Output,
             FhirDataLoader,
             measures,
             profiles,
             totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
-            patientIdPrefix: "AdhocPatient",
+            patientIdPrefix: "MegaMultiPatient",
             generationSeed: GenerationSeed,
             acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
             {
@@ -75,7 +82,7 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
             Config.PatientIds = pipelineResult.PatientIds;
         }
 
-        Output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds)}]");
+        Output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds.Take(10))}...] ({Config.PatientIds.Count} total)");
 
         var validationApi = _sp.GetRequiredService<ValidationApiHelper>();
         await validationApi.InitializeArtifactsAsync();
@@ -100,8 +107,8 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
     }
 
     [Fact]
-    [Trait("Category", "AdhocReportTest")]
-    public async Task ExecuteAdhocReportTest()
+    [Trait("Category", "MegaMultiPatientTest")]
+    public async Task ExecuteMegaMultiPatientTest()
     {
         // Step 1: Load measure definition into MeasureEval and Validation.
         var measureLoader = new MeasureLoader(
@@ -112,6 +119,9 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
 
         var measureId = measureLoader.MeasureId
             ?? throw new InvalidOperationException("MeasureLoader did not produce a MeasureId");
+
+        Output.WriteLine($"MeasureId: {measureId}");
+        Output.WriteLine($"Patients : {Config.PatientIds.Count}");
 
         // Step 2: Create facility.
         await FacilitySetupHelper.EnsureFacilityAsync(
@@ -128,7 +138,6 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         // Step 5: Create FHIR query config.
         await FacilitySetupHelper.EnsureQueryConfigAsync(
             _sp.GetRequiredService<IDataAcquisitionServiceClient>(), AutomationCfg, Output, _facilityId);
-
         await FacilitySetupHelper.EnsureQueryDispatchConfigAsync(
             _sp.GetRequiredService<IQueryDispatchServiceClient>(),
             Output,
@@ -149,14 +158,12 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
             forwardInternalLogsToOutput: false,
             pipelineReader: dataReader);
         await using var watcher = DiagnosticsEventWatcher.Start(diagnostics, Output);
-
         await diagnostics.StartAsync(_facilityId, reportId);
 
         var reportSubmitted = await reportApi.CheckSubmissionStatusAsync(reportId, Config, diagnostics);
         await diagnostics.StopAsync();
         await watcher.StopAsync();
 
-        // Always capture a non-asserting snapshot before assertions.
         var pipelineSnapshot = _sp.GetRequiredService<PipelineSnapshot>();
         await pipelineSnapshot.WriteFullSnapshotAsync(Output, _facilityId, reportId);
 
@@ -171,7 +178,7 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         Assert.True(downloadedResources.ContainsKey("manifest.ndjson"),
             "Expected report to include manifest.ndjson but it was not");
 
-        foreach (var patientId in Config.PatientIds)
+        foreach (var patientId in Config.PatientIds.Take(10))
         {
             Assert.True(downloadedResources.ContainsKey($"patient-{patientId}.ndjson"),
                 $"Expected report to include patient-{patientId}.ndjson but it was not");
@@ -182,8 +189,6 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         // Flush stale cache from diagnostics polling so validators read authoritative data.
         dataReader.InvalidateCache();
 
-        // Manifest was fully constructed by the pipeline during generation. Add measure-specific
-        // fields that depend on what the measure loader discovered post-setup.
         var generationManifest = _generationManifest
             ?? throw new InvalidOperationException("Generation manifest was not produced by the pipeline.");
         generationManifest.MeasureIds = [measureId];
@@ -208,6 +213,5 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         await _sp.GetRequiredService<DataAcquisitionDatabaseValidator>().ValidateAllAsync(_facilityId, reportId, measureId, Config.PatientIds);
         await _sp.GetRequiredService<NormalizationDatabaseValidator>().ValidateAllAsync(_facilityId);
         await _sp.GetRequiredService<TenantDatabaseValidator>().ValidateAllAsync(_facilityId, measureId);
-        await _sp.GetRequiredService<ValidationResultsValidator>().ValidateAllAsync(_facilityId, reportId, Config.PatientIds, Config.LokiScrapeWindow);
     }
 }

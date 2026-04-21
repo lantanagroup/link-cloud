@@ -1,4 +1,4 @@
-ï»¿using LantanaGroup.Automation.Configuration;
+using LantanaGroup.Automation.Configuration;
 using LantanaGroup.Automation.Helpers;
 using System.Collections.Concurrent;
 
@@ -276,6 +276,49 @@ public class FhirDataLoader
         await Task.WhenAll(tasks);
 
         output.WriteLine($"Upload complete: {successCount} succeeded, {failCount} failed out of {bundles.Count} bundles.");
+    }
+
+    /// <summary>
+    /// Uploads a sequence of FHIR transaction bundles in strict order. Each bundle is
+    /// posted and confirmed before the next is sent. Used by the generation pipeline to
+    /// ensure a patient's resources reach the FHIR server in the correct dependency order
+    /// (Patient ? Encounter ? Observations, etc.) and to avoid data-shape corruption
+    /// from out-of-order concurrent uploads within a single patient context.
+    /// </summary>
+    public async Task<bool> UploadBundlesSequentiallyAsync(
+        IAutomationOutput output,
+        IReadOnlyList<(string Name, string Json)> bundles,
+        string progressPrefix = "")
+    {
+        for (var i = 0; i < bundles.Count; i++)
+        {
+            var (name, json) = bundles[i];
+            var progress = string.IsNullOrEmpty(progressPrefix)
+                ? $"[{i + 1}/{bundles.Count}]"
+                : $"{progressPrefix}[{i + 1}/{bundles.Count}]";
+
+            var response = await PostBundleWithRetryAsync(json, name, progress, output);
+
+            if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
+            {
+                output.WriteLine($"  {progress} FAILED {name}: {response.StatusCode} {response.Content}");
+
+                // Abort the sequence — later bundles depend on earlier ones.
+                for (var j = i + 1; j < bundles.Count; j++)
+                {
+                    var skippedProgress = string.IsNullOrEmpty(progressPrefix)
+                        ? $"[{j + 1}/{bundles.Count}]"
+                        : $"{progressPrefix}[{j + 1}/{bundles.Count}]";
+                    output.WriteLine($"  {skippedProgress} SKIPPED {bundles[j].Name} (dependency failed)");
+                }
+
+                return false;
+            }
+
+            TrackCreatedResources(response.Content, name, progress, output);
+        }
+
+        return true;
     }
 
     private void TrackCreatedResources(string responseContent, string name, string progress, IAutomationOutput output)
