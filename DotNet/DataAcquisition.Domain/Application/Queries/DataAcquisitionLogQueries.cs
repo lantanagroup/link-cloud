@@ -188,7 +188,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     QueryType = q.QueryType,
                     ResourceTypes = q.FhirQueryResourceTypes.Select(r => r.ResourceType).ToList(),
                     QueryParameters = q.QueryParameters,
-                    IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
                     Paged = q.Paged,
                     DataAcquisitionLogId = q.DataAcquisitionLogId,
                     CensusListId = q.CensusListId,

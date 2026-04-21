@@ -30,10 +30,21 @@ public class FhirQueryModel
         set
         {
             const string prefix = "_id=";
-            QueryParameters = (QueryParameters ?? [])
-                .Where(p => !p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                .Append($"{prefix}{string.Join(',', (value ?? []).Where(id => !string.IsNullOrWhiteSpace(id)))}")
+            var ids = (value ?? Enumerable.Empty<string>())
+                .Where(id => !string.IsNullOrWhiteSpace(id))
                 .ToList();
+
+            var withoutId = (QueryParameters ?? [])
+                .Where(p => !p.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            // Only re-append an "_id=..." entry when we actually have ids to write;
+            // otherwise leave QueryParameters free of a stray empty "_id=" that would
+            // otherwise trip the empty-_id skip path during execution.
+            if (ids.Count > 0)
+                withoutId.Add($"{prefix}{string.Join(',', ids)}");
+
+            QueryParameters = withoutId;
         }
     }
     public TimeFrame? CensusTimeFrame { get; set; } = null;

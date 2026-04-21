@@ -49,6 +49,24 @@ public class FhirApiServiceTests
     }
 
     [Fact]
+    public void FhirQueryModel_IdQueryParameterValues_EmptyAssignment_DoesNotInjectStrayIdParam()
+    {
+        // Regression guard: assigning an empty IdQueryParameterValues must not leave
+        // a stray "_id=" entry on QueryParameters - otherwise PatientDataService's
+        // empty-_id skip path would mark every primary search as Skipped before it
+        // ever fetches anything (and therefore before any references can be discovered).
+        var model = new FhirQueryModel
+        {
+            QueryParameters = new List<string> { "patient=Patient/123" }
+        };
+
+        model.IdQueryParameterValues = Array.Empty<string>();
+
+        Assert.Equal(new[] { "patient=Patient/123" }, model.QueryParameters);
+        Assert.Empty(model.IdQueryParameterValues);
+    }
+
+    [Fact]
     public async Task CheckIfReferenceResourceHasBeenSent_ResourceAlreadySent_ReturnsTrueAndSkipsReprocessing()
     {
         var mockLogQueries = new Mock<IDataAcquisitionLogQueries>();

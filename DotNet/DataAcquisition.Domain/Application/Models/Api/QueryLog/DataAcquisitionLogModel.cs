@@ -69,7 +69,6 @@ public class DataAcquisitionLogModel
                 Id = q.Id,
                 FacilityId = q.FacilityId,
                 MeasureId = q.MeasureId,
-                IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
                 IsReference = q.IsReference,
                 QueryType = q.QueryType,
                 ResourceTypes = q.FhirQueryResourceTypes.Select(s => s.ResourceType).ToList(),

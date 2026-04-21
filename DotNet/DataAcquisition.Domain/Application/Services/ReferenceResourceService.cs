@@ -309,12 +309,10 @@ public class ReferenceResourceService : IReferenceResourceService
 
         foreach (var fhirQuery in log.FhirQuery.Where(q => q.IsReference.GetValueOrDefault()))
         {
-            var nonIdParams = (fhirQuery.QueryParameters ?? new List<string>())
-                .Where(p => !p.StartsWith("_id=", StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            nonIdParams.Add($"_id={string.Join(',', missingIds)}");
-            fhirQuery.QueryParameters = nonIdParams;
-            fhirQuery.IdQueryParameterValues = missingIds.ToList();
+            // IdQueryParameterValues is a computed view over QueryParameters: the
+            // setter strips any existing "_id=" entries and re-appends a single
+            // "_id=a,b,c" entry, so QueryParameters stays the single source of truth.
+            fhirQuery.IdQueryParameterValues = missingIds;
         }
 
         var notes = cachedRows.Count > 0
