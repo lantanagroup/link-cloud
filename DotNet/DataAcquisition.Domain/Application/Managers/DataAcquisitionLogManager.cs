@@ -809,6 +809,30 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             return null; // Another worker already sent the tail.
         }
 
+        // Referential is an internal-only phase: its purpose is to fetch reference
+        // resources discovered during the Initial phase and stream them into
+        // MeasureEval's per-correlation bundle as ordinary ResourceAcquired records.
+        // It must NOT send a tail (AcquisitionComplete=true) Kafka message because
+        // QueryPhaseUtilities.ToWireQueryType coerces Referential to "Supplemental"
+        // on the wire. Java MeasureEval would interpret that tail as the SUPPLEMENTAL
+        // acquisition completing and run a SUPPLEMENTAL evaluation, producing an
+        // extra MeasureReportGenerated event before the real Supplemental phase
+        // tail arrives. The downstream Report service then aggregates twice,
+        // doubling ReportResource rows and ReportPopulation MeasureReportPopulations
+        // while the ABS patient blob is overwritten by the last write — manifesting
+        // as the ReportResource->ABS / MeasureEval->ReportResource count mismatches
+        // observed in the AdHoc validator.
+        //
+        // We still claim the tail above so TailMessageRecoveryJob does not keep
+        // retrying these logs; we just skip producing the Kafka tail message here.
+        if (groupInfo.QueryPhase == QueryPhase.Referential)
+        {
+            _logger.LogDebug(
+                "TryCompleteTailAsync: suppressing tail emission for Referential phase (FacilityId={FacilityId}, CorrelationId={CorrelationId}). Reference resources are delivered as individual ResourceAcquired records and the Supplemental-phase tail will trigger MeasureEval evaluation.",
+                groupInfo.FacilityId, groupInfo.CorrelationId);
+            return null;
+        }
+
         // Read the data we need for the tail Kafka message.
         var representative = await _dbContext.DataAcquisitionLogs.AsNoTracking()
             .Where(l =>
