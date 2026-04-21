@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Automation.Link.Models;
+namespace LantanaGroup.Link.Automation.Link.Models;
 
 /// <summary>
 /// Per-run, per-domain snapshot data stored in the database.
@@ -35,12 +35,13 @@ public interface ISnapshotStore
     // --- Run metadata ---
     Task RegisterRunAsync(Guid runId, RunSnapshotMeta meta, CancellationToken ct = default);
     Task UpdateRunMetaAsync(Guid runId, string facilityId, string reportId, CancellationToken ct = default);
-    Task CompleteRunAsync(Guid runId, CancellationToken ct = default);
+    Task CompleteRunAsync(Guid runId, string? duration = null, CancellationToken ct = default);
     Task<IReadOnlyList<RunSnapshotMeta>> GetActiveRunsAsync(CancellationToken ct = default);
     Task<RunSnapshotMeta?> GetRunMetaAsync(Guid runId, CancellationToken ct = default);
     Task UpsertRunSummaryAsync(AutomationRunSummary summary, string? facilityId, string? reportId, CancellationToken ct = default);
     Task<AutomationRunSummary?> GetRunSummaryAsync(Guid runId, CancellationToken ct = default);
     Task<PagedRunResult> GetRunsPageAsync(int pageNumber, int pageSize, CancellationToken ct = default);
+    Task<IReadOnlyList<AutomationRunSummary>> GetAllRunSummariesAsync(DateTimeOffset? since = null, CancellationToken ct = default);
     Task DeleteRunAsync(Guid runId, CancellationToken ct = default);
 
     // --- Domain snapshots (per-run, per-service polling data) ---
