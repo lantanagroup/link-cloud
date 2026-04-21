@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -200,16 +200,24 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 query = sortBy.ToLower() switch
                 {
-                    "createdate" => sortOrder == SortOrder.Descending ? query.OrderByDescending(r => r.CreateDate) : query.OrderBy(r => r.CreateDate),
-                    "facilityid" => sortOrder == SortOrder.Descending ? query.OrderByDescending(r => r.FacilityId) : query.OrderBy(r => r.FacilityId),
-                    "patientid" => sortOrder == SortOrder.Descending ? query.OrderByDescending(r => r.PatientId) : query.OrderBy(r => r.PatientId),
-                    "resourcetype" => sortOrder == SortOrder.Descending ? query.OrderByDescending(r => r.ResourceType) : query.OrderBy(r => r.ResourceType),
-                    _ => query.OrderByDescending(r => r.CreateDate)
+                    "createdate" => sortOrder == SortOrder.Descending
+                        ? query.OrderByDescending(r => r.CreateDate).ThenByDescending(r => r.Id)
+                        : query.OrderBy(r => r.CreateDate).ThenBy(r => r.Id),
+                    "facilityid" => sortOrder == SortOrder.Descending
+                        ? query.OrderByDescending(r => r.FacilityId).ThenByDescending(r => r.Id)
+                        : query.OrderBy(r => r.FacilityId).ThenBy(r => r.Id),
+                    "patientid" => sortOrder == SortOrder.Descending
+                        ? query.OrderByDescending(r => r.PatientId).ThenByDescending(r => r.Id)
+                        : query.OrderBy(r => r.PatientId).ThenBy(r => r.Id),
+                    "resourcetype" => sortOrder == SortOrder.Descending
+                        ? query.OrderByDescending(r => r.ResourceType).ThenByDescending(r => r.Id)
+                        : query.OrderBy(r => r.ResourceType).ThenBy(r => r.Id),
+                    _ => query.OrderByDescending(r => r.CreateDate).ThenByDescending(r => r.Id)
                 };
             }
             else
             {
-                query = query.OrderByDescending(r => r.CreateDate);
+                query = query.OrderByDescending(r => r.CreateDate).ThenByDescending(r => r.Id);
             }
 
             var totalCount = await query.CountAsync(cancellationToken);
