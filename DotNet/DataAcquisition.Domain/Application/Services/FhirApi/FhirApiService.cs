@@ -115,9 +115,18 @@ public class FhirApiService : IFhirApiService
 
             InsertDateExtension(resource);
 
-            //get references
-            var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
-            await _referenceResourceService.ProcessReferences(log, refResources, fhirQueryConfiguration, cancellationToken);
+            // Reference discovery only runs for the Initial primary-phase pass — matches
+            // the historical pre-performance-improvement behavior. Supplemental-phase
+            // bundles must not stage refs: ReferentialPhasePromoter is gated on a single
+            // Referential log per correlation, so any ids staged after that log exists
+            // would be silently purged by PurgePendingAsync and never fetched. Reference
+            // logs themselves also skip discovery to avoid an infinite promoter loop.
+            if (!fhirQuery.IsReference.GetValueOrDefault() && log.QueryPhase == QueryPhase.Initial)
+            {
+                //get references
+                var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
+                await _referenceResourceService.ProcessReferences(log, refResources, fhirQueryConfiguration, cancellationToken);
+            }
 
             await GenerateResourceAcquiredMessage(new ResourceAcquired
             {
@@ -219,12 +228,16 @@ public class FhirApiService : IFhirApiService
                             fhirQuery.QueryType),
                             cancellationToken))
             {
-                // Reference discovery only runs for primary-phase logs. Reference-phase
+                // Reference discovery only runs for Initial primary-phase logs — matches
+                // the historical pre-performance-improvement behavior. Reference-phase
                 // logs must not re-stage ids discovered inside their own fetched
-                // reference resources — that would re-enter the promoter loop for this
-                // correlation forever. (Chained-reference discovery is out of scope;
-                // matches historical single-level behavior.)
-                if (!isReferenceLog)
+                // reference resources (would re-enter the promoter loop for this
+                // correlation forever), and Supplemental-phase logs must not stage refs
+                // either: ReferentialPhasePromoter is gated on a single Referential log
+                // per correlation, so any ids staged after that log exists are silently
+                // purged by PurgePendingAsync and never fetched. (Chained-reference
+                // discovery is out of scope; matches historical single-level behavior.)
+                if (!isReferenceLog && log.QueryPhase == QueryPhase.Initial)
                 {
                     var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
                     await _referenceResourceService.ProcessReferences(log, refResources, fhirQueryConfiguration, cancellationToken);
