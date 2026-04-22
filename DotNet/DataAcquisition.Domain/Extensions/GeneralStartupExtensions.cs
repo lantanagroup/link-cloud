@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
@@ -208,19 +208,20 @@ public static class GeneralStartupExtensions
     public static void RegisterRepositories(this IServiceCollection services)
     {
         //Repositories
-        services.AddTransient<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<SftpAcquisitionLog>, EntityRepository<SftpAcquisitionLog, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<OrganizationLocationConfiguration>, EntityRepository<OrganizationLocationConfiguration, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<OrganizationLocationCondition>, EntityRepository<OrganizationLocationCondition, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<OrganizationLocationMapping>, EntityRepository<OrganizationLocationMapping, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<SftpAcquisitionLog>, EntityRepository<SftpAcquisitionLog, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<OrganizationLocationConfiguration>, EntityRepository<OrganizationLocationConfiguration, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<OrganizationLocationCondition>, EntityRepository<OrganizationLocationCondition, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<OrganizationLocationMapping>, EntityRepository<OrganizationLocationMapping, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<EncounterMapping>, EntityRepository<EncounterMapping, DataAcquisitionDbContext>>();
 
         //Database
         services.AddScoped<IDatabase, Database>();
@@ -229,29 +230,28 @@ public static class GeneralStartupExtensions
     public static void RegisterManagers(this IServiceCollection services)
     {
         //Queries
-        services.AddTransient<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
-        services.AddTransient<IDataAcquisitionLogNotesQueries, DataAcquisitionLogNotesQueries>();
-        services.AddTransient<ISftpAcquisitionLogQueries, SftpAcquisitionLogQueries>();
-        services.AddTransient<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
-        services.AddTransient<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
-        services.AddTransient<IFhirQueryQueries, FhirQueryQueries>();
-        services.AddTransient<IQueryPlanQueries, QueryPlanQueries>();
-        services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
-        services.AddTransient<ISftpConfigurationQueries, SftpConfigurationQueries>();
+        services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
+        services.AddScoped<IDataAcquisitionLogNotesQueries, DataAcquisitionLogNotesQueries>();
+        services.AddScoped<ISftpAcquisitionLogQueries, SftpAcquisitionLogQueries>();
+        services.AddScoped<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
+        services.AddScoped<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
+        services.AddScoped<IFhirQueryQueries, FhirQueryQueries>();
+        services.AddScoped<IQueryPlanQueries, QueryPlanQueries>();
+        services.AddScoped<IReferenceResourcesQueries, ReferenceResourcesQueries>();
+        services.AddScoped<ISftpConfigurationQueries, SftpConfigurationQueries>();
         services.AddScoped<IOrganizationLocationConfigurationQueries, OrganizationLocationConfigurationQueries>();
         services.AddScoped<IOrganizationLocationMappingQueries, OrganizationLocationMappingQueries>();
 
-
         //Managers
-        services.AddTransient<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
-        services.AddTransient<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
-        services.AddTransient<IQueryPlanManager, QueryPlanManager>();
-        services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
-        services.AddTransient<IFhirQueryManager, FhirQueryManager>();
-        services.AddTransient<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
-        services.AddTransient<IScheduledReportManager, ScheduledReportManager>();
-        services.AddTransient<ISftpAcquisitionLogManager, SftpAcquisitionLogManager>();
-        services.AddTransient<ISftpConfigurationManager, SftpConfigurationManager>();
+        services.AddScoped<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
+        services.AddScoped<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
+        services.AddScoped<IQueryPlanManager, QueryPlanManager>();
+        services.AddScoped<IReferenceResourcesManager, ReferenceResourcesManager>();
+        services.AddScoped<IFhirQueryManager, FhirQueryManager>();
+        services.AddScoped<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
+        services.AddScoped<IScheduledReportManager, ScheduledReportManager>();
+        services.AddScoped<ISftpAcquisitionLogManager, SftpAcquisitionLogManager>();
+        services.AddScoped<ISftpConfigurationManager, SftpConfigurationManager>();
         services.AddScoped<IOrganizationLocationConfigurationManager, OrganizationLocationConfigurationManager>();
         services.AddScoped<IOrganizationLocationMappingManager, OrganizationLocationMappingManager>();
         services.AddScoped<IEncounterMappingManager, EncounterMappingManager>();
