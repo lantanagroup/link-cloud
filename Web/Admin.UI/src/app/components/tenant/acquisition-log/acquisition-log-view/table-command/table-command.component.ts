@@ -19,7 +19,7 @@ import { animate, style, transition, trigger } from '@angular/animations';
     FontAwesomeModule,
     MatDialogModule,
     ClickOutsideDirective
-  ],  
+  ],
   templateUrl: './table-command.component.html',
   styleUrl: './table-command.component.scss',
   animations: [
@@ -40,6 +40,7 @@ export class TableCommandComponent implements OnInit, OnDestroy {
   @Input() status: string = '';
   @Input() createDate: string | Date | undefined;
   @Input() cancelMinAgeHours: number = 0;
+  @Input() isReportSubmitted: boolean = false;
 
   @Output() queryLogAddedToQueue = new EventEmitter<string>();
   @Output() queryLogCancelled = new EventEmitter<string>();
@@ -50,8 +51,19 @@ export class TableCommandComponent implements OnInit, OnDestroy {
   faBan = faBan;
   isOpen = false;
 
+  private readonly TERMINAL_STATUSES = ['MaxRetriesReached', 'ConfigurationMissing', 'Completed', 'Cancelled', 'Skipped'];
+
+  private readonly EXECUTE_INELIGIBLE_STATUSES = ['Completed', 'Skipped'];
+
+  get isExecuteEligible(): boolean {
+    if (this.isReportSubmitted) return false;
+    return this.status !== 'Completed' && !this.EXECUTE_INELIGIBLE_STATUSES.includes(this.status);
+  }
+
   get isCancelEligible(): boolean {
-    if (['MaxRetriesReached', 'ConfigurationMissing', 'Completed', 'Cancelled', 'Skipped'].includes(this.status)) return false;
+    if (this.isReportSubmitted) return false;
+    if (this.status === 'Completed') return false;
+    if (this.TERMINAL_STATUSES.includes(this.status)) return false;
     if (this.cancelMinAgeHours === 0) return true;
     if (!this.createDate) return false;
     // Match backend: CreateDate <= UtcNow.AddHours(-minAgeHours)
@@ -60,23 +72,23 @@ export class TableCommandComponent implements OnInit, OnDestroy {
   }
 
   private subscription = new Subscription();
-  
+
   constructor(
     private dialog: MatDialog,
     private acquisitionLogService: AcquisitionLogService,
-    private snackBar: MatSnackBar) { } 
+    private snackBar: MatSnackBar) { }
 
   ngOnInit(): void {
     if(!this.acquisitionLogId) {
       throw new Error('Acquisition Log Id is required');
     }
-  }  
+  }
 
   toggleMenu() {
     this.isOpen = !this.isOpen;
   }
 
-  showLogDetails() {    
+  showLogDetails() {
     this.isOpen = false;
 
     //get acquisitin log details
@@ -89,25 +101,25 @@ export class TableCommandComponent implements OnInit, OnDestroy {
           console.error('Failed to load acquisition log details:', error);
         }
       })
-    );       
+    );
   }
 
   openLogDetails(log: AcquisitionLog): void {
-      
+
       const dialogConfig = new MatDialogConfig();
       dialogConfig.minWidth = '90vw';
       dialogConfig.maxHeight = '85vh';
       dialogConfig.panelClass = 'link-dialog-container';
       dialogConfig.data = {
         dialogTitle: 'Acquisition Log Details',
-        acquisitionLog: log,      
+        acquisitionLog: log,
       };
-  
+
       this.dialog.open(AcquisitionLogDetailsComponent, dialogConfig);
     }
 
   executeLog() {
-    this.isOpen = false;    
+    this.isOpen = false;
 
     //check of query log id is set
     if(this.acquisitionLogId !== undefined) {
@@ -124,7 +136,7 @@ export class TableCommandComponent implements OnInit, OnDestroy {
     {
       console.log(`Query log id is not set.`);
     }
-    
+
   }
 
   cancelLog() {
