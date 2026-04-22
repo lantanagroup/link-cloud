@@ -15,7 +15,9 @@ public static class CqlFilterSimulator
     private static readonly IReadOnlyList<ICqlFilterProfile> Profiles =
     [
         new AchConditionFilterProfile(),
-        new HypoglycemicConditionFilterProfile()
+        new HypoglycemicConditionFilterProfile(),
+        new AchObservationFilterProfile(),
+        new HypoglycemicObservationFilterProfile()
     ];
 
     /// <summary>
@@ -63,7 +65,8 @@ public static class CqlFilterSimulator
         string EncounterId,
         DateTime EncounterStart,
         DateTime EncounterEnd,
-        IReadOnlyList<ConditionContext> Conditions);
+        IReadOnlyList<ConditionContext> Conditions,
+        IReadOnlyList<ObservationContext> Observations);
 
     public interface ICqlFilterProfile
     {
@@ -161,5 +164,124 @@ public static class CqlFilterSimulator
         var slash = encounterReference.IndexOf('/');
         var refId = slash >= 0 ? encounterReference[(slash + 1)..] : encounterReference;
         return string.Equals(refId, encounterId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // -------------------------------------------------------------------
+    //  Observation profiles
+    // -------------------------------------------------------------------
+
+    /// <summary>
+    /// CQL-relevant attributes of a generated Observation resource.
+    /// Extracted from the actual generated FHIR content (no seed replay).
+    /// <see cref="EffectiveStart"/> / <see cref="EffectiveEnd"/> normalize both
+    /// <c>effectiveDateTime</c> (start == end) and <c>effectivePeriod</c> shapes.
+    /// </summary>
+    public sealed record ObservationContext(
+        string ResourceId,
+        string LoincCode,
+        IReadOnlyList<string> CategoryCodes,
+        DateTime EffectiveStart,
+        DateTime EffectiveEnd)
+    {
+        public bool HasCategory(string code) =>
+            CategoryCodes.Any(c => string.Equals(c, code, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
+        /// True when the observation's effective range overlaps the closed interval
+        /// [periodStart, periodEnd] using FHIR "overlaps" semantics.
+        /// </summary>
+        public bool OverlapsPeriod(DateTime periodStart, DateTime periodEnd) =>
+            EffectiveStart <= periodEnd && EffectiveEnd >= periodStart;
+    }
+
+    private abstract class ObservationFilterProfileBase : ICqlFilterProfile
+    {
+        public abstract bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
+
+        protected abstract bool IncludeObservation(
+            ObservationContext o,
+            DateTime encounterStart,
+            DateTime encounterEnd);
+
+        public HashSet<string> ComputeExcludedKeys(PatientCqlInput input)
+        {
+            var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var o in input.Observations)
+            {
+                if (!IncludeObservation(o, input.EncounterStart, input.EncounterEnd))
+                    excluded.Add($"Observation/{o.ResourceId}");
+            }
+            return excluded;
+        }
+    }
+
+    /// <summary>
+    /// ACH Monthly + ACH Daily SDE Observation semantics:
+    /// <list type="bullet">
+    ///   <item>SDE Observation Lab Category: <c>category ~ "laboratory"</c> AND effective overlaps IP.</item>
+    ///   <item>SDE Observation Vital Signs Category: <c>category ~ "vital-signs"</c> AND effective overlaps IP.</item>
+    ///   <item>SDE Observation Category (catch-all): <c>category</c> in
+    ///         <c>{social-history, survey, imaging, procedure}</c> AND effective overlaps IP.</item>
+    /// </list>
+    /// IP for the simulator is approximated by the patient's encounter period, which is
+    /// how the generator places observations and how the measures' Initial Population
+    /// resolves for the synthetic patients (one qualifying encounter per patient).
+    /// </summary>
+    private sealed class AchObservationFilterProfile : ObservationFilterProfileBase
+    {
+        private static readonly HashSet<string> AchCategoryCodes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "laboratory",
+            "vital-signs",
+            "social-history",
+            "survey",
+            "imaging",
+            "procedure"
+        };
+
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            || measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation);
+
+        protected override bool IncludeObservation(ObservationContext o, DateTime encounterStart, DateTime encounterEnd)
+        {
+            if (!o.CategoryCodes.Any(c => AchCategoryCodes.Contains(c)))
+                return false;
+
+            return o.OverlapsPeriod(encounterStart, encounterEnd);
+        }
+    }
+
+    /// <summary>
+    /// Hypoglycemic SDE Observation semantics:
+    /// <c>[Observation: "Blood Glucose Laboratory and Point of Care Tests"]</c> retrieve,
+    /// then <c>start of effective during InitialPopulation period</c>.
+    ///
+    /// Only blood-glucose lab/POC LOINCs are reachable; every other observation is dropped
+    /// by the value-set bound retrieve regardless of category or effective date.
+    /// The whitelist below is the subset of the measure's value set that the synthetic
+    /// generator currently emits; expanding the generator pool is the only thing that
+    /// would require expanding this whitelist.
+    /// </summary>
+    private sealed class HypoglycemicObservationFilterProfile : ObservationFilterProfileBase
+    {
+        private static readonly HashSet<string> BloodGlucoseLoincCodes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "2339-0",   // Glucose [Mass/volume] in Blood
+            "2345-7",   // Glucose [Mass/volume] in Serum or Plasma
+            "41653-7"   // Glucose [Mass/volume] in Capillary blood by Glucometer
+        };
+
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
+
+        protected override bool IncludeObservation(ObservationContext o, DateTime encounterStart, DateTime encounterEnd)
+        {
+            if (!BloodGlucoseLoincCodes.Contains(o.LoincCode))
+                return false;
+
+            // Hypoglycemic uses "start of effective during IP" — point-in-IP semantics.
+            return o.EffectiveStart >= encounterStart && o.EffectiveStart <= encounterEnd;
+        }
     }
 }
