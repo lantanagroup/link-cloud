@@ -26,6 +26,7 @@ public static class CqlFilterInputExtractor
     {
         Encounter? encounter = null;
         var conditions = new List<Condition>();
+        var observations = new List<Observation>();
 
         foreach (var entry in entries)
         {
@@ -37,6 +38,9 @@ public static class CqlFilterInputExtractor
                 case Condition cond:
                     conditions.Add(cond);
                     break;
+                case Observation obs:
+                    observations.Add(obs);
+                    break;
             }
         }
 
@@ -47,10 +51,16 @@ public static class CqlFilterInputExtractor
         var encEnd = ParseFhirDateTime(encounter.Period.End) ?? DateTime.MaxValue;
         var encounterId = encounter.Id;
 
-        var contexts = new List<CqlFilterSimulator.ConditionContext>(conditions.Count);
+        var conditionContexts = new List<CqlFilterSimulator.ConditionContext>(conditions.Count);
         foreach (var cond in conditions)
         {
-            contexts.Add(BuildConditionContext(cond));
+            conditionContexts.Add(BuildConditionContext(cond));
+        }
+
+        var observationContexts = new List<CqlFilterSimulator.ObservationContext>(observations.Count);
+        foreach (var obs in observations)
+        {
+            observationContexts.Add(BuildObservationContext(obs));
         }
 
         return new CqlFilterSimulator.PatientCqlInput(
@@ -58,7 +68,8 @@ public static class CqlFilterInputExtractor
             encounterId,
             encStart,
             encEnd,
-            contexts);
+            conditionContexts,
+            observationContexts);
     }
 
     private static CqlFilterSimulator.ConditionContext BuildConditionContext(Condition cond)
@@ -91,5 +102,45 @@ public static class CqlFilterInputExtractor
         if (DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var parsed))
             return parsed;
         return null;
+    }
+
+    private static CqlFilterSimulator.ObservationContext BuildObservationContext(Observation obs)
+    {
+        var loinc = (obs.Code?.Coding ?? [])
+            .FirstOrDefault(c => string.Equals(c.System, "http://loinc.org", StringComparison.OrdinalIgnoreCase))?.Code
+            ?? string.Empty;
+
+        var categories = (obs.Category ?? [])
+            .SelectMany(cat => cat.Coding ?? [])
+            .Select(c => c.Code)
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Select(code => code!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        DateTime effectiveStart;
+        DateTime effectiveEnd;
+        switch (obs.Effective)
+        {
+            case Period p:
+                effectiveStart = ParseFhirDateTime(p.Start) ?? DateTime.MinValue;
+                effectiveEnd = ParseFhirDateTime(p.End) ?? effectiveStart;
+                break;
+            case FhirDateTime dt:
+                effectiveStart = ParseFhirDateTime(dt.Value) ?? DateTime.MinValue;
+                effectiveEnd = effectiveStart;
+                break;
+            default:
+                effectiveStart = DateTime.MinValue;
+                effectiveEnd = DateTime.MaxValue;
+                break;
+        }
+
+        return new CqlFilterSimulator.ObservationContext(
+            obs.Id,
+            loinc,
+            categories,
+            effectiveStart,
+            effectiveEnd);
     }
 }
