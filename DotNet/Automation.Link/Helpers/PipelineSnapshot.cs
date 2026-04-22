@@ -89,11 +89,6 @@ public class PipelineSnapshot
                                  $"WithMeasureReportId: {withMrId}/{measureReports.Count}");
             }
 
-            var resources = await _reader.GetReportResourceSummaryAsync(scheduleId, facilityId);
-            var totalResources = resources.Sum(r => r.Count);
-            var patientCount = resources.Select(r => r.PatientId).Distinct().Count();
-            output.WriteLine($"[Snapshot][ReportResource]      {totalResources} resource(s) across {patientCount} patient(s)");
-
             var populations = await _reader.GetReportPopulationsAsync(scheduleId, facilityId);
             var groupCount = populations.SelectMany(p => p.GroupPopulations).Count();
             var mrpCount = populations.SelectMany(p => p.GroupPopulations).SelectMany(gp => gp.MeasureReportPopulations).Count();
@@ -238,12 +233,6 @@ public class PipelineSnapshot
                 .ToList();
 
             output.WriteLine($"[Snapshot][Validation]          ReportingStatus: {string.Join(", ", byReportingStatus)}");
-
-            var resourceCounts = await _reader.GetReportResourceCountsByPatientTypeAsync(scheduleId, facilityId);
-            var totalResources = resourceCounts.Sum(x => x.Count);
-            var patientCount = resourceCounts.Select(x => x.PatientId).Distinct(StringComparer.Ordinal).Count();
-
-            output.WriteLine($"[Snapshot][Validation]          Report resources: {totalResources} across {patientCount} patient(s)");
         }
         catch (Exception ex)
         {

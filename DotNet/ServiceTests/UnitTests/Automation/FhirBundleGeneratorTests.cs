@@ -375,7 +375,8 @@ public class FhirBundleGeneratorTests
                 excludedResolvedProblemList,
                 includedEncounterDiagnosis,
                 excludedUnlinkedEncounterDiagnosis
-            ]);
+            ],
+            Observations: []);
 
         var excluded = CqlFilterSimulator.ComputeFilteredKeys(
             [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
@@ -394,6 +395,7 @@ public class FhirBundleGeneratorTests
             "P", "P-Enc-001",
             new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
             new DateTime(2024, 1, 3, 0, 0, 0, DateTimeKind.Utc),
+            [],
             []);
 
         Assert.Empty(CqlFilterSimulator.ComputeFilteredKeys([], input));
@@ -437,7 +439,8 @@ public class FhirBundleGeneratorTests
             EncounterId: encounterId,
             EncounterStart: encStart,
             EncounterEnd: encEnd,
-            Conditions: [resolvedProblemDuringEncounter, resolvedProblemAfterEncounter]);
+            Conditions: [resolvedProblemDuringEncounter, resolvedProblemAfterEncounter],
+            Observations: []);
 
         var excluded = CqlFilterSimulator.ComputeFilteredKeys(
             [

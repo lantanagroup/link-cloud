@@ -15,8 +15,8 @@ public sealed class GenerationManifest
     /// Resource types that are pipeline-derived (not produced by our FHIR generator).
     /// They appear in ABS as a deterministic function of the pipeline, not of generated input:
     /// <list type="bullet">
-    ///   <item><c>MeasureReport</c> — MeasureEval writes one per submitted patient per measure.</item>
-    ///   <item><c>OperationOutcome</c> — one per patient that fails validation. Normally 0;
+    ///   <item><c>MeasureReport</c> � MeasureEval writes one per submitted patient per measure.</item>
+    ///   <item><c>OperationOutcome</c> � one per patient that fails validation. Normally 0;
     ///         callers set <see cref="ExpectedOperationOutcomeCountByPatient"/> when failures are expected.</item>
     /// </list>
     /// These types are never compared key-for-key; instead a count-level prediction is added
@@ -169,7 +169,7 @@ public sealed class GenerationManifest
     ///         to <c>patient-{id}.ndjson</c> in ABS and to the ReportResource DB.</item>
     /// </list>
     ///
-    /// Therefore: Generated ∩ QP-Acquired ∩ CQL-Referenced = Expected in ABS.
+    /// Therefore: Generated ? QP-Acquired ? CQL-Referenced = Expected in ABS.
     /// </summary>
     public bool IsExpectedInAbs(string resourceType)
     {
@@ -184,56 +184,29 @@ public sealed class GenerationManifest
         if (CqlReferencedResourceTypes.Count > 0)
             return CqlReferencedResourceTypes.Contains(resourceType);
 
-        // Fallback when CQL analysis is unavailable — assume all acquired types pass
+        // Fallback when CQL analysis is unavailable � assume all acquired types pass
         return true;
     }
 
     /// <summary>
     /// Returns the per-patient resource type -> count map filtered to only types
-    /// expected in the ABS patient NDJSON artifact (generated ∩ query-plan-acquired ∩
+    /// expected in the ABS patient NDJSON artifact (generated ? query-plan-acquired ?
     /// CQL-referenced), plus deterministic pipeline-derived additions:
     /// <list type="bullet">
-    ///   <item><c>Patient</c> — always 1 for patients that qualify for any selected measure
+    ///   <item><c>Patient</c> � always 1 for patients that qualify for any selected measure
     ///         (MeasureEval's CQL engine loads Patient implicitly, so it always lands in ABS).</item>
-    ///   <item><c>MeasureReport</c> — one per measure the patient qualifies for
+    ///   <item><c>MeasureReport</c> � one per measure the patient qualifies for
     ///         (MeasureEval writes exactly one MeasureReport per submitted patient per measure).</item>
-    ///   <item><c>OperationOutcome</c> — the caller-supplied expectation from
-    ///         <see cref="ExpectedOperationOutcomeCountByPatient"/> (default 0). Only present
-    ///         in the ABS blob; not persisted to ReportResource DB.</item>
+    ///   <item><c>OperationOutcome</c> � the caller-supplied expectation from
+    ///         <see cref="ExpectedOperationOutcomeCountByPatient"/> (default 0). Appended
+    ///         directly to the patient aggregate blob by <c>ValidationCompleteListener</c>
+    ///         for any patient whose <c>ValidationComplete.IsValid == false</c>.</item>
     /// </list>
     /// </summary>
     public Dictionary<string, int>? GetExpectedAbsCountsForPatient(string patientId)
-        => BuildExpectedCountsForPatient(patientId, AbsDestination.PatientNdjson);
+        => BuildExpectedCountsForPatient(patientId);
 
-    /// <summary>
-    /// Returns the per-patient resource type -> count map expected in the <c>ReportResource</c>
-    /// database table. Same as <see cref="GetExpectedAbsCountsForPatient"/> except it excludes
-    /// resource types that are appended directly to the ABS blob by the Report service (bypassing
-    /// <c>PatientAggregator</c> and <c>ReportResourceManager</c>):
-    /// <list type="bullet">
-    ///   <item><c>OperationOutcome</c> — <c>ValidationCompleteListener</c> calls
-    ///         <c>AppendResourceToBlob</c> directly when <c>ValidationComplete.IsValid == false</c>,
-    ///         so the OO lands in <c>patient-{id}.ndjson</c> but is never inserted into
-    ///         <c>ReportResource</c>.</item>
-    /// </list>
-    /// </summary>
-    public Dictionary<string, int>? GetExpectedReportResourceCountsForPatient(string patientId)
-        => BuildExpectedCountsForPatient(patientId, AbsDestination.ReportResourceDb);
-
-    /// <summary>
-    /// Downstream persistence destinations for generated resources. The two destinations
-    /// differ only for types that are appended directly to the ABS blob by the Report
-    /// service (see <see cref="GetExpectedReportResourceCountsForPatient"/>).
-    /// </summary>
-    public enum AbsDestination
-    {
-        /// <summary>The patient NDJSON file in ABS (<c>patient-{id}.ndjson</c>).</summary>
-        PatientNdjson,
-        /// <summary>The <c>ReportResource</c> table in the Report database.</summary>
-        ReportResourceDb
-    }
-
-    private Dictionary<string, int>? BuildExpectedCountsForPatient(string patientId, AbsDestination destination)
+    private Dictionary<string, int>? BuildExpectedCountsForPatient(string patientId)
     {
         var expectedKeys = GetExpectedAbsKeysForPatient(patientId);
         var counts = expectedKeys
@@ -242,8 +215,8 @@ public sealed class GenerationManifest
             .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
-        // Pipeline-derived additions — count-level only because IDs are assigned downstream.
-        AddPipelineDerivedExpectedCounts(patientId, counts, destination);
+        // Pipeline-derived additions � count-level only because IDs are assigned downstream.
+        AddPipelineDerivedExpectedCounts(patientId, counts);
 
         return counts;
     }
@@ -251,11 +224,11 @@ public sealed class GenerationManifest
     /// <summary>
     /// Returns expected ABS resource keys for a patient using deterministic key-level logic:
     /// simulated-acquired keys (when available) filtered to types that pass all three gates
-    /// (generated ∩ acquired ∩ CQL-referenced). Falls back to generated keys when
+    /// (generated ? acquired ? CQL-referenced). Falls back to generated keys when
     /// acquisition simulation is unavailable.
     ///
     /// For patients qualifying for any selected measure, <c>Patient/{patientId}</c> is always
-    /// included — MeasureEval's CQL engine loads the Patient resource as an implicit anchor
+    /// included � MeasureEval's CQL engine loads the Patient resource as an implicit anchor
     /// even if the query plan has no explicit Patient query.
     ///
     /// Pipeline-derived resources (<c>MeasureReport</c>, <c>OperationOutcome</c>) are
@@ -301,10 +274,10 @@ public sealed class GenerationManifest
     /// <summary>
     /// Adds count-level predictions for pipeline-derived resource types that have no
     /// deterministic key-level prediction (IDs assigned downstream).
-    /// OperationOutcome is only added for the ABS blob destination — <c>ValidationCompleteListener</c>
-    /// appends it directly to the patient aggregate blob and it never reaches <c>ReportResource</c>.
+    /// <c>OperationOutcome</c> is appended directly to the patient aggregate blob by
+    /// <c>ValidationCompleteListener</c> when <c>ValidationComplete.IsValid == false</c>.
     /// </summary>
-    private void AddPipelineDerivedExpectedCounts(string patientId, Dictionary<string, int> counts, AbsDestination destination)
+    private void AddPipelineDerivedExpectedCounts(string patientId, Dictionary<string, int> counts)
     {
         var qualifyingMeasureCount = CountQualifyingMeasuresForPatient(patientId);
         if (qualifyingMeasureCount > 0)
@@ -313,8 +286,7 @@ public sealed class GenerationManifest
             counts["MeasureReport"] = qualifyingMeasureCount;
         }
 
-        if (destination == AbsDestination.PatientNdjson
-            && ExpectedOperationOutcomeCountByPatient != null
+        if (ExpectedOperationOutcomeCountByPatient != null
             && ExpectedOperationOutcomeCountByPatient.TryGetValue(patientId, out var ooCount)
             && ooCount > 0)
         {
@@ -438,7 +410,7 @@ public sealed class GenerationManifest
             eligibility[PatientIds[i]] = qualifying;
         }
 
-        // Build predicted ABS counts per patient (generated ∩ acquired ∩ CQL-referenced)
+        // Build predicted ABS counts per patient (generated ? acquired ? CQL-referenced)
         var expectedAbsByPatient = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
         var expectedAbsTotals = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         foreach (var patientId in PatientIds)

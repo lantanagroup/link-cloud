@@ -15,18 +15,23 @@ public static class CqlFilterSimulator
     private static readonly IReadOnlyList<ICqlFilterProfile> Profiles =
     [
         new AchConditionFilterProfile(),
-        new HypoglycemicConditionFilterProfile()
+        new HypoglycemicConditionFilterProfile(),
+        new AchObservationFilterProfile(),
+        new HypoglycemicObservationFilterProfile()
     ];
 
     /// <summary>
     /// Computes resource keys CQL SDE <c>where</c> clauses will exclude for the patient.
     ///
-    /// The result is the <b>intersection</b> of exclusions across every profile applicable
-    /// to the selected measures — a resource is only truly absent from ABS when every
-    /// applicable measure excludes it. MeasureEval evaluates each measure independently and
-    /// writes one <c>.mr</c> file per measure; PatientAggregator unions the contained
-    /// resources across those files when producing the patient NDJSON. So if any one
-    /// measure includes the resource, it appears in ABS regardless of the others.
+    /// The intersection rule is applied <b>per resource type</b>: a key is excluded only when
+    /// every applicable profile that targets that resource type excludes it. Profiles for
+    /// other resource types do not participate in that intersection — an Observation profile
+    /// has no opinion about whether a Condition belongs in ABS, and vice-versa.
+    ///
+    /// MeasureEval evaluates each measure independently and writes one <c>.mr</c> file per
+    /// measure; PatientAggregator unions the contained resources across those files when
+    /// producing the patient NDJSON. So if any one applicable measure includes the resource,
+    /// it appears in ABS regardless of the others.
     /// </summary>
     public static HashSet<string> ComputeFilteredKeys(
         IReadOnlyList<ProfiledMeasureType> measures,
@@ -35,23 +40,34 @@ public static class CqlFilterSimulator
         if (measures == null || measures.Count == 0 || input == null)
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var applicableExclusions = new List<HashSet<string>>();
+        var perTypeExclusions = new Dictionary<string, List<HashSet<string>>>(StringComparer.OrdinalIgnoreCase);
         foreach (var profile in Profiles)
         {
             if (!profile.AppliesToAny(measures))
                 continue;
-            applicableExclusions.Add(profile.ComputeExcludedKeys(input));
+
+            if (!perTypeExclusions.TryGetValue(profile.TargetResourceType, out var bucket))
+            {
+                bucket = new List<HashSet<string>>();
+                perTypeExclusions[profile.TargetResourceType] = bucket;
+            }
+            bucket.Add(profile.ComputeExcludedKeys(input));
         }
 
-        if (applicableExclusions.Count == 0)
-            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var bucket in perTypeExclusions.Values)
+        {
+            // Intersect within a resource type: keep keys every applicable profile of that
+            // type excludes. Then union across types into the final excluded-key set.
+            var intersection = new HashSet<string>(bucket[0], StringComparer.OrdinalIgnoreCase);
+            for (var i = 1; i < bucket.Count; i++)
+                intersection.IntersectWith(bucket[i]);
 
-        // Intersect: keep only keys that every applicable profile excludes.
-        var intersection = new HashSet<string>(applicableExclusions[0], StringComparer.OrdinalIgnoreCase);
-        for (var i = 1; i < applicableExclusions.Count; i++)
-            intersection.IntersectWith(applicableExclusions[i]);
+            foreach (var key in intersection)
+                result.Add(key);
+        }
 
-        return intersection;
+        return result;
     }
 
     /// <summary>
@@ -63,16 +79,26 @@ public static class CqlFilterSimulator
         string EncounterId,
         DateTime EncounterStart,
         DateTime EncounterEnd,
-        IReadOnlyList<ConditionContext> Conditions);
+        IReadOnlyList<ConditionContext> Conditions,
+        IReadOnlyList<ObservationContext> Observations);
 
     public interface ICqlFilterProfile
     {
+        /// <summary>
+        /// FHIR resource type this profile produces exclusions for (e.g. <c>Condition</c>,
+        /// <c>Observation</c>). Used by <see cref="ComputeFilteredKeys"/> to scope the
+        /// intersection rule to profiles that operate on the same resource type.
+        /// </summary>
+        string TargetResourceType { get; }
+
         bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
         HashSet<string> ComputeExcludedKeys(PatientCqlInput input);
     }
 
     private abstract class ConditionFilterProfileBase : ICqlFilterProfile
     {
+        public string TargetResourceType => "Condition";
+
         public abstract bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
 
         protected abstract bool IncludeCondition(
@@ -161,5 +187,126 @@ public static class CqlFilterSimulator
         var slash = encounterReference.IndexOf('/');
         var refId = slash >= 0 ? encounterReference[(slash + 1)..] : encounterReference;
         return string.Equals(refId, encounterId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // -------------------------------------------------------------------
+    //  Observation profiles
+    // -------------------------------------------------------------------
+
+    /// <summary>
+    /// CQL-relevant attributes of a generated Observation resource.
+    /// Extracted from the actual generated FHIR content (no seed replay).
+    /// <see cref="EffectiveStart"/> / <see cref="EffectiveEnd"/> normalize both
+    /// <c>effectiveDateTime</c> (start == end) and <c>effectivePeriod</c> shapes.
+    /// </summary>
+    public sealed record ObservationContext(
+        string ResourceId,
+        string LoincCode,
+        IReadOnlyList<string> CategoryCodes,
+        DateTime EffectiveStart,
+        DateTime EffectiveEnd)
+    {
+        public bool HasCategory(string code) =>
+            CategoryCodes.Any(c => string.Equals(c, code, StringComparison.OrdinalIgnoreCase));
+
+        /// <summary>
+        /// True when the observation's effective range overlaps the closed interval
+        /// [periodStart, periodEnd] using FHIR "overlaps" semantics.
+        /// </summary>
+        public bool OverlapsPeriod(DateTime periodStart, DateTime periodEnd) =>
+            EffectiveStart <= periodEnd && EffectiveEnd >= periodStart;
+    }
+
+    private abstract class ObservationFilterProfileBase : ICqlFilterProfile
+    {
+        public string TargetResourceType => "Observation";
+
+        public abstract bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
+
+        protected abstract bool IncludeObservation(
+            ObservationContext o,
+            DateTime encounterStart,
+            DateTime encounterEnd);
+
+        public HashSet<string> ComputeExcludedKeys(PatientCqlInput input)
+        {
+            var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var o in input.Observations)
+            {
+                if (!IncludeObservation(o, input.EncounterStart, input.EncounterEnd))
+                    excluded.Add($"Observation/{o.ResourceId}");
+            }
+            return excluded;
+        }
+    }
+
+    /// <summary>
+    /// ACH Monthly + ACH Daily SDE Observation semantics:
+    /// <list type="bullet">
+    ///   <item>SDE Observation Lab Category: <c>category ~ "laboratory"</c> AND effective overlaps IP.</item>
+    ///   <item>SDE Observation Vital Signs Category: <c>category ~ "vital-signs"</c> AND effective overlaps IP.</item>
+    ///   <item>SDE Observation Category (catch-all): <c>category</c> in
+    ///         <c>{social-history, survey, imaging, procedure}</c> AND effective overlaps IP.</item>
+    /// </list>
+    /// IP for the simulator is approximated by the patient's encounter period, which is
+    /// how the generator places observations and how the measures' Initial Population
+    /// resolves for the synthetic patients (one qualifying encounter per patient).
+    /// </summary>
+    private sealed class AchObservationFilterProfile : ObservationFilterProfileBase
+    {
+        private static readonly HashSet<string> AchCategoryCodes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "laboratory",
+            "vital-signs",
+            "social-history",
+            "survey",
+            "imaging",
+            "procedure"
+        };
+
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            || measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation);
+
+        protected override bool IncludeObservation(ObservationContext o, DateTime encounterStart, DateTime encounterEnd)
+        {
+            if (!o.CategoryCodes.Any(c => AchCategoryCodes.Contains(c)))
+                return false;
+
+            return o.OverlapsPeriod(encounterStart, encounterEnd);
+        }
+    }
+
+    /// <summary>
+    /// Hypoglycemic SDE Observation semantics:
+    /// <c>[Observation: "Blood Glucose Laboratory and Point of Care Tests"]</c> retrieve,
+    /// then <c>start of effective during InitialPopulation period</c>.
+    ///
+    /// Only blood-glucose lab/POC LOINCs are reachable; every other observation is dropped
+    /// by the value-set bound retrieve regardless of category or effective date.
+    /// The whitelist below is the subset of the measure's value set that the synthetic
+    /// generator currently emits; expanding the generator pool is the only thing that
+    /// would require expanding this whitelist.
+    /// </summary>
+    private sealed class HypoglycemicObservationFilterProfile : ObservationFilterProfileBase
+    {
+        private static readonly HashSet<string> BloodGlucoseLoincCodes = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "2339-0",   // Glucose [Mass/volume] in Blood
+            "2345-7",   // Glucose [Mass/volume] in Serum or Plasma
+            "41653-7"   // Glucose [Mass/volume] in Capillary blood by Glucometer
+        };
+
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
+
+        protected override bool IncludeObservation(ObservationContext o, DateTime encounterStart, DateTime encounterEnd)
+        {
+            if (!BloodGlucoseLoincCodes.Contains(o.LoincCode))
+                return false;
+
+            // Hypoglycemic uses "start of effective during IP" — point-in-IP semantics.
+            return o.EffectiveStart >= encounterStart && o.EffectiveStart <= encounterEnd;
+        }
     }
 }
