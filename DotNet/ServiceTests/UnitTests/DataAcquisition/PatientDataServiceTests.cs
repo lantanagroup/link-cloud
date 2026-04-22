@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
@@ -303,6 +303,308 @@ public class PatientDataServiceTests
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => _service.CreateLogEntries(request, cancellationToken));
+    }
+
+    [Fact]
+    public async Task CreateLogEntries_ShouldCreateTerminalConfigurationMissingLog_WhenFhirQueryConfigurationIsMissing()
+    {
+        // Arrange
+        var dataAcqRequested = new DataAcquisitionRequested
+        {
+            PatientId = "patient-123",
+            ReportableEvent = ReportableEvent.Discharge,
+            QueryType = "Initial",
+            ScheduledReports = new List<ScheduledReport>
+            {
+                new ScheduledReport
+                {
+                    ReportTypes = new List<string> { "measure-1" },
+                    Frequency = Frequency.Discharge,
+                    StartDate = DateTime.UtcNow,
+                    EndDate = DateTime.UtcNow.AddDays(1),
+                    ReportTrackingId = Guid.NewGuid().ToString()
+                }
+            }
+        };
+
+        var consumeResult = new ConsumeResult<string, DataAcquisitionRequested>
+        {
+            Message = new Message<string, DataAcquisitionRequested>
+            {
+                Value = dataAcqRequested
+            }
+        };
+
+        var request = new GetPatientDataRequest
+        {
+            ConsumeResult = consumeResult,
+            FacilityId = "facility-1",
+            CorrelationId = "corr-1",
+            QueryPlanType = QueryPlanType.Initial
+        };
+        var cancellationToken = CancellationToken.None;
+
+        // No FhirQueryConfiguration for the facility
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((FhirQueryConfigurationModel)null);
+
+        CreateDataAcquisitionLogModel capturedModel = null;
+        _mockLogManager
+            .Setup(manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), cancellationToken))
+            .Callback<CreateDataAcquisitionLogModel, CancellationToken>((m, _) => capturedModel = m)
+            .ReturnsAsync(new DataAcquisitionLogModel());
+
+        // Act
+        await _service.CreateLogEntries(request, cancellationToken);
+
+        // Assert: no exception thrown, a single terminal ConfigurationMissing log was created
+        _mockLogManager.Verify(
+            manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), cancellationToken),
+            Times.Once);
+
+        Assert.NotNull(capturedModel);
+        Assert.Equal(RequestStatus.ConfigurationMissing, capturedModel.Status);
+        Assert.Equal("facility-1", capturedModel.FacilityId);
+        Assert.Equal("patient-123", capturedModel.PatientId);
+        Assert.Equal("corr-1", capturedModel.CorrelationId);
+        Assert.NotNull(capturedModel.Notes);
+        Assert.Contains(capturedModel.Notes, n => n.Contains("FhirQueryConfiguration", StringComparison.OrdinalIgnoreCase));
+
+        // QueryPlan lookup must not have been attempted, and the QueryListProcessor must not run
+        _mockQueryPlanQueries.Verify(
+            q => q.SearchAsync(It.IsAny<SearchQueryPlanModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        _mockQueryListProcessor.Verify(
+            p => p.Process(
+                It.IsAny<IOrderedEnumerable<KeyValuePair<string, IQueryConfig>>>(),
+                It.IsAny<GetPatientDataRequest>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<QueryPlanModel>(),
+                It.IsAny<List<ResourceReferenceType>>(),
+                It.IsAny<string>(),
+                It.IsAny<ScheduledReport>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+
+        // SiblingCount should not be stamped — no actionable group was created
+        _mockLogManager.Verify(
+            m => m.StampSiblingCountAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase>(),
+                It.IsAny<int>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateLogEntries_ShouldCreateTerminalConfigurationMissingLog_WhenQueryPlanIsMissing()
+    {
+        // Arrange
+        var reportTrackingId = Guid.NewGuid().ToString();
+        var dataAcqRequested = new DataAcquisitionRequested
+        {
+            PatientId = "patient-123",
+            ReportableEvent = ReportableEvent.Discharge,
+            QueryType = "Initial",
+            ScheduledReports = new List<ScheduledReport>
+            {
+                new ScheduledReport
+                {
+                    ReportTypes = new List<string> { "measure-1" },
+                    Frequency = Frequency.Discharge,
+                    StartDate = DateTime.UtcNow,
+                    EndDate = DateTime.UtcNow.AddDays(1),
+                    ReportTrackingId = reportTrackingId
+                }
+            }
+        };
+
+        var consumeResult = new ConsumeResult<string, DataAcquisitionRequested>
+        {
+            Message = new Message<string, DataAcquisitionRequested>
+            {
+                Value = dataAcqRequested
+            }
+        };
+
+        var request = new GetPatientDataRequest
+        {
+            ConsumeResult = consumeResult,
+            FacilityId = "facility-1",
+            CorrelationId = "corr-1",
+            QueryPlanType = QueryPlanType.Initial
+        };
+        var cancellationToken = CancellationToken.None;
+
+        var fhirQueryConfig = new FhirQueryConfigurationModel
+        {
+            FacilityId = "facility-1",
+            FhirServerBaseUrl = "http://example.com",
+        };
+
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(fhirQueryConfig);
+
+        // No QueryPlan returned
+        _mockQueryPlanQueries
+            .Setup(m => m.SearchAsync(It.IsAny<SearchQueryPlanModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PagedConfigModel<QueryPlanModel> { Records = new List<QueryPlanModel>() });
+
+        CreateDataAcquisitionLogModel capturedModel = null;
+        _mockLogManager
+            .Setup(manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), cancellationToken))
+            .Callback<CreateDataAcquisitionLogModel, CancellationToken>((m, _) => capturedModel = m)
+            .ReturnsAsync(new DataAcquisitionLogModel());
+
+        // Act
+        await _service.CreateLogEntries(request, cancellationToken);
+
+        // Assert
+        _mockLogManager.Verify(
+            manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), cancellationToken),
+            Times.Once);
+
+        Assert.NotNull(capturedModel);
+        Assert.Equal(RequestStatus.ConfigurationMissing, capturedModel.Status);
+        Assert.Equal(reportTrackingId, capturedModel.ReportTrackingId);
+        Assert.Contains(capturedModel.Notes, n => n.Contains("QueryPlan", StringComparison.OrdinalIgnoreCase));
+
+        // ScheduledReport row should be ensured for the supplied tracking id
+        _mockScheduledReportManager.Verify(
+            s => s.EnsureCreatedAsync(It.Is<ScheduledReport>(r => r.ReportTrackingId == reportTrackingId), cancellationToken),
+            Times.Once);
+
+        // QueryListProcessor must not run when configuration is incomplete
+        _mockQueryListProcessor.Verify(
+            p => p.Process(
+                It.IsAny<IOrderedEnumerable<KeyValuePair<string, IQueryConfig>>>(),
+                It.IsAny<GetPatientDataRequest>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<QueryPlanModel>(),
+                It.IsAny<List<ResourceReferenceType>>(),
+                It.IsAny<string>(),
+                It.IsAny<ScheduledReport>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateLogEntries_ShouldCreateOneConfigurationMissingLogPerScheduledReport_WhenConfigurationIsMissing()
+    {
+        // Arrange
+        var dataAcqRequested = new DataAcquisitionRequested
+        {
+            PatientId = "patient-123",
+            ReportableEvent = ReportableEvent.Discharge,
+            QueryType = "Initial",
+            ScheduledReports = new List<ScheduledReport>
+            {
+                new ScheduledReport
+                {
+                    ReportTypes = new List<string> { "measure-1" },
+                    Frequency = Frequency.Daily,
+                    StartDate = DateTime.UtcNow,
+                    EndDate = DateTime.UtcNow.AddDays(1),
+                    ReportTrackingId = Guid.NewGuid().ToString()
+                },
+                new ScheduledReport
+                {
+                    ReportTypes = new List<string> { "measure-2" },
+                    Frequency = Frequency.Discharge,
+                    StartDate = DateTime.UtcNow,
+                    EndDate = DateTime.UtcNow.AddDays(1),
+                    ReportTrackingId = Guid.NewGuid().ToString()
+                }
+            }
+        };
+
+        var consumeResult = new ConsumeResult<string, DataAcquisitionRequested>
+        {
+            Message = new Message<string, DataAcquisitionRequested>
+            {
+                Value = dataAcqRequested
+            }
+        };
+
+        var request = new GetPatientDataRequest
+        {
+            ConsumeResult = consumeResult,
+            FacilityId = "facility-1",
+            CorrelationId = "corr-1",
+            QueryPlanType = QueryPlanType.Initial
+        };
+        var cancellationToken = CancellationToken.None;
+
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((FhirQueryConfigurationModel)null);
+
+        var captured = new List<CreateDataAcquisitionLogModel>();
+        _mockLogManager
+            .Setup(manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), cancellationToken))
+            .Callback<CreateDataAcquisitionLogModel, CancellationToken>((m, _) => captured.Add(m))
+            .ReturnsAsync(new DataAcquisitionLogModel());
+
+        // Act
+        await _service.CreateLogEntries(request, cancellationToken);
+
+        // Assert
+        _mockLogManager.Verify(
+            manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), cancellationToken),
+            Times.Exactly(2));
+
+        Assert.Equal(2, captured.Count);
+        Assert.All(captured, m => Assert.Equal(RequestStatus.ConfigurationMissing, m.Status));
+
+        // Daily report should be marked High priority, others Normal
+        Assert.Single(captured, m => m.Priority == AcquisitionPriority.High);
+        Assert.Single(captured, m => m.Priority == AcquisitionPriority.Normal);
+    }
+
+    [Fact]
+    public async Task CreateLogEntries_ShouldStillThrow_WhenFhirQueryConfigurationLookupFails()
+    {
+        // Arrange — verify that genuine errors (e.g. DB failure) during config lookup are
+        // still surfaced as exceptions (so the listener can retry transient infrastructure issues).
+        var dataAcqRequested = new DataAcquisitionRequested
+        {
+            PatientId = "patient-123",
+            ReportableEvent = ReportableEvent.Discharge,
+            QueryType = "Initial",
+            ScheduledReports = new List<ScheduledReport>()
+        };
+
+        var consumeResult = new ConsumeResult<string, DataAcquisitionRequested>
+        {
+            Message = new Message<string, DataAcquisitionRequested>
+            {
+                Value = dataAcqRequested
+            }
+        };
+
+        var request = new GetPatientDataRequest
+        {
+            ConsumeResult = consumeResult,
+            FacilityId = "facility-1",
+            CorrelationId = "corr-1",
+            QueryPlanType = QueryPlanType.Initial
+        };
+        var cancellationToken = CancellationToken.None;
+
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("DB unavailable"));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() => _service.CreateLogEntries(request, cancellationToken));
+
+        _mockLogManager.Verify(
+            manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
