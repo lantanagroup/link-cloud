@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
