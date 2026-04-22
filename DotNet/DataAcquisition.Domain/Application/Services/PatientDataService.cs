@@ -63,6 +63,7 @@ public class PatientDataService : IPatientDataService
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
     private readonly IFhirApiService _fhirApiService;
+    private readonly IReferenceResourceService _referenceResourceService;
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
     private readonly IPatientCensusService _patientCensusService;
     private readonly IScheduledReportManager _scheduledReportManager;
@@ -77,6 +78,7 @@ public class PatientDataService : IPatientDataService
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
         IFhirApiService fhirApiService,
+        IReferenceResourceService referenceResourceService,
         IDistributedSemaphoreProvider distributedSemaphoreProvider,
         IServiceProvider serviceProvider,
         IPatientCensusService patientCensusService,
@@ -99,6 +101,7 @@ public class PatientDataService : IPatientDataService
         _dataAcquisitionLogQueries = dataAcquisitionLogQueries ??
                                      throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
         _fhirApiService = fhirApiService ?? throw new ArgumentNullException(nameof(fhirApiService));
+        _referenceResourceService = referenceResourceService ?? throw new ArgumentNullException(nameof(referenceResourceService));
         _scheduledReportManager = scheduledReportManager ?? throw new ArgumentNullException(nameof(scheduledReportManager));
         _distributedSemaphoreProvider = distributedSemaphoreProvider ??
                                         throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
@@ -499,16 +502,39 @@ public class PatientDataService : IPatientDataService
                         $"No configuration for {log.FacilityId} exists.");
                 }
 
-                var maxRetryAttempts = fhirQueryConfiguration.MaxRetries ?? DataAcquisitionLog.MaxRetryAttempts;
-
-                //hashset to hold unique resource ids
+                // HashSet to hold unique resource ids emitted during execution.
                 var resourceIds = new HashSet<string>();
 
                 bool skipFetch = false;
 
                 var newNotes = new List<string>();
 
-                //4. call api
+                // Accumulator for references discovered while paging through this primary
+                // log's bundles. Drained once at the end of the fetch loop into the
+                // single durable same-phase reference log per (correlation, type).
+                var isReferenceLog = log.FhirQuery.Any(q => q.IsReference.GetValueOrDefault());
+                var referenceAccumulator = isReferenceLog ? null : new DiscoveredReferenceAccumulator();
+
+                if (isReferenceLog)
+                {
+                    var preparedReferenceLog = await _referenceResourceService.PrepareReferenceLogExecutionAsync(
+                        log,
+                        cancellationToken);
+
+                    foreach (var resourceId in preparedReferenceLog.ResourceIds)
+                    {
+                        resourceIds.Add(resourceId);
+                    }
+
+                    if (preparedReferenceLog.Notes.Count > 0)
+                    {
+                        newNotes.AddRange(preparedReferenceLog.Notes);
+                    }
+
+                    skipFetch = preparedReferenceLog.SkipFetch;
+                }
+
+                // Execute the log's FHIR queries.
                 foreach (var fhirQuery in log.FhirQuery.ToList())
                 {
                     if (skipFetch)
@@ -516,7 +542,6 @@ public class PatientDataService : IPatientDataService
                         break;
                     }
 
-                    //check if log is search and not census, if true,
                     if ((fhirQuery.QueryType == FhirQueryType.Search ||
                          fhirQuery.QueryType == FhirQueryType.SearchPost) && !log.IsCensus)
                     {
@@ -531,7 +556,6 @@ public class PatientDataService : IPatientDataService
                                 ids.AddRange(splitIds);
                             }
 
-                            //cleanse ids for empty strings in ids
                             ids = ids.Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
 
                             if (!ids.Any())
@@ -550,7 +574,7 @@ public class PatientDataService : IPatientDataService
                             if (fhirQuery.QueryType == FhirQueryType.Read)
                             {
                                 var ids = await _fhirApiService.ExecuteRead(log, fhirQuery, resourceType,
-                                    fhirQueryConfiguration, cancellationToken);
+                                    fhirQueryConfiguration, referenceAccumulator, cancellationToken);
                                 if (ids != null)
                                     foreach (var id in ids)
                                         resourceIds.Add(id);
@@ -559,7 +583,7 @@ public class PatientDataService : IPatientDataService
                                      fhirQuery.QueryType == FhirQueryType.SearchPost)
                             {
                                 var ids = await _fhirApiService.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration,
-                                    resourceType, cancellationToken);
+                                    resourceType, referenceAccumulator, cancellationToken);
                                 if (ids != null)
                                     foreach (var id in ids)
                                         resourceIds.Add(id);
@@ -576,12 +600,20 @@ public class PatientDataService : IPatientDataService
                     }
                 }
 
-                //5. stop timer and update log
+                // Drain discovered references into the single durable same-phase
+                // reference log per (correlation, type) before this primary goes terminal.
+                if (referenceAccumulator != null && referenceAccumulator.HasAny)
+                {
+                    await _referenceResourceService.FetchAndPersistAsync(
+                        log, referenceAccumulator, cancellationToken);
+                }
+
+                // Stop timer and persist the terminal state for this execution.
                 stopwatch.Stop();
 
                 log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
                 log.CompletionDate = System.DateTime.UtcNow;
-                log.Status = skipFetch ? RequestStatus.Skipped : RequestStatus.Completed;
+                log.Status = skipFetch && !isReferenceLog ? RequestStatus.Skipped : RequestStatus.Completed;
 
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {
