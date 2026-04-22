@@ -1,4 +1,4 @@
-﻿using MongoDB.Bson;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace Automation.UI.Services.Persistence;
@@ -28,6 +28,8 @@ public sealed class AutomationRunDocument
     public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset? FinishedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
+    /// <summary>Human-readable pipeline duration (report created ? submitted). Populated at run completion.</summary>
+    public string? Duration { get; set; }
 }
 
 /// <summary>MongoDB document for automation_run_snapshots collection (one per run+domain).</summary>

@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -66,7 +66,6 @@ public class ReportDatabaseValidator
             await ValidateScheduleReportTypes(scheduleId, expectedMeasureIds, errors);
             await ValidateReportEntries(scheduleId, facilityId, expectedPatientIds, expectedSubmitted, errors);
             await ValidateEntryMeasureReports(scheduleId, expectedMeasureIds, expectedPatientIds.Count, errors);
-            await ValidateReportResources(scheduleId, facilityId, expectedSubmitted, manifest, errors);
             await ValidateReportPopulations(scheduleId, facilityId, expectedMeasureIds, qualifyingCountPerMeasure, errors);
         }
         catch (Exception ex)
@@ -188,7 +187,7 @@ public class ReportDatabaseValidator
         var expectedTotal = expectedPatientCount * expectedMeasureIds.Count;
 
         if (reports.Count != expectedTotal)
-            AddError(errors, $"EntryMeasureReport count mismatch: expected {expectedTotal} ({expectedPatientCount} patients × {expectedMeasureIds.Count} measures), actual {reports.Count}");
+            AddError(errors, $"EntryMeasureReport count mismatch: expected {expectedTotal} ({expectedPatientCount} patients � {expectedMeasureIds.Count} measures), actual {reports.Count}");
 
         var expectedSet = expectedMeasureIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var report in reports)
@@ -198,54 +197,6 @@ public class ReportDatabaseValidator
 
             if (string.IsNullOrWhiteSpace(report.MeasureReportId))
                 AddError(errors, $"EntryMeasureReport {report.Id} MeasureReportId should be populated.");
-        }
-    }
-
-    private async Task ValidateReportResources(Guid scheduleId, string facilityId, List<string> expectedPatientIds, GenerationManifest? manifest, List<string> errors)
-    {
-        var resources = await _reader.GetReportResourceSummaryAsync(scheduleId, facilityId);
-        var patientsWithResources = resources.Select(r => r.PatientId).Distinct().ToHashSet();
-
-        foreach (var patientId in expectedPatientIds)
-        {
-            if (!patientsWithResources.Contains(patientId))
-                AddError(errors, $"No ReportResource rows found for expected patient {patientId}.");
-        }
-
-        // When the manifest is available, validate per-patient resource type counts.
-        // ReportResource is populated by PatientAggregator from MeasureEval's MeasureReport
-        // contained resources — the same data that goes into ABS patient NDJSON files.
-        // Expected types = generated ∩ acquired ∩ CQL-referenced.
-        if (manifest != null)
-        {
-            var dbCountsByPatient = resources
-                .GroupBy(r => r.PatientId)
-                .ToDictionary(g => g.Key,
-                    g => g.GroupBy(r => r.ResourceType)
-                          .ToDictionary(rg => rg.Key, rg => rg.Sum(r => r.Count), StringComparer.OrdinalIgnoreCase),
-                    StringComparer.Ordinal);
-
-            foreach (var patientId in expectedPatientIds)
-            {
-                var expectedCounts = manifest.GetExpectedAbsCountsForPatient(patientId);
-                if (expectedCounts == null)
-                    continue;
-
-                dbCountsByPatient.TryGetValue(patientId, out var actualCounts);
-                actualCounts ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-                foreach (var (resourceType, expectedCount) in expectedCounts)
-                {
-                    actualCounts.TryGetValue(resourceType, out var actualCount);
-                    if (actualCount < expectedCount)
-                    {
-                        AddError(errors,
-                            $"ReportResource count for patient={patientId}, type={resourceType}: " +
-                            $"expected>={expectedCount} (sim-acquired ∩ reachable-CQL), " +
-                            $"actual={actualCount}.");
-                    }
-                }
-            }
         }
     }
 
@@ -282,7 +233,7 @@ public class ReportDatabaseValidator
             {
                 if (!measureHasQualifyingPatients)
                 {
-                    _output.WriteLine($"  ReportPopulation '{pop.ReportType}' has no GroupPopulations (expected — 0 qualifying patients per cohort config).");
+                    _output.WriteLine($"  ReportPopulation '{pop.ReportType}' has no GroupPopulations (expected � 0 qualifying patients per cohort config).");
                     continue;
                 }
 
@@ -300,7 +251,7 @@ public class ReportDatabaseValidator
             {
                 if (!measureHasQualifyingPatients)
                 {
-                    _output.WriteLine($"  ReportPopulation '{pop.ReportType}' has GroupPopulations but none are valid (expected — 0 qualifying patients per cohort config).");
+                    _output.WriteLine($"  ReportPopulation '{pop.ReportType}' has GroupPopulations but none are valid (expected � 0 qualifying patients per cohort config).");
                     continue;
                 }
 

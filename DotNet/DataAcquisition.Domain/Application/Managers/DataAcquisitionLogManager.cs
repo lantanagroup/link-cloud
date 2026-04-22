@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
@@ -37,11 +37,12 @@ public interface IDataAcquisitionLogManager
     Task<int> RestoreByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
     Task ThrottleFacilityAcquisitions(string facilityId, DateTime executionDate, CancellationToken cancellationToken = default);
-    Task<bool> TrySetLogStatusAsync(long logId, List<RequestStatus> validCurrentStatuses, RequestStatus newStatus, CancellationToken cancellationToken = default);
+    Task<bool> TrySetLogStatusAsync(long logId, List<RequestStatus> validCurrentStatuses, RequestStatus newStatus, string? note = null, CancellationToken cancellationToken = default);
     Task<bool> TrySetLogToQueuedAsync(long logId, CancellationToken cancellationToken);
     Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
     Task<int> ResetStalledProcessingLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
     Task<int> SetMaxRetriesReachedWithNoteBatchAsync(IEnumerable<long> ids, string note, CancellationToken cancellationToken = default);
+    Task<int> SetConfigurationMissingWithNoteBatchAsync(IEnumerable<long> ids, string note, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Stamps the SiblingCount on all logs in a (FacilityId, CorrelationId, QueryPhase) group.
@@ -587,6 +588,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<bool> TrySetLogStatusAsync(long logId, List<RequestStatus> validCurrentStatuses,
         RequestStatus newStatus,
+        string? note = null,
         CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.TrySetLogStatusAsync");
@@ -599,13 +601,24 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                     .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
                 cancellationToken);
 
+        if (rowsAffected > 0 && !string.IsNullOrWhiteSpace(note))
+        {
+            _dbContext.DataAcquisitionLogNotes.Add(new DataAcquisitionLogNote
+            {
+                DataAcquisitionLogId = logId,
+                Note = note,
+                CreateDate = DateTime.UtcNow
+            });
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
         return rowsAffected > 0;
     }
 
     public async Task<bool> TrySetLogToQueuedAsync(long logId, CancellationToken cancellationToken)
     {
         return await TrySetLogStatusAsync(logId, [RequestStatus.Ready, RequestStatus.Pending], RequestStatus.Queued,
-            cancellationToken);
+            cancellationToken: cancellationToken);
     }
 
     public async Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)
@@ -686,14 +699,24 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<int> SetMaxRetriesReachedWithNoteBatchAsync(IEnumerable<long> ids, string note, CancellationToken cancellationToken = default)
     {
-        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.SetMaxRetriesReachedWithNoteBatchAsync");
+        return await SetTerminalStatusWithNoteBatchAsync(ids, RequestStatus.MaxRetriesReached, note, cancellationToken);
+    }
+
+    public async Task<int> SetConfigurationMissingWithNoteBatchAsync(IEnumerable<long> ids, string note, CancellationToken cancellationToken = default)
+    {
+        return await SetTerminalStatusWithNoteBatchAsync(ids, RequestStatus.ConfigurationMissing, note, cancellationToken);
+    }
+
+    private async Task<int> SetTerminalStatusWithNoteBatchAsync(IEnumerable<long> ids, RequestStatus status, string note, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.SetTerminalStatusWithNoteBatchAsync");
 
         var idList = ids as ICollection<long> ?? ids.ToList();
 
         int updated = await _dbContext.DataAcquisitionLogs
             .Where(l => idList.Contains(l.Id))
             .ExecuteUpdateAsync(setters => setters
-                .SetProperty(l => l.Status, RequestStatus.MaxRetriesReached)
+                .SetProperty(l => l.Status, status)
                 .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
                 cancellationToken);
 
@@ -735,7 +758,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.TryCompleteTailAsync");
         activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, completedLogId);
 
-        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped };
+        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled, RequestStatus.ConfigurationMissing };
 
         // Load group identity for the completed log (PK lookup)
         var groupInfo = await _dbContext.DataAcquisitionLogs.AsNoTracking()

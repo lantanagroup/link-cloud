@@ -484,7 +484,7 @@ public class PatientDataService : IPatientDataService
 
             var successfullyUpdatedLog = await _dataAcquisitionLogManager.TrySetLogStatusAsync(log.Id,
                 allowedStatuses, RequestStatus.Processing,
-                cancellationToken);
+                cancellationToken: cancellationToken);
 
             if (successfullyUpdatedLog)
             {
@@ -611,6 +611,17 @@ public class PatientDataService : IPatientDataService
                     NewNotes = newNotes.Count > 0 ? newNotes : null,
                     Status = log.Status,
                 }, cancellationToken);
+            }
+            else
+            {
+                // Diagnostic: the atomic Queued->Processing transition didn't match any row.
+                var currentDbStatus = (await _dataAcquisitionLogQueries.GetAsync(log.Id, cancellationToken))?.Status;
+
+                _logger.LogWarning(
+                    "Queued->Processing transition skipped for LogId {LogId}. " +
+                    "Fetched status was {FetchedStatus}; current DB status is {DbStatus}. " +
+                    "Another worker likely owns this log now.",
+                    log.Id, log.Status, currentDbStatus);
             }
         }
         catch (OpOutcomeException ex)

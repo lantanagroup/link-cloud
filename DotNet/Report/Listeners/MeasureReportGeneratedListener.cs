@@ -10,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using System.Diagnostics;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
 
@@ -147,6 +148,8 @@ namespace LantanaGroup.Link.Report.Listeners
             var messageValue = result.Message.Value;
             var correlationId = Encoding.UTF8.GetString(headerValue);
 
+            _logger.LogDebug("Consuming MeasureReportGenerated (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId}, ReportType = {ReportType})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId, messageValue.ReportType);
+
             using var scope = _serviceScopeFactory.CreateScope();
             var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
             var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
@@ -167,18 +170,27 @@ namespace LantanaGroup.Link.Report.Listeners
 
             if (isAllNonReportable)
             {
+                _logger.LogDebug("Entry not reportable (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
+
                 await reportEntryManager.UpdateAsyncNotReportableEntry(reportEntry, cancellationToken);
                 await reportManifestProducer.Produce(schedule, correlationId);
                 return;
             }
 
+            //The aggregation step for a patient will only be performed once the Report service has consumed 'MeasureReportGenerated' events for all entries in reportEntry.MeasureReportList.
             var readyForAggregation = reportEntry.MeasureReports.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable || x.Status == Domain.Enums.MeasureReportStatus.ReadyForValidation);
 
             if (!readyForAggregation)
             {
+                _logger.LogDebug("Patient not ready for aggregation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
+                //Daniel - 02/2026 - The 'isAllNonReportable' logic above was added and may replace the need for executing reportManifestProducer below. It won't hurt to run, but may not be needed. If we find that we don't need to execute the manifest producer, we will only need to return in this block.
+
                 await reportManifestProducer.Produce(schedule, correlationId);
                 return;
             }
+
+            _logger.LogDebug("Patient ready for aggregation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
+            var startTime = Stopwatch.GetTimestamp();
 
             AggregateResult aggregateResult;
             try
@@ -190,9 +202,12 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new DeadLetterException(ex.Message, ex);
             }
 
-            await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
-            await reportResourceManager.AddAsyncWithAggregateResult(facilityId, reportTrackingId, messageValue.PatientId, aggregateResult, cancellationToken);
+            var elapsed = Stopwatch.GetElapsedTime(startTime);
+            _logger.LogDebug("Patient aggregation complete. Elapsed time: {Elapsed} (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", elapsed.ToString(), messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
+            startTime = Stopwatch.GetTimestamp();
 
+            await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
+            
             foreach (var agg in aggregateResult.MeasureReportResults)
             {
                 var existing = (await reportPopulationManager.FindAsync(
@@ -216,6 +231,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 return;
             }
 
+            elapsed = Stopwatch.GetElapsedTime(startTime);
+
+            _logger.LogDebug("Database updates complete. Elapsed time: {Elapsed} (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", elapsed.ToString(), messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
+            
             try
             {
                 await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, messageValue.PatientId, aggregateResult.Uri.AbsoluteUri, correlationId);

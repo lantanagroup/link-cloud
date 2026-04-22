@@ -27,7 +27,11 @@ public class PipelineSummarySnapshotBuilder
         public IReadOnlyList<PipelineDataReader.ReportPopulationInfo> Populations { get; init; } = [];
         public PipelineDataReader.AcquisitionSummaryInfo? AcquisitionSummary { get; init; }
         public IReadOnlyList<PipelineDataReader.PatientResourceTypeCount> MeasureEvalResourceCounts { get; init; } = [];
-        public IReadOnlyList<PipelineDataReader.PatientResourceTypeCount> ReportResourceCounts { get; init; } = [];
+
+        /// <summary>
+        /// Structured test-validator results persisted by the run manager.
+        /// </summary>
+        public IReadOnlyList<ValidatorResultSnapshot>? ValidatorResults { get; init; }
     }
     public class PipelineSummarySnapshot
     {
@@ -82,6 +86,10 @@ public class PipelineSummarySnapshotBuilder
         public string? AdHocType { get; set; }
         public string? Frequency { get; set; }
         public string? ScheduleStatus { get; set; }
+        public string? ReportCreated { get; set; }
+        public string? SubmittedAt { get; set; }
+        /// <summary>Human-readable duration from report creation to submission.</summary>
+        public string? Duration { get; set; }
     }
 
     public class DataAcquisitionSnapshot
@@ -153,7 +161,6 @@ public class PipelineSummarySnapshotBuilder
         snapshot.Validation.Errors = GetServiceLokiErrors(lokiErrors, "Validation");
         snapshot.DataAcquisition.Errors = GetServiceLokiErrors(lokiErrors, "Data Acquisition");
         snapshot.Normalization.Errors = GetServiceLokiErrors(lokiErrors, "Normalization");
-        snapshot.ValidatorResults = ParseValidatorResults(logs);
 
         if (string.IsNullOrWhiteSpace(facilityId) ||
             string.IsNullOrWhiteSpace(reportId) ||
@@ -182,7 +189,6 @@ public class PipelineSummarySnapshotBuilder
         IReadOnlyList<PipelineDataReader.ReportPopulationInfo> populations;
         PipelineDataReader.AcquisitionSummaryInfo? acquisitionSummary;
         IReadOnlyList<PipelineDataReader.PatientResourceTypeCount> measureEvalResourceCounts;
-        IReadOnlyList<PipelineDataReader.PatientResourceTypeCount> reportResourceCounts;
 
         var data = await _domainDataProvider(scheduleId, facilityId);
         schedule = data.Schedule;
@@ -190,7 +196,6 @@ public class PipelineSummarySnapshotBuilder
         populations = data.Populations;
         acquisitionSummary = data.AcquisitionSummary;
         measureEvalResourceCounts = data.MeasureEvalResourceCounts;
-        reportResourceCounts = data.ReportResourceCounts;
 
         snapshot.Report.Schedule = schedule == null
             ? null
@@ -201,8 +206,15 @@ public class PipelineSummarySnapshotBuilder
                 EndDate = schedule.ReportEndDate?.ToString("u"),
                 AdHocType = schedule.AdHocType,
                 Frequency = schedule.Frequency,
-                ScheduleStatus = schedule.Status
+                ScheduleStatus = schedule.Status,
+                ReportCreated = schedule.CreateDate?.ToString("u"),
+                SubmittedAt = schedule.SubmitReportDateTime?.ToString("u"),
+                Duration = schedule.CreateDate.HasValue && schedule.SubmitReportDateTime.HasValue
+                    ? FormatDuration(schedule.SubmitReportDateTime.Value - schedule.CreateDate.Value)
+                    : null
             };
+
+        snapshot.ValidatorResults = (data.ValidatorResults ?? []).ToList();
 
         snapshot.Report.EntrySubmissionStatuses = entries
             .GroupBy(e => string.IsNullOrWhiteSpace(e.SubmissionStatus) ? "Unknown" : e.SubmissionStatus!)
@@ -227,11 +239,10 @@ public class PipelineSummarySnapshotBuilder
         snapshot.DataAcquisition.ResourceTypeCounts = (acquisitionSummary?.ResourceTypeCounts ?? [])
             .Select(r => new CategoryCountSnapshot { Status = r.ResourceType, Count = r.Count })
             .OrderByDescending(x => x.Count)
-            .Take(6)
+            .Take(15)
             .ToList();
 
         var measureResources = measureEvalResourceCounts.Sum(x => x.Count);
-        var validationResources = reportResourceCounts.Sum(x => x.Count);
 
         // Normalization processes every resource acquired by DataAcquisition, so its
         // resource count mirrors DataAcquisition output. Resource type breakdown is the same.
@@ -241,23 +252,19 @@ public class PipelineSummarySnapshotBuilder
         snapshot.Normalization.ResourceTypeCounts = snapshot.DataAcquisition.ResourceTypeCounts.ToList();
 
         snapshot.MeasureEval.ResourceCount = measureResources;
-        snapshot.Validation.ResourceCount = validationResources;
-
         snapshot.MeasureEval.AverageResourcesPerSecond = ComputeResourcesPerSecond(measureResources, measureLines);
-        snapshot.Validation.AverageResourcesPerSecond = ComputeResourcesPerSecond(validationResources, validationLines);
+
+        // Validation operates in a per-patient context -- its 'resource count' is the
+        // number of patients whose validation reached a terminal status. The per-status
+        // breakdown is supplied below via FunnelCounts.
+        snapshot.Validation.ResourceCount = entries.Count;
+        snapshot.Validation.AverageResourcesPerSecond = ComputeResourcesPerSecond(entries.Count, validationLines);
 
         snapshot.MeasureEval.ResourceTypeCounts = measureEvalResourceCounts
             .GroupBy(x => x.ResourceType)
             .Select(g => new CategoryCountSnapshot { Status = g.Key, Count = g.Sum(x => x.Count) })
             .OrderByDescending(x => x.Count)
-            .Take(6)
-            .ToList();
-
-        snapshot.Validation.ResourceTypeCounts = reportResourceCounts
-            .GroupBy(x => x.ResourceType)
-            .Select(g => new CategoryCountSnapshot { Status = g.Key, Count = g.Sum(x => x.Count) })
-            .OrderByDescending(x => x.Count)
-            .Take(6)
+            .Take(15)
             .ToList();
 
         var measureReadyForValidationCount = entries.Count(e =>
@@ -311,17 +318,17 @@ public class PipelineSummarySnapshotBuilder
         var dataAcqComplete = dataAcqExplicitlyComplete || dataAcqImplicitlyComplete;
         var measureComplete = measureResources > 0;
 
-        // Validation completion is inferred from resource reconciliation:
-        // once measure reports are generated and the report/validation resource
-        // count has caught up to MeasureEval's resource count, validation has
-        // completed processing for this run.
-        var validationComplete = measureComplete
-            && validationResources == measureResources;
+        // Validation is complete when report entries exist and every entry has
+        // reached a terminal reporting status (PassedValidation, FailedValidation,
+        // or NotReportable). This prevents the milestone from completing before
+        // the validation service has actually processed all entries.
+        var validationComplete = entries.Count > 0
+            && entries.All(e =>
+                string.Equals(e.ReportingStatus, "PassedValidation", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(e.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(e.ReportingStatus, "NotReportable", StringComparison.OrdinalIgnoreCase));
 
         var submitted = string.Equals(scheduleStatus, "Submitted", StringComparison.OrdinalIgnoreCase);
-        var effectiveValidatorResults = snapshot.ValidatorResults
-            .Where(v => !(v.Name ?? string.Empty).StartsWith("[Snapshot]", StringComparison.OrdinalIgnoreCase))
-            .ToList();
 
         var expectedHardValidators = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -332,18 +339,16 @@ public class PipelineSummarySnapshotBuilder
             "TENANT DATABASE VALIDATION"
         };
 
-        var hardValidatorResults = effectiveValidatorResults
-            .Where(v => !string.Equals(v.Name, "VALIDATION RESULTS (API)", StringComparison.OrdinalIgnoreCase))
+        var hardValidatorResults = snapshot.ValidatorResults
+            .Where(v => expectedHardValidators.Contains(v.Name ?? string.Empty))
             .ToList();
 
-        var observedHardValidatorNames = hardValidatorResults
-            .Select(v => v.Name)
-            .Where(n => !string.IsNullOrWhiteSpace(n))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var hasAllHardValidatorResults = expectedHardValidators.IsSubsetOf(
+            hardValidatorResults.Select(v => v.Name).ToHashSet(StringComparer.OrdinalIgnoreCase));
 
-        var hasAllHardValidatorResults = expectedHardValidators.IsSubsetOf(observedHardValidatorNames);
-        var hasFailedValidators = hardValidatorResults.Any(v =>
-            string.Equals(v.Outcome, "Failed", StringComparison.OrdinalIgnoreCase));
+        var hasFailedValidators = hasAllHardValidatorResults
+            && hardValidatorResults.Any(v =>
+                string.Equals(v.Outcome, "Failed", StringComparison.OrdinalIgnoreCase));
 
         snapshot.Report.Milestones =
         [
@@ -370,6 +375,14 @@ public class PipelineSummarySnapshotBuilder
         ];
 
         return snapshot;
+    }
+
+    private static string FormatDuration(TimeSpan ts)
+    {
+        if (ts.TotalSeconds < 1) return "< 1s";
+        if (ts.TotalMinutes < 1) return $"{ts.Seconds}s";
+        if (ts.TotalHours < 1) return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+        return $"{(int)ts.TotalHours}h {ts.Minutes}m {ts.Seconds}s";
     }
 
     private static List<string> FilterLines(IEnumerable<string> lines, params string[] terms)
@@ -614,37 +627,6 @@ public class PipelineSummarySnapshotBuilder
                 Label = $"{g.Key * bucketSeconds}s",
                 Count = g.Count()
             })
-            .ToList();
-    }
-
-    private static List<ValidatorResultSnapshot> ParseValidatorResults(IReadOnlyList<string> logs)
-    {
-        var map = new Dictionary<string, ValidatorResultSnapshot>(StringComparer.OrdinalIgnoreCase);
-        var regex = new Regex(@"\]\s+(?<name>.+?)\s*:\s*(?<outcome>Passed|Failed)(?:\s*\((?<issues>\d+)\s+issue\(s\)\))?", RegexOptions.Compiled);
-
-        foreach (var line in logs)
-        {
-            var match = regex.Match(line);
-            if (!match.Success)
-                continue;
-
-            var name = match.Groups["name"].Value.Trim();
-
-            var outcome = match.Groups["outcome"].Value.Trim();
-            var issues = 0;
-            if (match.Groups["issues"].Success)
-                int.TryParse(match.Groups["issues"].Value, out issues);
-
-            map[name] = new ValidatorResultSnapshot
-            {
-                Name = name,
-                Outcome = outcome,
-                IssueCount = issues
-            };
-        }
-
-        return map.Values
-            .OrderBy(v => v.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 

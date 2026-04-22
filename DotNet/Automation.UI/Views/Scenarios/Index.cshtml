@@ -1,99 +1,103 @@
-﻿@model List<TestScenarioDefinition>
+@model List<TestScenarioDefinition>
 @{
-    ViewData["Title"] = "Saved Scenarios";
+    ViewData["Title"] = "Scenarios";
 }
 
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h2>Saved Scenarios</h2>
-            <p class="text-muted mb-0">Create, edit, clone, and manage reusable test configurations.</p>
+    <h2 class="fw-bold mb-1"><i class="bi bi-collection-fill me-2"></i>Scenarios</h2>
+    <p class="text-muted mb-3">Create, edit, clone, and manage reusable test configurations.</p>
+
+    <div class="au-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list-ul me-2"></i>All Scenarios</span>
+            <button type="button" class="btn btn-sm btn-success" id="btnNewScenario">
+                <i class="bi bi-plus-lg"></i>
+            </button>
         </div>
-        <a asp-action="Create" class="btn btn-primary">
-            <i class="bi bi-plus-lg"></i> New Scenario
-        </a>
-    </div>
-
-    <div class="table-responsive">
-        <table class="table table-striped table-hover">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Report Method</th>
-                    <th>Measures</th>
-                    <th>Patients</th>
-                    <th>Resources/Patient</th>
-                    <th>Seed</th>
-                    <th>Type</th>
-                    <th>Updated</th>
-                    <th style="width: 220px;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var s in Model)
-                {
-                    var resourceRange = s.ResourcesPerPatientMin == s.ResourcesPerPatientMax
-                        ? s.ResourcesPerPatientMin.ToString()
-                        : $"{s.ResourcesPerPatientMin}–{s.ResourcesPerPatientMax}";
-
+        <div class="card-body p-0">
+            <table class="table au-table mb-0" id="scenarioTable">
+                <thead>
                     <tr>
-                        <td>
-                            <strong>@s.Name</strong>
-                            @if (!string.IsNullOrWhiteSpace(s.Description))
-                            {
-                                <br /><small class="text-muted">@s.Description</small>
-                            }
-                        </td>
-                        <td><span class="badge bg-info text-dark">@s.ReportMethod</span></td>
-                        <td>
-                            @foreach (var m in s.SelectedMeasures)
-                            {
-                                <span class="badge bg-secondary">@ProfiledMeasureCatalog.GetDisplayName(m)</span>
-                            }
-                        </td>
-                        <td>@(s.UseMeasureEligibilityProfiles ? s.PatientProfiles.Count : s.PatientCount)</td>
-                        <td>@resourceRange</td>
-                        <td><code>@s.Seed</code></td>
-                        <td>
-                            @if (s.IsSystemScenario)
-                            {
-                                <span class="badge bg-dark">System</span>
-                            }
-                            else
-                            {
-                                <span class="badge bg-light text-dark border">Custom</span>
-                            }
-                        </td>
-                        <td>@s.UpdatedAt.LocalDateTime.ToString("g")</td>
-                        <td class="text-nowrap">
-                            <div class="d-inline-flex gap-1">
+                        <th>Name</th>
+                        <th>Method</th>
+                        <th>Measures</th>
+                        <th>Patients</th>
+                        <th>Resources</th>
+                        <th>Seed</th>
+                        <th>Type</th>
+                        <th>Updated</th>
+                        <th style="width:180px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in Model)
+                    {
+                        var resourceRange = s.ResourcesPerPatientMin == s.ResourcesPerPatientMax
+                            ? s.ResourcesPerPatientMin.ToString()
+                            : $"{s.ResourcesPerPatientMin}\u2013{s.ResourcesPerPatientMax}";
+                        var patientCount = s.PatientCohorts.Count > 0
+                            ? s.PatientCohorts.Sum(c => c.PatientCount)
+                            : s.PatientCount;
+
+                        <tr data-id="@s.Id">
+                            <td>
+                                <strong>@s.Name</strong>
+                                @if (!string.IsNullOrWhiteSpace(s.Description))
+                                {
+                                    <br /><small class="text-muted">@s.Description</small>
+                                }
+                            </td>
+                            <td><span class="badge bg-light text-dark border">@s.ReportMethod</span></td>
+                            <td>
+                                @foreach (var m in s.SelectedMeasures)
+                                {
+                                    <span class="badge bg-secondary">@ProfiledMeasureCatalog.GetDisplayName(m)</span>
+                                }
+                            </td>
+                            <td>@patientCount</td>
+                            <td>@resourceRange</td>
+                            <td><code>@s.Seed</code></td>
+                            <td>
                                 @if (s.IsSystemScenario)
                                 {
-                                    <a asp-action="Details" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">View</a>
+                                    <span class="badge bg-dark">System</span>
                                 }
                                 else
                                 {
-                                    <a asp-action="Edit" asp-route-id="@s.Id" class="btn btn-sm btn-outline-primary">Edit</a>
+                                    <span class="badge bg-light text-dark border">Custom</span>
                                 }
-                                <form asp-action="Clone" method="post" class="d-inline m-0">
-                                    @Html.AntiForgeryToken()
-                                    <input type="hidden" name="id" value="@s.Id" />
-                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Clone</button>
-                                </form>
-                                @if (!s.IsSystemScenario)
-                                {
-                                    <form asp-action="Delete" method="post" class="d-inline m-0">
-                                        @Html.AntiForgeryToken()
-                                        <input type="hidden" name="id" value="@s.Id" />
-                                        <button type="submit" class="btn btn-sm btn-outline-danger"
-                                                onclick="return confirm('Delete this scenario?');">Delete</button>
-                                    </form>
-                                }
-                            </div>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
+                            </td>
+                            <td class="small text-muted">@s.UpdatedAt.LocalDateTime.ToString("g")</td>
+                            <td class="text-nowrap">
+                                <div class="d-inline-flex gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-primary btn-scenario-open" data-id="@s.Id" data-mode="@(s.IsSystemScenario ? "view" : "edit")">
+                                        @(s.IsSystemScenario ? "View" : "Edit")
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-scenario-clone" data-id="@s.Id">Clone</button>
+                                    @if (!s.IsSystemScenario)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-danger btn-scenario-delete" data-id="@s.Id">Delete</button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            @if (Model.Count == 0)
+            {
+                <div class="text-center text-muted py-4">No scenarios yet. Click <strong>+</strong> to create one.</div>
+            }
+        </div>
     </div>
 </div>
+
+@await Html.PartialAsync("_ScenarioEditorModal")
+
+<script>
+(function () {
+    // The shared editor fires this event after a successful save/clone/delete.
+    // On the Scenarios list page we reload so the table reflects the change.
+    document.addEventListener('scenario-editor:changed', function () { location.reload(); });
+})();
+</script>
