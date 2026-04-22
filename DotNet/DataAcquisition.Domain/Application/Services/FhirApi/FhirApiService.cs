@@ -13,9 +13,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
@@ -26,6 +23,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using DateTime = System.DateTime;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -344,30 +342,9 @@ public class FhirApiService : IFhirApiService
         if (toCreate.Count == 0)
             return;
 
-        // Upsert canonical cache rows (unique index on facility+type+id; existing rows
-        // are left untouched so cross-correlation cache sharing remains authoritative).
+        // Upsert canonical cache rows; do not link back into this reference log's
+        // junction (the junction is reserved for primary logs that depend on them).
         await _referenceResourceManager.CreateBatchAsync(toCreate, cancellationToken);
-
-        // Link the canonical rows to THIS log. Lookups happen per-ResourceType because
-        // SearchReferenceResourcesModel scopes by ResourceType.
-        var canonicalIds = new List<Guid>(toCreate.Count);
-        foreach (var byType in toCreate.GroupBy(c => c.ResourceType, StringComparer.Ordinal))
-        {
-            var resourceIds = byType.Select(c => c.ResourceId).ToList();
-            var rows = (await _referenceResourcesQueries.SearchAsync(new SearchReferenceResourcesModel
-            {
-                FacilityId = log.FacilityId,
-                ResourceType = byType.Key,
-                ResourceIds = resourceIds,
-                PageSize = int.MaxValue
-            })).Records;
-            canonicalIds.AddRange(rows.Select(r => r.Id));
-        }
-
-        if (canonicalIds.Count > 0)
-        {
-            await _referenceResourceManager.LinkToLogAsync(log.Id, canonicalIds, cancellationToken);
-        }
     }
 
     private SearchParams BuildSearchParams(List<string> parameters)

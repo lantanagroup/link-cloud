@@ -231,6 +231,12 @@ public class ReferenceResourceService : IReferenceResourceService
             .OrderBy(id => id)
             .ToListAsync(cancellationToken);
 
+        // Persist the full pending set as the log's query of record.
+        if (pendingIds.Count > 0)
+        {
+            await PersistReferenceQueryParametersAsync(log.Id, pendingIds, cancellationToken);
+        }
+
         var acquiredIds = (log.ResourceAcquiredIds ?? new List<string>())
             .Where(id => !string.IsNullOrWhiteSpace(id))
             .Distinct(StringComparer.Ordinal)
@@ -267,12 +273,8 @@ public class ReferenceResourceService : IReferenceResourceService
             .GroupBy(r => r.ResourceId, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 
-        var cacheRowIds = cachedRows.Select(r => r.Id).Distinct().ToList();
-        if (cacheRowIds.Count > 0)
-        {
-            await _referenceResourcesManager.LinkToLogAsync(log.Id, cacheRowIds, cancellationToken);
-        }
-
+        // Reference logs surface their own resources via ResourceAcquiredIds; the
+        // junction is reserved for primary logs that depend on them.
         var resourceIds = new HashSet<string>(acquiredIds, StringComparer.Ordinal);
         foreach (var cached in cachedRows)
         {
@@ -307,11 +309,9 @@ public class ReferenceResourceService : IReferenceResourceService
             };
         }
 
+        // In-memory only: the on-the-wire call fetches just the cache-miss subset.
         foreach (var fhirQuery in log.FhirQuery.Where(q => q.IsReference.GetValueOrDefault()))
         {
-            // IdQueryParameterValues is a computed view over QueryParameters: the
-            // setter strips any existing "_id=" entries and re-appends a single
-            // "_id=a,b,c" entry, so QueryParameters stays the single source of truth.
             fhirQuery.IdQueryParameterValues = missingIds;
         }
 
@@ -367,7 +367,7 @@ public class ReferenceResourceService : IReferenceResourceService
                     ReportTrackingId = primaryLog.ReportTrackingId,
                     ReportableEvent = primaryLog.ReportableEvent,
                     Priority = primaryLog.Priority,
-                    PatientId = null,
+                    PatientId = primaryLog.PatientId,
                     ReferenceResourceType = resourceType.ToString(),
                     FhirVersion = "R4",
                     QueryType = fhirQueryType,
@@ -510,6 +510,44 @@ public class ReferenceResourceService : IReferenceResourceService
                 }
             },
             cancellationToken);
+    }
+
+    private async Task PersistReferenceQueryParametersAsync(
+        long dataAcquisitionLogId,
+        IReadOnlyList<string> pendingIds,
+        CancellationToken cancellationToken)
+    {
+        var referenceQueries = await _dbContext.FhirQueries
+            .Where(q => q.DataAcquisitionLogId == dataAcquisitionLogId
+                && q.IsReference == true)
+            .ToListAsync(cancellationToken);
+
+        if (referenceQueries.Count == 0)
+            return;
+
+        var changed = false;
+        foreach (var fhirQuery in referenceQueries)
+        {
+            var before = string.Join('|', fhirQuery.QueryParameters ?? new List<string>());
+            fhirQuery.IdQueryParameterValues = pendingIds;
+            var after = string.Join('|', fhirQuery.QueryParameters ?? new List<string>());
+
+            if (!string.Equals(before, after, StringComparison.Ordinal))
+            {
+                fhirQuery.ModifyDate = DateTime.UtcNow;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        foreach (var fhirQuery in referenceQueries)
+        {
+            _dbContext.Entry(fhirQuery).State = EntityState.Detached;
+        }
     }
 
     private string ResolveReferenceResourceType(DataAcquisitionLogModel log)
