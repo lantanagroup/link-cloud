@@ -149,7 +149,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.SubmitPayloadRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
-    builder.Services.AddSingleton<BlobStorageService>();
+    builder.Services.AddSingleton<IStorageService, BlobStorageService>();
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();

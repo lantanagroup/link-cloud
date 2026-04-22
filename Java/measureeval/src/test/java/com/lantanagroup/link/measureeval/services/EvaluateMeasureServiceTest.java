@@ -174,6 +174,6 @@ class EvaluateMeasureServiceTest {
         assertEquals("facility-1", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.FACILITY_ID)));
         assertEquals("patient-1", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.PATIENT_ID)));
         assertEquals("measure-1", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.REPORT_TYPE)));
-        assertEquals("test-query", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.QUERY_TYPE)));
+        assertEquals("test-query", attributes.get(io.opentelemetry.api.common.AttributeKey.stringKey(DiagnosticNames.PHASE)));
     }
 }

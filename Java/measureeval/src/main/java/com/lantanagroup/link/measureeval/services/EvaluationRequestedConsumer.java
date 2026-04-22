@@ -63,27 +63,31 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
     @Override
     protected void process(ConsumerRecord<String, EvaluationRequested> record) {
         String correlationId = Headers.getCorrelationId(record.headers());
+        String queryType = Headers.getQueryType(record.headers());
+        var reportTrackingId = record.value().getReportTrackingId();
+        String facilityId = record.key();
 
         Span currentSpan = Span.current();
         MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
         MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
 
-        var reportTrackingId = record.value().getReportTrackingId();
-        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.REPORT_ID), reportTrackingId).build();
-        measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
-
-        String facilityId = record.key();
         var patientReportStatus = patientStatusRepository.findByFacilityIdAndPatientIdAndReportsReportTrackingId(facilityId, record.value().getPatientId(), record.value().getPreviousReportId()).orElse(null);
 
         if (patientReportStatus != null) {
             var bundle = patientStatusBundler.createBundle(facilityId, patientReportStatus.getCorrelationId());
-            evaluateMeasures(reportTrackingId, correlationId, record.value(), patientReportStatus, bundle);
+
+            if (queryType != null) {
+                Attributes attributes = MeasureEvalMetrics.buildAttributes(queryType, patientReportStatus, reportTrackingId, bundle.getEntry().size());
+                measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
+            }
+
+            evaluateMeasures(queryType, reportTrackingId, correlationId, record.value(), patientReportStatus, bundle);
         } else {
             logger.warn("Patient status not found for facilityId: {}, patientId: {}, reportTrackingId: {}. EvaluationRequested event not fully processed.", facilityId, record.value().getPatientId(), record.value().getPreviousReportId());
         }
     }
 
-    private void evaluateMeasures (String reportTrackingId, String correlationId, EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
+    private void evaluateMeasures (String queryType, String reportTrackingId, String correlationId, EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
         if (logger.isDebugEnabled()) {
             logger.debug("Evaluating measures");
         }
@@ -102,30 +106,16 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
         patientStatusRepository.insert(newPatientStatus);
 
         reports.forEach(r -> {
-            MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(patientStatus, r, bundle);
+            MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(queryType, patientStatus, r, bundle);
 
             if (measureReport.getIdPart() == null) {
                 measureReport.setId(UUID.randomUUID().toString());
             }
 
             blobStorageService.storePatientInBlobStorage(patientStatus, r, measureReport);
+
+            Attributes attributes = MeasureEvalMetrics.buildAttributes(queryType, patientStatus, value.getReportTrackingId(), bundle.getEntry().size());
+            measureEvalMetrics.IncrementPatientReportableCounter(attributes, r.getReportable());
         });
-
-        boolean reportablePatient = patientStatus.getReports().stream().anyMatch(PatientReportingEvaluationStatus.Report::getReportable);
-
-        // if at least one reportable measure, increment the reportable patient counter otherwise increment the non-reportable patient counter
-        updatePatientMetrics(value, patientStatus, reportablePatient);
-    }
-
-    private void updatePatientMetrics (EvaluationRequested value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
-        Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
-                    put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
-                    put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
-            if (reportablePatient) {
-                measureEvalMetrics.IncrementPatientReportableCounter(attributes);
-            } else {
-                measureEvalMetrics.IncrementPatientNonReportableCounter(attributes);
-            }
-
     }
 }

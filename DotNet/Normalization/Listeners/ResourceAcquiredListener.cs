@@ -1,4 +1,6 @@
-﻿using Confluent.Kafka;
+﻿using System.Text;
+using System.Text.Json;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
@@ -18,10 +20,6 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using Microsoft.OpenApi.Writers;
-using OpenTelemetry.Resources;
-using System.Text;
-using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
@@ -177,10 +175,11 @@ public class ResourceAcquiredListener : BackgroundService
 
                                 sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
 
+                                bool resourceChanged = false;
+
                                 foreach (var sequence in sequences)
                                 {
                                     var dbEntity = sequence.OperationResourceType.Operation;
-
                                     var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
 
                                     if (operation == null)
@@ -188,30 +187,49 @@ public class ResourceAcquiredListener : BackgroundService
                                         throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
                                     }
 
-                                    var operationResult = operation.OperationType switch
-                                    {
-                                        OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource),
-                                        OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource),
-                                        OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource),
-                                        OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource),
-                                        _ => null
-                                    };
-
-                                    if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
-                                    {
-                                        resource = operationResult.Resource;
-
-                                        _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
+                                    var tags = new List<KeyValuePair<string, object?>>() {
                                         new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, messageMetaData.facilityId),
                                         new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, messageMetaData.correlationId),
                                         new KeyValuePair<string, object?>(DiagnosticNames.PatientId, message.Message.Value.PatientId),
-                                        new KeyValuePair<string, object?>(DiagnosticNames.Resource, resource.TypeName),
-                                        new KeyValuePair<string, object?>(DiagnosticNames.QueryType, message.Message.Value.QueryType),
-                                        new KeyValuePair<string, object?>(DiagnosticNames.NormalizationOperation, operation.OperationType.ToString())});
-                                    }
-                                    else
+                                        new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(message.Message.Value.QueryType)),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.ReportTrackingId, message.Message.Value.ScheduledReports?.FirstOrDefault()?.ReportTrackingId ?? string.Empty),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, message.Message.Value.ResourceType),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.OperationType, operation.OperationType)
+                                    };
+                                    using (var duration = _metrics.MeasureNormalizationDuration(tags))
                                     {
-                                        _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", messageMetaData.facilityId, messageMetaData.correlationId, operation.OperationType, operationResult?.ErrorMessage ?? "No Operation Result Error Message");
+                                        var operationResult = operation.OperationType switch
+                                        {
+                                            OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource),
+                                            OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource),
+                                            OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource),
+                                            OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource),
+                                            _ => null
+                                        };
+
+                                        if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
+                                        {
+                                            resource = operationResult.Resource;
+
+                                            if (operationResult.SuccessCode == OperationStatus.Success)
+                                            {
+                                                resourceChanged = true;
+                                            }
+                                            
+                                            _logger.LogDebug(
+                                                "Normalization Complete ({FacilityId}, {CorrelationId}, {ResourceType}): {ResourceChanged}",
+                                                messageMetaData.facilityId, messageMetaData.correlationId,
+                                                message.Message.Value.ResourceType, resourceChanged);
+                                            _metrics.IncrementResourceChangedCounter(tags, resourceChanged);
+                                        }
+                                        else
+                                        {
+                                            _logger.LogWarning(
+                                                "Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}",
+                                                messageMetaData.facilityId, messageMetaData.correlationId,
+                                                operation.OperationType,
+                                                operationResult?.ErrorMessage ?? "No Operation Result Error Message");
+                                        }
                                     }
                                 }
 

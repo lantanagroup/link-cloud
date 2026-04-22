@@ -1,4 +1,6 @@
-﻿using Hl7.Fhir.Model;
+﻿using System.Net;
+using System.Net.Http.Headers;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
@@ -10,9 +12,6 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Diagnostics;
-using System.Net;
-using System.Net.Http.Headers;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 
@@ -21,7 +20,8 @@ public record ReadFhirCommandRequest(
     ResourceType resourceType,
     string resourceId,
     string baseUrl,
-    FhirQueryConfigurationModel fhirQueryConfiguration);
+    FhirQueryConfigurationModel fhirQueryConfiguration,
+    string? reportTrackingId);
 
 public interface IReadFhirCommand
 {
@@ -58,6 +58,7 @@ public class ReadFhirCommand : IReadFhirCommand
         activity?.SetTag(DiagnosticNames.FacilityId, request.facilityId);
         activity?.SetTag(DiagnosticNames.ResourceType, request.resourceType.ToString());
         activity?.SetTag(DiagnosticNames.ResourceId, request.resourceId);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, request.reportTrackingId);
 
         if (string.IsNullOrWhiteSpace(request.resourceId))
             throw new ArgumentNullException(nameof(request.resourceId), "Resource ID cannot be null or empty.");

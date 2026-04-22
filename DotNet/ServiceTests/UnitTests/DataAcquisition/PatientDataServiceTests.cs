@@ -1,5 +1,8 @@
-﻿using Confluent.Kafka;
+﻿using System.Net;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
+using Hl7.Fhir.Rest;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
@@ -52,6 +55,7 @@ public class PatientDataServiceTests
     private readonly Mock<IServiceProvider> _mockServiceProvider;
     private readonly Mock<IPatientCensusService> _mockPatientCensusService;
     private readonly Mock<IScheduledReportManager> _mockScheduledReportManager;
+    private readonly Mock<IDataAcquisitionServiceMetrics> _mockMetrics;
 
     private readonly PatientDataService _service;
 
@@ -76,6 +80,7 @@ public class PatientDataServiceTests
         _mockServiceProvider = new Mock<IServiceProvider>();
         _mockPatientCensusService = new Mock<IPatientCensusService>();
         _mockScheduledReportManager = new Mock<IScheduledReportManager>();
+        _mockMetrics = new Mock<IDataAcquisitionServiceMetrics>();
 
         // Mock the semaphore and handle
         var mockSemaphore = new Mock<IDistributedSemaphore>();
@@ -104,7 +109,8 @@ public class PatientDataServiceTests
             _mockDistributedSemaphoreProvider.Object,
             _mockServiceProvider.Object,
             _mockPatientCensusService.Object,
-            _mockScheduledReportManager.Object
+            _mockScheduledReportManager.Object,
+            _mockMetrics.Object
         );
     }
 
@@ -433,7 +439,7 @@ public class PatientDataServiceTests
                 It.IsAny<ResourceType>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
                 cancellationToken))
-            .ThrowsAsync(new OpOutcomeException("OperationOutcome encountered", new Hl7.Fhir.Rest.FhirOperationException("test", System.Net.HttpStatusCode.NotFound)));
+            .ThrowsAsync(new OpOutcomeException("OperationOutcome encountered", new FhirOperationException("test", HttpStatusCode.NotFound)));
 
         UpdateDataAcquisitionLogModel updatedModel = null;
         _mockLogManager
@@ -506,7 +512,7 @@ public class PatientDataServiceTests
                 It.IsAny<ResourceType>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
                 cancellationToken))
-            .ThrowsAsync(new OpOutcomeException("OperationOutcome encountered", new Hl7.Fhir.Rest.FhirOperationException("test", System.Net.HttpStatusCode.InternalServerError)));
+            .ThrowsAsync(new OpOutcomeException("OperationOutcome encountered", new FhirOperationException("test", HttpStatusCode.InternalServerError)));
 
         UpdateDataAcquisitionLogModel updatedModel = null;
         _mockLogManager
@@ -578,7 +584,7 @@ public class PatientDataServiceTests
                 It.IsAny<ResourceType>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
                 cancellationToken))
-            .ThrowsAsync(new OpOutcomeException("OperationOutcome encountered", new Hl7.Fhir.Rest.FhirOperationException("test", System.Net.HttpStatusCode.InternalServerError)));
+            .ThrowsAsync(new OpOutcomeException("OperationOutcome encountered", new FhirOperationException("test", HttpStatusCode.InternalServerError)));
 
         UpdateDataAcquisitionLogModel updatedModel = null;
         _mockLogManager

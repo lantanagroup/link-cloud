@@ -1,7 +1,10 @@
-﻿using Confluent.Kafka;
+﻿using System.Diagnostics;
+using System.Net;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
@@ -14,18 +17,15 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Comm
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
-using System.Net;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using StringComparison = System.StringComparison;
 using Task = System.Threading.Tasks.Task;
@@ -67,6 +67,7 @@ public class PatientDataService : IPatientDataService
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
     private readonly IPatientCensusService _patientCensusService;
     private readonly IScheduledReportManager _scheduledReportManager;
+    private readonly IDataAcquisitionServiceMetrics _metrics;
 
     public PatientDataService(
         IDatabase database,
@@ -81,7 +82,8 @@ public class PatientDataService : IPatientDataService
         IDistributedSemaphoreProvider distributedSemaphoreProvider,
         IServiceProvider serviceProvider,
         IPatientCensusService patientCensusService,
-        IScheduledReportManager scheduledReportManager)
+        IScheduledReportManager scheduledReportManager,
+        IDataAcquisitionServiceMetrics metrics)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -104,6 +106,7 @@ public class PatientDataService : IPatientDataService
         _distributedSemaphoreProvider = distributedSemaphoreProvider ??
                                         throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
         _patientCensusService = patientCensusService ?? throw new ArgumentNullException(nameof(patientCensusService));
+        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
     }
 
     public async Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request,
@@ -122,7 +125,8 @@ public class PatientDataService : IPatientDataService
                 ResourceType.Patient,
                 TEMPORARYPatientIdPart(request.ConsumeResult.Value.PatientId),
                 queryConfig.FhirServerBaseUrl,
-                queryConfig),
+                queryConfig,
+                request.ConsumeResult.Value.ScheduledReports.FirstOrDefault()?.ReportTrackingId),
             cancellationToken);
 
         var queryPlan = (await _queryPlanQueries.SearchAsync(new SearchQueryPlanModel
@@ -272,7 +276,7 @@ public class PatientDataService : IPatientDataService
                                 CorrelationId = request.CorrelationId,
                                 PatientId = request.ConsumeResult.Message.Value.PatientId,
                                 Priority = priority,
-                                ExecutionDate = System.DateTime.UtcNow,
+                                ExecutionDate = DateTime.UtcNow,
                                 ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
                                 Status = RequestStatus.Pending,
                                 FhirVersion = "R4",
@@ -317,14 +321,14 @@ public class PatientDataService : IPatientDataService
                 try
                 {
                     totalLogsCreated += await _queryListProcessor.Process(
-                        dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase)
+                        dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase)
                             ? initialQueries
                             : supplementalQueries,
                         request,
                         fhirQueryConfiguration,
                         queryPlan,
                         referenceTypes,
-                        dataAcqRequested.QueryType.Equals("Initial", System.StringComparison.InvariantCultureIgnoreCase)
+                        dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase)
                             ? QueryPlanType.Initial.ToString()
                             : QueryPlanType.Supplemental.ToString(),
                         schedReport,
@@ -458,7 +462,7 @@ public class PatientDataService : IPatientDataService
                 ActivityKind.Internal,
                 parentContext);
 
-            activity?.SetTag(DiagnosticNames.ReportId, log.Id.ToString());
+            activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, log.Id.ToString());
             activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
             activity?.SetTag(DiagnosticNames.CorrelationId, log.CorrelationId ?? string.Empty);
             activity?.SetTag(DiagnosticNames.ReportTrackingId, log.ReportTrackingId ?? string.Empty);
@@ -487,6 +491,17 @@ public class PatientDataService : IPatientDataService
                 log.Status = RequestStatus.Processing;
 
                 //3. start timer
+                var tags = new List<KeyValuePair<string, object?>>
+                {
+                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, log.FacilityId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.PatientId, log.PatientId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, log.CorrelationId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.ReportTrackingId, log.ReportTrackingId),
+                    new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(log.QueryPhase?.ToString()))
+                };
+
+                using var duration = _metrics.MeasureDataRequestDuration(tags);
+
                 Stopwatch stopwatch = new Stopwatch();
                 stopwatch.Start();
 
@@ -581,7 +596,7 @@ public class PatientDataService : IPatientDataService
                 stopwatch.Stop();
 
                 log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
-                log.CompletionDate = System.DateTime.UtcNow;
+                log.CompletionDate = DateTime.UtcNow;
                 log.Status = skipFetch ? RequestStatus.Skipped : RequestStatus.Completed;
 
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel

@@ -1,4 +1,7 @@
-﻿using Confluent.Kafka;
+﻿using System.Net;
+using System.Text;
+using System.Text.Json;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
@@ -20,7 +23,6 @@ using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using Task = System.Threading.Tasks.Task;
 
@@ -177,7 +179,7 @@ public class ReferenceResourceService : IReferenceResourceService
                 continue;
 
             // Fetch missing resources from FHIR server and cache them
-            var fhirResourceType = Enum.Parse<Hl7.Fhir.Model.ResourceType>(resourceType);
+            var fhirResourceType = Enum.Parse<ResourceType>(resourceType);
             var toCreate = new List<CreateReferenceResourcesModel>();
 
             foreach (var resourceId in missingIds)
@@ -190,7 +192,8 @@ public class ReferenceResourceService : IReferenceResourceService
                             fhirResourceType,
                             resourceId,
                             fhirQueryConfiguration.FhirServerBaseUrl,
-                            fhirQueryConfiguration),
+                            fhirQueryConfiguration,
+                            log.ReportTrackingId),
                         cancellationToken);
 
                     var serialized = JsonSerializer.Serialize(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
@@ -204,7 +207,7 @@ public class ReferenceResourceService : IReferenceResourceService
                         QueryPhase = QueryPhase.Referential,
                     });
                 }
-                catch (FhirOperationException ex) when (ex.Status == System.Net.HttpStatusCode.NotFound || ex.Status == System.Net.HttpStatusCode.Gone)
+                catch (FhirOperationException ex) when (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone)
                 {
                     _logger.LogWarning("Reference resource {ResourceType}/{ResourceId} not found (HTTP {Status}) for log {LogId}; skipping.",
                         resourceType, resourceId, ex.Status, log.Id);
@@ -280,7 +283,7 @@ public class ReferenceResourceService : IReferenceResourceService
                             Headers = new Headers
                             {
                                 new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
-                                    System.Text.Encoding.UTF8.GetBytes(log.CorrelationId))
+                                    Encoding.UTF8.GetBytes(log.CorrelationId))
                             },
                             Value = new ResourceAcquired
                             {
