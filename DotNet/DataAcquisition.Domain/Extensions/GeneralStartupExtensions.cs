@@ -222,6 +222,7 @@ public static class GeneralStartupExtensions
         services.AddScoped<IEntityRepository<OrganizationLocationCondition>, EntityRepository<OrganizationLocationCondition, DataAcquisitionDbContext>>();
         services.AddScoped<IEntityRepository<OrganizationLocationMapping>, EntityRepository<OrganizationLocationMapping, DataAcquisitionDbContext>>();
         services.AddScoped<IEntityRepository<EncounterMapping>, EntityRepository<EncounterMapping, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<EncounterLocation>, EntityRepository<EncounterLocation, DataAcquisitionDbContext>>();
 
         //Database
         services.AddScoped<IDatabase, Database>();
