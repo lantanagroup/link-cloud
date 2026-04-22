@@ -201,6 +201,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   get hasActionEligibleOnPage(): boolean {
+    if (this.isReportSubmitted) return false;
     return this.acquisitionLogs.some(l => !this.TERMINAL_STATUSES.includes(l.status));
   }
 
@@ -212,6 +213,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   get canBulkExecute(): boolean {
+    if (this.isReportSubmitted) return false;
     if (this.isAllSelected) {
       return true;
     }
@@ -226,6 +228,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   get canBulkCancel(): boolean {
+    if (this.isReportSubmitted) return false;
     if (this.isAllSelected) {
       // In Select-All mode the count shown is paginationMetadata.totalCount, which only
       // matches cancel-eligibility when the Cancellable Logs filter is active.
