@@ -78,6 +78,17 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return model;
         }
 
+        /// <summary>
+        /// Daniel - 04/2026: As of 0.6, writing to the ReportResource table is temporarily disabled for two reasons:
+        ///     1. After a few staging runs, we found that Report generated ~13 million entries into the table which could affect write/read performance. Strategies on how to better store this data will need to be investigated.
+        ///     2. Currently, the data in this table is not being used in the admin UI. 
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="reportId"></param>
+        /// <param name="patientId"></param>
+        /// <param name="aggregateResult"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         public async Task AddAsyncWithAggregateResult(string facilityId, Guid reportId, string patientId, AggregateResult aggregateResult, CancellationToken cancellationToken)
         {
             if (aggregateResult?.MeasureReportResults == null || !aggregateResult.MeasureReportResults.Any())
