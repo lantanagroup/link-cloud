@@ -27,7 +27,6 @@ public class PipelineSummarySnapshotBuilder
         public IReadOnlyList<PipelineDataReader.ReportPopulationInfo> Populations { get; init; } = [];
         public PipelineDataReader.AcquisitionSummaryInfo? AcquisitionSummary { get; init; }
         public IReadOnlyList<PipelineDataReader.PatientResourceTypeCount> MeasureEvalResourceCounts { get; init; } = [];
-        public IReadOnlyList<PipelineDataReader.PatientResourceTypeCount> ReportResourceCounts { get; init; } = [];
 
         /// <summary>
         /// Structured test-validator results persisted by the run manager.
@@ -190,7 +189,6 @@ public class PipelineSummarySnapshotBuilder
         IReadOnlyList<PipelineDataReader.ReportPopulationInfo> populations;
         PipelineDataReader.AcquisitionSummaryInfo? acquisitionSummary;
         IReadOnlyList<PipelineDataReader.PatientResourceTypeCount> measureEvalResourceCounts;
-        IReadOnlyList<PipelineDataReader.PatientResourceTypeCount> reportResourceCounts;
 
         var data = await _domainDataProvider(scheduleId, facilityId);
         schedule = data.Schedule;
@@ -198,7 +196,6 @@ public class PipelineSummarySnapshotBuilder
         populations = data.Populations;
         acquisitionSummary = data.AcquisitionSummary;
         measureEvalResourceCounts = data.MeasureEvalResourceCounts;
-        reportResourceCounts = data.ReportResourceCounts;
 
         snapshot.Report.Schedule = schedule == null
             ? null
@@ -246,7 +243,6 @@ public class PipelineSummarySnapshotBuilder
             .ToList();
 
         var measureResources = measureEvalResourceCounts.Sum(x => x.Count);
-        var validationResources = reportResourceCounts.Sum(x => x.Count);
 
         // Normalization processes every resource acquired by DataAcquisition, so its
         // resource count mirrors DataAcquisition output. Resource type breakdown is the same.
@@ -256,19 +252,15 @@ public class PipelineSummarySnapshotBuilder
         snapshot.Normalization.ResourceTypeCounts = snapshot.DataAcquisition.ResourceTypeCounts.ToList();
 
         snapshot.MeasureEval.ResourceCount = measureResources;
-        snapshot.Validation.ResourceCount = validationResources;
-
         snapshot.MeasureEval.AverageResourcesPerSecond = ComputeResourcesPerSecond(measureResources, measureLines);
-        snapshot.Validation.AverageResourcesPerSecond = ComputeResourcesPerSecond(validationResources, validationLines);
+
+        // Validation operates in a per-patient context -- its 'resource count' is the
+        // number of patients whose validation reached a terminal status. The per-status
+        // breakdown is supplied below via FunnelCounts.
+        snapshot.Validation.ResourceCount = entries.Count;
+        snapshot.Validation.AverageResourcesPerSecond = ComputeResourcesPerSecond(entries.Count, validationLines);
 
         snapshot.MeasureEval.ResourceTypeCounts = measureEvalResourceCounts
-            .GroupBy(x => x.ResourceType)
-            .Select(g => new CategoryCountSnapshot { Status = g.Key, Count = g.Sum(x => x.Count) })
-            .OrderByDescending(x => x.Count)
-            .Take(15)
-            .ToList();
-
-        snapshot.Validation.ResourceTypeCounts = reportResourceCounts
             .GroupBy(x => x.ResourceType)
             .Select(g => new CategoryCountSnapshot { Status = g.Key, Count = g.Sum(x => x.Count) })
             .OrderByDescending(x => x.Count)
