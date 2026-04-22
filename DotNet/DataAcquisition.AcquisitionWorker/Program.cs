@@ -1,4 +1,4 @@
-﻿using HealthChecks.UI.Client;
+using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
@@ -23,10 +23,7 @@ builder.Configuration.AddStandardEnvironmentConfiguration();
 
 var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-// Determine if secret manager should be enabled based on configuration
-var secretManagerEnabled = builder.Configuration.GetValue<bool>("SecretManagement:Enabled");
-
-builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, configureRedis: true, configureSecretManager: secretManagerEnabled);
+builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, configureRedis: true);
 
 builder.Services.AddTransient<SftpAcquisitionHandler>();
 

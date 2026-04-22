@@ -1,4 +1,4 @@
-﻿using HealthChecks.UI.Client;
+using HealthChecks.UI.Client;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
@@ -45,10 +45,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 {
     var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-    // Determine if secret manager should be enabled based on configuration
-    var secretManagerEnabled = builder.Configuration.GetValue<bool>("SecretManagement:Enabled");
-
-    builder.RegisterAll(DataAcquisitionConstants.ServiceName, configureRedis: true, configureSecretManager: secretManagerEnabled);
+    builder.RegisterAll(DataAcquisitionConstants.ServiceName, configureRedis: true);
 
     // Add Data Protection
     builder.Services.AddDataProtection()
