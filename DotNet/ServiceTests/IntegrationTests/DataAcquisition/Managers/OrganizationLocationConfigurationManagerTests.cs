@@ -1,9 +1,8 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
@@ -11,7 +10,7 @@ namespace IntegrationTests.DataAcquisition.Managers;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class OrganizationLocationConfigurationManagerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class OrganizationLocationConfigurationManagerTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -27,19 +26,18 @@ public class OrganizationLocationConfigurationManagerTests : IClassFixture<DataA
         return new OrganizationLocationConfigurationManager(database, queries);
     }
 
+    private static string NewFacilityId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";
+
     [Fact]
     public async Task CreateAsync_ValidModelWithConditions_ReturnsModel()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
+        var facilityId = NewFacilityId("Nebraska");
 
         var createModel = new CreateOrganizationLocationConfigurationModel
         {
-            FacilityId = "Nebraska-001",
+            FacilityId = facilityId,
             Description = "Nebraska Epic Config",
             IsActive = true,
             Conditions = new List<CreateOrganizationLocationConditionModel>
@@ -51,7 +49,7 @@ public class OrganizationLocationConfigurationManagerTests : IClassFixture<DataA
         var result = await manager.CreateAsync(createModel);
 
         Assert.NotNull(result);
-        Assert.Equal("Nebraska-001", result.FacilityId);
+        Assert.Equal(facilityId, result.FacilityId);
         Assert.Equal("Nebraska Epic Config", result.Description);
         Assert.True(result.IsActive);
         Assert.Single(result.Conditions);
@@ -62,14 +60,10 @@ public class OrganizationLocationConfigurationManagerTests : IClassFixture<DataA
     public async Task UpdateByIdAsync_ValidUpdate_ReturnsUpdatedModel()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
         var created = await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel
         {
-            FacilityId = "Test-Update-Id",
+            FacilityId = NewFacilityId("Test-Update-Id"),
             Description = "Old Description"
         });
 
@@ -94,17 +88,14 @@ public class OrganizationLocationConfigurationManagerTests : IClassFixture<DataA
     public async Task UpdateByFacilityIdAsync_MultipleConfigs_UpdatesAll()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
-        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Multi-Facility", Description = "Config A" });
-        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Multi-Facility", Description = "Config B" });
+        var facilityId = NewFacilityId("Multi-Facility");
+        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = facilityId, Description = "Config A" });
+        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = facilityId, Description = "Config B" });
 
         var updateModel = new UpdateOrganizationLocationConfigurationModel { Description = "All Updated" };
 
-        var result = await manager.UpdateByFacilityIdAsync("Multi-Facility", updateModel);
+        var result = await manager.UpdateByFacilityIdAsync(facilityId, updateModel);
 
         Assert.All(result, x => x.Description.Equals("All Updated"));
     }
@@ -113,12 +104,8 @@ public class OrganizationLocationConfigurationManagerTests : IClassFixture<DataA
     public async Task DeleteByIdAsync_Existing_DeletesSuccessfully()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
-        var created = await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Delete-By-Id" });
+        var created = await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = NewFacilityId("Delete-By-Id") });
 
         await manager.DeleteByIdAsync(created.ConfigId);
 
@@ -130,18 +117,15 @@ public class OrganizationLocationConfigurationManagerTests : IClassFixture<DataA
     public async Task DeleteByFacilityIdAsync_Multiple_DeletesAll()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
-        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Delete-All" });
-        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = "Delete-All" });
+        var facilityId = NewFacilityId("Delete-All");
+        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = facilityId });
+        await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel { FacilityId = facilityId });
 
-        await manager.DeleteByFacilityIdAsync("Delete-All");
+        await manager.DeleteByFacilityIdAsync(facilityId);
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
-        var search = await queries.SearchAsync(new OrganizationLocationConfigurationSearchModel { FacilityId = "Delete-All" });
+        var search = await queries.SearchAsync(new OrganizationLocationConfigurationSearchModel { FacilityId = facilityId });
         Assert.Empty(search.Records);
     }
 

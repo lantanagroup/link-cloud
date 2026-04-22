@@ -1,8 +1,7 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
@@ -10,7 +9,7 @@ namespace IntegrationTests.DataAcquisition.Managers;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class OrganizationLocationMappingManagerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class OrganizationLocationMappingManagerTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -25,20 +24,21 @@ public class OrganizationLocationMappingManagerTests : IClassFixture<DataAcquisi
         return new OrganizationLocationMappingManager(database);
     }
 
+    private static string NewFacilityId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";
+    private static string NewLocationId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";
+
     [Fact]
     public async Task CreateAsync_ValidModel_ReturnsModel()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
+        var facilityId = NewFacilityId("Facility-ABC");
+        var locationId = NewLocationId("Location-123");
 
         var createModel = new CreateOrganizationLocationMappingModel
         {
-            FacilityId = "Facility-ABC",
-            LocationId = "Location-123",
+            FacilityId = facilityId,
+            LocationId = locationId,
             LocationName = "Main Hospital Bed 101",
             LocationAlias = "ICU-Bed-101",
             PartOfValue = "Location-Parent-001",
@@ -50,8 +50,8 @@ public class OrganizationLocationMappingManagerTests : IClassFixture<DataAcquisi
         var result = await manager.CreateAsync(createModel);
 
         Assert.NotNull(result);
-        Assert.Equal("Facility-ABC", result.FacilityId);
-        Assert.Equal("Location-123", result.LocationId);
+        Assert.Equal(facilityId, result.FacilityId);
+        Assert.Equal(locationId, result.LocationId);
         Assert.Equal("Main Hospital Bed 101", result.LocationName);
         Assert.True(result.IsOrgLocation);
     }
@@ -60,15 +60,11 @@ public class OrganizationLocationMappingManagerTests : IClassFixture<DataAcquisi
     public async Task UpdateByIdAsync_ValidUpdate_ReturnsUpdatedModel()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
         var created = await manager.CreateAsync(new CreateOrganizationLocationMappingModel
         {
-            FacilityId = "Test-Fac",
-            LocationId = "Loc-001",
+            FacilityId = NewFacilityId("Test-Fac"),
+            LocationId = NewLocationId("Loc-001"),
             IsOrgLocation = false
         });
 
@@ -90,21 +86,19 @@ public class OrganizationLocationMappingManagerTests : IClassFixture<DataAcquisi
     public async Task UpdateByFacilityIdAndLocationIdAsync_ValidUpdate_ReturnsUpdatedModel()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
+        var facilityId = NewFacilityId("Fac-XYZ");
+        var locationId = NewLocationId("Loc-555");
         await manager.CreateAsync(new CreateOrganizationLocationMappingModel
         {
-            FacilityId = "Fac-XYZ",
-            LocationId = "Loc-555",
+            FacilityId = facilityId,
+            LocationId = locationId,
             LocationName = "Old Name"
         });
 
         var updateModel = new UpdateOrganizationLocationMappingModel { LocationName = "New Name" };
 
-        var result = await manager.UpdateByFacilityIdAndLocationIdAsync("Fac-XYZ", "Loc-555", updateModel);
+        var result = await manager.UpdateByFacilityIdAndLocationIdAsync(facilityId, locationId, updateModel);
 
         Assert.Equal("New Name", result.LocationName);
     }
@@ -113,15 +107,11 @@ public class OrganizationLocationMappingManagerTests : IClassFixture<DataAcquisi
     public async Task DeleteByIdAsync_Existing_DeletesRecord()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
         var created = await manager.CreateAsync(new CreateOrganizationLocationMappingModel
         {
-            FacilityId = "Delete-Test",
-            LocationId = "Loc-999"
+            FacilityId = NewFacilityId("Delete-Test"),
+            LocationId = NewLocationId("Loc-999")
         });
 
         await manager.DeleteByIdAsync(created.LocationMappingId);
@@ -134,21 +124,19 @@ public class OrganizationLocationMappingManagerTests : IClassFixture<DataAcquisi
     public async Task DeleteByFacilityIdAndLocationIdAsync_Existing_DeletesRecord()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
+        var facilityId = NewFacilityId("Fac-Delete");
+        var locationId = NewLocationId("Loc-Delete");
         await manager.CreateAsync(new CreateOrganizationLocationMappingModel
         {
-            FacilityId = "Fac-Delete",
-            LocationId = "Loc-Delete"
+            FacilityId = facilityId,
+            LocationId = locationId
         });
 
-        await manager.DeleteByFacilityIdAndLocationIdAsync("Fac-Delete", "Loc-Delete");
+        await manager.DeleteByFacilityIdAndLocationIdAsync(facilityId, locationId);
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
-        Assert.Null(await queries.GetByFacilityIdAndLocationIdAsync("Fac-Delete", "Loc-Delete"));
+        Assert.Null(await queries.GetByFacilityIdAndLocationIdAsync(facilityId, locationId));
     }
 
     [Fact]

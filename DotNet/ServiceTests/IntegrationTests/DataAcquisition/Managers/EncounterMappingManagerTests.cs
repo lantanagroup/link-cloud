@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
@@ -11,7 +11,7 @@ namespace IntegrationTests.DataAcquisition.Managers;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class EncounterMappingManagerTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -32,18 +32,19 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
         return new EncounterMappingQueries(database);
     }
 
+    private static string NewFacilityId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";
+
     [Fact]
     public async Task CreateAsync_ValidModel_ReturnsModel()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var facilityId = NewFacilityId("Facility-ABC");
 
         var locationMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
         var loc1 = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
         {
-            FacilityId = "Facility-ABC",
+            FacilityId = facilityId,
             LocationId = "Loc-1",
             IsOrgLocation = true,
             IsActive = true
@@ -52,7 +53,7 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
 
         var loc2 = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
         {
-            FacilityId = "Facility-ABC",
+            FacilityId = facilityId,
             LocationId = "Loc-2",
             IsOrgLocation = true,
             IsActive = true
@@ -63,7 +64,7 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
 
         var createModel = new CreateEncounterMappingModel
         {
-            FacilityId = "Facility-ABC",
+            FacilityId = facilityId,
             PatientId = "Patient-123",
             EncounterId = "Encounter-456",
             MappedToOrg = true,
@@ -73,7 +74,7 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
         var result = await manager.CreateAsync(createModel);
 
         Assert.NotNull(result);
-        Assert.Equal("Facility-ABC", result.FacilityId);
+        Assert.Equal(facilityId, result.FacilityId);
         Assert.Equal("Patient-123", result.PatientId);
         Assert.Equal("Encounter-456", result.EncounterId);
         Assert.True(result.MappedToOrg);
@@ -85,30 +86,29 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var facilityId = NewFacilityId("Test-Fac");
 
         var locationMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
         var loc10 = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
         {
-            FacilityId = "Test-Fac", LocationId = "Loc-10", IsOrgLocation = true, IsActive = true
+            FacilityId = facilityId, LocationId = "Loc-10", IsOrgLocation = true, IsActive = true
         });
         await dbContext.SaveChangesAsync();
         var loc20 = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
         {
-            FacilityId = "Test-Fac", LocationId = "Loc-20", IsOrgLocation = true, IsActive = true
+            FacilityId = facilityId, LocationId = "Loc-20", IsOrgLocation = true, IsActive = true
         });
         await dbContext.SaveChangesAsync();
         var loc30 = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
         {
-            FacilityId = "Test-Fac", LocationId = "Loc-30", IsOrgLocation = true, IsActive = true
+            FacilityId = facilityId, LocationId = "Loc-30", IsOrgLocation = true, IsActive = true
         });
         await dbContext.SaveChangesAsync();
 
         var manager = CreateManager(scope);
         var created = await manager.CreateAsync(new CreateEncounterMappingModel
         {
-            FacilityId = "Test-Fac",
+            FacilityId = facilityId,
             PatientId = "Test-Pat",
             EncounterId = "Test-Enc",
             MappedToOrg = false
@@ -130,27 +130,25 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
     public async Task SearchAsync_WithFilters_ReturnsPagedResult()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
         var queries = CreateQueries(scope);
+        var fac1 = NewFacilityId("Fac-1");
+        var fac2 = NewFacilityId("Fac-2");
 
         await manager.CreateAsync(new CreateEncounterMappingModel
         {
-            FacilityId = "Fac-1", PatientId = "Pat-1", EncounterId = "Enc-1", MappedToOrg = true
+            FacilityId = fac1, PatientId = "Pat-1", EncounterId = "Enc-1", MappedToOrg = true
         });
         await manager.CreateAsync(new CreateEncounterMappingModel
         {
-            FacilityId = "Fac-1", PatientId = "Pat-2", EncounterId = "Enc-2", MappedToOrg = false
+            FacilityId = fac1, PatientId = "Pat-2", EncounterId = "Enc-2", MappedToOrg = false
         });
         await manager.CreateAsync(new CreateEncounterMappingModel
         {
-            FacilityId = "Fac-2", PatientId = "Pat-3", EncounterId = "Enc-3", MappedToOrg = true
+            FacilityId = fac2, PatientId = "Pat-3", EncounterId = "Enc-3", MappedToOrg = true
         });
 
-        var search = new EncounterMappingSearchModel { FacilityId = "Fac-1" };
+        var search = new EncounterMappingSearchModel { FacilityId = fac1 };
         var result = await queries.SearchAsync(search, 1, 10);
 
         Assert.Equal(2, result.Metadata.TotalCount);
@@ -161,32 +159,30 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
     public async Task DeleteByFacilityIdAsync_DeletesAllForFacility()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
         var queries = CreateQueries(scope);
+        var deleteFac = NewFacilityId("Delete-Fac");
+        var otherFac = NewFacilityId("Other-Fac");
 
         await manager.CreateAsync(new CreateEncounterMappingModel
         {
-            FacilityId = "Delete-Fac", PatientId = "P1", EncounterId = "E1"
+            FacilityId = deleteFac, PatientId = "P1", EncounterId = "E1"
         });
         await manager.CreateAsync(new CreateEncounterMappingModel
         {
-            FacilityId = "Delete-Fac", PatientId = "P2", EncounterId = "E2"
+            FacilityId = deleteFac, PatientId = "P2", EncounterId = "E2"
         });
         await manager.CreateAsync(new CreateEncounterMappingModel
         {
-            FacilityId = "Other-Fac", PatientId = "P3", EncounterId = "E3"
+            FacilityId = otherFac, PatientId = "P3", EncounterId = "E3"
         });
 
-        await manager.DeleteByFacilityIdAsync("Delete-Fac");
+        await manager.DeleteByFacilityIdAsync(deleteFac);
 
-        var results = await queries.GetByFacilityIdAsync("Delete-Fac");
+        var results = await queries.GetByFacilityIdAsync(deleteFac);
         Assert.Empty(results);
 
-        var otherResults = await queries.GetByFacilityIdAsync("Other-Fac");
+        var otherResults = await queries.GetByFacilityIdAsync(otherFac);
         Assert.Single(otherResults);
     }
 
@@ -194,14 +190,10 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
     public async Task CreateAsync_DuplicateNaturalKey_ThrowsException()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
         var model = new CreateEncounterMappingModel
         {
-            FacilityId = "Fac-1", EncounterId = "Enc-1", PatientId = "Pat-1"
+            FacilityId = NewFacilityId("Fac-1"), EncounterId = "Enc-1", PatientId = "Pat-1"
         };
 
         await manager.CreateAsync(model);
@@ -216,30 +208,30 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
 
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => manager.UpdateByIdAsync(9999, new UpdateEncounterMappingModel()));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => manager.UpdateByIdAsync(int.MaxValue, new UpdateEncounterMappingModel()));
     }
 
     [Fact]
     public async Task DeleteByPatientIdAsync_DeletesMatchingRecords()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
         var queries = CreateQueries(scope);
+        var fac1 = NewFacilityId("F1");
+        var fac2 = NewFacilityId("F2");
+        var targetPatient = $"Target-Pat-{Guid.NewGuid():N}";
+        var otherPatient = $"Other-Pat-{Guid.NewGuid():N}";
 
-        await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = "F1", EncounterId = "E1", PatientId = "Target-Pat" });
-        await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = "F2", EncounterId = "E2", PatientId = "Target-Pat" });
-        await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = "F1", EncounterId = "E3", PatientId = "Other-Pat" });
+        await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = fac1, EncounterId = "E1", PatientId = targetPatient });
+        await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = fac2, EncounterId = "E2", PatientId = targetPatient });
+        await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = fac1, EncounterId = "E3", PatientId = otherPatient });
 
-        await manager.DeleteByPatientIdAsync("Target-Pat");
+        await manager.DeleteByPatientIdAsync(targetPatient);
 
-        var targetResults = await queries.GetByPatientIdAsync("Target-Pat");
+        var targetResults = await queries.GetByPatientIdAsync(targetPatient);
         Assert.Empty(targetResults);
 
-        var otherResults = await queries.GetByPatientIdAsync("Other-Pat");
+        var otherResults = await queries.GetByPatientIdAsync(otherPatient);
         Assert.Single(otherResults);
     }
 
@@ -247,20 +239,15 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
     public async Task CreateAsync_InvalidLocationMappingId_ThrowsException()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
         var model = new CreateEncounterMappingModel
         {
-            FacilityId = "F1",
+            FacilityId = NewFacilityId("F1"),
             EncounterId = "E1",
             PatientId = "P1",
-            OrganizationLocationMappingIds = new List<int> { 9999 } // Non-existent ID
+            OrganizationLocationMappingIds = new List<int> { int.MaxValue } // Non-existent ID
         };
 
-        // SQLite should throw a FK constraint violation
         await Assert.ThrowsAsync<Microsoft.EntityFrameworkCore.DbUpdateException>(() => manager.CreateAsync(model));
     }
 
@@ -269,17 +256,16 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var facilityId = NewFacilityId("F1");
 
         var locMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
-        var loc1 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = "F1", LocationId = "L1" });
+        var loc1 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "L1" });
         await dbContext.SaveChangesAsync();
 
         var manager = CreateManager(scope);
         var created = await manager.CreateAsync(new CreateEncounterMappingModel
         {
-            FacilityId = "F1", EncounterId = "E1", PatientId = "P1", OrganizationLocationMappingIds = new List<int> { loc1.LocationMappingId }
+            FacilityId = facilityId, EncounterId = "E1", PatientId = "P1", OrganizationLocationMappingIds = new List<int> { loc1.LocationMappingId }
         });
 
         var updateModel = new UpdateEncounterMappingModel { MappedToOrg = false, OrganizationLocationMappingIds = null };
@@ -293,16 +279,13 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
     public async Task SearchAsync_PageOutOfBounds_ReturnsEmptyRecordsButCorrectTotalCount()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
         var queries = CreateQueries(scope);
+        var facilityId = NewFacilityId("F1");
 
-        await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = "F1", EncounterId = "E1", PatientId = "P1" });
+        await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = facilityId, EncounterId = "E1", PatientId = "P1" });
 
-        var result = await queries.SearchAsync(new EncounterMappingSearchModel(), 2, 10);
+        var result = await queries.SearchAsync(new EncounterMappingSearchModel { FacilityId = facilityId }, 2, 10);
 
         Assert.Empty(result.Records);
         Assert.Equal(1, result.Metadata.TotalCount);
@@ -314,17 +297,16 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var facilityId = NewFacilityId("F1");
 
         var locMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
-        var loc1 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = "F1", LocationId = "L1" });
+        var loc1 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "L1" });
         await dbContext.SaveChangesAsync();
 
         var manager = CreateManager(scope);
         var created = await manager.CreateAsync(new CreateEncounterMappingModel
         {
-            FacilityId = "F1", EncounterId = "E1", PatientId = "P1", OrganizationLocationMappingIds = new List<int> { loc1.LocationMappingId }
+            FacilityId = facilityId, EncounterId = "E1", PatientId = "P1", OrganizationLocationMappingIds = new List<int> { loc1.LocationMappingId }
         });
 
         var mappingId = created.EncounterMappingId;
@@ -338,19 +320,17 @@ public class EncounterMappingManagerTests : IClassFixture<DataAcquisitionIntegra
     public async Task UpdateByIdAsync_SyncsLocationsCorrectly()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var facilityId = NewFacilityId("F1");
 
         var locMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
-        var loc1 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = "F1", LocationId = "L1" });
-        var loc2 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = "F1", LocationId = "L2" });
-        var loc3 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = "F1", LocationId = "L3" });
+        var loc1 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "L1" });
+        var loc2 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "L2" });
+        var loc3 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "L3" });
 
         var manager = CreateManager(scope);
         var created = await manager.CreateAsync(new CreateEncounterMappingModel
         {
-            FacilityId = "F1", EncounterId = "E1", PatientId = "P1", OrganizationLocationMappingIds = new List<int> { loc1.LocationMappingId, loc2.LocationMappingId }
+            FacilityId = facilityId, EncounterId = "E1", PatientId = "P1", OrganizationLocationMappingIds = new List<int> { loc1.LocationMappingId, loc2.LocationMappingId }
         });
 
         // Update: remove L1, keep L2, add L3

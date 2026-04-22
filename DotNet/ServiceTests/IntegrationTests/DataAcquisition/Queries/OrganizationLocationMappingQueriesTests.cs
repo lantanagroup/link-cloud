@@ -1,7 +1,6 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
@@ -9,7 +8,7 @@ namespace IntegrationTests.DataAcquisition.Queries;
 
 [Collection("DataAcquisitionIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class OrganizationLocationMappingQueriesTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -18,20 +17,17 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
         _fixture = fixture;
     }
 
-    #region Original Tests (unchanged)
+    private static string NewFacilityId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";
 
     [Fact]
     public async Task GetByIdAsync_Exists_ReturnsModel()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        var facilityId = NewFacilityId("Test-Fac");
         var created = await manager.CreateAsync(new CreateOrganizationLocationMappingModel
         {
-            FacilityId = "Test-Fac",
+            FacilityId = facilityId,
             LocationId = "Loc-001",
             LocationName = "Test Bed",
             IsOrgLocation = true
@@ -41,7 +37,7 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
         var result = await queries.GetByIdAsync(created.LocationMappingId);
 
         Assert.NotNull(result);
-        Assert.Equal("Test-Fac", result.FacilityId);
+        Assert.Equal(facilityId, result.FacilityId);
         Assert.Equal("Loc-001", result.LocationId);
         Assert.Equal("Test Bed", result.LocationName);
     }
@@ -50,38 +46,32 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
     public async Task GetByFacilityIdAndLocationIdAsync_Exists_ReturnsModel()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        var facilityId = NewFacilityId("Fac-123");
         await manager.CreateAsync(new CreateOrganizationLocationMappingModel
         {
-            FacilityId = "Fac-123",
+            FacilityId = facilityId,
             LocationId = "Loc-XYZ"
         });
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
-        var result = await queries.GetByFacilityIdAndLocationIdAsync("Fac-123", "Loc-XYZ");
+        var result = await queries.GetByFacilityIdAndLocationIdAsync(facilityId, "Loc-XYZ");
 
         Assert.NotNull(result);
-        Assert.Equal("Fac-123", result.FacilityId);
+        Assert.Equal(facilityId, result.FacilityId);
     }
 
     [Fact]
     public async Task GetByFacilityIdAsync_ReturnsAllForFacility()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
-        await manager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = "Fac-ABC", LocationId = "Loc-1" });
-        await manager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = "Fac-ABC", LocationId = "Loc-2" });
+        var facilityId = NewFacilityId("Fac-ABC");
+        await manager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "Loc-1" });
+        await manager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "Loc-2" });
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
-        var results = await queries.GetByFacilityIdAsync("Fac-ABC");
+        var results = await queries.GetByFacilityIdAsync(facilityId);
 
         Assert.Equal(2, results.Count);
     }
@@ -90,19 +80,16 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
     public async Task SearchAsync_WithFilters_ReturnsCorrectResults()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
-        await manager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = "Fac-Filter", LocationId = "Loc-A", IsOrgLocation = true });
-        await manager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = "Fac-Filter", LocationId = "Loc-B", IsOrgLocation = false });
+        var facilityId = NewFacilityId("Fac-Filter");
+        await manager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "Loc-A", IsOrgLocation = true });
+        await manager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "Loc-B", IsOrgLocation = false });
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
 
         var result = await queries.SearchAsync(new OrganizationLocationMappingSearchModel
         {
-            FacilityId = "Fac-Filter",
+            FacilityId = facilityId,
             IsOrgLocation = true
         });
 
@@ -114,30 +101,23 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
     public async Task SearchAsync_Pagination_WorksCorrectly()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        var facilityId = NewFacilityId("Pag-Test");
         for (int i = 1; i <= 15; i++)
-            await manager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = "Pag-Test", LocationId = $"Loc-{i}" });
+            await manager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = $"Loc-{i}" });
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
-        var result = await queries.SearchAsync(new OrganizationLocationMappingSearchModel { FacilityId = "Pag-Test" }, pageNumber: 2, pageSize: 5);
+        var result = await queries.SearchAsync(new OrganizationLocationMappingSearchModel { FacilityId = facilityId }, pageNumber: 2, pageSize: 5);
 
         Assert.Equal(5, result.Records.Count);
         Assert.Equal(15, result.Metadata.TotalCount);
     }
 
-    #endregion
-
-    #region Hierarchy Test Data Setup
-
     /// <summary>
     /// Creates a realistic, multi-branch healthcare location hierarchy (4 levels deep, 13 locations)
     /// with branching, multiple roots, and names chosen to exercise alphabetical child sorting.
     /// </summary>
-    private async Task SetupRobustHierarchyTestDataAsync(IOrganizationLocationMappingManager manager, string facilityId = "Hierarchy-Test-Fac")
+    private async Task SetupRobustHierarchyTestDataAsync(IOrganizationLocationMappingManager manager, string facilityId)
     {
         var data = new List<(string LocationId, string LocationName, string? PartOfValue)>
         {
@@ -170,23 +150,16 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
         }
     }
 
-    #endregion
-
-    #region New Hierarchy Tests
-
     [Fact]
     public async Task GetHierarchyUpAsync_FromDeepLeaf_ReturnsCorrectPathWithProperDepths()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
-        await SetupRobustHierarchyTestDataAsync(manager);
+        var facilityId = NewFacilityId("Hierarchy-Test-Fac");
+        await SetupRobustHierarchyTestDataAsync(manager, facilityId);
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
-        var path = await queries.GetHierarchyUpAsync("Hierarchy-Test-Fac", "WARD-A11");
+        var path = await queries.GetHierarchyUpAsync(facilityId, "WARD-A11");
 
         Assert.Equal(4, path.Count);
 
@@ -203,15 +176,12 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
     public async Task GetHierarchyUpAsync_FromRoot_ReturnsSingleRootNode()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
-        await SetupRobustHierarchyTestDataAsync(manager);
+        var facilityId = NewFacilityId("Hierarchy-Test-Fac");
+        await SetupRobustHierarchyTestDataAsync(manager, facilityId);
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
-        var path = await queries.GetHierarchyUpAsync("Hierarchy-Test-Fac", "ORG-ROOT");
+        var path = await queries.GetHierarchyUpAsync(facilityId, "ORG-ROOT");
 
         Assert.Single(path);
         Assert.Equal(0, path[0].Depth);
@@ -223,15 +193,12 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
     public async Task GetHierarchyUpAsync_NonExistentLocation_ReturnsEmptyList()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
-        await SetupRobustHierarchyTestDataAsync(manager);
+        var facilityId = NewFacilityId("Hierarchy-Test-Fac");
+        await SetupRobustHierarchyTestDataAsync(manager, facilityId);
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
-        var path = await queries.GetHierarchyUpAsync("Hierarchy-Test-Fac", "NON-EXISTENT");
+        var path = await queries.GetHierarchyUpAsync(facilityId, "NON-EXISTENT");
 
         Assert.Empty(path);
     }
@@ -240,15 +207,12 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
     public async Task GetFullSubtreeAsync_FromRoot_ReturnsCompleteTreeWithChildrenSortedByName()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
-        await SetupRobustHierarchyTestDataAsync(manager);
+        var facilityId = NewFacilityId("Hierarchy-Test-Fac");
+        await SetupRobustHierarchyTestDataAsync(manager, facilityId);
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
-        var tree = await queries.GetFullSubtreeAsync("Hierarchy-Test-Fac", "ORG-ROOT");
+        var tree = await queries.GetFullSubtreeAsync(facilityId, "ORG-ROOT");
 
         Assert.NotNull(tree);
         Assert.Equal("ORG-ROOT", tree.Mapping.LocationId);
@@ -270,15 +234,12 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
     public async Task GetFullSubtreeAsync_FromMidLevelChild_ReturnsFullTreeFromUltimateRoot()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
-        await SetupRobustHierarchyTestDataAsync(manager);
+        var facilityId = NewFacilityId("Hierarchy-Test-Fac");
+        await SetupRobustHierarchyTestDataAsync(manager, facilityId);
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
-        var tree = await queries.GetFullSubtreeAsync("Hierarchy-Test-Fac", "WARD-A11");
+        var tree = await queries.GetFullSubtreeAsync(facilityId, "WARD-A11");
 
         Assert.NotNull(tree);
         Assert.Equal("ORG-ROOT", tree.Mapping.LocationId); // Always returns from true root
@@ -292,15 +253,12 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
     public async Task GetFullSubtreeAsync_FromStandaloneRoot_ReturnsIsolatedTree()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
-        await SetupRobustHierarchyTestDataAsync(manager);
+        var facilityId = NewFacilityId("Hierarchy-Test-Fac");
+        await SetupRobustHierarchyTestDataAsync(manager, facilityId);
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
-        var tree = await queries.GetFullSubtreeAsync("Hierarchy-Test-Fac", "STANDALONE-1");
+        var tree = await queries.GetFullSubtreeAsync(facilityId, "STANDALONE-1");
 
         Assert.NotNull(tree);
         Assert.Equal("STANDALONE-1", tree.Mapping.LocationId);
@@ -312,15 +270,12 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
     public async Task GetFullSubtreeAsync_NonExistentLocation_ReturnsNull()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
-        await SetupRobustHierarchyTestDataAsync(manager);
+        var facilityId = NewFacilityId("Hierarchy-Test-Fac");
+        await SetupRobustHierarchyTestDataAsync(manager, facilityId);
 
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
-        var result = await queries.GetFullSubtreeAsync("Hierarchy-Test-Fac", "NONEXISTENT-XYZ");
+        var result = await queries.GetFullSubtreeAsync(facilityId, "NONEXISTENT-XYZ");
 
         Assert.Null(result);
     }
@@ -340,6 +295,4 @@ public class OrganizationLocationMappingQueriesTests : IClassFixture<DataAcquisi
         }
         return null;
     }
-
-    #endregion
 }
