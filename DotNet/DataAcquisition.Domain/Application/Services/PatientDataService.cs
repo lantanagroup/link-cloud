@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
@@ -185,32 +185,18 @@ public class PatientDataService : IPatientDataService
             fhirQueryConfiguration =
                 await _fhirQueryQueries.GetByFacilityIdAsync(request.FacilityId, cancellationToken);
 
-            if (fhirQueryConfiguration == null)
+            if (fhirQueryConfiguration != null)
             {
-                throw new ArgumentNullException("No FHIR Query Confiugration found for FacilityId: " +
-                                                request.FacilityId);
+                Frequency reportableEventTranslation =
+                    ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult
+                        .Value.ReportableEvent);
+
+                queryPlan = (await _queryPlanQueries.SearchAsync(new SearchQueryPlanModel
+                {
+                    FacilityId = request.FacilityId,
+                    Type = reportableEventTranslation
+                })).Records.FirstOrDefault();
             }
-
-            Frequency reportableEventTranslation =
-                ReportableEventToQueryPlanTypeFactory.GenerateQueryPlanTypeFromReportableEvent(request.ConsumeResult
-                    .Value.ReportableEvent);
-
-            queryPlan = (await _queryPlanQueries.SearchAsync(new SearchQueryPlanModel
-            {
-                FacilityId = request.FacilityId,
-                Type = reportableEventTranslation
-            })).Records.FirstOrDefault();
-
-            if (fhirQueryConfiguration == null || queryPlan == null)
-            {
-                throw new MissingFacilityConfigurationException(
-                    $"No configuration for {request.FacilityId} exists.");
-            }
-        }
-        catch (MissingFacilityConfigurationException ex)
-        {
-            _logger.LogError(ex, "Error retrieving configuration for facility {FacilityId}", request.FacilityId);
-            throw;
         }
         catch (Exception ex)
         {
@@ -226,6 +212,24 @@ public class PatientDataService : IPatientDataService
         var traceAndSpanDelimited = (traceId != null && spanId != null)
             ? $"{traceId}|{spanId}"
             : null;
+
+        // Missing configuration is a terminal, non-retryable condition. Instead of throwing
+        // (which would cause the listener to enter a transient retry loop), record the failure
+        // by creating ConfigurationMissing log entries — mirroring the AcquisitionProcessingJob
+        // behavior for missing configuration.
+        if (fhirQueryConfiguration == null || queryPlan == null)
+        {
+            var note = fhirQueryConfiguration == null
+                ? $"No FhirQueryConfiguration found for FacilityId: {request.FacilityId}."
+                : $"No QueryPlan found for FacilityId: {request.FacilityId}.";
+
+            _logger.LogWarning(
+                "Missing facility configuration for facility {FacilityId}. Creating terminal ConfigurationMissing log entries. Reason: {Reason}",
+                request.FacilityId, note);
+
+            await CreateMissingConfigurationLogEntries(request, traceAndSpanDelimited, note, cancellationToken);
+            return;
+        }
 
         if (queryPlan != null)
         {
@@ -348,6 +352,65 @@ public class PatientDataService : IPatientDataService
                     queryPhase,
                     totalLogsCreated,
                     cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Creates terminal ConfigurationMissing log entries when the facility has no FhirQueryConfiguration
+    /// or QueryPlan defined. Mirrors the missing-config handling in AcquisitionProcessingJob so the
+    /// listener does not enter a transient retry loop on a non-recoverable configuration error.
+    /// </summary>
+    private async Task CreateMissingConfigurationLogEntries(
+        GetPatientDataRequest request,
+        string? traceAndSpanDelimited,
+        string note,
+        CancellationToken cancellationToken)
+    {
+        var dataAcqRequested = request.ConsumeResult.Message.Value;
+        var queryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType);
+
+        var scheduledReports = dataAcqRequested.ScheduledReports != null && dataAcqRequested.ScheduledReports.Any()
+            ? dataAcqRequested.ScheduledReports.ToList()
+            : new List<ScheduledReport> { null };
+
+        foreach (var schedReport in scheduledReports)
+        {
+            var priority = schedReport != null && schedReport.Frequency == Frequency.Daily
+                ? AcquisitionPriority.High
+                : AcquisitionPriority.Normal;
+
+            try
+            {
+                if (schedReport != null && !string.IsNullOrWhiteSpace(schedReport.ReportTrackingId))
+                {
+                    await _scheduledReportManager.EnsureCreatedAsync(schedReport, cancellationToken);
+                }
+
+                await _dataAcquisitionLogManager.CreateAsync(
+                    new CreateDataAcquisitionLogModel
+                    {
+                        FacilityId = request.FacilityId,
+                        CorrelationId = request.CorrelationId,
+                        PatientId = dataAcqRequested.PatientId,
+                        Priority = priority,
+                        ExecutionDate = DateTime.UtcNow,
+                        ReportableEvent = dataAcqRequested.ReportableEvent,
+                        Status = RequestStatus.ConfigurationMissing,
+                        FhirVersion = "R4",
+                        QueryType = FhirQueryType.Read,
+                        QueryPhase = queryPhase,
+                        ReportTrackingId = schedReport?.ReportTrackingId,
+                        TraceId = traceAndSpanDelimited,
+                        Notes = new List<string> { note },
+                        FhirQuery = new List<CreateFhirQueryModel>(),
+                    }, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Error creating ConfigurationMissing log entry for facility {FacilityId} and patient {PatientId}",
+                    request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
             }
         }
     }
