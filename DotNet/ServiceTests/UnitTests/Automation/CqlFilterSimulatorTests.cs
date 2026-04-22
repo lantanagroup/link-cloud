@@ -184,4 +184,45 @@ public class CqlFilterSimulatorTests
 
         Assert.Contains("Observation/o-exam", excluded);
     }
+
+    // ---------- Per-resource-type intersection regression ----------
+
+    [Fact]
+    public void PerTypeIntersection_ObservationProfileDoesNotErase_ConditionExclusions()
+    {
+        // Regression guard: a profile that targets Observations must not be intersected
+        // against a profile that targets Conditions. If the simulator intersected globally,
+        // every Condition exclusion would be wiped out the moment any Observation profile
+        // was applicable, because the two profiles never produce overlapping keys.
+        var encStart = new DateTime(2024, 5, 10, 0, 0, 0, DateTimeKind.Utc);
+        var encEnd = new DateTime(2024, 5, 15, 0, 0, 0, DateTimeKind.Utc);
+        var encounterId = "P-Enc-001";
+
+        // Condition that ACH excludes: resolved problem-list-item with recordedDate
+        // not strictly before encounter end.
+        var excludedCondition = new CqlFilterSimulator.ConditionContext(
+            ResourceId: "P-Condition-001",
+            IsActive: false,
+            RecordedDate: encEnd.Date,
+            EncounterReference: $"Encounter/{encounterId}",
+            CategoryCodes: new[] { "problem-list-item" });
+
+        // Observation ACH would keep (lab inside the encounter).
+        var keptObservation = Obs("o-lab", "laboratory", "718-7", encStart.AddHours(1));
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            PatientId: "P",
+            EncounterId: encounterId,
+            EncounterStart: encStart,
+            EncounterEnd: encEnd,
+            Conditions: new[] { excludedCondition },
+            Observations: new[] { keptObservation });
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[] { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation },
+            input);
+
+        Assert.Contains("Condition/P-Condition-001", excluded);
+        Assert.DoesNotContain("Observation/o-lab", excluded);
+    }
 }
