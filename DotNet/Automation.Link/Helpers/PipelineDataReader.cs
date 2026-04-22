@@ -74,8 +74,7 @@ public class PipelineDataReader
         _cache.Clear();
     }
 
-    public record ResourceGroupSummary(string PatientId, string ResourceType, int Count);
-    public record ReportResourceIdentity(string PatientId, string ResourceType, string ResourceId);
+
     public record PatientResourceTypeCount(string PatientId, string ResourceType, int Count);
 
     public record ReportScheduleInfo(
@@ -204,16 +203,6 @@ public class PipelineDataReader
             .ToList();
     }
 
-    public async Task<List<ResourceGroupSummary>> GetReportResourceSummaryAsync(Guid scheduleId, string facilityId)
-    {
-        var identities = await GetReportResourceIdentitiesAsync(scheduleId, facilityId);
-        return identities
-            .GroupBy(r => new { r.PatientId, r.ResourceType })
-            .Select(g => new ResourceGroupSummary(g.Key.PatientId, g.Key.ResourceType, g.Count()))
-            .OrderBy(x => x.PatientId).ThenBy(x => x.ResourceType)
-            .ToList();
-    }
-
     public async Task<List<ReportPopulationInfo>> GetReportPopulationsAsync(Guid scheduleId, string facilityId)
     {
         var result = await GetOrFetchAsync($"populations:{scheduleId}:{facilityId}", async () =>
@@ -227,34 +216,6 @@ public class PipelineDataReader
                 p.GroupPopulations.Select(gp => new GroupPopulationInfo(
                     gp.PopulationCodeJson,
                     gp.MeasureReportPopulations.Select(mrp => new MeasureReportPopulationInfo(mrp.MeasureReportId)).ToList())).ToList())).ToList();
-        });
-
-        return result ?? [];
-    }
-
-    public async Task<List<ReportResourceIdentity>> GetReportResourceIdentitiesAsync(Guid scheduleId, string facilityId)
-    {
-        var result = await GetOrFetchAsync($"resourceIdentities:{scheduleId}:{facilityId}", async () =>
-        {
-            var pageNumber = 1;
-            const int pageSize = 100;
-            var results = new List<ReportResourceIdentity>();
-
-            while (true)
-            {
-                var page = await _reportClient.SearchResourcesAsync(facilityId, scheduleId.ToString(), pageSize: pageSize, pageNumber: pageNumber);
-                if (page?.Records == null || page.Records.Count == 0)
-                    break;
-
-                results.AddRange(page.Records.Select(r => new ReportResourceIdentity(r.PatientId, r.ResourceType, r.ResourceId)));
-
-                if (page.Records.Count < pageSize)
-                    break;
-
-                pageNumber++;
-            }
-
-            return results;
         });
 
         return result ?? [];
@@ -486,16 +447,6 @@ public class PipelineDataReader
                 facility.ScheduledReports?.Monthly ?? [],
                 facility.ScheduledReports?.Daily ?? [],
                 facility.ScheduledReports?.Weekly ?? []));
-    }
-
-    public async Task<List<PatientResourceTypeCount>> GetReportResourceCountsByPatientTypeAsync(Guid scheduleId, string facilityId)
-    {
-        var identities = await GetReportResourceIdentitiesAsync(scheduleId, facilityId);
-        return identities
-            .Where(r => !string.IsNullOrWhiteSpace(r.PatientId) && !string.IsNullOrWhiteSpace(r.ResourceType))
-            .GroupBy(r => new { r.PatientId, r.ResourceType })
-            .Select(g => new PatientResourceTypeCount(g.Key.PatientId, g.Key.ResourceType, g.Count()))
-            .ToList();
     }
 
     public async Task<List<PatientResourceTypeCount>> GetMeasureEvalResourceCountsByPatientTypeAsync(Guid scheduleId)
