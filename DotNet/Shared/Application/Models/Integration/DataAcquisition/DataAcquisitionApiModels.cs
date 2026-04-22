@@ -145,6 +145,9 @@ public enum QueryPhase
     Initial,
     [StringValue("Supplemental")]
     Supplemental,
+    [Obsolete("Referential phase is no longer emitted on the primary log or downstream contracts; Use Initial or Supplemental instead. Retaining for backward compatibility.")]
+    [StringValue("Referential")]
+    Referential,
     [StringValue("Polling")]
     Polling,
     [StringValue("Monitoring")]
