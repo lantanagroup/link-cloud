@@ -74,14 +74,14 @@ public class PatientEventListenerTests : IClassFixture<ReportIntegrationTestFixt
     }
 
     [Fact]
-    public async Task ProcessMessageAsync_DischargePatientEvent_Ignored()
+    public async Task ProcessMessageAsync_DischargePatientEvent_CreatesReportEntries()
     {
         using var scope = _fixture.ScopeFactory.CreateScope();
         var listener = scope.ServiceProvider.GetRequiredService<PatientEventListener>();
         var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
         var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
 
-        var facilityId = "test-facility-003";
+        var facilityId = "test-facility-discharge-001";
         var reportId = Guid.NewGuid();
 
         var schedule = new ReportScheduleModel
@@ -110,6 +110,53 @@ public class PatientEventListenerTests : IClassFixture<ReportIntegrationTestFixt
             {
                 Key = facilityId,
                 Value = patientEventValue
+            }
+        };
+
+        await listener.ProcessMessageAsync(consumeResult, CancellationToken.None);
+
+        var entry1 = await reportEntryManager.SingleOrDefaultAsync(e => e.PatientId == "12345" && e.ReportScheduleId == reportId);
+
+        Assert.NotNull(entry1);
+        Assert.Equal(ReportingStatus.PatientIdentified, entry1.ReportingStatus);
+        Assert.Equal(2, entry1.MeasureReports.Count);
+    }
+
+    [Fact]
+    public async Task ProcessMessageAsync_UnknownEventType_Ignored()
+    {
+        using var scope = _fixture.ScopeFactory.CreateScope();
+        var listener = scope.ServiceProvider.GetRequiredService<PatientEventListener>();
+        var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+        var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+
+        var facilityId = "test-facility-unknown-001";
+        var reportId = Guid.NewGuid();
+
+        var schedule = new ReportScheduleModel
+        {
+            Id = reportId,
+            FacilityId = facilityId,
+            ReportStartDate = DateTimeOffset.UtcNow.AddDays(-30),
+            ReportEndDate = DateTimeOffset.UtcNow.AddDays(30),
+            Frequency = Frequency.Monthly,
+            ReportTypes = new List<string> { "DE-111", "DE-222" },
+            Status = ScheduleStatus.Scheduled,
+            EndOfReportPeriodJobHasRun = false,
+            CreateDate = DateTime.UtcNow
+        };
+        await reportScheduledManager.AddAsync(schedule, CancellationToken.None);
+
+        var consumeResult = new ConsumeResult<string, PatientEventValue>
+        {
+            Message = new Message<string, PatientEventValue>
+            {
+                Key = facilityId,
+                Value = new PatientEventValue
+                {
+                    EventType = "Transfer",
+                    PatientId = "12345"
+                }
             }
         };
 
