@@ -259,6 +259,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IQueryListProcessor, QueryListProcessor>();
         services.AddTransient<IBundleEventService<ResourceKey, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>, BundleResourceAcquiredEventService>();
         services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
+        services.AddTransient<IAcquisitionDependencyChecker, AcquisitionDependencyChecker>();
 
         //Data Pull Commands
         services.AddTransient<IReadFhirCommand, ReadFhirCommand>();
