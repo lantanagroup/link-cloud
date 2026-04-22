@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -23,6 +23,9 @@ public class DataAcquisitionLog
     public string? PatientId { get; set; }
 
     public string? CorrelationId { get; set; }
+
+    [MaxLength(128)]
+    public string? ReferenceResourceType { get; set; }
 
     public string? FhirVersion { get; set; }
 
