@@ -59,8 +59,7 @@ public static class GeneralStartupExtensions
     public static void RegisterAll(
         this WebApplicationBuilder builder,
         string serviceName,
-        bool? configureRedis = false,
-        bool? configureSecretManager = false)
+        bool? configureRedis = false)
     {
         var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
@@ -82,7 +81,9 @@ public static class GeneralStartupExtensions
             builder.RegisterRedis();
         }
 
-        if (configureSecretManager.GetValueOrDefault())
+        // Determine if secret manager should be enabled based on configuration
+        var configureSecretManager = builder.Configuration.GetValue<bool>("SecretManagement:Enabled");
+        if (configureSecretManager)
         {
             builder.Services.RegisterSecretManager(builder.Configuration);
         }
