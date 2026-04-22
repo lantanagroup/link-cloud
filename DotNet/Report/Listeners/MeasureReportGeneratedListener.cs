@@ -207,8 +207,7 @@ namespace LantanaGroup.Link.Report.Listeners
             startTime = Stopwatch.GetTimestamp();
 
             await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
-            await reportResourceManager.AddAsyncWithAggregateResult(facilityId, reportTrackingId, messageValue.PatientId, aggregateResult, cancellationToken);
-
+            
             foreach (var agg in aggregateResult.MeasureReportResults)
             {
                 var existing = (await reportPopulationManager.FindAsync(
