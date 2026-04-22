@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -103,6 +103,8 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
             builder.Services.AddScoped<IEntityRepository<SftpAcquisitionLog>, EntityRepository<SftpAcquisitionLog, DataAcquisitionDbContext>>();
             builder.Services.AddScoped<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<EncounterMapping>, EntityRepository<EncounterMapping, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<EncounterLocation>, EntityRepository<EncounterLocation, DataAcquisitionDbContext>>();
 
             // Register IDatabase implementation
             builder.Services.AddScoped<IDatabase, Database>();
