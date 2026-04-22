@@ -263,27 +263,23 @@
                 <div class="card-header"><i class="bi bi-shield-check me-2"></i>Validation</div>
                 <div class="card-body">
                     <div class="row g-3 mb-3">
-                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Resource Count</div><div class="fs-4 fw-semibold" id="validationResourceCount">0</div></div></div>
-                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Avg Resources/sec</div><div class="fs-4 fw-semibold" id="validationResPerSec">0.00</div></div></div>
-                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Events/sec</div><div class="fs-4 fw-semibold" id="validationRate">0.00</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Patients</div><div class="fs-4 fw-semibold" id="validationPatientCount">0</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Passed</div><div class="fs-4 fw-semibold text-success" id="validationPassedCount">0</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Failed</div><div class="fs-4 fw-semibold text-danger" id="validationFailedCount">0</div></div></div>
                         <div class="col-md-3 d-flex align-items-end justify-content-end">
                             <button type="button" id="validationErrorsBtn" class="btn btn-sm btn-outline-danger" style="display:none;">Errors Encountered</button>
                         </div>
                     </div>
 
                     <div class="row g-3">
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <div class="small text-muted mb-1">Validation Patient States</div>
                             <canvas id="validationStageChart" height="170" style="height:170px;max-height:170px;"></canvas>
                             <div id="validationStageLegend" class="small mt-2"></div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <div class="small text-muted mb-1">Throughput Timeline (10s buckets)</div>
                             <canvas id="validationTimeline" height="90" style="height:90px;max-height:90px;"></canvas>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="small text-muted mb-1">Top Resource Types</div>
-                            <canvas id="validationResourceMixChart" height="170" style="height:170px;max-height:170px;"></canvas>
                         </div>
                     </div>
                 </div>
@@ -1257,15 +1253,19 @@
                 measureErrors = snapshot.measureEval?.errors || [];
                 document.getElementById('measureErrorsBtn').style.display = measureErrors.length > 0 ? '' : 'none';
 
-                document.getElementById('validationRate').textContent = formatNumber(snapshot.validation?.completionRatePerSecond);
-                document.getElementById('validationResourceCount').textContent = snapshot.validation?.resourceCount || 0;
-                document.getElementById('validationResPerSec').textContent = formatNumber(snapshot.validation?.averageResourcesPerSecond);
-                renderStageChart('validationStageChart', 'validationStageLegend', snapshot.validation?.funnelCounts || [], {
+                const validationFunnel = snapshot.validation?.funnelCounts || [];
+                const validationTotal = validationFunnel.reduce((acc, item) => acc + (item.count || 0), 0);
+                const validationPassed = (validationFunnel.find(f => (f.status || '').toLowerCase() === 'passedvalidation') || {}).count || 0;
+                const validationFailed = (validationFunnel.find(f => (f.status || '').toLowerCase() === 'failedvalidation') || {}).count || 0;
+
+                document.getElementById('validationPatientCount').textContent = validationTotal;
+                document.getElementById('validationPassedCount').textContent = validationPassed;
+                document.getElementById('validationFailedCount').textContent = validationFailed;
+                renderStageChart('validationStageChart', 'validationStageLegend', validationFunnel, {
                     notvalidated: '#94a3b8',
                     failedvalidation: '#ef4444',
                     passedvalidation: '#198754'
                 });
-                renderResourceMix('validationResourceMixChart', snapshot.validation?.resourceTypeCounts || []);
                 renderTimeline('validationTimeline', snapshot.validation?.throughputBuckets || [], '#198754');
 
                 validationErrors = snapshot.validation?.errors || [];
