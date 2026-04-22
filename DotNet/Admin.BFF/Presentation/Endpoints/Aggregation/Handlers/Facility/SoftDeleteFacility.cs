@@ -13,6 +13,7 @@ public static class SoftDeleteFacility
         TenantService tenantService,
         ReportService reportService,
         DataAcquisitionService dataAcquisitionService,
+        CensusService censusService,
         string facilityId)
     {
         var logger = loggerFactory.CreateLogger("SoftDeleteFacility");
@@ -101,12 +102,37 @@ public static class SoftDeleteFacility
             return ProblemDetailsExtension.UserFacingProblem("Failed to soft-delete acquisition logs. All previous steps have been rolled back.", StatusCodes.Status500InternalServerError);
         }
 
+        // Step 4: Delete Census cron jobs — roll back steps 1, 2 and 3 if this fails
+        HttpResponseMessage censusResponse;
+        try
+        {
+            censusResponse = await censusService.DeleteCensusJobsAsync(context.User, facilityId, context.RequestAborted);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Exception deleting census jobs for facility {FacilityId} — rolling back steps 1, 2 and 3", facilityId);
+            await RollbackAcquisitionLogsAsync(dataAcquisitionService, context, facilityId, logger);
+            await RollbackReportSchedulesAsync(reportService, context, facilityId, logger);
+            await RollbackTenantAsync(tenantService, context, facilityId, logger);
+            return ProblemDetailsExtension.UserFacingProblem("Failed to delete census jobs. All previous steps have been rolled back.", StatusCodes.Status500InternalServerError);
+        }
+
+        if (!censusResponse.IsSuccessStatusCode)
+        {
+            logger.LogWarning("Census job deletion failed for facility {FacilityId} with status {StatusCode} — rolling back steps 1, 2 and 3", facilityId, censusResponse.StatusCode);
+            await RollbackAcquisitionLogsAsync(dataAcquisitionService, context, facilityId, logger);
+            await RollbackReportSchedulesAsync(reportService, context, facilityId, logger);
+            await RollbackTenantAsync(tenantService, context, facilityId, logger);
+            return ProblemDetailsExtension.UserFacingProblem("Failed to delete census jobs. All previous steps have been rolled back.", StatusCodes.Status500InternalServerError);
+        }
+
         return Results.Ok(new FacilitySoftDeleteResult
         {
             FacilityId = facilityId,
             TenantDeleted = true,
             ReportSchedulesDeleted = true,
-            AcquisitionLogsDeleted = true
+            AcquisitionLogsDeleted = true,
+            CensusJobsDeleted = true
         });
     }
 
@@ -149,6 +175,20 @@ public static class SoftDeleteFacility
         catch (Exception ex)
         {
             logger.LogError(ex, "Rollback failed: exception restoring report schedules for facility {FacilityId}", facilityId);
+        }
+    }
+
+    private static async Task RollbackAcquisitionLogsAsync(DataAcquisitionService dataAcquisitionService, HttpContext context, string facilityId, ILogger logger)
+    {
+        try
+        {
+            var response = await dataAcquisitionService.RestoreLogsAsync(context.User, facilityId, context.RequestAborted);
+            if (!response.IsSuccessStatusCode)
+                logger.LogError("Rollback failed: could not restore acquisition logs for facility {FacilityId} (status {StatusCode})", facilityId, response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Rollback failed: exception restoring acquisition logs for facility {FacilityId}", facilityId);
         }
     }
 }

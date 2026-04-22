@@ -1,6 +1,8 @@
-export interface AcquisitionLog {
+﻿export interface AcquisitionLog {
     id: string;
     reportTrackingId: string;
+    correlationId?: string;
+    traceId?: string;
     priority: string;
     facilityId: string;
     patientId: string;
@@ -15,7 +17,8 @@ export interface AcquisitionLog {
     completionDate?: Date;
     completionTimeMilliseconds?: number;
     resourceAcquiredIds?: string[];
-    referenceResources?: ReferencedResource[];
+    resourceAcquiredCount?: number;
+    referenceResourceCount?: number;
     notes?: string[];
     scheduledReport: ScheduledReport;
     isDeleted: boolean;

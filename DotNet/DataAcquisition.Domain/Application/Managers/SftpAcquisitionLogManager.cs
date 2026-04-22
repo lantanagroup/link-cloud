@@ -1,17 +1,20 @@
-using System.Diagnostics;
-using System.Text.Json;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Exceptions;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using System.Diagnostics;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -307,11 +310,11 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         if (retryAfter.HasValue)
         {
             log.ScheduledDate = retryAfter.Value.ToUniversalTime();
-            log.Notes.Add($"[{DateTime.UtcNow:O}] Processing failed (attempt {log.RetryAttempts}): {errorMessage}. Retry scheduled for {log.ScheduledDate:O}");
+            log.Notes.Add($"[{DateTime.UtcNow:O}] Processing failed (attempt {log.RetryAttempts}). Retry scheduled for {log.ScheduledDate:O}");
         }
         else
         {
-            log.Notes.Add($"[{DateTime.UtcNow:O}] Processing failed (attempt {log.RetryAttempts}): {errorMessage}");
+            log.Notes.Add($"[{DateTime.UtcNow:O}] Processing failed (attempt {log.RetryAttempts})");
         }
 
         await database.SaveChangesAsync();
@@ -361,7 +364,6 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         }
 
         log.Status = RequestStatus.ConfigurationRequired;
-        log.Notes.Add($"[{DateTime.UtcNow:O}] Configuration required: {errorMessage}");
 
         await database.SaveChangesAsync();
         logger.LogWarning("SFTP acquisition log {LogId} marked as configuration required: {Error}", id, errorMessage);

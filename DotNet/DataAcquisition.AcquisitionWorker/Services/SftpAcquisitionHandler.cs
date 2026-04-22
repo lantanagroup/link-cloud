@@ -8,6 +8,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Process
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
@@ -338,7 +342,7 @@ public class SftpAcquisitionHandler(
             logger.LogError(ex, "Invalid operation for SFTP acquisition log {LogId} for facility {FacilityId}: {Message}",
                 log.Id, log.FacilityId, ex.Message);
 
-            // InvalidOperationException typically indicates a configuration issue (e.g., missing acquisition config)
+            // InvalidOperationException typically indicates a configuration issue (e.g., missing acquisition config, invalid remote directory)
             await logManager.SetConfigurationRequiredAsync(log.Id, ex.Message, cancellationToken);
 
             return new LogProcessingResult(SessionMayBeUnhealthy: false);

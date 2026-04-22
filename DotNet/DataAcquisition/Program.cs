@@ -1,4 +1,4 @@
-using HealthChecks.UI.Client;
+﻿using HealthChecks.UI.Client;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
@@ -28,6 +28,8 @@ using System.Reflection;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.DataProtection;
 
+using Microsoft.AspNetCore.Antiforgery;
+
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
 
@@ -51,7 +53,16 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add Data Protection
     builder.Services.AddDataProtection()
         .SetApplicationName(builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link");
+
+    // Configure antiforgery for browser-based callers (Admin.UI via YARP).
+    // Bearer-authenticated callers (LinkSdk) bypass validation via ValidateAntiForgeryOrBearerTokenAttribute.
+    builder.Services.AddAntiforgery(options =>
+    {
+        options.HeaderName = "X-Link-AntiForgery";
+    });
+
     builder.Services.Configure<AcquisitionJobSettings>(builder.Configuration.GetSection(AcquisitionJobSettings.SectionName));
+    builder.Services.Configure<TailMessageRecoveryJobSettings>(builder.Configuration.GetSection(TailMessageRecoveryJobSettings.SectionName));
 
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
@@ -190,6 +201,14 @@ static void SetupMiddleware(WebApplication app)
     app.UseAuthorization();
 
     app.MapControllers();
+
+    // Antiforgery token endpoint for browser-based callers (Admin.UI via YARP proxy).
+    // Returns the request token in the response body and sets the cookie token automatically.
+    app.MapGet("/api/data/antiforgery-token", (IAntiforgery antiforgery, HttpContext context) =>
+    {
+        var tokens = antiforgery.GetAndStoreTokens(context);
+        return Results.Ok(new { token = tokens.RequestToken, headerName = "X-Link-AntiForgery" });
+    }).RequireAuthorization();
 
     //map health check middleware and info endpoint
     app.MapHealthChecks("/health", new HealthCheckOptions

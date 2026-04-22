@@ -1,10 +1,9 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Support;
 using LantanaGroup.Link.Report.Application.Core;
-using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Models;
@@ -16,6 +15,9 @@ using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using LantanaGroup.Link.Shared.Settings;
 using System.Text;
 using Task = System.Threading.Tasks.Task;
@@ -168,6 +170,8 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 throw new DeadLetterException($"Received message without correlation ID (ReportId = {reportId}, FacilityId = {facilityId}).");
             }
+
+            _logger.LogDebug("Consuming ValidationComplete (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, value.PatientId, reportId);
 
             var correlationIdStr = Encoding.UTF8.GetString(headerValue);
             var reportEntry = await reportEntryManager.GetEntry(schedule.Id, value.PatientId, cancellationToken);

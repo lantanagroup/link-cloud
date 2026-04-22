@@ -22,6 +22,7 @@ version: '3.4'
 ## dataacq: 8065
 ## dataacq-worker: 8078
 ## admin-ui: 8066
+## automation-ui: 5256
 ## measureeval: 8067
 ## normalization: 8068
 ## querydispatch: 8071
@@ -125,6 +126,7 @@ services:
     environment:
       AZURE_STORAGE_CONNECTION_STRING: ${AZURITE_CONNECTION_STRING}
     command: bash -c 'az storage container create -n ${INTERNAL_BLOB_CONTAINER_NAME}; az storage container create -n ${EXTERNAL_BLOB_CONTAINER_NAME}'
+    restart: "no"
     depends_on:
       azurite:
         condition: service_healthy
@@ -287,7 +289,7 @@ services:
       - otel-collector
 
   tempo:
-    image: grafana/tempo:latest
+    image: grafana/tempo:2.9.1
     command: [ "-config.file=/etc/tempo.yaml" ]
     container_name: tempo
     hostname: tempo
@@ -657,6 +659,30 @@ services:
     depends_on:
       - admin-bff
 
+  automation-ui:
+    image: link-automation-ui
+    container_name: link-automation-ui
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+    volumes:
+      - automation_ui_keys:/keys/dataprotection
+    ports:
+      - "5256:5257"
+    build:
+      context: .
+      dockerfile: DotNet/Automation.UI/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
+    networks:
+      - link-nw
+    depends_on:
+      mongo:
+        condition: service_healthy
+      admin-bff:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5257/"]
+
   measureeval:
     image: link-measureeval
     container_name: link-measureeval
@@ -777,6 +803,8 @@ services:
         condition: service_completed_successfully
       mssql_init:
         condition: service_completed_successfully
+      azurite_init:
+        condition: service_completed_successfully
       otel-collector:
         condition: service_started
       loki:
@@ -814,6 +842,8 @@ services:
       kafka_init:
         condition: service_completed_successfully
       mssql_init:
+        condition: service_completed_successfully
+      azurite_init:
         condition: service_completed_successfully
       otel-collector:
         condition: service_started
@@ -943,4 +973,6 @@ volumes:
   terminology_data:
     driver: local
   sftp_data:
+    driver: local
+  automation_ui_keys:
     driver: local

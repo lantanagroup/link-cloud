@@ -193,6 +193,8 @@ public static class GeneralStartupExtensions
         //Fhir Authentication Handlers
         services.AddSingleton<EpicAuth>();
         services.AddSingleton<BasicAuth>();
+        services.AddSingleton<CustomHeaderAuth>();
+        services.AddSingleton<OAuth>();
         services.AddSingleton<IAuthenticationRetrievalService, AuthenticationRetrievalService>();
     }
 
@@ -228,6 +230,7 @@ public static class GeneralStartupExtensions
     {
         //Queries
         services.AddTransient<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
+        services.AddTransient<IDataAcquisitionLogNotesQueries, DataAcquisitionLogNotesQueries>();
         services.AddTransient<ISftpAcquisitionLogQueries, SftpAcquisitionLogQueries>();
         services.AddTransient<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
         services.AddTransient<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
@@ -246,6 +249,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
         services.AddTransient<IFhirQueryManager, FhirQueryManager>();
         services.AddTransient<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
+        services.AddTransient<IScheduledReportManager, ScheduledReportManager>();
         services.AddTransient<ISftpAcquisitionLogManager, SftpAcquisitionLogManager>();
         services.AddTransient<ISftpConfigurationManager, SftpConfigurationManager>();
         services.AddScoped<IOrganizationLocationConfigurationManager, OrganizationLocationConfigurationManager>();

@@ -1,5 +1,8 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
@@ -13,7 +16,6 @@ public class ReferenceResourcesModel
     public DateTime CreateDate { get; set; }
     public DateTime? ModifyDate { get; set; }
     public QueryPhase QueryPhase { get; set; }
-    public long? DataAcquisitionLogId { get; set; }
 
     public static ReferenceResourcesModel FromDomain(ReferenceResources entity)
     {
@@ -28,8 +30,7 @@ public class ReferenceResourcesModel
             ReferenceResource = entity.ReferenceResource,
             CreateDate = entity.CreateDate,
             ModifyDate = entity.ModifyDate,
-            QueryPhase = entity.QueryPhase,
-            DataAcquisitionLogId = entity.DataAcquisitionLogId
+            QueryPhase = entity.QueryPhase
         };
     }
 }

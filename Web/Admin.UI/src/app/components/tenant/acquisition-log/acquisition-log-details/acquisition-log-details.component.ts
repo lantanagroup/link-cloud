@@ -10,6 +10,7 @@ import {MatTooltipModule} from '@angular/material/tooltip';
 import {PaginationMetadata} from 'src/app/models/pagination-metadata.model';
 import {FormsModule} from '@angular/forms';
 import {debounceTime, Subject, Subscription} from 'rxjs';
+import {AcquisitionLogService, ReferenceResourceRecord} from '../acquisition-log.service';
 
 export interface AcquiredResourcesTable {
   resourceType: string;
@@ -49,6 +50,8 @@ export class AcquisitionLogDetailsComponent implements OnInit {
   filteredReferenceResourceTable: ReferencedResourcesTable[] = [];
   referencedPaginationMetadata: PaginationMetadata = new PaginationMetadata;
   referenceResourceTableView: ReferencedResourcesTable[] = [];
+  referenceResourcesLoading = false;
+  notesLoading = false;
 
   defaultPageNumber: number = 0;
   defaultPageSize: number = 5;
@@ -64,6 +67,7 @@ export class AcquisitionLogDetailsComponent implements OnInit {
   constructor(
     public dialogRef: MatDialogRef<AcquisitionLogDetailsComponent>,
     @Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, acquisitionLog: AcquisitionLog },
+    private acquisitionLogService: AcquisitionLogService
   ) { }
 
 
@@ -72,8 +76,7 @@ export class AcquisitionLogDetailsComponent implements OnInit {
     this.acquisitionLog = this.data.acquisitionLog;
     this.acquiredResourceRecords = this.getAcquiredResourceRecords();
     this.filteredAcquiredResourceTable = [...this.acquiredResourceTable];
-    this.referenceResourceRecords = this.getReferenceResourceRecords();
-    this.filteredReferenceResourceTable = [...this.referenceResourceTable];
+    this.acquisitionLog.notes = [];
 
     this.acquiredResourceTableView = this.filteredAcquiredResourceTable.slice(0, this.defaultPageSize);
     this.acquiredPaginationMetadata = {
@@ -83,13 +86,33 @@ export class AcquisitionLogDetailsComponent implements OnInit {
       totalPages: Math.ceil((this.filteredAcquiredResourceTable?.length || 0) / this.defaultPageSize)
     };
 
-    this.referenceResourceTableView = this.filteredReferenceResourceTable.slice(0, this.defaultPageSize);
-    this.referencedPaginationMetadata = {
-      pageNumber: this.defaultPageNumber,
-      pageSize: this.defaultPageSize,
-      totalCount: this.filteredReferenceResourceTable?.length || 0,
-      totalPages: Math.ceil((this.filteredReferenceResourceTable?.length || 0) / this.defaultPageSize)
-    };
+    // Lazy-load reference resources from dedicated endpoint
+    if ((this.acquisitionLog.referenceResourceCount ?? 0) > 0) {
+      this.referenceResourcesLoading = true;
+      this.acquisitionLogService.getReferenceResourcesForLog(this.acquisitionLog.id).subscribe({
+        next: (response) => {
+          this.loadReferenceResources(response.records);
+          this.referenceResourcesLoading = false;
+        },
+        error: () => {
+          this.referenceResourcesLoading = false;
+        }
+      });
+    } else {
+      this.initReferenceResourcePagination();
+    }
+
+    // Lazy-load notes from dedicated endpoint
+    this.notesLoading = true;
+    this.acquisitionLogService.getNotesForLog(this.acquisitionLog.id).subscribe({
+      next: (notes: string[]) => {
+        this.acquisitionLog.notes = notes;
+        this.notesLoading = false;
+      },
+      error: () => {
+        this.notesLoading = false;
+      }
+    });
 
     this.searchAcquisitionSub = this.searchAcquisitionSubject
       .pipe(debounceTime(300))
@@ -145,9 +168,9 @@ export class AcquisitionLogDetailsComponent implements OnInit {
     return acquiredResourceRecords;
   }
 
-  getReferenceResourceRecords(): Record<string, number> {
+  getReferenceResourceRecords(records: ReferenceResourceRecord[]): Record<string, number> {
     const referenceResourceRecords: Record<string, number> = {};
-    this.acquisitionLog.referenceResources?.forEach(record => {
+    records.forEach(record => {
 
       if (referenceResourceRecords[record.resourceType]) {
         referenceResourceRecords[record.resourceType] += 1;
@@ -164,6 +187,22 @@ export class AcquisitionLogDetailsComponent implements OnInit {
     });
 
     return referenceResourceRecords;
+  }
+
+  private loadReferenceResources(records: ReferenceResourceRecord[]): void {
+    this.referenceResourceRecords = this.getReferenceResourceRecords(records);
+    this.filteredReferenceResourceTable = [...this.referenceResourceTable];
+    this.initReferenceResourcePagination();
+  }
+
+  private initReferenceResourcePagination(): void {
+    this.referenceResourceTableView = this.filteredReferenceResourceTable.slice(0, this.defaultPageSize);
+    this.referencedPaginationMetadata = {
+      pageNumber: this.defaultPageNumber,
+      pageSize: this.defaultPageSize,
+      totalCount: this.filteredReferenceResourceTable?.length || 0,
+      totalPages: Math.ceil((this.filteredReferenceResourceTable?.length || 0) / this.defaultPageSize)
+    };
   }
 
   acquiredPagedEvent(event: PageEvent) {

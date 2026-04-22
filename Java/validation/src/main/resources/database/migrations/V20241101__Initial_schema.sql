@@ -1,86 +1,120 @@
-create table artifact
-(
-    id      bigint identity not null,
-    name    varchar(255)    not null,
-    type    varchar(255)    not null check (type in ('PACKAGE', 'RESOURCE')),
-    content varbinary(max)  not null,
-    primary key (id)
-);
+if not exists (select 1 from sys.tables where name = 'artifact' and schema_id = schema_id('dbo'))
+begin
+    create table artifact
+    (
+        id      bigint identity not null,
+        name    varchar(255)    not null,
+        type    varchar(255)    not null check (type in ('PACKAGE', 'RESOURCE')),
+        content varbinary(max)  not null,
+        primary key (id)
+    );
+end;
 
-create table category
-(
-    acceptable bit           not null,
-    guidance   varchar(1000) not null,
-    id         varchar(255)  not null,
-    severity   varchar(255)  not null check (severity in ('ERROR', 'WARNING', 'INFORMATION')),
-    title      varchar(255)  not null,
-    primary key (id)
-);
+if not exists (select 1 from sys.tables where name = 'category' and schema_id = schema_id('dbo'))
+begin
+    create table category
+    (
+        acceptable bit           not null,
+        guidance   varchar(1000) not null,
+        id         varchar(255)  not null,
+        severity   varchar(255)  not null check (severity in ('ERROR', 'WARNING', 'INFORMATION')),
+        title      varchar(255)  not null,
+        primary key (id)
+    );
+end;
 
-create table category_rule
-(
-    id          bigint identity   not null,
-    timestamp   datetimeoffset(6) not null,
-    category_id varchar(255)      not null,
-    matcher     varchar(max)      not null,
-    primary key (id)
-);
+if not exists (select 1 from sys.tables where name = 'category_rule' and schema_id = schema_id('dbo'))
+begin
+    create table category_rule
+    (
+        id          bigint identity   not null,
+        timestamp   datetimeoffset(6) not null,
+        category_id varchar(255)      not null,
+        matcher     varchar(max)      not null,
+        primary key (id)
+    );
+end;
 
-create table result
-(
-    id          bigint identity not null,
-    expression  varchar(1000),
-    code        varchar(255)    not null check (code in
-                                                ('INVALID', 'STRUCTURE', 'REQUIRED', 'VALUE', 'INVARIANT', 'SECURITY',
-                                                 'LOGIN', 'UNKNOWN', 'EXPIRED', 'FORBIDDEN', 'SUPPRESSED', 'PROCESSING',
-                                                 'NOTSUPPORTED', 'DUPLICATE', 'MULTIPLEMATCHES', 'NOTFOUND', 'DELETED',
-                                                 'TOOLONG', 'CODEINVALID', 'EXTENSION', 'TOOCOSTLY', 'BUSINESSRULE',
-                                                 'CONFLICT', 'TRANSIENT', 'LOCKERROR', 'NOSTORE', 'EXCEPTION',
-                                                 'TIMEOUT', 'INCOMPLETE', 'THROTTLED', 'INFORMATIONAL', 'NULL')),
-    facility_id varchar(255)    not null,
-    location    varchar(255),
-    message     varchar(max)    not null,
-    patient_id  varchar(255)    not null,
-    report_id   varchar(255)    not null,
-    severity    varchar(255)    not null check (severity in ('FATAL', 'ERROR', 'WARNING', 'INFORMATION', 'NULL')),
-    primary key (id)
-);
+if not exists (select 1 from sys.tables where name = 'result' and schema_id = schema_id('dbo'))
+begin
+    create table result
+    (
+        id          bigint identity not null,
+        expression  varchar(1000),
+        code        varchar(255)    not null check (code in
+                                                    ('INVALID', 'STRUCTURE', 'REQUIRED', 'VALUE', 'INVARIANT', 'SECURITY',
+                                                     'LOGIN', 'UNKNOWN', 'EXPIRED', 'FORBIDDEN', 'SUPPRESSED', 'PROCESSING',
+                                                     'NOTSUPPORTED', 'DUPLICATE', 'MULTIPLEMATCHES', 'NOTFOUND', 'DELETED',
+                                                     'TOOLONG', 'CODEINVALID', 'EXTENSION', 'TOOCOSTLY', 'BUSINESSRULE',
+                                                     'CONFLICT', 'TRANSIENT', 'LOCKERROR', 'NOSTORE', 'EXCEPTION',
+                                                     'TIMEOUT', 'INCOMPLETE', 'THROTTLED', 'INFORMATIONAL', 'NULL')),
+        facility_id varchar(255)    not null,
+        location    varchar(255),
+        message     varchar(max)    not null,
+        patient_id  varchar(255)    not null,
+        report_id   varchar(255)    not null,
+        severity    varchar(255)    not null check (severity in ('FATAL', 'ERROR', 'WARNING', 'INFORMATION', 'NULL')),
+        primary key (id)
+    );
+end;
 
-create table result_category
-(
-    result_id   bigint       not null,
-    category_id varchar(255) not null
-);
+if not exists (select 1 from sys.tables where name = 'result_category' and schema_id = schema_id('dbo'))
+begin
+    create table result_category
+    (
+        result_id   bigint       not null,
+        category_id varchar(255) not null
+    );
+end;
 
-alter table artifact
-    add constraint uq_artifact_type_name unique (type, name);
+if not exists (select 1 from sys.key_constraints where name = 'uq_artifact_type_name')
+begin
+    alter table artifact
+        add constraint uq_artifact_type_name unique (type, name);
+end;
 
-create index ix_result_facility_id
-    on result (facility_id);
+if not exists (select 1 from sys.indexes where name = 'ix_result_facility_id' and object_id = object_id('result'))
+    create index ix_result_facility_id
+        on result (facility_id);
 
-create index ix_result_facility_id_report_id
-    on result (facility_id, report_id);
+if not exists (select 1 from sys.indexes where name = 'ix_result_facility_id_report_id' and object_id = object_id('result'))
+    create index ix_result_facility_id_report_id
+        on result (facility_id, report_id);
 
-create index ix_result_facility_id_report_id_patient_id
-    on result (facility_id, report_id, patient_id);
+if not exists (select 1 from sys.indexes where name = 'ix_result_facility_id_report_id_patient_id' and object_id = object_id('result'))
+    create index ix_result_facility_id_report_id_patient_id
+        on result (facility_id, report_id, patient_id);
 
-create index ix_result_category_result_id
-    on result_category (result_id);
+if not exists (select 1 from sys.indexes where name = 'ix_result_category_result_id' and object_id = object_id('result_category'))
+    create index ix_result_category_result_id
+        on result_category (result_id);
 
-alter table result_category
-    add constraint ix_result_category_result_id_category_id unique (result_id, category_id);
+if not exists (select 1 from sys.key_constraints where name = 'ix_result_category_result_id_category_id')
+begin
+    alter table result_category
+        add constraint ix_result_category_result_id_category_id unique (result_id, category_id);
+end;
 
-alter table category_rule
-    add constraint fk_category_rule_category_id
-        foreign key (category_id)
-            references category;
+if not exists (select 1 from sys.foreign_keys where name = 'fk_category_rule_category_id')
+begin
+    alter table category_rule
+        add constraint fk_category_rule_category_id
+            foreign key (category_id)
+                references category;
+end;
 
-alter table result_category
-    add constraint fk_result_category_category_id
-        foreign key (category_id)
-            references category;
+if not exists (select 1 from sys.foreign_keys where name = 'fk_result_category_category_id')
+begin
+    alter table result_category
+        add constraint fk_result_category_category_id
+            foreign key (category_id)
+                references category;
+end;
 
-alter table result_category
-    add constraint fk_result_category_result_id
-        foreign key (result_id)
-            references result;
+if not exists (select 1 from sys.foreign_keys where name = 'fk_result_category_result_id')
+begin
+    alter table result_category
+        add constraint fk_result_category_result_id
+            foreign key (result_id)
+                references result;
+end;
