@@ -356,7 +356,7 @@ public class PatientDataServiceTests
             .ReturnsAsync(fhirQueryConfig);
 
         _mockLogManager
-            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), cancellationToken))
             .ReturnsAsync(true);
 
         // ADD THIS SETUP - Mock the ExecuteRead method to return a list of IDs
@@ -423,7 +423,7 @@ public class PatientDataServiceTests
             .ReturnsAsync(fhirQueryConfig);
 
         _mockLogManager
-            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), cancellationToken))
             .ReturnsAsync(true);
 
         _mockFhirApiService
@@ -496,7 +496,7 @@ public class PatientDataServiceTests
             .ReturnsAsync(fhirQueryConfig);
 
         _mockLogManager
-            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), cancellationToken))
             .ReturnsAsync(true);
 
         _mockFhirApiService
@@ -568,7 +568,7 @@ public class PatientDataServiceTests
             .ReturnsAsync(fhirQueryConfig);
 
         _mockLogManager
-            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), cancellationToken))
             .ReturnsAsync(true);
 
         _mockFhirApiService
@@ -659,7 +659,7 @@ public class PatientDataServiceTests
             .ReturnsAsync(fhirConfig);
 
         _mockLogManager
-            .Setup(q => q.TrySetLogStatusAsync(logId, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .Setup(q => q.TrySetLogStatusAsync(logId, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), cancellationToken))
             .ReturnsAsync(true);
 
         // Critical: We expect ExecuteSearch to be called exactly once for the valid ID,
@@ -794,7 +794,7 @@ public class PatientDataServiceTests
             .Returns(Task.CompletedTask);
 
         _mockLogManager
-            .Setup(q => q.TrySetLogStatusAsync(logId, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .Setup(q => q.TrySetLogStatusAsync(logId, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), cancellationToken))
             .ReturnsAsync(true);
 
         // Expect ExecuteSearch to be called once (for Observation)
@@ -892,7 +892,7 @@ public class PatientDataServiceTests
             .ReturnsAsync(new FhirQueryConfigurationModel { FacilityId = "facility-1" });
 
         _mockLogManager
-            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), cancellationToken))
             .ReturnsAsync(true);
 
         // Mock three different queries returning different IDs
@@ -986,7 +986,7 @@ public class PatientDataServiceTests
 
         // Simulate 429 with Retry-After: 30 seconds
         _mockLogManager
-            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), cancellationToken))
             .ReturnsAsync(true);
 
         _mockFhirApiService
@@ -1049,7 +1049,7 @@ public class PatientDataServiceTests
 
         // Simulate 429 with Retry-After as a future date (e.g., 2 minutes from now)
         _mockLogManager
-            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), cancellationToken))
             .ReturnsAsync(true);
 
         var futureDate = DateTimeOffset.UtcNow.AddMinutes(2);
@@ -1114,7 +1114,7 @@ public class PatientDataServiceTests
 
         // Simulate 429 with negative/invalid Retry-After (parser will default to 60s)
         _mockLogManager
-            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, cancellationToken))
+            .Setup(q => q.TrySetLogStatusAsync(1, It.IsAny<List<RequestStatus>>(), RequestStatus.Processing, It.IsAny<string?>(), cancellationToken))
             .ReturnsAsync(true);
 
         _mockFhirApiService

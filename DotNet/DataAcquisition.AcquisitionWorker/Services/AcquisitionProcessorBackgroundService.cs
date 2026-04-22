@@ -6,11 +6,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -116,6 +112,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
         var producerFactory = scope.ServiceProvider.GetRequiredService<IKafkaProducerFactory<long, ReadyToAcquire>>();
+        var dependencyChecker = scope.ServiceProvider.GetRequiredService<IAcquisitionDependencyChecker>();
 
         DataAcquisitionLogModel? log = null;
 
@@ -136,10 +133,28 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                     log.Id.ToString().SanitizeUntrustedString(), log.Status?.ToString()?.SanitizeUntrustedString());
                 return;
             }
+
+            var depResult = await dependencyChecker.CheckDependenciesAsync(log, ct);
+            if (!depResult.AreDependenciesMet)
+            {
+                var blockingList = string.Join(", ", depResult.BlockingResourceTypes);
+                _logger.LogInformation(
+                    "Log {LogId} has unmet dependencies ({BlockingTypes}). Deferring to Pending.",
+                    log.Id, blockingList);
+
+                await logManager.TrySetLogStatusAsync(
+                    log.Id,
+                    [RequestStatus.Queued],
+                    RequestStatus.Pending,
+                    note: $"[{DateTime.UtcNow:O}] Deferred: waiting for {blockingList} queries to complete.",
+                    cancellationToken: ct);
+
+                return;
+            }
         }
         catch (OperationCanceledException)
         {
-            throw; // Shutdown — must propagate
+            throw; // Shutdown must propagate
         }
         catch (Exception ex)
         {
@@ -174,7 +189,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                     "The log will be recovered by the stalled-queue housekeeping job.", item.LogId);
             }
 
-            // Do NOT re-throw — a transient DB error for one work item must not
+            // Do NOT re-throw a transient DB error for one work item must not
             // kill the Parallel.ForEachAsync loop and take down the entire
             // background service. The log stays in Queued state and will be
             // recovered by FailStalledQueuedLogsAsync on the next job cycle.
@@ -189,7 +204,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
             _logger.LogInformation("Successfully completed acquisition for LogId {LogId}", log.Id);
 
-            // Inline tail check — if all siblings are terminal, produce AcquisitionComplete.
+            // Inline tail check if all siblings are terminal, produce AcquisitionComplete.
             await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, ct);
         }
         catch (Exception ex)
