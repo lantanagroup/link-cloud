@@ -251,19 +251,17 @@ public class AutomationRunManager : IAutomationRunManager
                 var populations = await SafeGetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, "populations", cancellationToken) ?? [];
                 var acquisitionSummary = await SafeGetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, "acquisitionSummary", cancellationToken);
                 var measureResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "measureResources", cancellationToken) ?? [];
-                var validationResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "validationResources", cancellationToken) ?? [];
                 var validatorResults = await SafeGetDomainAsync<List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>>(runId, "validatorResults", cancellationToken);
 
                 _logger.LogDebug(
-                    "[Snapshot][{RunId}] Domain data: schedule={HasSchedule}, entries={EntryCount}, populations={PopCount}, acqSummary={HasAcqSummary} (logs={AcqLogs}), measureRes={MeasureCount}, valRes={ValCount}",
+                    "[Snapshot][{RunId}] Domain data: schedule={HasSchedule}, entries={EntryCount}, populations={PopCount}, acqSummary={HasAcqSummary} (logs={AcqLogs}), measureRes={MeasureCount}",
                     runId,
                     schedule != null,
                     entries.Count,
                     populations.Count,
                     acquisitionSummary != null,
                     acquisitionSummary?.TotalLogs ?? 0,
-                    measureResources.Count,
-                    validationResources.Count);
+                    measureResources.Count);
 
                 return new PipelineSummarySnapshotBuilder.ResolvedDomainData
                 {
@@ -272,7 +270,6 @@ public class AutomationRunManager : IAutomationRunManager
                     Populations = populations,
                     AcquisitionSummary = acquisitionSummary,
                     MeasureEvalResourceCounts = measureResources,
-                    ReportResourceCounts = validationResources,
                     ValidatorResults = validatorResults
                 };
             });
