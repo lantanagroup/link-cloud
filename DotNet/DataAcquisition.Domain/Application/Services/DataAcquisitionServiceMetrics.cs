@@ -18,7 +18,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services
 
             // Use the configured service name for the meter name to ensure it matches OpenTelemetry registration
             Meter meter = meterFactory.Create($"Link.{serviceInformation.ServiceConfigName}");
-            _resourceAcquiredCounter = meter.CreateCounter<long>(DiagnosticNames.DataAcquisitionResourecAcquiredCount);
+            _resourceAcquiredCounter = meter.CreateCounter<long>(DiagnosticNames.DataAcquisitionResourceAcquiredCount);
             _dataRequestDuration = meter.CreateHistogram<double>(DiagnosticNames.DataAcquisitionQueryDuration, "ms");
         }
 

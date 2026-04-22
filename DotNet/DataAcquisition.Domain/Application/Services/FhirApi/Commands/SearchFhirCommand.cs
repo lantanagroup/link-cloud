@@ -49,8 +49,9 @@ public class SearchFhirCommand : ISearchFhirCommand
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
     private readonly DistributedLockSettings _distributedLockSettings;
     private readonly IAuthenticationRetrievalService _authenticationRetrievalService;
+    private readonly IOptionsMonitor<TelemetrySettings> _telemetrySettings;
 
-    public SearchFhirCommand(ILogger<SearchFhirCommand> logger, HttpClient httpClient, IDataAcquisitionServiceMetrics metrics, IDistributedSemaphoreProvider distributedSemaphoreProvider, IOptions<DistributedLockSettings> distributedLockSettings, IAuthenticationRetrievalService authenticationRetrievalService)
+    public SearchFhirCommand(ILogger<SearchFhirCommand> logger, HttpClient httpClient, IDataAcquisitionServiceMetrics metrics, IDistributedSemaphoreProvider distributedSemaphoreProvider, IOptions<DistributedLockSettings> distributedLockSettings, IAuthenticationRetrievalService authenticationRetrievalService, IOptionsMonitor<TelemetrySettings> telemetrySettings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
@@ -58,6 +59,7 @@ public class SearchFhirCommand : ISearchFhirCommand
         _distributedSemaphoreProvider = distributedSemaphoreProvider ?? throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
         _distributedLockSettings = distributedLockSettings?.Value ?? throw new ArgumentNullException(nameof(distributedLockSettings));
         _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentNullException(nameof(authenticationRetrievalService));
+        _telemetrySettings = telemetrySettings ?? throw new ArgumentNullException(nameof(telemetrySettings));
     }
 
     public async IAsyncEnumerable<Bundle> ExecuteAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken = default)
@@ -67,24 +69,14 @@ public class SearchFhirCommand : ISearchFhirCommand
         activity?.SetTag(DiagnosticNames.CorrelationId, request.correlationId);
         activity?.SetTag(DiagnosticNames.ReportTrackingId, request.reportTrackingId);
         activity?.SetTag(DiagnosticNames.PatientId, request.patientId);
-        activity?.SetTag(DiagnosticNames.QueryType, request.queryPhase?.ToString());
+        activity?.SetTag(DiagnosticNames.Phase, request.queryPhase?.ToString());
         activity?.SetTag(DiagnosticNames.ResourceType, request.resourceType.ToString());
-
-        using var _ = _metrics.MeasureDataRequestDuration([
-                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.facilityId),
-                new KeyValuePair<string, object?>(DiagnosticNames.PatientId, request.patientId),
-                new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(request.queryPhase?.ToString())),
-                new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, request.correlationId),
-                new KeyValuePair<string, object?>(DiagnosticNames.ReportTrackingId, request.reportTrackingId),
-                new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, request.resourceType)
-            ]);
 
         if (request == null || string.IsNullOrWhiteSpace(request.facilityId) || string.IsNullOrWhiteSpace(request.queryConfig.FhirServerBaseUrl))
         {
             _logger.LogError("Invalid request parameters. FacilityId: {FacilityId}; FhirServerBaseUrl: {FhirServerBaseUrl}", request?.facilityId?.Sanitize(), request?.queryConfig.FhirServerBaseUrl.Sanitize());
             yield break;
         }
-
 
         var maxConcurrent = request.queryConfig.GetMaxConcurrentRequestsOrDefault();
         var semWaitStart = DateTime.UtcNow;
@@ -194,18 +186,9 @@ public class SearchFhirCommand : ISearchFhirCommand
         activity?.SetTag(DiagnosticNames.CorrelationId, request.correlationId);
         activity?.SetTag(DiagnosticNames.ReportTrackingId, request.reportTrackingId);
         activity?.SetTag(DiagnosticNames.PatientId, request.patientId);
-        activity?.SetTag(DiagnosticNames.QueryType, request.queryPhase?.ToString());
+        activity?.SetTag(DiagnosticNames.Phase, request.queryPhase?.ToString());
         activity?.SetTag(DiagnosticNames.ResourceType, request.resourceType.ToString());
-
-        using var _ = _metrics.MeasureDataRequestDuration([
-                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, request.facilityId),
-                new KeyValuePair<string, object?>(DiagnosticNames.PatientId, request.patientId),
-                new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(request.queryPhase?.ToString())),
-                new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, request.correlationId),
-                new KeyValuePair<string, object?>(DiagnosticNames.ReportTrackingId, request.reportTrackingId),
-                new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, request.resourceType)
-            ]);
-
+        
         var maxConcurrent = request.queryConfig.GetMaxConcurrentRequestsOrDefault();
         var semWaitStart = DateTime.UtcNow;
         var maskedFacilityId = request.facilityId.MaskForLog();
@@ -265,15 +248,21 @@ public class SearchFhirCommand : ISearchFhirCommand
 
     private void IncrementResourceAcquiredCounter(string? correlationId, string? patientIdReference, string? facilityId, string? reportTrackingId, string? queryType, string resourceType, string resourceId)
     {
-        _metrics.IncrementResourceAcquiredCounter([
-            new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
+        var tags = new List<KeyValuePair<string, object?>>
+        {
             new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, facilityId),
             new KeyValuePair<string, object?>(DiagnosticNames.ReportTrackingId, reportTrackingId),
-            new KeyValuePair<string, object?>(DiagnosticNames.PatientId, patientIdReference), //TODO: Can we keep this?
-            new KeyValuePair<string, object?>(DiagnosticNames.QueryType, queryType),
             new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(queryType)),
             new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resourceType),
             new KeyValuePair<string, object?>(DiagnosticNames.ResourceId, resourceId)
-        ]);
+        };
+
+        if (_telemetrySettings.CurrentValue.PatientTags)
+        {
+            tags.Add(new KeyValuePair<string, object?>("patient_id", patientIdReference));
+            tags.Add(new KeyValuePair<string, object?>("correlation_id", correlationId));
+        }
+
+        _metrics.IncrementResourceAcquiredCounter(tags);
     }
 }

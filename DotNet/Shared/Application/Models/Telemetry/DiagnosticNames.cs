@@ -12,7 +12,6 @@
         public const string FacilityId = "facility.id";
         public const string PatientId = "patient.id";
         public const string PatientEvent = "patient.event";
-        public const string QueryType = "query.type";
         public const string Phase = "phase";
         public const string Resource = "resource";
         public const string ResourceType = "resource.type";
@@ -27,6 +26,7 @@
         public const string Duration = "duration";
         public const string OperationType = "operation.type";
         public const string DestinationType = "destination.type";
+        public const string RetryAttempts = "retry.attempts";
 
         //Diagnostic tags Searching
         public const string SearchParameters = "search.parameters";
@@ -45,7 +45,7 @@
         
         //Diagnostic metric names
         public const string DataAcquisitionQueryDuration = "link_data_acq_query_duration";
-        public const string DataAcquisitionResourecAcquiredCount = "link_data_acq_resource_acquired_count";
+        public const string DataAcquisitionResourceAcquiredCount = "link_data_acq_resource_acquired_count";
         public const string NormalizationResourceChangedCount = "link_normalization_resource_changed_count";
         public const string NormalizationResourceNotChangedCount = "link_normalization_resource_not_changed_count";
         public const string NormalizationDuration = "link_normalization_duration";

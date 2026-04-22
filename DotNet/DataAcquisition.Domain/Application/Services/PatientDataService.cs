@@ -19,11 +19,13 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -68,6 +70,7 @@ public class PatientDataService : IPatientDataService
     private readonly IPatientCensusService _patientCensusService;
     private readonly IScheduledReportManager _scheduledReportManager;
     private readonly IDataAcquisitionServiceMetrics _metrics;
+    private readonly IOptionsMonitor<TelemetrySettings> _telemetrySettings;
 
     public PatientDataService(
         IDatabase database,
@@ -83,7 +86,8 @@ public class PatientDataService : IPatientDataService
         IServiceProvider serviceProvider,
         IPatientCensusService patientCensusService,
         IScheduledReportManager scheduledReportManager,
-        IDataAcquisitionServiceMetrics metrics)
+        IDataAcquisitionServiceMetrics metrics,
+        IOptionsMonitor<TelemetrySettings> telemetrySettings)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -107,6 +111,7 @@ public class PatientDataService : IPatientDataService
                                         throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
         _patientCensusService = patientCensusService ?? throw new ArgumentNullException(nameof(patientCensusService));
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
+        _telemetrySettings = telemetrySettings ?? throw new ArgumentNullException(nameof(telemetrySettings));
     }
 
     public async Task<List<Resource>> ValidateFacilityConnection(GetPatientDataRequest request,
@@ -494,11 +499,16 @@ public class PatientDataService : IPatientDataService
                 var tags = new List<KeyValuePair<string, object?>>
                 {
                     new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, log.FacilityId),
-                    new KeyValuePair<string, object?>(DiagnosticNames.PatientId, log.PatientId),
-                    new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, log.CorrelationId),
                     new KeyValuePair<string, object?>(DiagnosticNames.ReportTrackingId, log.ReportTrackingId),
-                    new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(log.QueryPhase?.ToString()))
+                    new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(log.QueryPhase?.ToString())),
+                    new KeyValuePair<string, object?>(DiagnosticNames.RetryAttempts, log.RetryAttempts)
                 };
+
+                if (_telemetrySettings.CurrentValue.PatientTags)
+                {
+                    tags.Add(new KeyValuePair<string, object?>("patient_id", log.PatientId));
+                    tags.Add(new KeyValuePair<string, object?>("correlation_id", log.CorrelationId));
+                }
 
                 using var duration = _metrics.MeasureDataRequestDuration(tags);
 

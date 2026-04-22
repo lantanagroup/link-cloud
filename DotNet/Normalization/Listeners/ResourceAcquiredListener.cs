@@ -16,10 +16,12 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using Microsoft.Extensions.Options;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
@@ -36,6 +38,7 @@ public class ResourceAcquiredListener : BackgroundService
     private readonly INormalizationServiceMetrics _metrics;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ServiceInformation _serviceInformation;
+    private readonly IOptionsMonitor<TelemetrySettings> _telemetrySettings;
 
     private readonly CopyPropertyOperationService _copyPropertyOperationService;
     private readonly CodeMapOperationService _codeMapOperationService;
@@ -55,7 +58,8 @@ public class ResourceAcquiredListener : BackgroundService
         CopyPropertyOperationService copyPropertyOperationService,
         CodeMapOperationService codeMapOperationService,
         ConditionalTransformOperationService conditionalTransformOperationService,
-        CopyLocationOperationService copyLocationOperationService)
+        CopyLocationOperationService copyLocationOperationService,
+        IOptionsMonitor<TelemetrySettings> telemetrySettings)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -74,6 +78,7 @@ public class ResourceAcquiredListener : BackgroundService
         _producer = producer ?? throw new ArgumentNullException(nameof(producer));
 
         _serviceInformation = serviceInformation ?? throw new ArgumentNullException(nameof(serviceInformation));
+        _telemetrySettings = telemetrySettings ?? throw new ArgumentNullException(nameof(telemetrySettings));
 
         _copyPropertyOperationService = copyPropertyOperationService;
         _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
@@ -189,13 +194,18 @@ public class ResourceAcquiredListener : BackgroundService
 
                                     var tags = new List<KeyValuePair<string, object?>>() {
                                         new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, messageMetaData.facilityId),
-                                        new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, messageMetaData.correlationId),
-                                        new KeyValuePair<string, object?>(DiagnosticNames.PatientId, message.Message.Value.PatientId),
                                         new KeyValuePair<string, object?>(DiagnosticNames.Phase, DiagnosticNames.NormalizePhase(message.Message.Value.QueryType)),
                                         new KeyValuePair<string, object?>(DiagnosticNames.ReportTrackingId, message.Message.Value.ScheduledReports?.FirstOrDefault()?.ReportTrackingId ?? string.Empty),
                                         new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, message.Message.Value.ResourceType),
                                         new KeyValuePair<string, object?>(DiagnosticNames.OperationType, operation.OperationType)
                                     };
+
+                                    if (_telemetrySettings.CurrentValue.PatientTags)
+                                    {
+                                        tags.Add(new KeyValuePair<string, object?>("patient_id", message.Message.Value.PatientId));
+                                        tags.Add(new KeyValuePair<string, object?>("correlation_id", messageMetaData.correlationId));
+                                    }
+
                                     using (var duration = _metrics.MeasureNormalizationDuration(tags))
                                     {
                                         var operationResult = operation.OperationType switch
