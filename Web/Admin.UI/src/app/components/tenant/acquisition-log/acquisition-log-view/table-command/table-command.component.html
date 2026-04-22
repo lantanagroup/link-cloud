@@ -14,7 +14,9 @@
   @if (isOpen) {
     <ul class="menu-dropdown" role="menu" @dropdownAnimation>
       <li role="none"><button role="menuitem" class="menu-item" (click)="showLogDetails()"><fa-icon [icon]="faInfoCircle"></fa-icon> Details</button></li>
-      <li role="none"><button role="menuitem" class="menu-item" (click)="executeLog()"><fa-icon [icon]="faPlay"></fa-icon> Execute</button></li>
+      @if (isExecuteEligible) {
+        <li role="none"><button role="menuitem" class="menu-item" (click)="executeLog()"><fa-icon [icon]="faPlay"></fa-icon> Execute</button></li>
+      }
       @if (isCancelEligible) {
         <li role="none"><button role="menuitem" class="menu-item" (click)="cancelLog()"><fa-icon [icon]="faBan"></fa-icon> Cancel</button></li>
       }
