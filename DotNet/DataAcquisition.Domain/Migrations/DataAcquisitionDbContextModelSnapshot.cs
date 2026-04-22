@@ -1574,16 +1574,6 @@ namespace DataAcquisition.Domain.Migrations
                     b.Navigation("PartOf");
                 });
 
-            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ReferenceResources", b =>
-                {
-                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", "DataAcquisitionLog")
-                        .WithMany("ReferenceResources")
-                        .HasForeignKey("DataAcquisitionLogId")
-                        .HasConstraintName("FK_ReferenceResources_DataAcquisitionLog");
-
-                    b.Navigation("DataAcquisitionLog");
-                });
-
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ResourceReferenceType", b =>
                 {
                     b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.FhirQuery", "FhirQuery")
