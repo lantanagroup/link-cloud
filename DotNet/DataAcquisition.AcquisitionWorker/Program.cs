@@ -21,9 +21,9 @@ using System.Reflection;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
 
-var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
-
 builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, configureRedis: true);
+
+var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
 builder.Services.AddTransient<SftpAcquisitionHandler>();
 

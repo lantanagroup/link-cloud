@@ -43,9 +43,9 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
-
     builder.RegisterAll(DataAcquisitionConstants.ServiceName, configureRedis: true);
+
+    var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
     // Add Data Protection
     builder.Services.AddDataProtection()
