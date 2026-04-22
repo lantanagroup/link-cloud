@@ -1,4 +1,3 @@
-﻿using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -19,7 +18,7 @@ namespace DataAcquisition.Domain.Migrations
     ///   3. Drop ScheduledReportId column from DataAcquisitionLog.
     ///   4. Drop the Id PK from ScheduledReports, create new PK on ReportTrackingId.
     ///   5. Drop the old Id column from ScheduledReports.
-    ///   6. Create the FK: DataAcquisitionLog.ReportTrackingId → ScheduledReports.ReportTrackingId.
+    ///   6. Create the FK: DataAcquisitionLog.ReportTrackingId ? ScheduledReports.ReportTrackingId.
     ///   7. Drop ReportStartDate / ReportEndDate columns.
     ///   8. Recreate indexes to match the new schema.
     /// </summary>
@@ -205,7 +204,7 @@ namespace DataAcquisition.Domain.Migrations
                 column: "ReportTrackingId");
 
             // Recreate IX_DataAcquisitionLogs_TailSent_Status with updated INCLUDE list
-            // (removed ScheduledReportId, ReportStartDate, ReportEndDate — those columns no longer exist).
+            // (removed ScheduledReportId, ReportStartDate, ReportEndDate � those columns no longer exist).
             migrationBuilder.CreateIndex(
                 name: "IX_DataAcquisitionLogs_TailSent_Status",
                 table: "DataAcquisitionLog",

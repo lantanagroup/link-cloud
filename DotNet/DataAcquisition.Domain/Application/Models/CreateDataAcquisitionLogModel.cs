@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
@@ -12,6 +12,7 @@ namespace DataAcquisition.Domain.Application.Models
         public AcquisitionPriority Priority { get; set; }
         public string? PatientId { get; set; }
         public string? CorrelationId { get; set; }
+        public string? ReferenceResourceType { get; set; }
         public string? FhirVersion { get; set; }
         public bool IsCensus { get; set; }
         public ReportableEvent? ReportableEvent { get; set; }

@@ -8,7 +8,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.Extensions.Logging;
 using Moq;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
@@ -200,10 +199,12 @@ public class AcquisitionDependencyCheckerTests
         Assert.Contains("Encounter", result.BlockingResourceTypes);
     }
 
-    [Fact]
-    public async Task CheckDependenciesAsync_ReferentialPhase_ReturnsMet()
+    [Theory]
+    [InlineData(QueryPhase.Polling)]
+    [InlineData(QueryPhase.Monitoring)]
+    public async Task CheckDependenciesAsync_NonPrimaryPhase_ReturnsMet(QueryPhase phase)
     {
-        var log = CreateLog(phase: QueryPhase.Referential, logResourceTypes: ResourceType.Condition);
+        var log = CreateLog(phase: phase, logResourceTypes: ResourceType.Condition);
 
         var result = await CreateChecker().CheckDependenciesAsync(log, CancellationToken.None);
 
