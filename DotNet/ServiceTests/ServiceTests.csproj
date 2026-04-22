@@ -133,5 +133,9 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="IntegrationTests\DataAcquisition\Controllers\" />
+  </ItemGroup>
+
 </Project>
 

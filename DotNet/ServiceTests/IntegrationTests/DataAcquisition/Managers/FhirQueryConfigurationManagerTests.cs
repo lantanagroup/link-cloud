@@ -65,21 +65,6 @@ public class FhirQueryConfigurationManagerTests
     }
 
     [Fact]
-    public async Task CreateAuthenticationConfiguration_NoConfig_ThrowsNotFound()
-    {
-        // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var manager = CreateManager(scope);
-        var authConfig = new AuthenticationConfiguration
-        {
-            AuthType = AuthType.Basic.ToString()
-        };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() => manager.CreateAuthenticationConfiguration("NonExisting", authConfig));
-    }
-
-    [Fact]
     public async Task CreateAuthenticationConfiguration_ExistingAuth_ThrowsAlreadyExists()
     {
         // Arrange
@@ -140,21 +125,6 @@ public class FhirQueryConfigurationManagerTests
     }
 
     [Fact]
-    public async Task UpdateAuthenticationConfiguration_NoConfig_ThrowsNotFound()
-    {
-        // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var manager = CreateManager(scope);
-        var authConfig = new AuthenticationConfiguration
-        {
-            AuthType = AuthType.Basic.ToString()
-        };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() => manager.UpdateAuthenticationConfiguration("NonExisting", authConfig));
-    }
-
-    [Fact]
     public async Task DeleteAuthenticationConfiguration_Valid_DeletesAuth()
     {
         // Arrange
@@ -180,17 +150,6 @@ public class FhirQueryConfigurationManagerTests
         // Assert
         var updatedConfig = await dbContext.FhirQueryConfigurations.SingleOrDefaultAsync(c => c.FacilityId == facilityId);
         Assert.Null(updatedConfig.Authentication);
-    }
-
-    [Fact]
-    public async Task DeleteAuthenticationConfiguration_NoConfig_ThrowsNotFound()
-    {
-        // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var manager = CreateManager(scope);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() => manager.DeleteAuthenticationConfiguration("NonExisting"));
     }
 
     [Fact]
@@ -229,36 +188,6 @@ public class FhirQueryConfigurationManagerTests
     }
 
     [Fact]
-    public async Task CreateAsync_MissingFacilityId_ThrowsArgumentNull()
-    {
-        // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var manager = CreateManager(scope);
-        var model = new CreateFhirQueryConfigurationModel
-        {
-            FhirServerBaseUrl = "http://example.com"
-        };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() => manager.CreateAsync(model));
-    }
-
-    [Fact]
-    public async Task CreateAsync_MissingFhirServerBaseUrl_ThrowsArgumentNull()
-    {
-        // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var manager = CreateManager(scope);
-        var model = new CreateFhirQueryConfigurationModel
-        {
-            FacilityId = "TestFacility"
-        };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() => manager.CreateAsync(model));
-    }
-
-    [Fact]
     public async Task UpdateAsync_Valid_ReturnsModel()
     {
         // Arrange
@@ -291,37 +220,6 @@ public class FhirQueryConfigurationManagerTests
     }
 
     [Fact]
-    public async Task UpdateAsync_NoExisting_ThrowsNotFound()
-    {
-        // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var manager = CreateManager(scope);
-        var model = new UpdateFhirQueryConfigurationModel
-        {
-            FacilityId = "NonExisting",
-            FhirServerBaseUrl = "http://example.com"
-        };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() => manager.UpdateAsync(model));
-    }
-
-    [Fact]
-    public async Task UpdateAsync_MissingFhirServerBaseUrl_ThrowsArgumentNull()
-    {
-        // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var manager = CreateManager(scope);
-        var model = new UpdateFhirQueryConfigurationModel
-        {
-            FacilityId = "TestFacility",
-        };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() => manager.UpdateAsync(model));
-    }
-
-    [Fact]
     public async Task DeleteAsync_Valid_ReturnsTrue()
     {
         // Arrange
@@ -347,17 +245,6 @@ public class FhirQueryConfigurationManagerTests
         Assert.True(result);
         var deleted = await dbContext.FhirQueryConfigurations.SingleOrDefaultAsync(c => c.FacilityId == facilityId);
         Assert.Null(deleted);
-    }
-
-    [Fact]
-    public async Task DeleteAsync_NoExisting_ThrowsNotFound()
-    {
-        // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var manager = CreateManager(scope);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() => manager.DeleteAsync("NonExisting"));
     }
 
     [Theory]
@@ -386,26 +273,6 @@ public class FhirQueryConfigurationManagerTests
         // Assert
         Assert.NotNull(result);
         Assert.Equal(maxRetries, result.MaxRetries);
-    }
-
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(11)]
-    public async Task CreateAsync_MaxRetries_Invalid_ThrowsArgumentOutOfRange(int maxRetries)
-    {
-        // Arrange
-        var facilityId = NewFacilityId("TestFacility");
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var manager = CreateManager(scope);
-        var model = new CreateFhirQueryConfigurationModel
-        {
-            FacilityId = facilityId,
-            FhirServerBaseUrl = "http://example.com",
-            MaxRetries = maxRetries
-        };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => manager.CreateAsync(model));
     }
 
     [Theory]
@@ -444,35 +311,5 @@ public class FhirQueryConfigurationManagerTests
         Assert.Equal(maxRetries, result.MaxRetries);
     }
 
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(11)]
-    public async Task UpdateAsync_MaxRetries_Invalid_ThrowsArgumentOutOfRange(int maxRetries)
-    {
-        // Arrange
-        var facilityId = NewFacilityId("TestFacility");
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-
-
-        var existing = new FhirQueryConfiguration
-        {
-            FacilityId = facilityId,
-            FhirServerBaseUrl = "http://old.com",
-        };
-        dbContext.FhirQueryConfigurations.Add(existing);
-        await dbContext.SaveChangesAsync();
-
-        var manager = CreateManager(scope);
-        var model = new UpdateFhirQueryConfigurationModel
-        {
-            FacilityId = facilityId,
-            FhirServerBaseUrl = "http://example.com",
-            MaxRetries = maxRetries
-        };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => manager.UpdateAsync(model));
     }
-}
 

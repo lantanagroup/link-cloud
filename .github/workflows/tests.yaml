@@ -1,4 +1,4 @@
-﻿name: "Tests"
+name: "Tests"
 
 on:
 #  schedule:
@@ -356,6 +356,9 @@ jobs:
 
       - name: Pull Azurite Docker image
         run: docker pull mcr.microsoft.com/azure-storage/azurite:latest
+
+      - name: Pull SQL Server Docker image
+        run: docker pull mcr.microsoft.com/mssql/server:2022-CU13-ubuntu-22.04
 
       - name: Restore dependencies
         run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj
