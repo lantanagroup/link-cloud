@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -103,12 +104,12 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             Status = model.Status,
             FacilityId = model.FacilityId,
             QueryPhase = model.QueryPhase,
+            ReferenceResourceType = model.ReferenceResourceType,
             FhirVersion = model.FhirVersion,
             QueryType = model.QueryType,
             FhirQueries = model.FhirQuery.Select(q => new FhirQuery
             {
                 FacilityId = model.FacilityId,
-                IdQueryParameterValues = q.IdQueryParameterValues,
                 IsReference = q.IsReference,
                 MeasureId = q.MeasureId,
                 QueryParameters = q.QueryParameters,
@@ -788,7 +789,23 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             return null;
         }
 
-        // Count terminal siblings. 
+        // Tail threshold is derived from the live count of stamped siblings rather
+        // than the SiblingCount value on any single row. Same-phase reference logs
+        // are added mid-flow and stamp ONLY their own row (single-row UPDATE) to
+        // avoid deadlocking with this method's wide TailSent UPDATE; that means a
+        // single row's SiblingCount can lag behind the true group size, but the
+        // count of stamped rows is always authoritative.
+        var stampedSiblingCount = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+            .CountAsync(l =>
+                l.SiblingCount != null
+                && l.CorrelationId != null
+                && l.QueryPhase != null
+                && l.FacilityId == groupInfo.FacilityId
+                && l.CorrelationId == groupInfo.CorrelationId
+                && l.QueryPhase == groupInfo.QueryPhase,
+                cancellationToken);
+
+        // Count terminal siblings.
         var terminalCount = await _dbContext.DataAcquisitionLogs.AsNoTracking()
             .CountAsync(l =>
                 !l.TailSent
@@ -802,7 +819,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 && terminalStatuses.Contains(l.Status.Value),
                 cancellationToken);
 
-        if (terminalCount < groupInfo.SiblingCount)
+        if (terminalCount < stampedSiblingCount)
         {
             return null;
         }
@@ -863,7 +880,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             {
                 AcquisitionComplete = true,
                 PatientId = representative.PatientId ?? string.Empty,
-                QueryType = groupInfo.QueryPhase.ToString()!,
+                QueryType = QueryPhaseUtilities.ToWireQueryType(groupInfo.QueryPhase),
                 ReportableEvent = representative.ReportableEvent ?? default,
                 ScheduledReports = representative.ScheduledReport != null
                     ? new List<ScheduledReport> { representative.ScheduledReport }
