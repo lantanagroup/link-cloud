@@ -46,10 +46,10 @@ jobs:
       - name: Show decision
         run: echo "run_job=${{ steps.should.outputs.run_job }}"
 
-  docker-build-and-run:    
-    name: Smoke Test with Docker Compose
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  backend-e2e-tests:
+    name: Backend E2E Tests with Docker Compose
+    runs-on: [docker-16core-64gb]
+    timeout-minutes: 60
 
     needs: changes
     if: ${{ needs.changes.outputs.run_job == 'true' }}
@@ -58,8 +58,9 @@ jobs:
       PROJECT_NAME: link
       HEALTH_CHECK_TIMEOUT: 60
       CHECK_INTERVAL: 10
+      ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
 
-    steps:          
+    steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -72,6 +73,7 @@ jobs:
             --set *.cache-from=type=gha,scope=e2e-docker \
             --set *.cache-to=type=gha,scope=e2e-docker \
             --set *.output=type=docker   # <-- makes images visible to `docker compose`
+
       - name: Start services
         run: docker compose up --no-build -d
 
@@ -83,253 +85,89 @@ jobs:
           chmod +x Scripts/check_health.sh
           Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
 
-      - name: Upload Logs on Failure
+      # ---- Test categories run sequentially against the SAME compose stack. ----
+      # `if: ${{ !cancelled() }}` lets later categories run even if an earlier one fails,
+      # while still letting a failure mark the overall job as failed.
+
+      - name: Adhoc Report Tests
+        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=AdhocReportTest" --logger "trx;LogFileName=adhoc-report-test-results.trx" --logger "console;verbosity=detailed"
+
+      - name: API Stability Test
+        if: ${{ !cancelled() }}
+        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=ApiStabilityTest" --logger "trx;LogFileName=api-stability-test-results.trx" --logger "console;verbosity=detailed"
+
+      - name: Report Scheduled E2E Test
+        if: ${{ !cancelled() }}
+        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=ReportScheduledTest" --logger "trx;LogFileName=report-scheduled-test-results.trx" --logger "console;verbosity=detailed"
+
+      - name: Regenerate Report E2E Test
+        if: ${{ !cancelled() }}
+        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=RegenerateReportTest" --logger "trx;LogFileName=regenerate-report-test-results.trx" --logger "console;verbosity=detailed"
+
+      - name: Multi-Measure E2E Test
+        if: ${{ !cancelled() }}
+        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=MultiMeasureTest" --logger "trx;LogFileName=multi-measure-test-results.trx" --logger "console;verbosity=detailed"
+
+      # ---- Always-on artifact uploads (preserve per-category artifact names) ----
+
+      - name: Upload Service Logs on Failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: adhoc-report-service-logs
+          name: backend-e2e-service-logs
           path: service-logs/
 
-      - name: Run Backend E2E Adhoc Report Tests
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=AdhocReportTest" --logger "trx;LogFileName=adhoc-report-test-results.trx" --logger "console;verbosity=detailed"
-        env:
-          ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
-
-      - name: Upload test results
-        if: always()
+      - name: Upload Adhoc Report test results
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: adhoc-report-test-results
           path: ./Tests/BackendE2ETests/TestResults/adhoc-report-test-results.trx
+          if-no-files-found: ignore
 
-      - name: Upload submission ZIP
-        if: always()
+      - name: Upload Adhoc Report submission ZIP
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: adhoc-report-submission-zip
           path: ./Tests/BackendE2ETests/TestResults/adhoc-report-test-submission.zip
+          if-no-files-found: ignore
 
-  docker-build-and-run-api-stability:
-    name: API Stability Test with Docker Compose
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-
-    needs: changes
-    if: ${{ needs.changes.outputs.run_job == 'true' }}
-
-    env:
-      PROJECT_NAME: link
-      HEALTH_CHECK_TIMEOUT: 60
-      CHECK_INTERVAL: 10
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build services with cache
-        run: |
-          docker buildx bake --file docker-compose.yml \
-            --set *.cache-from=type=gha,scope=e2e-docker \
-            --set *.cache-to=type=gha,scope=e2e-docker \
-            --set *.output=type=docker
-
-      - name: Start services
-        run: docker compose up --no-build -d
-
-      - name: Wait for services to start
-        run: sleep 10
-
-      - name: Wait for Services to Become Healthy
-        run: |
-          chmod +x Scripts/check_health.sh
-          Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
-
-      - name: Upload Logs on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-stability-service-logs
-          path: service-logs/
-
-      - name: Run Backend E2E API Stability Test
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=ApiStabilityTest" --logger "trx;LogFileName=api-stability-test-results.trx" --logger "console;verbosity=detailed"
-
-      - name: Upload test results
-        if: always()
+      - name: Upload API Stability test results
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: api-stability-test-results
           path: ./Tests/BackendE2ETests/TestResults/api-stability-test-results.trx
+          if-no-files-found: ignore
 
-  docker-build-and-run-report-scheduled:
-    name: Report Scheduled E2E Test with Docker Compose
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    needs: changes
-    if: ${{ needs.changes.outputs.run_job == 'true' }}
-
-    env:
-      PROJECT_NAME: link
-      HEALTH_CHECK_TIMEOUT: 60
-      CHECK_INTERVAL: 10
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build services with cache
-        run: |
-          docker buildx bake --file docker-compose.yml \
-            --set *.cache-from=type=gha,scope=e2e-docker \
-            --set *.cache-to=type=gha,scope=e2e-docker \
-            --set *.output=type=docker
-
-      - name: Start services
-        run: docker compose up --no-build -d
-
-      - name: Wait for services to start
-        run: sleep 10
-
-      - name: Wait for Services to Become Healthy
-        run: |
-          chmod +x Scripts/check_health.sh
-          Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
-
-      - name: Upload Logs on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: report-scheduled-service-logs
-          path: service-logs/
-
-      - name: Run Backend E2E Report Scheduled Test
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=ReportScheduledTest" --logger "trx;LogFileName=report-scheduled-test-results.trx" --logger "console;verbosity=detailed"
-
-      - name: Upload test results
-        if: always()
+      - name: Upload Report Scheduled test results
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: report-scheduled-test-results
           path: ./Tests/BackendE2ETests/TestResults/report-scheduled-test-results.trx
+          if-no-files-found: ignore
 
-  docker-build-and-run-regenerate-report:
-    name: Regenerate Report E2E Test with Docker Compose
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    needs: changes
-    if: ${{ needs.changes.outputs.run_job == 'true' }}
-
-    env:
-      PROJECT_NAME: link
-      HEALTH_CHECK_TIMEOUT: 60
-      CHECK_INTERVAL: 10
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build services with cache
-        run: |
-          docker buildx bake --file docker-compose.yml \
-            --set *.cache-from=type=gha,scope=e2e-docker \
-            --set *.cache-to=type=gha,scope=e2e-docker \
-            --set *.output=type=docker
-
-      - name: Start services
-        run: docker compose up --no-build -d
-
-      - name: Wait for services to start
-        run: sleep 10
-
-      - name: Wait for Services to Become Healthy
-        run: |
-          chmod +x Scripts/check_health.sh
-          Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
-
-      - name: Upload Logs on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: regenerate-report-service-logs
-          path: service-logs/
-
-      - name: Run Backend E2E Regenerate Report Test
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=RegenerateReportTest" --logger "trx;LogFileName=regenerate-report-test-results.trx" --logger "console;verbosity=detailed"
-
-      - name: Upload test results
-        if: always()
+      - name: Upload Regenerate Report test results
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: regenerate-report-test-results
           path: ./Tests/BackendE2ETests/TestResults/regenerate-report-test-results.trx
+          if-no-files-found: ignore
 
-  docker-build-and-run-multi-measure:
-    name: Multi-Measure E2E Test with Docker Compose
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-
-    needs: changes
-    if: ${{ needs.changes.outputs.run_job == 'true' }}
-
-    env:
-      PROJECT_NAME: link
-      HEALTH_CHECK_TIMEOUT: 60
-      CHECK_INTERVAL: 10
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build services with cache
-        run: |
-          docker buildx bake --file docker-compose.yml \
-            --set *.cache-from=type=gha,scope=e2e-docker \
-            --set *.cache-to=type=gha,scope=e2e-docker \
-            --set *.output=type=docker
-
-      - name: Start services
-        run: docker compose up --no-build -d
-
-      - name: Wait for services to start
-        run: sleep 10
-
-      - name: Wait for Services to Become Healthy
-        run: |
-          chmod +x Scripts/check_health.sh
-          Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
-
-      - name: Upload Logs on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: multi-measure-service-logs
-          path: service-logs/
-
-      - name: Run Backend E2E Multi-Measure Test
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=MultiMeasureTest" --logger "trx;LogFileName=multi-measure-test-results.trx" --logger "console;verbosity=detailed"
-        env:
-          ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
-
-      - name: Upload test results
-        if: always()
+      - name: Upload Multi-Measure test results
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: multi-measure-test-results
           path: ./Tests/BackendE2ETests/TestResults/multi-measure-test-results.trx
+          if-no-files-found: ignore
+
+      - name: Tear down services
+        if: always()
+        run: docker compose down -v --remove-orphans
 
   integration-tests:
     name: Integration Tests

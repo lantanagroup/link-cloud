@@ -15,8 +15,9 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census;
 
+[Collection("CensusIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegrationTestFixture>
+public class PatientListProcessingWorkflowTests
 {
     private readonly CensusIntegrationTestFixture _fixture;
     private PatientListService _patientListService;

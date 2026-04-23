@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Census.Application.Models;
+using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Controllers;
 using LantanaGroup.Link.Census.Domain.Context;
@@ -14,7 +14,7 @@ namespace IntegrationTests.Census;
 
 [Collection("CensusIntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class PatientEventsControllerTests : IClassFixture<CensusIntegrationTestFixture>
+public class PatientEventsControllerTests
 {
     private readonly CensusIntegrationTestFixture _fixture;
     private readonly ITestOutputHelper _output;
