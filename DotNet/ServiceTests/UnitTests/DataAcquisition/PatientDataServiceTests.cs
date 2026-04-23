@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Rest;
@@ -114,6 +114,7 @@ public class PatientDataServiceTests
             _mockLogManager.Object,
             _mockLogQueries.Object,
             _mockFhirApiService.Object,
+            _mockRefService.Object,
             _mockDistributedSemaphoreProvider.Object,
             _mockServiceProvider.Object,
             _mockPatientCensusService.Object,
@@ -381,6 +382,7 @@ public class PatientDataServiceTests
                 It.IsAny<FhirQueryModel>(),
                 It.IsAny<ResourceType>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken))
             .ReturnsAsync(new[] { "Patient/patient-1" });
 
@@ -609,6 +611,7 @@ public class PatientDataServiceTests
                 It.IsAny<FhirQueryModel>(),
                 It.IsAny<ResourceType>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken))
             .ThrowsAsync(new OpOutcomeException("OperationOutcome encountered", new FhirOperationException("test", HttpStatusCode.NotFound)));
 
@@ -682,6 +685,7 @@ public class PatientDataServiceTests
                 It.IsAny<FhirQueryModel>(),
                 It.IsAny<ResourceType>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken))
             .ThrowsAsync(new OpOutcomeException("OperationOutcome encountered", new FhirOperationException("test", HttpStatusCode.InternalServerError)));
 
@@ -754,6 +758,7 @@ public class PatientDataServiceTests
                 It.IsAny<FhirQueryModel>(),
                 It.IsAny<ResourceType>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken))
             .ThrowsAsync(new OpOutcomeException("OperationOutcome encountered", new FhirOperationException("test", HttpStatusCode.InternalServerError)));
 
@@ -887,6 +892,7 @@ public class PatientDataServiceTests
                 It.IsAny<FhirQueryModel>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
                 It.IsAny<ResourceType>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken),
             Times.Never);
 
@@ -896,6 +902,7 @@ public class PatientDataServiceTests
                 It.IsAny<FhirQueryModel>(),
                 It.IsAny<ResourceType>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken),
             Times.Never);
     }
@@ -981,6 +988,7 @@ public class PatientDataServiceTests
                 It.IsAny<FhirQueryModel>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
                 ResourceType.Observation,
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken))
             .ReturnsAsync(new List<string> { "obs-100", "obs-200", "obs-300" }) // simulate returned IDs
             .Verifiable(); // allows .Verify() later
@@ -995,6 +1003,7 @@ public class PatientDataServiceTests
                 It.IsAny<FhirQueryModel>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
                 ResourceType.Observation,
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken),
             Times.Once,
             "ExecuteSearch should be called when at least one valid ID exists in _id parameter.");
@@ -1079,6 +1088,7 @@ public class PatientDataServiceTests
                 It.Is<FhirQueryModel>(q => q.ResourceTypes.Contains(ResourceType.Patient)),
                 ResourceType.Patient,
                 It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken))
             .ReturnsAsync(new[] { "Patient/123" });
 
@@ -1088,6 +1098,7 @@ public class PatientDataServiceTests
                 It.Is<FhirQueryModel>(q => q.ResourceTypes.Contains(ResourceType.Observation)),
                 It.IsAny<FhirQueryConfigurationModel>(),
                 ResourceType.Observation,
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken))
             .ReturnsAsync(new[] { "Observation/obs1", "Observation/obs2" });
 
@@ -1097,6 +1108,7 @@ public class PatientDataServiceTests
                 It.Is<FhirQueryModel>(q => q.ResourceTypes.Contains(ResourceType.Encounter)),
                 ResourceType.Encounter,
                 It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken))
             .ReturnsAsync(new[] { "Encounter/enc1" });
 
@@ -1172,6 +1184,7 @@ public class PatientDataServiceTests
                 It.IsAny<FhirQueryModel>(),
                 ResourceType.Patient,
                 It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken))
             .ThrowsAsync(new TooManyRequestsException("Rate limited", TimeSpan.FromSeconds(30)));
 
@@ -1237,6 +1250,7 @@ public class PatientDataServiceTests
                 It.IsAny<FhirQueryModel>(),
                 ResourceType.Patient,
                 It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken))
             .ThrowsAsync(new TooManyRequestsException("Rate limited", expectedDelay));
 
@@ -1300,6 +1314,7 @@ public class PatientDataServiceTests
                 It.IsAny<FhirQueryModel>(),
                 ResourceType.Patient,
                 It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator>(),
                 cancellationToken))
             .ThrowsAsync(new TooManyRequestsException("Rate limited", TimeSpan.FromSeconds(60)));  // Mimic parsed default
 

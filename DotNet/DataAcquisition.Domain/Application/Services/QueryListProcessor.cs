@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
@@ -216,9 +216,10 @@ public class QueryListProcessor : IQueryListProcessor
             }
             else if (builtQuery is ReferenceQueryFactoryResult)
             {
-                // Reference resources are now fetched inline during normal log
-                // processing (in ProcessReferences). No separate log is needed.
-                _logger.LogDebug("Skipping separate log creation for reference query {ResourceType} — references are resolved inline.", ((ReferenceQueryConfig)queryConfig).ResourceType);
+                // Reference queries are not scheduled up front. Reference ids are discovered
+                // while primary logs execute and are accumulated into the single durable
+                // same-phase reference log for the correlation/resource type.
+                _logger.LogDebug("Skipping up-front log creation for reference query {ResourceType}; execution is driven by primary-log reference discovery.", ((ReferenceQueryConfig)queryConfig).ResourceType);
             }
         }
 

@@ -1,10 +1,8 @@
-﻿using System.Net;
-using System.Text;
-using System.Text.Json;
+﻿using System.Text;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Rest;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
@@ -12,18 +10,24 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.Refere
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using IsolationLevel = System.Data.IsolationLevel;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -38,15 +42,13 @@ public interface IReferenceResourceService
         string queryPlanType,
         CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Inline fetch-or-cache for discovered reference resource IDs.
-    /// Checks the canonical <c>ReferenceResources</c> cache; fetches any missing
-    /// resources from the FHIR server; stores them; and links them to the log.
-    /// </summary>
-    Task ProcessReferences(
+    Task FetchAndPersistAsync(
+        DataAcquisitionLogModel primaryLog,
+        DiscoveredReferenceAccumulator accumulator,
+        CancellationToken cancellationToken = default);
+
+    Task<PreparedReferenceLogExecutionModel> PrepareReferenceLogExecutionAsync(
         DataAcquisitionLogModel log,
-        List<ResourceReference> refResources,
-        FhirQueryConfigurationModel fhirQueryConfiguration,
         CancellationToken cancellationToken = default);
 }
 
@@ -55,27 +57,38 @@ public class ReferenceResourceService : IReferenceResourceService
     private readonly ILogger<ReferenceResourceService> _logger;
     private readonly IReferenceResourcesQueries _referenceResourcesQueries;
     private readonly IReferenceResourcesManager _referenceResourcesManager;
-    private readonly IReadFhirCommand _readFhirCommand;
+    private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
+    private readonly IQueryPlanQueries _queryPlanQueries;
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly IProducer<ResourceKey, ResourceAcquired> _kafkaProducer;
+
+    private const int LockTimeoutMs = 30000;
 
     public ReferenceResourceService(
         ILogger<ReferenceResourceService> logger,
         IReferenceResourcesQueries referenceResourcesQueries,
         IReferenceResourcesManager referenceResourcesManager,
-        IReadFhirCommand readFhirCommand,
-        IProducer<ResourceKey, ResourceAcquired> kafkaProducer,
-        DataAcquisitionDbContext dbContext)
+        IDataAcquisitionLogManager dataAcquisitionLogManager,
+        IQueryPlanQueries queryPlanQueries,
+        DataAcquisitionDbContext dbContext,
+        IProducer<ResourceKey, ResourceAcquired> kafkaProducer)
     {
         _logger = logger;
         _referenceResourcesQueries = referenceResourcesQueries;
         _referenceResourcesManager = referenceResourcesManager;
-        _readFhirCommand = readFhirCommand;
-        _kafkaProducer = kafkaProducer;
+        _dataAcquisitionLogManager = dataAcquisitionLogManager;
+        _queryPlanQueries = queryPlanQueries;
         _dbContext = dbContext;
+        _kafkaProducer = kafkaProducer;
     }
 
-    public async Task<List<Resource>> FetchReferenceResources(ReferenceQueryFactoryResult referenceQueryFactoryResult, GetPatientDataRequest request, FhirQueryConfigurationModel fhirQueryConfiguration, ReferenceQueryConfig referenceQueryConfig, string queryPlanType, CancellationToken cancellationToken = default)
+    public async Task<List<Resource>> FetchReferenceResources(
+        ReferenceQueryFactoryResult referenceQueryFactoryResult,
+        GetPatientDataRequest request,
+        FhirQueryConfigurationModel fhirQueryConfiguration,
+        ReferenceQueryConfig referenceQueryConfig,
+        string queryPlanType,
+        CancellationToken cancellationToken = default)
     {
         var resources = new List<Resource>();
         if (referenceQueryFactoryResult.ReferenceIds?.Count == 0)
@@ -85,8 +98,8 @@ public class ReferenceResourceService : IReferenceResourceService
 
         var validReferenceResources =
             referenceQueryFactoryResult
-            ?.ReferenceIds
-            ?.Where(x => x.TypeName == referenceQueryConfig.ResourceType || x.Reference.StartsWith(referenceQueryConfig.ResourceType, StringComparison.InvariantCultureIgnoreCase))
+            .ReferenceIds
+            .Where(x => x.TypeName == referenceQueryConfig.ResourceType || x.Reference.StartsWith(referenceQueryConfig.ResourceType, StringComparison.InvariantCultureIgnoreCase))
             .ToList();
 
         var referenceIds = validReferenceResources.Select(x => x.Reference.SplitReference()).ToList();
@@ -95,209 +108,550 @@ public class ReferenceResourceService : IReferenceResourceService
             FacilityId = request.FacilityId,
             ResourceIds = referenceIds,
             PageSize = int.MaxValue
-        })).Records;
+        }, cancellationToken)).Records;
 
-
-        resources.AddRange(existingReferenceResources.Select(x => FhirResourceDeserializer.DeserializeFhirResource(x)));
-
-        List<ResourceReference> missingReferences = validReferenceResources
-            .Where(x => !existingReferenceResources.Any(y => y.ResourceId == x.Reference.SplitReference())).ToList();
-
-        foreach (var x in missingReferences)
-        {
-            var fullMissingResources = new List<Resource>();
-            resources.AddRange(fullMissingResources);
-        }
+        resources.AddRange(existingReferenceResources.Select(FhirResourceDeserializer.DeserializeFhirResource));
 
         return resources;
     }
 
-    public async Task ProcessReferences(
-        DataAcquisitionLogModel log,
-        List<ResourceReference> refResources,
-        FhirQueryConfigurationModel fhirQueryConfiguration,
+    public async Task FetchAndPersistAsync(
+        DataAcquisitionLogModel primaryLog,
+        DiscoveredReferenceAccumulator accumulator,
         CancellationToken cancellationToken = default)
     {
-        if (refResources == null || refResources.Count == 0)
+        using var activity = ServiceActivitySource.Instance.StartActivity("ReferenceResourceService.FetchAndPersistAsync");
+
+        if (primaryLog == null) throw new ArgumentNullException(nameof(primaryLog));
+        if (accumulator == null) throw new ArgumentNullException(nameof(accumulator));
+        if (string.IsNullOrWhiteSpace(primaryLog.FacilityId))
+            throw new ArgumentException("Primary log is missing a FacilityId.", nameof(primaryLog));
+        if (string.IsNullOrWhiteSpace(primaryLog.CorrelationId))
+            throw new ArgumentException("Primary log is missing a CorrelationId.", nameof(primaryLog));
+        if (primaryLog.QueryPhase == null)
+            throw new ArgumentException("Primary log is missing a QueryPhase.", nameof(primaryLog));
+        if (primaryLog.ReportableEvent == null)
+            throw new ArgumentException("Primary log is missing a ReportableEvent.", nameof(primaryLog));
+
+        if (!accumulator.HasAny)
             return;
 
-        if (log == null)
-            throw new ArgumentNullException(nameof(log), "Data acquisition log cannot be null.");
+        activity?.SetTag(DiagnosticNames.FacilityId, primaryLog.FacilityId);
+        activity?.SetTag(DiagnosticNames.CorrelationId, primaryLog.CorrelationId);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, primaryLog.Id);
 
-        // Group discovered references by type and deduplicate IDs
-        var groupedIdentities = refResources.Select(rr => rr.Reference)
-            .Where(r => !string.IsNullOrEmpty(r))
-            .Select(r => new ResourceIdentity(r))
-            .GroupBy(i => i.ResourceType)
-            .ToList();
-
-        _logger.LogInformation("Processing {Count} reference resources for log with ID: {LogId}", groupedIdentities.Sum(g => g.Count()), log.Id);
-
-        var allCanonicalIdsToLink = new List<Guid>();
-        var resourceByCanonicalId = new Dictionary<Guid, Resource>();
-
-        foreach (var group in groupedIdentities)
+        // Resolve the facility's query plan once. The plan's per-type ReferenceQueryConfig
+        // tells us OperationType (Search vs SearchPost) and Paged batch size.
+        Frequency planFrequency;
+        try
         {
-            var resourceType = group.Key;
-            if (string.IsNullOrEmpty(resourceType))
-            {
-                _logger.LogWarning("Skipping reference resources with no type for log with ID: {LogId}", log.Id);
-                continue;
-            }
-
-            var distinctIds = group.Select(i => i.Id).Distinct().ToList();
-
-            // Check canonical cache: which ones already exist?
-            var existing = (await _referenceResourcesQueries.SearchAsync(new SearchReferenceResourcesModel
-            {
-                FacilityId = log.FacilityId,
-                ResourceType = resourceType,
-                ResourceIds = distinctIds,
-                PageSize = int.MaxValue
-            })).Records;
-
-            var existingIdSet = existing.Select(r => r.ResourceId).ToHashSet(StringComparer.Ordinal);
-            allCanonicalIdsToLink.AddRange(existing.Select(r => r.Id));
-            foreach (var existingRecord in existing)
-            {
-                try
-                {
-                    var deserialized = FhirResourceDeserializer.DeserializeFhirResource(existingRecord);
-                    if (deserialized != null)
-                        resourceByCanonicalId[existingRecord.Id] = deserialized;
-                }
-                catch
-                {
-                    // Non-fatal; skip event publish for malformed cached payload.
-                }
-            }
-
-            // Determine which IDs need fetching
-            var missingIds = distinctIds.Where(id => !existingIdSet.Contains(id)).ToList();
-
-            if (missingIds.Count == 0)
-                continue;
-
-            // Fetch missing resources from FHIR server and cache them
-            var fhirResourceType = Enum.Parse<ResourceType>(resourceType);
-            var toCreate = new List<CreateReferenceResourcesModel>();
-
-            foreach (var resourceId in missingIds)
-            {
-                try
-                {
-                    var resource = await _readFhirCommand.ExecuteAsync(
-                        new ReadFhirCommandRequest(
-                            log.FacilityId,
-                            fhirResourceType,
-                            resourceId,
-                            fhirQueryConfiguration.FhirServerBaseUrl,
-                            fhirQueryConfiguration,
-                            log.ReportTrackingId),
-                        cancellationToken);
-
-                    var serialized = JsonSerializer.Serialize(resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
-
-                    toCreate.Add(new CreateReferenceResourcesModel
-                    {
-                        FacilityId = log.FacilityId,
-                        ResourceId = resource.Id,
-                        ResourceType = resource.TypeName,
-                        ReferenceResource = serialized,
-                        QueryPhase = QueryPhase.Referential,
-                    });
-                }
-                catch (FhirOperationException ex) when (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone)
-                {
-                    _logger.LogWarning("Reference resource {ResourceType}/{ResourceId} not found (HTTP {Status}) for log {LogId}; skipping.",
-                        resourceType, resourceId, ex.Status, log.Id);
-                }
-            }
-
-            if (toCreate.Count > 0)
-            {
-                await _referenceResourcesManager.CreateBatchAsync(toCreate, cancellationToken);
-
-                // Look up newly created IDs for junction linking
-                var newResourceIds = toCreate.Select(c => c.ResourceId).ToList();
-                var newRecords = (await _referenceResourcesQueries.SearchAsync(new SearchReferenceResourcesModel
-                {
-                    FacilityId = log.FacilityId,
-                    ResourceType = resourceType,
-                    ResourceIds = newResourceIds,
-                    PageSize = int.MaxValue
-                })).Records;
-                allCanonicalIdsToLink.AddRange(newRecords.Select(r => r.Id));
-                foreach (var newRecord in newRecords)
-                {
-                    try
-                    {
-                        var deserialized = FhirResourceDeserializer.DeserializeFhirResource(newRecord);
-                        if (deserialized != null)
-                            resourceByCanonicalId[newRecord.Id] = deserialized;
-                    }
-                    catch
-                    {
-                        // Non-fatal; skip event publish for malformed payload.
-                    }
-                }
-            }
+            planFrequency = ReportableEventToQueryPlanTypeFactory
+                .GenerateQueryPlanTypeFromReportableEvent(primaryLog.ReportableEvent.Value);
+        }
+        catch (ArgumentException ex)
+        {
+            _logger.LogWarning(ex,
+                "FetchAndPersistAsync: cannot map ReportableEvent {ReportableEvent} to a Frequency for facility {FacilityId} correlation {CorrelationId}; dropping {Count} discovered reference type(s).",
+                primaryLog.ReportableEvent, primaryLog.FacilityId, primaryLog.CorrelationId, accumulator.ByType.Count);
+            return;
         }
 
-        // Link all canonical rows to this log and publish ResourceAcquired events for
-        // newly linked references so downstream consumers (MeasureEval/Report) receive
-        // reference resources in this correlation's stream.
-        if (allCanonicalIdsToLink.Count > 0)
+        var queryPlan = await _queryPlanQueries.GetAsync(primaryLog.FacilityId, planFrequency, cancellationToken);
+        if (queryPlan == null)
         {
-            var requestedCanonicalIds = allCanonicalIdsToLink.Distinct().ToList();
+            _logger.LogWarning(
+                "FetchAndPersistAsync: no query plan found for facility {FacilityId} frequency {Frequency}; dropping {Count} discovered reference type(s).",
+                primaryLog.FacilityId, planFrequency, accumulator.ByType.Count);
+            return;
+        }
 
-            var alreadyLinkedIds = await _dbContext.DataAcquisitionLogs
-                .Where(l => l.Id == log.Id)
-                .SelectMany(l => l.ReferenceResources.Select(r => r.Id))
-                .ToListAsync(cancellationToken);
+        foreach (var (resourceType, idSet) in accumulator.ByType)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
 
-            var newIdsToLink = requestedCanonicalIds
-                .Except(alreadyLinkedIds)
+            if (idSet == null || idSet.Count == 0)
+                continue;
+
+            var refConfig = ResolveReferenceQueryConfig(queryPlan, resourceType);
+            if (refConfig == null)
+            {
+                _logger.LogDebug(
+                    "FetchAndPersistAsync: no ReferenceQueryConfig for type {ResourceType} in facility {FacilityId} plan; skipping {Count} discovered id(s).",
+                    resourceType, primaryLog.FacilityId, idSet.Count);
+                continue;
+            }
+
+            if (!Enum.TryParse<ResourceType>(resourceType, ignoreCase: false, out var parsedResourceType))
+            {
+                _logger.LogWarning(
+                    "FetchAndPersistAsync: type {ResourceType} is not a valid FHIR ResourceType; skipping {Count} id(s).",
+                    resourceType, idSet.Count);
+                continue;
+            }
+
+            var requestedIds = idSet
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(id => id, StringComparer.Ordinal)
                 .ToList();
 
-            if (newIdsToLink.Count > 0)
-            {
-                await _referenceResourcesManager.LinkToLogAsync(log.Id, newIdsToLink, cancellationToken);
+            if (requestedIds.Count == 0)
+                continue;
 
-                foreach (var referenceId in newIdsToLink)
-                {
-                    if (!resourceByCanonicalId.TryGetValue(referenceId, out var resource))
-                        continue;
-                    if (resource == null)
-                        continue;
-
-                    await _kafkaProducer.ProduceAsync(
-                        KafkaTopic.ResourceAcquired.ToString(),
-                        new Message<ResourceKey, ResourceAcquired>
-                        {
-                            Key = new ResourceKey
-                            {
-                                FacilityId = log.FacilityId,
-                                CorrelationId = log.CorrelationId
-                            },
-                            Headers = new Headers
-                            {
-                                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
-                                    Encoding.UTF8.GetBytes(log.CorrelationId))
-                            },
-                            Value = new ResourceAcquired
-                            {
-                                Resource = resource,
-                                ResourceType = resource.TypeName,
-                                ScheduledReports = [log.ScheduledReport],
-                                PatientId = null,
-                                QueryType = log.QueryPhase.ToString(),
-                                ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent))
-                            }
-                        },
-                        cancellationToken);
-                }
-            }
+            await GetOrCreateAndAppendAsync(
+                primaryLog,
+                parsedResourceType,
+                refConfig,
+                requestedIds,
+                cancellationToken);
         }
     }
+
+    public async Task<PreparedReferenceLogExecutionModel> PrepareReferenceLogExecutionAsync(
+        DataAcquisitionLogModel log,
+        CancellationToken cancellationToken = default)
+    {
+        if (log == null) throw new ArgumentNullException(nameof(log));
+
+        var resourceType = ResolveReferenceResourceType(log);
+        if (string.IsNullOrWhiteSpace(resourceType))
+        {
+            return new PreparedReferenceLogExecutionModel
+            {
+                SkipFetch = true,
+                Notes = new[] { $"[{DateTime.UtcNow:O}] Reference log has no reference resource type; skipping execution." }
+            };
+        }
+
+        var pendingIds = await _dbContext.PendingReferenceIds
+            .AsNoTracking()
+            .Where(p => p.DataAcquisitionLogId == log.Id)
+            .Select(p => p.ResourceId)
+            .Distinct()
+            .OrderBy(id => id)
+            .ToListAsync(cancellationToken);
+
+        // Persist the full pending set as the log's query of record.
+        if (pendingIds.Count > 0)
+        {
+            await PersistReferenceQueryParametersAsync(log.Id, pendingIds, cancellationToken);
+        }
+
+        var acquiredIds = (log.ResourceAcquiredIds ?? new List<string>())
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        var alreadyAcquiredBareIds = acquiredIds
+            .Where(id => id.StartsWith($"{resourceType}/", StringComparison.OrdinalIgnoreCase))
+            .Select(id => id.SplitReference())
+            .ToHashSet(StringComparer.Ordinal);
+
+        var outstandingIds = pendingIds
+            .Where(id => !alreadyAcquiredBareIds.Contains(id))
+            .ToList();
+
+        if (outstandingIds.Count == 0)
+        {
+            return new PreparedReferenceLogExecutionModel
+            {
+                SkipFetch = true,
+                ResourceIds = acquiredIds,
+                Notes = new[] { $"[{DateTime.UtcNow:O}] No outstanding reference ids remained for {resourceType}; completing without FHIR fetch." }
+            };
+        }
+
+        var cachedRows = (await _referenceResourcesQueries.SearchAsync(new SearchReferenceResourcesModel
+        {
+            FacilityId = log.FacilityId,
+            ResourceType = resourceType,
+            ResourceIds = outstandingIds,
+            PageSize = int.MaxValue
+        }, cancellationToken)).Records;
+
+        var cachedById = cachedRows
+            .GroupBy(r => r.ResourceId, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
+        // Reference logs surface their own resources via ResourceAcquiredIds; the
+        // junction is reserved for primary logs that depend on them.
+        var resourceIds = new HashSet<string>(acquiredIds, StringComparer.Ordinal);
+        foreach (var cached in cachedRows)
+        {
+            Resource? resource;
+            try
+            {
+                resource = FhirResourceDeserializer.DeserializeFhirResource(cached);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "PrepareReferenceLogExecutionAsync: failed to deserialize cached reference {ResourceType}/{ResourceId} for log {LogId}.",
+                    resourceType, cached.ResourceId, log.Id);
+                continue;
+            }
+
+            if (resource == null)
+                continue;
+
+            resourceIds.Add($"{resource.TypeName}/{resource.Id}");
+            await PublishResourceAcquiredAsync(log, resource, cancellationToken);
+        }
+
+        var missingIds = outstandingIds.Where(id => !cachedById.ContainsKey(id)).ToList();
+        if (missingIds.Count == 0)
+        {
+            return new PreparedReferenceLogExecutionModel
+            {
+                SkipFetch = true,
+                ResourceIds = resourceIds.ToList(),
+                Notes = new[] { $"[{DateTime.UtcNow:O}] Reference ids for {resourceType} were satisfied from canonical cache without a FHIR round-trip." }
+            };
+        }
+
+        // In-memory only: the on-the-wire call fetches just the cache-miss subset.
+        foreach (var fhirQuery in log.FhirQuery.Where(q => q.IsReference.GetValueOrDefault()))
+        {
+            fhirQuery.IdQueryParameterValues = missingIds;
+        }
+
+        var notes = cachedRows.Count > 0
+            ? new[] { $"[{DateTime.UtcNow:O}] {cachedRows.Count} reference resource(s) for {resourceType} were served from canonical cache; fetching {missingIds.Count} remaining id(s) from FHIR." }
+            : Array.Empty<string>();
+
+        return new PreparedReferenceLogExecutionModel
+        {
+            SkipFetch = false,
+            ResourceIds = resourceIds.ToList(),
+            Notes = notes
+        };
+    }
+
+    private async Task GetOrCreateAndAppendAsync(
+        DataAcquisitionLogModel primaryLog,
+        ResourceType resourceType,
+        ReferenceQueryConfig refConfig,
+        List<string> resourceIds,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+        await AcquireLockAsync(primaryLog, resourceType, cancellationToken);
+
+        try
+        {
+            var existingLogId = await _dbContext.DataAcquisitionLogs
+                .AsNoTracking()
+                .Where(l => l.FacilityId == primaryLog.FacilityId
+                    && l.CorrelationId == primaryLog.CorrelationId
+                    && l.QueryPhase == primaryLog.QueryPhase
+                    && l.ReferenceResourceType == resourceType.ToString())
+                .Select(l => (long?)l.Id)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var created = false;
+            long referenceLogId;
+
+            if (existingLogId.HasValue)
+            {
+                referenceLogId = existingLogId.Value;
+            }
+            else
+            {
+                var fhirQueryType = MapOperationType(refConfig.OperationType);
+                var pageSize = refConfig.Paged > 0 ? (int?)refConfig.Paged : null;
+
+                var createdLog = await _dataAcquisitionLogManager.CreateAsync(new CreateDataAcquisitionLogModel
+                {
+                    FacilityId = primaryLog.FacilityId,
+                    CorrelationId = primaryLog.CorrelationId,
+                    ReportTrackingId = primaryLog.ReportTrackingId,
+                    ReportableEvent = primaryLog.ReportableEvent,
+                    Priority = primaryLog.Priority,
+                    PatientId = primaryLog.PatientId,
+                    ReferenceResourceType = resourceType.ToString(),
+                    FhirVersion = "R4",
+                    QueryType = fhirQueryType,
+                    QueryPhase = primaryLog.QueryPhase,
+                    Status = RequestStatus.Pending,
+                    ExecutionDate = DateTime.UtcNow,
+                    TraceId = primaryLog.TraceId,
+                    Notes = new List<string>
+                    {
+                        $"Reference aggregation log for {resourceType} created from primary correlation discovery."
+                    },
+                    FhirQuery = new List<CreateFhirQueryModel>
+                    {
+                        new CreateFhirQueryModel
+                        {
+                            FacilityId = primaryLog.FacilityId,
+                            IsReference = true,
+                            QueryType = fhirQueryType,
+                            Paged = pageSize,
+                            ResourceTypes = new List<ResourceType> { resourceType },
+                            QueryParameters = new List<string>()
+                        }
+                    }
+                }, cancellationToken);
+
+                referenceLogId = createdLog.Id;
+                created = true;
+
+                // Stamp ONLY the new reference log's SiblingCount with a single-row
+                // UPDATE so it participates in TryCompleteTailAsync's count-based tail
+                // gate. We deliberately avoid the previous wide-range UPDATE over every
+                // log in the (facility, correlation, phase) group: that wide UPDATE
+                // deadlocked with TryCompleteTailAsync's wide TailSent UPDATE on the
+                // same range. The exact stamped value is not significant for the tail
+                // threshold (which now COUNTs stamped siblings instead of trusting one
+                // row's value); we use the post-insert sibling count purely for human
+                // readability when inspecting the row.
+                var stampedSiblingCount = await _dbContext.DataAcquisitionLogs
+                    .AsNoTracking()
+                    .CountAsync(
+                        l => l.FacilityId == primaryLog.FacilityId
+                            && l.CorrelationId == primaryLog.CorrelationId
+                            && l.QueryPhase == primaryLog.QueryPhase
+                            && l.SiblingCount != null,
+                        cancellationToken);
+
+                await _dbContext.DataAcquisitionLogs
+                    .Where(l => l.Id == referenceLogId)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(l => l.SiblingCount, stampedSiblingCount + 1)
+                        .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                        cancellationToken);
+            }
+
+            var existingPendingIds = await _dbContext.PendingReferenceIds
+                .AsNoTracking()
+                .Where(p => p.DataAcquisitionLogId == referenceLogId)
+                .Select(p => p.ResourceId)
+                .ToListAsync(cancellationToken);
+
+            var existingAcquiredIds = await _dbContext.DataAcquisitionLogResourceIds
+                .AsNoTracking()
+                .Where(r => r.DataAcquisitionLogId == referenceLogId
+                    && r.ResourceId.StartsWith(resourceType + "/"))
+                .Select(r => r.ResourceId)
+                .ToListAsync(cancellationToken);
+
+            var acquiredBareIds = existingAcquiredIds
+                .Select(id => id.SplitReference())
+                .ToHashSet(StringComparer.Ordinal);
+
+            var pendingLookup = existingPendingIds.ToHashSet(StringComparer.Ordinal);
+            var toInsert = resourceIds
+                .Where(id => !pendingLookup.Contains(id) && !acquiredBareIds.Contains(id))
+                .Select(id => new PendingReferenceId
+                {
+                    DataAcquisitionLogId = referenceLogId,
+                    FacilityId = primaryLog.FacilityId,
+                    CorrelationId = primaryLog.CorrelationId!,
+                    ResourceType = resourceType.ToString(),
+                    ResourceId = id,
+                    CreateDate = DateTime.UtcNow
+                })
+                .ToList();
+
+            if (toInsert.Count > 0)
+            {
+                _dbContext.PendingReferenceIds.AddRange(toInsert);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+
+            if (created)
+            {
+                _logger.LogDebug(
+                    "FetchAndPersistAsync: created reference log {ReferenceLogId} for {FacilityId}/{CorrelationId}/{QueryPhase}/{ResourceType}.",
+                    referenceLogId, primaryLog.FacilityId, primaryLog.CorrelationId, primaryLog.QueryPhase, resourceType);
+            }
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    private async Task PublishResourceAcquiredAsync(
+        DataAcquisitionLogModel primaryLog,
+        Resource resource,
+        CancellationToken cancellationToken)
+    {
+        var headers = new Headers
+        {
+            new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
+                Encoding.UTF8.GetBytes(primaryLog.CorrelationId!))
+        };
+
+        await _kafkaProducer.ProduceAsync(
+            KafkaTopic.ResourceAcquired.ToString(),
+            new Message<ResourceKey, ResourceAcquired>
+            {
+                Key = new ResourceKey
+                {
+                    FacilityId = primaryLog.FacilityId,
+                    CorrelationId = primaryLog.CorrelationId
+                },
+                Headers = headers,
+                Value = new ResourceAcquired
+                {
+                    Resource = resource,
+                    ResourceType = resource.TypeName,
+                    ScheduledReports = primaryLog.ScheduledReport != null
+                        ? new List<ScheduledReport> { primaryLog.ScheduledReport }
+                        : new List<ScheduledReport>(),
+                    PatientId = null,
+                    QueryType = QueryPhaseUtilities.ToWireQueryType(primaryLog.QueryPhase),
+                    ReportableEvent = primaryLog.ReportableEvent
+                        ?? throw new ArgumentNullException(nameof(primaryLog.ReportableEvent))
+                }
+            },
+            cancellationToken);
+    }
+
+    private async Task PersistReferenceQueryParametersAsync(
+        long dataAcquisitionLogId,
+        IReadOnlyList<string> pendingIds,
+        CancellationToken cancellationToken)
+    {
+        var referenceQueries = await _dbContext.FhirQueries
+            .Where(q => q.DataAcquisitionLogId == dataAcquisitionLogId
+                && q.IsReference == true)
+            .ToListAsync(cancellationToken);
+
+        if (referenceQueries.Count == 0)
+            return;
+
+        var changed = false;
+        foreach (var fhirQuery in referenceQueries)
+        {
+            var before = string.Join('|', fhirQuery.QueryParameters ?? new List<string>());
+            fhirQuery.IdQueryParameterValues = pendingIds;
+            var after = string.Join('|', fhirQuery.QueryParameters ?? new List<string>());
+
+            if (!string.Equals(before, after, StringComparison.Ordinal))
+            {
+                fhirQuery.ModifyDate = DateTime.UtcNow;
+                changed = true;
+            }
+        }
+
+        if (changed)
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        foreach (var fhirQuery in referenceQueries)
+        {
+            _dbContext.Entry(fhirQuery).State = EntityState.Detached;
+        }
+    }
+
+    private string ResolveReferenceResourceType(DataAcquisitionLogModel log)
+    {
+        if (!string.IsNullOrWhiteSpace(log.ReferenceResourceType))
+            return log.ReferenceResourceType;
+
+        return log.FhirQuery
+            .SelectMany(q => q.ResourceTypes)
+            .Select(r => r.ToString())
+            .FirstOrDefault() ?? string.Empty;
+    }
+
+    private async Task AcquireLockAsync(
+        DataAcquisitionLogModel primaryLog,
+        ResourceType resourceType,
+        CancellationToken cancellationToken)
+    {
+        var connection = _dbContext.Database.GetDbConnection();
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = @"
+            DECLARE @result int;
+            EXEC @result = sp_getapplock
+                @Resource = @resource,
+                @LockMode = 'Exclusive',
+                @LockOwner = 'Transaction',
+                @LockTimeout = @lockTimeoutMs,
+                @DbPrincipal = 'public';
+            SELECT @result;";
+
+        var resourceParam = command.CreateParameter();
+        resourceParam.ParameterName = "@resource";
+        // The lock scope is the (facility, correlation, phase) group, NOT per-resource-type.
+        // Broader serialization is required because GetOrCreateAndAppendAsync also performs
+        // a single-row UPDATE that stamps the new ref log's SiblingCount based on a live
+        // count of stamped siblings. Per-type locking would let two transactions read the
+        // same count and assign duplicate stamps; a single per-group lock makes the
+        // read-then-stamp sequence linearizable across resource types within the group.
+        // The throughput cost is negligible because ref-log work per group is fast and
+        // only happens when primaries finish.
+        resourceParam.Value = $"ReferenceLog:{primaryLog.FacilityId}:{primaryLog.CorrelationId}:{primaryLog.QueryPhase}";
+        command.Parameters.Add(resourceParam);
+
+        var timeoutParam = command.CreateParameter();
+        timeoutParam.ParameterName = "@lockTimeoutMs";
+        timeoutParam.Value = LockTimeoutMs;
+        command.Parameters.Add(timeoutParam);
+
+        var dbTransaction = _dbContext.Database.CurrentTransaction?.GetDbTransaction();
+        if (dbTransaction == null)
+            throw new InvalidOperationException("AcquireLockAsync must be called within an active transaction.");
+
+        command.Transaction = dbTransaction;
+
+        var resultObj = await command.ExecuteScalarAsync(cancellationToken);
+        var result = Convert.ToInt32(resultObj);
+        if (result < 0)
+            throw new InvalidOperationException($"Unable to acquire SQL app lock for reference-log group '{primaryLog.FacilityId}:{primaryLog.CorrelationId}:{primaryLog.QueryPhase}' (resourceType='{resourceType}'). sp_getapplock result={result}.");
+    }
+
+    private static ReferenceQueryConfig? ResolveReferenceQueryConfig(QueryPlanModel plan, string resourceType)
+    {
+        if (plan.InitialQueries != null
+            && TryFindReferenceConfig(plan.InitialQueries, resourceType, out var fromInitial))
+        {
+            return fromInitial;
+        }
+
+        if (plan.SupplementalQueries != null
+            && TryFindReferenceConfig(plan.SupplementalQueries, resourceType, out var fromSupplemental))
+        {
+            return fromSupplemental;
+        }
+
+        return null;
+    }
+
+    private static bool TryFindReferenceConfig(
+        IDictionary<string, IQueryConfig> bucket,
+        string resourceType,
+        out ReferenceQueryConfig? config)
+    {
+        foreach (var kvp in bucket)
+        {
+            if (kvp.Value is ReferenceQueryConfig rc &&
+                string.Equals(rc.ResourceType, resourceType, StringComparison.Ordinal))
+            {
+                config = rc;
+                return true;
+            }
+        }
+
+        config = null;
+        return false;
+    }
+
+    private static FhirQueryType MapOperationType(OperationType opType) =>
+        opType switch
+        {
+            OperationType.Search => FhirQueryType.Search,
+            OperationType.SearchPost => FhirQueryType.SearchPost,
+            OperationType.Read => FhirQueryType.Read,
+            _ => FhirQueryType.Search,
+        };
 }
+

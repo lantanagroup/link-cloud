@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
@@ -10,6 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.EntityFrameworkCore;
@@ -245,6 +246,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 ReportableEvent = l.ReportableEvent,
                 ReportTrackingId = l.ReportTrackingId != null ? l.ReportTrackingId.ToString().ToLower() : null,
                 CorrelationId = l.CorrelationId,
+                ReferenceResourceType = l.ReferenceResourceType,
                 FhirVersion = l.FhirVersion,
                 QueryType = l.QueryType,
                 QueryPhase = l.QueryPhase,
@@ -257,7 +259,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     QueryType = q.QueryType,
                     ResourceTypes = q.FhirQueryResourceTypes.Select(r => r.ResourceType).ToList(),
                     QueryParameters = q.QueryParameters,
-                    IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
                     Paged = q.Paged,
                     DataAcquisitionLogId = q.DataAcquisitionLogId,
                     CensusListId = q.CensusListId,
@@ -315,7 +316,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             // Phase 2: For each candidate group, verify that it has zero
             //          non-terminal logs (i.e. all logs are finished).
 
-            // Phase 1 � narrow candidate groups via terminal-status logs only.
+            // Phase 1 ? narrow candidate groups via terminal-status logs only.
             var candidateGroups = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                 .Where(log =>
                     !log.TailSent &&
@@ -402,7 +403,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     ResourceAcquired = new ResourceAcquired
                     {
                         PatientId = first.PatientId ?? string.Empty,
-                        QueryType = group.QueryPhase.ToString() ?? string.Empty,
+                        QueryType = QueryPhaseUtilities.ToWireQueryType(group.QueryPhase),
                         ReportableEvent = first.ReportableEvent ?? default,
                         AcquisitionComplete = true,
                         ScheduledReports = new List<ScheduledReport>
@@ -518,31 +519,18 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     .Select(q => q.DataAcquisitionLogId)
                     .ToHashSet();
 
-                // Fetch reference resource types linked via the skip-navigation.
-                // DataAcquisitionLogReferenceResource is a shared-type entity and cannot
-                // be accessed via a typed DbSet; query through the DataAcquisitionLog
-                // navigation property instead.
-                var refResourceTypesByLogId = await _dbContext.DataAcquisitionLogs
-                    .AsNoTracking()
-                    .Where(l => logIds.Contains(l.Id))
-                    .SelectMany(l => l.ReferenceResources.Select(r => new { LogId = l.Id, r.ResourceType }))
-                    .GroupBy(x => x.LogId)
-                    .ToDictionaryAsync(
-                        g => g.Key,
-                        g => g.Select(x => x.ResourceType).Distinct().ToList(),
-                        cancellationToken);
-
                 records = pageLogs.Select(log =>
                 {
                     firstQueryByLogId.TryGetValue(log.Id, out var fhirQuery);
                     allQueryResourceTypesByLogId.TryGetValue(log.Id, out var allQueryTypes);
-                    refResourceTypesByLogId.TryGetValue(log.Id, out var refTypes);
 
-                    // Merge FhirQuery resource types + reference resource types.
-                    var resourceTypes = (allQueryTypes ?? fhirQuery?.ResourceTypes?.Select(rt => rt.ToString()).ToList() ?? new List<string>())
-                        .Concat(refTypes ?? [])
-                        .Distinct(StringComparer.OrdinalIgnoreCase)
-                        .ToList();
+                    // Reference logs exist as first-class rows with their
+                    // own FhirQueryResourceTypes, so the log's resource types are strictly
+                    // what its own FhirQueries declare. No synthesis off the
+                    // ReferenceResources junction.
+                    var resourceTypes = allQueryTypes
+                        ?? fhirQuery?.ResourceTypes?.Select(rt => rt.ToString()).ToList()
+                        ?? new List<string>();
 
                     string? resourceId;
 
@@ -559,8 +547,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         resourceId = string.Empty;
                     }
 
-                    var isReferenceLog = logsWithReferenceQuery.Contains(log.Id)
-                        || (refTypes != null && refTypes.Count > 0);
+                    var isReferenceLog = logsWithReferenceQuery.Contains(log.Id);
 
                     return new QueryLogSummaryModel
                     {
@@ -709,39 +696,17 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         foreach (var qp in queryPhaseCounts)
             statistics.QueryPhaseCounts[qp.Phase] = qp.Count;
 
-        // Resource type counts + total from ResourceIds junction table.
-        // Include reference resources linked to completed logs when they are stored
-        // separately in ReferenceResources.
+        // Resource type counts + total. Reference logs are first-class
+        // log rows in the same QueryPhase as their primary; their fetched ids are
+        // recorded in DataAcquisitionLogResourceIds just like any primary log, so
+        // walking ResourceIds across all completed logs counts every resource —
+        // primary and reference — exactly once.
         var completedResourceIds = await baseQuery
             .Where(l => l.Status == RequestStatus.Completed)
             .SelectMany(l => l.ResourceIds.Select(r => r.ResourceId))
             .ToListAsync(cancellationToken);
 
-        var completedReferenceResourceIds = await baseQuery
-            .Where(l => l.Status == RequestStatus.Completed)
-            .SelectMany(l => l.ReferenceResources.Select(r => r.ResourceType + "/" + r.ResourceId))
-            .ToListAsync(cancellationToken);
-
-        var completedLogs = new List<string>(completedResourceIds.Count + completedReferenceResourceIds.Count);
-        completedLogs.AddRange(completedResourceIds);
-
-        // Avoid double-counting resources that already exist in ResourceIds.
-        var existingResourceSet = completedResourceIds
-            .Where(r => !string.IsNullOrWhiteSpace(r))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var referenceResourceId in completedReferenceResourceIds)
-        {
-            if (string.IsNullOrWhiteSpace(referenceResourceId))
-                continue;
-
-            if (existingResourceSet.Contains(referenceResourceId))
-                continue;
-
-            completedLogs.Add(referenceResourceId);
-        }
-
-        foreach (var resource in completedLogs)
+        foreach (var resource in completedResourceIds)
         {
             if (string.IsNullOrWhiteSpace(resource)) continue;
             var slashIdx = resource.IndexOf('/');
@@ -991,12 +956,29 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         CancellationToken cancellationToken = default)
     {
         designagtedExecutionTime ??= DateTime.UtcNow;
+        var terminalStatuses = new[]
+        {
+            RequestStatus.Completed,
+            RequestStatus.MaxRetriesReached,
+            RequestStatus.Skipped,
+            RequestStatus.Cancelled,
+            RequestStatus.ConfigurationMissing,
+        };
 
         var query = from log in _dbContext.DataAcquisitionLogs.AsNoTracking()
                     where log.FacilityId == facilityId
                           && (lastId == null || log.Id > lastId)
                           && (log.ExecutionDate == null || log.ExecutionDate <= designagtedExecutionTime)
                           && (log.Status == null || statuses.Contains(log.Status.Value))
+                          && (log.ReferenceResourceType == null
+                              || (log.CorrelationId != null
+                                  && log.QueryPhase != null
+                                  && !_dbContext.DataAcquisitionLogs.Any(sibling =>
+                                      sibling.FacilityId == log.FacilityId
+                                      && sibling.CorrelationId == log.CorrelationId
+                                      && sibling.QueryPhase == log.QueryPhase
+                                      && sibling.ReferenceResourceType == null
+                                      && (sibling.Status == null || !terminalStatuses.Contains(sibling.Status.Value)))))
                     orderby log.Id
                     select new DataAcquisitionLogModel
                     {
@@ -1008,6 +990,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         ReportableEvent = log.ReportableEvent,
                         ReportTrackingId = log.ReportTrackingId != null ? log.ReportTrackingId.ToString().ToLower() : null,
                         CorrelationId = log.CorrelationId,
+                        ReferenceResourceType = log.ReferenceResourceType,
                         FhirVersion = log.FhirVersion,
                         QueryType = log.QueryType,
                         QueryPhase = log.QueryPhase,
