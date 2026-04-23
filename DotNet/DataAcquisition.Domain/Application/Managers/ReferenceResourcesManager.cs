@@ -1,23 +1,15 @@
-﻿using DataAcquisition.Domain.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using Microsoft.Extensions.Logging;
 using System.Data;
-using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IReferenceResourcesManager
 {
-    Task<ReferenceResourcesModel> CreateAsync(CreateReferenceResourcesModel model, CancellationToken cancellationToken = default);
-    Task<ReferenceResourcesModel> UpdateAsync(UpdateReferenceResourcesModel model, CancellationToken cancellationToken = default);
     Task CreateBatchAsync(IReadOnlyList<CreateReferenceResourcesModel> models, CancellationToken cancellationToken = default);
-    Task UpdateBatchAsync(IReadOnlyList<UpdateReferenceResourcesModel> models, CancellationToken cancellationToken = default);
 
     Task LinkToLogAsync(long dataAcquisitionLogId, IReadOnlyList<Guid> referenceResourceIds, CancellationToken cancellationToken = default);
 }
@@ -28,73 +20,11 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
     private const int LockTimeoutMs = 30000;
     private const int ExistenceCheckChunkSize = 800;
 
-    private readonly ILogger<ReferenceResourcesManager> _logger;
-    private readonly IDatabase _database;
     private readonly DataAcquisitionDbContext _dbContext;
 
-    public ReferenceResourcesManager(ILogger<ReferenceResourcesManager> logger, IDatabase database, DataAcquisitionDbContext dbContext)
+    public ReferenceResourcesManager(DataAcquisitionDbContext dbContext)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-    }
-
-    public async Task<ReferenceResourcesModel> CreateAsync(CreateReferenceResourcesModel model, CancellationToken cancellationToken = default)
-    {
-        using var activity = ServiceActivitySource.Instance.StartActivity("ReferenceResourcesManager.CreateAsync");
-        activity?.SetTag(DiagnosticNames.FacilityId, model.FacilityId);
-        activity?.SetTag(DiagnosticNames.ResourceId, model.ResourceId);
-        activity?.SetTag(DiagnosticNames.ResourceType, model.ResourceType);
-
-        if (model == null) throw new ArgumentNullException(nameof(model));
-
-        var entity = new ReferenceResources
-        {
-            FacilityId = model.FacilityId,
-            ResourceId = model.ResourceId,
-            ResourceType = model.ResourceType,
-            ReferenceResource = model.ReferenceResource,
-            QueryPhase = model.QueryPhase,
-            CreateDate = DateTime.UtcNow,
-            ModifyDate = DateTime.UtcNow
-        };
-
-        entity = await _database.ReferenceResourcesRepository.AddAsync(entity);
-        await _database.ReferenceResourcesRepository.SaveChangesAsync(cancellationToken);
-
-        return ReferenceResourcesModel.FromDomain(entity);
-    }
-
-    public async Task<ReferenceResourcesModel> UpdateAsync(UpdateReferenceResourcesModel model, CancellationToken cancellationToken = default)
-    {
-        using var activity = ServiceActivitySource.Instance.StartActivity("ReferenceResourcesManager.UpdateAsync");
-        activity?.SetTag(DiagnosticNames.ResourceId, model.Id);
-        activity?.SetTag(DiagnosticNames.ResourceType, model.ResourceType);
-
-        if (model == null) throw new ArgumentNullException(nameof(model));
-
-        var modifyDate = DateTime.UtcNow;
-
-        var updated = await _dbContext.ReferenceResources
-            .Where(r => r.Id == model.Id)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(r => r.QueryPhase, model.QueryPhase)
-                .SetProperty(r => r.ResourceType, model.ResourceType)
-                .SetProperty(r => r.ReferenceResource, model.ReferenceResource)
-                .SetProperty(r => r.ModifyDate, modifyDate),
-            cancellationToken);
-
-        if (updated == 0)
-            throw new KeyNotFoundException($"ReferenceResources with ID {model.Id} not found.");
-
-        return new ReferenceResourcesModel
-        {
-            Id = model.Id,
-            QueryPhase = model.QueryPhase,
-            ResourceType = model.ResourceType,
-            ReferenceResource = model.ReferenceResource,
-            ModifyDate = modifyDate
-        };
     }
 
     public async Task CreateBatchAsync(IReadOnlyList<CreateReferenceResourcesModel> models, CancellationToken cancellationToken = default)
@@ -221,26 +151,6 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
     {
         for (var i = 0; i < source.Count; i += size)
             yield return source.Skip(i).Take(size).ToList();
-    }
-
-    public async Task UpdateBatchAsync(IReadOnlyList<UpdateReferenceResourcesModel> models, CancellationToken cancellationToken = default)
-    {
-        if (models == null || models.Count == 0)
-            return;
-
-        var modifyDate = DateTime.UtcNow;
-
-        foreach (var model in models)
-        {
-            await _dbContext.ReferenceResources
-                .Where(r => r.Id == model.Id)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(r => r.QueryPhase, model.QueryPhase)
-                    .SetProperty(r => r.ResourceType, model.ResourceType)
-                    .SetProperty(r => r.ReferenceResource, model.ReferenceResource)
-                    .SetProperty(r => r.ModifyDate, modifyDate),
-                cancellationToken);
-        }
     }
 
     public async Task LinkToLogAsync(long dataAcquisitionLogId, IReadOnlyList<Guid> referenceResourceIds, CancellationToken cancellationToken = default)

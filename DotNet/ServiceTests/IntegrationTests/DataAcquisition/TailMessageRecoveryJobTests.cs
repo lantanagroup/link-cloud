@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -21,7 +21,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition;
 
-[Collection("DataAcquisitionIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
 public class TailMessageRecoveryJobTests
 {

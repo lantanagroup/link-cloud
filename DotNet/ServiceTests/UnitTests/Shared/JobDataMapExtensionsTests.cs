@@ -4,6 +4,7 @@ using System.Text.Json;
 
 namespace UnitTests.Shared;
 
+[Trait("Category", "UnitTests")]
 public class JobDataMapExtensionsTests
 {
     private enum TestStatus
