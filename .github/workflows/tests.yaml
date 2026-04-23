@@ -47,7 +47,7 @@ jobs:
         run: echo "run_job=${{ steps.should.outputs.run_job }}"
 
   backend-e2e-tests:
-    name: Backend E2E Tests with Docker Compose
+    name: Smoke Test with Docker Compose
     runs-on: [docker-16core-64gb]
     timeout-minutes: 60
 

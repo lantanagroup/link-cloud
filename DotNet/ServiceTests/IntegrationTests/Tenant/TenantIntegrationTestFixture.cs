@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using LantanaGroup.Link.Account.Persistence.Interceptors;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
@@ -33,7 +33,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Tenant
 {
-    [CollectionDefinition("TenantIntegrationTests")]
+    [CollectionDefinition("TenantIntegrationTests", DisableParallelization = true)]
     public class DatabaseCollection : ICollectionFixture<TenantIntegrationTestFixture>
     {
         // This class is a marker for the collection

@@ -27,7 +27,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census;
 
-[CollectionDefinition("CensusIntegrationTests")]
+[CollectionDefinition("CensusIntegrationTests", DisableParallelization = true)]
 public class DatabaseCollection : ICollectionFixture<CensusIntegrationTestFixture> { }
 
 public sealed class CensusIntegrationTestFixture : IDisposable

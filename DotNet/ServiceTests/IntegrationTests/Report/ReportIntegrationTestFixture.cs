@@ -1,4 +1,4 @@
-﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs;
 using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Application.Interfaces;
@@ -34,7 +34,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
 {
-    [CollectionDefinition("ReportIntegrationTests")]
+    [CollectionDefinition("ReportIntegrationTests", DisableParallelization = true)]
     public class DatabaseCollection : ICollectionFixture<ReportIntegrationTestFixture> { }
 
     public class ReportIntegrationTestFixture : IAsyncLifetime, IDisposable
