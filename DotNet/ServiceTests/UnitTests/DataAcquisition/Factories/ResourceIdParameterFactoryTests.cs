@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFactories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
@@ -8,6 +8,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.DataAcquisition.Factories
 {
+    [Trait("Category", "UnitTests")]
     public class ResourceIdParameterFactoryTests
     {
         private readonly Mock<IDataAcquisitionLogQueries> _dataAcquisitionLogQueriesMock;
