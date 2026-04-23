@@ -11,6 +11,7 @@ import {PaginationMetadata} from 'src/app/models/pagination-metadata.model';
 import {FormsModule} from '@angular/forms';
 import {debounceTime, Subject, Subscription} from 'rxjs';
 import {AcquisitionLogService, ReferenceResourceRecord} from '../acquisition-log.service';
+import {AppConfigService} from 'src/app/services/app-config.service';
 
 export interface AcquiredResourcesTable {
   resourceType: string;
@@ -67,7 +68,8 @@ export class AcquisitionLogDetailsComponent implements OnInit {
   constructor(
     public dialogRef: MatDialogRef<AcquisitionLogDetailsComponent>,
     @Inject(MAT_DIALOG_DATA) public data: { dialogTitle: string, acquisitionLog: AcquisitionLog },
-    private acquisitionLogService: AcquisitionLogService
+    private acquisitionLogService: AcquisitionLogService,
+    private appConfig: AppConfigService
   ) { }
 
 
@@ -240,6 +242,24 @@ export class AcquisitionLogDetailsComponent implements OnInit {
     const uniqueTypes = Array.from(new Set(allTypes)).sort(); // javascript Set only keeps unique values
 
     return uniqueTypes.join(', ');
+  }
+
+  getTraceUrl(traceId: string): string {
+    const grafanaUrl = this.appConfig.config?.grafanaUrl;
+    if (!traceId || !grafanaUrl) return '';
+    const traceOnly = traceId.split('|')[0];
+    const leftParam = {
+      datasource: 'tempo',
+      queries: [
+        {
+          refId: 'A',
+          datasource: { uid: 'tempo', type: 'tempo' },
+          queryType: 'traceql',
+          query: traceOnly
+        }
+      ]
+    };
+    return `${grafanaUrl.replace(/\/$/, '')}/explore?orgId=1&left=${encodeURIComponent(JSON.stringify(leftParam))}`;
   }
 
   onModalClose(): void {
