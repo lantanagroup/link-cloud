@@ -47,15 +47,47 @@ jobs:
         run: echo "run_job=${{ steps.should.outputs.run_job }}"
 
   backend-e2e-tests:
-    name: Backend E2E Tests with Docker Compose
+    # Each matrix entry runs as its own GitHub Actions job, so it gets its
+    # own collapsible section and its own clean log stream in the UI — no
+    # more interleaved output from unrelated test categories. The jobs run
+    # in parallel across runners, and each one stands up its own isolated
+    # docker compose stack (scoped by PROJECT_NAME) so they can't collide.
+    name: Backend E2E - ${{ matrix.test.name }}
     runs-on: [docker-16core-64gb]
     timeout-minutes: 60
 
     needs: changes
     if: ${{ needs.changes.outputs.run_job == 'true' }}
 
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - name: Adhoc Report
+            category: AdhocReportTest
+            trx: adhoc-report-test-results.trx
+            slug: adhoc-report
+          - name: API Stability
+            category: ApiStabilityTest
+            trx: api-stability-test-results.trx
+            slug: api-stability
+          - name: Report Scheduled
+            category: ReportScheduledTest
+            trx: report-scheduled-test-results.trx
+            slug: report-scheduled
+          - name: Regenerate Report
+            category: RegenerateReportTest
+            trx: regenerate-report-test-results.trx
+            slug: regenerate-report
+          - name: Multi-Measure
+            category: MultiMeasureTest
+            trx: multi-measure-test-results.trx
+            slug: multi-measure
+
     env:
-      PROJECT_NAME: link
+      # Unique compose project per matrix job keeps parallel stacks isolated
+      # (separate networks, container names, volumes).
+      PROJECT_NAME: link-${{ matrix.test.slug }}
       HEALTH_CHECK_TIMEOUT: 60
       CHECK_INTERVAL: 10
       ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
@@ -75,7 +107,7 @@ jobs:
             --set *.output=type=docker   # <-- makes images visible to `docker compose`
 
       - name: Start services
-        run: docker compose up --no-build -d
+        run: docker compose -p "$PROJECT_NAME" up --no-build -d
 
       - name: Wait for services to start
         run: sleep 10
@@ -85,16 +117,13 @@ jobs:
           chmod +x Scripts/check_health.sh
           Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
 
-      # ---- All test categories run CONCURRENTLY against the SAME compose stack. ----
-      # xUnit's parallel collection runner (configured in Tests/BackendE2ETests/xunit.runner.json
-      # with parallelizeTestCollections=true and maxParallelThreads=5) discovers every
-      # test class in the BackendE2ETests assembly and runs them on parallel threads.
-      # Each test class still owns its own facility id and per-test cleanup, so they
-      # don't collide on tenant data — but they DO share Kafka, MongoDB, the services,
-      # etc. Watch the run for new contention/timeout failures.
-
-      - name: Backend E2E Tests (parallel)
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --logger "trx;LogFileName=backend-e2e-test-results.trx" --logger "console;verbosity=detailed" --results-directory ./Tests/BackendE2ETests/TestResults
+      - name: ${{ matrix.test.name }} E2E Test
+        run: |
+          dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj \
+            --filter "Category=${{ matrix.test.category }}" \
+            --logger "trx;LogFileName=${{ matrix.test.trx }}" \
+            --logger "console;verbosity=detailed" \
+            --results-directory ./Tests/BackendE2ETests/TestResults
 
       # ---- Artifact uploads ----
 
@@ -102,19 +131,19 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: backend-e2e-service-logs
+          name: backend-e2e-service-logs-${{ matrix.test.slug }}
           path: service-logs/
 
-      - name: Upload Backend E2E test results
+      - name: Upload ${{ matrix.test.name }} test results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: backend-e2e-test-results
-          path: ./Tests/BackendE2ETests/TestResults/backend-e2e-test-results.trx
+          name: ${{ matrix.test.slug }}-test-results
+          path: ./Tests/BackendE2ETests/TestResults/${{ matrix.test.trx }}
           if-no-files-found: ignore
 
       - name: Upload Adhoc Report submission ZIP
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.test.category == 'AdhocReportTest' }}
         uses: actions/upload-artifact@v4
         with:
           name: adhoc-report-submission-zip
@@ -123,7 +152,7 @@ jobs:
 
       - name: Tear down services
         if: always()
-        run: docker compose down -v --remove-orphans
+        run: docker compose -p "$PROJECT_NAME" down -v --remove-orphans
 
   dotnet-tests:
     name: .NET Tests
