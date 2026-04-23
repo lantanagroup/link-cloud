@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Normalization.Application.Services.Operations;
+using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Managers;
@@ -15,12 +15,6 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Normalization
 {
-    [CollectionDefinition("NormalizationIntegrationTests")]
-    public class DatabaseCollection : ICollectionFixture<NormalizationIntegrationTestFixture>
-    {
-        // This class is a marker for the collection
-    }
-
     public class NormalizationIntegrationTestFixture : IDisposable
     {
         public IServiceProvider ServiceProvider { get; private set; }

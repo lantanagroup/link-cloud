@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig
 
 namespace UnitTests.DataAcquisition.QPValidator;
 
+[Trait("Category", "UnitTests")]
 public class QueryPlanValidatorTests
 {
     private readonly QueryPlanValidator _validator;
