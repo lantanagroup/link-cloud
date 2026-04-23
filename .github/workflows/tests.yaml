@@ -90,13 +90,27 @@ jobs:
           chmod +x Scripts/check_health.sh
           Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
 
+      # Build the test project ONCE up front. The parallel `dotnet test`
+      # invocations below all target the same assembly and transitively
+      # reference the same service projects; if each one runs MSBuild they
+      # race on shared bin/*.deps.json / appsettings output files and crash
+      # with "The process cannot access the file ... being used by another
+      # process" (MSB4018). Building once and passing --no-build/--no-restore
+      # to each parallel run avoids the contention.
+      - name: Restore & build BackendE2ETests
+        run: |
+          dotnet restore ./Tests/BackendE2ETests/BackendE2ETests.csproj
+          dotnet build ./Tests/BackendE2ETests/BackendE2ETests.csproj \
+            --configuration Debug \
+            --no-restore
+
       # ---- All 5 test categories run CONCURRENTLY against the SAME stack. ----
       # Each `dotnet test` is launched in the background with its stdout/stderr
       # redirected to a dedicated log file. After they all finish we emit each
       # log wrapped in ::group::/::endgroup:: markers so the GitHub Actions UI
       # renders a separate, collapsible section per test category instead of
       # interleaving everything into one wall of text.
-      - name: Backend E2E Tests (parallel, segmented logs)
+      - name: Backend E2E Tests
         shell: bash
         run: |
           set -o pipefail
@@ -123,6 +137,8 @@ jobs:
             echo "Starting: $NAME (Category=$CATEGORY) -> $LOG"
             (
               dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj \
+                --no-build \
+                --no-restore \
                 --filter "Category=${CATEGORY}" \
                 --logger "trx;LogFileName=${TRX}" \
                 --logger "console;verbosity=detailed" \
