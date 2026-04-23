@@ -12,7 +12,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Tenant
 {
-    [Collection("TenantIntegrationTests")]
+    [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
     public class ScheduleServiceTests
     {

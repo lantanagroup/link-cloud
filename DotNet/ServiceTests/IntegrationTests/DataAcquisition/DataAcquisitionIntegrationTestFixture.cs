@@ -29,12 +29,6 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition
 {
-    [CollectionDefinition("DataAcquisitionIntegrationTests", DisableParallelization = true)]
-    public class DatabaseCollection : ICollectionFixture<DataAcquisitionIntegrationTestFixture>
-    {
-        // This class is a marker for the collection
-    }
-
     public class DataAcquisitionIntegrationTestFixture : IAsyncLifetime
     {
         // Pinned to a specific tag (rather than :latest) so that the layer
