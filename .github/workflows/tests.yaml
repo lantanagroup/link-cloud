@@ -163,8 +163,11 @@ jobs:
 
           # Render each run's output in its own collapsible group in the UI.
           for i in "${!NAMES[@]}"; do
-            STATUS="✅ PASSED"
-            [[ "${EXITS[$i]}" != "0" ]] && STATUS="❌ FAILED (exit ${EXITS[$i]})"
+            if [[ "${EXITS[$i]}" != "0" ]]; then
+              STATUS="❌ FAILED (exit ${EXITS[$i]})"
+            else
+              STATUS="✅ PASSED"
+            fi
             echo "::group::${NAMES[$i]} — ${STATUS}"
             cat "${LOGS[$i]}" || true
             echo "::endgroup::"
