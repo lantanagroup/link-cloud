@@ -424,16 +424,19 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.CancelBulkAsync");
 
         var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
-        var minAgeCutoff = DateTime.UtcNow.AddHours(-minAgeHours);
 
         var cancelledCount = 0;
         foreach (var batch in ids.Chunk(DataAcquisitionConstants.DatabaseSettings.MaxBulkIds))
         {
-            cancelledCount += await _dbContext.DataAcquisitionLogs
+            var query = _dbContext.DataAcquisitionLogs
                 .Where(l => batch.Contains(l.Id)
                     && l.Status != null
-                    && !terminalStatuses.Contains(l.Status.Value)
-                    && l.CreateDate <= minAgeCutoff)
+                    && !terminalStatuses.Contains(l.Status.Value));
+
+            if (minAgeHours > 0)
+                query = query.Where(l => l.CreateDate <= DateTime.UtcNow.AddHours(-minAgeHours));
+
+            cancelledCount += await query
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(l => l.Status, RequestStatus.Cancelled)
                     .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
@@ -448,7 +451,6 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.CancelByFilterAsync");
 
         var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
-        var minAgeCutoff = DateTime.UtcNow.AddHours(-minAgeHours);
 
         var query = _dbContext.DataAcquisitionLogs.AsQueryable();
 
@@ -501,9 +503,13 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         var requested = await query.CountAsync(cancellationToken);
 
         // Get IDs of logs eligible for cancellation
-        var eligibleIds = await query.Where(l => l.Status != null
-            && !terminalStatuses.Contains(l.Status.Value)
-            && l.CreateDate <= minAgeCutoff)
+        var eligibleQuery = query.Where(l => l.Status != null
+            && !terminalStatuses.Contains(l.Status.Value));
+
+        if (minAgeHours > 0)
+            eligibleQuery = eligibleQuery.Where(l => l.CreateDate <= DateTime.UtcNow.AddHours(-minAgeHours));
+
+        var eligibleIds = await eligibleQuery
             .Select(l => l.Id)
             .ToListAsync(cancellationToken);
 
