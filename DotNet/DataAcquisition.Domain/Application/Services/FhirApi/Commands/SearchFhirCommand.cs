@@ -152,10 +152,11 @@ public class SearchFhirCommand : ISearchFhirCommand
                 maskedFacilityId, request.resourceType, request.correlationId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
         }
 
-        yield return resultBundle;
-
         if (resultBundle != null)
         {
+            yield return resultBundle;
+            IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
+
             while (resultBundle.Link.Exists(x => x.Relation == "next"))
             {
                 try
@@ -188,7 +189,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                     throw;
                 }
 
-                if (resultBundle != null && resultBundle.Entry.Any())
+                if (resultBundle != null)
                 {
                     yield return resultBundle;
                     IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
