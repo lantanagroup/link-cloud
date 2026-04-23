@@ -883,6 +883,11 @@ public class LogController : Controller
             return BadRequest("Query parameters are required.");
         }
 
+        if (minAgeHours < 0)
+        {
+            return BadRequest("minAgeHours must be zero or greater.");
+        }
+
         if (string.IsNullOrWhiteSpace(queryParameters.FacilityId) &&
             string.IsNullOrWhiteSpace(queryParameters.PatientId) &&
             string.IsNullOrWhiteSpace(queryParameters.ReportId) &&
