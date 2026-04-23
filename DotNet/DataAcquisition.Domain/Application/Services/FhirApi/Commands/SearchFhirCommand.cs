@@ -62,6 +62,8 @@ public class SearchFhirCommand : ISearchFhirCommand
         _telemetrySettings = telemetrySettings ?? throw new ArgumentNullException(nameof(telemetrySettings));
     }
 
+    protected virtual HttpMessageHandler CreateInnerHttpMessageHandler() => new HttpClientHandler();
+
     public async IAsyncEnumerable<Bundle> ExecuteAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("SearchFhirCommand.ExecuteAsync");
@@ -78,6 +80,18 @@ public class SearchFhirCommand : ISearchFhirCommand
             yield break;
         }
 
+        // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
+        var innerHandler = CreateInnerHttpMessageHandler();
+        var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
+        var httpClientWithHandler = new HttpClient(headerCapturingHandler);
+
+        var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, httpClientWithHandler, new FhirClientSettings
+        {
+            PreferredFormat = ResourceFormat.Json
+        });
+
+        Bundle? resultBundle = null;
+
         var maxConcurrent = request.queryConfig.GetMaxConcurrentRequestsOrDefault();
         var semWaitStart = DateTime.UtcNow;
         var maskedFacilityId = request.facilityId.MaskForLog();
@@ -90,16 +104,6 @@ public class SearchFhirCommand : ISearchFhirCommand
             _logger.LogDebug(
                 "Semaphore: SearchPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
                 maskedFacilityId, request.resourceType, request.correlationId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
-
-            // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
-            var innerHandler = new HttpClientHandler();
-            var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
-            var httpClientWithHandler = new HttpClient(headerCapturingHandler);
-
-            var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, httpClientWithHandler, new FhirClientSettings
-            {
-                PreferredFormat = ResourceFormat.Json
-            });
 
             var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
@@ -116,8 +120,6 @@ public class SearchFhirCommand : ISearchFhirCommand
                     }
                 }
             }
-
-            Bundle? resultBundle = null;
 
             try
             {
@@ -141,42 +143,59 @@ public class SearchFhirCommand : ISearchFhirCommand
                 throw;
             }
 
-            yield return resultBundle;
-
-            Bundle? newResultBundle = resultBundle;
-
-            if (newResultBundle != null)
-            {
-                while (resultBundle.Link.Exists(x => x.Relation == "next"))
-                {
-                    try
-                    {
-                        resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
-                    }
-                    catch (FhirOperationException ex) when (ex.Status == HttpStatusCode.TooManyRequests)
-                    {
-                        var retryAfter = FhirCommandUtils.ParseRetryAfter(headerCapturingHandler.LastResponseHeaders);
-                        throw new TooManyRequestsException($"Too many requests during paging for {request.resourceType}", retryAfter);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; SearchParams: {SearchParams},\n\n\t{stack}\n\n\t{innerStack}", request.resourceType, request.searchParams, ex.StackTrace, ex.InnerException?.StackTrace);
-                        throw;
-                    }
-
-                    if (resultBundle != null && resultBundle.Entry.Any())
-                    {
-                        yield return resultBundle;
-                        IncrementResourceAcquiredCounter(request.correlationId, request.patientId, request.facilityId, request.reportTrackingId, DiagnosticNames.NormalizePhase(request.queryPhase.ToString()), request.resourceType.ToString(), resultBundle.Id);
-                    }
-                }
-            }
-
             _logger.LogDebug(
                 "Semaphore: SearchPaging releasing facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} holdMs={HoldMs}",
                 maskedFacilityId, request.resourceType, request.correlationId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
         }
 
+        if (resultBundle != null)
+        {
+            yield return resultBundle;
+            IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
+
+            while (resultBundle.Link.Exists(x => x.Relation == "next"))
+            {
+                try
+                {
+                    _logger.LogDebug(
+                        "Semaphore: SearchPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
+                        maskedFacilityId, request.resourceType, request.correlationId, maxConcurrent);
+                    using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
+                    {
+                        var semAcquiredAt = DateTime.UtcNow;
+                        _logger.LogDebug(
+                            "Semaphore: SearchPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
+                            maskedFacilityId, request.resourceType, request.correlationId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
+
+                        resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
+
+                        _logger.LogDebug(
+                            "Semaphore: SearchPaging releasing facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} holdMs={HoldMs}",
+                            maskedFacilityId, request.resourceType, request.correlationId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
+                    }
+                }
+                catch (FhirOperationException ex) when (ex.Status == HttpStatusCode.TooManyRequests)
+                {
+                    var retryAfter = FhirCommandUtils.ParseRetryAfter(headerCapturingHandler.LastResponseHeaders);
+                    throw new TooManyRequestsException($"Too many requests during paging for {request.resourceType}", retryAfter);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; SearchParams: {SearchParams},\n\n\t{stack}\n\n\t{innerStack}", request.resourceType, request.searchParams, ex.StackTrace, ex.InnerException?.StackTrace);
+                    throw;
+                }
+
+                if (resultBundle != null)
+                {
+                    yield return resultBundle;
+                    IncrementResourceAcquiredCounter(request.correlationId, request.patientId, request.facilityId, request.reportTrackingId, DiagnosticNames.NormalizePhase(request.queryPhase.ToString()), request.resourceType.ToString(), resultBundle.Id);
+                }
+                else
+                {
+                    yield break;
+                }
+            }
+        }
     }
 
     public async Task<Bundle> ExecuteNonPagingAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken)
@@ -203,7 +222,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                 maskedFacilityId, request.resourceType, request.correlationId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
 
             // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
-            var innerHandler = new HttpClientHandler();
+            var innerHandler = CreateInnerHttpMessageHandler();
             var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
             var httpClientWithHandler = new HttpClient(headerCapturingHandler);
 
