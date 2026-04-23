@@ -85,30 +85,18 @@ jobs:
           chmod +x Scripts/check_health.sh
           Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
 
-      # ---- Test categories run sequentially against the SAME compose stack. ----
-      # `if: ${{ !cancelled() }}` lets later categories run even if an earlier one fails,
-      # while still letting a failure mark the overall job as failed.
+      # ---- All test categories run CONCURRENTLY against the SAME compose stack. ----
+      # xUnit's parallel collection runner (configured in Tests/BackendE2ETests/xunit.runner.json
+      # with parallelizeTestCollections=true and maxParallelThreads=5) discovers every
+      # test class in the BackendE2ETests assembly and runs them on parallel threads.
+      # Each test class still owns its own facility id and per-test cleanup, so they
+      # don't collide on tenant data — but they DO share Kafka, MongoDB, the services,
+      # etc. Watch the run for new contention/timeout failures.
 
-      - name: Adhoc Report Tests
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=AdhocReportTest" --logger "trx;LogFileName=adhoc-report-test-results.trx" --logger "console;verbosity=detailed"
+      - name: Backend E2E Tests (parallel)
+        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --logger "trx;LogFileName=backend-e2e-test-results.trx" --logger "console;verbosity=detailed" --results-directory ./Tests/BackendE2ETests/TestResults
 
-      - name: API Stability Test
-        if: ${{ !cancelled() }}
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=ApiStabilityTest" --logger "trx;LogFileName=api-stability-test-results.trx" --logger "console;verbosity=detailed"
-
-      - name: Report Scheduled E2E Test
-        if: ${{ !cancelled() }}
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=ReportScheduledTest" --logger "trx;LogFileName=report-scheduled-test-results.trx" --logger "console;verbosity=detailed"
-
-      - name: Regenerate Report E2E Test
-        if: ${{ !cancelled() }}
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=RegenerateReportTest" --logger "trx;LogFileName=regenerate-report-test-results.trx" --logger "console;verbosity=detailed"
-
-      - name: Multi-Measure E2E Test
-        if: ${{ !cancelled() }}
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=MultiMeasureTest" --logger "trx;LogFileName=multi-measure-test-results.trx" --logger "console;verbosity=detailed"
-
-      # ---- Always-on artifact uploads (preserve per-category artifact names) ----
+      # ---- Artifact uploads ----
 
       - name: Upload Service Logs on Failure
         if: failure()
@@ -117,12 +105,12 @@ jobs:
           name: backend-e2e-service-logs
           path: service-logs/
 
-      - name: Upload Adhoc Report test results
+      - name: Upload Backend E2E test results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: adhoc-report-test-results
-          path: ./Tests/BackendE2ETests/TestResults/adhoc-report-test-results.trx
+          name: backend-e2e-test-results
+          path: ./Tests/BackendE2ETests/TestResults/backend-e2e-test-results.trx
           if-no-files-found: ignore
 
       - name: Upload Adhoc Report submission ZIP
@@ -131,38 +119,6 @@ jobs:
         with:
           name: adhoc-report-submission-zip
           path: ./Tests/BackendE2ETests/TestResults/adhoc-report-test-submission.zip
-          if-no-files-found: ignore
-
-      - name: Upload API Stability test results
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-stability-test-results
-          path: ./Tests/BackendE2ETests/TestResults/api-stability-test-results.trx
-          if-no-files-found: ignore
-
-      - name: Upload Report Scheduled test results
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: report-scheduled-test-results
-          path: ./Tests/BackendE2ETests/TestResults/report-scheduled-test-results.trx
-          if-no-files-found: ignore
-
-      - name: Upload Regenerate Report test results
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: regenerate-report-test-results
-          path: ./Tests/BackendE2ETests/TestResults/regenerate-report-test-results.trx
-          if-no-files-found: ignore
-
-      - name: Upload Multi-Measure test results
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: multi-measure-test-results
-          path: ./Tests/BackendE2ETests/TestResults/multi-measure-test-results.trx
           if-no-files-found: ignore
 
       - name: Tear down services
