@@ -115,7 +115,7 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
             blobStorageService.storePatientInBlobStorage(patientStatus, r, measureReport);
 
             Attributes attributes = MeasureEvalMetrics.buildAttributes(queryType, patientStatus, value.getReportTrackingId(), bundle.getEntry().size());
-            measureEvalMetrics.IncrementPatientReportableCounter(attributes, r.getReportable());
+            measureEvalMetrics.IncrementPatientReportableCounter(attributes, Boolean.TRUE.equals(r.getReportable()));
         });
     }
 }

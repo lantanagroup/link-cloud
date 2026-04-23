@@ -422,6 +422,6 @@ public class ReadyForValidationConsumerTest {
         consumer.process(buildRecord(null));
 
         verify(validationMetrics).addToValidationCounter(any());
-        verify(validationMetrics).recordValidationDuration(anyLong(), any());
+        verify(validationMetrics).recordValidationDuration(anyDouble(), any());
     }
 }

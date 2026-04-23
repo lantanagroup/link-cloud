@@ -180,8 +180,6 @@ public class ResourceAcquiredListener : BackgroundService
 
                                 sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
 
-                                bool resourceChanged = false;
-
                                 foreach (var sequence in sequences)
                                 {
                                     var dbEntity = sequence.OperationResourceType.Operation;
@@ -191,6 +189,8 @@ public class ResourceAcquiredListener : BackgroundService
                                     {
                                         throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
                                     }
+
+                                    bool resourceChanged = false;
 
                                     var tags = new List<KeyValuePair<string, object?>>() {
                                         new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, messageMetaData.facilityId),

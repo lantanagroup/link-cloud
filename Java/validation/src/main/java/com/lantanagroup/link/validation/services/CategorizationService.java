@@ -39,18 +39,16 @@ public class CategorizationService {
     private final CategoryRepository categoryRepository;
     private final CategoryRuleRepository categoryRuleRepository;
     private final ResultRepository resultRepository;
-    private final ValidationMetrics validationMetrics;
 
     public CategorizationService(
             ObjectMapper objectMapper,
             CategoryRepository categoryRepository,
             CategoryRuleRepository categoryRuleRepository,
-            ResultRepository resultRepository, ValidationMetrics validationMetrics) {
+            ResultRepository resultRepository) {
         this.objectMapper = objectMapper;
         this.categoryRepository = categoryRepository;
         this.categoryRuleRepository = categoryRuleRepository;
         this.resultRepository = resultRepository;
-        this.validationMetrics = validationMetrics;
     }
 
     /**
