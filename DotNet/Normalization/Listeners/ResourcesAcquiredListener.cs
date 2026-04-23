@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
@@ -26,14 +26,14 @@ using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
-public class ResourceAcquiredListener : BackgroundService
+public class ResourcesAcquiredListener : BackgroundService
 {
-    private readonly ILogger<ResourceAcquiredListener> _logger;
-    private readonly IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage> _consumerFactory;
+    private readonly ILogger<ResourcesAcquiredListener> _logger;
+    private readonly IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue> _consumerFactory;
     private readonly IProducer<ResourceKey, ResourceNormalizedMessage> _producer;
-    private readonly IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, string> _consumeExceptionHandler;
-    private readonly IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> _deadLetterExceptionHandler;
-    private readonly ITransientExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> _transientExceptionHandler;
+    private readonly IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string> _consumeExceptionHandler;
+    private readonly IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> _deadLetterExceptionHandler;
+    private readonly ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> _transientExceptionHandler;
     private bool _cancelled = false;
     private readonly INormalizationServiceMetrics _metrics;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -44,14 +44,14 @@ public class ResourceAcquiredListener : BackgroundService
     private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
     private readonly CopyLocationOperationService _copyLocationOperationService;
 
-    public ResourceAcquiredListener(
-        ILogger<ResourceAcquiredListener> logger,
+    public ResourcesAcquiredListener(
+        ILogger<ResourcesAcquiredListener> logger,
         ServiceInformation serviceInformation,
         IServiceScopeFactory scopeFactory,
-        IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage> consumerFactory,
-        IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, string> consumeExceptionHandler,
-        IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> deadLetterExceptionHandler,
-        ITransientExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> transientExceptionHandler,
+        IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue> consumerFactory,
+        IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string> consumeExceptionHandler,
+        IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> deadLetterExceptionHandler,
+        ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> transientExceptionHandler,
         INormalizationServiceMetrics metrics,
         IProducer<ResourceKey, ResourceNormalizedMessage> producer,
         CopyPropertyOperationService copyPropertyOperationService,
@@ -96,11 +96,11 @@ public class ResourceAcquiredListener : BackgroundService
             EnableAutoCommit = false
         });
 
-        kafkaConsumer.Subscribe(new string[] { KafkaTopic.ResourceAcquired.ToString() });
+        kafkaConsumer.Subscribe(new string[] { KafkaTopic.ResourcesAcquired.ToString() });
 
         while (!cancellationToken.IsCancellationRequested && !_cancelled)
         {
-            ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message = default;
+            ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message = default;
             try
             {
                 await kafkaConsumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
@@ -109,23 +109,19 @@ public class ResourceAcquiredListener : BackgroundService
                     {
                         message = result;
 
-                        if (message.Message.Key == null || string.IsNullOrWhiteSpace(message.Message.Key.FacilityId))
-                        {
-                            throw new DeadLetterException("Message Key (FacilityId) is null or empty.");
+                        if (message == null || message.Message == null) {
+                            throw new DeadLetterException("Event is null");
                         }
 
-                        if (
-                        message.Message.Value == null
-                            || ((message.Message.Value.Resource == null
-                                || string.IsNullOrWhiteSpace(message.Message.Value.QueryType)
-                                || message.Message.Value.ScheduledReports == null)
-                               && !message.Message.Value.AcquisitionComplete)
-                        )
+                        if (message.Message.Key == null || string.IsNullOrWhiteSpace(message.Message.Key.FacilityId) || string.IsNullOrWhiteSpace(message.Message.Key.PatientId))
                         {
-                            throw new DeadLetterException("Bad message with one of the followign reasons: \n* Null Message \n* Null Resource \n* No QueryType \n* No Scheduled Reports. Skipping message.");
+                            throw new DeadLetterException("Malformed key in the event. Facility Id and Patient Id are required.");
                         }
+
+                        //TODO - Daniel: Add message value handling. But first check if there is something that can be done on the serdes level rather than having to do this type of checking accross all values
 
                         (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
+
                         try
                         {
                             messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(message.Message);
@@ -137,16 +133,14 @@ public class ResourceAcquiredListener : BackgroundService
 
                         if (string.IsNullOrWhiteSpace(message.Message.Value.ReportableEvent))
                         {
-                            throw new DeadLetterException("Message.Value.ReportableEvent) is null or empty");
+                            throw new DeadLetterException("ReportableEvent value is null or empty");
                         }
 
-                        if (message.Message.Value.AcquisitionComplete && message.Message.Value.Resource == null)
-                        {
-                            _logger.LogInformation("Acquisition Complete tail message received. Producing message for measure eval.");
-
-                            await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, message.Message.Value.Resource);
-                            return;
-                        }
+                        /*
+                         * Cache Interface
+                         * 1. Get Resources by type
+                         * 2. Update Resources by type
+                         */
 
                         using (var scope = _scopeFactory.CreateScope())
                         {
@@ -286,7 +280,7 @@ public class ResourceAcquiredListener : BackgroundService
     }
 
 
-    private async Task ProduceResourceNormalizedMessage(ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message, string facilityId, string correlationId, object? resource)
+    private async Task ProduceResourceNormalizedMessage(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, string facilityId, string correlationId, object? resource)
     {
         var headers = new Headers
         {
@@ -329,7 +323,7 @@ public class ResourceAcquiredListener : BackgroundService
         this._cancelled = true;
     }
 
-    private (string facilityId, string correlationId) ExtractFacilityIdAndCorrelationIdFromMessage(Message<ResourceKey, ResourceAcquiredMessage> message)
+    private (string facilityId, string correlationId) ExtractFacilityIdAndCorrelationIdFromMessage(Message<ResourceKey, ResourcesAcquiredValue> message)
     {
         var facilityId = message.Key.FacilityId;
         var correlationId = message.Key.CorrelationId;

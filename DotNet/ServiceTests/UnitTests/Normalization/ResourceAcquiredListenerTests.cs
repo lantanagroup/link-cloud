@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
@@ -17,13 +17,13 @@ namespace UnitTests.Normalization;
 
 public class ResourceAcquiredListenerTests
 {
-    private readonly Mock<ILogger<ResourceAcquiredListener>> _loggerMock;
+    private readonly Mock<ILogger<ResourcesAcquiredListener>> _loggerMock;
     private readonly Mock<ServiceInformation> _serviceInformationMock;
     private readonly Mock<IServiceScopeFactory> _scopeFactoryMock;
-    private readonly Mock<IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage>> _consumerFactoryMock;
-    private readonly Mock<IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, string>> _consumeExceptionHandlerMock;
-    private readonly Mock<IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage>> _deadLetterExceptionHandlerMock;
-    private readonly Mock<ITransientExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage>> _transientExceptionHandlerMock;
+    private readonly Mock<IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue>> _consumerFactoryMock;
+    private readonly Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>> _consumeExceptionHandlerMock;
+    private readonly Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>> _deadLetterExceptionHandlerMock;
+    private readonly Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>> _transientExceptionHandlerMock;
     private readonly Mock<INormalizationServiceMetrics> _metricsMock;
     private readonly Mock<IProducer<ResourceKey, ResourceNormalizedMessage>> _producerMock;
     private readonly Mock<CopyPropertyOperationService> _copyPropertyOperationServiceMock;
@@ -33,13 +33,13 @@ public class ResourceAcquiredListenerTests
 
     public ResourceAcquiredListenerTests()
     {
-        _loggerMock = new Mock<ILogger<ResourceAcquiredListener>>();
+        _loggerMock = new Mock<ILogger<ResourcesAcquiredListener>>();
         _serviceInformationMock = new Mock<ServiceInformation>();
         _scopeFactoryMock = new Mock<IServiceScopeFactory>();
-        _consumerFactoryMock = new Mock<IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage>>();
-        _consumeExceptionHandlerMock = new Mock<IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, string>>();
-        _deadLetterExceptionHandlerMock = new Mock<IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage>>();
-        _transientExceptionHandlerMock = new Mock<ITransientExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage>>();
+        _consumerFactoryMock = new Mock<IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue>>();
+        _consumeExceptionHandlerMock = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>>();
+        _deadLetterExceptionHandlerMock = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
+        _transientExceptionHandlerMock = new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
         _metricsMock = new Mock<INormalizationServiceMetrics>();
         _producerMock = new Mock<IProducer<ResourceKey, ResourceNormalizedMessage>>();
 
@@ -54,7 +54,7 @@ public class ResourceAcquiredListenerTests
     public async Task ProduceResourceNormalizedMessage_ShouldThrowTransientException_WhenProduceExceptionOccurs()
     {
         // Arrange
-        var listener = new ResourceAcquiredListener(
+        var listener = new ResourcesAcquiredListener(
             _loggerMock.Object,
             _serviceInformationMock.Object,
             _scopeFactoryMock.Object,
@@ -72,7 +72,7 @@ public class ResourceAcquiredListenerTests
         var facilityId = "TestFacility";
         var correlationId = "TestCorrelationId";
         var resource = new Patient { Id = "TestPatient" };
-        var messageValue = new ResourceAcquiredMessage
+        var messageValue = new ResourcesAcquiredValue
         {
             PatientId = "TestPatient",
             QueryType = "TestQuery",
@@ -81,9 +81,9 @@ public class ResourceAcquiredListenerTests
             AcquisitionComplete = false
         };
 
-        var consumeResult = new ConsumeResult<ResourceKey, ResourceAcquiredMessage>
+        var consumeResult = new ConsumeResult<ResourceKey, ResourcesAcquiredValue>
         {
-            Message = new Message<ResourceKey, ResourceAcquiredMessage>
+            Message = new Message<ResourceKey, ResourcesAcquiredValue>
             {
                 Key = new ResourceKey { FacilityId = facilityId, CorrelationId = correlationId },
                 Value = messageValue
@@ -99,7 +99,7 @@ public class ResourceAcquiredListenerTests
             .ThrowsAsync(produceException);
 
         // Act & Assert
-        var methodInfo = typeof(ResourceAcquiredListener).GetMethod("ProduceResourceNormalizedMessage", BindingFlags.NonPublic | BindingFlags.Instance);
+        var methodInfo = typeof(ResourcesAcquiredListener).GetMethod("ProduceResourceNormalizedMessage", BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(methodInfo);
 
         var task = (Task)methodInfo.Invoke(listener, new object[] { consumeResult, facilityId, correlationId, resource });
@@ -122,7 +122,7 @@ public class ResourceAcquiredListenerTests
     public async Task ProduceResourceNormalizedMessage_ShouldThrowTransientException_WhenProduceExceptionOccursAndResourceIsNull()
     {
         // Arrange
-        var listener = new ResourceAcquiredListener(
+        var listener = new ResourcesAcquiredListener(
             _loggerMock.Object,
             _serviceInformationMock.Object,
             _scopeFactoryMock.Object,
@@ -140,7 +140,7 @@ public class ResourceAcquiredListenerTests
         var facilityId = "TestFacility";
         var correlationId = "TestCorrelationId";
         DomainResource resource = null; // This is the case we want to test
-        var messageValueNull = new ResourceAcquiredMessage
+        var messageValueNull = new ResourcesAcquiredValue
         {
             PatientId = "TestPatient",
             QueryType = "TestQuery",
@@ -149,9 +149,9 @@ public class ResourceAcquiredListenerTests
             AcquisitionComplete = true // Typical for null resource
         };
 
-        var consumeResultNull = new ConsumeResult<ResourceKey, ResourceAcquiredMessage>
+        var consumeResultNull = new ConsumeResult<ResourceKey, ResourcesAcquiredValue>
         {
-            Message = new Message<ResourceKey, ResourceAcquiredMessage>
+            Message = new Message<ResourceKey, ResourcesAcquiredValue>
             {
                 Key = new ResourceKey { FacilityId = facilityId, CorrelationId = correlationId },
                 Value = messageValueNull
@@ -167,7 +167,7 @@ public class ResourceAcquiredListenerTests
             .ThrowsAsync(produceExceptionNull);
 
         // Act & Assert
-        var methodInfo = typeof(ResourceAcquiredListener).GetMethod("ProduceResourceNormalizedMessage", BindingFlags.NonPublic | BindingFlags.Instance);
+        var methodInfo = typeof(ResourcesAcquiredListener).GetMethod("ProduceResourceNormalizedMessage", BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(methodInfo);
 
         var task = (Task)methodInfo.Invoke(listener, new object[] { consumeResultNull, facilityId, correlationId, resource });

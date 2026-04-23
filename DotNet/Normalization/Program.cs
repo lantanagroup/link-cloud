@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
@@ -73,12 +73,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage>, KafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue>, KafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue>>();
 
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, string>, KafkaProducerFactory<ResourceKey, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourceAcquiredMessage>, KafkaProducerFactory<ResourceKey, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourcesAcquiredValue>, KafkaProducerFactory<ResourceKey, ResourcesAcquiredValue>>();
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourceNormalizedMessage>, KafkaProducerFactory<ResourceKey, ResourceNormalizedMessage>>();
 
     builder.Services.RegisterKafkaProducer<ResourceKey, ResourceNormalizedMessage>(
@@ -200,7 +200,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     
     if (consumerSettings != null && !consumerSettings.DisableConsumer)
     {
-        builder.Services.AddHostedService<ResourceAcquiredListener>();
+        builder.Services.AddHostedService<ResourcesAcquiredListener>();
     }
 
     if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
