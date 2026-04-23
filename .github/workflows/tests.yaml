@@ -48,7 +48,7 @@ jobs:
 
   docker-build-and-run:    
     name: Smoke Test with Docker Compose
-    runs-on: [docker-16core-64gb]
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     needs: changes
@@ -111,7 +111,7 @@ jobs:
 
   docker-build-and-run-api-stability:
     name: API Stability Test with Docker Compose
-    runs-on: [docker-16core-64gb]
+    runs-on: ubuntu-latest
     timeout-minutes: 12
 
     needs: changes
@@ -166,7 +166,7 @@ jobs:
 
   docker-build-and-run-report-scheduled:
     name: Report Scheduled E2E Test with Docker Compose
-    runs-on: [docker-16core-64gb]
+    runs-on: ubuntu-latest
     timeout-minutes: 20
 
     needs: changes
@@ -221,7 +221,7 @@ jobs:
 
   docker-build-and-run-regenerate-report:
     name: Regenerate Report E2E Test with Docker Compose
-    runs-on: [docker-16core-64gb]
+    runs-on: ubuntu-latest
     timeout-minutes: 20
 
     needs: changes
@@ -276,7 +276,7 @@ jobs:
 
   docker-build-and-run-multi-measure:
     name: Multi-Measure E2E Test with Docker Compose
-    runs-on: [docker-16core-64gb]
+    runs-on: ubuntu-latest
     timeout-minutes: 20
 
     needs: changes
