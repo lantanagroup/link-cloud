@@ -462,6 +462,7 @@ public class PatientDataServiceTests
                 It.IsAny<FhirQueryModel>(),
                 It.IsAny<ResourceType>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator?>(),
                 cancellationToken))
             .ReturnsAsync(new[] { "Patient/patient-1" });
 
@@ -543,6 +544,7 @@ public class PatientDataServiceTests
                 It.IsAny<FhirQueryModel>(),
                 It.IsAny<ResourceType>(),
                 It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<DiscoveredReferenceAccumulator?>(),
                 cancellationToken))
             .ReturnsAsync(new[] { "Patient/patient-1" });
 
