@@ -61,6 +61,8 @@ public class SearchFhirCommand : ISearchFhirCommand
         _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentNullException(nameof(authenticationRetrievalService));
     }
 
+    protected virtual HttpMessageHandler CreateInnerHttpMessageHandler() => new HttpClientHandler();
+
     public async IAsyncEnumerable<Bundle> ExecuteAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("SearchFhirCommand.ExecuteAsync");
@@ -85,7 +87,7 @@ public class SearchFhirCommand : ISearchFhirCommand
         }
 
         // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
-        var innerHandler = new HttpClientHandler();
+        var innerHandler = CreateInnerHttpMessageHandler();
         var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
         var httpClientWithHandler = new HttpClient(headerCapturingHandler);
 
@@ -233,7 +235,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                 maskedFacilityId, request.resourceType, request.correlationId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
 
             // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
-            var innerHandler = new HttpClientHandler();
+            var innerHandler = CreateInnerHttpMessageHandler();
             var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
             var httpClientWithHandler = new HttpClient(headerCapturingHandler);
 
