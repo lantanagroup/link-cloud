@@ -13,6 +13,7 @@ using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
@@ -29,6 +30,7 @@ using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
@@ -68,6 +70,20 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+
+    builder.Services.AddRedisCache(options =>
+    {
+        options.Environment = builder.Environment;
+
+        var redisConnection = builder.Configuration.GetConnectionString("Redis");
+
+        if (string.IsNullOrEmpty(redisConnection))
+            throw new NullReferenceException("Redis Connection String is required.");
+
+        options.ConnectionString = redisConnection;
+        options.Password = builder.Configuration.GetValue<string>("Redis:Password");
+    });
+    builder.Services.AddSingleton<ICacheService, RedisCacheService>();
 
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682

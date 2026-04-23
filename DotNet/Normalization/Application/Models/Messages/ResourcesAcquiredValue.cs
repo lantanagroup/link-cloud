@@ -1,3 +1,4 @@
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore.Query.Internal;
 
@@ -8,6 +9,6 @@ public class ResourcesAcquiredValue
     public string QueryType { get; set; }
     public List<ScheduledReport> ScheduledReports { get; set; }
     public string ReportableEvent { get; set; }
-    public string CacheType { get; set; }
+    public ResourceCacheType CacheType { get; set; }
     public List<string> CacheKeys { get; set; }
 }
