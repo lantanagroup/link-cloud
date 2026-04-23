@@ -1300,18 +1300,14 @@
       {
         "allValue": ".*",
         "current": {
-          "text": [
-            "ehr-test"
-          ],
-          "value": [
-            "ehr-test"
-          ]
+          "text": "All",
+          "value": "$__all"
         },
         "datasource": {
           "type": "prometheus",
           "uid": "PBFA97CFB590B2093"
         },
-        "definition": "label_values(facilityId)",
+        "definition": "label_values(facility_id)",
         "description": "",
         "includeAll": true,
         "label": "Facility ID",
@@ -1320,7 +1316,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(facilityId)",
+          "query": "label_values(facility_id)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -1358,11 +1354,9 @@
       {
         "allValue": ".*",
         "current": {
-          "text": [
-            "5s2QhWS0SV8VrXgh8e0d7IwuX0V0kpgMeYsF6BcfzhK9b"
-          ],
+          "text": "All",
           "value": [
-            "5s2QhWS0SV8VrXgh8e0d7IwuX0V0kpgMeYsF6BcfzhK9b"
+            "$__all"
           ]
         },
         "datasource": {
@@ -1388,9 +1382,7 @@
       {
         "allowCustomValue": false,
         "current": {
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
@@ -1462,5 +1454,5 @@
   "timezone": "browser",
   "title": "Link Patient-Based Performance",
   "uid": "4d747f1d-456c-4974-b619-63d3d2b24b38",
-  "version": 9
+  "version": 10
 }
