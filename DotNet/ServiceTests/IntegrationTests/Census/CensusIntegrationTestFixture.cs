@@ -27,9 +27,6 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census;
 
-[CollectionDefinition("CensusIntegrationTests")]
-public class DatabaseCollection : ICollectionFixture<CensusIntegrationTestFixture> { }
-
 public sealed class CensusIntegrationTestFixture : IDisposable
 {
     private IHost? _host;

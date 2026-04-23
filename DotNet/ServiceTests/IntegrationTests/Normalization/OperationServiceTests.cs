@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Normalization.Application.Models.Operations;
+﻿using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
 using LantanaGroup.Link.Normalization.Application.Operations;
@@ -15,7 +15,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Normalization
 {
-    [Collection("NormalizationIntegrationTests")]
+    [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
     public class OperationServiceTests
     {

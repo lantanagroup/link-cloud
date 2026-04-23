@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Report.Application.Core;
+﻿using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
@@ -13,9 +13,9 @@ using SystemTask = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report.Core
 {
-    [Collection("ReportIntegrationTests")]
+    [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
-    public class MeasureReportAggregatorTests : IClassFixture<ReportIntegrationTestFixture>
+    public class MeasureReportAggregatorTests
     {
         private readonly ReportIntegrationTestFixture _fixture;
 

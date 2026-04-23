@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using CsvHelper;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Terminology.Application.Models;
@@ -11,7 +11,7 @@ using Moq;
 using Xunit;
 using Task = System.Threading.Tasks.Task;
 
-namespace LantanaGroup.Link.Terminology.Tests.Services;
+namespace UnitTests.Terminology;
 
 public class CodeGroupCacheServiceTests
 {

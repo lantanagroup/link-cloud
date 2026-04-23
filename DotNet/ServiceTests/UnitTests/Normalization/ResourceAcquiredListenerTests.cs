@@ -15,6 +15,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Normalization;
 
+[Trait("Category", "UnitTests")]
 public class ResourceAcquiredListenerTests
 {
     private readonly Mock<ILogger<ResourceAcquiredListener>> _loggerMock;

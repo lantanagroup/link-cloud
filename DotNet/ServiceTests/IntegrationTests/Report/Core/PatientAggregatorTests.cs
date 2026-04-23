@@ -1,4 +1,4 @@
-using Azure.Storage.Blobs.Specialized;
+ï»¿using Azure.Storage.Blobs.Specialized;
 using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
@@ -16,9 +16,9 @@ using SystemTask = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report.Core
 {
-    [Collection("ReportIntegrationTests")]
+    [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
-    public class PatientAggregatorTests : IClassFixture<ReportIntegrationTestFixture>
+    public class PatientAggregatorTests
     {
         private readonly ReportIntegrationTestFixture _fixture;
 
@@ -298,7 +298,7 @@ namespace IntegrationTests.Report.Core
             var mrJson = serializer.SerializeToString(measureReport);
             var mrReference = $"MeasureReport/{measureReport.Id}";
 
-            // Include the same Condition reference twice — only one should be counted
+            // Include the same Condition reference twice â€” only one should be counted
             var conditionRef = "Condition/cond-123";
             var conditionJson = "{\"resourceType\":\"Condition\",\"id\":\"cond-123\"}";
 
@@ -308,7 +308,7 @@ namespace IntegrationTests.Report.Core
             await UploadPatientBlobAsync(entryBlobName,
                 (conditionRef, conditionJson),
                 (mrReference, mrJson),
-                (conditionRef, conditionJson)); // duplicate — should be skipped
+                (conditionRef, conditionJson)); // duplicate â€” should be skipped
 
             await SeedReportEntryAsync(context, schedule.Id, facilityId, patientId,
                 ("DE-111", MeasureReportStatus.ReadyForValidation, measureReport.Id, entryBlobName));
@@ -327,7 +327,7 @@ namespace IntegrationTests.Report.Core
         }
 
         // ------------------------------------------------------------------ //
-        //  Mixed statuses — only ReadyForValidation entries are processed
+        //  Mixed statuses â€” only ReadyForValidation entries are processed
         // ------------------------------------------------------------------ //
 
         [Fact]

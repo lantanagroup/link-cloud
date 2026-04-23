@@ -2,7 +2,7 @@
 
 namespace IntegrationTests.DataAcquisition;
 
-[Collection("DataAcquisitionIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
 public class ReferenceResourceBundleExtractorTest
 {

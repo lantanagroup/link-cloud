@@ -12,8 +12,9 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census;
 
-[Collection("CensusIntegrationTests")]
-public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationTestFixture>
+[Collection("IntegrationTests")]
+[Trait("Category", "IntegrationTests")]
+public class PatientEncountersControllerTests
 {
     private readonly CensusIntegrationTestFixture _fixture;
     private readonly ITestOutputHelper _output;

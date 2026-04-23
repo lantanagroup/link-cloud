@@ -2,6 +2,7 @@
 
 namespace UnitTests.DataAcquisition.FhirCommandUtilities;
 
+[Trait("Category", "UnitTests")]
 public class FhirCommandUtilsTests
 {
     [Theory]

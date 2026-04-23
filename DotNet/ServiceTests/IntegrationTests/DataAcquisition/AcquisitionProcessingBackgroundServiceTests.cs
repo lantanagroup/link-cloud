@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
+﻿using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
@@ -8,7 +8,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition;
 
-[Collection("DataAcquisitionIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
 public class AcquisitionProcessorBackgroundServiceTests
 {

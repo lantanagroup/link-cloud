@@ -1,10 +1,10 @@
-using System.Net;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using Xunit;
+using System.Net;
 
 namespace ServiceTests.UnitTests;
 
+[Trait("Category", "UnitTests")]
 public class OpOutcomeExceptionTests
 {
     [Fact]

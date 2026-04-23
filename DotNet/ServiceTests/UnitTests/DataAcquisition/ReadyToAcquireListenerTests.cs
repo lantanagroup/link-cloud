@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
@@ -17,6 +17,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.DataAcquisition;
 
+[Trait("Category", "UnitTests")]
 public class ReadyToAcquireListenerTests
 {
     [Fact]
