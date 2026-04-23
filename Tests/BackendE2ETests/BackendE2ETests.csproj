@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
@@ -19,6 +19,16 @@
       <Compile Remove="Services\**" />
       <EmbeddedResource Remove="Services\**" />
       <None Remove="Services\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <!--
+        xUnit reads xunit.runner.json from the test assembly's output directory.
+        Copy it on every build so tweaks to parallelism settings take effect immediately.
+      -->
+      <None Update="xunit.runner.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
     </ItemGroup>
 
     <ItemGroup>
