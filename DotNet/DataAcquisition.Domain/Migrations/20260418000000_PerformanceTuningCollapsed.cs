@@ -49,30 +49,37 @@ namespace DataAcquisition.Domain.Migrations
                 IF COL_LENGTH('DataAcquisitionLog', 'ScheduledReportId') IS NULL
                     ALTER TABLE [DataAcquisitionLog] ADD [ScheduledReportId] bigint NULL;
 
-                IF COL_LENGTH('DataAcquisitionLog', 'ScheduledReport') IS NOT NULL
+                IF COL_LENGTH('DataAcquisitionLog', 'ScheduledReport')   IS NOT NULL
+                   AND COL_LENGTH('DataAcquisitionLog', 'ReportStartDate')  IS NOT NULL
+                   AND COL_LENGTH('DataAcquisitionLog', 'ReportEndDate')    IS NOT NULL
+                   AND COL_LENGTH('DataAcquisitionLog', 'ScheduledReportId') IS NOT NULL
                 BEGIN
-                    INSERT INTO [ScheduledReports] ([ReportTrackingId], [Frequency], [StartDate], [EndDate], [ReportTypes], [CreateDate])
-                    SELECT
-                        dal.[ReportTrackingId],
-                        COALESCE(NULLIF(JSON_VALUE(dal.[ScheduledReport], '$.Frequency'), ''), 'Adhoc'),
-                        COALESCE(TRY_CAST(JSON_VALUE(dal.[ScheduledReport], '$.StartDate') AS datetime2), dal.[ReportStartDate], '1900-01-01'),
-                        COALESCE(TRY_CAST(JSON_VALUE(dal.[ScheduledReport], '$.EndDate') AS datetime2), dal.[ReportEndDate], '1900-01-01'),
-                        (SELECT STRING_AGG(rt.[value], ',') FROM OPENJSON(dal.[ScheduledReport], '$.ReportTypes') rt),
-                        GETUTCDATE()
-                    FROM (
-                        SELECT [ReportTrackingId], [ScheduledReport], [ReportStartDate], [ReportEndDate],
-                               ROW_NUMBER() OVER (PARTITION BY [ReportTrackingId] ORDER BY [Id]) AS rn
-                        FROM [DataAcquisitionLog]
-                        WHERE [ScheduledReport] IS NOT NULL AND [ReportTrackingId] IS NOT NULL
-                    ) dal
-                    WHERE dal.rn = 1
-                      AND NOT EXISTS (SELECT 1 FROM [ScheduledReports] sr WHERE sr.[ReportTrackingId] = dal.[ReportTrackingId]);
+                    EXEC(N'
+                        INSERT INTO [ScheduledReports] ([ReportTrackingId], [Frequency], [StartDate], [EndDate], [ReportTypes], [CreateDate])
+                        SELECT
+                            dal.[ReportTrackingId],
+                            COALESCE(NULLIF(JSON_VALUE(dal.[ScheduledReport], ''$.Frequency''), ''''), ''Adhoc''),
+                            COALESCE(TRY_CAST(JSON_VALUE(dal.[ScheduledReport], ''$.StartDate'') AS datetime2), dal.[ReportStartDate], ''1900-01-01''),
+                            COALESCE(TRY_CAST(JSON_VALUE(dal.[ScheduledReport], ''$.EndDate'')   AS datetime2), dal.[ReportEndDate],   ''1900-01-01''),
+                            (SELECT STRING_AGG(rt.[value], '','') FROM OPENJSON(dal.[ScheduledReport], ''$.ReportTypes'') rt),
+                            GETUTCDATE()
+                        FROM (
+                            SELECT [ReportTrackingId], [ScheduledReport], [ReportStartDate], [ReportEndDate],
+                                   ROW_NUMBER() OVER (PARTITION BY [ReportTrackingId] ORDER BY [Id]) AS rn
+                            FROM [DataAcquisitionLog]
+                            WHERE [ScheduledReport] IS NOT NULL AND [ReportTrackingId] IS NOT NULL
+                        ) dal
+                        WHERE dal.rn = 1
+                          AND NOT EXISTS (SELECT 1 FROM [ScheduledReports] sr WHERE sr.[ReportTrackingId] = dal.[ReportTrackingId]);
+                    ');
 
-                    UPDATE dal
-                    SET dal.[ScheduledReportId] = sr.[Id]
-                    FROM [DataAcquisitionLog] dal
-                    INNER JOIN [ScheduledReports] sr ON dal.[ReportTrackingId] = sr.[ReportTrackingId]
-                    WHERE dal.[ScheduledReport] IS NOT NULL AND dal.[ScheduledReportId] IS NULL;
+                    EXEC(N'
+                        UPDATE dal
+                        SET dal.[ScheduledReportId] = sr.[Id]
+                        FROM [DataAcquisitionLog] dal
+                        INNER JOIN [ScheduledReports] sr ON dal.[ReportTrackingId] = sr.[ReportTrackingId]
+                        WHERE dal.[ScheduledReport] IS NOT NULL AND dal.[ScheduledReportId] IS NULL;
+                    ');
                 END
             ");
 
@@ -94,13 +101,15 @@ namespace DataAcquisition.Domain.Migrations
 
                 IF COL_LENGTH('DataAcquisitionLog', 'Notes') IS NOT NULL
                 BEGIN
-                    INSERT INTO [DataAcquisitionLogNotes] ([DataAcquisitionLogId], [Note], [CreateDate])
-                    SELECT dal.[Id], CAST(j.[value] AS nvarchar(max)), GETUTCDATE()
-                    FROM [DataAcquisitionLog] dal
-                    CROSS APPLY OPENJSON(dal.[Notes]) j
-                    WHERE dal.[Notes] IS NOT NULL AND ISJSON(dal.[Notes]) = 1
-                      AND NOT EXISTS (SELECT 1 FROM [DataAcquisitionLogNotes] n 
-                                      WHERE n.[DataAcquisitionLogId] = dal.[Id] AND n.[Note] = CAST(j.[value] AS nvarchar(max)));
+                    EXEC(N'
+                        INSERT INTO [DataAcquisitionLogNotes]
+                        SELECT dal.[Id], CAST(j.[value] AS nvarchar(max)), GETUTCDATE()
+                        FROM [DataAcquisitionLog] dal
+                        CROSS APPLY OPENJSON(dal.[Notes]) j
+                        WHERE dal.[Notes] IS NOT NULL AND ISJSON(dal.[Notes]) = 1
+                          AND NOT EXISTS (SELECT 1 FROM [DataAcquisitionLogNotes] n
+                                          WHERE n.[DataAcquisitionLogId] = dal.[Id] AND n.[Note] = CAST(j.[value] AS nvarchar(max)));
+                    ');
                 END
             ");
 
@@ -122,15 +131,17 @@ namespace DataAcquisition.Domain.Migrations
 
                 IF COL_LENGTH('DataAcquisitionLog', 'ResourceAcquiredIds') IS NOT NULL
                 BEGIN
-                    INSERT INTO [DataAcquisitionLogResourceIds] ([DataAcquisitionLogId], [ResourceId], [CreateDate])
-                    SELECT dal.[Id], j.[value], GETUTCDATE()
-                    FROM [DataAcquisitionLog] dal
-                    CROSS APPLY OPENJSON(dal.[ResourceAcquiredIds]) j
-                    WHERE dal.[ResourceAcquiredIds] IS NOT NULL
-                      AND dal.[ResourceAcquiredIds] <> '[]'
-                      AND dal.[ResourceAcquiredIds] <> 'null'
-                      AND NOT EXISTS (SELECT 1 FROM [DataAcquisitionLogResourceIds] r 
-                                      WHERE r.[DataAcquisitionLogId] = dal.[Id] AND r.[ResourceId] = j.[value]);
+                    EXEC(N'
+                        INSERT INTO [DataAcquisitionLogResourceIds]
+                        SELECT dal.[Id], j.[value], GETUTCDATE()
+                        FROM [DataAcquisitionLog] dal
+                        CROSS APPLY OPENJSON(dal.[ResourceAcquiredIds]) j
+                        WHERE dal.[ResourceAcquiredIds] IS NOT NULL
+                          AND dal.[ResourceAcquiredIds] <> ''[]''
+                          AND dal.[ResourceAcquiredIds] <> ''null''
+                          AND NOT EXISTS (SELECT 1 FROM [DataAcquisitionLogResourceIds] r
+                                          WHERE r.[DataAcquisitionLogId] = dal.[Id] AND r.[ResourceId] = j.[value]);
+                    ');
                 END
             ");
 
@@ -140,7 +151,7 @@ namespace DataAcquisition.Domain.Migrations
                     ALTER TABLE [DataAcquisitionLog] ADD [SiblingCount] int NULL;
             ");
 
-            // 6. ReferenceResources — max-length columns, unique index, junction table
+            // 6. ReferenceResources â€” max-length columns, unique index, junction table
             //    All operations are now raw SQL + fully idempotent to prevent EF Core index conflicts in tests
 
             // 6a. Drop existing index FIRST (defensive, safe even if index was never created)
@@ -178,13 +189,15 @@ namespace DataAcquisition.Domain.Migrations
             migrationBuilder.Sql(@"
                 IF COL_LENGTH('ReferenceResources', 'DataAcquisitionLogId') IS NOT NULL
                 BEGIN
-                    INSERT INTO [DataAcquisitionLogReferenceResource] ([DataAcquisitionLogId], [ReferenceResourceId])
-                    SELECT DISTINCT [DataAcquisitionLogId], [Id]
-                    FROM [ReferenceResources]
-                    WHERE [DataAcquisitionLogId] IS NOT NULL
-                      AND NOT EXISTS (SELECT 1 FROM [DataAcquisitionLogReferenceResource] j 
-                                      WHERE j.[DataAcquisitionLogId] = [ReferenceResources].[DataAcquisitionLogId]
-                                        AND j.[ReferenceResourceId] = [ReferenceResources].[Id]);
+                    EXEC(N'
+                        INSERT INTO [DataAcquisitionLogReferenceResource]
+                        SELECT DISTINCT [DataAcquisitionLogId], [Id]
+                        FROM [ReferenceResources]
+                        WHERE [DataAcquisitionLogId] IS NOT NULL
+                          AND NOT EXISTS (SELECT 1 FROM [DataAcquisitionLogReferenceResource] j
+                                          WHERE j.[DataAcquisitionLogId] = [ReferenceResources].[DataAcquisitionLogId]
+                                            AND j.[ReferenceResourceId] = [ReferenceResources].[Id]);
+                    ');
 
                     DECLARE @fkName sysname;
                     DECLARE @dropSql nvarchar(500);
@@ -303,7 +316,7 @@ namespace DataAcquisition.Domain.Migrations
                 END
             ");
 
-            // 8. Final indexes and FK — now idempotent (will not fail migration if they already exist)
+            // 8. Final indexes and FK â€” now idempotent (will not fail migration if they already exist)
             migrationBuilder.Sql(@"
                 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID('DataAcquisitionLog') AND name = 'IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id')
                     CREATE NONCLUSTERED INDEX [IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id]
