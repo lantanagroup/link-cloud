@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -57,11 +57,17 @@
     <ProjectReference Include="..\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
     <ProjectReference Include="..\DataAcquisition\DataAcquisition.csproj" />
     <ProjectReference Include="..\Normalization\Normalization.csproj" />
+    <ProjectReference Include="..\QueryDispatch\QueryDispatch.csproj" />
     <ProjectReference Include="..\Report\Report.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
     <ProjectReference Include="..\Tenant\Tenant.csproj" />
+    <ProjectReference Include="..\Terminology\Terminology.csproj" />
     <ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />
     <ProjectReference Include="..\Automation\Automation.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,6 +1,4 @@
-﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
@@ -9,10 +7,9 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Xunit;
 using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
 
-namespace LantanaGroup.Link.Terminology.Tests.Services;
+namespace UnitTests.Terminology;
 
 public class FhirServiceTests
 {
