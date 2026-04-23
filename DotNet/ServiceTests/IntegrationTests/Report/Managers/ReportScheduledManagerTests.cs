@@ -7,8 +7,9 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report.Managers;
 
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class ReportScheduledManagerTests : IClassFixture<ReportIntegrationTestFixture>
+public class ReportScheduledManagerTests
 {
     private readonly IServiceScopeFactory _scopeFactory;
 
