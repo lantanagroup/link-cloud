@@ -47,47 +47,20 @@ jobs:
         run: echo "run_job=${{ steps.should.outputs.run_job }}"
 
   backend-e2e-tests:
-    # Each matrix entry runs as its own GitHub Actions job, so it gets its
-    # own collapsible section and its own clean log stream in the UI — no
-    # more interleaved output from unrelated test categories. The jobs run
-    # in parallel across runners, and each one stands up its own isolated
-    # docker compose stack (scoped by PROJECT_NAME) so they can't collide.
-    name: Backend E2E - ${{ matrix.test.name }}
+    # All five test categories run in parallel against a SINGLE shared
+    # docker compose stack (one build, one up). Each `dotnet test`
+    # invocation writes to its own log file and is then rendered as its own
+    # collapsible ::group:: in the Actions UI so logs are segmented per
+    # category instead of interleaved.
+    name: Backend E2E Tests with Docker Compose
     runs-on: [docker-16core-64gb]
     timeout-minutes: 60
 
     needs: changes
     if: ${{ needs.changes.outputs.run_job == 'true' }}
 
-    strategy:
-      fail-fast: false
-      matrix:
-        test:
-          - name: Adhoc Report
-            category: AdhocReportTest
-            trx: adhoc-report-test-results.trx
-            slug: adhoc-report
-          - name: API Stability
-            category: ApiStabilityTest
-            trx: api-stability-test-results.trx
-            slug: api-stability
-          - name: Report Scheduled
-            category: ReportScheduledTest
-            trx: report-scheduled-test-results.trx
-            slug: report-scheduled
-          - name: Regenerate Report
-            category: RegenerateReportTest
-            trx: regenerate-report-test-results.trx
-            slug: regenerate-report
-          - name: Multi-Measure
-            category: MultiMeasureTest
-            trx: multi-measure-test-results.trx
-            slug: multi-measure
-
     env:
-      # Unique compose project per matrix job keeps parallel stacks isolated
-      # (separate networks, container names, volumes).
-      PROJECT_NAME: link-${{ matrix.test.slug }}
+      PROJECT_NAME: link
       HEALTH_CHECK_TIMEOUT: 60
       CHECK_INTERVAL: 10
       ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
@@ -107,7 +80,7 @@ jobs:
             --set *.output=type=docker   # <-- makes images visible to `docker compose`
 
       - name: Start services
-        run: docker compose -p "$PROJECT_NAME" up --no-build -d
+        run: docker compose up --no-build -d
 
       - name: Wait for services to start
         run: sleep 10
@@ -117,13 +90,71 @@ jobs:
           chmod +x Scripts/check_health.sh
           Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
 
-      - name: ${{ matrix.test.name }} E2E Test
+      # ---- All 5 test categories run CONCURRENTLY against the SAME stack. ----
+      # Each `dotnet test` is launched in the background with its stdout/stderr
+      # redirected to a dedicated log file. After they all finish we emit each
+      # log wrapped in ::group::/::endgroup:: markers so the GitHub Actions UI
+      # renders a separate, collapsible section per test category instead of
+      # interleaving everything into one wall of text.
+      - name: Backend E2E Tests (parallel, segmented logs)
+        shell: bash
         run: |
-          dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj \
-            --filter "Category=${{ matrix.test.category }}" \
-            --logger "trx;LogFileName=${{ matrix.test.trx }}" \
-            --logger "console;verbosity=detailed" \
-            --results-directory ./Tests/BackendE2ETests/TestResults
+          set -o pipefail
+          mkdir -p ./Tests/BackendE2ETests/TestResults
+          mkdir -p ./test-logs
+
+          # name|category|trx-file
+          TESTS=(
+            "Adhoc Report|AdhocReportTest|adhoc-report-test-results.trx"
+            "API Stability|ApiStabilityTest|api-stability-test-results.trx"
+            "Report Scheduled|ReportScheduledTest|report-scheduled-test-results.trx"
+            "Regenerate Report|RegenerateReportTest|regenerate-report-test-results.trx"
+            "Multi-Measure|MultiMeasureTest|multi-measure-test-results.trx"
+          )
+
+          declare -a PIDS
+          declare -a NAMES
+          declare -a LOGS
+
+          for entry in "${TESTS[@]}"; do
+            IFS='|' read -r NAME CATEGORY TRX <<< "$entry"
+            SLUG=$(echo "$CATEGORY" | tr '[:upper:]' '[:lower:]')
+            LOG="./test-logs/${SLUG}.log"
+            echo "Starting: $NAME (Category=$CATEGORY) -> $LOG"
+            (
+              dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj \
+                --filter "Category=${CATEGORY}" \
+                --logger "trx;LogFileName=${TRX}" \
+                --logger "console;verbosity=detailed" \
+                --results-directory ./Tests/BackendE2ETests/TestResults
+            ) > "$LOG" 2>&1 &
+            PIDS+=("$!")
+            NAMES+=("$NAME")
+            LOGS+=("$LOG")
+          done
+
+          # Wait for every test run, capture individual exit codes.
+          FAILED=0
+          declare -a EXITS
+          for i in "${!PIDS[@]}"; do
+            if wait "${PIDS[$i]}"; then
+              EXITS+=("0")
+            else
+              EXITS+=("$?")
+              FAILED=1
+            fi
+          done
+
+          # Render each run's output in its own collapsible group in the UI.
+          for i in "${!NAMES[@]}"; do
+            STATUS="✅ PASSED"
+            [[ "${EXITS[$i]}" != "0" ]] && STATUS="❌ FAILED (exit ${EXITS[$i]})"
+            echo "::group::${NAMES[$i]} — ${STATUS}"
+            cat "${LOGS[$i]}" || true
+            echo "::endgroup::"
+          done
+
+          exit $FAILED
 
       # ---- Artifact uploads ----
 
@@ -131,19 +162,27 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: backend-e2e-service-logs-${{ matrix.test.slug }}
+          name: backend-e2e-service-logs
           path: service-logs/
 
-      - name: Upload ${{ matrix.test.name }} test results
+      - name: Upload Backend E2E per-category console logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.test.slug }}-test-results
-          path: ./Tests/BackendE2ETests/TestResults/${{ matrix.test.trx }}
+          name: backend-e2e-console-logs
+          path: ./test-logs/
+          if-no-files-found: ignore
+
+      - name: Upload Backend E2E test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-e2e-test-results
+          path: ./Tests/BackendE2ETests/TestResults/*.trx
           if-no-files-found: ignore
 
       - name: Upload Adhoc Report submission ZIP
-        if: ${{ !cancelled() && matrix.test.category == 'AdhocReportTest' }}
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: adhoc-report-submission-zip
@@ -152,7 +191,7 @@ jobs:
 
       - name: Tear down services
         if: always()
-        run: docker compose -p "$PROJECT_NAME" down -v --remove-orphans
+        run: docker compose down -v --remove-orphans
 
   dotnet-tests:
     name: .NET Tests
