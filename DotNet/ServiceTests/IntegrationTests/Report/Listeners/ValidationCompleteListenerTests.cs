@@ -1,4 +1,4 @@
-using Azure.Storage.Blobs;
+﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Confluent.Kafka;
 using LantanaGroup.Link.Report.Domain.Managers;
@@ -17,9 +17,9 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report.Listeners;
 
-[Collection("ReportIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class ValidationCompleteListenerTests : IClassFixture<ReportIntegrationTestFixture>
+public class ValidationCompleteListenerTests
 {
     private readonly ReportIntegrationTestFixture _fixture;
 

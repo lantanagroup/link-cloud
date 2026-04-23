@@ -9,7 +9,7 @@ using Task = System.Threading.Tasks.Task;
 namespace IntegrationTests.Normalization
 {
 
-    [Collection("NormalizationIntegrationTests")]
+    [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
     public class VendorTests
     {

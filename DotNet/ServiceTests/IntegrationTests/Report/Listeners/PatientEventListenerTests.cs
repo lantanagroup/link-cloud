@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Report.Models;
@@ -12,9 +12,9 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report.Listeners;
 
-[Collection("ReportIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class PatientEventListenerTests : IClassFixture<ReportIntegrationTestFixture>
+public class PatientEventListenerTests
 {
     private readonly ReportIntegrationTestFixture _fixture;
 

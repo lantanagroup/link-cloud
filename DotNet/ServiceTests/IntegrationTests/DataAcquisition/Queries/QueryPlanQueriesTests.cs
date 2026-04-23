@@ -11,7 +11,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Queries
 {
-    [Collection("DataAcquisitionIntegrationTests")]
+    [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
     public class QueryPlanQueriesTests
     {

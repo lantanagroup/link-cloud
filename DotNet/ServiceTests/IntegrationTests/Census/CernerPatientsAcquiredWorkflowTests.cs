@@ -1,4 +1,4 @@
-using Census.Domain.Entities;
+﻿using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
 using LantanaGroup.Link.Census.Application.Services;
@@ -14,7 +14,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census
 {
-    [Collection("CensusIntegrationTests")]
+    [Collection("IntegrationTests")]
     public class CernerPatientsAcquiredWorkflowTests
     {
         private readonly CensusIntegrationTestFixture _fixture;

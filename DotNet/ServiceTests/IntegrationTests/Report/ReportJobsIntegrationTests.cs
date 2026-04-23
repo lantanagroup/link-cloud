@@ -16,7 +16,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report.Jobs;
 
-[Collection("ReportIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
 public class EndOfReportPeriodJobTests
 {

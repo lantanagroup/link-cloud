@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -10,7 +10,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Queries
 {
-    [Collection("DataAcquisitionIntegrationTests")]
+    [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
     public class ReferenceResourcesQueriesTests
     {

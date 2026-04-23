@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Census.Application.Models;
+﻿using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Controllers;
 using LantanaGroup.Link.Census.Domain.Context;
@@ -12,7 +12,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census;
 
-[Collection("CensusIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
 public class PatientEventsControllerTests
 {

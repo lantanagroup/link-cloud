@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -18,7 +18,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Managers;
 
-[Collection("DataAcquisitionIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
 public class QueryPlanManagerTests
 {

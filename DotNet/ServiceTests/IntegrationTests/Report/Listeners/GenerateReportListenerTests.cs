@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Listeners;
@@ -14,9 +14,9 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report.Listeners;
 
-[Collection("ReportIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class GenerateReportListenerTests : IClassFixture<ReportIntegrationTestFixture>
+public class GenerateReportListenerTests
 {
     private readonly ReportIntegrationTestFixture _fixture;
 
@@ -211,7 +211,7 @@ public class GenerateReportListenerTests : IClassFixture<ReportIntegrationTestFi
             Times.Exactly(2));
     }
 
-    [Fact(Skip = "Requires live Census service — SDK clients are now concrete types injected via AddLinkSdk()")]
+    [Fact(Skip = "Requires live Census service â€” SDK clients are now concrete types injected via AddLinkSdk()")]
     public async Task ProcessMessageAsync_NewAdHocCensus_NoPatientIds_FetchesFromCensusAndCreatesEntries()
     {
         _fixture.DataAcquisitionRequestedKafkaProducerMock.Reset();

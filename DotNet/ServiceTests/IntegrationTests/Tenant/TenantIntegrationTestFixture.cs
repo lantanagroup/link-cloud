@@ -33,12 +33,6 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Tenant
 {
-    [CollectionDefinition("TenantIntegrationTests", DisableParallelization = true)]
-    public class DatabaseCollection : ICollectionFixture<TenantIntegrationTestFixture>
-    {
-        // This class is a marker for the collection
-    }
-
     public class TenantIntegrationTestFixture : IDisposable
     {
         public IServiceProvider ServiceProvider { get; private set; }

@@ -1,4 +1,4 @@
-using Census.Controllers;
+﻿using Census.Controllers;
 using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Domain.Context;
@@ -10,7 +10,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census
 {
-    [Collection("CensusIntegrationTests")]
+    [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
     public class CensusConfigControllerTests
     {
