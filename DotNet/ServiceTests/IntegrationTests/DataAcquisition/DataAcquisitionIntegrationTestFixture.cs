@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -29,17 +29,26 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition
 {
-    [CollectionDefinition("DataAcquisitionIntegrationTests", DisableParallelization = true)]
-    public class DatabaseCollection : ICollectionFixture<DataAcquisitionIntegrationTestFixture>
-    {
-        // This class is a marker for the collection
-    }
-
     public class DataAcquisitionIntegrationTestFixture : IAsyncLifetime
     {
+        // Pinned to a specific tag (rather than :latest) so that the layer
+        // cache in CI is reusable across runs and developer machines pull a
+        // single, reproducible image.
+        private const string SqlServerImage = "mcr.microsoft.com/mssql/server:2022-CU13-ubuntu-22.04";
+
+        // Setting LINK_TESTS_SQL_CONNECTION_STRING points the fixture at an
+        // existing SQL Server (LocalDB, docker, devcontainer, etc.) instead of
+        // spinning up a Testcontainer. This drops fixture startup from
+        // ~30s to ~2s for the inner-dev loop. Each test class still gets an
+        // isolated database so re-runs remain deterministic.
+        private static string? ExternalConnectionString =>
+            Environment.GetEnvironmentVariable("LINK_TESTS_SQL_CONNECTION_STRING");
+
         public IServiceProvider ServiceProvider { get; private set; } = default!;
         private IHost? _host;
-        private readonly MsSqlContainer _sqlContainer;
+        private readonly MsSqlContainer? _sqlContainer;
+        private string? _testDatabaseName;
+        private string? _serverConnectionString;
 
         public Mock<IProducer<long, ReadyToAcquire>> ReadyToAcquireProducerMock { get; private set; }
         public Mock<IProducer<ResourceKey, ResourceAcquired>> ResourceAcquiredProducerMock { get; private set; }
@@ -49,30 +58,45 @@ namespace IntegrationTests.DataAcquisition
             ReadyToAcquireProducerMock = new Mock<IProducer<long, ReadyToAcquire>>();
             ResourceAcquiredProducerMock = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
 
-            _sqlContainer = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest")
-                .Build();
+            if (string.IsNullOrWhiteSpace(ExternalConnectionString))
+            {
+                _sqlContainer = new MsSqlBuilder()
+                    .WithImage(SqlServerImage)
+                    .Build();
+            }
         }
 
         public async Task InitializeAsync()
         {
-            await _sqlContainer.StartAsync();
-
-            // The container's default connection string targets 'master'.
-            // Migrations that alter database-level settings (e.g. READ_COMMITTED_SNAPSHOT)
-            // cannot run against 'master', so point to a dedicated test database.
-            var csBuilder = new SqlConnectionStringBuilder(_sqlContainer.GetConnectionString())
+            if (_sqlContainer is not null)
             {
-                InitialCatalog = "DataAcquisitionTest",
+                await _sqlContainer.StartAsync();
+                _serverConnectionString = _sqlContainer.GetConnectionString();
+            }
+            else
+            {
+                _serverConnectionString = ExternalConnectionString!;
+            }
+
+            // The default container connection string targets 'master'. Migrations
+            // that alter database-level settings (e.g. READ_COMMITTED_SNAPSHOT)
+            // cannot run against 'master', so point to a dedicated test database.
+            // The unique name allows running against a shared external server
+            // without colliding with parallel runs.
+            _testDatabaseName = $"DataAcquisitionTest_{Guid.NewGuid():N}";
+            var csBuilder = new SqlConnectionStringBuilder(_serverConnectionString)
+            {
+                InitialCatalog = _testDatabaseName,
                 ConnectTimeout = 60
             };
             var connectionString = csBuilder.ConnectionString;
 
-            // Create the test database on the container
-            await using (var masterConn = new SqlConnection(_sqlContainer.GetConnectionString()))
+            // Create the test database on the server
+            await using (var masterConn = new SqlConnection(_serverConnectionString))
             {
                 await masterConn.OpenAsync();
                 await using var cmd = masterConn.CreateCommand();
-                cmd.CommandText = "CREATE DATABASE [DataAcquisitionTest];";
+                cmd.CommandText = $"CREATE DATABASE [{_testDatabaseName}];";
                 await cmd.ExecuteNonQueryAsync();
             }
 
@@ -179,7 +203,29 @@ namespace IntegrationTests.DataAcquisition
                 _host.Dispose();
             }
 
-            await _sqlContainer.DisposeAsync();
+            if (_sqlContainer is not null)
+            {
+                await _sqlContainer.DisposeAsync();
+            }
+            else if (!string.IsNullOrWhiteSpace(_serverConnectionString) && !string.IsNullOrWhiteSpace(_testDatabaseName))
+            {
+                // Best-effort drop of the per-fixture database when running
+                // against an external server.
+                try
+                {
+                    await using var masterConn = new SqlConnection(_serverConnectionString);
+                    await masterConn.OpenAsync();
+                    await using var cmd = masterConn.CreateCommand();
+                    cmd.CommandText =
+                        $"ALTER DATABASE [{_testDatabaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; " +
+                        $"DROP DATABASE [{_testDatabaseName}];";
+                    await cmd.ExecuteNonQueryAsync();
+                }
+                catch
+                {
+                    // Ignore cleanup failures - the next run uses a new GUID.
+                }
+            }
         }
     }
 }

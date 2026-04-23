@@ -1,10 +1,7 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using IndexAttribute = Microsoft.EntityFrameworkCore.IndexAttribute;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -64,10 +61,21 @@ public partial class FhirQuery
         }
         set
         {
-            string prefix = "_id=";
-            QueryParameters = (QueryParameters ?? []).Where(p => !p.StartsWith(prefix))
-                .Append($"{prefix}{string.Join(',', (value ?? []))}")
+            const string prefix = "_id=";
+            var ids = (value ?? Enumerable.Empty<string>())
+                .Where(id => !string.IsNullOrWhiteSpace(id))
                 .ToList();
+
+            var withoutId = (QueryParameters ?? [])
+                .Where(p => !p.StartsWith(prefix))
+                .ToList();
+
+            // Only re-append an "_id=..." entry when we actually have ids to write;
+            // an empty assignment must not leave a stray "_id=" in QueryParameters.
+            if (ids.Count > 0)
+                withoutId.Add($"{prefix}{string.Join(',', ids)}");
+
+            QueryParameters = withoutId;
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -21,6 +21,7 @@ public class DataAcquisitionLogModel
     public string? PatientId { get; set; }
     public string? ResourceId { get; set; }
     public string? CorrelationId { get; set; }
+    public string? ReferenceResourceType { get; set; }
     public string? ReportTrackingId { get; set; }
     public string? FhirVersion { get; set; }
     public ReportableEvent? ReportableEvent { get; set; }
@@ -58,6 +59,7 @@ public class DataAcquisitionLogModel
             ReportableEvent = log.ReportableEvent,
             ReportTrackingId = log.ReportTrackingId?.ToString().ToLowerInvariant(),
             CorrelationId = log.CorrelationId,
+            ReferenceResourceType = log.ReferenceResourceType,
             FhirVersion = log.FhirVersion,
             QueryType = log.QueryType,
             QueryPhase = log.QueryPhase,
@@ -67,7 +69,6 @@ public class DataAcquisitionLogModel
                 Id = q.Id,
                 FacilityId = q.FacilityId,
                 MeasureId = q.MeasureId,
-                IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
                 IsReference = q.IsReference,
                 QueryType = q.QueryType,
                 ResourceTypes = q.FhirQueryResourceTypes.Select(s => s.ResourceType).ToList(),
