@@ -28,25 +28,31 @@ namespace DataAcquisition.Domain.Migrations
         {
             // 1) Backfill orphan scheduled reports from legacy logs.
             migrationBuilder.Sql(@"
-                INSERT INTO [ScheduledReports] ([ReportTrackingId], [Frequency], [StartDate], [EndDate], [ReportTypes], [CreateDate])
-                SELECT
-                    dal.[ReportTrackingId],
-                    'Adhoc',
-                    COALESCE(dal.[ReportStartDate], '1900-01-01'),
-                    COALESCE(dal.[ReportEndDate],   '1900-01-01'),
-                    NULL,
-                    GETUTCDATE()
-                FROM (
-                    SELECT [ReportTrackingId], [ReportStartDate], [ReportEndDate],
-                           ROW_NUMBER() OVER (PARTITION BY [ReportTrackingId] ORDER BY [Id]) AS rn
-                    FROM [DataAcquisitionLog]
-                    WHERE [ReportTrackingId] IS NOT NULL
-                ) dal
-                WHERE dal.rn = 1
-                  AND NOT EXISTS (
-                      SELECT 1 FROM [ScheduledReports] sr
-                      WHERE sr.[ReportTrackingId] = dal.[ReportTrackingId]
-                  );
+                IF COL_LENGTH('DataAcquisitionLog', 'ReportStartDate') IS NOT NULL
+                   AND COL_LENGTH('DataAcquisitionLog', 'ReportEndDate') IS NOT NULL
+                BEGIN
+                    EXEC(N'
+                        INSERT INTO [ScheduledReports] ([ReportTrackingId], [Frequency], [StartDate], [EndDate], [ReportTypes], [CreateDate])
+                        SELECT
+                            dal.[ReportTrackingId],
+                            ''Adhoc'',
+                            COALESCE(dal.[ReportStartDate], ''1900-01-01''),
+                            COALESCE(dal.[ReportEndDate],   ''1900-01-01''),
+                            NULL,
+                            GETUTCDATE()
+                        FROM (
+                            SELECT [ReportTrackingId], [ReportStartDate], [ReportEndDate],
+                                   ROW_NUMBER() OVER (PARTITION BY [ReportTrackingId] ORDER BY [Id]) AS rn
+                            FROM [DataAcquisitionLog]
+                            WHERE [ReportTrackingId] IS NOT NULL
+                        ) dal
+                        WHERE dal.rn = 1
+                          AND NOT EXISTS (
+                              SELECT 1 FROM [ScheduledReports] sr
+                              WHERE sr.[ReportTrackingId] = dal.[ReportTrackingId]
+                          );
+                    ');
+                END
             ");
 
             // 2) Validate all non-null ReportTrackingIds are GUIDs before conversion.
@@ -204,7 +210,7 @@ namespace DataAcquisition.Domain.Migrations
                 column: "ReportTrackingId");
 
             // Recreate IX_DataAcquisitionLogs_TailSent_Status with updated INCLUDE list
-            // (removed ScheduledReportId, ReportStartDate, ReportEndDate — those columns no longer exist).
+            // (removed ScheduledReportId, ReportStartDate, ReportEndDate â€” those columns no longer exist).
             migrationBuilder.CreateIndex(
                 name: "IX_DataAcquisitionLogs_TailSent_Status",
                 table: "DataAcquisitionLog",
