@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Automation.Link.Validation;
+using LantanaGroup.Link.Automation.Link.Validation;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -38,7 +38,11 @@ public sealed class KafkaErrorProbe : IBackgroundMonitorProbe
 
     public Task<MonitorProbeResult> ExecuteAsync(TestMonitorState state, CancellationToken cancellationToken)
     {
-        var count = _kafkaMonitor.CapturedErrors.Count;
+        // Only count errors keyed to THIS test's facility (or with no key at all). The
+        // KafkaErrorMonitor subscribes to every -Error / -Retry topic on the broker, so
+        // dead-letter traffic from a sibling test in the same sequential run would
+        // otherwise trigger a false-positive critical failure here.
+        var count = _kafkaMonitor.GetErrorCountForFacility(state.CorrelationId1);
 
         if (count <= 0)
             return Task.FromResult(new MonitorProbeResult { MessageBusErrorCount = 0 });
@@ -49,7 +53,7 @@ public sealed class KafkaErrorProbe : IBackgroundMonitorProbe
             issues.Add(new MonitorIssue(
                 Key: $"kafka-errors-{count}",
                 Source: Name,
-                Message: $"Kafka error/retry messages detected: {count}",
+                Message: $"Kafka error/retry messages detected for facility {state.CorrelationId1}: {count}",
                 Severity: MonitorIssueSeverity.Critical,
                 TimestampUtc: DateTime.UtcNow));
         }
