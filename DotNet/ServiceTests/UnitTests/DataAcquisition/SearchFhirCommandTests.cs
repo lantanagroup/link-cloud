@@ -1,3 +1,5 @@
+using System.Net;
+using System.Text;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
@@ -11,8 +13,6 @@ using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using System.Net;
-using System.Text;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -35,8 +35,9 @@ public class SearchFhirCommandTests
             IDistributedSemaphoreProvider semaphoreProvider,
             IOptions<DistributedLockSettings> lockSettings,
             IAuthenticationRetrievalService authService,
+            IOptionsMonitor<TelemetrySettings> telemetrySettings,
             HttpMessageHandler stubHandler)
-            : base(logger, new HttpClient(), metrics, semaphoreProvider, lockSettings, authService)
+            : base(logger, new HttpClient(), metrics, semaphoreProvider, lockSettings, authService, telemetrySettings)
         {
             _stubHandler = stubHandler;
         }
@@ -141,6 +142,7 @@ public class SearchFhirCommandTests
             facilityId: "test-facility",
             patientId: "test-patient",
             correlationId: "test-correlation",
+            reportTrackingId: "test-report",
             queryPhase: QueryPhase.Initial,
             queryType: FhirQueryType.Search);
 
@@ -184,14 +186,22 @@ public class SearchFhirCommandTests
         StubHttpMessageHandler stub,
         Mock<IDistributedSemaphoreProvider> semaphoreProvider,
         Mock<IDataAcquisitionServiceMetrics> metrics,
-        Mock<IAuthenticationRetrievalService> auth) =>
-        new(
+        Mock<IAuthenticationRetrievalService> auth)
+    {
+        var telemetrySettings = new Mock<IOptionsMonitor<TelemetrySettings>>();
+        telemetrySettings
+            .Setup(x => x.CurrentValue)
+            .Returns(new TelemetrySettings());
+
+        return new TestableSearchFhirCommand(
             new Mock<ILogger<SearchFhirCommand>>().Object,
             metrics.Object,
             semaphoreProvider.Object,
             Options.Create(new DistributedLockSettings()),
             auth.Object,
+            telemetrySettings.Object,
             stub);
+    }
 
     // ── Tests ─────────────────────────────────────────────────────────────────
 

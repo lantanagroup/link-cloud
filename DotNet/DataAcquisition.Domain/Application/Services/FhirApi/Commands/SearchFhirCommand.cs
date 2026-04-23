@@ -151,7 +151,7 @@ public class SearchFhirCommand : ISearchFhirCommand
         if (resultBundle != null)
         {
             yield return resultBundle;
-            IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
+            IncrementResourceAcquiredCounter(request.correlationId, request.patientId, request.facilityId, request.reportTrackingId, DiagnosticNames.NormalizePhase(request.queryPhase.ToString()), request.resourceType.ToString(), resultBundle.Id);
 
             while (resultBundle.Link.Exists(x => x.Relation == "next"))
             {
