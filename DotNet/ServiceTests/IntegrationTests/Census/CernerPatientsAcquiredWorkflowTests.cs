@@ -10,12 +10,11 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census
 {
-    [Collection("CensusIntegrationTests")]
+    [Collection("IntegrationTests")]
     public class CernerPatientsAcquiredWorkflowTests
     {
         private readonly CensusIntegrationTestFixture _fixture;
@@ -30,6 +29,7 @@ namespace IntegrationTests.Census
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
+            var configManager = scope.ServiceProvider.GetRequiredService<ICensusConfigManager>();
             var eventManager = scope.ServiceProvider.GetRequiredService<IPatientEventManager>();
             var eventQueries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
             var encounterManager = scope.ServiceProvider.GetRequiredService<IPatientEncounterManager>();
@@ -59,7 +59,7 @@ namespace IntegrationTests.Census
             };
 
             var cernerListService = new CernerListService(
-                new NullLogger<PatientListService>(),
+                new Microsoft.Extensions.Logging.Abstractions.NullLogger<LantanaGroup.Link.Census.Application.Services.PatientListService>(),
                 new NullCensusServiceMetrics(),
                 eventManager, eventQueries, encounterQueries, encounterManager, censusConfigManager);
 
@@ -76,6 +76,7 @@ namespace IntegrationTests.Census
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
+            var configManager = scope.ServiceProvider.GetRequiredService<ICensusConfigManager>();
             var eventManager = scope.ServiceProvider.GetRequiredService<IPatientEventManager>();
             var eventQueries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
             var encounterManager = scope.ServiceProvider.GetRequiredService<IPatientEncounterManager>();
@@ -115,7 +116,7 @@ namespace IntegrationTests.Census
 
             // Create Kafka Event
             var cernerListService = new CernerListService(
-                new NullLogger<PatientListService>(),
+                new Microsoft.Extensions.Logging.Abstractions.NullLogger<LantanaGroup.Link.Census.Application.Services.PatientListService>(),
                 new NullCensusServiceMetrics(),
                 eventManager, eventQueries, encounterQueries, encounterManager, censusConfigManager);
 
@@ -138,6 +139,7 @@ namespace IntegrationTests.Census
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<CensusContext>();
+            var configManager = scope.ServiceProvider.GetRequiredService<ICensusConfigManager>();
             var eventManager = scope.ServiceProvider.GetRequiredService<IPatientEventManager>();
             var eventQueries = scope.ServiceProvider.GetRequiredService<IPatientEventQueries>();
             var encounterManager = scope.ServiceProvider.GetRequiredService<IPatientEncounterManager>();
@@ -178,7 +180,7 @@ namespace IntegrationTests.Census
 
             // Create Kafka Event
             var cernerListService = new CernerListService(
-                new NullLogger<PatientListService>(),
+                new Microsoft.Extensions.Logging.Abstractions.NullLogger<LantanaGroup.Link.Census.Application.Services.PatientListService>(),
                 new NullCensusServiceMetrics(),
                 eventManager, eventQueries, encounterQueries, encounterManager, censusConfigManager);
 
