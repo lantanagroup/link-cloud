@@ -10,6 +10,7 @@ namespace IntegrationTests.Normalization
 {
 
     [Collection("NormalizationIntegrationTests")]
+    [Trait("Category", "IntegrationTests")]
     public class VendorTests
     {
         private readonly NormalizationIntegrationTestFixture _fixture;

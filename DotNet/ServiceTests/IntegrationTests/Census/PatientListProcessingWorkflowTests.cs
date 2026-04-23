@@ -1,6 +1,5 @@
-﻿using LantanaGroup.Link.Census.Application.Models;
+using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
-using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Domain.Context;
@@ -16,6 +15,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census;
 
+[Trait("Category", "IntegrationTests")]
 public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegrationTestFixture>
 {
     private readonly CensusIntegrationTestFixture _fixture;

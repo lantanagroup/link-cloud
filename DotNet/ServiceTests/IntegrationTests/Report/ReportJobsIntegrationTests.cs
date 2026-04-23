@@ -17,6 +17,7 @@ using Task = System.Threading.Tasks.Task;
 namespace IntegrationTests.Report.Jobs;
 
 [Collection("ReportIntegrationTests")]
+[Trait("Category", "IntegrationTests")]
 public class EndOfReportPeriodJobTests
 {
     private readonly ReportIntegrationTestFixture _fixture;

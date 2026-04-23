@@ -7,18 +7,18 @@ using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
-using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
-using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using System.Text;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report.Listeners;
 
 [Collection("ReportIntegrationTests")]
+[Trait("Category", "IntegrationTests")]
 public class ValidationCompleteListenerTests : IClassFixture<ReportIntegrationTestFixture>
 {
     private readonly ReportIntegrationTestFixture _fixture;
