@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Domain.Enums;
@@ -275,7 +275,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             Name, reportSchedule.Id);
 
                         value.PatientIds =
-                            await GetPatientList(facilityId, startDate.Value, endDate.Value);
+                            await GetPatientList(facilityId, startDate.Value, endDate.Value, cancellationToken);
                     }
 
                     var patientIds = value.PatientIds.Distinct().ToList();
@@ -312,34 +312,65 @@ namespace LantanaGroup.Link.Report.Listeners
 
                 if (value.Regenerate)
                 {
+                    // Fire-and-forget Produce + delivery handler preserves per-message error
+                    // visibility without serializing a broker round-trip per patient (which
+                    // is what awaited ProduceAsync did and what pushed 5000+ patient batches
+                    // toward the Kafka consumer poll timeout).
+                    var deliveryFailures = new System.Collections.Concurrent.ConcurrentBag<(string PatientId, Error Error)>();
+
                     foreach (var entry in newEntries)
                     {
+                        var capturedPatientId = entry.PatientId;
                         try
                         {
-                            await _evaluationProducer.ProduceAsync(nameof(KafkaTopic.EvaluationRequested), new Message<string, EvaluationRequestedValue>
-                            {
-                                Key = facilityId,
-                                Value = new EvaluationRequestedValue
+                            _evaluationProducer.Produce(nameof(KafkaTopic.EvaluationRequested),
+                                new Message<string, EvaluationRequestedValue>
                                 {
-                                    PreviousReportId = value.ReportId?.ToString(),
-                                    PatientId = entry.PatientId,
-                                    ReportTrackingId = reportSchedule.Id.ToString(),
+                                    Key = facilityId,
+                                    Value = new EvaluationRequestedValue
+                                    {
+                                        PreviousReportId = value.ReportId?.ToString(),
+                                        PatientId = entry.PatientId,
+                                        ReportTrackingId = reportSchedule.Id.ToString(),
+                                    },
+                                    Headers = new Headers
+                                        {
+                                            { KafkaConstants.HeaderConstants.CorrelationId, Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
+                                        }
                                 },
-                                Headers = new Headers
-                                            {
-                                                { "X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
-                                            }
-                            });
+                                deliveryReport =>
+                                {
+                                    if (deliveryReport.Error.IsError)
+                                    {
+                                        deliveryFailures.Add((capturedPatientId, deliveryReport.Error));
+                                    }
+                                });
                         }
                         catch (ProduceException<string, EvaluationRequestedValue> ex)
                         {
-                            _exceptionLogger.Handle(ex, "An error was encountered generating an Evaluation Requested event", LogLevel.Error, facilityId, new { ReportTrackingId = reportSchedule.Id });
+                            _exceptionLogger.Handle(ex, "An error was encountered generating an Evaluation Requested event", LogLevel.Error, facilityId, new { ReportTrackingId = reportSchedule.Id, entry.PatientId });
                         }
+                    }
+
+                    // Flush uses the caller's CancellationToken so we never block longer
+                    // than the surrounding consume pipeline allows (shutdown / poll timeout).
+                    _evaluationProducer.Flush(cancellationToken);
+
+                    foreach (var failure in deliveryFailures)
+                    {
+                        _exceptionLogger.Handle(
+                            new ProduceException<string, EvaluationRequestedValue>(
+                                failure.Error,
+                                new DeliveryResult<string, EvaluationRequestedValue> { Topic = nameof(KafkaTopic.EvaluationRequested) }),
+                            "Asynchronous delivery of Evaluation Requested event failed",
+                            LogLevel.Error,
+                            facilityId,
+                            new { ReportTrackingId = reportSchedule.Id, PatientId = failure.PatientId });
                     }
                 }
                 else
                 {
-                    await _dataAcqProducer.Produce(reportSchedule, newEntries.Select(e => e.PatientId).ToList());
+                    await _dataAcqProducer.Produce(reportSchedule, newEntries.Select(e => e.PatientId).ToList(), cancellationToken);
                 }
             }
             catch (DeadLetterException ex)
@@ -362,7 +393,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
         }
 
-        private async Task<List<string>> GetPatientList(string facilityId, DateTime startDate, DateTime enddate)
+        private async Task<List<string>> GetPatientList(string facilityId, DateTime startDate, DateTime enddate, CancellationToken cancellationToken = default)
         {
             string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
             var httpClient = _httpClientFactory.CreateClient();
@@ -378,9 +409,12 @@ namespace LantanaGroup.Link.Report.Listeners
                 httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
-            var censusResponse = await httpClient.GetAsync(censusRequestUrl, cts.Token);
-            var censusContent = await censusResponse.Content.ReadAsStringAsync(cts.Token);
+            // Link the caller's token with the 120s per-request timeout so either signal
+            // (consumer shutdown / poll timeout OR request timeout) aborts the HTTP call.
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            var censusResponse = await httpClient.GetAsync(censusRequestUrl, linkedCts.Token);
+            var censusContent = await censusResponse.Content.ReadAsStringAsync(linkedCts.Token);
 
             if (!censusResponse.IsSuccessStatusCode)
                 throw new TransientException("Response from Census service is not successful: " + censusContent);

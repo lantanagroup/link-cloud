@@ -74,7 +74,7 @@ namespace LantanaGroup.Link.Report.Jobs
                 _logger.LogInformation("Executing EndOfReportPeriodJob for ScheduleId {ScheduleId}", schedule.Id);
 
                 // Mark the end-of-period flag BEFORE attempting to produce the manifest.
-                // ReportManifestProducer.Produce gates on EndOfReportPeriodJobHasRun — if
+                // ReportManifestProducer.Produce gates on EndOfReportPeriodJobHasRun â€” if
                 // all patient entries already reached a terminal state (e.g., discharge
                 // processing completed before the period ended), the flag must be true
                 // for the manifest to be generated on this call.
@@ -95,7 +95,7 @@ namespace LantanaGroup.Link.Report.Jobs
                     {
                         try
                         {
-                            await _dataAcqProducer.Produce(schedule);
+                            await _dataAcqProducer.Produce(schedule, cancellationToken: context.CancellationToken);
                         }
                         catch (ProduceException<string, DataAcquisitionRequestedValue> ex)
                         {
