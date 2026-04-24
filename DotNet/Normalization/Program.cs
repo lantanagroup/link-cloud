@@ -103,9 +103,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, string>, KafkaProducerFactory<ResourceKey, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourcesAcquiredValue>, KafkaProducerFactory<ResourceKey, ResourcesAcquiredValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourcesNormalizedMessage>, KafkaProducerFactory<ResourceKey, ResourcesNormalizedMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourcesNormalizedValue>, KafkaProducerFactory<ResourceKey, ResourcesNormalizedValue>>();
 
-    builder.Services.RegisterKafkaProducer<ResourceKey, ResourcesNormalizedMessage>(
+    builder.Services.RegisterKafkaProducer<ResourceKey, ResourcesNormalizedValue>(
         builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
         new ProducerConfig() { CompressionType = CompressionType.Zstd });
     builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection: builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(), new ProducerConfig());

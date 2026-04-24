@@ -1,8 +1,10 @@
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using StackExchange.Redis;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -18,6 +20,14 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Cache
         public RedisResourceCache(IConnectionMultiplexer redis)
         {
             _db = redis.GetDatabase();
+        }
+
+        public void Delete(List<string> cacheKeys)
+        {
+            foreach (var cacheKey in cacheKeys)
+            {
+                _db.KeyDelete(cacheKey);
+            }
         }
 
         public List<DomainResource> Get(string cacheKey)
@@ -58,9 +68,25 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Cache
             }
         }
 
-        public void UpdateResourcesByType(List<DomainResource> resources)
+        public void AddToCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType, out string destination)
         {
-            throw new NotImplementedException();
+            List<HashEntry> correlationHash = new List<HashEntry>();
+
+            foreach (var resource in resources)
+            {
+                correlationHash.Add(new HashEntry(resource.TypeName + "/" + resource.Id, resource.ToJson()));
+            }
+
+            _db.HashSet(correlationId, correlationHash.ToArray());
+
+            destination = correlationId;
+        }
+
+        public void CopyResourcesToCorrelationCache(string sourceCache, string destinationCache)
+        {
+            var hashEntries = _db.HashGetAll(sourceCache);
+
+            _db.HashSet(destinationCache, hashEntries);
         }
     }
 }

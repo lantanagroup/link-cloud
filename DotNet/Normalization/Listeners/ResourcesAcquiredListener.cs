@@ -34,7 +34,7 @@ public class ResourcesAcquiredListener : BackgroundService
 {
     private readonly ILogger<ResourcesAcquiredListener> _logger;
     private readonly IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue> _consumerFactory;
-    private readonly IProducer<ResourceKey, ResourcesNormalizedMessage> _producer;
+    private readonly IProducer<ResourceKey, ResourcesNormalizedValue> _producer;
     private readonly IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string> _consumeExceptionHandler;
     private readonly IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> _deadLetterExceptionHandler;
     private readonly ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> _transientExceptionHandler;
@@ -58,7 +58,7 @@ public class ResourcesAcquiredListener : BackgroundService
         IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> deadLetterExceptionHandler,
         ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> transientExceptionHandler,
         INormalizationServiceMetrics metrics,
-        IProducer<ResourceKey, ResourcesNormalizedMessage> producer,
+        IProducer<ResourceKey, ResourcesNormalizedValue> producer,
         CopyPropertyOperationService copyPropertyOperationService,
         CodeMapOperationService codeMapOperationService,
         ConditionalTransformOperationService conditionalTransformOperationService,
@@ -158,7 +158,6 @@ public class ResourcesAcquiredListener : BackgroundService
 
                             foreach (var cacheKey in message.Message.Value.CacheKeys)
                             {
-                                //ResourceType resourceType = resourceCache.GetResourceTypeByEventKey(cacheKey);
                                 ResourceType resourceType = GetResourceTypeByEventKey(cacheKey, message.Message.Value.CacheType);
 
                                 var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
@@ -170,12 +169,11 @@ public class ResourcesAcquiredListener : BackgroundService
                                 });
 
                                 if (sequences == null || sequences.Count == 0) {
+                                    _redisCache.CopyResourcesToCorrelationCache(cacheKey, correlationId);
                                     continue;
                                 }
 
                                 List<DomainResource> resources = _redisCache.Get(cacheKey);
-                                //List <DomainResource> resources = _redisCache.Get<List<DomainResource>>(cacheKey);
-
 
                                 foreach (var resource in resources) {
                                     sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
@@ -217,28 +215,12 @@ public class ResourcesAcquiredListener : BackgroundService
                                     }
                                 }
 
-                               
-                                
-                                //try
-                                //{
-                                //    resource = DeserializeResource(message.Message.Value.Resource);
-                                //}
-                                //catch (Exception ex)
-                                //{
-                                //    if (ex is JsonException || ex is NotSupportedException)
-                                //    {
-                                //        throw new TransientException("Failed to deserialize resource.", ex);
-                                //    }
-
-                                //    throw new DeadLetterException("Failed to deserialize resource.", ex);
-                                //}
-
-                                
-                                
+                                _redisCache.AddToCorrelationCache(correlationId, resources, resourceType, out string destination);
                             }
                                 
-                            await ProduceResourcesNormalizedMessage(message, message.Message.Key.FacilityId, correlationId);
-                            
+                            await ProduceResourcesNormalizedMessage(message, message.Message.Key.FacilityId, correlationId, "");
+
+                            _redisCache.Delete(message.Message.Value.CacheKeys);
                         }
                     }
                     catch (DeadLetterException ex)
@@ -304,22 +286,22 @@ public class ResourcesAcquiredListener : BackgroundService
     }
 
 
-    private async Task ProduceResourcesNormalizedMessage(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, string facilityId, string correlationId)
+    private async Task ProduceResourcesNormalizedMessage(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, string facilityId, string correlationId, string cacheKey)
     {
         var headers = new Headers
         {
             new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
         };
 
-        var resourceNormalizedMessage = new ResourcesNormalizedMessage
+        var resourceNormalizedMessage = new ResourcesNormalizedValue
         {
             QueryType = message.Message.Value.QueryType,
             ScheduledReports = message.Message.Value.ScheduledReports,
             ReportableEvent = message.Message.Value.ReportableEvent,
             CacheType = message.Message.Value.CacheType,
-            CacheKeys = message.Message.Value.CacheKeys
+            CacheKey = cacheKey
         };
-        Message<ResourceKey, ResourcesNormalizedMessage> produceMessage = new Message<ResourceKey, ResourcesNormalizedMessage>
+        Message<ResourceKey, ResourcesNormalizedValue> produceMessage = new Message<ResourceKey, ResourcesNormalizedValue>
         {
             Key = message.Message.Key,
             Headers = headers,
@@ -330,7 +312,7 @@ public class ResourcesAcquiredListener : BackgroundService
         {
             await _producer.ProduceAsync(KafkaTopic.ResourcesNormalized.ToString(), produceMessage);
         }
-        catch (ProduceException<ResourceKey, ResourcesNormalizedMessage> ex)
+        catch (ProduceException<ResourceKey, ResourcesNormalizedValue> ex)
         {
             _logger.LogError(ex, "Failed to produce ResourcesNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, ResourceAcquired Partition: {Partition}, ResourceAcquired Offset: {Offset}", facilityId, correlationId, message.Partition.Value, message.Offset.Value);
             throw new TransientException($"Failed to produce ResourcesNormalized message: {ex.Message}", ex);
