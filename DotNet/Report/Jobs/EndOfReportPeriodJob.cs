@@ -95,9 +95,6 @@ namespace LantanaGroup.Link.Report.Jobs
                     {
                         try
                         {
-                            // Flow the Quartz job's cancellation token so the producer's
-                            // final Flush honors scheduler shutdown / job interrupt and
-                            // never blocks the worker thread past the job's lifecycle.
                             await _dataAcqProducer.Produce(schedule, cancellationToken: context.CancellationToken);
                         }
                         catch (ProduceException<string, DataAcquisitionRequestedValue> ex)
