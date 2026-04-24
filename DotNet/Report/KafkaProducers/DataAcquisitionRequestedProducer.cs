@@ -60,6 +60,12 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             foreach (string patientId in patientsToEvaluate)
             {
+                // IProducer<K,V>.Produce is fire-and-forget and has no CancellationToken
+                // overload (only ProduceAsync does, which is what we're deliberately
+                // avoiding for throughput). Honor cancellation cooperatively between
+                // iterations so large batches still abort promptly on shutdown.
+                cancellationToken.ThrowIfCancellationRequested();
+
                 // Generate the trace and span ID first
                 string traceId = ActivityTraceId.CreateRandom().ToHexString();
                 string spanId = ActivitySpanId.CreateRandom().ToHexString();

@@ -275,7 +275,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             Name, reportSchedule.Id);
 
                         value.PatientIds =
-                            await GetPatientList(facilityId, startDate.Value, endDate.Value);
+                            await GetPatientList(facilityId, startDate.Value, endDate.Value, cancellationToken);
                     }
 
                     var patientIds = value.PatientIds.Distinct().ToList();
@@ -335,7 +335,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     },
                                     Headers = new Headers
                                         {
-                                            { "X-Correlation-Id", Encoding.ASCII.GetBytes(Guid.NewGuid().ToString()) }
+                                            { KafkaConstants.HeaderConstants.CorrelationId, Encoding.UTF8.GetBytes(Guid.NewGuid().ToString()) }
                                         }
                                 },
                                 deliveryReport =>
@@ -393,7 +393,7 @@ namespace LantanaGroup.Link.Report.Listeners
             }
         }
 
-        private async Task<List<string>> GetPatientList(string facilityId, DateTime startDate, DateTime enddate)
+        private async Task<List<string>> GetPatientList(string facilityId, DateTime startDate, DateTime enddate, CancellationToken cancellationToken = default)
         {
             string dtFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
             var httpClient = _httpClientFactory.CreateClient();
@@ -409,9 +409,12 @@ namespace LantanaGroup.Link.Report.Listeners
                 httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
             }
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
-            var censusResponse = await httpClient.GetAsync(censusRequestUrl, cts.Token);
-            var censusContent = await censusResponse.Content.ReadAsStringAsync(cts.Token);
+            // Link the caller's token with the 120s per-request timeout so either signal
+            // (consumer shutdown / poll timeout OR request timeout) aborts the HTTP call.
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+            var censusResponse = await httpClient.GetAsync(censusRequestUrl, linkedCts.Token);
+            var censusContent = await censusResponse.Content.ReadAsStringAsync(linkedCts.Token);
 
             if (!censusResponse.IsSuccessStatusCode)
                 throw new TransientException("Response from Census service is not successful: " + censusContent);

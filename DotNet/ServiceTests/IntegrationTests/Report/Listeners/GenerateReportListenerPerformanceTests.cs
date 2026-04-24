@@ -104,9 +104,9 @@ public class GenerateReportListenerPerformanceTests
 
         Assert.Equal(PatientCount, produceCallCount);
 
-        // Core optimization: Flush must NOT be invoked per-patient. A small constant
-        // number of flushes (ideally 1) is required for this batch.
-        Assert.InRange(flushCallCount, 1, 5);
+        // Core optimization: ProcessMessageAsync must Flush the producer exactly once
+        // per invocation (never once-per-patient, which was the original bottleneck).
+        Assert.Equal(1, flushCallCount);
     }
 
     [Fact]
@@ -207,9 +207,9 @@ public class GenerateReportListenerPerformanceTests
         Assert.Equal(PatientCount, newEntries.Count);
 
         // Regenerate path must use fire-and-forget Produce rather than awaited
-        // ProduceAsync, and must Flush a small number of times (not once per patient).
+        // ProduceAsync, and must Flush exactly once per invocation (never per-patient).
         Assert.Equal(PatientCount, produceCallCount);
         Assert.Equal(0, produceAsyncCallCount);
-        Assert.InRange(flushCallCount, 1, 5);
+        Assert.Equal(1, flushCallCount);
     }
 }
