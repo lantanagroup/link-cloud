@@ -24,11 +24,20 @@ public sealed class AutomationRunDocument
     public string? Error { get; set; }
 
     // Store DateTimeOffset values as native BSON ISODate (UTC) so server-side range
-    // queries and indexes work. The default driver representation is a two-element
-    // array [ticks, offsetMinutes], which is not indexable and causes $gte/$lte to
-    // fall into Mongo's per-element array match semantics (silently dropping docs).
-    // The driver's DateTimeOffsetSerializer tolerates reading legacy array-form
-    // documents, so this change is backward-compatible with existing data.
+    // queries and indexes work. The driver's default representation is a two-element
+    // array [ticks, offsetMinutes], which is not indexable and makes $gte/$lte fall
+    // into Mongo's per-element array match semantics (silently dropping docs).
+    //
+    // Compatibility notes:
+    //   - Reads: the driver's DateTimeOffsetSerializer is polymorphic on the read path
+    //     (handles Array, DateTime, Document, and String representations), so legacy
+    //     array-form documents still deserialize correctly.
+    //   - Writes: all new writes use ISODate because of the attribute below.
+    //   - Range queries: NOT transparently compatible. BSON canonical type order
+    //     places every Array value below every Date value, so a $gte against an
+    //     ISODate excludes legacy array-form docs entirely. A one-time startup
+    //     migration in MongoIndexManager.MigrateLegacyRunDateFields rewrites any
+    //     pre-existing documents so the 14-day dashboard query sees them again.
     [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset CreatedAt { get; set; }
     public bool IsActive { get; set; } = true;
