@@ -3,6 +3,10 @@
     ViewData["Title"] = "Automation Runs";
 
     var stats = Model.Stats;
+    var sortedScenarios = Model.SavedScenarios
+        .OrderBy(s => s.IsSystemScenario ? 1 : 0)
+        .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+        .ToList();
     var avgDuration = stats.AvgDurationSeconds > 0
         ? TimeSpan.FromSeconds(stats.AvgDurationSeconds).ToString(@"mm\:ss")
         : "—";
@@ -103,7 +107,7 @@
                     <label class="form-label fw-bold" for="quickLaunchSelect">Select a saved scenario to run</label>
                     <select class="form-select" id="quickLaunchSelect">
                         <option value="">-- Select a scenario --</option>
-                        @foreach (var s in Model.SavedScenarios)
+                        @foreach (var s in sortedScenarios)
                         {
                             var suffix = s.IsSystemScenario ? " [System]" : "";
                             <option value="@s.Id">@s.Name@suffix</option>
@@ -476,9 +480,28 @@
             headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': antiforgeryToken() },
             body: JSON.stringify({ id: runId })
         })
-        .then(function (r) { return r.json(); })
-        .then(function () { refreshDashboard(); })
-        .catch(function () { btn.disabled = false; btn.innerHTML = '<i class="bi bi-x-circle"></i>'; alert('Unable to cancel.'); });
+        .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+        .then(function (res) {
+            // Honor the server's success flag. Previously this branch called
+            // refreshDashboard() regardless, so a {success:false} response (e.g.
+            // when the run existed only in Mongo with no in-memory state to
+            // cancel) looked like "nothing happened" to the user.
+            if (res.ok && res.body && res.body.success) {
+                refreshDashboard();
+                return;
+            }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-x-circle"></i>';
+            var reason = (res.body && res.body.error)
+                ? res.body.error
+                : 'The server could not cancel this run. It may have already finished or been cancelled elsewhere.';
+            alert('Unable to cancel: ' + reason);
+        })
+        .catch(function () {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-x-circle"></i>';
+            alert('Unable to cancel.');
+        });
     });
 
     // --- AJAX Delete ---
@@ -523,16 +546,56 @@
         var label = detail.name || 'Scenario';
         var opt = sel.querySelector('option[value="' + detail.id + '"]');
         if (opt) {
-            opt.textContent = label;
+            // Preserve the existing " [System]" suffix (if any) across rename so an
+            // edited system scenario doesn't get demoted into the custom group on
+            // re-sort below. User-created scenarios have no suffix on either branch.
+            var wasSystem = /\s\[System\]$/.test(opt.textContent || '');
+            opt.textContent = label + (wasSystem ? ' [System]' : '');
         } else {
             opt = document.createElement('option');
             opt.value = detail.id;
+            // New scenarios created through this editor are always custom; system
+            // scenarios are read-only and only the seeded set can exist.
             opt.textContent = label;
             sel.appendChild(opt);
         }
+        sortScenarioOptions(sel);
         sel.value = detail.id;
         sel.dispatchEvent(new Event('change'));
     });
+
+    // Re-orders <option>s inside the Quick Launch selector to match the server-side
+    // ordering in RunsController.Index / Views/Runs/Index.cshtml:
+    //   1. The "-- Select a scenario --" placeholder stays pinned at index 0.
+    //   2. Custom scenarios (no " [System]" suffix) come next, alphabetically.
+    //   3. System scenarios come last, alphabetically.
+    // Sorting is case-insensitive so "zNick" / "ZNick" / "znick" cluster together.
+    function sortScenarioOptions(sel) {
+        if (!sel) return;
+        var placeholder = null;
+        var items = [];
+        for (var i = 0; i < sel.options.length; i++) {
+            var o = sel.options[i];
+            // The placeholder is the only option with an empty value.
+            if (placeholder === null && !o.value) {
+                placeholder = o;
+                continue;
+            }
+            items.push(o);
+        }
+
+        items.sort(function (a, b) {
+            var aSys = /\s\[System\]$/.test(a.textContent || '') ? 1 : 0;
+            var bSys = /\s\[System\]$/.test(b.textContent || '') ? 1 : 0;
+            if (aSys !== bSys) return aSys - bSys;
+            return (a.textContent || '').localeCompare((b.textContent || ''), undefined, { sensitivity: 'base' });
+        });
+
+        // Re-append in sorted order. appendChild on an already-parented node moves it,
+        // so we don't need to remove first.
+        if (placeholder) sel.appendChild(placeholder);
+        items.forEach(function (o) { sel.appendChild(o); });
+    }
 })();
 </script>
 

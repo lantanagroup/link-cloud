@@ -227,6 +227,47 @@ public class MongoSnapshotStoreDashboardTests : IAsyncLifetime
         results.Select(r => r.RunId).Should().Contain(new[] { modern.RunId, legacyA, legacyB });
     }
 
+    [Fact]
+    public async Task Migration_must_not_mutate_non_date_fields_on_legacy_documents()
+    {
+        // Regression guard for a subtle bug: if the migration round-trips through the
+        // typed class map, the POCO's defaults silently overwrite fields like Status,
+        // Scenario, and RunName on the way back out. That caused the dashboard to
+        // bucket migrated rows as Queued/"Other" and bump the Active counter
+        // incorrectly. The migration must touch ONLY the four date fields.
+        var runId = Guid.NewGuid();
+        await SeedLegacyArrayFormRunAsync(runId, DateTimeOffset.UtcNow.AddDays(-2));
+
+        // Capture every non-date field value before migration so we can compare byte
+        // for byte afterwards.
+        var before = await _fixture.RawRunsCollection
+            .Find(Builders<BsonDocument>.Filter.Eq("_id", runId.ToString()))
+            .FirstAsync();
+
+        var dateFields = new HashSet<string> { "CreatedAt", "StartedAt", "FinishedAt", "CompletedAt" };
+        var nonDateFieldsBefore = before.Elements
+            .Where(e => !dateFields.Contains(e.Name))
+            .ToDictionary(e => e.Name, e => e.Value.DeepClone());
+
+        _fixture.CreateIndexManager().EnsureAllIndexes();
+
+        var after = await _fixture.RawRunsCollection
+            .Find(Builders<BsonDocument>.Filter.Eq("_id", runId.ToString()))
+            .FirstAsync();
+
+        foreach (var kvp in nonDateFieldsBefore)
+        {
+            after.Contains(kvp.Key).Should().BeTrue($"field {kvp.Key} must survive migration");
+            after[kvp.Key].Should().Be(kvp.Value, $"field {kvp.Key} must not be mutated by migration");
+        }
+
+        // And the enum-string status specifically must still parse back into the
+        // correct AutomationRunStatus when the store reads it (this is what the
+        // dashboard's status-breakdown pie chart binds to).
+        var summary = await _fixture.CreateStore().GetRunSummaryAsync(runId);
+        summary!.Status.Should().Be(AutomationRunStatus.Succeeded);
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     //  Helpers
     // ─────────────────────────────────────────────────────────────────────

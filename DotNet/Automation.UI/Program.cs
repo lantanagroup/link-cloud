@@ -126,6 +126,12 @@ builder.Services.AddScoped<PipelineDataReader>();
 builder.Services.AddHostedService<ScenarioSeedService>();
 builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
 
+// -- TEMPORARY: seed synthetic runs for dashboard verification.
+//    Gated on config (Dashboard:SeedFakeRuns). Remove along with the service
+//    once the dashboard work is verified. See DashboardSeedService for the
+//    full removal checklist.
+builder.Services.AddHostedService<DashboardSeedService>();
+
 // -- MVC + SignalR --
 builder.Services.AddControllersWithViews()
     .AddJsonOptions(opts =>

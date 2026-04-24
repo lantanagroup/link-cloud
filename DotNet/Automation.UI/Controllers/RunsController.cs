@@ -18,7 +18,10 @@ public class RunsController(
     {
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
         var recentPage = await runManager.GetRunsPageAsync(1, 10, cancellationToken);
-        var scenarios = await scenarioStore.GetAllAsync(cancellationToken);
+        var scenarios = (await scenarioStore.GetAllAsync(cancellationToken))
+            .OrderBy(s => s.IsSystemScenario)
+            .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         var activeRuns = recentPage.Runs
             .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
