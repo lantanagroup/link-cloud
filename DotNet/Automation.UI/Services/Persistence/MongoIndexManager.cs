@@ -27,7 +27,7 @@ public sealed class MongoIndexManager
 
     /// <summary>
     /// Ensures all indexes required by the Automation.UI stores exist.
-    /// Safe to call on every startup � idempotent.
+    /// Safe to call on every startup — idempotent.
     /// </summary>
     public void EnsureAllIndexes()
     {
@@ -35,6 +35,102 @@ public sealed class MongoIndexManager
         EnsureSnapshotIndexes();
         EnsureScenarioIndexes();
         EnsureQueryPlanTemplateIndexes();
+        MigrateLegacyRunDateFields();
+    }
+
+    // —— Data migrations ——————————————————————————————————————————————
+
+    /// <summary>
+    /// Rewrites any automation_runs documents whose DateTimeOffset fields were persisted
+    /// by the driver's default array-form serializer ([ticks, offsetMinutes]) into the
+    /// current ISODate representation.
+    ///
+    /// Why this is necessary: BSON canonical type order places every Array value below
+    /// every Date value, so server-side $gte filters on CreatedAt (used by the rolling
+    /// 14-day dashboard query) would silently exclude legacy documents until they are
+    /// next upserted. Rewriting them once at startup restores visibility and lets the
+    /// idx_createdAt_desc index service the range scan.
+    ///
+    /// Idempotent: after the first successful run, the $type:"array" filter matches
+    /// nothing and the method is a no-op.
+    /// </summary>
+    private void MigrateLegacyRunDateFields()
+    {
+        var typed = _database.GetCollection<AutomationRunDocument>("automation_runs");
+        var raw = _database.GetCollection<BsonDocument>("automation_runs");
+
+        // Match any run doc where at least one of the date fields is still an array.
+        // $type with "array" is a BSON type alias supported by both Mongo and Cosmos.
+        var legacyFilter = new BsonDocument
+        {
+            { "$or", new BsonArray
+                {
+                    new BsonDocument("CreatedAt",   new BsonDocument("$type", "array")),
+                    new BsonDocument("StartedAt",   new BsonDocument("$type", "array")),
+                    new BsonDocument("FinishedAt",  new BsonDocument("$type", "array")),
+                    new BsonDocument("CompletedAt", new BsonDocument("$type", "array"))
+                }
+            }
+        };
+
+        int scanned = 0, rewritten = 0;
+
+        try
+        {
+            // Use the raw collection to enumerate _id only; then reload each via the
+            // typed collection so the driver's DateTimeOffsetSerializer performs the
+            // legacy array -> DateTimeOffset conversion on the read path. Writing the
+            // typed document back via ReplaceOne serializes every date field using the
+            // now-configured BsonType.DateTime representation.
+            var idProjection = Builders<BsonDocument>.Projection.Include("_id");
+            using var cursor = raw.Find(legacyFilter).Project(idProjection).ToCursor();
+
+            while (cursor.MoveNext())
+            {
+                foreach (var idDoc in cursor.Current)
+                {
+                    scanned++;
+
+                    if (!idDoc.TryGetValue("_id", out var idValue))
+                        continue;
+
+                    var idFilter = new BsonDocument("_id", idValue);
+
+                    try
+                    {
+                        var doc = typed.Find(idFilter).FirstOrDefault();
+                        if (doc == null)
+                            continue;
+
+                        typed.ReplaceOne(idFilter, doc);
+                        rewritten++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex,
+                            "Failed to migrate legacy date fields for automation_runs document {Id}. " +
+                            "The document will remain in array form and be invisible to dashboard range queries until re-upserted.",
+                            idValue);
+                    }
+                }
+            }
+
+            if (rewritten > 0)
+            {
+                _logger.LogInformation(
+                    "Migrated {Rewritten}/{Scanned} automation_runs document(s) from legacy array-form DateTimeOffset to ISODate representation.",
+                    rewritten, scanned);
+            }
+            else
+            {
+                _logger.LogDebug("No automation_runs documents required date-field migration.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "automation_runs legacy date-field migration scan failed. Existing legacy documents may remain hidden from dashboard range queries.");
+        }
     }
 
     // ?? automation_runs ??????????????????????????????????????????????
@@ -89,7 +185,7 @@ public sealed class MongoIndexManager
         {
             if (HasIndexWithKeys(collection, keys))
             {
-                _logger.LogDebug("Index {IndexName} already exists on {Collection} � skipping.", name, collection.CollectionNamespace.CollectionName);
+                _logger.LogDebug("Index {IndexName} already exists on {Collection} — skipping.", name, collection.CollectionNamespace.CollectionName);
                 return;
             }
 

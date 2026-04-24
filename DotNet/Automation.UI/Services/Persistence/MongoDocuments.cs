@@ -23,10 +23,20 @@ public sealed class AutomationRunDocument
     public string Status { get; set; } = string.Empty;
     public string? Error { get; set; }
 
+    // Store DateTimeOffset values as native BSON ISODate (UTC) so server-side range
+    // queries and indexes work. The default driver representation is a two-element
+    // array [ticks, offsetMinutes], which is not indexable and causes $gte/$lte to
+    // fall into Mongo's per-element array match semantics (silently dropping docs).
+    // The driver's DateTimeOffsetSerializer tolerates reading legacy array-form
+    // documents, so this change is backward-compatible with existing data.
+    [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset CreatedAt { get; set; }
     public bool IsActive { get; set; } = true;
+    [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset StartedAt { get; set; }
+    [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset? FinishedAt { get; set; }
+    [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset? CompletedAt { get; set; }
     /// <summary>Human-readable pipeline duration (report created ? submitted). Populated at run completion.</summary>
     public string? Duration { get; set; }
