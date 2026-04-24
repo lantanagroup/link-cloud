@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 
 namespace LantanaGroup.Link.Normalization.Application.Models.Cache
 {
-    internal interface IResourceCache
+    public interface IResourceCache
     {
         ResourceType GetResourceTypeByEventKey(string cacheKey);
-        List<DomainResource> GetResourcesByType(ResourceType type);
+        List<DomainResource> Get(string cacheKey);
         void UpdateResourcesByType(List<DomainResource> resources);
     }
 }

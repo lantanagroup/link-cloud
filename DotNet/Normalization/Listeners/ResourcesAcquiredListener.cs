@@ -26,6 +26,7 @@ using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.Shared.Application.Enums;
 using StackExchange.Redis;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
@@ -46,6 +47,7 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly CodeMapOperationService _codeMapOperationService;
     private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
     private readonly CopyLocationOperationService _copyLocationOperationService;
+    private readonly IResourceCache _redisCache;
 
     public ResourcesAcquiredListener(
         ILogger<ResourcesAcquiredListener> logger,
@@ -60,7 +62,8 @@ public class ResourcesAcquiredListener : BackgroundService
         CopyPropertyOperationService copyPropertyOperationService,
         CodeMapOperationService codeMapOperationService,
         ConditionalTransformOperationService conditionalTransformOperationService,
-        CopyLocationOperationService copyLocationOperationService)
+        CopyLocationOperationService copyLocationOperationService, 
+        IResourceCache redisCache)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -84,6 +87,7 @@ public class ResourcesAcquiredListener : BackgroundService
         _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
         _conditionalTransformOperationService = conditionalTransformOperationService ?? throw new ArgumentNullException(nameof(conditionalTransformOperationService));
         _copyLocationOperationService = copyLocationOperationService ?? throw new ArgumentNullException(nameof(copyLocationOperationService));
+        _redisCache = redisCache ?? throw new ArgumentNullException(nameof(redisCache));
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -141,19 +145,21 @@ public class ResourcesAcquiredListener : BackgroundService
 
                         using (var scope = _scopeFactory.CreateScope())
                         {
-                            IResourceCache resourceCache;
+                            //IResourceCache resourceCache;
 
-                            //TODO: Daniel - Can we inject these classes?
-                            switch (message.Message.Value.CacheType) {
-                                case ResourceCacheType.ABS: resourceCache = new RedisResourceCache();  break; //TODO: Daniel - Implement ABS class
-                                case ResourceCacheType.Redis: resourceCache = new RedisResourceCache(); break;
-                                default: 
-                                    throw new DeadLetterException($"Cache Type '{message.Message.Value.CacheType.ToString()}' not supported");
-                            }
+                            ////TODO: Daniel - Can we inject these classes?
+                            //switch (message.Message.Value.CacheType)
+                            //{
+                            //    case ResourceCacheType.ABS: resourceCache = _redisResourceCache; break; //TODO: Daniel - Implement ABS class
+                            //    case ResourceCacheType.Redis: resourceCache = _redisResourceCache; break;
+                            //    default:
+                            //        throw new DeadLetterException($"Cache Type '{message.Message.Value.CacheType.ToString()}' not supported");
+                            //}
 
                             foreach (var cacheKey in message.Message.Value.CacheKeys)
                             {
-                                ResourceType resourceType = resourceCache.GetResourceTypeByEventKey(cacheKey);
+                                //ResourceType resourceType = resourceCache.GetResourceTypeByEventKey(cacheKey);
+                                ResourceType resourceType = GetResourceTypeByEventKey(cacheKey, message.Message.Value.CacheType);
 
                                 var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
 
@@ -167,7 +173,9 @@ public class ResourcesAcquiredListener : BackgroundService
                                     continue;
                                 }
 
-                                List<DomainResource> resources = resourceCache.GetResourcesByType(resourceType);
+                                List<DomainResource> resources = _redisCache.Get(cacheKey);
+                                //List <DomainResource> resources = _redisCache.Get<List<DomainResource>>(cacheKey);
+
 
                                 foreach (var resource in resources) {
                                     sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
@@ -320,7 +328,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
         try
         {
-            await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+            await _producer.ProduceAsync(KafkaTopic.ResourcesNormalized.ToString(), produceMessage);
         }
         catch (ProduceException<ResourceKey, ResourcesNormalizedMessage> ex)
         {
@@ -363,6 +371,31 @@ public class ResourcesAcquiredListener : BackgroundService
             default:
                 throw new DeserializationUnsupportedTypeException();
         }
+    }
+
+    private ResourceType GetResourceTypeByEventKey(string cacheKey, ResourceCacheType cacheType)
+    {
+        if (cacheType == ResourceCacheType.Redis)
+        {
+            string[] splitKey = cacheKey.Split(":");
+
+            if (splitKey.Length != 2)
+            {
+                throw new Exception($"Cache key '{cacheKey}' does not contain required ':' divider. Expected format is <correlation id>:<resource type>");
+            }
+
+            if (Enum.TryParse<ResourceType>(splitKey[1], out var resourceType))
+            {
+                return resourceType;
+            }
+            else
+            {
+                throw new Exception($"Could not parse the Redis cache key '{cacheKey}' into a valid FHIR Resource Type");
+            }
+        }
+
+        //TODO: Daniel - Add ABS
+        return ResourceType.Encounter;
     }
 
 }

@@ -22,12 +22,7 @@ public enum KafkaTopic
     DataAcquisitionRequested,
     [StringValue("DataAcquisitionRequested-Retry")]
     DataAcquisitionRequestedRetry,
-    DataAcquisitionFailed,
-    PatientDataEvaluated,
-    PatientNormalized,
-    ResourceNormalized,
-    PatientDischarged,
-    PatientDataAcquired,
+    ResourcesNormalized,
     ReadyToAcquire,
     [StringValue("ReadyToAcquire-Retry")]
     ReadyToAcquireRetry,
@@ -36,7 +31,6 @@ public enum KafkaTopic
     ReportRequestRejected,
     ReportScheduled,
     RetentionCheckScheduled,
-    PatientResourcesNormalized,
     MeasureChanged,
     MeasureEvalFailed,
     FHIRValidationFailed,

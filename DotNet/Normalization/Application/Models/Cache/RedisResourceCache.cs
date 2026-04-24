@@ -1,18 +1,42 @@
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.SerDes;
+using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace LantanaGroup.Link.Normalization.Application.Models.Cache
 {
     public class RedisResourceCache : IResourceCache
     {
-        public List<DomainResource> GetResourcesByType(ResourceType type)
+        private readonly IDatabase _db;
+
+        public RedisResourceCache(IConnectionMultiplexer redis)
         {
-            throw new NotImplementedException();
+            _db = redis.GetDatabase();
+        }
+
+        public List<DomainResource> Get(string cacheKey)
+        {
+            var hashEntries = _db.HashGetAll(cacheKey);
+
+            if (hashEntries == null || hashEntries.Length == 0) {
+                return new List<DomainResource>();
+            }
+
+            List<DomainResource> resources = new List<DomainResource>();
+
+            foreach (var entry in hashEntries) {
+                //TODO: Daniel - Add Null check or something
+                DomainResource resource = JsonSerializer.Deserialize<DomainResource>(entry.Value, LinkFhirSerializerOptions.ForFhirLenientSerialization);
+                resources.Add(resource);
+            }
+
+            return resources;
         }
 
         public ResourceType GetResourceTypeByEventKey(string cacheKey)
