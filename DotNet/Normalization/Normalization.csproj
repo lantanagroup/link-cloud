@@ -38,6 +38,7 @@
 	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
 		<PackageReference Include="Azure.Identity" Version="1.*" />
+		<PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
 		<PackageReference Include="Confluent.Kafka" Version="2.*" />
 		<PackageReference Include="Grpc.AspNetCore" Version="2.*" />
 		<PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />

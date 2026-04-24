@@ -47,7 +47,8 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly CodeMapOperationService _codeMapOperationService;
     private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
     private readonly CopyLocationOperationService _copyLocationOperationService;
-    private readonly IResourceCache _redisCache;
+    private readonly RedisResourceCache _redisCache;
+    private readonly ABSResourceCache _absCache;
 
     public ResourcesAcquiredListener(
         ILogger<ResourcesAcquiredListener> logger,
@@ -63,7 +64,8 @@ public class ResourcesAcquiredListener : BackgroundService
         CodeMapOperationService codeMapOperationService,
         ConditionalTransformOperationService conditionalTransformOperationService,
         CopyLocationOperationService copyLocationOperationService, 
-        IResourceCache redisCache)
+        RedisResourceCache redisCache,
+        ABSResourceCache absCache)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -88,6 +90,7 @@ public class ResourcesAcquiredListener : BackgroundService
         _conditionalTransformOperationService = conditionalTransformOperationService ?? throw new ArgumentNullException(nameof(conditionalTransformOperationService));
         _copyLocationOperationService = copyLocationOperationService ?? throw new ArgumentNullException(nameof(copyLocationOperationService));
         _redisCache = redisCache ?? throw new ArgumentNullException(nameof(redisCache));
+        _absCache = absCache;
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -143,19 +146,18 @@ public class ResourcesAcquiredListener : BackgroundService
                             throw new DeadLetterException("ReportableEvent value is null or empty");
                         }
 
+                        IResourceCache resourceCache;
+
+                        switch (message.Message.Value.CacheType)
+                        {
+                            case ResourceCacheType.ABS: resourceCache = _absCache; break;
+                            case ResourceCacheType.Redis: resourceCache = _redisCache; break;
+                            default:
+                                throw new DeadLetterException($"Cache Type '{message.Message.Value.CacheType.ToString()}' not supported");
+                        }
+
                         using (var scope = _scopeFactory.CreateScope())
                         {
-                            //IResourceCache resourceCache;
-
-                            ////TODO: Daniel - Can we inject these classes?
-                            //switch (message.Message.Value.CacheType)
-                            //{
-                            //    case ResourceCacheType.ABS: resourceCache = _redisResourceCache; break; //TODO: Daniel - Implement ABS class
-                            //    case ResourceCacheType.Redis: resourceCache = _redisResourceCache; break;
-                            //    default:
-                            //        throw new DeadLetterException($"Cache Type '{message.Message.Value.CacheType.ToString()}' not supported");
-                            //}
-
                             foreach (var cacheKey in message.Message.Value.CacheKeys)
                             {
                                 ResourceType resourceType = GetResourceTypeByEventKey(cacheKey, message.Message.Value.CacheType);
@@ -169,11 +171,11 @@ public class ResourcesAcquiredListener : BackgroundService
                                 });
 
                                 if (sequences == null || sequences.Count == 0) {
-                                    _redisCache.CopyResourcesToCorrelationCache(cacheKey, correlationId);
+                                    resourceCache.CopyResourcesToCorrelationCache(cacheKey, correlationId);
                                     continue;
                                 }
 
-                                List<DomainResource> resources = _redisCache.Get(cacheKey);
+                                List<DomainResource> resources = resourceCache.Get(cacheKey);
 
                                 foreach (var resource in resources) {
                                     sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
@@ -215,27 +217,27 @@ public class ResourcesAcquiredListener : BackgroundService
                                     }
                                 }
 
-                                _redisCache.AddToCorrelationCache(correlationId, resources, resourceType, out string destination);
+                                resourceCache.UpdateCorrelationCache(correlationId, resources, resourceType, out string destination);
                             }
                                 
                             await ProduceResourcesNormalizedMessage(message, message.Message.Key.FacilityId, correlationId, "");
 
-                            _redisCache.Delete(message.Message.Value.CacheKeys);
+                            resourceCache.Delete(message.Message.Value.CacheKeys);
                         }
                     }
                     catch (DeadLetterException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(message, ex, message.Key?.FacilityId ?? string.Empty);
+                        _deadLetterExceptionHandler.HandleException(message, ex, message.Message.Key?.FacilityId ?? string.Empty);
                     }
                     catch (TransientException ex)
                     {
-                        _transientExceptionHandler.HandleException(message, ex, message.Key?.FacilityId ?? string.Empty);
+                        _transientExceptionHandler.HandleException(message, ex, message.Message.Key?.FacilityId ?? string.Empty);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                        _transientExceptionHandler.HandleException(message, new TransientException("Normalization Exception thrown: " + ex.Message, ex), message.Key?.FacilityId ?? string.Empty);
+                        _transientExceptionHandler.HandleException(message, new TransientException("Normalization Exception thrown: " + ex.Message, ex), message.Message.Key?.FacilityId ?? string.Empty);
                     }
                     finally
                     {
@@ -375,9 +377,18 @@ public class ResourcesAcquiredListener : BackgroundService
                 throw new Exception($"Could not parse the Redis cache key '{cacheKey}' into a valid FHIR Resource Type");
             }
         }
+        else {
+            string[] splitKey = cacheKey.Split("/");
+            if (Enum.TryParse<ResourceType>(splitKey.Last(), out var resourceType))
+            {
+                return resourceType;
+            }
+            else
+            {
+                throw new Exception($"Could not parse the ABS cache key '{cacheKey}' into a valid FHIR Resource Type");
+            }
+        }
 
-        //TODO: Daniel - Add ABS
-        return ResourceType.Encounter;
     }
 
 }

@@ -68,7 +68,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Cache
             }
         }
 
-        public void AddToCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType, out string destination)
+        public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType, out string destination)
         {
             List<HashEntry> correlationHash = new List<HashEntry>();
 

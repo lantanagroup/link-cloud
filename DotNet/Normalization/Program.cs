@@ -1,6 +1,7 @@
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using Hl7.Fhir.Model.CdsHooks;
+using LantanaGroup.Link.Normalization.Application.Config;
 using LantanaGroup.Link.Normalization.Application.Models.Cache;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
@@ -69,10 +70,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
     var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
 
+    builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(BlobStorageSettings.Key));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
+    //builder.Services.AddSingleton<IResourceCache, ABSResourceCache>();
+    builder.Services.AddSingleton<ABSResourceCache>();
 
     builder.Services.AddRedisCache(options =>
     {
@@ -89,8 +93,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         //TODO: Daniel - Temporary
         builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect("localhost:6379,password=suT1ChwYtkwWfbV1bUfRvQZO1YNhNRMj"));
     });
-    builder.Services.AddSingleton<IResourceCache, RedisResourceCache>();
-    //builder.Services.AddSingleton<RedisCacheService>();
+    //builder.Services.AddSingleton<IResourceCache, RedisResourceCache>();
+    builder.Services.AddSingleton<RedisResourceCache>();
     //builder.Services.AddSingleton<ICacheService, RedisCacheService>();
 
     // Additional configuration is required to successfully run gRPC on macOS.
