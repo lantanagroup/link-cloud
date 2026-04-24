@@ -134,16 +134,21 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
             if (!deliveryFailures.IsEmpty)
             {
-                var first = deliveryFailures.First();
+                // ConcurrentBag is unordered, so any element we pull is a sample — not
+                // the chronologically first failure. Surface a bounded sample of patient
+                // IDs/reasons to aid diagnostics without blowing up the exception message.
+                var sample = deliveryFailures.Take(5).ToList();
+                var sampleText = string.Join("; ", sample.Select(f => $"patient {f.PatientId} - {f.Error.Reason}"));
+
                 throw new ProduceException<string, DataAcquisitionRequestedValue>(
-                    first.Error,
+                    sample[0].Error,
                     new DeliveryResult<string, DataAcquisitionRequestedValue>
                     {
                         Topic = nameof(KafkaTopic.DataAcquisitionRequested)
                     },
                     new Exception(
                         $"{deliveryFailures.Count} DataAcquisitionRequested delivery failure(s) for schedule {schedule.Id}. " +
-                        $"First failure: patient {first.PatientId} - {first.Error.Reason}"));
+                        $"Sample failure(s) (up to {sample.Count}): {sampleText}"));
             }
 
             return true;
