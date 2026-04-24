@@ -95,9 +95,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, string>, KafkaProducerFactory<ResourceKey, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourcesAcquiredValue>, KafkaProducerFactory<ResourceKey, ResourcesAcquiredValue>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourceNormalizedMessage>, KafkaProducerFactory<ResourceKey, ResourceNormalizedMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourcesNormalizedMessage>, KafkaProducerFactory<ResourceKey, ResourcesNormalizedMessage>>();
 
-    builder.Services.RegisterKafkaProducer<ResourceKey, ResourceNormalizedMessage>(
+    builder.Services.RegisterKafkaProducer<ResourceKey, ResourcesNormalizedMessage>(
         builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
         new ProducerConfig() { CompressionType = CompressionType.Zstd });
     builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection: builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(), new ProducerConfig());
@@ -221,7 +221,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
-        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.ResourceAcquiredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.ResourcesAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }

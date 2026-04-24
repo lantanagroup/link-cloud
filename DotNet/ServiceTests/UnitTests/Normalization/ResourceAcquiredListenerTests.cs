@@ -25,7 +25,7 @@ public class ResourceAcquiredListenerTests
     private readonly Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>> _deadLetterExceptionHandlerMock;
     private readonly Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>> _transientExceptionHandlerMock;
     private readonly Mock<INormalizationServiceMetrics> _metricsMock;
-    private readonly Mock<IProducer<ResourceKey, ResourceNormalizedMessage>> _producerMock;
+    private readonly Mock<IProducer<ResourceKey, ResourcesNormalizedMessage>> _producerMock;
     private readonly Mock<CopyPropertyOperationService> _copyPropertyOperationServiceMock;
     private readonly Mock<CodeMapOperationService> _codeMapOperationServiceMock;
     private readonly Mock<ConditionalTransformOperationService> _conditionalTransformOperationServiceMock;
@@ -41,7 +41,7 @@ public class ResourceAcquiredListenerTests
         _deadLetterExceptionHandlerMock = new Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
         _transientExceptionHandlerMock = new Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>>();
         _metricsMock = new Mock<INormalizationServiceMetrics>();
-        _producerMock = new Mock<IProducer<ResourceKey, ResourceNormalizedMessage>>();
+        _producerMock = new Mock<IProducer<ResourceKey, ResourcesNormalizedMessage>>();
 
         // Mocking services that might not have parameterless constructors or are classes
         _copyPropertyOperationServiceMock = new Mock<CopyPropertyOperationService>(new Mock<ILogger<CopyPropertyOperationService>>().Object, null);
@@ -90,12 +90,12 @@ public class ResourceAcquiredListenerTests
             }
         };
 
-        var produceException = new ProduceException<ResourceKey, ResourceNormalizedMessage>(
+        var produceException = new ProduceException<ResourceKey, ResourcesNormalizedMessage>(
             new Error(ErrorCode.Local_Application, "Test Kafka Error"),
-            new DeliveryResult<ResourceKey, ResourceNormalizedMessage>());
+            new DeliveryResult<ResourceKey, ResourcesNormalizedMessage>());
 
         _producerMock
-            .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, ResourceNormalizedMessage>>(), It.IsAny<CancellationToken>()))
+            .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, ResourcesNormalizedMessage>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(produceException);
 
         // Act & Assert
@@ -158,12 +158,12 @@ public class ResourceAcquiredListenerTests
             }
         };
 
-        var produceExceptionNull = new ProduceException<ResourceKey, ResourceNormalizedMessage>(
+        var produceExceptionNull = new ProduceException<ResourceKey, ResourcesNormalizedMessage>(
             new Error(ErrorCode.Local_Application, "Test Kafka Error"),
-            new DeliveryResult<ResourceKey, ResourceNormalizedMessage>());
+            new DeliveryResult<ResourceKey, ResourcesNormalizedMessage>());
 
         _producerMock
-            .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, ResourceNormalizedMessage>>(), It.IsAny<CancellationToken>()))
+            .Setup(p => p.ProduceAsync(It.IsAny<string>(), It.IsAny<Message<ResourceKey, ResourcesNormalizedMessage>>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(produceExceptionNull);
 
         // Act & Assert

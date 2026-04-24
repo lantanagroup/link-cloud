@@ -25,6 +25,7 @@ using System.Text;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.Shared.Application.Enums;
+using StackExchange.Redis;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
@@ -32,7 +33,7 @@ public class ResourcesAcquiredListener : BackgroundService
 {
     private readonly ILogger<ResourcesAcquiredListener> _logger;
     private readonly IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue> _consumerFactory;
-    private readonly IProducer<ResourceKey, ResourceNormalizedMessage> _producer;
+    private readonly IProducer<ResourceKey, ResourcesNormalizedMessage> _producer;
     private readonly IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string> _consumeExceptionHandler;
     private readonly IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> _deadLetterExceptionHandler;
     private readonly ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> _transientExceptionHandler;
@@ -55,7 +56,7 @@ public class ResourcesAcquiredListener : BackgroundService
         IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> deadLetterExceptionHandler,
         ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue> transientExceptionHandler,
         INormalizationServiceMetrics metrics,
-        IProducer<ResourceKey, ResourceNormalizedMessage> producer,
+        IProducer<ResourceKey, ResourcesNormalizedMessage> producer,
         CopyPropertyOperationService copyPropertyOperationService,
         CodeMapOperationService codeMapOperationService,
         ConditionalTransformOperationService conditionalTransformOperationService,
@@ -122,11 +123,11 @@ public class ResourcesAcquiredListener : BackgroundService
 
                         //TODO - Daniel: Add message value handling. But first check if there is something that can be done on the serdes level rather than having to do this type of checking accross all values
 
-                        (string facilityId, string correlationId) messageMetaData = (string.Empty, string.Empty);
+                        string correlationId;
 
                         try
                         {
-                            messageMetaData = ExtractFacilityIdAndCorrelationIdFromMessage(message.Message);
+                            correlationId = ExtractCorrelationId(message.Message);
                         }
                         catch (Exception ex)
                         {
@@ -158,7 +159,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
                                 var sequences = await operationSequenceQueries.Search(new OperationSequenceSearchModel()
                                 {
-                                    FacilityId = messageMetaData.facilityId,
+                                    FacilityId = message.Message.Key.FacilityId,
                                     ResourceType = resourceType.ToString(),
                                 });
 
@@ -194,8 +195,8 @@ public class ResourcesAcquiredListener : BackgroundService
                                         if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
                                         {
                                             _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
-                                                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, messageMetaData.facilityId),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, messageMetaData.correlationId),
+                                                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, message.Message.Key.FacilityId),
+                                                new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
                                                 new KeyValuePair<string, object?>(DiagnosticNames.PatientId, message.Message.Key.PatientId),
                                                 new KeyValuePair<string, object?>(DiagnosticNames.Resource, resource.TypeName),
                                                 new KeyValuePair<string, object?>(DiagnosticNames.QueryType, message.Message.Value.QueryType),
@@ -203,7 +204,7 @@ public class ResourcesAcquiredListener : BackgroundService
                                         }
                                         else
                                         {
-                                            _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", messageMetaData.facilityId, messageMetaData.correlationId, operation.OperationType, operationResult?.ErrorMessage ?? "No Operation Result Error Message");
+                                            _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", message.Message.Key.FacilityId, correlationId, operation.OperationType, operationResult?.ErrorMessage ?? "No Operation Result Error Message");
                                         }
                                     }
                                 }
@@ -228,7 +229,7 @@ public class ResourcesAcquiredListener : BackgroundService
                                 
                             }
                                 
-                            await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, message.Message.Value.Resource);
+                            await ProduceResourcesNormalizedMessage(message, message.Message.Key.FacilityId, correlationId);
                             
                         }
                     }
@@ -295,29 +296,24 @@ public class ResourcesAcquiredListener : BackgroundService
     }
 
 
-    private async Task ProduceResourceNormalizedMessage(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, string facilityId, string correlationId, object? resource)
+    private async Task ProduceResourcesNormalizedMessage(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, string facilityId, string correlationId)
     {
         var headers = new Headers
         {
             new Header(NormalizationConstants.HeaderNames.CorrelationId, Encoding.UTF8.GetBytes(correlationId))
         };
 
-        var resourceNormalizedMessage = new ResourceNormalizedMessage
+        var resourceNormalizedMessage = new ResourcesNormalizedMessage
         {
-            AcquisitionComplete = message.Message.Value.AcquisitionComplete,
-            PatientId = message.Message.Value.PatientId ?? "",
-            Resource = resource,
             QueryType = message.Message.Value.QueryType,
             ScheduledReports = message.Message.Value.ScheduledReports,
-            ReportableEvent = message.Message.Value.ReportableEvent
+            ReportableEvent = message.Message.Value.ReportableEvent,
+            CacheType = message.Message.Value.CacheType,
+            CacheKeys = message.Message.Value.CacheKeys
         };
-        Message<ResourceKey, ResourceNormalizedMessage> produceMessage = new Message<ResourceKey, ResourceNormalizedMessage>
+        Message<ResourceKey, ResourcesNormalizedMessage> produceMessage = new Message<ResourceKey, ResourcesNormalizedMessage>
         {
-            Key = new ResourceKey
-            {
-                FacilityId = facilityId,
-                CorrelationId = correlationId
-            },
+            Key = message.Message.Key,
             Headers = headers,
             Value = resourceNormalizedMessage
         };
@@ -326,10 +322,10 @@ public class ResourcesAcquiredListener : BackgroundService
         {
             await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
         }
-        catch (ProduceException<ResourceKey, ResourceNormalizedMessage> ex)
+        catch (ProduceException<ResourceKey, ResourcesNormalizedMessage> ex)
         {
-            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, ResourceAcquired Partition: {Partition}, ResourceAcquired Offset: {Offset}", facilityId, correlationId, message.Partition.Value, message.Offset.Value);
-            throw new TransientException($"Failed to produce ResourceNormalized message: {ex.Message}", ex);
+            _logger.LogError(ex, "Failed to produce ResourcesNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, ResourceAcquired Partition: {Partition}, ResourceAcquired Offset: {Offset}", facilityId, correlationId, message.Partition.Value, message.Offset.Value);
+            throw new TransientException($"Failed to produce ResourcesNormalized message: {ex.Message}", ex);
         }
     }
 
@@ -338,22 +334,16 @@ public class ResourcesAcquiredListener : BackgroundService
         this._cancelled = true;
     }
 
-    private (string facilityId, string correlationId) ExtractFacilityIdAndCorrelationIdFromMessage(Message<ResourceKey, ResourcesAcquiredValue> message)
+    private string ExtractCorrelationId(Message<ResourceKey, ResourcesAcquiredValue> message)
     {
-        var facilityId = message.Key.FacilityId;
-        var correlationId = message.Key.CorrelationId;
+        var cIBytes = message.Headers.FirstOrDefault(x => x.Key == NormalizationConstants.HeaderNames.CorrelationId)?.GetValueBytes();
 
-        if (string.IsNullOrWhiteSpace(correlationId))
-        {
-            var cIBytes = message.Headers.FirstOrDefault(x => x.Key == NormalizationConstants.HeaderNames.CorrelationId)?.GetValueBytes();
+        if (cIBytes == null || cIBytes.Length == 0)
+            throw new MissingCorrelationIdException();
 
-            if (cIBytes == null || cIBytes.Length == 0)
-                throw new MissingCorrelationIdException();
+        var correlationId = Encoding.UTF8.GetString(cIBytes);
 
-            correlationId = Encoding.UTF8.GetString(cIBytes);
-        }
-
-        return (facilityId, correlationId);
+        return correlationId;
     }
 
     private DomainResource DeserializeStringToResource(string json)
