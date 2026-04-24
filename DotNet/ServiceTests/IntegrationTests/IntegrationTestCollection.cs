@@ -1,3 +1,4 @@
+using IntegrationTests.AutomationUI;
 using IntegrationTests.Census;
 using IntegrationTests.DataAcquisition;
 using IntegrationTests.Normalization;
@@ -30,7 +31,8 @@ public class IntegrationTestCollection :
     ICollectionFixture<CensusIntegrationTestFixture>,
     ICollectionFixture<DataAcquisitionIntegrationTestFixture>,
     ICollectionFixture<NormalizationIntegrationTestFixture>,
-    ICollectionFixture<ReportIntegrationTestFixture>
+    ICollectionFixture<ReportIntegrationTestFixture>,
+    ICollectionFixture<AutomationUIIntegrationTestFixture>
 {
     public const string Name = "IntegrationTests";
 }

@@ -10,9 +10,9 @@ namespace Automation.UI.Services.Persistence;
 /// Cosmos DB for MongoDB API (deployed environments).
 ///
 /// Collections:
-///   automation_runs       — lightweight run metadata
-///   automation_snapshots  — per-run, per-domain polling data (upsert on RunId+Domain)
-///   automation_logs       — full log output per run
+///   automation_runs       â€” lightweight run metadata
+///   automation_snapshots  â€” per-run, per-domain polling data (upsert on RunId+Domain)
+///   automation_logs       â€” full log output per run
 ///
 /// Indexes are managed centrally by <see cref="MongoIndexManager"/>.
 /// </summary>
@@ -132,6 +132,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     public async Task<IReadOnlyList<AutomationRunSummary>> GetAllRunSummariesAsync(DateTimeOffset? since = null, CancellationToken ct = default)
     {
+        // CreatedAt is persisted as BSON ISODate (see AutomationRunDocument), so $gte
+        // evaluates as a proper date comparison and hits the idx_createdAt_desc index.
         var filter = since.HasValue
             ? Builders<AutomationRunDocument>.Filter.Gte(r => r.CreatedAt, since.Value)
             : FilterDefinition<AutomationRunDocument>.Empty;
@@ -253,7 +255,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
         catch (MongoCommandException)
         {
-            // Cosmos DB may reject $push/$each in some configurations — fall back to read-modify-write.
+            // Cosmos DB may reject $push/$each in some configurations â€” fall back to read-modify-write.
             var doc = await _logs.Find(filter).FirstOrDefaultAsync(ct);
             if (doc == null)
             {
