@@ -19,14 +19,10 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using Microsoft.OpenApi.Writers;
-using OpenTelemetry.Resources;
 using System.Text;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.Shared.Application.Enums;
-using StackExchange.Redis;
-using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 

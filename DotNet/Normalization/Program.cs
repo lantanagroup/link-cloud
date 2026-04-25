@@ -93,9 +93,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         //TODO: Daniel - Temporary
         builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect("localhost:6379,password=suT1ChwYtkwWfbV1bUfRvQZO1YNhNRMj"));
     });
-    //builder.Services.AddSingleton<IResourceCache, RedisResourceCache>();
+    
     builder.Services.AddSingleton<RedisResourceCache>();
-    //builder.Services.AddSingleton<ICacheService, RedisCacheService>();
 
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682

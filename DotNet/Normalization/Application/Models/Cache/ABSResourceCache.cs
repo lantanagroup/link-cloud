@@ -2,22 +2,15 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using Humanizer.Localisation;
 using LantanaGroup.Link.Normalization.Application.Config;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace LantanaGroup.Link.Normalization.Application.Models.Cache
 {
     public class ABSResourceCache : IResourceCache
     {
-        //private readonly BlobStorageService _blobStorageService;
         private readonly BlobContainerClient _containerClient;
         private readonly BlobStorageSettings _settings;
 

@@ -1,18 +1,8 @@
-using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
-using LantanaGroup.Link.Normalization.Application.Models.Messages;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using StackExchange.Redis;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace LantanaGroup.Link.Normalization.Application.Models.Cache
 {
