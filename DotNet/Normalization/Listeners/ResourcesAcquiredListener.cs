@@ -115,32 +115,7 @@ public class ResourcesAcquiredListener : BackgroundService
                     {
                         message = result;
 
-                        if (message == null || message.Message == null) {
-                            throw new DeadLetterException("Event is null");
-                        }
-
-                        if (message.Message.Key == null || string.IsNullOrWhiteSpace(message.Message.Key.FacilityId) || string.IsNullOrWhiteSpace(message.Message.Key.PatientId))
-                        {
-                            throw new DeadLetterException("Malformed key in the event. Facility Id and Patient Id are required.");
-                        }
-
-                        //TODO - Daniel: Add message value handling. But first check if there is something that can be done on the serdes level rather than having to do this type of checking accross all values
-
-                        string correlationId;
-
-                        try
-                        {
-                            correlationId = ExtractCorrelationId(message.Message);
-                        }
-                        catch (Exception ex)
-                        {
-                            throw new DeadLetterException("Failed to extract FacilityId and CorrelationId from message.", ex);
-                        }
-
-                        if (string.IsNullOrWhiteSpace(message.Message.Value.ReportableEvent))
-                        {
-                            throw new DeadLetterException("ReportableEvent value is null or empty");
-                        }
+                        ValidateResourcesAcquiredEvent(message, out string correlationId);
 
                         IResourceCache resourceCache;
 
@@ -156,7 +131,7 @@ public class ResourcesAcquiredListener : BackgroundService
                         {
                             foreach (var cacheKey in message.Message.Value.CacheKeys)
                             {
-                                ResourceType resourceType = resourceCache.GetResourceTypeByEventKey(cacheKey);
+                                ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
 
                                 var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
 
@@ -167,7 +142,7 @@ public class ResourcesAcquiredListener : BackgroundService
                                 });
 
                                 if (sequences == null || sequences.Count == 0) {
-                                    resourceCache.CacheSkipped(cacheKey, correlationId);
+                                    resourceCache.Skipped(cacheKey, correlationId);
                                     continue;
                                 }
 
@@ -283,6 +258,41 @@ public class ResourcesAcquiredListener : BackgroundService
         }
     }
 
+    private void ValidateResourcesAcquiredEvent(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, out string correlationId) {
+        if (message == null || message.Message == null)
+        {
+            throw new DeadLetterException("Event is null");
+        }
+
+        if (message.Message.Key == null || string.IsNullOrWhiteSpace(message.Message.Key.FacilityId) || string.IsNullOrWhiteSpace(message.Message.Key.PatientId))
+        {
+            throw new DeadLetterException("Malformed key in the event. Facility Id and Patient Id are required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(message.Message.Value.QueryType))
+        {
+            throw new DeadLetterException("Malformed value in the event. QueryType is required.");
+        }
+
+        if (message.Message.Value.ScheduledReports.Count() == 0)
+        {
+            throw new DeadLetterException("Malformed value in the event. At least one ScheduledReport must be included.");
+        }
+
+        if (string.IsNullOrEmpty(message.Message.Value.ReportableEvent))
+        {
+            throw new DeadLetterException("Malformed value in the event. ReportableEvent is required.");
+        }
+
+        try
+        {
+            correlationId = ExtractCorrelationId(message.Message);
+        }
+        catch (Exception ex)
+        {
+            throw new DeadLetterException("Failed to extract CorrelationId from message.", ex);
+        }
+    }
 
     private async Task ProduceResourcesNormalizedMessage(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, string facilityId, string correlationId)
     {

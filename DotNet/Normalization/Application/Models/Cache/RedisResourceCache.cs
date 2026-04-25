@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Cache
             return resources;
         }
 
-        public ResourceType GetResourceTypeByEventKey(string cacheKey)
+        public ResourceType GetResourceTypeByCacheKey(string cacheKey)
         {
             string[] splitKey = cacheKey.Split(":");
             
@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Cache
             _db.HashSet(correlationId, correlationHash.ToArray());
         }
 
-        public void CacheSkipped(string sourceCache, string correlationId)
+        public void Skipped(string sourceCache, string correlationId)
         {
             var hashEntries = _db.HashGetAll(sourceCache);
 

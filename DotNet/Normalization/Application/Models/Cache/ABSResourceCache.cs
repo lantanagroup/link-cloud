@@ -65,7 +65,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Cache
             return resources;
         }
 
-        public ResourceType GetResourceTypeByEventKey(string cacheKey)
+        public ResourceType GetResourceTypeByCacheKey(string cacheKey)
         {
             string[] splitKey = cacheKey.Split("/");
 
@@ -79,7 +79,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Cache
             }
         }
 
-        public void CacheSkipped(string sourceCache, string destinationCache)
+        public void Skipped(string sourceCache, string destinationCache)
         {
             //Nothing to do
         }

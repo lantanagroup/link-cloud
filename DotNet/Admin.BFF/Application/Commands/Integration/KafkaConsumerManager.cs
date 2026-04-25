@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -38,10 +38,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
             ("Dynamic", KafkaTopic.DataAcquisitionRequested.ToString() + errorTopic),
             ("Dynamic", KafkaTopic.ReadyToAcquire.ToString()),
             ("Dynamic", KafkaTopic.ReadyToAcquire.ToString() + errorTopic),
-            ("Dynamic", KafkaTopic.ResourceAcquired.ToString()),
-            ("Dynamic", KafkaTopic.ResourceAcquired.ToString() + errorTopic),
-            ("Dynamic", KafkaTopic.ResourceNormalized.ToString()),
-            ("Dynamic", KafkaTopic.ResourceNormalized.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.ResourcesAcquired.ToString()),
+            ("Dynamic", KafkaTopic.ResourcesAcquired.ToString() + errorTopic),
+            ("Dynamic", KafkaTopic.ResourcesNormalized.ToString()),
+            ("Dynamic", KafkaTopic.ResourcesNormalized.ToString() + errorTopic),
             ("Dynamic", KafkaTopic.MeasureReportGenerated.ToString()),
             ("Dynamic", KafkaTopic.MeasureReportGenerated.ToString() + errorTopic),
             ("Dynamic", KafkaTopic.ReadyForValidation.ToString()),
