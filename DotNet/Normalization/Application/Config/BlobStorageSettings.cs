@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.Normalization.Application.Config
 {
     public class BlobStorageSettings
     {
-        public const string Key = "InternalBlobStorage";
+        public const string Key = "CacheBlobStorage";
         public string? ConnectionString { get; set; }
         public string? BlobContainerName { get; set; }
         public string? BlobRoot { get; set; }

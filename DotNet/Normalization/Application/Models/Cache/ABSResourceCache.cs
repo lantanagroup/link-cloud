@@ -1,6 +1,7 @@
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using Humanizer.Localisation;
 using LantanaGroup.Link.Normalization.Application.Config;
 using LantanaGroup.Link.Shared.Application.SerDes;
@@ -26,19 +27,21 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Cache
             _containerClient = new BlobContainerClient(_settings.ConnectionString, _settings.BlobContainerName);
         }
 
-        public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType, out string destination)
+        public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType)
         {
-            throw new NotImplementedException();
-        }
+            string blobName = _settings.BlobRoot + "/" + correlationId + "/" + resourceType.ToString();
 
-        public void CopyResourcesToCorrelationCache(string sourceCache, string destinationCache)
-        {
-            //Nothing to do
-        }
+            AppendBlobClient writeBlobClient = _containerClient.GetAppendBlobClient(blobName);
 
-        public void Delete(List<string> cacheKeys)
-        {
-            //Nothing to do
+            using (Stream write_stream = writeBlobClient.OpenWrite(true))
+            using (StreamWriter writer = new StreamWriter(write_stream)) 
+            {
+                foreach (var resource in resources) 
+                {
+                    writer.WriteLine(resource.TypeName + "/" + resource.Id);
+                    writer.WriteLine(resource.ToJson());
+                }
+            }
         }
 
         public List<DomainResource> Get(string cacheKey)
@@ -71,7 +74,26 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Cache
 
         public ResourceType GetResourceTypeByEventKey(string cacheKey)
         {
-            throw new NotImplementedException();
+            string[] splitKey = cacheKey.Split("/");
+
+            if (Enum.TryParse<ResourceType>(splitKey.Last(), out var resourceType))
+            {
+                return resourceType;
+            }
+            else
+            {
+                throw new Exception($"Could not parse the ABS cache key '{cacheKey}' into a valid FHIR Resource Type");
+            }
+        }
+
+        public void CacheSkipped(string sourceCache, string destinationCache)
+        {
+            //Nothing to do
+        }
+
+        public void Delete(List<string> cacheKeys)
+        {
+            //Nothing to do
         }
     }
 }

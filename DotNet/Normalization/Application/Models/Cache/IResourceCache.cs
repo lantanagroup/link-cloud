@@ -11,8 +11,8 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Cache
     {
         ResourceType GetResourceTypeByEventKey(string cacheKey);
         List<DomainResource> Get(string cacheKey);
-        void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType, out string destination);
-        void CopyResourcesToCorrelationCache(string sourceCache, string destinationCache);
+        void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType);
+        void CacheSkipped(string sourceCache, string correlationId);
         void Delete(List<string> cacheKeys);
     }
 }

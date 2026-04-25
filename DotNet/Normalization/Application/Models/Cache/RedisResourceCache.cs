@@ -1,6 +1,9 @@
+using Confluent.Kafka;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using StackExchange.Redis;
 using System;
@@ -68,7 +71,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Cache
             }
         }
 
-        public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType, out string destination)
+        public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType)
         {
             List<HashEntry> correlationHash = new List<HashEntry>();
 
@@ -78,15 +81,13 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Cache
             }
 
             _db.HashSet(correlationId, correlationHash.ToArray());
-
-            destination = correlationId;
         }
 
-        public void CopyResourcesToCorrelationCache(string sourceCache, string destinationCache)
+        public void CacheSkipped(string sourceCache, string correlationId)
         {
             var hashEntries = _db.HashGetAll(sourceCache);
 
-            _db.HashSet(destinationCache, hashEntries);
+            _db.HashSet(correlationId, hashEntries);
         }
     }
 }

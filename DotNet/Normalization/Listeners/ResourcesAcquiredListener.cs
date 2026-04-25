@@ -160,7 +160,7 @@ public class ResourcesAcquiredListener : BackgroundService
                         {
                             foreach (var cacheKey in message.Message.Value.CacheKeys)
                             {
-                                ResourceType resourceType = GetResourceTypeByEventKey(cacheKey, message.Message.Value.CacheType);
+                                ResourceType resourceType = resourceCache.GetResourceTypeByEventKey(cacheKey);
 
                                 var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
 
@@ -171,7 +171,7 @@ public class ResourcesAcquiredListener : BackgroundService
                                 });
 
                                 if (sequences == null || sequences.Count == 0) {
-                                    resourceCache.CopyResourcesToCorrelationCache(cacheKey, correlationId);
+                                    resourceCache.CacheSkipped(cacheKey, correlationId);
                                     continue;
                                 }
 
@@ -217,10 +217,10 @@ public class ResourcesAcquiredListener : BackgroundService
                                     }
                                 }
 
-                                resourceCache.UpdateCorrelationCache(correlationId, resources, resourceType, out string destination);
+                                resourceCache.UpdateCorrelationCache(correlationId, resources, resourceType);
                             }
                                 
-                            await ProduceResourcesNormalizedMessage(message, message.Message.Key.FacilityId, correlationId, "");
+                            await ProduceResourcesNormalizedMessage(message, message.Message.Key.FacilityId, correlationId);
 
                             resourceCache.Delete(message.Message.Value.CacheKeys);
                         }
@@ -288,7 +288,7 @@ public class ResourcesAcquiredListener : BackgroundService
     }
 
 
-    private async Task ProduceResourcesNormalizedMessage(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, string facilityId, string correlationId, string cacheKey)
+    private async Task ProduceResourcesNormalizedMessage(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, string facilityId, string correlationId)
     {
         var headers = new Headers
         {
@@ -301,7 +301,7 @@ public class ResourcesAcquiredListener : BackgroundService
             ScheduledReports = message.Message.Value.ScheduledReports,
             ReportableEvent = message.Message.Value.ReportableEvent,
             CacheType = message.Message.Value.CacheType,
-            CacheKey = cacheKey
+            CacheKey = correlationId
         };
         Message<ResourceKey, ResourcesNormalizedValue> produceMessage = new Message<ResourceKey, ResourcesNormalizedValue>
         {
@@ -356,39 +356,4 @@ public class ResourcesAcquiredListener : BackgroundService
                 throw new DeserializationUnsupportedTypeException();
         }
     }
-
-    private ResourceType GetResourceTypeByEventKey(string cacheKey, ResourceCacheType cacheType)
-    {
-        if (cacheType == ResourceCacheType.Redis)
-        {
-            string[] splitKey = cacheKey.Split(":");
-
-            if (splitKey.Length != 2)
-            {
-                throw new Exception($"Cache key '{cacheKey}' does not contain required ':' divider. Expected format is <correlation id>:<resource type>");
-            }
-
-            if (Enum.TryParse<ResourceType>(splitKey[1], out var resourceType))
-            {
-                return resourceType;
-            }
-            else
-            {
-                throw new Exception($"Could not parse the Redis cache key '{cacheKey}' into a valid FHIR Resource Type");
-            }
-        }
-        else {
-            string[] splitKey = cacheKey.Split("/");
-            if (Enum.TryParse<ResourceType>(splitKey.Last(), out var resourceType))
-            {
-                return resourceType;
-            }
-            else
-            {
-                throw new Exception($"Could not parse the ABS cache key '{cacheKey}' into a valid FHIR Resource Type");
-            }
-        }
-
-    }
-
 }
