@@ -215,17 +215,34 @@ public class AutomationRunManager : IAutomationRunManager
         }
     }
 
-    public async Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    public async Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, string? sortBy = null, bool sortDescending = true, CancellationToken cancellationToken = default)
     {
-        var page = await _snapshotStore.GetRunsPageAsync(pageNumber, pageSize, cancellationToken);
+        var page = await _snapshotStore.GetRunsPageAsync(pageNumber, pageSize, sortBy, sortDescending, cancellationToken);
         return new AutomationRunIndexViewModel
         {
             Runs = page.Items,
             PageNumber = page.PageNumber,
             PageSize = page.PageSize,
-            TotalCount = page.TotalCount
+            TotalCount = page.TotalCount,
+            // Echo the *normalized* sort back so the view can render its
+            // active-column indicator and build correct sort-toggle URLs.
+            // Empty/unrecognized sortBy resolves to "createdAt".
+            SortBy = NormalizeSortBy(sortBy),
+            SortDescending = sortDescending,
         };
     }
+
+    private static string NormalizeSortBy(string? sortBy) =>
+        (sortBy ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "runname"      => "runName",
+            "patientcount" => "patientCount",
+            "seed"         => "seed",
+            "status"       => "status",
+            "finishedat"   => "finishedAt",
+            "createdat"    => "createdAt",
+            _              => "createdAt",
+        };
 
     public async Task<AutomationRunSummary?> GetRunAsync(Guid runId, CancellationToken cancellationToken = default)
     {

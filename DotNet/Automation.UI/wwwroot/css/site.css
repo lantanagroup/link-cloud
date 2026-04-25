@@ -1,5 +1,5 @@
 /* ===================================================================
-   Automation.UI — Design System
+   Automation.UI â€” Design System
    =================================================================== */
 
 /* --- Tokens --- */
@@ -44,7 +44,7 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 .au-navbar .navbar-text { color: rgba(255,255,255,.7); }
 
 /* ===================================================================
-   Cards — the core container
+   Cards â€” the core container
    =================================================================== */
 .au-card {
   border: none;
@@ -65,7 +65,7 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 .au-card .card-body { padding: 1rem; }
 
 /* ===================================================================
-   Buttons — colour vocabulary
+   Buttons â€” colour vocabulary
    =================================================================== */
 .btn-au-action {
   background: var(--au-accent); color: #fff; border: none;
@@ -112,6 +112,55 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 }
 .au-table tbody tr:hover { background: rgba(77,163,255,.06); }
 
+/* Sort header anchors inside .au-table thead th. The default user-agent +
+   Bootstrap link color (blue/purple) clashes with the white header text;
+   inheriting color while keeping the underline and arrow indicator preserves
+   the dark/white theme and still signals the link is clickable. */
+.au-sort-header,
+.au-sort-header:visited {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.au-sort-header:hover,
+.au-sort-header:focus {
+  color: #fff;
+  text-decoration: underline;
+  filter: brightness(1.15); /* subtle affordance without changing the palette */
+}
+
+/* Loading overlay used while the recent-runs table is being refreshed via
+   the partial-view fetch path. Sits over the card body without disturbing
+   layout â€” the card keeps its height so the page doesn't reflow. */
+.au-card-loading {
+  position: relative;
+}
+.au-card-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,.65);
+  z-index: 5;
+}
+.au-card-loading::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2rem;
+  height: 2rem;
+  margin: -1rem 0 0 -1rem;
+  border: 3px solid #ccc;
+  border-top-color: var(--au-dark, #1f2937);
+  border-radius: 50%;
+  animation: au-card-spin .8s linear infinite;
+  z-index: 6;
+}
+@@keyframes au-card-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* ===================================================================
    Cohort builder
    =================================================================== */
@@ -134,7 +183,7 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 }
 
 /* ===================================================================
-   Details — run summary grid
+   Details â€” run summary grid
    =================================================================== */
 .au-summary-item {
   display: flex;
@@ -206,7 +255,7 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 }
 
 /* ===================================================================
-   Tooltips — rely on Bootstrap but ensure dark style
+   Tooltips â€” rely on Bootstrap but ensure dark style
    =================================================================== */
 
 /* Info-icon tooltips: subtle (?) indicators for contextual help */

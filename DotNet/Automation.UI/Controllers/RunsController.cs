@@ -14,16 +14,32 @@ public class RunsController(
     ILogger<RunsController> logger) : Controller
 {
     [HttpGet]
-    public async Task<IActionResult> Index(CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(
+        int pageNumber = 1,
+        int pageSize = 20,
+        string sortBy = "createdAt",
+        string sortDir = "desc",
+        CancellationToken cancellationToken = default)
     {
+        // Normalize: accept "asc"/"desc" only, default to descending. Server-side
+        // store-level whitelisting also clamps unknown sortBy values, so this is
+        // belt-and-suspenders against URL tampering.
+        var descending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
-        var recentPage = await runManager.GetRunsPageAsync(1, 10, cancellationToken);
+        var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
         var scenarios = (await scenarioStore.GetAllAsync(cancellationToken))
             .OrderBy(s => s.IsSystemScenario)
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var activeRuns = recentPage.Runs
+        // Active runs are surfaced by status, not by what page the user is on,
+        // so they always come from a default-sorted first page slice. Otherwise
+        // a user paged deep into history would lose the Active Runs card.
+        var activeRunsSource = recentPage.PageNumber == 1
+            ? recentPage.Runs
+            : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
+        var activeRuns = activeRunsSource
             .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
             .ToList();
 
@@ -36,18 +52,54 @@ public class RunsController(
             RecentRuns = recentPage.Runs,
             ActiveRuns = activeRuns,
             SavedScenarios = scenarios,
+            // Echo paging/sort state to the view so headers + pager render
+            // current state and click-to-toggle URLs are correct.
+            PageNumber = recentPage.PageNumber,
+            PageSize = recentPage.PageSize,
+            TotalCount = recentPage.TotalCount,
+            TotalPages = recentPage.TotalPages,
+            SortBy = recentPage.SortBy,
+            SortDescending = recentPage.SortDescending,
         };
 
         return View(vm);
     }
 
     [HttpGet]
-    public async Task<IActionResult> DashboardStats(CancellationToken cancellationToken)
+    public async Task<IActionResult> RecentRunsPartial(
+        int pageNumber = 1,
+        int pageSize = 20,
+        string sortBy = "createdAt",
+        string sortDir = "desc",
+        CancellationToken cancellationToken = default)
     {
-        var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
-        var recentPage = await runManager.GetRunsPageAsync(1, 10, cancellationToken);
+        // Returns just the Recent Runs card markup so the dashboard can refresh
+        // the table in place (sort / paginate / SignalR update) without a full
+        // page navigation. The view model matches the partial's @model so the
+        // partial is reused by both this action and the initial server render
+        // in Index.cshtml — there's no divergence between the two templates.
+        var descending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+        var page = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
+        return PartialView("_RecentRunsTable", page);
+    }
 
-        var activeRuns = recentPage.Runs
+    [HttpGet]
+    public async Task<IActionResult> DashboardStats(
+        int pageNumber = 1,
+        int pageSize = 20,
+        string sortBy = "createdAt",
+        string sortDir = "desc",
+        CancellationToken cancellationToken = default)
+    {
+        var descending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+
+        var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
+        var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
+
+        var activeRunsSource = recentPage.PageNumber == 1
+            ? recentPage.Runs
+            : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
+        var activeRuns = activeRunsSource
             .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
             .ToList();
 
@@ -55,7 +107,16 @@ public class RunsController(
         {
             stats,
             recentRuns = recentPage.Runs,
-            activeRuns
+            activeRuns,
+            paging = new
+            {
+                pageNumber = recentPage.PageNumber,
+                pageSize = recentPage.PageSize,
+                totalCount = recentPage.TotalCount,
+                totalPages = recentPage.TotalPages,
+                sortBy = recentPage.SortBy,
+                sortDir = recentPage.SortDir,
+            }
         });
     }
 
