@@ -518,8 +518,8 @@ public class AutomationRunManager : IAutomationRunManager
                     acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
                     {
                         QueryPlan = QueryPlanDefaults.GetDefaultAsInput(),
-                        ReportStart = scenarioConfig.StartDate,
-                        ReportEnd = scenarioConfig.EndDate
+                        ClinicalPeriodStart = scenarioConfig.StartDate,
+                        ClinicalPeriodEnd = scenarioConfig.EndDate
                     });
 
                 patientIds = pipelineResult.PatientIds;

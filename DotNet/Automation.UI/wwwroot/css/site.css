@@ -157,7 +157,7 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   animation: au-card-spin .8s linear infinite;
   z-index: 6;
 }
-@@keyframes au-card-spin {
+@keyframes au-card-spin {
   to { transform: rotate(360deg); }
 }
 

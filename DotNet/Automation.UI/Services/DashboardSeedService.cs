@@ -22,6 +22,13 @@ namespace Automation.UI.Services;
 /// Behavior:
 ///   • Only runs when <c>Dashboard:SeedFakeRuns</c> is true (default false), so
 ///     this service is a no-op in any environment where the flag isn't set.
+///     The flag is gated at registration time in <c>Program.cs</c> — when it's
+///     false the service isn't registered at all and no Mongo activity occurs.
+///   • Note: the flag is read from compiled-in <c>appsettings.json</c> in
+///     containerized deployments. Editing the source file without rebuilding
+///     the image leaves the container running with whatever value was baked
+///     in at build time. If you flip the flag in source and the running app
+///     still seeds (or the running app still won't seed), rebuild the image.
 ///   • Uses deterministic GUIDs derived from (date, slot) so re-running on
 ///     subsequent boots upserts the same rows rather than piling on duplicates.
 ///     That means the seeded dataset stays at ~60 rows indefinitely.
@@ -57,13 +64,6 @@ public sealed class DashboardSeedService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        if (!_config.GetValue<bool>("Dashboard:SeedFakeRuns"))
-        {
-            _logger.LogDebug(
-                "DashboardSeedService skipped: Dashboard:SeedFakeRuns is not true.");
-            return;
-        }
-
         // Deterministic RNG per-boot: seeded from today's date so the status
         // distribution is stable across restarts on the same day (makes visual
         // verification of the dashboard chart less jittery) but shifts naturally

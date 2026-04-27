@@ -166,11 +166,44 @@ public sealed class MongoIndexManager
     {
         var collection = _database.GetCollection<BsonDocument>("automation_runs");
 
-        // Sort index for GetRunsPageAsync (ORDER BY CreatedAt DESC).
+        // Sort index for GetRunsPageAsync (default ORDER BY CreatedAt DESC).
         CreateIndexSafe(collection, new BsonDocument { { "CreatedAt", -1 } }, unique: false, "idx_createdAt_desc");
 
         // Filter index for GetActiveRunsAsync (WHERE IsActive = true).
         CreateIndexSafe(collection, new BsonDocument { { "IsActive", 1 } }, unique: false, "idx_isActive");
+
+        // Single-field sort indexes for the user-selectable columns exposed by
+        // the Recent Runs table on the dashboard. Without these, picking any
+        // sort other than the default CreatedAt forces Cosmos / Mongo to do a
+        // full collection scan + in-memory sort, which becomes expensive once
+        // automation_runs grows past a few thousand documents.
+        //
+        // Direction is intentionally ascending (1). Both Cosmos Mongo API and
+        // native MongoDB can scan a single-field index in reverse, so one
+        // index serves both ASC and DESC for the same column — no need for a
+        // mirrored "_desc" copy.
+        //
+        // BSON field names match the C# property casing (PascalCase) because
+        // no camelCase convention is registered on the Mongo client; see
+        // MongoDocuments.AutomationRunDocument. Lowercase variants would
+        // create dead indexes that the query planner never picks up.
+        //
+        // Cosmos DB (RU model) note: every secondary index here costs write
+        // RU/s on each UpsertRunSummaryAsync call. We deliberately keep the
+        // set minimal:
+        //   - Only single-field indexes, no {Sort, RunId} compound matrix.
+        //     The RunId tiebreaker in MongoSnapshotStore.GetRunsPageAsync is
+        //     resolved by a small post-seek sort step at pageSize=20, which
+        //     is cheap; doubling the index count to make it index-resident
+        //     would not be worth the per-write RU hit at this collection's
+        //     scale.
+        //   - No indexes on derived/string-formatted columns like Duration
+        //     (intentionally not sortable in the UI).
+        CreateIndexSafe(collection, new BsonDocument { { "RunName",      1 } }, unique: false, "idx_runName_asc");
+        CreateIndexSafe(collection, new BsonDocument { { "PatientCount", 1 } }, unique: false, "idx_patientCount_asc");
+        CreateIndexSafe(collection, new BsonDocument { { "Seed",         1 } }, unique: false, "idx_seed_asc");
+        CreateIndexSafe(collection, new BsonDocument { { "Status",       1 } }, unique: false, "idx_status_asc");
+        CreateIndexSafe(collection, new BsonDocument { { "FinishedAt",   1 } }, unique: false, "idx_finishedAt_asc");
     }
 
     // ?? automation_snapshots ?????????????????????????????????????????

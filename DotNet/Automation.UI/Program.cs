@@ -1,5 +1,6 @@
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using Confluent.Kafka;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.DependencyInjection;
@@ -126,11 +127,12 @@ builder.Services.AddScoped<PipelineDataReader>();
 builder.Services.AddHostedService<ScenarioSeedService>();
 builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
 
-// -- TEMPORARY: seed synthetic runs for dashboard verification.
-//    Gated on config (Dashboard:SeedFakeRuns). Remove along with the service
-//    once the dashboard work is verified. See DashboardSeedService for the
-//    full removal checklist.
-builder.Services.AddHostedService<DashboardSeedService>();
+// -- Seed synthetic runs for dashboard verification.
+//    Gated on config (Dashboard:SeedFakeRuns). Used for Debugging Dashbhoard.
+if (builder.Configuration.GetValue<bool?>("Dashboard:SeedFakeRuns") ?? false)
+{
+    builder.Services.AddHostedService<DashboardSeedService>();
+}
 
 // -- MVC + SignalR --
 builder.Services.AddControllersWithViews()
