@@ -74,8 +74,8 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
             {
                 QueryPlan = QueryPlanBuilder.GetDefaultAsInput(),
-                ReportStart = _config.StartDate,
-                ReportEnd = _config.EndDate
+                ClinicalPeriodStart = _config.StartDate,
+                ClinicalPeriodEnd = _config.EndDate
             });
 
         _generationManifest = pipelineResult.Manifest;

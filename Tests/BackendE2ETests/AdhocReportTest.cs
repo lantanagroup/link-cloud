@@ -64,8 +64,8 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
             acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
             {
                 QueryPlan = QueryPlanBuilder.GetDefaultAsInput(),
-                ReportStart = Config.StartDate,
-                ReportEnd = Config.EndDate
+                ClinicalPeriodStart = Config.StartDate,
+                ClinicalPeriodEnd = Config.EndDate
             });
 
         _generationManifest = pipelineResult.Manifest;

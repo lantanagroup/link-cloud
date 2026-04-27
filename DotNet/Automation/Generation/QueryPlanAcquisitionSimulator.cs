@@ -25,18 +25,18 @@ public static class QueryPlanAcquisitionSimulator
     /// referenced by the patient's resources.
     /// </param>
     /// <param name="queryPlan">The query plan to simulate.</param>
-    /// <param name="reportStart">Optional report period start date.</param>
-    /// <param name="reportEnd">Optional report period end date.</param>
+    /// <param name="clinicalPeriodStart">Optional clinical period start date (ISO-8601). When provided, parameter queries with a <c>date=ge…</c> filter exclude resources whose effective date falls before this value.</param>
+    /// <param name="clinicalPeriodEnd">Optional clinical period end date (ISO-8601). When provided, parameter queries with a <c>date=le…</c> filter exclude resources whose effective date falls after this value.</param>
     public static HashSet<string> SimulateAcquiredKeysForPatient(
         string patientId,
         IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)> patientResourceEntries,
         IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedResourceEntries,
         QueryPlanInput queryPlan,
-        string? reportStart = null,
-        string? reportEnd = null)
+        string? clinicalPeriodStart = null,
+        string? clinicalPeriodEnd = null)
     {
-        var hasStart = DateTimeOffset.TryParse(reportStart, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var start);
-        var hasEnd = DateTimeOffset.TryParse(reportEnd, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var end);
+        var hasStart = DateTimeOffset.TryParse(clinicalPeriodStart, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var start);
+        var hasEnd = DateTimeOffset.TryParse(clinicalPeriodEnd, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var end);
 
         // Build per-type index for this patient (patient resources + shared)
         var typeMap = new Dictionary<string, List<GeneratedResource>>(StringComparer.OrdinalIgnoreCase);

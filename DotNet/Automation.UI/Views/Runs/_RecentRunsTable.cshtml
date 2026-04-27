@@ -1,0 +1,138 @@
+@model Automation.UI.Models.AutomationRunIndexViewModel
+@{
+    // Click-to-sort URL builder. Clicking the active column toggles direction;
+    // any other column resets to descending (most useful default for date-like
+    // and numeric columns). Always resets to page 1 on sort change so the user
+    // doesn't land on a meaningless slice of a freshly-sorted list.
+    Func<string, string> sortUrl = col => Url.Action("Index", "Runs", new
+    {
+        pageNumber = 1,
+        pageSize = Model.PageSize,
+        sortBy = col,
+        sortDir = (Model.SortBy == col && Model.SortDescending) ? "asc" : "desc",
+    }) ?? "#";
+
+    Func<string, string> sortIndicator = col => Model.SortBy == col
+        ? (Model.SortDescending ? " ▼" : " ▲")
+        : string.Empty;
+
+    Func<string, string, string> headerLink = (col, label) =>
+        $"<a class=\"au-sort-header\" data-sort-col=\"{col}\" href=\"{sortUrl(col)}\">{label}{sortIndicator(col)}</a>";
+
+    // Pager URL — preserves active sort and page size, only mutates pageNumber.
+    Func<int, string> pageUrl = p => Url.Action("Index", "Runs", new
+    {
+        pageNumber = p,
+        pageSize = Model.PageSize,
+        sortBy = Model.SortBy,
+        sortDir = Model.SortDir,
+    }) ?? "#";
+}
+<div class="au-card"
+     data-page-number="@Model.PageNumber"
+     data-page-size="@Model.PageSize"
+     data-sort-by="@Model.SortBy"
+     data-sort-dir="@Model.SortDir"
+     id="recentRunsCard">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock-history me-2"></i>Recent Runs</span>
+        <span class="small text-muted">
+            @Model.TotalCount run@(Model.TotalCount == 1 ? "" : "s") &middot; page @Model.PageNumber of @Model.TotalPages
+        </span>
+    </div>
+    <div class="table-responsive">
+        <table class="table au-table mb-0">
+            <thead>
+                <tr>
+                    <th>@Html.Raw(headerLink("runName", "Run"))</th>
+                    <th>@Html.Raw(headerLink("patientCount", "Patients"))</th>
+                    <th>@Html.Raw(headerLink("seed", "Seed"))</th>
+                    <th>@Html.Raw(headerLink("status", "Status"))</th>
+                    <th>Duration</th>
+                    <th>@Html.Raw(headerLink("createdAt", "Created"))</th>
+                    <th>@Html.Raw(headerLink("finishedAt", "Finished"))</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="recentRunsBody">
+            @foreach (var run in Model.Runs)
+            {
+                <tr>
+                    <td>
+                        <div class="fw-semibold">@run.RunName</div>
+                        <code class="small text-muted">@run.RunId</code>
+                    </td>
+                    <td>@run.PatientCount</td>
+                    <td>@run.Seed</td>
+                    <td>
+                        <span class="badge run-status-badge @(run.Status == AutomationRunStatus.Succeeded ? "au-badge-success" : run.Status == AutomationRunStatus.Failed ? "au-badge-danger" : run.Status == AutomationRunStatus.Cancelled ? "au-badge-warning" : "au-badge-muted")" data-run-id="@run.RunId">@run.Status</span>
+                    </td>
+                    <td class="small text-muted">@(run.Duration ?? "–")</td>
+                    <td>@run.CreatedAt.LocalDateTime</td>
+                    <td>@(run.FinishedAt?.LocalDateTime.ToString() ?? "—")</td>
+                    <td class="text-nowrap">
+                        <div class="d-inline-flex gap-1 align-items-center run-actions" data-run-id="@run.RunId">
+                            <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-au-action"><i class="bi bi-box-arrow-up-right"></i></a>
+                            @if (run.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-warning btn-cancel-run" data-run-id="@run.RunId"><i class="bi bi-x-circle"></i></button>
+                            }
+                            @if (run.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-danger btn-delete-run" data-run-id="@run.RunId"><i class="bi bi-trash"></i></button>
+                            }
+                        </div>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    @if (Model.TotalPages > 1)
+    {
+        <div class="d-flex justify-content-between align-items-center p-2 border-top">
+            <div class="d-flex align-items-center gap-2">
+                <label for="pageSizeSelect" class="form-label mb-0 small text-muted">Rows per page</label>
+                <select id="pageSizeSelect" class="form-select form-select-sm" style="width:auto;">
+                    @foreach (var size in new[] { 10, 20, 50, 100 })
+                    {
+                        <option value="@size" selected="@(size == Model.PageSize)">@size</option>
+                    }
+                </select>
+            </div>
+            <nav aria-label="Recent runs pagination">
+                <ul class="pagination pagination-sm mb-0">
+                    <li class="page-item @(Model.PageNumber == 1 ? "disabled" : "")">
+                        <a class="page-link" data-page="1" href="@(Model.PageNumber == 1 ? "#" : pageUrl(1))" aria-label="First">«</a>
+                    </li>
+                    <li class="page-item @(Model.PageNumber == 1 ? "disabled" : "")">
+                        <a class="page-link" data-page="@(Model.PageNumber - 1)" href="@(Model.PageNumber == 1 ? "#" : pageUrl(Model.PageNumber - 1))" aria-label="Previous">‹</a>
+                    </li>
+                    <li class="page-item disabled">
+                        <span class="page-link">@Model.PageNumber / @Model.TotalPages</span>
+                    </li>
+                    <li class="page-item @(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
+                        <a class="page-link" data-page="@(Model.PageNumber + 1)" href="@(Model.PageNumber >= Model.TotalPages ? "#" : pageUrl(Model.PageNumber + 1))" aria-label="Next">›</a>
+                    </li>
+                    <li class="page-item @(Model.PageNumber >= Model.TotalPages ? "disabled" : "")">
+                        <a class="page-link" data-page="@Model.TotalPages" href="@(Model.PageNumber >= Model.TotalPages ? "#" : pageUrl(Model.TotalPages))" aria-label="Last">»</a>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    }
+    else
+    {
+        <div class="d-flex justify-content-end p-2 border-top">
+            <div class="d-flex align-items-center gap-2">
+                <label for="pageSizeSelect" class="form-label mb-0 small text-muted">Rows per page</label>
+                <select id="pageSizeSelect" class="form-select form-select-sm" style="width:auto;">
+                    @foreach (var size in new[] { 10, 20, 50, 100 })
+                    {
+                        <option value="@size" selected="@(size == Model.PageSize)">@size</option>
+                    }
+                </select>
+            </div>
+        </div>
+    }
+</div>

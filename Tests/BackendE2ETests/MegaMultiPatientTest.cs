@@ -71,8 +71,8 @@ public sealed class MegaMultiPatientTest : IAsyncLifetime, IClassFixture<Backend
             acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
             {
                 QueryPlan = QueryPlanBuilder.GetDefaultAsInput(),
-                ReportStart = Config.StartDate,
-                ReportEnd = Config.EndDate
+                ClinicalPeriodStart = Config.StartDate,
+                ClinicalPeriodEnd = Config.EndDate
             });
 
         _generationManifest = pipelineResult.Manifest;

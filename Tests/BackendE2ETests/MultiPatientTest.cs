@@ -68,8 +68,8 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
             acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
             {
                 QueryPlan = QueryPlanBuilder.GetDefaultAsInput(),
-                ReportStart = Config.StartDate,
-                ReportEnd = Config.EndDate
+                ClinicalPeriodStart = Config.StartDate,
+                ClinicalPeriodEnd = Config.EndDate
             });
 
         _generationManifest = pipelineResult.Manifest;
