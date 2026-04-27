@@ -58,24 +58,25 @@ public sealed class MongoIndexManager
     {
         var raw = _database.GetCollection<BsonDocument>("automation_runs");
 
-        // Match any doc where at least one date field is still array-shaped.
-        // $type with the string alias "array" is supported by MongoDB 3.2+ and the
-        // Cosmos DB Mongo API, so we avoid the server-version-dependent numeric form.
-        var legacyFilter = new BsonDocument("$or", new BsonArray
-        {
-            new BsonDocument("CreatedAt",   new BsonDocument("$type", "array")),
-            new BsonDocument("StartedAt",   new BsonDocument("$type", "array")),
-            new BsonDocument("FinishedAt",  new BsonDocument("$type", "array")),
-            new BsonDocument("CompletedAt", new BsonDocument("$type", "array")),
-        });
-
+        // Full-collection scan with a client-side type check on each date
+        // field. We previously narrowed this with a server-side
+        // {$type:"array"} filter, but the Cosmos DB Mongo API doesn't honour
+        // that operator consistently across wire versions — legacy
+        // [ticks, offsetMinutes] documents written through the default
+        // DateTimeOffset serializer were silently skipped, leaving a mixed
+        // ISODate / Array population that Cosmos cannot impose a stable sort
+        // on (manifests as the Recent Runs table refusing to sort by Created).
+        // Scanning every document and inspecting the BSON value type
+        // client-side is portable and cheap once-only: subsequent startups
+        // see only ISODate values and the IsBsonArray check is a no-op per
+        // document.
         var dateFields = new[] { "CreatedAt", "StartedAt", "FinishedAt", "CompletedAt" };
 
         int scanned = 0, rewritten = 0, failed = 0;
 
         try
         {
-            using var cursor = raw.Find(legacyFilter).ToCursor();
+            using var cursor = raw.Find(FilterDefinition<BsonDocument>.Empty).ToCursor();
             while (cursor.MoveNext())
             {
                 foreach (var doc in cursor.Current)
@@ -116,18 +117,14 @@ public sealed class MongoIndexManager
                 }
             }
 
-            if (scanned > 0)
-            {
-                // Logged at Information so operators can confirm the migration ran on
-                // first startup after deploy; subsequent startups log nothing.
-                _logger.LogInformation(
-                    "automation_runs legacy date migration: scanned={Scanned}, rewritten={Rewritten}, failed={Failed}.",
-                    scanned, rewritten, failed);
-            }
-            else
-            {
-                _logger.LogDebug("No automation_runs documents required date-field migration.");
-            }
+            // Always log the scan outcome (Information) so an operator can
+            // confirm the migration actually inspected the collection in
+            // each environment. Previously this was Debug when nothing
+            // needed rewriting, which made it impossible to distinguish
+            // "ran and found nothing" from "didn't run" in production logs.
+            _logger.LogInformation(
+                "automation_runs legacy date migration: scanned={Scanned}, rewritten={Rewritten}, failed={Failed}.",
+                scanned, rewritten, failed);
         }
         catch (Exception ex)
         {

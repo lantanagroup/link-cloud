@@ -9,6 +9,10 @@ public class DataAcquisitionLogApiModel
     public string? PatientId { get; set; }
     public string? CorrelationId { get; set; }
     public string? ReportTrackingId { get; set; }
+    public string? TraceId { get; set; }
+    public string? FhirVersion { get; set; }
+    public string? Priority { get; set; }
+    public int? RetryAttempts { get; set; }
     public RequestStatus? Status { get; set; }
     public QueryPhase? QueryPhase { get; set; }
     public DateTime? CompletionDate { get; set; }
