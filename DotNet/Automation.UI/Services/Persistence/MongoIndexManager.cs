@@ -160,7 +160,7 @@ public sealed class MongoIndexManager
         }
     }
 
-    // ?? automation_runs ??????????????????????????????????????????????
+    // --- automation_runs ---
 
     private void EnsureRunIndexes()
     {
@@ -210,18 +210,17 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "FinishedAt",   1 } }, unique: false, "idx_finishedAt_asc");
     }
 
-    // ?? automation_snapshots ?????????????????????????????????????????
+    // --- automation_snapshots ---
 
     private void EnsureSnapshotIndexes()
     {
         var collection = _database.GetCollection<BsonDocument>("automation_snapshots");
 
-        // Compound key used for upserts and lookups (RunId + Domain).
-        // Unique constraint enforces one snapshot per run+domain pair.
-        CreateIndexSafe(collection, new BsonDocument { { "RunId", 1 }, { "Domain", 1 } }, unique: true, "idx_runId_domain_unique");
+        // Compound key used for upserts and lookups (RunId + Domain)
+        CreateIndexSafe(collection, new BsonDocument { { "RunId", 1 }, { "Domain", 1 } }, unique: false, "idx_runId_domain");
     }
 
-    // ?? automation_scenarios ?????????????????????????????????????????
+    // --- automation_scenarios ---
 
     private void EnsureScenarioIndexes()
     {
@@ -231,7 +230,7 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
     }
 
-    // ?? automation_query_plan_templates ???????????????????????????????
+    // --- automation_query_plan_templates ---
 
     private void EnsureQueryPlanTemplateIndexes()
     {
@@ -241,7 +240,7 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
     }
 
-    // ?? Helpers ??????????????????????????????????????????????????????
+    // --- Helpers ---
 
     private void CreateIndexSafe(IMongoCollection<BsonDocument> collection, BsonDocument keys, bool unique, string name)
     {
@@ -266,23 +265,6 @@ public sealed class MongoIndexManager
                 name,
                 collection.CollectionNamespace.CollectionName);
         }
-        catch (MongoCommandException ex) when (unique && IsCosmosUniqueIndexOnNonEmptyCollectionError(ex))
-        {
-            // Cosmos DB for MongoDB API only allows unique indexes to be created on empty
-            // collections. In a deployed environment where the collection already holds
-            // documents from a previous deploy (when no unique index existed), the create
-            // call fails with "Cannot create unique index when collection contains documents."
-            //
-            // Falling back to a non-unique index with the same keys preserves lookup
-            // performance for the upsert path (filter is RunId + Domain) without changing
-            // application behaviour: dedup is enforced application-side via the upsert
-            // filter, the unique constraint was only a defence-in-depth backstop.
-            _logger.LogWarning(
-                "Cosmos rejected unique index {IndexName} on {Collection} because the collection is non-empty; falling back to a non-unique index with the same keys.",
-                name,
-                collection.CollectionNamespace.CollectionName);
-            CreateIndexSafe(collection, keys, unique: false, name + "_nonunique");
-        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex,
@@ -290,9 +272,6 @@ public sealed class MongoIndexManager
                 name, collection.CollectionNamespace.CollectionName);
         }
     }
-
-    private static bool IsCosmosUniqueIndexOnNonEmptyCollectionError(MongoCommandException ex)
-        => ex.Message.Contains("unique index when collection contains documents", StringComparison.OrdinalIgnoreCase);
 
     private static bool HasIndexWithKeys(IMongoCollection<BsonDocument> collection, BsonDocument targetKeys)
     {
