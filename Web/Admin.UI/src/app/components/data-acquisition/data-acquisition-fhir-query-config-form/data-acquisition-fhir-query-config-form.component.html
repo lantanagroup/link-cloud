@@ -235,7 +235,7 @@
         @if (authTypeControl.value === 'OAuth' || authTypeControl.value === 'Epic') {
         <div class="form-input">
           <mat-form-field appearance="outline" class="subject-input form-input ">
-            <mat-label>Client ID</mat-label>
+            <mat-label>Client ID - Secret Name</mat-label>
             <input matInput formControlName="clientId" [readonly]="viewOnly" placeholder="Client ID">
             @if (clientIdControl.value && !viewOnly) {
             <button matSuffix mat-icon-button aria-label="Clear" (click)="clearClientId()">
@@ -244,7 +244,7 @@
             }
             @if (clientIdControl.hasError('required')) {
             <mat-error>
-              Client Id is <strong>required</strong>.
+              Client ID - Secret Name is <strong>required</strong>.
             </mat-error>
             }
           </mat-form-field>
@@ -254,8 +254,8 @@
         @if (authTypeControl.value === 'OAuth') {
         <div class="form-input">
           <mat-form-field appearance="outline" class="subject-input form-input ">
-            <mat-label>Client Secret</mat-label>
-            <input matInput formControlName="clientSecret" [readonly]="viewOnly" type="password" placeholder="Client Secret">
+            <mat-label>Client Secret - Secret Name</mat-label>
+            <input matInput formControlName="clientSecret" [readonly]="viewOnly" placeholder="Client Secret">
             @if (clientSecretControl.value && !viewOnly) {
             <button matSuffix mat-icon-button aria-label="Clear" (click)="clearClientSecret()">
               <mat-icon>close</mat-icon>
@@ -263,7 +263,7 @@
             }
             @if (clientSecretControl.hasError('required')) {
             <mat-error>
-              Client Secret is <strong>required</strong>.
+              Client Secret - Secret Name is <strong>required</strong>.
             </mat-error>
             }
           </mat-form-field>

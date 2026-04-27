@@ -13,6 +13,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Security;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 
@@ -21,16 +22,18 @@ public class EpicAuth : IAuth
     private readonly HttpClient _httpClient;
     private readonly ILogger<EpicAuth> _logger;
     private readonly ICacheService _cacheService;
-
+    private readonly ISecretManager _secretManager;
     public EpicAuth(
         HttpClient httpClient,
         ILogger<EpicAuth> logger,
-        ICacheService cacheService
+        ICacheService cacheService,
+        ISecretManager secretManager
         )
     {
         _httpClient = httpClient;
         _logger = logger;
         _cacheService = cacheService;
+        _secretManager = secretManager;
     }
 
     /// <summary>
@@ -46,7 +49,7 @@ public class EpicAuth : IAuth
         if (!string.IsNullOrWhiteSpace(cachedToken))
             return (false, new AuthenticationHeaderValue("Bearer", cachedToken));
 
-        string jwt = GetJwt(authSettings);
+        string jwt = await GetJwt(authSettings);
 
         try
         {
@@ -84,7 +87,7 @@ public class EpicAuth : IAuth
         return sanitizedInput;
     }
 
-    private string GetJwt(AuthenticationConfigurationModel authSettings)
+    private async Task<string> GetJwt(AuthenticationConfigurationModel authSettings)
     {
         var key = authSettings.Key.Replace("\\r\\n\\t", "\r\n\t");
 
@@ -106,16 +109,24 @@ public class EpicAuth : IAuth
 
         var signingCredentials = new SigningCredentials(rsaKey, SecurityAlgorithms.RsaSha256);
 
+        if (string.IsNullOrWhiteSpace(authSettings.ClientId))
+                throw new ArgumentException("A secret name for ClientId must be provided for Epic authentication.");
+
+        var clientId = await _secretManager.GetSecretAsync(authSettings.ClientId, CancellationToken.None);
+
+        if (string.IsNullOrWhiteSpace(clientId))
+            throw new InvalidOperationException($"No value found in secret manager for ClientId");
+
         var descriptor = new SecurityTokenDescriptor
         {
-            Issuer = authSettings.ClientId,
+            Issuer = clientId,
             Audience = authSettings.TokenUrl,
             IssuedAt = now,
             NotBefore = now,
             Expires = now.AddMinutes(4),
             AdditionalHeaderClaims = headers,
             Claims = new Dictionary<string, object> { { "jti", Guid.NewGuid().ToString() } },
-            Subject = new ClaimsIdentity(new List<Claim> { new Claim("sub", authSettings.ClientId) }),
+            Subject = new ClaimsIdentity(new List<Claim> { new Claim("sub", clientId) }),
             SigningCredentials = signingCredentials
         };
 
