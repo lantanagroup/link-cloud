@@ -114,14 +114,37 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return doc == null ? null : ToSummary(doc);
     }
 
-    public async Task<PagedRunResult> GetRunsPageAsync(int pageNumber, int pageSize, CancellationToken ct = default)
+    public async Task<PagedRunResult> GetRunsPageAsync(int pageNumber, int pageSize, string? sortBy = null, bool sortDescending = true, CancellationToken ct = default)
     {
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 200);
 
         var total = await _runs.CountDocumentsAsync(FilterDefinition<AutomationRunDocument>.Empty, cancellationToken: ct);
+
+        // Build the sort spec from a server-side whitelist. Anything unrecognized
+        // (or null) falls back to CreatedAt DESC, the existing default. The client
+        // sends short friendly tokens (matched case-insensitively) rather than raw
+        // BSON field names so we never bind user input directly into the query.
+        var sortBuilder = Builders<AutomationRunDocument>.Sort;
+        var primary = (sortBy ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "runname"      => sortDescending ? sortBuilder.Descending(r => r.RunName)      : sortBuilder.Ascending(r => r.RunName),
+            "patientcount" => sortDescending ? sortBuilder.Descending(r => r.PatientCount) : sortBuilder.Ascending(r => r.PatientCount),
+            "seed"         => sortDescending ? sortBuilder.Descending(r => r.Seed)         : sortBuilder.Ascending(r => r.Seed),
+            "status"       => sortDescending ? sortBuilder.Descending(r => r.Status)       : sortBuilder.Ascending(r => r.Status),
+            "finishedat"   => sortDescending ? sortBuilder.Descending(r => r.FinishedAt)   : sortBuilder.Ascending(r => r.FinishedAt),
+            "createdat"    => sortDescending ? sortBuilder.Descending(r => r.CreatedAt)    : sortBuilder.Ascending(r => r.CreatedAt),
+            _              => sortBuilder.Descending(r => r.CreatedAt),
+        };
+
+        // RunId tiebreaker so paging is deterministic when the primary key has
+        // duplicates (e.g. two seeded rows on the same day, or two runs sharing
+        // a Status value). Without this, a user paging through the table can see
+        // the same row appear on consecutive pages or vanish entirely.
+        var sort = sortBuilder.Combine(primary, sortBuilder.Ascending(r => r.RunId));
+
         var docs = await _runs.Find(FilterDefinition<AutomationRunDocument>.Empty)
-            .SortByDescending(r => r.CreatedAt)
+            .Sort(sort)
             .Skip((pageNumber - 1) * pageSize)
             .Limit(pageSize)
             .ToListAsync(ct);

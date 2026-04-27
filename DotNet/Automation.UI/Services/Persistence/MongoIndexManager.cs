@@ -51,75 +51,78 @@ public sealed class MongoIndexManager
     /// next upserted. Rewriting them once at startup restores visibility and lets the
     /// idx_createdAt_desc index service the range scan.
     ///
-    /// Idempotent: after the first successful run, the $type:"array" filter matches
-    /// nothing and the method is a no-op.
+    /// Idempotent: after a successful run no documents match the <c>$type:"array"</c>
+    /// probe, and the method is a no-op.
     /// </summary>
     private void MigrateLegacyRunDateFields()
     {
-        var typed = _database.GetCollection<AutomationRunDocument>("automation_runs");
         var raw = _database.GetCollection<BsonDocument>("automation_runs");
 
-        // Match any run doc where at least one of the date fields is still an array.
-        // $type with "array" is a BSON type alias supported by both Mongo and Cosmos.
-        var legacyFilter = new BsonDocument
+        // Match any doc where at least one date field is still array-shaped.
+        // $type with the string alias "array" is supported by MongoDB 3.2+ and the
+        // Cosmos DB Mongo API, so we avoid the server-version-dependent numeric form.
+        var legacyFilter = new BsonDocument("$or", new BsonArray
         {
-            { "$or", new BsonArray
-                {
-                    new BsonDocument("CreatedAt",   new BsonDocument("$type", "array")),
-                    new BsonDocument("StartedAt",   new BsonDocument("$type", "array")),
-                    new BsonDocument("FinishedAt",  new BsonDocument("$type", "array")),
-                    new BsonDocument("CompletedAt", new BsonDocument("$type", "array"))
-                }
-            }
-        };
+            new BsonDocument("CreatedAt",   new BsonDocument("$type", "array")),
+            new BsonDocument("StartedAt",   new BsonDocument("$type", "array")),
+            new BsonDocument("FinishedAt",  new BsonDocument("$type", "array")),
+            new BsonDocument("CompletedAt", new BsonDocument("$type", "array")),
+        });
 
-        int scanned = 0, rewritten = 0;
+        var dateFields = new[] { "CreatedAt", "StartedAt", "FinishedAt", "CompletedAt" };
+
+        int scanned = 0, rewritten = 0, failed = 0;
 
         try
         {
-            // Use the raw collection to enumerate _id only; then reload each via the
-            // typed collection so the driver's DateTimeOffsetSerializer performs the
-            // legacy array -> DateTimeOffset conversion on the read path. Writing the
-            // typed document back via ReplaceOne serializes every date field using the
-            // now-configured BsonType.DateTime representation.
-            var idProjection = Builders<BsonDocument>.Projection.Include("_id");
-            using var cursor = raw.Find(legacyFilter).Project(idProjection).ToCursor();
-
+            using var cursor = raw.Find(legacyFilter).ToCursor();
             while (cursor.MoveNext())
             {
-                foreach (var idDoc in cursor.Current)
+                foreach (var doc in cursor.Current)
                 {
                     scanned++;
 
-                    if (!idDoc.TryGetValue("_id", out var idValue))
+                    if (!doc.TryGetValue("_id", out var idValue))
                         continue;
 
-                    var idFilter = new BsonDocument("_id", idValue);
+                    var set = new BsonDocument();
+                    foreach (var field in dateFields)
+                    {
+                        if (!doc.TryGetValue(field, out var value) || !value.IsBsonArray)
+                            continue;
+
+                        if (TryConvertLegacyDateArray(value.AsBsonArray, out var converted))
+                            set[field] = converted;
+                    }
+
+                    if (set.ElementCount == 0)
+                        continue;
 
                     try
                     {
-                        var doc = typed.Find(idFilter).FirstOrDefault();
-                        if (doc == null)
-                            continue;
-
-                        typed.ReplaceOne(idFilter, doc);
+                        raw.UpdateOne(
+                            new BsonDocument("_id", idValue),
+                            new BsonDocument("$set", set));
                         rewritten++;
                     }
                     catch (Exception ex)
                     {
+                        failed++;
                         _logger.LogWarning(ex,
-                            "Failed to migrate legacy date fields for automation_runs document {Id}. " +
-                            "The document will remain in array form and be invisible to dashboard range queries until re-upserted.",
+                            "Failed to rewrite legacy date fields for automation_runs document {Id}. " +
+                            "The document will remain in array form and stay hidden from dashboard range queries until re-upserted.",
                             idValue);
                     }
                 }
             }
 
-            if (rewritten > 0)
+            if (scanned > 0)
             {
+                // Logged at Information so operators can confirm the migration ran on
+                // first startup after deploy; subsequent startups log nothing.
                 _logger.LogInformation(
-                    "Migrated {Rewritten}/{Scanned} automation_runs document(s) from legacy array-form DateTimeOffset to ISODate representation.",
-                    rewritten, scanned);
+                    "automation_runs legacy date migration: scanned={Scanned}, rewritten={Rewritten}, failed={Failed}.",
+                    scanned, rewritten, failed);
             }
             else
             {
@@ -133,17 +136,74 @@ public sealed class MongoIndexManager
         }
     }
 
+    /// <summary>
+    /// Converts the driver's legacy two-element DateTimeOffset array
+    /// (<c>[ticks, offsetMinutes]</c>) into a BSON <c>DateTime</c> normalized to UTC.
+    /// </summary>
+    private static bool TryConvertLegacyDateArray(BsonArray array, out BsonDateTime converted)
+    {
+        converted = default!;
+        if (array.Count != 2)
+            return false;
+
+        try
+        {
+            var ticks = array[0].ToInt64();
+            var offsetMinutes = array[1].ToInt32();
+            var dto = new DateTimeOffset(ticks, TimeSpan.FromMinutes(offsetMinutes));
+            converted = new BsonDateTime(dto.UtcDateTime);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     // ?? automation_runs ??????????????????????????????????????????????
 
     private void EnsureRunIndexes()
     {
         var collection = _database.GetCollection<BsonDocument>("automation_runs");
 
-        // Sort index for GetRunsPageAsync (ORDER BY CreatedAt DESC).
+        // Sort index for GetRunsPageAsync (default ORDER BY CreatedAt DESC).
         CreateIndexSafe(collection, new BsonDocument { { "CreatedAt", -1 } }, unique: false, "idx_createdAt_desc");
 
         // Filter index for GetActiveRunsAsync (WHERE IsActive = true).
         CreateIndexSafe(collection, new BsonDocument { { "IsActive", 1 } }, unique: false, "idx_isActive");
+
+        // Single-field sort indexes for the user-selectable columns exposed by
+        // the Recent Runs table on the dashboard. Without these, picking any
+        // sort other than the default CreatedAt forces Cosmos / Mongo to do a
+        // full collection scan + in-memory sort, which becomes expensive once
+        // automation_runs grows past a few thousand documents.
+        //
+        // Direction is intentionally ascending (1). Both Cosmos Mongo API and
+        // native MongoDB can scan a single-field index in reverse, so one
+        // index serves both ASC and DESC for the same column — no need for a
+        // mirrored "_desc" copy.
+        //
+        // BSON field names match the C# property casing (PascalCase) because
+        // no camelCase convention is registered on the Mongo client; see
+        // MongoDocuments.AutomationRunDocument. Lowercase variants would
+        // create dead indexes that the query planner never picks up.
+        //
+        // Cosmos DB (RU model) note: every secondary index here costs write
+        // RU/s on each UpsertRunSummaryAsync call. We deliberately keep the
+        // set minimal:
+        //   - Only single-field indexes, no {Sort, RunId} compound matrix.
+        //     The RunId tiebreaker in MongoSnapshotStore.GetRunsPageAsync is
+        //     resolved by a small post-seek sort step at pageSize=20, which
+        //     is cheap; doubling the index count to make it index-resident
+        //     would not be worth the per-write RU hit at this collection's
+        //     scale.
+        //   - No indexes on derived/string-formatted columns like Duration
+        //     (intentionally not sortable in the UI).
+        CreateIndexSafe(collection, new BsonDocument { { "RunName",      1 } }, unique: false, "idx_runName_asc");
+        CreateIndexSafe(collection, new BsonDocument { { "PatientCount", 1 } }, unique: false, "idx_patientCount_asc");
+        CreateIndexSafe(collection, new BsonDocument { { "Seed",         1 } }, unique: false, "idx_seed_asc");
+        CreateIndexSafe(collection, new BsonDocument { { "Status",       1 } }, unique: false, "idx_status_asc");
+        CreateIndexSafe(collection, new BsonDocument { { "FinishedAt",   1 } }, unique: false, "idx_finishedAt_asc");
     }
 
     // ?? automation_snapshots ?????????????????????????????????????????

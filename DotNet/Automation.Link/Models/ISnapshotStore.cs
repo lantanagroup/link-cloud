@@ -40,7 +40,7 @@ public interface ISnapshotStore
     Task<RunSnapshotMeta?> GetRunMetaAsync(Guid runId, CancellationToken ct = default);
     Task UpsertRunSummaryAsync(AutomationRunSummary summary, string? facilityId, string? reportId, CancellationToken ct = default);
     Task<AutomationRunSummary?> GetRunSummaryAsync(Guid runId, CancellationToken ct = default);
-    Task<PagedRunResult> GetRunsPageAsync(int pageNumber, int pageSize, CancellationToken ct = default);
+    Task<PagedRunResult> GetRunsPageAsync(int pageNumber, int pageSize, string? sortBy = null, bool sortDescending = true, CancellationToken ct = default);
     Task<IReadOnlyList<AutomationRunSummary>> GetAllRunSummariesAsync(DateTimeOffset? since = null, CancellationToken ct = default);
     Task DeleteRunAsync(Guid runId, CancellationToken ct = default);
 
