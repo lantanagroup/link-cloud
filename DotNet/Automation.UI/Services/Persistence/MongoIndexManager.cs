@@ -192,11 +192,15 @@ public sealed class MongoIndexManager
         // RU/s on each UpsertRunSummaryAsync call. We deliberately keep the
         // set minimal:
         //   - Only single-field indexes, no {Sort, RunId} compound matrix.
-        //     The RunId tiebreaker in MongoSnapshotStore.GetRunsPageAsync is
-        //     resolved by a small post-seek sort step at pageSize=20, which
-        //     is cheap; doubling the index count to make it index-resident
-        //     would not be worth the per-write RU hit at this collection's
-        //     scale.
+        //     Cosmos DB for MongoDB API rejects multi-field ORDER BY queries
+        //     without a matching composite index outright ("The order by
+        //     query does not have a corresponding composite index that it
+        //     can be served from"), unlike native MongoDB which silently
+        //     applies an in-memory secondary sort. To stay index-resident on
+        //     Cosmos without doubling the index count, MongoSnapshotStore
+        //     .GetRunsPageAsync issues a single-field server-side sort and
+        //     applies the RunId tiebreaker client-side after the page is
+        //     fetched (within-page determinism only).
         //   - No indexes on derived/string-formatted columns like Duration
         //     (intentionally not sortable in the UI).
         CreateIndexSafe(collection, new BsonDocument { { "RunName",      1 } }, unique: false, "idx_runName_asc");
@@ -262,6 +266,23 @@ public sealed class MongoIndexManager
                 name,
                 collection.CollectionNamespace.CollectionName);
         }
+        catch (MongoCommandException ex) when (unique && IsCosmosUniqueIndexOnNonEmptyCollectionError(ex))
+        {
+            // Cosmos DB for MongoDB API only allows unique indexes to be created on empty
+            // collections. In a deployed environment where the collection already holds
+            // documents from a previous deploy (when no unique index existed), the create
+            // call fails with "Cannot create unique index when collection contains documents."
+            //
+            // Falling back to a non-unique index with the same keys preserves lookup
+            // performance for the upsert path (filter is RunId + Domain) without changing
+            // application behaviour: dedup is enforced application-side via the upsert
+            // filter, the unique constraint was only a defence-in-depth backstop.
+            _logger.LogWarning(
+                "Cosmos rejected unique index {IndexName} on {Collection} because the collection is non-empty; falling back to a non-unique index with the same keys.",
+                name,
+                collection.CollectionNamespace.CollectionName);
+            CreateIndexSafe(collection, keys, unique: false, name + "_nonunique");
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex,
@@ -269,6 +290,9 @@ public sealed class MongoIndexManager
                 name, collection.CollectionNamespace.CollectionName);
         }
     }
+
+    private static bool IsCosmosUniqueIndexOnNonEmptyCollectionError(MongoCommandException ex)
+        => ex.Message.Contains("unique index when collection contains documents", StringComparison.OrdinalIgnoreCase);
 
     private static bool HasIndexWithKeys(IMongoCollection<BsonDocument> collection, BsonDocument targetKeys)
     {
