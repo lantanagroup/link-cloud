@@ -337,23 +337,32 @@
 
 <div class="modal fade" id="dataAcqLogModal" tabindex="-1" aria-labelledby="dataAcqLogModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="dataAcqLogModalLabel">Data Acquisition Logs</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="modal-content au-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-download me-2"></i><span id="dataAcqLogModalLabel">Data Acquisition Logs</span></span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
+                    <input type="search"
+                           id="daLogSearch"
+                           class="form-control form-control-sm"
+                           style="max-width:360px;"
+                           placeholder="Filter loaded rows (Id, patient, status, phase, resource types…)"
+                           autocomplete="off" />
+                    <span class="small text-muted" id="daLogFilterInfo"></span>
+                </div>
                 <div class="table-responsive">
-                    <table class="table table-sm table-striped" id="dataAcqLogTable">
+                    <table class="table au-table mb-0" id="dataAcqLogTable">
                         <thead>
                             <tr>
-                                <th role="button" class="user-select-none" data-sortby="Id">Id <span id="sortIconId" class="text-muted"></span></th>
-                                <th role="button" class="user-select-none" data-sortby="PatientId">Patient <span id="sortIconPatientId" class="text-muted"></span></th>
-                                <th role="button" class="user-select-none" data-sortby="Status">Status <span id="sortIconStatus" class="text-muted"></span></th>
-                                <th role="button" class="user-select-none" data-sortby="QueryPhase">Phase <span id="sortIconQueryPhase" class="text-muted"></span></th>
+                                <th role="button" class="user-select-none" data-sortby="Id">Id <span id="sortIconId" class="text-white-50"></span></th>
+                                <th role="button" class="user-select-none" data-sortby="PatientId">Patient <span id="sortIconPatientId" class="text-white-50"></span></th>
+                                <th role="button" class="user-select-none" data-sortby="Status">Status <span id="sortIconStatus" class="text-white-50"></span></th>
+                                <th role="button" class="user-select-none" data-sortby="QueryPhase">Phase <span id="sortIconQueryPhase" class="text-white-50"></span></th>
                                 <th>Reference</th>
                                 <th>Resource Types</th>
-                                <th>Details</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody id="dataAcqLogTableBody">
@@ -361,21 +370,21 @@
                     </table>
                 </div>
 
-<div id="daLogFlyout" style="position:fixed; top:0; right:-560px; width:540px; height:100%; background:#fff; box-shadow:-4px 0 20px rgba(0,0,0,.2); z-index:1060; transition:right .2s ease;">
-    <div class="d-flex justify-content-between align-items-center border-bottom p-3">
+<div id="daLogFlyout" class="au-card" style="position:fixed; top:0; right:-720px; width:700px; max-width:96vw; height:100%; z-index:1060; transition:right .2s ease; border-radius:0; margin-bottom:0;">
+    <div class="card-header d-flex justify-content-between align-items-center">
         <div>
-            <h6 class="mb-0" id="daLogFlyoutTitle">Data Acquisition Log Details</h6>
-            <small class="text-muted" id="daLogFlyoutSubtitle"></small>
+            <div id="daLogFlyoutTitle"><i class="bi bi-file-text me-2"></i>Data Acquisition Log Details</div>
+            <div class="small" id="daLogFlyoutSubtitle" style="opacity:.85;font-weight:400;"></div>
         </div>
-        <button class="btn btn-sm btn-outline-secondary" id="closeDaLogFlyout">Close</button>
+        <button type="button" class="btn-close btn-close-white" id="closeDaLogFlyout" aria-label="Close"></button>
     </div>
-    <div class="p-3" id="daLogFlyoutBody" style="overflow:auto; height: calc(100% - 72px);"></div>
+    <div class="p-3" id="daLogFlyoutBody" style="overflow:auto; height: calc(100% - 56px); background:#fff;"></div>
 </div>
                 <div class="d-flex justify-content-between align-items-center mt-2">
                     <span class="small text-muted" id="dataAcqLogPaginationInfo"></span>
                     <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-secondary" id="dataAcqLogPrev" disabled>Previous</button>
-                        <button class="btn btn-outline-secondary" id="dataAcqLogNext" disabled>Next</button>
+                        <button class="btn btn-au-action" id="dataAcqLogPrev" disabled>Previous</button>
+                        <button class="btn btn-au-action" id="dataAcqLogNext" disabled>Next</button>
                     </div>
                 </div>
             </div>
@@ -1422,19 +1431,20 @@
                     const resourceTypes = r.resourceTypes || r.ResourceTypes || [];
                     const patient = r.patientId ?? r.PatientId ?? '-';
                     const logId = r.id ?? r.Id;
-                    const statusClass = status.toLowerCase() === 'completed' ? 'text-success'
-                        : status.toLowerCase() === 'failed' ? 'text-danger'
-                        : status.toLowerCase() === 'processing' ? 'text-info'
-                        : '';
+                    const statusKey = String(status).toLowerCase();
+                    const statusBadge = statusKey === 'completed' ? 'au-badge-success'
+                        : statusKey === 'failed' ? 'au-badge-danger'
+                        : statusKey === 'processing' ? 'au-badge-muted'
+                        : 'au-badge-muted';
                     return `<tr>
                         <td class="small">${logId ?? '-'}</td>
                         <td class="small">${escapeHtml(patient)}</td>
-                        <td class="small ${statusClass}">${escapeHtml(status)}</td>
+                        <td><span class="badge ${statusBadge}">${escapeHtml(status)}</span></td>
                         <td class="small">${escapeHtml(phase)}</td>
-                        <td class="small">${refCount > 0 ? `<span class="badge" style="background:var(--au-accent);color:#fff;">${refCount} ref</span>` : isReference ? '<span class="badge bg-light text-dark border">Ref</span>' : '<span class="text-muted">-</span>'}</td>
+                        <td class="small">${refCount > 0 ? `<span class="badge" style="background:var(--au-accent);color:#fff;">${refCount} ref</span>` : isReference ? '<span class="badge au-badge-muted">Ref</span>' : '<span class="text-muted">-</span>'}</td>
                         <td class="small" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(resourceTypes.join(', '))}">${escapeHtml(resourceTypes.join(', ') || '-')}</td>
-                        <td class="small">
-                            <button type="button" class="btn btn-sm btn-outline-secondary da-detail-btn" data-logid="${logId}" title="View details"><i class="bi bi-file-text"></i></button>
+                        <td class="small text-end">
+                            <button type="button" class="btn btn-sm btn-au-action da-detail-btn" data-logid="${logId}" title="View details"><i class="bi bi-file-text"></i></button>
                         </td>
                     </tr>`;
                 }).join('');
@@ -1455,9 +1465,9 @@
             const subtitle = document.getElementById('daLogFlyoutSubtitle');
             const body = document.getElementById('daLogFlyoutBody');
 
-            title.textContent = `Data Acquisition Log ${logId}`;
-            subtitle.textContent = 'Loading...';
-            body.innerHTML = '<div class="text-muted">Loading details...</div>';
+            title.innerHTML = `<i class="bi bi-file-text me-2"></i>Data Acquisition Log ${logId}`;
+            subtitle.textContent = 'Loading…';
+            body.innerHTML = '<div class="text-muted">Loading details…</div>';
             flyout.style.right = '0';
 
             try {
@@ -1478,34 +1488,51 @@
                 const status = d.status ?? d.Status ?? '-';
                 const phase = d.queryPhase ?? d.QueryPhase ?? '-';
                 const patient = d.patientId ?? d.PatientId ?? '-';
+                const traceId = d.traceId ?? d.TraceId ?? '';
+                const correlationId = d.correlationId ?? d.CorrelationId ?? '';
+                const queryType = d.queryType ?? d.QueryType ?? '';
+                const queries = d.queries || d.Queries || [];
+                const fhirVersion = d.fhirVersion ?? d.FhirVersion ?? '';
+                const priority = d.priority ?? d.Priority ?? '';
+                const retryAttempts = d.retryAttempts ?? d.RetryAttempts ?? 0;
 
-                subtitle.textContent = `Patient: ${patient} | Status: ${status} | Phase: ${phase}`;
+                const statusKey = String(status).toLowerCase();
+                const statusBadge = statusKey === 'completed' ? 'au-badge-success'
+                    : statusKey === 'failed' ? 'au-badge-danger'
+                    : statusKey === 'processing' ? 'au-badge-muted'
+                    : 'au-badge-muted';
+
+                subtitle.innerHTML = `Patient <code class="text-white">${escapeHtml(patient)}</code> &middot; <span class="badge ${statusBadge}">${escapeHtml(status)}</span> &middot; Phase ${escapeHtml(phase)}`;
                 body.innerHTML = `
-                    <div class="mb-3">
-                        <div class="small text-muted">Reference Workflow</div>
-                        <div class="small">${isReference ? 'Yes' : 'No'}${isReference ? ` (stored reference resources: ${referenceResourceCount})` : ''}</div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-12">
+                            <div class="au-summary-item"><span class="au-label">Trace Id</span><code class="au-value text-break">${escapeHtml(traceId || '-')}</code></div>
+                        </div>
+                        <div class="col-12">
+                            <div class="au-summary-item"><span class="au-label">Correlation Id</span><code class="au-value text-break">${escapeHtml(correlationId || '-')}</code></div>
+                        </div>
+                        <div class="col-6"><div class="au-summary-item"><span class="au-label">Query Type</span><span class="au-value">${escapeHtml(queryType || '-')}</span></div></div>
+                        <div class="col-6"><div class="au-summary-item"><span class="au-label">FHIR Version</span><span class="au-value">${escapeHtml(fhirVersion || '-')}</span></div></div>
+                        <div class="col-6"><div class="au-summary-item"><span class="au-label">Priority</span><span class="au-value">${escapeHtml(String(priority) || '-')}</span></div></div>
+                        <div class="col-6"><div class="au-summary-item"><span class="au-label">Retry Attempts</span><span class="au-value">${retryAttempts}</span></div></div>
+                        <div class="col-6"><div class="au-summary-item"><span class="au-label">Reference Workflow</span><span class="au-value">${isReference ? `Yes (${referenceResourceCount})` : 'No'}</span></div></div>
+                        <div class="col-6"><div class="au-summary-item"><span class="au-label">Completion</span><span class="au-value">${escapeHtml(String(d.completionTimeMilliseconds ?? d.CompletionTimeMilliseconds ?? '-'))} ms</span><span class="small text-muted">${escapeHtml(String(d.completionDate ?? d.CompletionDate ?? '-'))}</span></div></div>
                     </div>
-                    <div class="mb-3">
-                        <div class="small text-muted">Resource Types</div>
-                        <div class="small">${escapeHtml(resourceTypes.join(', ') || '-')}</div>
-                    </div>
-                    <div class="mb-3">
-                        <div class="small text-muted">Completion</div>
-                        <div class="small">${escapeHtml(String(d.completionDate ?? d.CompletionDate ?? '-'))}</div>
-                        <div class="small">${escapeHtml(String(d.completionTimeMilliseconds ?? d.CompletionTimeMilliseconds ?? '-'))} ms</div>
-                    </div>
-                    <div class="mb-3">
-                        <div class="small text-muted mb-1">Resources (${resources.length})</div>
-                        <pre style="max-height:200px;overflow:auto;background:#f8f9fa;padding:8px;">${escapeHtml(resources.join('\n') || '(none)')}</pre>
-                    </div>
-                    ${referenceResources.length > 0 ? `<div class="mb-3">
-                        <div class="small text-muted mb-1"><span class="badge bg-light text-dark border me-1">Ref</span>Reference Resources (${referenceResources.length})</div>
-                        <pre style="max-height:200px;overflow:auto;background:#f0f8ff;padding:8px;">${escapeHtml(referenceResources.join('\n'))}</pre>
-                    </div>` : ''}
-                    <div>
-                        <div class="small text-muted mb-1">Notes (${notes.length})</div>
-                        <pre style="max-height:260px;overflow:auto;background:#f8f9fa;padding:8px;">${escapeHtml(notes.join('\n') || '(none)')}</pre>
-                    </div>`;
+
+                    <div class="au-summary-item mb-2"><span class="au-label">Queries (${queries.length})</span></div>
+                    <pre class="small" style="max-height:160px;overflow:auto;background:#f5f6f8;border:1px solid #e3e6ea;border-radius:.35rem;padding:.5rem .65rem;">${escapeHtml(queries.join('\n') || '(none)')}</pre>
+
+                    <div class="au-summary-item mb-2"><span class="au-label">Resource Types</span><span class="au-value">${escapeHtml(resourceTypes.join(', ') || '-')}</span></div>
+
+                    <div class="au-summary-item mb-2 mt-3"><span class="au-label">Resources (${resources.length})</span></div>
+                    <pre class="small" style="max-height:200px;overflow:auto;background:#f5f6f8;border:1px solid #e3e6ea;border-radius:.35rem;padding:.5rem .65rem;">${escapeHtml(resources.join('\n') || '(none)')}</pre>
+
+                    ${referenceResources.length > 0 ? `<div class="au-summary-item mb-2 mt-3"><span class="au-label"><span class="badge au-badge-muted me-1">Ref</span>Reference Resources (${referenceResources.length})</span></div>
+                    <pre class="small" style="max-height:200px;overflow:auto;background:#eef5ff;border:1px solid #cfe1fb;border-radius:.35rem;padding:.5rem .65rem;">${escapeHtml(referenceResources.join('\n'))}</pre>` : ''}
+
+                    <div class="au-summary-item mb-2 mt-3"><span class="au-label">Notes (${notes.length})</span></div>
+                    <pre class="small" style="max-height:260px;overflow:auto;background:#f5f6f8;border:1px solid #e3e6ea;border-radius:.35rem;padding:.5rem .65rem;">${escapeHtml(notes.join('\n') || '(none)')}</pre>
+                `;
             } catch {
                 subtitle.textContent = '';
                 body.innerHTML = '<div class="text-danger">Error loading log details.</div>';
@@ -1534,8 +1561,53 @@
         document.getElementById('dataAcqLogModal').addEventListener('show.bs.modal', () => loadDataAcqLogs(1));
         document.getElementById('dataAcqLogPrev').addEventListener('click', () => { if (daLogPage > 1) loadDataAcqLogs(daLogPage - 1); });
         document.getElementById('dataAcqLogNext').addEventListener('click', () => loadDataAcqLogs(daLogPage + 1));
+
+        // Client-side filter over the currently loaded page. Hides rows whose
+        // visible cell text doesn't match. Server-side search would require
+        // SDK changes; for now this gives quick narrowing within the 50 rows
+        // already on screen and clearly indicates the visible/total ratio.
+        (function () {
+            const input = document.getElementById('daLogSearch');
+            const info = document.getElementById('daLogFilterInfo');
+            if (!input) return;
+
+            let timer = null;
+            function applyFilter() {
+                const term = (input.value || '').trim().toLowerCase();
+                const tbody = document.getElementById('dataAcqLogTableBody');
+                if (!tbody) return;
+
+                let visible = 0;
+                let total = 0;
+                for (const tr of tbody.querySelectorAll('tr')) {
+                    if (!tr.querySelector('td')) continue; // skip empty/loading rows
+                    total++;
+                    const matches = !term || tr.textContent.toLowerCase().includes(term);
+                    tr.style.display = matches ? '' : 'none';
+                    if (matches) visible++;
+                }
+
+                if (info) {
+                    info.textContent = term
+                        ? `Showing ${visible} of ${total} loaded row(s)`
+                        : '';
+                }
+            }
+
+            input.addEventListener('input', () => {
+                clearTimeout(timer);
+                timer = setTimeout(applyFilter, 120);
+            });
+
+            // Re-apply when a new page is loaded so the filter persists across pagination.
+            const tbody = document.getElementById('dataAcqLogTableBody');
+            if (tbody) {
+                new MutationObserver(applyFilter).observe(tbody, { childList: true });
+            }
+        })();
+
         document.getElementById('closeDaLogFlyout').addEventListener('click', () => {
-            document.getElementById('daLogFlyout').style.right = '-560px';
+            document.getElementById('daLogFlyout').style.right = '-720px';
         });
 
         // --- Generation Manifest ---
