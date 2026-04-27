@@ -3,9 +3,7 @@ using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
-using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Helpers;
-using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Automation.Link.Services;
 using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
@@ -556,11 +554,8 @@ public class AutomationRunManager : IAutomationRunManager
                 throw new InvalidOperationException("MeasureLoader did not produce any MeasureIds");
             var measureId = measureIds[0];
 
-            var facilityId = $"{state.Scenario}-{state.RunId:N}".Substring(0, Math.Min(48, $"{state.Scenario}-{state.RunId:N}".Length));
-            lock (state.Sync)
-            {
-                state.FacilityId = facilityId;
-            }
+            var facilityId = state.RunId.ToString();
+            state.FacilityId = facilityId;
 
             // Resolve the query plan template (null = use built-in defaults).
             var queryPlanResolution = await ResolveQueryPlanAsync(state.Options.QueryPlanTemplateId);
