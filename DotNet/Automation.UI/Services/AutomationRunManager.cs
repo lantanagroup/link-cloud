@@ -689,6 +689,30 @@ public class AutomationRunManager : IAutomationRunManager
                 output.WriteLine($"[WARN] Failed to build/store ABS upload snapshot: {absEx.Message}");
             }
 
+            // Persist raw ABS file contents (NDJSON + serialized FHIR resources) so the
+            // diagnostics export can re-emit them later without a live re-download.
+            // Best-effort: a serialization or store-size failure must not abort the run.
+            try
+            {
+                var absFiles = new Dictionary<string, string>(internalAbsResources.Count, StringComparer.OrdinalIgnoreCase);
+                var fhirSerializer = new Hl7.Fhir.Serialization.FhirJsonSerializer(
+                    new Hl7.Fhir.Serialization.SerializerSettings { Pretty = true });
+                foreach (var (key, value) in internalAbsResources)
+                {
+                    absFiles[key] = value switch
+                    {
+                        string s => s,
+                        Hl7.Fhir.Model.Resource r => fhirSerializer.SerializeToString(r),
+                        _ => value?.ToString() ?? string.Empty
+                    };
+                }
+                await _snapshotStore.SetDomainAsync(state.RunId, "absFiles", absFiles, CancellationToken.None);
+            }
+            catch (Exception absFilesEx)
+            {
+                output.WriteLine($"[WARN] Failed to persist raw ABS files for export: {absFilesEx.Message}");
+            }
+
             if (!downloadedResources.ContainsKey("manifest.ndjson"))
                 throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
 

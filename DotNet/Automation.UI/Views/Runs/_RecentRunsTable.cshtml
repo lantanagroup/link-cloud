@@ -72,13 +72,14 @@
                     <td>@(run.FinishedAt?.LocalDateTime.ToString() ?? "—")</td>
                     <td class="text-nowrap">
                         <div class="d-inline-flex gap-1 align-items-center run-actions" data-run-id="@run.RunId">
-                            <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-au-action"><i class="bi bi-box-arrow-up-right"></i></a>
+                            <a asp-action="Details" asp-route-id="@run.RunId" class="btn btn-sm btn-au-action" title="View details"><i class="bi bi-box-arrow-up-right"></i></a>
                             @if (run.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
                             {
                                 <button type="button" class="btn btn-sm btn-outline-warning btn-cancel-run" data-run-id="@run.RunId"><i class="bi bi-x-circle"></i></button>
                             }
                             @if (run.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled)
                             {
+                                <a asp-action="Export" asp-route-id="@run.RunId" class="btn btn-sm btn-au-action" title="Export diagnostics ZIP"><i class="bi bi-download"></i></a>
                                 <button type="button" class="btn btn-sm btn-outline-danger btn-delete-run" data-run-id="@run.RunId"><i class="bi bi-trash"></i></button>
                             }
                         </div>

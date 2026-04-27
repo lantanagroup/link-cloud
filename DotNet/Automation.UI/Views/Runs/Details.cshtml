@@ -9,7 +9,7 @@
             <h3 class="fw-bold mb-0" id="runName">@Model.RunName</h3>
             <code class="text-muted small">@Model.RunId</code>
         </div>
-        <div class="d-flex gap-2" id="runHeaderActions">
+        <div class="d-flex gap-2 align-items-center" id="runHeaderActions">
             @if (Model.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
             {
                 <button type="button" class="btn btn-warning btn-sm" id="btnCancelRun"><i class="bi bi-x-circle me-1"></i>Cancel</button>
@@ -17,6 +17,9 @@
             @if (Model.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled)
             {
                 <button type="button" class="btn btn-danger btn-sm" id="btnDeleteRun"><i class="bi bi-trash me-1"></i>Delete</button>
+                <a asp-action="Export" asp-route-id="@Model.RunId" class="btn btn-sm" style="background:var(--au-accent);color:#fff;font-weight:600;">
+                    <i class="bi bi-download me-1"></i>Export Diagnostics
+                </a>
             }
             <a asp-action="Index" class="btn btn-sm btn-au-action"><i class="bi bi-arrow-left me-1"></i>Back</a>
         </div>
@@ -421,19 +424,31 @@
             if (cancelBtn) cancelBtn.remove();
 
             var actionsDiv = document.getElementById('runHeaderActions');
-            if (!actionsDiv || document.getElementById('btnDeleteRun')) return;
+            if (!actionsDiv) return;
 
-            var deleteBtn = document.createElement('button');
-            deleteBtn.type = 'button';
-            deleteBtn.className = 'btn btn-outline-danger';
-            deleteBtn.id = 'btnDeleteRun';
-            deleteBtn.textContent = 'Delete';
+            var backLink = actionsDiv.querySelector('a.btn-au-action');
 
-            var backLink = actionsDiv.querySelector('a');
-            if (backLink) {
-                actionsDiv.insertBefore(deleteBtn, backLink);
-            } else {
-                actionsDiv.appendChild(deleteBtn);
+            if (!document.getElementById('btnDeleteRun')) {
+                var deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'btn btn-danger btn-sm';
+                deleteBtn.id = 'btnDeleteRun';
+                deleteBtn.innerHTML = '<i class="bi bi-trash me-1"></i>Delete';
+                if (backLink) actionsDiv.insertBefore(deleteBtn, backLink);
+                else actionsDiv.appendChild(deleteBtn);
+            }
+
+            if (!document.getElementById('btnExportRun')) {
+                var exportLink = document.createElement('a');
+                exportLink.id = 'btnExportRun';
+                exportLink.className = 'btn btn-sm';
+                exportLink.style.background = 'var(--au-accent)';
+                exportLink.style.color = '#fff';
+                exportLink.style.fontWeight = '600';
+                exportLink.href = '@Url.Action("Export", "Runs", new { id = Model.RunId })';
+                exportLink.innerHTML = '<i class="bi bi-download me-1"></i>Export Diagnostics';
+                if (backLink) actionsDiv.insertBefore(exportLink, backLink);
+                else actionsDiv.appendChild(exportLink);
             }
         }
 
@@ -441,7 +456,7 @@
             if (!confirm('Delete this run and all persisted data?')) return;
 
             btn.disabled = true;
-            btn.textContent = 'Deleting…';
+            btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Deleting…';
 
             fetch('@Url.Action("DeleteJson", "Runs")', {
                 method: 'POST',
@@ -457,14 +472,14 @@
                     window.location.href = '@Url.Action("Index", "Runs")';
                 } else {
                     btn.disabled = false;
-                    btn.textContent = 'Delete';
+                    btn.innerHTML = '<i class="bi bi-trash me-1"></i>Delete';
                     alert('Unable to delete the run. It may still be active.');
                 }
             })
             .catch(function (err) {
                 console.error('Delete failed', err);
                 btn.disabled = false;
-                btn.textContent = 'Delete';
+                btn.innerHTML = '<i class="bi bi-trash me-1"></i>Delete';
                 alert('Unable to delete the run. Please try again.');
             });
         }
