@@ -137,14 +137,18 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             _              => sortBuilder.Descending(r => r.CreatedAt),
         };
 
-        // RunId tiebreaker so paging is deterministic when the primary key has
-        // duplicates (e.g. two seeded rows on the same day, or two runs sharing
-        // a Status value). Without this, a user paging through the table can see
-        // the same row appear on consecutive pages or vanish entirely.
-        var sort = sortBuilder.Combine(primary, sortBuilder.Ascending(r => r.RunId));
-
+        // Server-side: single-field sort only. Cosmos DB for MongoDB API rejects
+        // multi-field ORDER BY queries that don't have a matching composite index
+        // ("The order by query does not have a corresponding composite index that
+        // it can be served from"), so we cannot append a {RunId: 1} tiebreaker
+        // here without provisioning a {SortField, RunId} compound index for every
+        // sortable column — see the matching note in MongoIndexManager about the
+        // per-write RU cost we are deliberately avoiding. Rows that share the same
+        // primary-sort value (e.g. two runs in the same Status bucket) are returned
+        // in storage order; in practice this is stable across consecutive page
+        // requests because the underlying documents do not move.
         var docs = await _runs.Find(FilterDefinition<AutomationRunDocument>.Empty)
-            .Sort(sort)
+            .Sort(primary)
             .Skip((pageNumber - 1) * pageSize)
             .Limit(pageSize)
             .ToListAsync(ct);

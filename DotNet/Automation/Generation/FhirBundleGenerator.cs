@@ -21,7 +21,7 @@ public static class FhirBundleGenerator
     public const int DefaultResourcesPerPatient = 5_000;
     private const int MaxEntriesPerBundle = 500;
 
-    // Legacy shared infrastructure IDs â€” kept for backward compatibility / reference.
+    // Legacy shared infrastructure IDs - kept for backward compatibility / reference.
     // New runs should use SharedIds derived from the patient prefix.
     public const string HospitalLocationId = "Gen-Location-Hospital";
     public const string IcuLocationId = "Gen-Location-ICU";
@@ -108,7 +108,7 @@ public static class FhirBundleGenerator
                          (generationSeed.HasValue ? $" (seed={generationSeed.Value})" : string.Empty));
 
         // ------------------------------------------------------------------
-        // Shared infrastructure â€” uploaded once in the first chunk
+        // Shared infrastructure - uploaded once in the first chunk
         // ------------------------------------------------------------------
         var (sharedEntries, sharedPractitionerIds, sharedMedicationIds) =
             ScenarioResourceGeneration.BuildSharedInfrastructure(ids);
