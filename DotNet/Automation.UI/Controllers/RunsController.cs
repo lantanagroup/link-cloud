@@ -12,6 +12,7 @@ public class RunsController(
     IScenarioStore scenarioStore,
     IQueryPlanTemplateStore queryPlanTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
+    IRunExportService runExportService,
     ILogger<RunsController> logger) : Controller
 {
     [HttpGet]
@@ -193,6 +194,30 @@ public class RunsController(
             return NotFound();
 
         return Json(run);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Export(Guid id, CancellationToken cancellationToken)
+    {
+        var run = await runManager.GetRunAsync(id, cancellationToken);
+        if (run == null)
+            return NotFound();
+
+        // Export is only meaningful once the run has stopped collecting data;
+        // exporting an in-flight run would race the polling loop and yield
+        // half-populated domain snapshots.
+        if (run.Status is not AutomationRunStatus.Succeeded
+                       and not AutomationRunStatus.Failed
+                       and not AutomationRunStatus.Cancelled)
+        {
+            return Conflict(new { error = "Run must be completed (Succeeded, Failed, or Cancelled) before it can be exported." });
+        }
+
+        var package = await runExportService.BuildAsync(id, cancellationToken);
+        if (package == null)
+            return NotFound();
+
+        return File(package.Content, "application/zip", package.FileName);
     }
 
     [HttpPost]
