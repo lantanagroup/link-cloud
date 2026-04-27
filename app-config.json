@@ -132,12 +132,57 @@
       "description": "The base URL for the Submission Service."
     },
     {
+      "key": "ServiceRegistry:TerminologyServiceUrl",
+      "description": "The base URL for the Terminology Service."
+    },
+    {
+      "key": "ServiceRegistry:AuditServiceUrl",
+      "description": "The base URL for the Audit Service."
+    },
+    {
+      "key": "ServiceRegistry:QueryDispatchServiceUrl",
+      "description": "The base URL for the Query Dispatch Service."
+    },
+    {
+      "key": "ServiceRegistry:NotificationServiceUrl",
+      "description": "The base URL for the Notification Service."
+    },
+    {
       "key": "link.report.base-url",
       "description": "The base URL for the Report Service (used by Java services)."
+    },
+    {
+      "key": "SecretManagement:Enabled",
+      "description": "Boolean flag to enable or disable secret management."
+    },
+    {
+      "key": "SecretManagement:Manager",
+      "description": "The type of secret manager to use (e.g., AzureKeyVault)."
+    },
+    {
+      "key": "SecretManagement:ManagerUri",
+      "description": "The URI for the secret manager."
+    },
+    {
+      "key": "ConsumerSettings:ConsumerRetryDuration",
+      "description": "List of ISO 8601 durations defining the retry intervals for Kafka consumers."
+    },
+    {
+      "key": "ConsumerSettings:DisableRetryConsumer",
+      "description": "Boolean flag to disable the retry consumer for Kafka events."
+    },
+    {
+      "key": "ConsumerSettings:DisableConsumer",
+      "description": "Boolean flag to disable the Kafka consumer entirely for the service."
     }
   ],
   "services": {
-    "Account": [],
+    "Account": [
+      {
+        "key": "UserManagement:EnableAutomaticUserActivation",
+        "description": "Boolean flag to enable automatic activation of new users."
+      }
+    ],
     "AdminBFF": [
       {
         "key": "Authentication:Schemas:Oauth2:ClientId",
@@ -156,8 +201,16 @@
         "description": "The OAuth2 token endpoint URL."
       },
       {
+        "key": "Authentication:Schemas:Oauth2:Endpoints:UserInformation",
+        "description": "The OAuth2 user information endpoint URL."
+      },
+      {
         "key": "ReverseProxy:Clusters:{Service}:Destinations:destination1:Address",
         "description": "The backend address for each service routed through the BFF (e.g., AccountService, AuditService, etc.)."
+      },
+      {
+        "key": "MonitorBackendHealthChecks",
+        "description": "Boolean flag to enable monitoring of backend service health."
       }
     ],
     "Audit": [
@@ -188,6 +241,10 @@
       {
         "key": "AcquisitionJobSettings:CronSchedule",
         "description": "The cron expression defining how often data acquisition jobs should run."
+      },
+      {
+        "key": "DistributedLockSettings:Expiration",
+        "description": "The expiration time in minutes for distributed locks."
       }
     ],
     "DataAcquisitionWorker": [
@@ -222,6 +279,10 @@
       {
         "key": "link.reportability-predicate",
         "description": "Fully qualified class name of the reportability predicate to use."
+      },
+      {
+        "key": "link.cql-debug",
+        "description": "Boolean flag to enable CQL debugging."
       }
     ],
     "Normalization": [],
@@ -235,12 +296,26 @@
         "description": "The SMTP server port."
       }
     ],
-    "QueryDispatch": [],
-    "Report": [],
+    "QueryDispatch": [
+      {
+        "key": "QuartzCollectionPrefix",
+        "description": "The prefix for Quartz job collections in the database."
+      }
+    ],
+    "Report": [
+      {
+        "key": "EnhancedQueryLoggingSettings:EnableEnhancedQueryLogging",
+        "description": "Boolean flag to enable detailed logging of database queries."
+      }
+    ],
     "Submission": [
       {
         "key": "SubmissionServiceConfig:SubmissionDirectory",
         "description": "The local or network path where submission files are stored."
+      },
+      {
+        "key": "SubmissionServiceConfig:PatientBundleBatchSize",
+        "description": "The number of patient bundles to process in a single batch."
       },
       {
         "key": "ExternalBlobStorage:ConnectionString",
@@ -251,7 +326,12 @@
         "description": "The name of the blob container used for external storage."
       }
     ],
-    "Tenant": [],
+    "Tenant": [
+      {
+        "key": "FacilityIdSettings:NumericOnlyFacilityId",
+        "description": "Boolean flag to restrict facility IDs to numeric values only."
+      }
+    ],
     "Terminology": [
       {
         "key": "Terminology:Path",
