@@ -131,13 +131,10 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 
     // Add Secret Manager
-    if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
+    builder.Services.AddSecretManager(options =>
     {
-        builder.Services.AddSecretManager(options =>
-        {
-            options.Manager = builder.Configuration.GetValue<string>("SecretManagement:Manager")!;
-        });
-    }
+        options.Manager = builder.Configuration.GetValue<string>("SecretManagement:Manager") ?? "Local";
+    });
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
