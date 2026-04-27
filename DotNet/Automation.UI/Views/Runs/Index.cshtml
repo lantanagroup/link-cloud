@@ -86,7 +86,7 @@
                             <div class="small text-muted">@run.PatientCount patients &middot; seed @run.Seed</div>
                             <div class="d-flex justify-content-between align-items-center mt-2">
                                 <span class="badge au-badge-muted">@run.Status</span>
-                                <span class="small text-muted">@elapsed.ToString(@"mm\:ss") elapsed</span>
+                                <span class="small text-muted js-elapsed" data-created-at="@run.CreatedAt.ToString("o")">@elapsed.ToString(@"mm\:ss") elapsed</span>
                             </div>
                             <a href="@Url.Action("Details", "Runs", new { id = run.RunId })" class="btn btn-sm btn-au-action mt-2 w-100">
                                 <i class="bi bi-box-arrow-up-right me-1"></i>View Details
@@ -415,23 +415,43 @@
         }
         card.style.display = '';
         grid.innerHTML = runs.map(function (run) {
-            var created = new Date(run.createdAt);
-            var elapsed = Math.max(0, Math.round((Date.now() - created.getTime()) / 1000));
-            var em = Math.floor(elapsed / 60);
-            var es = elapsed % 60;
-            var elapsedStr = String(em).padStart(2, '0') + ':' + String(es).padStart(2, '0');
+            var elapsedStr = formatElapsed(run.createdAt);
             var url = detailsBaseUrl.replace('__ID__', run.runId);
             return '<div class="col-md-4"><div class="border rounded p-3">' +
                 '<div class="fw-semibold">' + escapeHtml(run.runName) + '</div>' +
                 '<div class="small text-muted">' + (run.patientCount || 0) + ' patients &middot; seed ' + (run.seed || 0) + '</div>' +
                 '<div class="d-flex justify-content-between align-items-center mt-2">' +
                 '<span class="badge au-badge-muted">' + escapeHtml(String(run.status)) + '</span>' +
-                '<span class="small text-muted">' + elapsedStr + ' elapsed</span>' +
+                '<span class="small text-muted js-elapsed" data-created-at="' + escapeHtml(String(run.createdAt)) + '">' + elapsedStr + ' elapsed</span>' +
                 '</div>' +
                 '<a href="' + url + '" class="btn btn-sm btn-au-action mt-2 w-100"><i class="bi bi-box-arrow-up-right me-1"></i>View Details</a>' +
                 '</div></div>';
         }).join('');
     }
+
+    // Ticks every active-run elapsed span using its data-created-at anchor so the
+    // duration advances without a full dashboard refresh. Spans rendered by either
+    // the server-side Razor pass or updateActiveRuns participate, since both emit
+    // the same .js-elapsed + data-created-at contract.
+    function formatElapsed(createdAtIso) {
+        var created = new Date(createdAtIso);
+        var totalSec = Math.max(0, Math.round((Date.now() - created.getTime()) / 1000));
+        var h = Math.floor(totalSec / 3600);
+        var m = Math.floor((totalSec % 3600) / 60);
+        var s = totalSec % 60;
+        var pad = function (n) { return String(n).padStart(2, '0'); };
+        return h > 0 ? (pad(h) + ':' + pad(m) + ':' + pad(s)) : (pad(m) + ':' + pad(s));
+    }
+
+    function tickActiveRunElapsed() {
+        var spans = document.querySelectorAll('#activeRunsGrid .js-elapsed[data-created-at]');
+        for (var i = 0; i < spans.length; i++) {
+            var iso = spans[i].getAttribute('data-created-at');
+            if (!iso) continue;
+            spans[i].textContent = formatElapsed(iso) + ' elapsed';
+        }
+    }
+    setInterval(tickActiveRunElapsed, 1000);
 
     function updateRecentRunsTable(_runs) {
         // Kept as a compatibility shim: earlier code paths (and any extensions
