@@ -15,8 +15,9 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report.Listeners;
 
-[Collection("ReportIntegrationTests")]
-public class PayloadSubmittedListenerTests : IClassFixture<ReportIntegrationTestFixture>
+[Collection("IntegrationTests")]
+[Trait("Category", "IntegrationTests")]
+public class PayloadSubmittedListenerTests
 {
     private readonly ReportIntegrationTestFixture _fixture;
 

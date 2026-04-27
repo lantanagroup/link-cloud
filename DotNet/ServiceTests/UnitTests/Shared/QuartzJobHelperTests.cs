@@ -6,6 +6,7 @@ using Quartz;
 
 namespace UnitTests.Shared;
 
+[Trait("Category", "UnitTests")]
 public class QuartzJobHelperTests
 {
     private sealed class TestJob : IJob

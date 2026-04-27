@@ -21,7 +21,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition;
 
-[Collection("DataAcquisitionIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
 public class AcquisitionProcessingJobTests
 {
@@ -103,7 +103,7 @@ public class AcquisitionProcessingJobTests
     }
 
     [Fact]
-    public async Task ProcessPendingLogs_NoConfig_SetsMaxRetriesReachedWithNoteImmediately()
+    public async Task ProcessPendingLogs_NoConfig_SetsConfigurationMissingWithNoteImmediately()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
         _fixture.ResourceAcquiredProducerMock.Reset();
@@ -155,7 +155,7 @@ public class AcquisitionProcessingJobTests
         var assertDbContext = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
         var updatedLog = await assertDbContext.DataAcquisitionLogs.FindAsync(log.Id);
-        Assert.Equal(RequestStatus.MaxRetriesReached, updatedLog.Status);
+        Assert.Equal(RequestStatus.ConfigurationMissing, updatedLog.Status);
 
         var note = await assertDbContext.DataAcquisitionLogNotes
             .FirstOrDefaultAsync(n => n.DataAcquisitionLogId == log.Id);
@@ -164,7 +164,7 @@ public class AcquisitionProcessingJobTests
     }
 
     [Fact]
-    public async Task ProcessPendingLogs_NoConfig_AlreadyFailedLog_AlsoSetsMaxRetriesReachedWithNote()
+    public async Task ProcessPendingLogs_NoConfig_AlreadyFailedLog_AlsoSetsConfigurationMissingWithNote()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
         _fixture.ResourceAcquiredProducerMock.Reset();
@@ -210,7 +210,7 @@ public class AcquisitionProcessingJobTests
         var assertDbContext = assertScope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
         var updatedLog = await assertDbContext.DataAcquisitionLogs.FindAsync(failedLog.Id);
-        Assert.Equal(RequestStatus.MaxRetriesReached, updatedLog.Status);
+        Assert.Equal(RequestStatus.ConfigurationMissing, updatedLog.Status);
 
         var note = await assertDbContext.DataAcquisitionLogNotes
             .FirstOrDefaultAsync(n => n.DataAcquisitionLogId == failedLog.Id);

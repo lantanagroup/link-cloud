@@ -17,7 +17,7 @@ namespace DataAcquisition.Domain.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.25")
+                .HasAnnotation("ProductVersion", "8.0.26")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -635,6 +635,10 @@ namespace DataAcquisition.Domain.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
 
+                    b.Property<string>("ReferenceResourceType")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
                     b.Property<Guid?>("ReportTrackingId")
                         .HasColumnType("uniqueidentifier");
 
@@ -664,14 +668,16 @@ namespace DataAcquisition.Domain.Migrations
                         .HasDatabaseName("IX_DataAcquisitionLogs_FacilityId_IsDeleted")
                         .HasFilter("[IsDeleted] = 1");
 
-                    b.HasIndex("ReportTrackingId")
-                        .HasDatabaseName("IX_DataAcquisitionLog_ReportTrackingId");
-
                     b.HasIndex("ExecutionDate", "Id")
                         .IsDescending()
                         .HasDatabaseName("IX_DataAcquisitionLogs_Paging_Default");
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("ExecutionDate", "Id"), new[] { "Priority", "FacilityId", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "TraceId", "FhirVersion", "QueryType", "QueryPhase", "Status", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds" });
+
+                    b.HasIndex("IsDeleted", "Id")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_IsDeleted_Id");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("IsDeleted", "Id"), new[] { "Priority", "FacilityId", "PatientId", "ReportTrackingId", "FhirVersion", "QueryType", "QueryPhase", "ExecutionDate", "CreateDate", "RetryAttempts", "Status" });
 
                     b.HasIndex("ReportTrackingId", "IsDeleted")
                         .HasDatabaseName("IX_DataAcquisitionLogs_ReportTrackingId_IsDeleted");
@@ -684,28 +690,28 @@ namespace DataAcquisition.Domain.Migrations
                     b.HasIndex("Status", "ModifyDate")
                         .HasDatabaseName("IX_DataAcquisitionLogs_Status_ModifyDate");
 
+                    b.HasIndex("TailSent", "Status")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_TailSent_Status");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TailSent", "Status"), new[] { "FacilityId", "ReportTrackingId", "CorrelationId", "QueryPhase", "TraceId", "PatientId", "ReportableEvent" });
+
+                    b.HasIndex("FacilityId", "CorrelationId", "QueryPhase", "ReferenceResourceType")
+                        .IsUnique()
+                        .HasDatabaseName("UX_DataAcquisitionLogs_ReferenceLogKey")
+                        .HasFilter("[CorrelationId] IS NOT NULL AND [QueryPhase] IS NOT NULL AND [ReferenceResourceType] IS NOT NULL");
+
                     b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id")
                         .HasDatabaseName("IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id");
 
                     SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("FacilityId", "Status", "ExecutionDate", "Id"), new[] { "Priority", "IsCensus", "PatientId", "ReportableEvent", "ReportTrackingId", "CorrelationId", "FhirVersion", "QueryType", "QueryPhase", "TraceId", "RetryAttempts", "CompletionDate", "CompletionTimeMilliseconds" });
 
-                    b.HasIndex("TailSent", "SiblingCount", "FacilityId", "CorrelationId", "QueryPhase", "Status")
-                        .HasDatabaseName("IX_DataAcquisitionLogs_InlineTail")
-                        .HasFilter("[TailSent] = 0 AND [SiblingCount] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [QueryPhase] IS NOT NULL");
-
                     b.HasIndex("TailSent", "FacilityId", "ReportTrackingId", "CorrelationId", "QueryPhase")
                         .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
                         .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL");
 
-                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("TailSent", "Status"), new[] { "FacilityId", "ReportTrackingId", "CorrelationId", "QueryPhase", "TraceId", "PatientId", "ReportableEvent" });
-
-                    b.HasIndex("TailSent", "Status")
-                        .HasDatabaseName("IX_DataAcquisitionLogs_TailSent_Status");
-
-                    b.HasIndex("IsDeleted", "Id")
-                        .HasDatabaseName("IX_DataAcquisitionLogs_IsDeleted_Id");
-
-                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("IsDeleted", "Id"), new[] { "Priority", "FacilityId", "PatientId", "ReportTrackingId", "FhirVersion", "QueryType", "QueryPhase", "ExecutionDate", "CreateDate", "RetryAttempts", "Status" });
+                    b.HasIndex("TailSent", "SiblingCount", "FacilityId", "CorrelationId", "QueryPhase", "Status")
+                        .HasDatabaseName("IX_DataAcquisitionLogs_InlineTail")
+                        .HasFilter("[TailSent] = 0 AND [SiblingCount] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [QueryPhase] IS NOT NULL");
 
                     b.ToTable("DataAcquisitionLog");
                 });
@@ -912,6 +918,50 @@ namespace DataAcquisition.Domain.Migrations
                     b.HasIndex("FhirQueryId");
 
                     b.ToTable("FhirQueryResourceType");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.PendingReferenceId", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<long>("DataAcquisitionLogId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FacilityId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("ResourceId")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex(new[] { "DataAcquisitionLogId" }, "IX_PendingReferenceIds_DataAcquisitionLogId");
+
+                    b.HasIndex(new[] { "DataAcquisitionLogId", "ResourceId" }, "UX_PendingReferenceIds_Log_ResourceId")
+                        .IsUnique();
+
+                    b.ToTable("PendingReferenceIds");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.QueryPlan", b =>
@@ -1304,6 +1354,18 @@ namespace DataAcquisition.Domain.Migrations
                         .HasConstraintName("FK_FhirQueryResourceType_FhirQuery");
 
                     b.Navigation("FhirQuery");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.PendingReferenceId", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.DataAcquisitionLog", "DataAcquisitionLog")
+                        .WithMany()
+                        .HasForeignKey("DataAcquisitionLogId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("FK_PendingReferenceIds_DataAcquisitionLog");
+
+                    b.Navigation("DataAcquisitionLog");
                 });
 
             modelBuilder.Entity("LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities.ResourceReferenceType", b =>

@@ -2,6 +2,7 @@
 
 namespace UnitTests.Shared
 {
+    [Trait("Category", "UnitTests")]
     public class ReportHelpersTests
     {
         #region Input Validation Tests

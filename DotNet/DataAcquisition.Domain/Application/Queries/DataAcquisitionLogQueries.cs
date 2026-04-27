@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Application.Models;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
@@ -6,22 +6,17 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using LantanaGroup.Link.Shared.Application.Services.Security;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -81,6 +76,14 @@ public interface IDataAcquisitionLogQueries
 
     Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string resourceType,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// For each resource type in <paramref name="resourceTypes"/>, returns the ones that still
+    /// have at least one non-terminal DataAcquisitionLog for the given correlation + facility.
+    /// A resource type with no matching logs at all is NOT returned.
+    /// </summary>
+    Task<List<string>> GetNonTerminalDependencyResourceTypes(string correlationId, string facilityId,
+        List<string> resourceTypes, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Safety-net query: finds one representative log ID per group that is
@@ -146,6 +149,73 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         return result;
     }
 
+    public async Task<List<string>> GetNonTerminalDependencyResourceTypes(string correlationId, string facilityId,
+        List<string> resourceTypes, CancellationToken cancellationToken = default)
+    {
+        using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetNonTerminalDependencyResourceTypes");
+        activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
+        if (string.IsNullOrWhiteSpace(correlationId) || string.IsNullOrWhiteSpace(facilityId) ||
+            resourceTypes is null || resourceTypes.Count == 0)
+        {
+            return [];
+        }
+
+        var terminalStatuses = new[]
+        {
+            RequestStatus.Completed, RequestStatus.Skipped, RequestStatus.MaxRetriesReached, RequestStatus.Cancelled
+        };
+
+        // Parse supplied strings to the ResourceType enum. Anything that doesn't parse is skipped.
+        var parsed = new List<(string Original, ResourceType Parsed)>();
+        foreach (var rt in resourceTypes.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (Enum.TryParse<ResourceType>(rt, ignoreCase: true, out var parsedType))
+            {
+                parsed.Add((rt, parsedType));
+            }
+            else
+            {
+                _logger.LogWarning("Could not parse dependency resource type {ResourceType}; treating as non-blocking.", rt);
+            }
+        }
+
+        if (parsed.Count == 0)
+            return [];
+
+        var parsedTypes = parsed.Select(p => p.Parsed).Distinct().ToList();
+
+        // Find which resource types have at least one non-terminal log in this correlation/facility.
+        // Also collect which types have any log at all (so missing types fail-open).
+        var logStatusByType = await (
+            from log in _dbContext.DataAcquisitionLogs.AsNoTracking()
+            join query in _dbContext.FhirQueries on log.Id equals query.DataAcquisitionLogId
+            join resourceTypeEntry in _dbContext.FhirQueryResourceTypes on query.Id equals resourceTypeEntry.FhirQueryId
+            where log.FacilityId == facilityId
+                  && log.CorrelationId == correlationId
+                  && parsedTypes.Contains(resourceTypeEntry.ResourceType)
+            select new { resourceTypeEntry.ResourceType, log.Status })
+            .ToListAsync(cancellationToken);
+
+        if (logStatusByType.Count == 0)
+            return [];
+
+        var blocking = new HashSet<ResourceType>();
+        foreach (var grouping in logStatusByType.GroupBy(x => x.ResourceType))
+        {
+            var hasNonTerminal = grouping.Any(g =>
+                g.Status is null || !terminalStatuses.Contains(g.Status.Value));
+            if (hasNonTerminal)
+                blocking.Add(grouping.Key);
+        }
+
+        return parsed
+            .Where(p => blocking.Contains(p.Parsed))
+            .Select(p => p.Original)
+            .ToList();
+    }
+
     public async Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetAsync");
@@ -175,6 +245,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 ReportableEvent = l.ReportableEvent,
                 ReportTrackingId = l.ReportTrackingId != null ? l.ReportTrackingId.ToString().ToLower() : null,
                 CorrelationId = l.CorrelationId,
+                ReferenceResourceType = l.ReferenceResourceType,
                 FhirVersion = l.FhirVersion,
                 QueryType = l.QueryType,
                 QueryPhase = l.QueryPhase,
@@ -187,7 +258,6 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     QueryType = q.QueryType,
                     ResourceTypes = q.FhirQueryResourceTypes.Select(r => r.ResourceType).ToList(),
                     QueryParameters = q.QueryParameters,
-                    IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
                     Paged = q.Paged,
                     DataAcquisitionLogId = q.DataAcquisitionLogId,
                     CensusListId = q.CensusListId,
@@ -245,7 +315,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             // Phase 2: For each candidate group, verify that it has zero
             //          non-terminal logs (i.e. all logs are finished).
 
-            // Phase 1 — narrow candidate groups via terminal-status logs only.
+            // Phase 1 ? narrow candidate groups via terminal-status logs only.
             var candidateGroups = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                 .Where(log =>
                     !log.TailSent &&
@@ -272,7 +342,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             if (candidateGroups.Count == 0)
                 return [];
 
-            // Phase 2 — for each candidate, check if ANY non-terminal log exists.
+            // Phase 2 for each candidate, check if ANY non-terminal log exists.
             var results = new List<TailingMessageModel>();
 
             foreach (var group in candidateGroups)
@@ -291,7 +361,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 if (hasIncomplete)
                     continue;
 
-                // All logs are terminal — collect data for the tail message
+                // All logs are terminal collect data for the tail message
                 var groupLogs = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                     .Where(log =>
                         !log.TailSent &&
@@ -332,7 +402,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     ResourceAcquired = new ResourceAcquired
                     {
                         PatientId = first.PatientId ?? string.Empty,
-                        QueryType = group.QueryPhase.ToString() ?? string.Empty,
+                        QueryType = QueryPhaseUtilities.ToWireQueryType(group.QueryPhase),
                         ReportableEvent = first.ReportableEvent ?? default,
                         AcquisitionComplete = true,
                         ScheduledReports = new List<ScheduledReport>
@@ -432,11 +502,35 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     .GroupBy(q => q.DataAcquisitionLogId)
                     .ToDictionary(g => g.Key, g => g.FirstOrDefault(q => q.IsReference != true) ?? g.First());
 
+                // Collect ALL resource types from ALL FhirQueries per log (not just the first).
+                var allQueryResourceTypesByLogId = queryInfo
+                    .GroupBy(q => q.DataAcquisitionLogId)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.SelectMany(q => q.ResourceTypes ?? [])
+                              .Distinct()
+                              .Select(rt => rt.ToString())
+                              .ToList());
+
+                // Determine which logs have any reference FhirQuery.
+                var logsWithReferenceQuery = queryInfo
+                    .Where(q => q.IsReference == true)
+                    .Select(q => q.DataAcquisitionLogId)
+                    .ToHashSet();
+
                 records = pageLogs.Select(log =>
                 {
                     firstQueryByLogId.TryGetValue(log.Id, out var fhirQuery);
-                    var resourceTypes = fhirQuery?.ResourceTypes?.Select(rt => rt.ToString()).ToList() ??
-                                        new List<string>();
+                    allQueryResourceTypesByLogId.TryGetValue(log.Id, out var allQueryTypes);
+
+                    // Reference logs exist as first-class rows with their
+                    // own FhirQueryResourceTypes, so the log's resource types are strictly
+                    // what its own FhirQueries declare. No synthesis off the
+                    // ReferenceResources junction.
+                    var resourceTypes = allQueryTypes
+                        ?? fhirQuery?.ResourceTypes?.Select(rt => rt.ToString()).ToList()
+                        ?? new List<string>();
+
                     string? resourceId;
 
                     if (resourceTypes.Count > 0 && resourceTypes[0] == ResourceType.Patient.ToString())
@@ -451,6 +545,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     {
                         resourceId = string.Empty;
                     }
+
+                    var isReferenceLog = logsWithReferenceQuery.Contains(log.Id);
 
                     return new QueryLogSummaryModel
                     {
@@ -468,7 +564,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         RetryAttempts = log.RetryAttempts,
                         Status = log.Status,
                         IsDeleted = log.IsDeleted,
-                        ReportTrackingId = log.ReportTrackingId != null ? log.ReportTrackingId.ToString().ToLower() : null
+                        ReportTrackingId = log.ReportTrackingId != null ? log.ReportTrackingId.ToString().ToLower() : null,
+                        IsReferenceLog = isReferenceLog
                     };
                 }).ToList();
             }
@@ -598,39 +695,17 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         foreach (var qp in queryPhaseCounts)
             statistics.QueryPhaseCounts[qp.Phase] = qp.Count;
 
-        // Resource type counts + total from ResourceIds junction table.
-        // Include reference resources linked to completed logs when they are stored
-        // separately in ReferenceResources.
+        // Resource type counts + total. Reference logs are first-class
+        // log rows in the same QueryPhase as their primary; their fetched ids are
+        // recorded in DataAcquisitionLogResourceIds just like any primary log, so
+        // walking ResourceIds across all completed logs counts every resource —
+        // primary and reference — exactly once.
         var completedResourceIds = await baseQuery
             .Where(l => l.Status == RequestStatus.Completed)
             .SelectMany(l => l.ResourceIds.Select(r => r.ResourceId))
             .ToListAsync(cancellationToken);
 
-        var completedReferenceResourceIds = await baseQuery
-            .Where(l => l.Status == RequestStatus.Completed)
-            .SelectMany(l => l.ReferenceResources.Select(r => r.ResourceType + "/" + r.ResourceId))
-            .ToListAsync(cancellationToken);
-
-        var completedLogs = new List<string>(completedResourceIds.Count + completedReferenceResourceIds.Count);
-        completedLogs.AddRange(completedResourceIds);
-
-        // Avoid double-counting resources that already exist in ResourceIds.
-        var existingResourceSet = completedResourceIds
-            .Where(r => !string.IsNullOrWhiteSpace(r))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var referenceResourceId in completedReferenceResourceIds)
-        {
-            if (string.IsNullOrWhiteSpace(referenceResourceId))
-                continue;
-
-            if (existingResourceSet.Contains(referenceResourceId))
-                continue;
-
-            completedLogs.Add(referenceResourceId);
-        }
-
-        foreach (var resource in completedLogs)
+        foreach (var resource in completedResourceIds)
         {
             if (string.IsNullOrWhiteSpace(resource)) continue;
             var slashIdx = resource.IndexOf('/');
@@ -686,7 +761,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 slowest.CompletionTimeMilliseconds!.Value);
         }
 
-        // Per-resource-type completion time aggregation – lightweight projection
+        // Per-resource-type completion time aggregation lightweight projection
         var completionTimes = await baseQuery
             .Where(l => l.CompletionTimeMilliseconds != null)
             .Select(l => new
@@ -880,12 +955,29 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         CancellationToken cancellationToken = default)
     {
         designagtedExecutionTime ??= DateTime.UtcNow;
+        var terminalStatuses = new[]
+        {
+            RequestStatus.Completed,
+            RequestStatus.MaxRetriesReached,
+            RequestStatus.Skipped,
+            RequestStatus.Cancelled,
+            RequestStatus.ConfigurationMissing,
+        };
 
         var query = from log in _dbContext.DataAcquisitionLogs.AsNoTracking()
                     where log.FacilityId == facilityId
                           && (lastId == null || log.Id > lastId)
                           && (log.ExecutionDate == null || log.ExecutionDate <= designagtedExecutionTime)
                           && (log.Status == null || statuses.Contains(log.Status.Value))
+                          && (log.ReferenceResourceType == null
+                              || (log.CorrelationId != null
+                                  && log.QueryPhase != null
+                                  && !_dbContext.DataAcquisitionLogs.Any(sibling =>
+                                      sibling.FacilityId == log.FacilityId
+                                      && sibling.CorrelationId == log.CorrelationId
+                                      && sibling.QueryPhase == log.QueryPhase
+                                      && sibling.ReferenceResourceType == null
+                                      && (sibling.Status == null || !terminalStatuses.Contains(sibling.Status.Value)))))
                     orderby log.Id
                     select new DataAcquisitionLogModel
                     {
@@ -897,6 +989,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         ReportableEvent = log.ReportableEvent,
                         ReportTrackingId = log.ReportTrackingId != null ? log.ReportTrackingId.ToString().ToLower() : null,
                         CorrelationId = log.CorrelationId,
+                        ReferenceResourceType = log.ReferenceResourceType,
                         FhirVersion = log.FhirVersion,
                         QueryType = log.QueryType,
                         QueryPhase = log.QueryPhase,
@@ -927,7 +1020,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
     public async Task<List<long>> GetOrphanedTailLogIds(TimeSpan minAge, int maxResults = 50, CancellationToken cancellationToken = default)
     {
-        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped };
+        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
         var cutoff = DateTime.UtcNow.Subtract(minAge);
 
         // Find groups where:

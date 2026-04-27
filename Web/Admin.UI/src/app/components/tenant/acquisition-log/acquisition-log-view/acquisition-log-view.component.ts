@@ -150,7 +150,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   selectedQueryPhaseFilter: string = 'Any';
   queryTypeFilterOptions: string[] = [ "Read", "Search", "BulkDataRequest", "BulkDataPoll" ];
   selectedQueryTypeFilter: string = 'Any';
-  statusFilterOptions: string[] = [ "Pending", "Ready", "Processing", "Completed", "Failed", "Cancelled", "MaxRetriesReached", "Skipped", "Queued"];
+  statusFilterOptions: string[] = [ "Pending", "Ready", "Processing", "Completed", "Failed", "Cancelled", "MaxRetriesReached", "ConfigurationMissing", "Skipped", "Queued"];
   selectedStatusFilter: string[] = [];
   targetPageNumber: number | null = null;
   selectedLogIds: Set<string> = new Set<string>();
@@ -173,20 +173,51 @@ export class AcquisitionLogViewComponent implements OnInit {
     private acquisitionLogService: AcquisitionLogService,
     private snackBar: MatSnackBar) { }
 
-  private readonly TERMINAL_STATUSES = ['Completed', 'MaxRetriesReached', 'Skipped', 'Cancelled'];
+  private readonly TERMINAL_STATUSES = ['Completed', 'MaxRetriesReached', 'ConfigurationMissing', 'Skipped', 'Cancelled'];
   cancelMinAgeHours: number = 0;
+  isReportSubmitted: boolean = false;
+  submittedDate?: Date;
 
   private get cancelMinAgeMs(): number {
     return this.cancelMinAgeHours * 60 * 60 * 1000;
   }
 
+  private readonly EXECUTE_INELIGIBLE_STATUSES = ['Completed', 'Skipped'];
+
+  isLogExecuteEligible(log: AcquisitionLogSummary): boolean {
+    if (this.isReportSubmitted) return false;
+    return log.status !== 'Completed' && !this.EXECUTE_INELIGIBLE_STATUSES.includes(log.status);
+  }
+
   isLogCancelEligible(log: AcquisitionLogSummary): boolean {
+    if (this.isReportSubmitted) return false;
+    if (log.status === 'Completed') return false;
     if (this.TERMINAL_STATUSES.includes(log.status)) return false;
     if (this.cancelMinAgeHours === 0) return true;
     if (!log.createDate) return false;
     // Match backend: CreateDate <= UtcNow.AddHours(-minAgeHours)
     const minAgeCutoff = Date.now() - this.cancelMinAgeMs;
     return new Date(log.createDate).getTime() <= minAgeCutoff;
+  }
+
+  get hasActionEligibleOnPage(): boolean {
+    if (this.isReportSubmitted) return false;
+    return this.acquisitionLogs.some(l => !this.TERMINAL_STATUSES.includes(l.status));
+  }
+
+  get executeEligibleSelectedCount(): number {
+    if (this.isAllSelected) {
+      return this.acquisitionLogs.filter(l => this.isLogExecuteEligible(l)).length;
+    }
+    return this.acquisitionLogs.filter(l => this.selectedLogIds.has(l.id) && this.isLogExecuteEligible(l)).length;
+  }
+
+  get canBulkExecute(): boolean {
+    if (this.isReportSubmitted) return false;
+    if (this.isAllSelected) {
+      return true;
+    }
+    return this.executeEligibleSelectedCount > 0;
   }
 
   get eligibleSelectedCount(): number {
@@ -197,6 +228,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   }
 
   get canBulkCancel(): boolean {
+    if (this.isReportSubmitted) return false;
     if (this.isAllSelected) {
       // In Select-All mode the count shown is paginationMetadata.totalCount, which only
       // matches cancel-eligibility when the Cancellable Logs filter is active.
@@ -237,13 +269,13 @@ export class AcquisitionLogViewComponent implements OnInit {
         this.reportIdFilter = reportId;
         this.reportIdFromRoute = reportId;
         this.reportFacilityId = facilityId ?? '';
-        if (!this.reportFacilityId) {
-          this.loadReportFacility(reportId);
-        }
+        this.loadReportInfo(reportId);
       } else {
         this.reportIdFilter = '';
         this.reportIdFromRoute = '';
         this.reportFacilityId = '';
+        this.isReportSubmitted = false;
+        this.submittedDate = undefined;
       }
 
       if (patientId) {
@@ -554,15 +586,12 @@ export class AcquisitionLogViewComponent implements OnInit {
     }
 
     if (!this.isAllSelected) {
-      const currentIds = new Set(this.acquisitionLogs.map(log => log.id));
-      const invalidIds: string[] = [];
-      this.selectedLogIds.forEach(id => {
-        if (!currentIds.has(id)) {
-          invalidIds.push(id);
-        }
-      });
+      const eligibleIds = this.acquisitionLogs
+        .filter(l => this.selectedLogIds.has(l.id) && this.isLogExecuteEligible(l))
+        .map(l => l.id);
 
-      invalidIds.forEach(id => this.selectedLogIds.delete(id));
+      this.selectedLogIds.clear();
+      eligibleIds.forEach(id => this.selectedLogIds.add(id));
 
       if (this.selectedLogIds.size === 0) {
         return;
@@ -859,10 +888,12 @@ export class AcquisitionLogViewComponent implements OnInit {
     this.targetPageNumber = this.getCurrentPageNumber() + 1;
   }
 
-  private loadReportFacility(reportId: string): void {
+  private loadReportInfo(reportId: string): void {
     this.reportService.getReportSchedule(reportId).subscribe({
       next: (report) => {
         this.reportFacilityId = report.facilityId;
+        this.isReportSubmitted = !!report.submitReportDateTime;
+        this.submittedDate = report.submitReportDateTime;
       },
       error: (error) => {
         console.error('Error loading report schedule:', error);

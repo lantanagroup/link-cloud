@@ -70,7 +70,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
   addOnBlur = true;
   readonly separatorKeysCodes = [ENTER, COMMA] as const;
 
-  authTypes: string[] = ["Basic", "Epic", "CustomHeaders", "None"];
+  authTypes: string[] = ["Basic", "Epic", "OAuth", "CustomHeaders", "None"];
 
   hoursOptions = [null, ...Array.from({ length: 24 }, (_, i) => i)]; // 0..23    // 0..23
   minutesOptions = [0, ...Array.from({ length: 59 }, (_, i) => i + 1)];
@@ -98,6 +98,8 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       tokenUrl: new FormControl(''),
       audience: new FormControl(''),
       clientId: new FormControl(''),
+      clientSecret: new FormControl(''),
+      scope: new FormControl(''),
       userName: new FormControl(''),
       password: new FormControl(''),
       customHeaders: new FormArray([])
@@ -150,6 +152,12 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
 
       this.clientIdControl.setValue(this.item.authentication?.clientId);
       this.clientIdControl.updateValueAndValidity();
+
+      this.clientSecretControl.setValue(this.item.authentication?.clientSecret);
+      this.clientSecretControl.updateValueAndValidity();
+
+      this.scopeControl.setValue(this.item.authentication?.scope);
+      this.scopeControl.updateValueAndValidity();
 
       this.userNameControl.setValue(this.item.authentication?.userName);
       this.userNameControl.updateValueAndValidity();
@@ -262,6 +270,12 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.clientIdControl.setValue(this.item.authentication?.clientId);
       this.clientIdControl.updateValueAndValidity();
 
+      this.clientSecretControl.setValue(this.item.authentication?.clientSecret);
+      this.clientSecretControl.updateValueAndValidity();
+
+      this.scopeControl.setValue(this.item.authentication?.scope);
+      this.scopeControl.updateValueAndValidity();
+
       this.userNameControl.setValue(this.item.authentication?.userName);
       this.userNameControl.updateValueAndValidity();
 
@@ -352,9 +366,11 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
 
     // Manage validators for fields requiring authentication
     this.toggleValidators('authKey', authType === 'Epic');
-    this.toggleValidators('tokenUrl', authType === 'Epic');
+    this.toggleValidators('tokenUrl', authType === 'Epic' || authType === 'OAuth');
     this.toggleValidators('audience', authType === 'Epic');
-    this.toggleValidators('clientId', authType === 'Epic');
+    this.toggleValidators('clientId', authType === 'Epic' || authType === 'OAuth');
+    this.toggleValidators('clientSecret', authType === 'OAuth');
+    this.toggleValidators('scope', authType === 'OAuth');
 
     // Manage validators for Basic Auth fields
     this.toggleValidators('userName', authType === 'Basic');
@@ -393,6 +409,8 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.tokenUrlControl.disable();
       this.audienceControl.disable();
       this.clientIdControl.disable();
+      this.clientSecretControl.disable();
+      this.scopeControl.disable();
       this.userNameControl.disable();
       this.passwordControl.disable();
       this.maxConcurrentRequestsControl.disable();
@@ -412,6 +430,8 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.tokenUrlControl.enable();
       this.audienceControl.enable();
       this.clientIdControl.enable();
+      this.clientSecretControl.enable();
+      this.scopeControl.enable();
       this.userNameControl.enable();
       this.passwordControl.enable();
       this.maxConcurrentRequestsControl.enable();
@@ -437,6 +457,8 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.configForm.controls['tokenUrl'].reset();
       this.configForm.controls['audience'].reset();
       this.configForm.controls['clientId'].reset();
+      this.configForm.controls['clientSecret'].reset();
+      this.configForm.controls['scope'].reset();
       this.configForm.controls['userName'].reset();
       this.configForm.controls['password'].reset();
       this.customHeadersArray.clear();
@@ -497,6 +519,14 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
 
   get clientIdControl(): FormControl {
     return this.configForm.get('clientId') as FormControl;
+  }
+
+  get clientSecretControl(): FormControl {
+    return this.configForm.get('clientSecret') as FormControl;
+  }
+
+  get scopeControl(): FormControl {
+    return this.configForm.get('scope') as FormControl;
   }
 
   get userNameControl(): FormControl {
@@ -579,6 +609,16 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     this.clientIdControl.updateValueAndValidity();
   }
 
+  clearClientSecret(): void {
+    this.clientSecretControl.setValue('');
+    this.clientSecretControl.updateValueAndValidity();
+  }
+
+  clearScope(): void {
+    this.scopeControl.setValue('');
+    this.scopeControl.updateValueAndValidity();
+  }
+
   clearUserName(): void {
     this.userNameControl.setValue('');
     this.userNameControl.updateValueAndValidity();
@@ -622,6 +662,8 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
               tokenUrl: this.tokenUrlControl.value || null,
               audience: this.audienceControl.value || null,
               clientId: this.clientIdControl.value || null,
+              clientSecret: this.clientSecretControl.value || null,
+              scope: this.scopeControl.value || null,
               userName: this.userNameControl.value || null,
               password: this.passwordControl.value || null,
               ...(this.getCustomHeadersObject() && { customHeaders: this.getCustomHeadersObject() })
@@ -648,6 +690,8 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
                 tokenUrl: this.tokenUrlControl.value || null,
                 audience: this.audienceControl.value || null,
                 clientId: this.clientIdControl.value || null,
+                clientSecret: this.clientSecretControl.value || null,
+                scope: this.scopeControl.value || null,
                 userName: this.userNameControl.value || null,
                 password: this.passwordControl.value || null,
                 ...(this.getCustomHeadersObject() && { customHeaders: this.getCustomHeadersObject() })

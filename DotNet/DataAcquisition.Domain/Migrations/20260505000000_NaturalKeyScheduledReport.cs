@@ -1,4 +1,3 @@
-﻿using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -19,7 +18,7 @@ namespace DataAcquisition.Domain.Migrations
     ///   3. Drop ScheduledReportId column from DataAcquisitionLog.
     ///   4. Drop the Id PK from ScheduledReports, create new PK on ReportTrackingId.
     ///   5. Drop the old Id column from ScheduledReports.
-    ///   6. Create the FK: DataAcquisitionLog.ReportTrackingId → ScheduledReports.ReportTrackingId.
+    ///   6. Create the FK: DataAcquisitionLog.ReportTrackingId ? ScheduledReports.ReportTrackingId.
     ///   7. Drop ReportStartDate / ReportEndDate columns.
     ///   8. Recreate indexes to match the new schema.
     /// </summary>
@@ -29,25 +28,31 @@ namespace DataAcquisition.Domain.Migrations
         {
             // 1) Backfill orphan scheduled reports from legacy logs.
             migrationBuilder.Sql(@"
-                INSERT INTO [ScheduledReports] ([ReportTrackingId], [Frequency], [StartDate], [EndDate], [ReportTypes], [CreateDate])
-                SELECT
-                    dal.[ReportTrackingId],
-                    'Adhoc',
-                    COALESCE(dal.[ReportStartDate], '1900-01-01'),
-                    COALESCE(dal.[ReportEndDate],   '1900-01-01'),
-                    NULL,
-                    GETUTCDATE()
-                FROM (
-                    SELECT [ReportTrackingId], [ReportStartDate], [ReportEndDate],
-                           ROW_NUMBER() OVER (PARTITION BY [ReportTrackingId] ORDER BY [Id]) AS rn
-                    FROM [DataAcquisitionLog]
-                    WHERE [ReportTrackingId] IS NOT NULL
-                ) dal
-                WHERE dal.rn = 1
-                  AND NOT EXISTS (
-                      SELECT 1 FROM [ScheduledReports] sr
-                      WHERE sr.[ReportTrackingId] = dal.[ReportTrackingId]
-                  );
+                IF COL_LENGTH('DataAcquisitionLog', 'ReportStartDate') IS NOT NULL
+                   AND COL_LENGTH('DataAcquisitionLog', 'ReportEndDate') IS NOT NULL
+                BEGIN
+                    EXEC(N'
+                        INSERT INTO [ScheduledReports] ([ReportTrackingId], [Frequency], [StartDate], [EndDate], [ReportTypes], [CreateDate])
+                        SELECT
+                            dal.[ReportTrackingId],
+                            ''Adhoc'',
+                            COALESCE(dal.[ReportStartDate], ''1900-01-01''),
+                            COALESCE(dal.[ReportEndDate],   ''1900-01-01''),
+                            NULL,
+                            GETUTCDATE()
+                        FROM (
+                            SELECT [ReportTrackingId], [ReportStartDate], [ReportEndDate],
+                                   ROW_NUMBER() OVER (PARTITION BY [ReportTrackingId] ORDER BY [Id]) AS rn
+                            FROM [DataAcquisitionLog]
+                            WHERE [ReportTrackingId] IS NOT NULL
+                        ) dal
+                        WHERE dal.rn = 1
+                          AND NOT EXISTS (
+                              SELECT 1 FROM [ScheduledReports] sr
+                              WHERE sr.[ReportTrackingId] = dal.[ReportTrackingId]
+                          );
+                    ');
+                END
             ");
 
             // 2) Validate all non-null ReportTrackingIds are GUIDs before conversion.

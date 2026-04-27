@@ -3,7 +3,9 @@ using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Automation.Link.Services;
 using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
@@ -51,6 +53,7 @@ public class AutomationRunManager : IAutomationRunManager
     {
         var runId = Guid.NewGuid();
         var options = ResolveRunOptions(request);
+
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
         var state = new MutableRunState(runId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
         _runs[runId] = state;
@@ -88,12 +91,22 @@ public class AutomationRunManager : IAutomationRunManager
 
     public async Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default)
     {
+        // ── Path 1: zombie run (exists in the store but no in-memory state) ────────
+        // _runs is lost on every app restart, so any run that was Running when the
+        // previous process died is a zombie: still flagged Running in Mongo, but
+        // with no execution task to signal. Returning false here was the reason the
+        // UI's Cancel button appeared to do nothing after a docker restart.
         if (!_runs.TryGetValue(runId, out var state))
-            return false;
+            return await CancelZombieRunAsync(runId, cancellationToken);
 
         if (state.Status is not AutomationRunStatus.Queued and not AutomationRunStatus.Running)
             return false;
 
+        // ── Path 2: live in-process run ────────────────────────────────────────────
+        // Flip the in-memory state, broadcast, persist. BroadcastStatus calls
+        // PersistRunSummaryAsync internally, so the row is marked Cancelled in Mongo
+        // before we return — the UI will see the updated status on its next refresh
+        // regardless of how long cleanup takes.
         state.CancelRequested = true;
         state.Status = AutomationRunStatus.Cancelled;
         state.Error = "Cancelled by user.";
@@ -109,60 +122,127 @@ public class AutomationRunManager : IAutomationRunManager
             // best effort
         }
 
-        if (state.ExecutionTask != null)
-        {
-            try
-            {
-                await Task.WhenAny(state.ExecutionTask, Task.Delay(TimeSpan.FromSeconds(10), cancellationToken));
-            }
-            catch
-            {
-                // best effort
-            }
-        }
-
-        var output = new RunAutomationOutput(message => WriteLog(state, message));
-        output.WriteLine("Cancellation requested. Running cancellation cleanup workflow...");
-
-        using var scope = _hostServices.CreateScope();
-        var dataAcqClient = scope.ServiceProvider.GetRequiredService<IDataAcquisitionServiceClient>();
-        var reportClient = scope.ServiceProvider.GetRequiredService<IReportServiceClient>();
-        var facilityClient = scope.ServiceProvider.GetRequiredService<IFacilityServiceClient>();
-        var normalizationClient = scope.ServiceProvider.GetRequiredService<INormalizationServiceClient>();
-        var queryDispatchClient = scope.ServiceProvider.GetRequiredService<IQueryDispatchServiceClient>();
-        var fhirDataLoader = state.FhirDataLoader
-            ?? new FhirDataLoader(_automationConfig.ExternalFhirServerBase, _automationConfig.FhirServerOAuth, _automationConfig.FhirServerBasicAuth);
-
-        await RunCleanupHelper.CleanupCancelledRunAsync(
-            facilityClient,
-            normalizationClient,
-            dataAcqClient,
-            queryDispatchClient,
-            reportClient,
-            fhirDataLoader,
-            output,
-            state.FacilityId,
-            state.ReportId,
-            cancellationToken);
-
-        await _orchestrator.CompleteRunAsync(runId);
-        await PersistRunSummaryAsync(state);
-        output.WriteLine("Cancellation cleanup complete.");
+        // Run the downstream cleanup workflow (FHIR purge, config teardown, report
+        // soft-delete) as a background task. Holding the HTTP request for 10s + N
+        // cross-service calls is what made Cancel feel hung to users; the run is
+        // already marked Cancelled at this point, so the UI doesn't need to wait.
+        _ = Task.Run(() => CleanupCancelledRunInBackgroundAsync(state));
 
         return true;
     }
 
-    public async Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// Cancels a run whose in-memory state no longer exists in this process.
+    /// Writes a minimal Cancelled summary directly through the snapshot store so
+    /// the dashboard updates correctly and the orchestrator stops polling.
+    /// Cleanup of downstream service state isn't attempted here because the facility
+    /// and report IDs captured on the persisted summary are the only handles we have
+    /// and may be missing if the run died before they were assigned.
+    /// </summary>
+    private async Task<bool> CancelZombieRunAsync(Guid runId, CancellationToken cancellationToken)
     {
-        var page = await _snapshotStore.GetRunsPageAsync(pageNumber, pageSize, cancellationToken);
+        var summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
+        if (summary == null)
+            return false;
+
+        if (summary.Status is not AutomationRunStatus.Queued and not AutomationRunStatus.Running)
+            return false;
+
+        summary.Status = AutomationRunStatus.Cancelled;
+        summary.Error = "Cancelled by user (no active execution in this process).";
+        summary.FinishedAt = DateTimeOffset.UtcNow;
+
+        await _snapshotStore.UpsertRunSummaryAsync(summary, summary.FacilityId, summary.ReportId, cancellationToken);
+        await _snapshotStore.CompleteRunAsync(runId, duration: null, ct: cancellationToken);
+        await _orchestrator.CompleteRunAsync(runId);
+
+        await _hub.Clients.Group(runId.ToString()).SendAsync("status", summary, cancellationToken);
+        await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", summary, cancellationToken);
+
+        _logger.LogInformation(
+            "Cancelled zombie run {RunId} (no in-memory state). Downstream service cleanup skipped; operator may need to reset facility {FacilityId} manually if it was partially provisioned.",
+            runId, summary.FacilityId);
+
+        return true;
+    }
+
+    private async Task CleanupCancelledRunInBackgroundAsync(MutableRunState state)
+    {
+        try
+        {
+            if (state.ExecutionTask != null)
+            {
+                // Let the running pipeline observe the cancellation token and unwind
+                // cleanly before we start clawing back its outputs.
+                await Task.WhenAny(state.ExecutionTask, Task.Delay(TimeSpan.FromSeconds(10)));
+            }
+
+            var output = new RunAutomationOutput(message => WriteLog(state, message));
+            output.WriteLine("Cancellation requested. Running cancellation cleanup workflow...");
+
+            using var scope = _hostServices.CreateScope();
+            var dataAcqClient = scope.ServiceProvider.GetRequiredService<IDataAcquisitionServiceClient>();
+            var reportClient = scope.ServiceProvider.GetRequiredService<IReportServiceClient>();
+            var facilityClient = scope.ServiceProvider.GetRequiredService<IFacilityServiceClient>();
+            var normalizationClient = scope.ServiceProvider.GetRequiredService<INormalizationServiceClient>();
+            var queryDispatchClient = scope.ServiceProvider.GetRequiredService<IQueryDispatchServiceClient>();
+            var fhirDataLoader = state.FhirDataLoader
+                ?? new FhirDataLoader(_automationConfig.ExternalFhirServerBase, _automationConfig.FhirServerOAuth, _automationConfig.FhirServerBasicAuth);
+
+            await RunCleanupHelper.CleanupCancelledRunAsync(
+                facilityClient,
+                normalizationClient,
+                dataAcqClient,
+                queryDispatchClient,
+                reportClient,
+                fhirDataLoader,
+                output,
+                state.FacilityId,
+                state.ReportId,
+                CancellationToken.None);
+
+            await _orchestrator.CompleteRunAsync(state.RunId);
+            await PersistRunSummaryAsync(state);
+            output.WriteLine("Cancellation cleanup complete.");
+        }
+        catch (Exception ex)
+        {
+            // A failure in background cleanup must never crash the host. The run is
+            // already marked Cancelled in the store from BroadcastStatus above; this
+            // only affects downstream service state that an operator may need to
+            // inspect/clean up manually.
+            _logger.LogError(ex, "Background cancellation cleanup failed for run {RunId}.", state.RunId);
+        }
+    }
+
+    public async Task<AutomationRunIndexViewModel> GetRunsPageAsync(int pageNumber = 1, int pageSize = 20, string? sortBy = null, bool sortDescending = true, CancellationToken cancellationToken = default)
+    {
+        var page = await _snapshotStore.GetRunsPageAsync(pageNumber, pageSize, sortBy, sortDescending, cancellationToken);
         return new AutomationRunIndexViewModel
         {
             Runs = page.Items,
             PageNumber = page.PageNumber,
             PageSize = page.PageSize,
-            TotalCount = page.TotalCount
+            TotalCount = page.TotalCount,
+            // Echo the *normalized* sort back so the view can render its
+            // active-column indicator and build correct sort-toggle URLs.
+            // Empty/unrecognized sortBy resolves to "createdAt".
+            SortBy = NormalizeSortBy(sortBy),
+            SortDescending = sortDescending,
         };
     }
+
+    private static string NormalizeSortBy(string? sortBy) =>
+        (sortBy ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "runname"      => "runName",
+            "patientcount" => "patientCount",
+            "seed"         => "seed",
+            "status"       => "status",
+            "finishedat"   => "finishedAt",
+            "createdat"    => "createdAt",
+            _              => "createdAt",
+        };
 
     public async Task<AutomationRunSummary?> GetRunAsync(Guid runId, CancellationToken cancellationToken = default)
     {
@@ -204,7 +284,7 @@ public class AutomationRunManager : IAutomationRunManager
 
     public async Task<PipelineSummarySnapshotBuilder.PipelineSummarySnapshot?> GetPipelineSnapshotAsync(Guid runId, CancellationToken cancellationToken = default)
     {
-        // Always read from Mongo � the poller writes domain data there,
+        // Always read from Mongo — the poller writes domain data there,
         // and logs are persisted as they're written. One data flow, no branching.
         var summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
 
@@ -248,18 +328,17 @@ public class AutomationRunManager : IAutomationRunManager
                 var populations = await SafeGetDomainAsync<List<PipelineDataReader.ReportPopulationInfo>>(runId, "populations", cancellationToken) ?? [];
                 var acquisitionSummary = await SafeGetDomainAsync<PipelineDataReader.AcquisitionSummaryInfo>(runId, "acquisitionSummary", cancellationToken);
                 var measureResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "measureResources", cancellationToken) ?? [];
-                var validationResources = await SafeGetDomainAsync<List<PipelineDataReader.PatientResourceTypeCount>>(runId, "validationResources", cancellationToken) ?? [];
+                var validatorResults = await SafeGetDomainAsync<List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>>(runId, "validatorResults", cancellationToken);
 
                 _logger.LogDebug(
-                    "[Snapshot][{RunId}] Domain data: schedule={HasSchedule}, entries={EntryCount}, populations={PopCount}, acqSummary={HasAcqSummary} (logs={AcqLogs}), measureRes={MeasureCount}, valRes={ValCount}",
+                    "[Snapshot][{RunId}] Domain data: schedule={HasSchedule}, entries={EntryCount}, populations={PopCount}, acqSummary={HasAcqSummary} (logs={AcqLogs}), measureRes={MeasureCount}",
                     runId,
                     schedule != null,
                     entries.Count,
                     populations.Count,
                     acquisitionSummary != null,
                     acquisitionSummary?.TotalLogs ?? 0,
-                    measureResources.Count,
-                    validationResources.Count);
+                    measureResources.Count);
 
                 return new PipelineSummarySnapshotBuilder.ResolvedDomainData
                 {
@@ -268,7 +347,7 @@ public class AutomationRunManager : IAutomationRunManager
                     Populations = populations,
                     AcquisitionSummary = acquisitionSummary,
                     MeasureEvalResourceCounts = measureResources,
-                    ReportResourceCounts = validationResources
+                    ValidatorResults = validatorResults
                 };
             });
 
@@ -298,6 +377,74 @@ public class AutomationRunManager : IAutomationRunManager
                 IsFinal = isFinal
             };
         }
+    }
+
+    public async Task<GenerationManifestSnapshot?> GetGenerationManifestAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        return await SafeGetDomainAsync<GenerationManifestSnapshot>(runId, "generationManifest", cancellationToken);
+    }
+
+    public async Task<AbsUploadSnapshot?> GetAbsUploadSnapshotAsync(Guid runId, CancellationToken cancellationToken = default)
+    {
+        return await SafeGetDomainAsync<AbsUploadSnapshot>(runId, "absUpload", cancellationToken);
+    }
+
+    public async Task<RunDashboardStats> GetDashboardStatsAsync(CancellationToken cancellationToken = default)
+    {
+        var since = DateTimeOffset.UtcNow.AddDays(-14);
+        var allRuns = await _snapshotStore.GetAllRunSummariesAsync(since, cancellationToken);
+
+        // Merge in-memory active runs that may not yet be persisted
+        var inMemory = _runs.Values.Select(ToSummary).ToList();
+        var persistedRunIds = new HashSet<Guid>(allRuns.Select(r => r.RunId));
+        var merged = allRuns
+            .Concat(inMemory.Where(m => !persistedRunIds.Contains(m.RunId)))
+            .ToList();
+
+        var stats = new RunDashboardStats
+        {
+            TotalRuns = merged.Count,
+            Succeeded = merged.Count(r => r.Status == AutomationRunStatus.Succeeded),
+            Failed = merged.Count(r => r.Status == AutomationRunStatus.Failed),
+            Cancelled = merged.Count(r => r.Status == AutomationRunStatus.Cancelled),
+            Running = merged.Count(r => r.Status == AutomationRunStatus.Running),
+            Queued = merged.Count(r => r.Status == AutomationRunStatus.Queued),
+        };
+
+        var completedWithDuration = merged
+            .Where(r => r.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed && r.FinishedAt.HasValue)
+            .Select(r => (r.FinishedAt!.Value - r.CreatedAt).TotalSeconds)
+            .Where(d => d > 0)
+            .ToList();
+
+        stats.AvgDurationSeconds = completedWithDuration.Count > 0
+            ? Math.Round(completedWithDuration.Average(), 1)
+            : 0;
+
+        // Last 14 days histogram
+        var cutoff = DateTimeOffset.UtcNow.AddDays(-13).Date;
+        for (var d = cutoff; d <= DateTime.UtcNow.Date; d = d.AddDays(1))
+            stats.RunsPerDay[d.ToString("yyyy-MM-dd")] = new RunDayBucket();
+
+        foreach (var run in merged.Where(r => r.CreatedAt.Date >= cutoff))
+        {
+            var key = run.CreatedAt.Date.ToString("yyyy-MM-dd");
+            if (!stats.RunsPerDay.TryGetValue(key, out var bucket))
+            {
+                bucket = new RunDayBucket();
+                stats.RunsPerDay[key] = bucket;
+            }
+
+            switch (run.Status)
+            {
+                case AutomationRunStatus.Succeeded: bucket.Succeeded++; break;
+                case AutomationRunStatus.Failed: bucket.Failed++; break;
+                case AutomationRunStatus.Cancelled: bucket.Cancelled++; break;
+                default: bucket.Other++; break;
+            }
+        }
+
+        return stats;
     }
 
     private async Task ExecuteAsync(MutableRunState state, CancellationToken cancellationToken)
@@ -336,14 +483,16 @@ public class AutomationRunManager : IAutomationRunManager
             output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, prefix={state.Options.Prefix}, seed={state.Options.Seed}");
 
             List<string> patientIds;
-            List<(string Name, string Json)> bundles;
             List<string> expectedSubmittedPatientIds;
+            GenerationManifest? generationManifest = null;
 
             // Use the first measure for generation context (profile-driven generation picks
-            // the most restrictive measure � patients qualifying for all measures must meet
-            // the criteria of each). For multi-measure, GenerateWithProfiles handles the union.
+            // the most restrictive measure — patients qualifying for all measures must meet
+            // the criteria of each). For multi-measure, the pipeline handles the union.
             var primaryMeasure = state.Options.SelectedMeasures[0];
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
+
+            await fhirDataLoader.WaitForServerAsync(output);
 
             if (state.Options.PatientProfiles is { Count: > 0 })
             {
@@ -354,14 +503,27 @@ public class AutomationRunManager : IAutomationRunManager
                 var mixedCount = profiles.Count - qualAllCount - nqAllCount;
                 output.WriteLine($"Using measure-eligibility profiles: {qualAllCount} qualifying-all, {nqAllCount} non-qualifying-all, {mixedCount} mixed");
 
-                (patientIds, bundles) = FhirBundleGenerator.GenerateWithProfiles(
+                // Use the streaming pipeline: generate ? upload ? dispose per patient.
+                // The pipeline builds the manifest incrementally and runs acquisition
+                // simulation per-patient, so no serialized FHIR JSON is retained.
+                var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
                     output,
+                    fhirDataLoader,
                     selectedMeasures,
                     profiles,
                     state.Options.ResourcesPerPatient,
                     state.Options.Prefix,
                     state.Options.Seed,
-                    generationConfig);
+                    generationConfig,
+                    acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
+                    {
+                        QueryPlan = QueryPlanDefaults.GetDefaultAsInput(),
+                        ClinicalPeriodStart = scenarioConfig.StartDate,
+                        ClinicalPeriodEnd = scenarioConfig.EndDate
+                    });
+
+                patientIds = pipelineResult.PatientIds;
+                generationManifest = pipelineResult.Manifest;
 
                 expectedSubmittedPatientIds = patientIds
                     .Where((_, idx) => idx < profiles.Count && profiles[idx].QualifiesForAny(selectedMeasures))
@@ -369,21 +531,20 @@ public class AutomationRunManager : IAutomationRunManager
             }
             else
             {
-                (patientIds, bundles) = FhirBundleGenerator.Generate(
+                var (genPatientIds, bundles) = FhirBundleGenerator.Generate(
                     output, state.Options.PatientCount, state.Options.ResourcesPerPatient, state.Options.Prefix, state.Options.Seed,
                     generationConfig);
 
+                patientIds = genPatientIds;
                 expectedSubmittedPatientIds = patientIds.ToList();
+
+                await fhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
             }
 
             if (scenarioConfig.PatientIds.Count == 0)
                 scenarioConfig.PatientIds = patientIds;
 
             var expectedAllPatientIds = scenarioConfig.PatientIds;
-
-            await fhirDataLoader.WaitForServerAsync(output);
-
-            await fhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
 
             await validationHelper.InitializeArtifactsAsync();
             await validationHelper.InitializeCategoriesAsync();
@@ -406,6 +567,19 @@ public class AutomationRunManager : IAutomationRunManager
             var queryPlanInput = queryPlanResolution.Input;
             if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
                 output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
+
+            // Finalize manifest metadata now that we have measure IDs and query plan.
+            if (generationManifest != null)
+            {
+                generationManifest.MeasureIds = measureIds;
+                var effectiveQueryPlanInput = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
+                generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlanInput);
+                generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlanInput);
+                generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
+
+                // Persist a lightweight manifest snapshot for the UI.
+                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), CancellationToken.None);
+            }
 
             await FacilitySetupHelper.EnsureFacilityAsync(
                 services.GetRequiredService<IFacilityServiceClient>(),
@@ -455,13 +629,13 @@ public class AutomationRunManager : IAutomationRunManager
                     throw new InvalidOperationException($"Expected report with id {reportId} to be submitted but it was not.");
             }
 
-            // ?? RegenerateReport: the first report is just a prerequisite.
+            // RegenerateReport: the first report is just a prerequisite.
             // Now trigger regeneration and track the *new* report through the full pipeline.
             if (state.Options.ReportMethod == ReportMethod.RegenerateReport)
             {
-                output.WriteLine("???????????????????????????????????????????????????????????????");
+                output.WriteLine("---------------------------------------------------------------");
                 output.WriteLine("Initial report submitted. Beginning REGENERATION phase...");
-                output.WriteLine("???????????????????????????????????????????????????????????????");
+                output.WriteLine("---------------------------------------------------------------");
 
                 // Flush stale domain data so the regenerated report starts fresh.
                 services.GetRequiredService<PipelineDataReader>().InvalidateCache();
@@ -504,6 +678,17 @@ public class AutomationRunManager : IAutomationRunManager
             var downloadedResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig);
             var internalAbsResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig, external: false);
 
+            // Capture a lightweight ABS upload snapshot for the manifest detail page.
+            try
+            {
+                var absSnapshot = AbsUploadSnapshot.Build(internalAbsResources);
+                await _snapshotStore.SetDomainAsync(state.RunId, "absUpload", absSnapshot, CancellationToken.None);
+            }
+            catch (Exception absEx)
+            {
+                output.WriteLine($"[WARN] Failed to build/store ABS upload snapshot: {absEx.Message}");
+            }
+
             if (!downloadedResources.ContainsKey("manifest.ndjson"))
                 throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
 
@@ -516,55 +701,97 @@ public class AutomationRunManager : IAutomationRunManager
             // Flush stale cache from diagnostics polling so validators read authoritative data.
             services.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
-            // Regeneration reuses prior data acquisition � no new DA logs exist for the regenerated report.
+            // Regeneration reuses prior data acquisition — no new DA logs exist for the regenerated report.
             var expectDataAcquisitionData = state.Options.ReportMethod != ReportMethod.RegenerateReport;
 
-            // Build the concrete generation manifest when profiles are available.
-            GenerationManifest? generationManifest = null;
-            if (state.Options.PatientProfiles is { Count: > 0 })
+            // Pipeline-built manifest already has all metadata; no need to re-parse bundles.
+            // For non-profile runs (no pipeline), generationManifest remains null.
+
+            var validatorResults = new List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>();
+
+            async Task RunValidator(string name, Func<Task> action)
             {
-                generationManifest = GenerationManifest.Build(
-                    patientIds,
-                    bundles,
-                    state.Options.PatientProfiles,
-                    (IReadOnlyList<ProfiledMeasureType>)state.Options.SelectedMeasures);
-                generationManifest.MeasureIds = measureIds;
-                var effectiveQueryPlanInput = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
-                generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlanInput);
-                generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlanInput);
-                generationManifest.SimulatedAcquiredResourceKeysByPatient = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysByPatient(
-                    patientIds,
-                    bundles,
-                    effectiveQueryPlanInput,
-                    scenarioConfig.StartDate,
-                    scenarioConfig.EndDate);
-                generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
+                try
+                {
+                    await action();
+                    validatorResults.Add(new PipelineSummarySnapshotBuilder.ValidatorResultSnapshot
+                    {
+                        Name = name,
+                        Outcome = "Passed",
+                        IssueCount = 0
+                    });
+                }
+                catch (Exception ex)
+                {
+                    // Extract issue count from the conventional message format:
+                    // "... failed with N issue(s)."
+                    var issueCount = 0;
+                    var match = System.Text.RegularExpressions.Regex.Match(ex.Message, @"(\d+)\s+issue\(s\)");
+                    if (match.Success)
+                        int.TryParse(match.Groups[1].Value, out issueCount);
+
+                    validatorResults.Add(new PipelineSummarySnapshotBuilder.ValidatorResultSnapshot
+                    {
+                        Name = name,
+                        Outcome = "Failed",
+                        IssueCount = issueCount
+                    });
+                    // Re-throw so the run still fails as before.
+                    throw;
+                }
+                finally
+                {
+                    // Persist after each validator so partial results are visible
+                    // in the dashboard even if a later validator throws.
+                    await _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", validatorResults, CancellationToken.None);
+                }
             }
 
-            await reportAbsValidator.ValidateAllAsync(
-                internalAbsResources,
-                expectedSubmittedPatientIds,
-                measureIds,
-                scenarioConfig.StartDate,
-                scenarioConfig.EndDate,
-                facilityId,
-                reportId,
-                bundles,
-                expectedManifestPatientListIds: expectedAllPatientIds,
-                expectDataAcquisitionData: expectDataAcquisitionData,
-                manifest: generationManifest);
+            await RunValidator("REPORT INTERNAL ABS MANIFEST VALIDATION", () =>
+                reportAbsValidator.ValidateAllAsync(
+                    internalAbsResources,
+                    expectedSubmittedPatientIds,
+                    measureIds,
+                    scenarioConfig.StartDate,
+                    scenarioConfig.EndDate,
+                    facilityId,
+                    reportId,
+                    generatedBundles: null,
+                    expectedManifestPatientListIds: expectedAllPatientIds,
+                    expectDataAcquisitionData: expectDataAcquisitionData,
+                    manifest: generationManifest));
 
-            await reportValidator.ValidateAllAsync(
-                facilityId,
-                reportId,
-                measureIds,
-                expectedAllPatientIds,
-                expectedSubmittedPatientIds: expectedSubmittedPatientIds,
-                manifest: generationManifest);
-            await dataAcqValidator.ValidateAllAsync(facilityId, reportId, measureIds[0], expectedAllPatientIds, expectDataAcquisitionData: expectDataAcquisitionData);
-            await normalizationValidator.ValidateAllAsync(facilityId);
-            await tenantValidator.ValidateAllAsync(facilityId, measureId);
-            await validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow);
+            // The ABS manifest validator enriches the manifest with downstream-derived
+            // predictions that are not known at generation time — most notably the
+            // per-patient OperationOutcome count (one OO is appended to the ABS blob for
+            // every patient whose ReportingStatus is FailedValidation). Re-persist the
+            // snapshot so the Runs dashboard shows the final, fully-enriched predictions
+            // rather than the pre-validation snapshot taken at line ~506.
+            if (generationManifest != null)
+            {
+                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), CancellationToken.None);
+            }
+
+            await RunValidator("REPORT DATABASE VALIDATION", () =>
+                reportValidator.ValidateAllAsync(
+                    facilityId,
+                    reportId,
+                    measureIds,
+                    expectedAllPatientIds,
+                    expectedSubmittedPatientIds: expectedSubmittedPatientIds,
+                    manifest: generationManifest));
+
+            await RunValidator("DATA ACQUISITION DATABASE VALIDATION", () =>
+                dataAcqValidator.ValidateAllAsync(facilityId, reportId, measureIds[0], expectedAllPatientIds, expectDataAcquisitionData: expectDataAcquisitionData));
+
+            await RunValidator("NORMALIZATION DATABASE VALIDATION", () =>
+                normalizationValidator.ValidateAllAsync(facilityId));
+
+            await RunValidator("TENANT DATABASE VALIDATION", () =>
+                tenantValidator.ValidateAllAsync(facilityId, measureId));
+
+            await RunValidator("VALIDATION RESULTS (API)", () =>
+                validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow));
 
             await RunCleanupHelper.CleanupAfterRunAsync(
                 scenarioConfig,
@@ -737,7 +964,7 @@ public class AutomationRunManager : IAutomationRunManager
                 ? [request.SelectedMeasure.Value]
                 : effectiveMeasures;
 
-        // Always expand profiles from cohorts � cohorts are the single source of truth.
+        // Always expand profiles from cohorts — cohorts are the single source of truth.
         profiles = ExpandProfilesFromCohorts(cohorts, request.Seed ?? defaults.Seed);
 
         return defaults with
@@ -877,6 +1104,7 @@ public class AutomationRunManager : IAutomationRunManager
     private async Task BroadcastStatus(MutableRunState state)
     {
         await _hub.Clients.Group(state.RunId.ToString()).SendAsync("status", ToSummary(state));
+        await _hub.Clients.Group(RunHub.DashboardGroup).SendAsync("dashboardUpdate", ToSummary(state));
         await PersistRunSummaryAsync(state);
     }
 
@@ -899,7 +1127,15 @@ public class AutomationRunManager : IAutomationRunManager
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Unable to persist run summary for {RunId}", state.RunId);
+            // Logged at Error: when this throws, the run exists only in-memory and
+            // never appears in the Recent Runs table (which is a pure Mongo read
+            // with no in-memory merge). Silent Warning-level logging previously
+            // masked exactly that failure mode.
+            _logger.LogError(ex,
+                "Failed to persist run summary for {RunId}. The run will be visible " +
+                "on the dashboard KPIs (via the in-memory merge) but will NOT appear " +
+                "in the Recent Runs table until a successful upsert lands.",
+                state.RunId);
         }
     }
 

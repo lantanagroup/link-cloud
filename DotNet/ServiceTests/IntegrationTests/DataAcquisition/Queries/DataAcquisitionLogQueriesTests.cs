@@ -13,7 +13,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Queries;
 
-[Collection("DataAcquisitionIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
 public class DataAcquisitionLogQueriesTests
 {
@@ -869,6 +869,169 @@ public class DataAcquisitionLogQueriesTests
             .CountAsync(l => testLogIds.Contains(l.Id) && l.Status == RequestStatus.Processing);
         Assert.Equal(200, pendingCount);
         Assert.Equal(50, stillProcessingCount);
+    }
+
+    // ==================== GetNonTerminalDependencyResourceTypes Tests ====================
+
+    [Fact]
+    public async Task GetNonTerminalDependencyResourceTypes_EmptyInput_ReturnsEmpty()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var nullResult = await queries.GetNonTerminalDependencyResourceTypes(
+            "corr", "facility", resourceTypes: null!, CancellationToken.None);
+        var emptyResult = await queries.GetNonTerminalDependencyResourceTypes(
+            "corr", "facility", new List<string>(), CancellationToken.None);
+        var missingCorrResult = await queries.GetNonTerminalDependencyResourceTypes(
+            "", "facility", ["Patient"], CancellationToken.None);
+        var missingFacilityResult = await queries.GetNonTerminalDependencyResourceTypes(
+            "corr", "  ", ["Patient"], CancellationToken.None);
+
+        Assert.Empty(nullResult);
+        Assert.Empty(emptyResult);
+        Assert.Empty(missingCorrResult);
+        Assert.Empty(missingFacilityResult);
+    }
+
+    [Fact]
+    public async Task GetNonTerminalDependencyResourceTypes_InvalidResourceType_IsSkippedNonBlocking()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"DepInvalid_{tag}";
+        var correlationId = Guid.NewGuid().ToString();
+
+        // Seed a non-terminal Patient log so that — if the unparseable type were
+        // to accidentally be broadened — it would blow up and fail the test.
+        dbContext.DataAcquisitionLogs.Add(new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            Status = RequestStatus.Queued,
+            CorrelationId = correlationId,
+            ReportTrackingId = Guid.NewGuid(),
+            PatientId = "Patient/123",
+            ScheduledReportEntity = new ScheduledReportEntity { ReportTrackingId = Guid.NewGuid(), StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery { MeasureId = "test", FacilityId = facilityId, QueryType = FhirQueryType.Read,
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> { new() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } }
+            }
+        });
+        await dbContext.SaveChangesAsync();
+
+        var result = await queries.GetNonTerminalDependencyResourceTypes(
+            correlationId, facilityId,
+            ["NotARealResource", "AlsoFake"],
+            CancellationToken.None);
+
+        // Unparseable types are skipped with a warning and treated as non-blocking.
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetNonTerminalDependencyResourceTypes_MissingProducer_ReturnsEmptyForThatType()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"DepMissing_{tag}";
+        var correlationId = Guid.NewGuid().ToString();
+
+        // Seed an Encounter log only — nothing for Patient. Asking about Patient should
+        // fail open (missing producer ≠ blocking).
+        dbContext.DataAcquisitionLogs.Add(new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            Status = RequestStatus.Queued,
+            CorrelationId = correlationId,
+            ReportTrackingId = Guid.NewGuid(),
+            PatientId = "Patient/123",
+            ScheduledReportEntity = new ScheduledReportEntity { ReportTrackingId = Guid.NewGuid(), StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery { MeasureId = "test", FacilityId = facilityId, QueryType = FhirQueryType.Search,
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> { new() { ResourceType = Hl7.Fhir.Model.ResourceType.Encounter } } }
+            }
+        });
+        await dbContext.SaveChangesAsync();
+
+        var result = await queries.GetNonTerminalDependencyResourceTypes(
+            correlationId, facilityId,
+            ["Patient"],
+            CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetNonTerminalDependencyResourceTypes_MixedValidAndInvalid_OnlyNonTerminalValidReturned()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"DepMixed_{tag}";
+        var correlationId = Guid.NewGuid().ToString();
+        var reportTrackingId = Guid.NewGuid();
+        var scheduledReport = new ScheduledReportEntity { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow };
+
+        // Patient log — non-terminal (Queued) → should block.
+        dbContext.DataAcquisitionLogs.Add(new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            Status = RequestStatus.Queued,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            PatientId = "Patient/123",
+            ScheduledReportEntity = scheduledReport,
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery { MeasureId = "test", FacilityId = facilityId, QueryType = FhirQueryType.Read,
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> { new() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient } } }
+            }
+        });
+
+        // Encounter log — terminal (Completed) → should NOT block.
+        dbContext.DataAcquisitionLogs.Add(new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            Status = RequestStatus.Completed,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            PatientId = "Patient/123",
+            ScheduledReportEntity = scheduledReport,
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery { MeasureId = "test", FacilityId = facilityId, QueryType = FhirQueryType.Search,
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> { new() { ResourceType = Hl7.Fhir.Model.ResourceType.Encounter } } }
+            }
+        });
+        await dbContext.SaveChangesAsync();
+
+        // Mix: non-terminal producer + terminal producer + missing producer + invalid type.
+        var result = await queries.GetNonTerminalDependencyResourceTypes(
+            correlationId, facilityId,
+            ["Patient", "Encounter", "Condition", "Garbage"],
+            CancellationToken.None);
+
+        // Only Patient should come back — Encounter is terminal, Condition has no producer, Garbage is unparseable.
+        Assert.Single(result);
+        Assert.Equal("Patient", result[0]);
     }
 }
 

@@ -1,4 +1,4 @@
-﻿name: "Tests"
+name: "Tests"
 
 on:
 #  schedule:
@@ -46,10 +46,15 @@ jobs:
       - name: Show decision
         run: echo "run_job=${{ steps.should.outputs.run_job }}"
 
-  docker-build-and-run:    
-    name: Smoke Test with Docker Compose
+  backend-e2e-tests:
+    # All five test categories run in parallel against a SINGLE shared
+    # docker compose stack (one build, one up). Each `dotnet test`
+    # invocation writes to its own log file and is then rendered as its own
+    # collapsible ::group:: in the Actions UI so logs are segmented per
+    # category instead of interleaved.
+    name: Backend E2E Tests with Docker Compose
     runs-on: [docker-16core-64gb]
-    timeout-minutes: 15
+    timeout-minutes: 60
 
     needs: changes
     if: ${{ needs.changes.outputs.run_job == 'true' }}
@@ -58,8 +63,9 @@ jobs:
       PROJECT_NAME: link
       HEALTH_CHECK_TIMEOUT: 60
       CHECK_INTERVAL: 10
+      ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
 
-    steps:          
+    steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -72,6 +78,7 @@ jobs:
             --set *.cache-from=type=gha,scope=e2e-docker \
             --set *.cache-to=type=gha,scope=e2e-docker \
             --set *.output=type=docker   # <-- makes images visible to `docker compose`
+
       - name: Start services
         run: docker compose up --no-build -d
 
@@ -83,258 +90,132 @@ jobs:
           chmod +x Scripts/check_health.sh
           Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
 
-      - name: Upload Logs on Failure
+      # Build the test project ONCE up front. The parallel `dotnet test`
+      # invocations below all target the same assembly and transitively
+      # reference the same service projects; if each one runs MSBuild they
+      # race on shared bin/*.deps.json / appsettings output files and crash
+      # with "The process cannot access the file ... being used by another
+      # process" (MSB4018). Building once and passing --no-build/--no-restore
+      # to each parallel run avoids the contention.
+      - name: Restore & build BackendE2ETests
+        run: |
+          dotnet restore ./Tests/BackendE2ETests/BackendE2ETests.csproj
+          dotnet build ./Tests/BackendE2ETests/BackendE2ETests.csproj \
+            --configuration Debug \
+            --no-restore
+
+      # ---- All 5 test categories run CONCURRENTLY against the SAME stack. ----
+      # Each `dotnet test` is launched in the background with its stdout/stderr
+      # redirected to a dedicated log file. After they all finish we emit each
+      # log wrapped in ::group::/::endgroup:: markers so the GitHub Actions UI
+      # renders a separate, collapsible section per test category instead of
+      # interleaving everything into one wall of text.
+      - name: Backend E2E Tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p ./Tests/BackendE2ETests/TestResults
+          mkdir -p ./test-logs
+
+          # name|category|trx-file
+          TESTS=(
+            "Adhoc Report|AdhocReportTest|adhoc-report-test-results.trx"
+            "API Stability|ApiStabilityTest|api-stability-test-results.trx"
+            "Report Scheduled|ReportScheduledTest|report-scheduled-test-results.trx"
+            "Regenerate Report|RegenerateReportTest|regenerate-report-test-results.trx"
+            "Multi-Measure|MultiMeasureTest|multi-measure-test-results.trx"
+          )
+
+          declare -a PIDS
+          declare -a NAMES
+          declare -a LOGS
+
+          for entry in "${TESTS[@]}"; do
+            IFS='|' read -r NAME CATEGORY TRX <<< "$entry"
+            SLUG=$(echo "$CATEGORY" | tr '[:upper:]' '[:lower:]')
+            LOG="./test-logs/${SLUG}.log"
+            echo "Starting: $NAME (Category=$CATEGORY) -> $LOG"
+            (
+              dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj \
+                --no-build \
+                --no-restore \
+                --filter "Category=${CATEGORY}" \
+                --logger "trx;LogFileName=${TRX}" \
+                --logger "console;verbosity=detailed" \
+                --results-directory ./Tests/BackendE2ETests/TestResults
+            ) > "$LOG" 2>&1 &
+            PIDS+=("$!")
+            NAMES+=("$NAME")
+            LOGS+=("$LOG")
+          done
+
+          # Wait for every test run, capture individual exit codes.
+          FAILED=0
+          declare -a EXITS
+          for i in "${!PIDS[@]}"; do
+            if wait "${PIDS[$i]}"; then
+              EXITS+=("0")
+            else
+              EXITS+=("$?")
+              FAILED=1
+            fi
+          done
+
+          # Render each run's output in its own collapsible group in the UI.
+          for i in "${!NAMES[@]}"; do
+            if [[ "${EXITS[$i]}" != "0" ]]; then
+              STATUS="❌ FAILED (exit ${EXITS[$i]})"
+            else
+              STATUS="✅ PASSED"
+            fi
+            echo "::group::${NAMES[$i]} — ${STATUS}"
+            cat "${LOGS[$i]}" || true
+            echo "::endgroup::"
+          done
+
+          exit $FAILED
+
+      # ---- Artifact uploads ----
+
+      - name: Upload Service Logs on Failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: adhoc-report-service-logs
+          name: backend-e2e-service-logs
           path: service-logs/
 
-      - name: Run Backend E2E Adhoc Report Tests
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=AdhocReportTest" --logger "trx;LogFileName=adhoc-report-test-results.trx" --logger "console;verbosity=detailed"
-        env:
-          ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
-
-      - name: Upload test results
-        if: always()
+      - name: Upload Backend E2E per-category console logs
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: adhoc-report-test-results
-          path: ./Tests/BackendE2ETests/TestResults/adhoc-report-test-results.trx
+          name: backend-e2e-console-logs
+          path: ./test-logs/
+          if-no-files-found: ignore
 
-      - name: Upload submission ZIP
-        if: always()
+      - name: Upload Backend E2E test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-e2e-test-results
+          path: ./Tests/BackendE2ETests/TestResults/*.trx
+          if-no-files-found: ignore
+
+      - name: Upload Adhoc Report submission ZIP
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: adhoc-report-submission-zip
           path: ./Tests/BackendE2ETests/TestResults/adhoc-report-test-submission.zip
+          if-no-files-found: ignore
 
-  docker-build-and-run-api-stability:
-    name: API Stability Test with Docker Compose
-    runs-on: [docker-16core-64gb]
-    timeout-minutes: 12
-
-    needs: changes
-    if: ${{ needs.changes.outputs.run_job == 'true' }}
-
-    env:
-      PROJECT_NAME: link
-      HEALTH_CHECK_TIMEOUT: 60
-      CHECK_INTERVAL: 10
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build services with cache
-        run: |
-          docker buildx bake --file docker-compose.yml \
-            --set *.cache-from=type=gha,scope=e2e-docker \
-            --set *.cache-to=type=gha,scope=e2e-docker \
-            --set *.output=type=docker
-
-      - name: Start services
-        run: docker compose up --no-build -d
-
-      - name: Wait for services to start
-        run: sleep 10
-
-      - name: Wait for Services to Become Healthy
-        run: |
-          chmod +x Scripts/check_health.sh
-          Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
-
-      - name: Upload Logs on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-stability-service-logs
-          path: service-logs/
-
-      - name: Run Backend E2E API Stability Test
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=ApiStabilityTest" --logger "trx;LogFileName=api-stability-test-results.trx" --logger "console;verbosity=detailed"
-
-      - name: Upload test results
+      - name: Tear down services
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-stability-test-results
-          path: ./Tests/BackendE2ETests/TestResults/api-stability-test-results.trx
+        run: docker compose down -v --remove-orphans
 
-  docker-build-and-run-report-scheduled:
-    name: Report Scheduled E2E Test with Docker Compose
-    runs-on: [docker-16core-64gb]
-    timeout-minutes: 20
-
-    needs: changes
-    if: ${{ needs.changes.outputs.run_job == 'true' }}
-
-    env:
-      PROJECT_NAME: link
-      HEALTH_CHECK_TIMEOUT: 60
-      CHECK_INTERVAL: 10
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build services with cache
-        run: |
-          docker buildx bake --file docker-compose.yml \
-            --set *.cache-from=type=gha,scope=e2e-docker \
-            --set *.cache-to=type=gha,scope=e2e-docker \
-            --set *.output=type=docker
-
-      - name: Start services
-        run: docker compose up --no-build -d
-
-      - name: Wait for services to start
-        run: sleep 10
-
-      - name: Wait for Services to Become Healthy
-        run: |
-          chmod +x Scripts/check_health.sh
-          Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
-
-      - name: Upload Logs on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: report-scheduled-service-logs
-          path: service-logs/
-
-      - name: Run Backend E2E Report Scheduled Test
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=ReportScheduledTest" --logger "trx;LogFileName=report-scheduled-test-results.trx" --logger "console;verbosity=detailed"
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: report-scheduled-test-results
-          path: ./Tests/BackendE2ETests/TestResults/report-scheduled-test-results.trx
-
-  docker-build-and-run-regenerate-report:
-    name: Regenerate Report E2E Test with Docker Compose
-    runs-on: [docker-16core-64gb]
-    timeout-minutes: 20
-
-    needs: changes
-    if: ${{ needs.changes.outputs.run_job == 'true' }}
-
-    env:
-      PROJECT_NAME: link
-      HEALTH_CHECK_TIMEOUT: 60
-      CHECK_INTERVAL: 10
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build services with cache
-        run: |
-          docker buildx bake --file docker-compose.yml \
-            --set *.cache-from=type=gha,scope=e2e-docker \
-            --set *.cache-to=type=gha,scope=e2e-docker \
-            --set *.output=type=docker
-
-      - name: Start services
-        run: docker compose up --no-build -d
-
-      - name: Wait for services to start
-        run: sleep 10
-
-      - name: Wait for Services to Become Healthy
-        run: |
-          chmod +x Scripts/check_health.sh
-          Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
-
-      - name: Upload Logs on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: regenerate-report-service-logs
-          path: service-logs/
-
-      - name: Run Backend E2E Regenerate Report Test
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=RegenerateReportTest" --logger "trx;LogFileName=regenerate-report-test-results.trx" --logger "console;verbosity=detailed"
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: regenerate-report-test-results
-          path: ./Tests/BackendE2ETests/TestResults/regenerate-report-test-results.trx
-
-  docker-build-and-run-multi-measure:
-    name: Multi-Measure E2E Test with Docker Compose
-    runs-on: [docker-16core-64gb]
-    timeout-minutes: 20
-
-    needs: changes
-    if: ${{ needs.changes.outputs.run_job == 'true' }}
-
-    env:
-      PROJECT_NAME: link
-      HEALTH_CHECK_TIMEOUT: 60
-      CHECK_INTERVAL: 10
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build services with cache
-        run: |
-          docker buildx bake --file docker-compose.yml \
-            --set *.cache-from=type=gha,scope=e2e-docker \
-            --set *.cache-to=type=gha,scope=e2e-docker \
-            --set *.output=type=docker
-
-      - name: Start services
-        run: docker compose up --no-build -d
-
-      - name: Wait for services to start
-        run: sleep 10
-
-      - name: Wait for Services to Become Healthy
-        run: |
-          chmod +x Scripts/check_health.sh
-          Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
-
-      - name: Upload Logs on Failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: multi-measure-service-logs
-          path: service-logs/
-
-      - name: Run Backend E2E Multi-Measure Test
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=MultiMeasureTest" --logger "trx;LogFileName=multi-measure-test-results.trx" --logger "console;verbosity=detailed"
-        env:
-          ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: multi-measure-test-results
-          path: ./Tests/BackendE2ETests/TestResults/multi-measure-test-results.trx
-
-  integration-tests:
-    name: Integration Tests
+  dotnet-tests:
+    name: .NET Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
 
     needs: changes
     if: ${{ needs.changes.outputs.run_job == 'true' }}
@@ -354,8 +235,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nuget-
 
+      # Pulled up-front so the integration fixtures (Testcontainers) don't
+      # spend their per-test pull budget on the cold pull.
       - name: Pull Azurite Docker image
         run: docker pull mcr.microsoft.com/azure-storage/azurite:latest
+
+      - name: Pull SQL Server Docker image
+        run: docker pull mcr.microsoft.com/mssql/server:2022-CU13-ubuntu-22.04
 
       - name: Restore dependencies
         run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj
@@ -363,104 +249,38 @@ jobs:
       - name: Build
         run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
 
-      - name: Run integration tests
+      # Single invocation runs every test in the ServiceTests project (unit + integration).
+      # No Category filter; xUnit's collection wiring keeps integration tests serialized
+      # and unit tests parallel within the same run.
+      - name: Run .NET tests
         run: |
           mkdir -p ./TestResults
           dotnet test DotNet/ServiceTests/ServiceTests.csproj \
             --configuration Release \
             --no-build \
-            --verbosity detailed \
-            --logger "trx;LogFileName=dotnet-integration-test-results.trx" \
+            --verbosity normal \
+            --logger "trx;LogFileName=dotnet-test-results.trx" \
             --results-directory ./TestResults \
-            --filter "Category=IntegrationTests"
+            --collect:"XPlat Code Coverage" \
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
         continue-on-error: true
-        timeout-minutes: 15
-
-      - name: Normalize TRX output location
-        if: always()
-        run: |
-          mkdir -p ./TestResults
-          i=0
-          while IFS= read -r -d '' file; do
-            i=$((i+1))
-            cp "$file" "./TestResults/integration-$i.trx"
-          done < <(find . -type f -name "*.trx" -print0)
-          echo "Collected $i trx file(s) into ./TestResults"
-
-      - name: Debug test results
-        run: |
-          ls -la ./TestResults || true
-          find . -type f -name "*.trx" -print || true
-        continue-on-error: true
+        timeout-minutes: 25
 
       - name: Upload Test Results
+        if: always()
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: integration-test-results
-          path: ./TestResults/*.trx
-
-      - name: .NET Integration Test Report
-        uses: dorny/test-reporter@v2
-        if: always()
-        with:
-          name: XUnit Integration Tests
-          path: ./TestResults/*.trx
-          reporter: dotnet-trx
-
-  dotnet-unit-tests:
-    name: Unit Tests for DotNet
-    runs-on: windows-latest
-    timeout-minutes: 10
-
-    needs: changes
-    if: ${{ needs.changes.outputs.run_job == 'true' }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-
-      - name: Cache NuGet packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      - name: Restore dependencies
-        run: dotnet restore DotNet/ServiceTests/ServiceTests.csproj
-
-      - name: Build
-        run: dotnet build DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-restore
-
-      - name: Run dotnet-unit tests
-        run: dotnet test DotNet/ServiceTests/ServiceTests.csproj --configuration Release --no-build --verbosity detailed --logger "trx;LogFileName=dotnet-unit-test-results.trx" --results-directory ./TestResults --filter "Category=UnitTests" --collect:"XPlat Code Coverage" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
-        continue-on-error: true
-        timeout-minutes: 5
-
-      - name: Debug test results
-        run: dir .\TestResults
-        continue-on-error: true
-
-      - name: Upload Test Results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: dotnet-unit-test-results
+          name: dotnet-test-results
           path: |
             ./TestResults/*.trx
             ./TestResults/*/coverage.cobertura.xml
 
-      - name: .NET Integration Test Report
+      - name: .NET Test Report
         uses: dorny/test-reporter@v2
         if: always()
         with:
-          name: XUnit Integration Tests
-          path: ./TestResults/dotnet-unit-test-results.trx
+          name: .NET Test Report
+          path: ./TestResults/*.trx
           reporter: dotnet-trx
 
   java-unit-tests:
@@ -510,8 +330,8 @@ jobs:
   coverage-report:
     name: Aggregate Coverage Report
     runs-on: ubuntu-latest
-    needs: [dotnet-unit-tests, java-unit-tests]
-    if: always() && (needs.dotnet-unit-tests.result == 'success' || needs.dotnet-unit-tests.result == 'skipped' || needs.dotnet-unit-tests.result == 'failure') && (needs.java-unit-tests.result == 'success' || needs.java-unit-tests.result == 'skipped' || needs.java-unit-tests.result == 'failure')
+    needs: [dotnet-tests, java-unit-tests]
+    if: always() && (needs.dotnet-tests.result == 'success' || needs.dotnet-tests.result == 'skipped' || needs.dotnet-tests.result == 'failure') && (needs.java-unit-tests.result == 'success' || needs.java-unit-tests.result == 'skipped' || needs.java-unit-tests.result == 'failure')
     permissions:
       contents: read
       pull-requests: write
@@ -524,7 +344,7 @@ jobs:
       - name: Download DotNet Coverage
         uses: actions/download-artifact@v4
         with:
-          name: dotnet-unit-test-results
+          name: dotnet-test-results
           path: dotnet-coverage
         continue-on-error: true
 

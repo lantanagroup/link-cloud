@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -23,9 +24,8 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
 
     private readonly IServiceProvider _sp;
     private readonly string _facilityId = $"AdhocReportTest-{Guid.NewGuid():N}";
-    private List<(string Name, string Json)> _generatedBundles = [];
+    private GenerationManifest? _generationManifest;
     private List<ProfiledMeasureType> _measures = [];
-    private List<PatientCohortDefinition> _cohorts = [];
     private string? _reportId;
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
@@ -48,19 +48,34 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         {
             PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 1000, resourcesMax: 1000)
         };
-        _cohorts = cohorts;
-        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(Output, measures, cohorts, "AdhocPatient", GenerationSeed);
-        _generatedBundles = bundles;
+        var profiles = PatientCohortDefinition.ExpandProfiles(cohorts, GenerationSeed);
+
+        await FhirDataLoader.WaitForServerAsync(Output);
+
+        // Unified generation: stream-generate + upload + build manifest in one pass.
+        var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
+            Output,
+            FhirDataLoader,
+            measures,
+            profiles,
+            totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
+            patientIdPrefix: "AdhocPatient",
+            generationSeed: GenerationSeed,
+            acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
+            {
+                QueryPlan = QueryPlanBuilder.GetDefaultAsInput(),
+                ClinicalPeriodStart = Config.StartDate,
+                ClinicalPeriodEnd = Config.EndDate
+            });
+
+        _generationManifest = pipelineResult.Manifest;
 
         if (Config.PatientIds.Count == 0)
         {
-            Config.PatientIds = patientIds;
+            Config.PatientIds = pipelineResult.PatientIds;
         }
 
         Output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds)}]");
-
-        await FhirDataLoader.WaitForServerAsync(Output);
-        await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(Output, bundles);
 
         var validationApi = _sp.GetRequiredService<ValidationApiHelper>();
         await validationApi.InitializeArtifactsAsync();
@@ -167,18 +182,14 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
         // Flush stale cache from diagnostics polling so validators read authoritative data.
         dataReader.InvalidateCache();
 
-        var profiles = PatientCohortDefinition.ExpandProfiles(_cohorts, GenerationSeed);
-        var generationManifest = GenerationManifest.Build(Config.PatientIds, _generatedBundles, profiles, _measures);
+        // Manifest was fully constructed by the pipeline during generation. Add measure-specific
+        // fields that depend on what the measure loader discovered post-setup.
+        var generationManifest = _generationManifest
+            ?? throw new InvalidOperationException("Generation manifest was not produced by the pipeline.");
         generationManifest.MeasureIds = [measureId];
         var queryPlanInput = QueryPlanBuilder.GetDefaultAsInput();
         generationManifest.AcquiredResourceTypes = QueryPlanBuilder.GetAcquiredResourceTypes(queryPlanInput);
         generationManifest.ParameterQueryResourceTypes = QueryPlanBuilder.GetParameterQueryResourceTypes(queryPlanInput);
-        generationManifest.SimulatedAcquiredResourceKeysByPatient = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysByPatient(
-            Config.PatientIds,
-            _generatedBundles,
-            queryPlanInput,
-            Config.StartDate,
-            Config.EndDate);
         generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(_measures);
 
         await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
@@ -189,7 +200,7 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
             Config.EndDate,
             _facilityId,
             reportId,
-            _generatedBundles,
+            generatedBundles: null,
             manifest: generationManifest);
 
         // Step 9-10: Strict database validation.

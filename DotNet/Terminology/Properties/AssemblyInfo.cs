@@ -1,3 +1,3 @@
-﻿using System.Runtime.CompilerServices;
+using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("LantanaGroup.Link.Terminology.Tests")]
+[assembly: InternalsVisibleTo("ServiceTests")]

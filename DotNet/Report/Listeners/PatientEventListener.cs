@@ -143,13 +143,13 @@ namespace LantanaGroup.Link.Report.Listeners
                     throw new DeadLetterException("Invalid Patient Event");
                 }
 
-                if (value.EventType != PatientEvents.Admit.ToString())
+                if (value.EventType != PatientEvents.Admit.ToString() && value.EventType != PatientEvents.Discharge.ToString())
                 {
-                    _logger.LogInformation("Patient {PatientId} has event type of {EventType}. Ignoring.", HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
+                    _logger.LogDebug("Patient {PatientId} has event type of {EventType}. Ignoring.", HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
                     return;
                 }
 
-                _logger.LogInformation("Consuming Admit PatientEvent (FacilityId: {facilityId}, PatientId: {PatientId})", HtmlInputSanitizer.Sanitize(facilityId), HtmlInputSanitizer.Sanitize(value.PatientId));
+                _logger.LogDebug("Consuming {EventType} PatientEvent (FacilityId: {facilityId}, PatientId: {PatientId})", HtmlInputSanitizer.Sanitize(value.EventType), HtmlInputSanitizer.Sanitize(facilityId), HtmlInputSanitizer.Sanitize(value.PatientId));
 
                 var scheduledReports = await reportScheduledManager.FindAsync(x => x.FacilityId == facilityId && x.EndOfReportPeriodJobHasRun == false, cancellationToken);
 

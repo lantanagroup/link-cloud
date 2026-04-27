@@ -1,4 +1,4 @@
-﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -90,8 +90,6 @@ public class MeasureLoader
         Measure measure = originalBundle.Entry.FirstOrDefault(e => e.Resource?.TypeName == "Measure")?.Resource as Measure ?? throw new InvalidOperationException("Measure not found in bundle.");
         this.MeasureId = measure.Id;
 
-        SanitizeSupplementalData(measure, originalBundle);
-
         this._evaluationBundle = new Bundle
         {
             Type = Bundle.BundleType.Transaction,
@@ -116,7 +114,16 @@ public class MeasureLoader
         await this.GetMeasureBundleAsync();
 
         _output.WriteLine("Loading measure bundle for evaluation...");
-        await _measureEvalClient.PutMeasureDefinitionAsync(this._evaluationBundle!.ToJson());
+        // The MeasureEval service's PUT /measure-definition handler is not
+        // safe against concurrent writers for the same Bundle.id: multiple
+        // E2E tests using the same measure bundle will race on the shared
+        // validator + evaluator cache + Mongo upsert and one will come back
+        // as HTTP 500. We serialize PUTs per measure id across *processes*
+        // via a file lock so parallel test runs can share the stack safely.
+        await WithCrossProcessMeasureIdLockAsync(this.MeasureId!, async () =>
+        {
+            await _measureEvalClient.PutMeasureDefinitionAsync(this._evaluationBundle!.ToJson());
+        });
 
         await VerifyMeasureDefinitionAsync();
 
@@ -133,6 +140,54 @@ public class MeasureLoader
 
             await Task.WhenAll(validationTasks);
             _output.WriteLine($"{this._validationBundle.Entry.Count} validation resources successfully loaded.");
+        }
+    }
+
+    /// <summary>
+    /// Serializes the given action across processes on the same host, keyed on
+    /// the measure id. Uses an exclusive file lock under the OS temp directory
+    /// so parallel `dotnet test` runs against a shared services stack don't
+    /// issue simultaneous PUTs for the same Bundle.id.
+    /// </summary>
+    private async Task WithCrossProcessMeasureIdLockAsync(string measureId, Func<Task> action)
+    {
+        var safeId = Regex.Replace(measureId, "[^A-Za-z0-9_.-]", "_");
+        var lockPath = Path.Combine(Path.GetTempPath(), $"link-measure-def-{safeId}.lock");
+
+        FileStream? lockStream = null;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var attempt = 0;
+        while (lockStream == null)
+        {
+            try
+            {
+                lockStream = new FileStream(
+                    lockPath,
+                    FileMode.OpenOrCreate,
+                    FileAccess.ReadWrite,
+                    FileShare.None,
+                    bufferSize: 1,
+                    options: FileOptions.DeleteOnClose);
+            }
+            catch (IOException)
+            {
+                attempt++;
+                if (sw.Elapsed > TimeSpan.FromMinutes(5))
+                    throw new TimeoutException(
+                        $"Timed out waiting for cross-process measure-definition lock at '{lockPath}'.");
+                if (attempt == 1)
+                    _output.WriteLine($"  Waiting on measure-definition lock for '{measureId}'...");
+                await Task.Delay(250);
+            }
+        }
+
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            lockStream.Dispose();
         }
     }
 
@@ -161,55 +216,7 @@ public class MeasureLoader
         }
     }
 
-    /// <summary>
-    /// Removes supplementalData entries from the Measure whose criteria.expression
-    /// does not match any CQL define in the bundle's Library resources.
-    /// This prevents the MeasureEval engine from hitting a NullPointerException
-    /// when evaluating SDEs that reference non-existent CQL expressions.
-    /// </summary>
-    private void SanitizeSupplementalData(Measure measure, Bundle bundle)
-    {
-        if (measure.SupplementalData.Count == 0)
-            return;
 
-        var cqlDefines = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var entry in bundle.Entry)
-        {
-            if (entry.Resource is not Library library)
-                continue;
-
-            foreach (var attachment in library.Content)
-            {
-                if (!string.Equals(attachment.ContentType, "text/cql", StringComparison.OrdinalIgnoreCase)
-                    || attachment.Data == null || attachment.Data.Length == 0)
-                    continue;
-
-                var cql = Encoding.UTF8.GetString(attachment.Data);
-                foreach (Match match in Regex.Matches(cql, @"define\s+""([^""]+)"""))
-                    cqlDefines.Add(match.Groups[1].Value);
-            }
-        }
-
-        var orphaned = measure.SupplementalData
-            .Where(sde => !string.IsNullOrWhiteSpace(sde.Criteria?.Expression_)
-                          && !cqlDefines.Contains(sde.Criteria.Expression_))
-            .ToList();
-
-        if (orphaned.Count == 0)
-        {
-            _output.WriteLine($"  Measure SDE define check passed: all {measure.SupplementalData.Count} supplementalData expressions have matching CQL defines.");
-            return;
-        }
-
-        foreach (var sde in orphaned)
-        {
-            _output.WriteLine($"  Removing orphaned supplementalData expression: \"{sde.Criteria.Expression_}\"");
-            measure.SupplementalData.Remove(sde);
-        }
-
-        _output.WriteLine($"  Removed {orphaned.Count} orphaned supplementalData entries ({measure.SupplementalData.Count} remaining).");
-    }
 
     /// <summary>
     /// Loads all measure bundles referenced by the scenario config.

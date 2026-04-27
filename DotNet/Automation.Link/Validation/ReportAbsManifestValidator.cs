@@ -1,4 +1,5 @@
-ï»¿using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Automation.Generation;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Automation.Link.Validation;
@@ -16,11 +17,6 @@ public class ReportAbsManifestValidator
     private static readonly HashSet<string> DerivedResourceTypes =
     [
         "MeasureReport",
-        "OperationOutcome"
-    ];
-
-    private static readonly HashSet<string> AbsSupplementalResourceTypes =
-    [
         "OperationOutcome"
     ];
 
@@ -129,30 +125,69 @@ public class ReportAbsManifestValidator
 
         if (!string.IsNullOrWhiteSpace(facilityId) && !string.IsNullOrWhiteSpace(reportId))
         {
-            await ValidateDatabaseReconciliationAsync(
-                facilityId,
-                reportId,
-                actualPatientFiles,
-                parsedPatientResources,
-                expectedMeasureIds,
-                manifest,
-                errors,
-                expectDataAcquisitionData);
-
             if (generatedBundles is { Count: > 0 })
             {
                 ValidateGeneratedBundleReconciliation(generatedBundles, parsedPatientResources, errors);
             }
+            else if (manifest != null && manifest.ResourceKeysByPatient.Count > 0)
+            {
+                ValidateGeneratedManifestReconciliation(manifest, parsedPatientResources, errors);
+            }
         }
 
         // When a manifest is available, validate ABS resource counts against the concrete
-        // generated input â€” no DB interrogation or baseline needed.
+        // generated input — no DB interrogation or baseline needed.
         if (manifest != null)
         {
+            // Populate the count-level expectation for OperationOutcome from the authoritative
+            // source: Report.ReportEntry.ReportingStatus. ValidationCompleteListener appends
+            // exactly one OperationOutcome to a patient's aggregate blob when its
+            // ValidationComplete.IsValid == false (status becomes FailedValidation).
+            if (!string.IsNullOrWhiteSpace(reportId) && Guid.TryParse(reportId, out var scheduleId))
+            {
+                await PopulateExpectedOperationOutcomesFromReportEntriesAsync(manifest, scheduleId);
+            }
+
             ValidateAbsResourceCountsAgainstManifest(manifest, parsedPatientResources, expectedSubmittedPatientIds, errors);
         }
 
         await FailIfNeededAsync(errors);
+    }
+
+    /// <summary>
+    /// Populates <see cref="GenerationManifest.ExpectedOperationOutcomeCountByPatient"/>
+    /// from Report DB entries. Every patient whose <c>ReportingStatus</c> is
+    /// <c>FailedValidation</c> gets exactly one OperationOutcome appended to their ABS
+    /// patient file by <c>ValidationCompleteListener.ProcessMessageAsync</c>.
+    /// </summary>
+    private async Task PopulateExpectedOperationOutcomesFromReportEntriesAsync(GenerationManifest manifest, Guid scheduleId)
+    {
+        try
+        {
+            var entries = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId);
+            var expected = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var entry in entries)
+            {
+                if (string.IsNullOrWhiteSpace(entry.PatientId))
+                    continue;
+
+                if (string.Equals(entry.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase))
+                    expected[entry.PatientId] = 1;
+            }
+
+            manifest.ExpectedOperationOutcomeCountByPatient = expected;
+
+            if (expected.Count > 0)
+            {
+                _output.WriteLine($"[ABS] Predicting 1 OperationOutcome for {expected.Count} patient(s) with FailedValidation status.");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Do not fail the validator on a DB read hiccup — just log. The strict check
+            // will then flag any unpredicted OperationOutcomes, which is the safe default.
+            _output.WriteLine($"[ABS][WARN] Could not read ReportEntry statuses to predict OperationOutcomes: {ex.Message}");
+        }
     }
 
     private void ValidateManifest(
@@ -358,114 +393,6 @@ public class ReportAbsManifestValidator
         }
     }
 
-    private async Task ValidateDatabaseReconciliationAsync(
-        string facilityId,
-        string reportId,
-        IReadOnlySet<string> actualPatientFiles,
-        List<AbsResourceRecord> patientResources,
-        IReadOnlyList<string> expectedMeasureIds,
-        GenerationManifest? manifest,
-        List<string> errors,
-        bool expectDataAcquisitionData)
-    {
-        if (!Guid.TryParse(reportId, out var scheduleId))
-        {
-            AddError(errors, $"Invalid reportId format for reconciliation: {reportId}");
-            return;
-        }
-
-        var reportResources = await _reader.GetReportResourceIdentitiesAsync(scheduleId, facilityId);
-        if (reportResources.Count == 0)
-        {
-            AddError(errors, "Report DB has no ReportResource rows for this schedule/facility.");
-            return;
-        }
-
-        var allEntries = await _reader.GetReportEntriesAsync(scheduleId);
-        var entryByPatient = allEntries
-            .GroupBy(e => e.PatientId)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
-
-        var submittedEntries = await _reader.GetSubmittedReportEntriesAsync(scheduleId);
-        var submittedPatients = submittedEntries.Select(e => e.PatientId).ToHashSet(StringComparer.Ordinal);
-        if (submittedPatients.Count > 0)
-        {
-            var artifactPatients = actualPatientFiles
-                .Select(f => f.Substring("patient-".Length, f.Length - "patient-".Length - ".ndjson".Length))
-                .ToHashSet(StringComparer.Ordinal);
-
-            foreach (var patientId in submittedPatients)
-            {
-                if (!artifactPatients.Contains(patientId))
-                    AddError(errors, $"Submitted ReportEntry patient {patientId} is missing a patient artifact file.");
-            }
-        }
-
-        var patientsWithOperationOutcome = patientResources
-            .Where(r => string.Equals(r.ResourceType, "OperationOutcome", StringComparison.OrdinalIgnoreCase))
-            .Select(r => r.PatientId)
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-
-        foreach (var patientId in patientsWithOperationOutcome)
-        {
-            if (!entryByPatient.TryGetValue(patientId, out var entry))
-            {
-                AddError(errors, $"Patient artifact for {patientId} contains OperationOutcome but no matching ReportEntry was found.");
-                continue;
-            }
-
-            if (!string.Equals(entry.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase))
-            {
-                AddError(errors,
-                    $"Patient artifact for {patientId} contains OperationOutcome but ReportEntry.ReportingStatus is {entry.ReportingStatus} (expected FailedValidation).");
-            }
-        }
-
-        var expectedKeys = reportResources
-            .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var absKeys = patientResources
-            .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
-            .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var absComparableKeys = absKeys
-            .Where(k => !IsAbsSupplementalType(GetResourceTypeFromKey(k)))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var missingInAbs = expectedKeys.Except(absKeys, StringComparer.OrdinalIgnoreCase).Take(50).ToList();
-        foreach (var missing in missingInAbs)
-            AddError(errors, $"ABS patient artifacts are missing ReportResource {missing}.");
-
-        var unexpectedInAbs = absComparableKeys.Except(expectedKeys, StringComparer.OrdinalIgnoreCase).Take(50).ToList();
-        foreach (var extra in unexpectedInAbs)
-            AddError(errors, $"ABS patient artifacts contain unexpected resource not present in ReportResource table: {extra}.");
-
-        var reportCountMap = ToCountMap(
-            (await _reader.GetReportResourceCountsByPatientTypeAsync(scheduleId, facilityId))
-            .Select(x => (x.PatientId, x.ResourceType, x.Count)));
-
-        var absCountMap = ToCountMap(
-            patientResources
-                .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId) && !IsAbsSupplementalType(r.ResourceType))
-                .GroupBy(r => new { r.PatientId, r.ResourceType })
-                .Select(g => (g.Key.PatientId, g.Key.ResourceType, g.Count())));
-
-        CompareCountMapsExact("ReportResource->ABS", reportCountMap, absCountMap, errors);
-
-        var measureEvalCountMap = ToCountMap(
-            (await _reader.GetMeasureEvalResourceCountsByPatientTypeAsync(scheduleId))
-            .Select(x => (x.PatientId, x.ResourceType, x.Count)));
-
-        CompareCountMapsExact("MeasureEval->ReportResource", measureEvalCountMap, reportCountMap, errors);
-        CompareCountMapsExact("MeasureEval->ABS", measureEvalCountMap, absCountMap, errors);
-
-        // NOTE: DataAcquisition database integrity checks belong in DA-focused validators.
-        // ABS validator intentionally reconciles deterministic expected sets against Report/ABS artifacts only.
-    }
-
     private void ValidateGeneratedBundleReconciliation(
         IReadOnlyList<(string Name, string Json)> generatedBundles,
         List<AbsResourceRecord> patientResources,
@@ -517,6 +444,39 @@ public class ReportAbsManifestValidator
     }
 
     /// <summary>
+    /// Warning-only reconciliation of ABS against the in-memory <see cref="GenerationManifest"/>.
+    /// Used when the caller has a manifest but did not retain serialized bundles (streaming pipeline).
+    /// </summary>
+    private void ValidateGeneratedManifestReconciliation(
+        GenerationManifest manifest,
+        List<AbsResourceRecord> patientResources,
+        List<string> errors)
+    {
+        var generatedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (_, keys) in manifest.ResourceKeysByPatient)
+            foreach (var key in keys)
+                generatedKeys.Add(key);
+
+        var absNonDerivedKeys = patientResources
+            .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
+            .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
+            .Where(k => !IsDerivedType(k.Split('/')[0]))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var missingFromGenerated = absNonDerivedKeys
+            .Except(generatedKeys, StringComparer.OrdinalIgnoreCase)
+            .Take(50)
+            .ToList();
+
+        if (missingFromGenerated.Count > 0)
+        {
+            _output.WriteLine($"[WARN] ABS contains {missingFromGenerated.Count} resource(s) not present in the generation manifest:");
+            foreach (var missing in missingFromGenerated)
+                _output.WriteLine($"  [WARN] {missing}");
+        }
+    }
+
+    /// <summary>
     /// Validates that ABS patient artifacts contain the resources the pipeline should have
     /// produced, using the generation manifest as the source of truth.
     ///
@@ -525,24 +485,23 @@ public class ReportAbsManifestValidator
     ///   <item>We <b>generated</b> resources and uploaded them to the FHIR server.</item>
     ///   <item>Data Acquisition ran the query plan (Parameter + Reference queries) and
     ///         sent every acquired resource to MeasureEval via Kafka.</item>
-    ///   <item>MeasureEval stored them in its Resource repository, then bundled them all
-    ///         and evaluated the CQL. The CQL engine loaded every resource whose type
-    ///         matches a <c>[ResourceType]</c> retrieve expression into the MeasureReport's
-    ///         contained list.</item>
-    ///   <item>MeasureEval wrote the MeasureReport + contained resources to a per-measure
-    ///         <c>.mr</c> file in ABS blob storage.</item>
-    ///   <item>The Report service's PatientAggregator read the <c>.mr</c> files, deduped
-    ///         resources across measures, and wrote <c>patient-{id}.ndjson</c> to ABS.
-    ///         It also saved the same resource references to the ReportResource DB.</item>
+    ///   <item>MeasureEval bundled all acquired resources as <c>additionalData</c> and
+    ///         evaluated the CQL. The HAPI CQL engine places resources into
+    ///         <c>MeasureReport.contained</c> only when they are touched by a CQL
+    ///         <c>[ResourceType]</c> retrieve expression.</item>
+    ///   <item>MeasureEval's <c>normalize()</c> extracts <c>contained</c> resources and
+    ///         writes them (plus the MeasureReport) to a per-patient <c>.mr</c> file in ABS.</item>
+    ///   <item>The Report service's PatientAggregator reads the <c>.mr</c> files, dedupes
+    ///         resources across measures, and writes <c>patient-{id}.ndjson</c> to ABS.
+    ///         It also saves the same resource references to the ReportResource DB.</item>
     /// </list>
     ///
     /// A resource type is expected in ABS when: we generated it AND the query plan acquires
-    /// it AND the CQL references it. The system is deterministic â€” no tolerance is needed.
+    /// it AND the CQL references it. The system is deterministic — no tolerance is needed.
     ///
-    /// Shared infrastructure resources (Location/Gen-*, Medication/Gen-*, Device/Gen-*)
-    /// are stored under the empty patient key in the manifest. They are excluded from
-    /// per-patient key validation because their IDs are rewritten by MeasureEval's normalize
-    /// step (the <c>#LCR-</c> prefix is stripped).
+    /// Shared infrastructure resources are stored under the empty patient key in the manifest.
+    /// They are excluded from per-patient key validation because their IDs are rewritten by
+    /// MeasureEval's normalize step (the <c>#LCR-</c> prefix is stripped).
     /// </summary>
     private void ValidateAbsResourceCountsAgainstManifest(
         GenerationManifest manifest,
@@ -568,20 +527,38 @@ public class ReportAbsManifestValidator
             absCountsByPatientType.TryGetValue(patientId, out var actualCounts);
             actualCounts ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var (resourceType, expectedCount) in expectedCounts)
+            // Strict prediction-vs-actual: every expected type must match exactly, and any
+            // type actually produced must have been predicted. Pipeline-derived types
+            // (MeasureReport, OperationOutcome) now contribute deterministic expectations
+            // via GenerationManifest.GetExpectedAbsCountsForPatient, so no tolerance is needed.
+            var allTypes = new HashSet<string>(expectedCounts.Keys, StringComparer.OrdinalIgnoreCase);
+            foreach (var t in actualCounts.Keys) allTypes.Add(t);
+
+            foreach (var resourceType in allTypes)
             {
+                expectedCounts.TryGetValue(resourceType, out var expectedCount);
                 actualCounts.TryGetValue(resourceType, out var actualCount);
+
+                if (actualCount == expectedCount)
+                    continue;
+
                 if (actualCount < expectedCount)
                 {
                     AddError(errors,
                         $"ABS patient={patientId}, type={resourceType}: " +
-                        $"expected>={expectedCount} (sim-acquired âˆ© reachable-CQL), actual={actualCount}.");
+                        $"expected={expectedCount} (sim-acquired ? reachable-CQL + derived), actual={actualCount}.");
+                }
+                else
+                {
+                    AddError(errors,
+                        $"ABS patient={patientId}, type={resourceType}: " +
+                        $"expected={expectedCount}, actual={actualCount} (ABS has {actualCount - expectedCount} more than predicted).");
                 }
             }
         }
 
         // Validate that every expected patient-scoped resource key is present in ABS.
-        // Shared infrastructure (empty patient key) is excluded â€” those resources reach ABS
+        // Shared infrastructure (empty patient key) is excluded — those resources reach ABS
         // through MeasureReport contained resources with MeasureEval-rewritten IDs.
         var allAbsKeys = parsedPatientResources
             .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
@@ -764,55 +741,8 @@ public class ReportAbsManifestValidator
 
     private static string ToResourceKey(string type, string id) => $"{type}/{id}";
 
-    private static string GetResourceTypeFromKey(string key)
-    {
-        var idx = key.IndexOf('/');
-        return idx > 0 ? key[..idx] : key;
-    }
-
     private static bool IsDerivedType(string resourceType) =>
         DerivedResourceTypes.Contains(resourceType, StringComparer.OrdinalIgnoreCase);
-
-    private static bool IsAbsSupplementalType(string resourceType) =>
-        AbsSupplementalResourceTypes.Contains(resourceType, StringComparer.OrdinalIgnoreCase);
-
-    private static Dictionary<(string PatientId, string ResourceType), int> ToCountMap(
-        IEnumerable<(string PatientId, string ResourceType, int Count)> source)
-    {
-        var map = new Dictionary<(string PatientId, string ResourceType), int>();
-
-        foreach (var row in source)
-        {
-            if (string.IsNullOrWhiteSpace(row.PatientId) || string.IsNullOrWhiteSpace(row.ResourceType))
-                continue;
-
-            var key = (row.PatientId, row.ResourceType);
-            map[key] = map.TryGetValue(key, out var existing) ? existing + row.Count : row.Count;
-        }
-
-        return map;
-    }
-
-    private static void CompareCountMapsExact(
-        string sourceName,
-        Dictionary<(string PatientId, string ResourceType), int> expected,
-        Dictionary<(string PatientId, string ResourceType), int> actual,
-        List<string> errors)
-    {
-        var keys = expected.Keys.Union(actual.Keys).ToList();
-
-        foreach (var key in keys)
-        {
-            expected.TryGetValue(key, out var expectedCount);
-            actual.TryGetValue(key, out var actualCount);
-
-            if (expectedCount != actualCount)
-            {
-                AddError(errors,
-                    $"{sourceName} count mismatch for patient={key.PatientId}, type={key.ResourceType}: expected={expectedCount}, actual={actualCount}.");
-            }
-        }
-    }
 
     private sealed record AbsResourceRecord(string SourceFile, string PatientId, string ResourceType, string ResourceId, JsonElement Resource);
 }
