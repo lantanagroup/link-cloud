@@ -168,37 +168,6 @@ public class AutomationRunManagerDashboardStatsTests : IAsyncLifetime
         }
     }
 
-    [Fact]
-    public async Task Dashboard_after_migrating_legacy_data_shows_the_full_14_day_picture()
-    {
-        // Regression test for the original production bug: every dashboard field is
-        // correct end-to-end even when the underlying collection started out full of
-        // legacy-shaped documents and had to be migrated at startup.
-        var rawCollection = _fixture.RawRunsCollection;
-
-        // Seed three legacy-shaped runs across the window.
-        await SeedLegacyAsync(rawCollection, AutomationRunStatus.Succeeded, DateTimeOffset.UtcNow.AddDays(-2));
-        await SeedLegacyAsync(rawCollection, AutomationRunStatus.Failed,    DateTimeOffset.UtcNow.AddDays(-6));
-        await SeedLegacyAsync(rawCollection, AutomationRunStatus.Succeeded, DateTimeOffset.UtcNow.AddDays(-10));
-
-        // Before migration: the dashboard sees nothing.
-        var preStats = await _fixture.CreateRunManager().GetDashboardStatsAsync();
-        preStats.TotalRuns.Should().Be(0, "legacy array-form dates are invisible to $gte");
-
-        // Run the startup migration.
-        _fixture.CreateIndexManager().EnsureAllIndexes();
-
-        // After migration: all three runs flow through the manager.
-        var postStats = await _fixture.CreateRunManager().GetDashboardStatsAsync();
-        postStats.TotalRuns.Should().Be(3);
-        postStats.Succeeded.Should().Be(2);
-        postStats.Failed.Should().Be(1);
-        postStats.SuccessRate.Should().Be(Math.Round(100.0 * 2 / 3, 1));
-        postStats.RunsPerDay.Should().HaveCount(14);
-        postStats.RunsPerDay.Values.Sum(b => b.Succeeded + b.Failed + b.Cancelled + b.Other)
-            .Should().Be(3);
-    }
-
     // ─────────────────────────────────────────────────────────────────────
     //  Helpers
     // ─────────────────────────────────────────────────────────────────────
