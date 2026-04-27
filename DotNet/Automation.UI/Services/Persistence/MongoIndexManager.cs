@@ -160,7 +160,7 @@ public sealed class MongoIndexManager
         }
     }
 
-    // ?? automation_runs ??????????????????????????????????????????????
+    // --- automation_runs ---
 
     private void EnsureRunIndexes()
     {
@@ -192,11 +192,15 @@ public sealed class MongoIndexManager
         // RU/s on each UpsertRunSummaryAsync call. We deliberately keep the
         // set minimal:
         //   - Only single-field indexes, no {Sort, RunId} compound matrix.
-        //     The RunId tiebreaker in MongoSnapshotStore.GetRunsPageAsync is
-        //     resolved by a small post-seek sort step at pageSize=20, which
-        //     is cheap; doubling the index count to make it index-resident
-        //     would not be worth the per-write RU hit at this collection's
-        //     scale.
+        //     Cosmos DB for MongoDB API rejects multi-field ORDER BY queries
+        //     without a matching composite index outright ("The order by
+        //     query does not have a corresponding composite index that it
+        //     can be served from"), unlike native MongoDB which silently
+        //     applies an in-memory secondary sort. To stay index-resident on
+        //     Cosmos without doubling the index count, MongoSnapshotStore
+        //     .GetRunsPageAsync issues a single-field server-side sort and
+        //     applies the RunId tiebreaker client-side after the page is
+        //     fetched (within-page determinism only).
         //   - No indexes on derived/string-formatted columns like Duration
         //     (intentionally not sortable in the UI).
         CreateIndexSafe(collection, new BsonDocument { { "RunName",      1 } }, unique: false, "idx_runName_asc");
@@ -206,18 +210,17 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "FinishedAt",   1 } }, unique: false, "idx_finishedAt_asc");
     }
 
-    // ?? automation_snapshots ?????????????????????????????????????????
+    // --- automation_snapshots ---
 
     private void EnsureSnapshotIndexes()
     {
         var collection = _database.GetCollection<BsonDocument>("automation_snapshots");
 
-        // Compound key used for upserts and lookups (RunId + Domain).
-        // Unique constraint enforces one snapshot per run+domain pair.
-        CreateIndexSafe(collection, new BsonDocument { { "RunId", 1 }, { "Domain", 1 } }, unique: true, "idx_runId_domain_unique");
+        // Compound key used for upserts and lookups (RunId + Domain)
+        CreateIndexSafe(collection, new BsonDocument { { "RunId", 1 }, { "Domain", 1 } }, unique: false, "idx_runId_domain");
     }
 
-    // ?? automation_scenarios ?????????????????????????????????????????
+    // --- automation_scenarios ---
 
     private void EnsureScenarioIndexes()
     {
@@ -227,7 +230,7 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
     }
 
-    // ?? automation_query_plan_templates ???????????????????????????????
+    // --- automation_query_plan_templates ---
 
     private void EnsureQueryPlanTemplateIndexes()
     {
@@ -237,7 +240,7 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
     }
 
-    // ?? Helpers ??????????????????????????????????????????????????????
+    // --- Helpers ---
 
     private void CreateIndexSafe(IMongoCollection<BsonDocument> collection, BsonDocument keys, bool unique, string name)
     {
