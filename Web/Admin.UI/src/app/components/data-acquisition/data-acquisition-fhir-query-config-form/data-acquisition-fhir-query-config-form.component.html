@@ -290,8 +290,8 @@
         @if (authTypeControl.value === 'Basic') {
         <div class="form-input">
           <mat-form-field appearance="outline" class="subject-input form-input ">
-            <mat-label>User Name</mat-label>
-            <input matInput formControlName="userName" [readonly]="viewOnly" placeholder="User Name">
+            <mat-label>User Name Secret Name</mat-label>
+            <input matInput formControlName="userName" [readonly]="viewOnly" placeholder="User Name Secret Name">
             @if (userNameControl.value && !viewOnly) {
             <button matSuffix mat-icon-button aria-label="Clear" (click)="clearUserName()">
               <mat-icon>close</mat-icon>
@@ -299,7 +299,7 @@
             }
             @if (authTypeControl.value == 'Basic') {
             <mat-error>
-              User Name is <strong>required</strong>.
+              User Name Secret Name is <strong>required</strong>.
             </mat-error>
             }
           </mat-form-field>
@@ -309,8 +309,8 @@
         @if (authTypeControl.value === 'Basic') {
         <div class="form-input">
           <mat-form-field appearance="outline" class="subject-input form-input ">
-            <mat-label>Password</mat-label>
-            <input matInput formControlName="password" type="password" [readonly]="viewOnly" placeholder="Password">
+            <mat-label>Password Secret Name</mat-label>
+            <input matInput formControlName="password" [readonly]="viewOnly" placeholder="Password Secret Name">
             @if (passwordControl.value && !viewOnly) {
             <button matSuffix mat-icon-button aria-label="Clear" (click)="clearPassword()">
               <mat-icon>close</mat-icon>
@@ -318,7 +318,7 @@
             }
             @if (authTypeControl.value == 'Basic') {
             <mat-error>
-              Password is <strong>required</strong>.
+              Password Secret Name is <strong>required</strong>.
             </mat-error>
             }
           </mat-form-field>
