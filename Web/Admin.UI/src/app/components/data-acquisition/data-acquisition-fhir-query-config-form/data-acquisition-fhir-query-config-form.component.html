@@ -334,7 +334,7 @@
             <thead>
               <tr>
                 <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Key</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Value</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Secret Name</th>
                 @if (!viewOnly) {
                 <th style="width: 60px; padding: 8px; border-bottom: 1px solid #ddd;"></th>
                 }
@@ -353,9 +353,9 @@
                 </td>
                 <td style="padding: 8px;">
                   <mat-form-field appearance="outline" style="width: 100%;">
-                    <input matInput formControlName="value" placeholder="Header Value" [readonly]="viewOnly">
+                    <input matInput formControlName="value" placeholder="Secret Name" [readonly]="viewOnly">
                     @if (header.get('value')?.hasError('required') && header.get('value')?.touched) {
-                    <mat-error>Value is required</mat-error>
+                    <mat-error>Secret Name is required</mat-error>
                     }
                   </mat-form-field>
                 </td>
