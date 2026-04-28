@@ -1,5 +1,4 @@
 ﻿using DataAcquisition.Domain.Application.Models;
-using Hl7.Fhir.Model.CdsHooks;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using System.Net.Http.Headers;

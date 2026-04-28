@@ -25,7 +25,12 @@ public class CustomHeaderAuth : IAuth
         {
             var secretName = header.Value;
             var secretValue = await _secretManager.GetSecretAsync(secretName, CancellationToken.None);
-            headers.Add(header.Key, secretValue ?? "");
+            if (string.IsNullOrEmpty(secretValue))
+            {
+                throw new InvalidOperationException(
+                    $"Secret for custom auth header '{header.Key}' (secret name: '{secretName}') could not be resolved or is empty.");
+            }
+            headers.Add(header.Key, secretValue);
         }
 
         return (false, headers);

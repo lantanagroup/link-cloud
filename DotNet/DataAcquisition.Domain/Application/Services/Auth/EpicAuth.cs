@@ -73,7 +73,7 @@ public class EpicAuth : IAuth
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException)
         {
             _logger.LogError(ex, "Error Acquiring Access Token Encountered");
         }

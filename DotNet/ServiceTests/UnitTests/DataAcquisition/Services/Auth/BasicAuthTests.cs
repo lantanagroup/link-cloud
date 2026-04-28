@@ -121,4 +121,34 @@ public class BasicAuthTests
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             sut.SetAuthentication(FacilityId, BuildAuthSettings()));
     }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task SetAuthentication_ThrowsInvalidOperationException_WhenSecretManagerReturnsNullOrWhitespaceForUserName(string? resolvedUserName)
+    {
+        _mockSecretManager
+            .Setup(x => x.GetSecretAsync(UserNameSecretKey, CancellationToken.None))
+            .ReturnsAsync(resolvedUserName);
+        var sut = BuildSut();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.SetAuthentication(FacilityId, BuildAuthSettings()));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task SetAuthentication_ThrowsInvalidOperationException_WhenSecretManagerReturnsNullOrWhitespaceForPassword(string? resolvedPassword)
+    {
+        _mockSecretManager
+            .Setup(x => x.GetSecretAsync(PasswordSecretKey, CancellationToken.None))
+            .ReturnsAsync(resolvedPassword);
+        var sut = BuildSut();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.SetAuthentication(FacilityId, BuildAuthSettings()));
+    }
 }
