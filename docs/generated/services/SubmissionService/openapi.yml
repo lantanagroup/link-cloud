@@ -1,40 +1,37 @@
-﻿swagger: "2.0"
+﻿openapi: 3.0.4
 info:
-  version: 0.4.1
+  version: 0.3.0
   title: Submission
 paths:
   /api/submission/info:
     get:
       tags:
       - Submission
-      produces:
-      - application/json
       responses:
         "200":
           description: OK
-          schema:
-            $ref: '#/definitions/ServiceInformation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceInformation'
   /api/Submission/{facilityId}/{reportId}:
     get:
       tags:
       - Submission
       description: Gets information about the report from the report service in order to construct the directory/path for the report.
       parameters:
-      - in: path
-        name: facilityId
+      - name: facilityId
+        in: path
         description: The ID of the facility
         required: true
-        type: string
-      - in: path
-        name: reportId
+        schema:
+          type: string
+      - name: reportId
+        in: path
         description: The ID of the report to download
         required: true
-        type: string
-      - in: query
-        name: external
-        description: Whether to download from external or internal (default) storage
-        type: boolean
-        default: false
+        schema:
+          type: string
       responses:
         "200":
           description: OK
@@ -44,96 +41,80 @@ paths:
       - Health
       summary: Health check endpoint
       description: Returns the health status of the service and its dependencies
-      produces:
-      - application/json
       responses:
         "200":
           description: Healthy
-          schema:
-            type: object
-            properties:
-              status:
-                description: Overall health status
-                type: string
-              totalDuration:
-                description: Total duration of health checks
-                type: string
-              entries:
+          content:
+            application/json:
+              schema:
                 type: object
                 properties:
-                  Database:
+                  status:
+                    type: string
+                    description: Overall health status
+                  totalDuration:
+                    type: string
+                    description: Total duration of health checks
+                  entries:
                     type: object
                     properties:
-                      status:
-                        type: string
-                      description:
-                        type: string
-                      duration:
-                        type: string
-                      data:
+                      Kafka:
                         type: object
-                  Kafka:
-                    type: object
-                    properties:
-                      status:
-                        type: string
-                      description:
-                        type: string
-                      duration:
-                        type: string
-                      data:
-                        type: object
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
         "503":
           description: Unhealthy
-          schema:
-            type: object
-            properties:
-              status:
-                description: Overall health status
-                type: string
-              totalDuration:
-                description: Total duration of health checks
-                type: string
-              entries:
+          content:
+            application/json:
+              schema:
                 type: object
                 properties:
-                  Database:
+                  status:
+                    type: string
+                    description: Overall health status
+                  totalDuration:
+                    type: string
+                    description: Total duration of health checks
+                  entries:
                     type: object
                     properties:
-                      status:
-                        type: string
-                      description:
-                        type: string
-                      duration:
-                        type: string
-                      data:
+                      Kafka:
                         type: object
-                  Kafka:
-                    type: object
-                    properties:
-                      status:
-                        type: string
-                      description:
-                        type: string
-                      duration:
-                        type: string
-                      data:
-                        type: object
-definitions:
-  ServiceInformation:
-    type: object
-    properties:
-      serviceName:
-        type: string
-      version:
-        type: string
-      productVersion:
-        type: string
-      commit:
-        type: string
-      build:
-        type: string
-      swaggerUrl:
-        type: string
-    additionalProperties: false
+                        properties:
+                          status:
+                            type: string
+                          description:
+                            type: string
+                          duration:
+                            type: string
+                          data:
+                            type: object
+components:
+  schemas:
+    ServiceInformation:
+      type: object
+      properties:
+        serviceName:
+          type: string
+          nullable: true
+        version:
+          type: string
+          nullable: true
+        productVersion:
+          type: string
+          nullable: true
+        commit:
+          type: string
+          nullable: true
+        build:
+          type: string
+          nullable: true
+      additionalProperties: false
 
