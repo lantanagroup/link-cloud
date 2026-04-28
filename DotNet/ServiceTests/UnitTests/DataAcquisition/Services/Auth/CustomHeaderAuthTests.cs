@@ -1,5 +1,7 @@
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services;
+using Moq;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.DataAcquisition.Auth;
@@ -7,11 +9,23 @@ namespace UnitTests.DataAcquisition.Auth;
 [Trait("Category", "UnitTests")]
 public class CustomHeaderAuthTests
 {
+    private readonly Mock<ISecretManager> _mockSecretManager;
+
+    public CustomHeaderAuthTests()
+    {
+        _mockSecretManager = new Mock<ISecretManager>();
+        _mockSecretManager
+            .Setup(x => x.GetSecretAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string name, CancellationToken _) => name);
+    }
+
+    private CustomHeaderAuth BuildSut() => new(_mockSecretManager.Object);
+
     [Fact]
-    public async Task SetAuthentication_WithNullCustomHeaders_ReturnsNullValue()
+    public async Task SetAuthentication_WithNullCustomHeaders_ReturnsEmptyDictionary()
     {
         // Arrange
-        var customHeaderAuth = new CustomHeaderAuth();
+        var customHeaderAuth = BuildSut();
         var facilityId = "test-facility-id";
         var authSettings = new AuthenticationConfigurationModel
         {
@@ -24,14 +38,15 @@ public class CustomHeaderAuthTests
 
         // Assert
         Assert.False(result.isQueryParam);
-        Assert.Null(result.authHeaderValue);
+        var returnedHeaders = Assert.IsType<Dictionary<string, string>>(result.authHeaderValue);
+        Assert.Empty(returnedHeaders);
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task SetAuthentication_WithEmptyCustomHeaders_ReturnsNullValue()
+    public async System.Threading.Tasks.Task SetAuthentication_WithEmptyCustomHeaders_ReturnsEmptyDictionary()
     {
         // Arrange
-        var customHeaderAuth = new CustomHeaderAuth();
+        var customHeaderAuth = BuildSut();
         var facilityId = "test-facility-id";
         var authSettings = new AuthenticationConfigurationModel
         {
@@ -44,14 +59,15 @@ public class CustomHeaderAuthTests
 
         // Assert
         Assert.False(result.isQueryParam);
-        Assert.Null(result.authHeaderValue);
+        var returnedHeaders = Assert.IsType<Dictionary<string, string>>(result.authHeaderValue);
+        Assert.Empty(returnedHeaders);
     }
 
     [Fact]
     public async Task SetAuthentication_WithSingleCustomHeader_ReturnsHeaderDictionary()
     {
         // Arrange
-        var customHeaderAuth = new CustomHeaderAuth();
+        var customHeaderAuth = BuildSut();
         var facilityId = "test-facility-id";
         var expectedHeaders = new Dictionary<string, string>
         {
@@ -79,7 +95,7 @@ public class CustomHeaderAuthTests
     public async Task SetAuthentication_WithMultipleCustomHeaders_ReturnsAllHeaders()
     {
         // Arrange
-        var customHeaderAuth = new CustomHeaderAuth();
+        var customHeaderAuth = BuildSut();
         var facilityId = "test-facility-id";
         var expectedHeaders = new Dictionary<string, string>
         {
@@ -111,7 +127,7 @@ public class CustomHeaderAuthTests
     public async Task SetAuthentication_IsQueryParamAlwaysFalse()
     {
         // Arrange
-        var customHeaderAuth = new CustomHeaderAuth();
+        var customHeaderAuth = BuildSut();
         var facilityId = "test-facility-id";
         var authSettings = new AuthenticationConfigurationModel
         {
@@ -130,10 +146,10 @@ public class CustomHeaderAuthTests
     }
 
     [Fact]
-    public async Task SetAuthentication_ReturnsSameHeadersObject()
+    public async Task SetAuthentication_ReturnsEqualHeadersObject()
     {
         // Arrange
-        var customHeaderAuth = new CustomHeaderAuth();
+        var customHeaderAuth = BuildSut();
         var facilityId = "test-facility-id";
         var expectedHeaders = new Dictionary<string, string>
         {
@@ -149,14 +165,14 @@ public class CustomHeaderAuthTests
         var result = await customHeaderAuth.SetAuthentication(facilityId, authSettings);
 
         // Assert
-        Assert.Same(expectedHeaders, result.authHeaderValue);
+        Assert.Equal(expectedHeaders, result.authHeaderValue);
     }
 
     [Fact]
     public async Task SetAuthentication_WithDifferentFacilityIds_ReturnsExpectedHeaders()
     {
         // Arrange
-        var customHeaderAuth = new CustomHeaderAuth();
+        var customHeaderAuth = BuildSut();
         var headers1 = new Dictionary<string, string> { { "X-Header-1", "Value-1" } };
         var headers2 = new Dictionary<string, string> { { "X-Header-2", "Value-2" } };
         
@@ -177,7 +193,7 @@ public class CustomHeaderAuthTests
         var result2 = await customHeaderAuth.SetAuthentication("facility-2", authSettings2);
 
         // Assert
-        Assert.Same(headers1, result1.authHeaderValue);
-        Assert.Same(headers2, result2.authHeaderValue);
+        Assert.Equal(headers1, result1.authHeaderValue);
+        Assert.Equal(headers2, result2.authHeaderValue);
     }
 }

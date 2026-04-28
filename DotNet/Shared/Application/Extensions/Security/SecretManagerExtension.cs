@@ -29,7 +29,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
 
         public class SecretManagerOptions
         {
-            public string Manager { get; set; } = default!;
+            public string Manager { get; set; } = "Local";
         }
     }
 }

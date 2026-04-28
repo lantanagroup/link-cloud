@@ -162,15 +162,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     // Add Secret Manager
-    if (builder.Configuration.GetValue<bool>("SecretManagement:Enabled"))
+    var secretManagerProvider = builder.Configuration.GetValue<string>("SecretManagement:Manager") ?? "Local";
+    Log.Logger.Information("Registering Secret Manager with provider {provider} for the Link Admin API.", secretManagerProvider);
+    builder.Services.AddSecretManager(options =>
     {
-        var manager = builder.Configuration.GetValue<string>("SecretManagement:Manager")!;
-        Log.Logger.Information("Registering Secret Manager with provider {provider} for the Link Admin API.", manager);
-        builder.Services.AddSecretManager(options =>
-        {
-            options.Manager = manager;
-        });
-    }
+        options.Manager = secretManagerProvider;
+    });
 
     // Add Link Security    
     if (!allowAnonymousAccess)
