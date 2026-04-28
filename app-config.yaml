@@ -21,167 +21,240 @@ required:
 global:
   - key: "KafkaConnection:BootstrapServers"
     description: "Comma-separated list of Kafka bootstrap servers for event messaging."
+    required: true
   - key: "DatabaseProvider"
     description: "The type of database provider to use (e.g., SqlServer, MongoDB)."
+    required: true
   - key: "ConnectionStrings:DatabaseConnection"
     description: "The connection string for the primary service database."
+    required: true
   - key: "Authentication:Schemas:LinkBearer:Authority"
     description: "The OIDC authority URL used for validating bearer tokens."
+    required: true
   - key: "LinkTokenService:Authority"
     description: "The authority URL used by the LinkTokenService for internal token generation and validation."
+    required: true
   - key: "LinkTokenService:SigningKey"
     description: "The secret key used for signing internal tokens. Must be kept secure."
+    required: true
   - key: "Telemetry:EnableTelemetry"
     description: "Boolean flag to enable or disable OpenTelemetry tracing and metrics."
+    required: true
   - key: "Serilog:WriteTo:GrafanaLoki:Args:uri"
     description: "The endpoint URI for the Grafana Loki log aggregator."
+    required: true
   - key: "ConnectionStrings:Redis"
     description: "The connection string for the Redis cache (e.g., 'localhost:6379,password=...')."
+    required: true
   - key: "InternalBlobStorage:ConnectionString"
     description: "The connection string for the internal Azure Blob Storage (or Azurite)."
+    required: true
   - key: "InternalBlobStorage:BlobContainerName"
     description: "The name of the blob container used for internal storage."
+    required: true
   - key: "ServiceRegistry:TenantService:TenantServiceUrl"
     description: "The base URL for the Tenant Service."
+    required: true
   - key: "ServiceRegistry:AccountServiceUrl"
     description: "The base URL for the Account Service."
+    required: true
   - key: "ServiceRegistry:ReportServiceUrl"
     description: "The base URL for the Report Service."
+    required: true
   - key: "ServiceRegistry:MeasureServiceUrl"
     description: "The base URL for the Measure Service."
+    required: true
   - key: "ServiceRegistry:CensusServiceUrl"
     description: "The base URL for the Census Service."
+    required: true
   - key: "ServiceRegistry:DataAcquisitionServiceUrl"
     description: "The base URL for the Data Acquisition Service."
+    required: true
   - key: "ServiceRegistry:NormalizationServiceUrl"
     description: "The base URL for the Normalization Service."
+    required: true
   - key: "ServiceRegistry:ValidationServiceUrl"
     description: "The base URL for the Validation Service."
+    required: true
   - key: "ServiceRegistry:SubmissionServiceUrl"
     description: "The base URL for the Submission Service."
+    required: true
   - key: "ServiceRegistry:TerminologyServiceUrl"
     description: "The base URL for the Terminology Service."
+    required: true
   - key: "ServiceRegistry:AuditServiceUrl"
     description: "The base URL for the Audit Service."
+    required: true
   - key: "ServiceRegistry:QueryDispatchServiceUrl"
     description: "The base URL for the Query Dispatch Service."
+    required: true
   - key: "ServiceRegistry:NotificationServiceUrl"
     description: "The base URL for the Notification Service."
+    required: true
   - key: "link.report.base-url"
     description: "The base URL for the Report Service (used by Java services)."
+    required: true
   - key: "SecretManagement:Enabled"
     description: "Boolean flag to enable or disable secret management."
+    required: true
   - key: "SecretManagement:Manager"
     description: "The type of secret manager to use (e.g., AzureKeyVault)."
+    required: true
   - key: "SecretManagement:ManagerUri"
     description: "The URI for the secret manager."
+    required: true
   - key: "ConsumerSettings:ConsumerRetryDuration"
     description: "List of ISO 8601 durations defining the retry intervals for Kafka consumers."
+    required: true
   - key: "ConsumerSettings:DisableRetryConsumer"
     description: "Boolean flag to disable the retry consumer for Kafka events."
+    required: true
   - key: "ConsumerSettings:DisableConsumer"
     description: "Boolean flag to disable the Kafka consumer entirely for the service."
+    required: true
 services:
   Account:
     - key: "UserManagement:EnableAutomaticUserActivation"
       description: "Boolean flag to enable automatic activation of new users."
+      required: true
   AdminBFF:
     - key: "Authentication:Schemas:Oauth2:ClientId"
       description: "The OAuth2 client ID for the Admin BFF."
+      required: true
     - key: "Authentication:Schemas:Oauth2:ClientSecret"
       description: "The OAuth2 client secret for the Admin BFF."
+      required: true
     - key: "Authentication:Schemas:Oauth2:Endpoints:Authorization"
       description: "The OAuth2 authorization endpoint URL."
+      required: true
     - key: "Authentication:Schemas:Oauth2:Endpoints:Token"
       description: "The OAuth2 token endpoint URL."
+      required: true
     - key: "Authentication:Schemas:Oauth2:Endpoints:UserInformation"
       description: "The OAuth2 user information endpoint URL."
+      required: true
     - key: "ReverseProxy:Clusters:{Service}:Destinations:destination1:Address"
       description: "The backend address for each service routed through the BFF (e.g., AccountService, AuditService, etc.)."
+      required: true
     - key: "MonitorBackendHealthChecks"
       description: "Boolean flag to enable monitoring of backend service health."
+      required: true
   Audit:
     - key: "KafkaConnection:ClientId"
       description: "The client ID for the Kafka connection."
+      required: true
   AutomationUI:
     - key: "Automation:ExternalFhirServerBase"
       description: "The base URL for the external FHIR server used for testing."
+      required: true
     - key: "Automation:InternalFhirServerBase"
       description: "The base URL for the internal FHIR server used for testing."
+      required: true
     - key: "MongoDB:ConnectionString"
       description: "The MongoDB connection string for automation data."
+      required: true
     - key: "MongoDB:DatabaseName"
       description: "The MongoDB database name for automation data."
+      required: true
   DataAcquisition:
     - key: "AcquisitionJobSettings:CronSchedule"
       description: "The cron expression defining how often data acquisition jobs should run."
+      required: true
     - key: "DistributedLockSettings:Expiration"
       description: "The expiration time in minutes for distributed locks."
+      required: true
   DataAcquisitionWorker:
     - key: "AcquisitionWorkerProcessorSettings:MaxConcurrentAcquisitions"
       description: "The maximum number of concurrent data acquisition tasks."
+      required: true
     - key: "AcquisitionWorkerProcessorSettings:WorkChannelCapacity"
       description: "The capacity of the internal work channel for acquisition tasks."
+      required: true
   Census:
     - key: "CensusSettings:ObservationCodes"
       description: "Comma-separated list of FHIR Observation codes used to identify census events."
+      required: true
   MeasureEval:
     - key: "spring.data.mongodb.uri"
       description: "The MongoDB connection string."
+      required: true
     - key: "spring.kafka.bootstrap-servers"
       description: "Kafka bootstrap servers for the measure evaluation service."
+      required: true
     - key: "authentication.authority"
       description: "The OIDC authority URL for token validation."
+      required: true
     - key: "link.reportability-predicate"
       description: "Fully qualified class name of the reportability predicate to use."
+      required: true
     - key: "link.cql-debug"
       description: "Boolean flag to enable CQL debugging."
+      required: true
   Normalization: []
   Notification:
     - key: "SmtpConnection:Host"
       description: "The SMTP server hostname for sending notifications."
+      required: true
     - key: "SmtpConnection:Port"
       description: "The SMTP server port."
+      required: true
   QueryDispatch:
     - key: "QuartzCollectionPrefix"
       description: "The prefix for Quartz job collections in the database."
+      required: true
   Report:
     - key: "EnhancedQueryLoggingSettings:EnableEnhancedQueryLogging"
       description: "Boolean flag to enable detailed logging of database queries."
+      required: true
   Submission:
     - key: "SubmissionServiceConfig:SubmissionDirectory"
       description: "The local or network path where submission files are stored."
+      required: true
     - key: "SubmissionServiceConfig:PatientBundleBatchSize"
       description: "The number of patient bundles to process in a single batch."
+      required: true
     - key: "ExternalBlobStorage:ConnectionString"
       description: "The connection string for the external Azure Blob Storage (where submissions are stored)."
+      required: true
     - key: "ExternalBlobStorage:BlobContainerName"
       description: "The name of the blob container used for external storage."
+      required: true
   Tenant:
     - key: "FacilityIdSettings:NumericOnlyFacilityId"
       description: "Boolean flag to restrict facility IDs to numeric values only."
+      required: true
   Terminology:
     - key: "Terminology:Path"
       description: "The path to the terminology data files."
+      required: true
   Validation:
     - key: "spring.datasource.url"
       description: "The SQL Server database connection URL for the validation service."
+      required: true
     - key: "spring.datasource.username"
       description: "The database username."
+      required: true
     - key: "spring.datasource.password"
       description: "The database password."
+      required: true
     - key: "spring.kafka.bootstrap-servers"
       description: "Kafka bootstrap servers for the validation service."
+      required: true
     - key: "spring.data.redis.host"
       description: "The Redis host for the validation service."
+      required: true
     - key: "spring.data.redis.port"
       description: "The Redis port for the validation service."
+      required: true
     - key: "spring.data.redis.password"
       description: "The Redis password."
+      required: true
     - key: "authentication.authority"
       description: "The OIDC authority URL for token validation."
+      required: true
     - key: "link.terminology-service-url"
       description: "The base URL for the Terminology Service used for validation."
+      required: true
 $defs:
   configEntry:
     type: "object"
