@@ -50,8 +50,8 @@ reviews:
         
         **App Config Check**: 
         If new required configuration keys (that don't have default values) are introduced, verify if new configuration keys have been added. If new required configuration keys are introduced, ensure that the 
-        root-level `/app-config.json` file has been updated to include these new keys with appropriate descriptions. If `/app-config.json` is not updated 
-        when new configuration is added, flag this as a required change and recommend blocking the PR until the configuration is documented in `/app-config.json`.
+        root-level `/app-config.yaml` file has been updated to include these new keys with appropriate descriptions. If `/app-config.yaml` is not updated 
+        when new configuration is added, flag this as a required change and recommend blocking the PR until the configuration is documented in `/app-config.yaml`.
     - path: '**'
       instructions: |
         Pull requests that have *DOCS* in the title should only contain changes related to documentation within the /docs folder or in .md files through-out the code-base.
