@@ -21,8 +21,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.Security
                     break;
 
                 default:
-                    services.AddSingleton<ISecretManager, LocalSecretManager>();
-                    break;
+                    throw new ArgumentException("Invalid secret manager");
             }
 
             return services;
