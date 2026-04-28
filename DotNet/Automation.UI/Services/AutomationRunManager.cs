@@ -3,9 +3,7 @@ using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
-using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Helpers;
-using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Automation.Link.Services;
 using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
@@ -556,11 +554,8 @@ public class AutomationRunManager : IAutomationRunManager
                 throw new InvalidOperationException("MeasureLoader did not produce any MeasureIds");
             var measureId = measureIds[0];
 
-            var facilityId = $"{state.Scenario}-{state.RunId:N}".Substring(0, Math.Min(48, $"{state.Scenario}-{state.RunId:N}".Length));
-            lock (state.Sync)
-            {
-                state.FacilityId = facilityId;
-            }
+            var facilityId = state.RunId.ToString();
+            state.FacilityId = facilityId;
 
             // Resolve the query plan template (null = use built-in defaults).
             var queryPlanResolution = await ResolveQueryPlanAsync(state.Options.QueryPlanTemplateId);
@@ -687,6 +682,30 @@ public class AutomationRunManager : IAutomationRunManager
             catch (Exception absEx)
             {
                 output.WriteLine($"[WARN] Failed to build/store ABS upload snapshot: {absEx.Message}");
+            }
+
+            // Persist raw ABS file contents (NDJSON + serialized FHIR resources) so the
+            // diagnostics export can re-emit them later without a live re-download.
+            // Best-effort: a serialization or store-size failure must not abort the run.
+            try
+            {
+                var absFiles = new Dictionary<string, string>(internalAbsResources.Count, StringComparer.OrdinalIgnoreCase);
+                var fhirSerializer = new Hl7.Fhir.Serialization.FhirJsonSerializer(
+                    new Hl7.Fhir.Serialization.SerializerSettings { Pretty = true });
+                foreach (var (key, value) in internalAbsResources)
+                {
+                    absFiles[key] = value switch
+                    {
+                        string s => s,
+                        Hl7.Fhir.Model.Resource r => fhirSerializer.SerializeToString(r),
+                        _ => value?.ToString() ?? string.Empty
+                    };
+                }
+                await _snapshotStore.SetDomainAsync(state.RunId, "absFiles", absFiles, CancellationToken.None);
+            }
+            catch (Exception absFilesEx)
+            {
+                output.WriteLine($"[WARN] Failed to persist raw ABS files for export: {absFilesEx.Message}");
             }
 
             if (!downloadedResources.ContainsKey("manifest.ndjson"))

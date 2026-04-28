@@ -144,6 +144,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
+builder.Services.AddSingleton<IRunExportService, RunExportService>();
 
 var app = builder.Build();
 

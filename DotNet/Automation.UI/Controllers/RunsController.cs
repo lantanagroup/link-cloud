@@ -2,6 +2,7 @@ using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automation.UI.Controllers;
@@ -11,6 +12,7 @@ public class RunsController(
     IScenarioStore scenarioStore,
     IQueryPlanTemplateStore queryPlanTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
+    IRunExportService runExportService,
     ILogger<RunsController> logger) : Controller
 {
     [HttpGet]
@@ -192,6 +194,30 @@ public class RunsController(
             return NotFound();
 
         return Json(run);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> Export(Guid id, CancellationToken cancellationToken)
+    {
+        var run = await runManager.GetRunAsync(id, cancellationToken);
+        if (run == null)
+            return NotFound();
+
+        // Export is only meaningful once the run has stopped collecting data;
+        // exporting an in-flight run would race the polling loop and yield
+        // half-populated domain snapshots.
+        if (run.Status is not AutomationRunStatus.Succeeded
+                       and not AutomationRunStatus.Failed
+                       and not AutomationRunStatus.Cancelled)
+        {
+            return Conflict(new { error = "Run must be completed (Succeeded, Failed, or Cancelled) before it can be exported." });
+        }
+
+        var package = await runExportService.BuildAsync(id, cancellationToken);
+        if (package == null)
+            return NotFound();
+
+        return File(package.Content, "application/zip", package.FileName);
     }
 
     [HttpPost]
@@ -394,6 +420,31 @@ public class RunsController(
                 logger.LogWarning(refEx, "Failed to load reference resources for log {LogId}", logId);
             }
 
+            // Build the human-readable "Resource?param=value&..." form per FhirQuery.
+            // Mirrors the FhirQueryModel.Query getter so the UI shows what was actually
+            // sent to the FHIR server.
+            var queries = (detailed.FhirQuery ?? [])
+                .Select(q =>
+                {
+                    var firstResource = q.ResourceTypes?.FirstOrDefault();
+                    var paramJoin = string.Join("&", q.QueryParameters ?? []);
+                    return q.QueryType switch
+                    {
+                        FhirQueryType.Search       => string.IsNullOrEmpty(firstResource) ? string.Empty : $"{firstResource}?{paramJoin}",
+                        FhirQueryType.SearchPost   => string.IsNullOrEmpty(firstResource) ? string.Empty : $"{firstResource}/_search [{string.Join(",", q.QueryParameters ?? [])}]",
+                        FhirQueryType.Read         => string.IsNullOrEmpty(firstResource) ? string.Empty : $"{firstResource}/{paramJoin}",
+                        FhirQueryType.BulkDataPoll => paramJoin,
+                        FhirQueryType.BulkDataRequest => "BulkDataRequest",
+                        _ => string.Empty
+                    };
+                })
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .ToList();
+
+            var queryType = (detailed.FhirQuery ?? [])
+                .Select(q => q.QueryType.ToString())
+                .FirstOrDefault();
+
             return Json(new
             {
                 detailed.Id,
@@ -406,6 +457,12 @@ public class RunsController(
                 ReferenceResourceCount = detailed.ReferenceResourceCount,
                 detailed.ReportTrackingId,
                 detailed.CorrelationId,
+                detailed.TraceId,
+                detailed.FhirVersion,
+                detailed.Priority,
+                detailed.RetryAttempts,
+                QueryType = queryType,
+                Queries = queries,
                 detailed.CompletionDate,
                 detailed.CompletionTimeMilliseconds,
                 ResourceTypes = (detailed.ResourceTypes ?? [])
