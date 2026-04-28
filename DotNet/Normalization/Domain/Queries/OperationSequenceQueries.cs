@@ -1,4 +1,4 @@
-﻿using AngleSharp;
+using AngleSharp;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain.Entities;
@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         private readonly IDatabase _database;
         private readonly NormalizationDbContext _dbContext;
         private readonly IMemoryCache _cache;
-        private readonly TimeSpan _cacheTtl = TimeSpan.FromSeconds(60);
+        private readonly TimeSpan _cacheTtl = TimeSpan.FromSeconds(300); //5 mins
 
         public OperationSequenceQueries(IDatabase database, NormalizationDbContext dbContext, IMemoryCache cache) 
         {

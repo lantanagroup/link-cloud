@@ -18,12 +18,16 @@
 
 	<ItemGroup>
 		<Compile Remove="Application\Interfaces\**" />
+		<Compile Remove="Application\Models\Business\**" />
 		<Compile Remove="Data\**" />
 		<Content Remove="Application\Interfaces\**" />
+		<Content Remove="Application\Models\Business\**" />
 		<Content Remove="Data\**" />
 		<EmbeddedResource Remove="Application\Interfaces\**" />
+		<EmbeddedResource Remove="Application\Models\Business\**" />
 		<EmbeddedResource Remove="Data\**" />
 		<None Remove="Application\Interfaces\**" />
+		<None Remove="Application\Models\Business\**" />
 		<None Remove="Data\**" />
 	</ItemGroup>
 
@@ -34,6 +38,7 @@
 	<ItemGroup>
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
 		<PackageReference Include="Azure.Identity" Version="1.*" />
+		<PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
 		<PackageReference Include="Confluent.Kafka" Version="2.*" />
 		<PackageReference Include="Grpc.AspNetCore" Version="2.*" />
 		<PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
@@ -59,7 +64,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Folder Include="Application\Models\Business\" />
 		<Folder Include="Scripts\" />
 	</ItemGroup>
 

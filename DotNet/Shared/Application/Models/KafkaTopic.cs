@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Shared.Application.Models;
 
@@ -13,21 +13,16 @@ public enum KafkaTopic
     [StringValue("PatientListsAcquired-Retry")]
     PatientListsAcquiredRetry,
     PatientAcquired,
-    ResourceAcquired,
-    [StringValue("ResourceAcquired-Retry")]
-    ResourceAcquiredRetry,
+    ResourcesAcquired,
+    [StringValue("ResourcesAcquired-Retry")]
+    ResourcesAcquiredRetry,
     [StringValue("PatientAcquired-Retry")]
     PatientAcquiredRetry,
     DataAcquisitionScheduled,
     DataAcquisitionRequested,
     [StringValue("DataAcquisitionRequested-Retry")]
     DataAcquisitionRequestedRetry,
-    DataAcquisitionFailed,
-    PatientDataEvaluated,
-    PatientNormalized,
-    ResourceNormalized,
-    PatientDischarged,
-    PatientDataAcquired,
+    ResourcesNormalized,
     ReadyToAcquire,
     [StringValue("ReadyToAcquire-Retry")]
     ReadyToAcquireRetry,
@@ -36,7 +31,6 @@ public enum KafkaTopic
     ReportRequestRejected,
     ReportScheduled,
     RetentionCheckScheduled,
-    PatientResourcesNormalized,
     MeasureChanged,
     MeasureEvalFailed,
     FHIRValidationFailed,
