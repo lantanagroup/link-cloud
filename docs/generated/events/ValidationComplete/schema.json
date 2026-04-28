@@ -1,9 +1,16 @@
 {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ValidationComplete",
   "type": "object",
   "properties": {
-    "patientId": { "type": "string" },
+    "patientId": { "type": ["string", "null"] },
+    "reportTrackingId": { "type": ["string", "null"] },
     "isValid": { "type": "boolean" },
-    "reportTrackingId": { "type": "string" }
+    "errors": {
+      "type": ["array", "null"],
+      "items": { "type": "string" }
+    }
   },
-  "required": ["patientId","isValid","reportTrackingId"]
+  "required": ["isValid"],
+  "additionalProperties": false
 }

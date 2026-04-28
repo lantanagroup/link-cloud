@@ -1,9 +1,16 @@
 {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ReadyForValidation",
   "type": "object",
   "properties": {
     "patientId": { "type": "string" },
-    "reportTypes": { "type": "array", "items": { "type": "string" } },
-    "reportTrackingId": { "type": "string" }
+    "reportTrackingId": { "type": ["string", "null"] },
+    "reportTypes": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "payloadUri": { "type": "string" }
   },
-  "required": ["patientId","reportTypes","reportTrackingId"]
+  "required": ["patientId", "payloadUri"],
+  "additionalProperties": false
 }
