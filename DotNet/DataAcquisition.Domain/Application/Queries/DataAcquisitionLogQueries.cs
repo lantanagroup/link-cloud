@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -399,16 +400,15 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     CorrelationId = group.CorrelationId ?? string.Empty,
                     LogIds = groupLogs.Select(x => x.Id).ToList(),
                     TraceParentId = groupLogs.FirstOrDefault(x => x.TraceId != null)?.TraceId ?? string.Empty,
-                    ResourceAcquired = new ResourceAcquired
+                    ResourcesAcquired = new ResourcesAcquired
                     {
-                        PatientId = first.PatientId ?? string.Empty,
                         QueryType = QueryPhaseUtilities.ToWireQueryType(group.QueryPhase),
                         ReportableEvent = first.ReportableEvent ?? default,
-                        AcquisitionComplete = true,
-                        ScheduledReports = new List<ScheduledReport>
-                        {
-                            first.ScheduledReport
-                        }
+                        ScheduledReports = first.ScheduledReport != null
+                            ? new List<ScheduledReport> { first.ScheduledReport }
+                            : new List<ScheduledReport>(),
+                        CacheType = ResourceCacheType.Redis, //TODO: also support ABS
+                        CacheKeys = group.CorrelationId != null ? [group.CorrelationId] : new List<string>()
                     }
                 });
 

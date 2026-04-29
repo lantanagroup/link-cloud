@@ -19,6 +19,7 @@ using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Enums;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -874,17 +875,21 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         return new TailCompletionResult
         {
             FacilityId = groupInfo.FacilityId,
+            PatientId = representative.PatientId ?? "",
             CorrelationId = groupInfo.CorrelationId!,
             TraceParentId = representative.TraceId,
-            ResourceAcquired = new ResourceAcquired
+            ResourcesAcquired = new ResourcesAcquired
             {
-                AcquisitionComplete = true,
-                PatientId = representative.PatientId ?? string.Empty,
                 QueryType = QueryPhaseUtilities.ToWireQueryType(groupInfo.QueryPhase),
                 ReportableEvent = representative.ReportableEvent ?? default,
                 ScheduledReports = representative.ScheduledReport != null
                     ? new List<ScheduledReport> { representative.ScheduledReport }
-                    : new List<ScheduledReport>()
+                    : new List<ScheduledReport>(),
+                CacheType = ResourceCacheType.Redis, //TODO: also support ABS
+                CacheKeys = new List<string>
+                {
+                    groupInfo.CorrelationId
+                }
             }
         };
     }

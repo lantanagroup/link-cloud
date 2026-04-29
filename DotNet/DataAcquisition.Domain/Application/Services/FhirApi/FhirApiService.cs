@@ -44,7 +44,6 @@ public class FhirApiService : IFhirApiService
     private readonly IReferenceResourcesQueries _referenceResourcesQueries;
     private readonly IReadFhirCommand _readFhirCommand;
     private readonly ISearchFhirCommand _searchFhirCommand;
-    private readonly IProducer<ResourceKey, ResourceAcquired> _kafkaProducer;
     private readonly ILogger<FhirApiService> _logger;
     private readonly IResourceCache _resourceCache;
 
@@ -53,7 +52,6 @@ public class FhirApiService : IFhirApiService
         IReferenceResourcesQueries referenceResourcesQueries,
         ISearchFhirCommand searchFhirCommand,
         IReadFhirCommand readFhirCommand,
-        IProducer<ResourceKey, ResourceAcquired> kafkaProducer,
         ILogger<FhirApiService> logger,
         IResourceCache resourceCache)
     {
@@ -61,7 +59,6 @@ public class FhirApiService : IFhirApiService
         _referenceResourcesQueries = referenceResourcesQueries;
         _searchFhirCommand = searchFhirCommand;
         _readFhirCommand = readFhirCommand;
-        _kafkaProducer = kafkaProducer;
         _logger = logger;
         _resourceCache = resourceCache;
     }
