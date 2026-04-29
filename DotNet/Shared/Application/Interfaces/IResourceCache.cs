@@ -1,6 +1,6 @@
 using Hl7.Fhir.Model;
 
-namespace LantanaGroup.Link.Normalization.Application.Models.Cache
+namespace LantanaGroup.Link.Shared.Application.Interfaces
 {
     public interface IResourceCache
     {

@@ -99,6 +99,7 @@ public static class DistributedLockSettingsExtensions
         }
 
         var connectionMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(configOptions);
+        services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(connectionMultiplexer);
         services.AddSingleton<IDistributedSemaphoreProvider>(new RedisDistributedSynchronizationProvider(connectionMultiplexer.GetDatabase()));
     }
 }

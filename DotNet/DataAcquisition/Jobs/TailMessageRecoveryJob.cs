@@ -86,19 +86,20 @@ public class TailMessageRecoveryJob : IJob
                         headers.Add("traceparent", Encoding.UTF8.GetBytes(tailResult.TraceParentId));
                     }
 
-                    await _resourceAcquiredProducer.ProduceAsync(
-                        KafkaTopic.ResourceAcquired.ToString(),
-                        new Message<ResourceKey, ResourceAcquired>
-                        {
-                            Key = new ResourceKey
-                            {
-                                FacilityId = tailResult.FacilityId,
-                                CorrelationId = tailResult.CorrelationId
-                            },
-                            Headers = headers,
-                            Value = tailResult.ResourceAcquired
-                        },
-                        context.CancellationToken);
+                    throw new NotImplementedException("Tail message will be replaced with ResourcesAcquired message.");
+                    // await _resourceAcquiredProducer.ProduceAsync(
+                    //     KafkaTopic.ResourceAcquired.ToString(),
+                    //     new Message<ResourceKey, ResourceAcquired>
+                    //     {
+                    //         Key = new ResourceKey
+                    //         {
+                    //             FacilityId = tailResult.FacilityId,
+                    //             CorrelationId = tailResult.CorrelationId
+                    //         },
+                    //         Headers = headers,
+                    //         Value = tailResult.ResourceAcquired
+                    //     },
+                    //     context.CancellationToken);
 
                     _logger.LogInformation(
                         "TailMessageRecoveryJob recovered tail for FacilityId={FacilityId}, CorrelationId={CorrelationId}",

@@ -52,6 +52,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
 using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
+using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
@@ -258,9 +259,9 @@ public static class GeneralStartupExtensions
         services.AddTransient<IPatientCensusService, PatientCensusService>();
         services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
         services.AddTransient<IQueryListProcessor, QueryListProcessor>();
-        services.AddTransient<IBundleEventService<ResourceKey, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>, BundleResourceAcquiredEventService>();
         services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
         services.AddTransient<IAcquisitionDependencyChecker, AcquisitionDependencyChecker>();
+        services.AddSingleton<IResourceCache, RedisResourceCache>();
 
         //Data Pull Commands
         services.AddTransient<IReadFhirCommand, ReadFhirCommand>();

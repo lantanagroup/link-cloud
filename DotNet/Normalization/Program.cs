@@ -1,8 +1,7 @@
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using Hl7.Fhir.Model.CdsHooks;
-using LantanaGroup.Link.Normalization.Application.Config;
-using LantanaGroup.Link.Normalization.Application.Models.Cache;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
@@ -45,6 +44,7 @@ using Serilog.Exceptions;
 using StackExchange.Redis;
 using System.Reflection;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
+using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -70,7 +70,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
     var consumerSettings = consumerSettingsSection.Get<ConsumerSettings>();
 
-    builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(BlobStorageSettings.Key));
+    builder.Services.Configure<ResourceCacheBlobStorageSettings>(builder.Configuration.GetSection(ResourceCacheBlobStorageSettings.Key));
     builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
     builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
@@ -88,10 +88,14 @@ static void RegisterServices(WebApplicationBuilder builder)
             throw new NullReferenceException("Redis Connection String is required.");
 
         options.ConnectionString = redisConnection;
-        options.Password = builder.Configuration.GetValue<string>("Redis:Password");
 
-        //TODO: Daniel - Temporary
-        builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect("localhost:6379,password=suT1ChwYtkwWfbV1bUfRvQZO1YNhNRMj"));
+        var redisPassword = builder.Configuration.GetValue<string>("Redis:Password");
+        options.Password = redisPassword;
+
+        var configOptions = new ConfigurationOptions { EndPoints = { redisConnection } };
+        if (!string.IsNullOrEmpty(redisPassword))
+            configOptions.Password = redisPassword;
+        builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(configOptions));
     });
     
     builder.Services.AddSingleton<RedisResourceCache>();

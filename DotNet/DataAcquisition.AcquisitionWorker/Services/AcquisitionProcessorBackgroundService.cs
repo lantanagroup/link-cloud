@@ -247,18 +247,19 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 headers.Add("traceparent", Encoding.UTF8.GetBytes(tailResult.TraceParentId));
             }
 
-            await producer.ProduceAsync(
-                KafkaTopic.ResourceAcquired.ToString(),
-                new Message<ResourceKey, ResourceAcquired>
-                {
-                    Key = new ResourceKey
-                    {
-                        FacilityId = tailResult.FacilityId,
-                        CorrelationId = tailResult.CorrelationId
-                    },
-                    Headers = headers,
-                    Value = tailResult.ResourceAcquired
-                }, ct);
+            throw new NotImplementedException("Tail message will be replaced with ResourcesAcquired message.");
+            // await producer.ProduceAsync(
+            //     KafkaTopic.ResourceAcquired.ToString(),
+            //     new Message<ResourceKey, ResourceAcquired>
+            //     {
+            //         Key = new ResourceKey
+            //         {
+            //             FacilityId = tailResult.FacilityId,
+            //             CorrelationId = tailResult.CorrelationId
+            //         },
+            //         Headers = headers,
+            //         Value = tailResult.ResourceAcquired
+            //     }, ct);
 
             _logger.LogInformation(
                 "Produced inline AcquisitionComplete tail for FacilityId={FacilityId}, CorrelationId={CorrelationId}",

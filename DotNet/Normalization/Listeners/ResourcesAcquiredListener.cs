@@ -5,7 +5,6 @@ using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
-using LantanaGroup.Link.Normalization.Application.Models.Cache;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
@@ -23,6 +22,7 @@ using System.Text;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 

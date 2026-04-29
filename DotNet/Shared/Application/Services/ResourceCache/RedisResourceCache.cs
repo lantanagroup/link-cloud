@@ -1,10 +1,11 @@
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using StackExchange.Redis;
 using System.Text.Json;
 
-namespace LantanaGroup.Link.Normalization.Application.Models.Cache
+namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 {
     public class RedisResourceCache : IResourceCache
     {

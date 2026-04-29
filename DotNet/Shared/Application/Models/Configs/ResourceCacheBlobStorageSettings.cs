@@ -1,12 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace LantanaGroup.Link.Normalization.Application.Config
+namespace LantanaGroup.Link.Shared.Application.Models.Configs
 {
-    public class BlobStorageSettings
+    public class ResourceCacheBlobStorageSettings
     {
         public const string Key = "CacheBlobStorage";
         public string? ConnectionString { get; set; }

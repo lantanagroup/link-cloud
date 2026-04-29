@@ -19,6 +19,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations" Version="0.*" />
+		<PackageReference Include="Azure.Storage.Blobs" Version="12.*" />
 		<PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer" Version="0.*" />
 		<PackageReference Include="AspNetCore.HealthChecks.Kafka" Version="8.*" />
 		<PackageReference Include="AutoMapper" Version="13.*" />

@@ -44,23 +44,23 @@ public class AcquisitionProcessingScheduleService : IHostedService
             .WithDescription("Acquisition Processing Trigger")
             .Build();
 
-        var tailRecoveryJob = JobBuilder
-            .Create(typeof(TailMessageRecoveryJob))
-            .StoreDurably()
-            .WithIdentity("Tail Message Recovery Job", nameof(KafkaTopic.ResourceAcquired))
-            .WithDescription("Tail Message Recovery Job")
-            .Build();
+        // var tailRecoveryJob = JobBuilder
+        //     .Create(typeof(TailMessageRecoveryJob))
+        //     .StoreDurably()
+        //     .WithIdentity("Tail Message Recovery Job", nameof(KafkaTopic.ResourceAcquired))
+        //     .WithDescription("Tail Message Recovery Job")
+        //     .Build();
 
-        var tailRecoveryTrigger = TriggerBuilder
-            .Create()
-            .ForJob(tailRecoveryJob.Key)
-            .WithIdentity("Tail Message Recovery Trigger", tailRecoveryJob.Key.Group)
-            .WithCronSchedule(_tailRecoverySettings.Value.CronSchedule) // default every 10 minutes
-            .WithDescription("Tail Message Recovery Trigger")
-            .Build();
+        // var tailRecoveryTrigger = TriggerBuilder
+        //     .Create()
+        //     .ForJob(tailRecoveryJob.Key)
+        //     .WithIdentity("Tail Message Recovery Trigger", tailRecoveryJob.Key.Group)
+        //     .WithCronSchedule(_tailRecoverySettings.Value.CronSchedule) // default every 10 minutes
+        //     .WithDescription("Tail Message Recovery Trigger")
+        //     .Build();
 
-        await EnsureJobAndTrigger(scheduler, acquisitionJob, acquisitionTrigger, cancellationToken);
-        await EnsureJobAndTrigger(scheduler, tailRecoveryJob, tailRecoveryTrigger, cancellationToken);
+        //await EnsureJobAndTrigger(scheduler, acquisitionJob, acquisitionTrigger, cancellationToken);
+        //await EnsureJobAndTrigger(scheduler, tailRecoveryJob, tailRecoveryTrigger, cancellationToken);
 
         await scheduler.Start(cancellationToken);
     }
