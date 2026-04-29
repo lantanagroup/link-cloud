@@ -1,16 +1,21 @@
 {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AuditableEventOccurred",
   "type": "object",
   "properties": {
-    "facilityId": { "type": "string" },
-    "serviceName": { "type": "string" },
-    "correlationId": { "type": "string" },
-    "eventDate": { "type": "string", "format": "date-time" },
-    "userId": { "type": "string" },
-    "user": { "type": "string" },
-    "action": { "type": "string", "enum": ["Create","Update","Delete","Query","Submit","Restore"] },
-    "resource": { "type": "string" },
+    "facilityId": { "type": ["string", "null"] },
+    "serviceName": { "type": ["string", "null"] },
+    "correlationId": { "type": ["string", "null"] },
+    "eventDate": { "type": ["string", "null"], "format": "date-time" },
+    "userId": { "type": ["string", "null"] },
+    "user": { "type": ["string", "null"] },
+    "action": {
+      "type": ["string", "null"],
+      "enum": ["Create", "Update", "Delete", "Query", "Submit", "Restore", null]
+    },
+    "resource": { "type": ["string", "null"] },
     "propertyChanges": {
-      "type": "array",
+      "type": ["array", "null"],
       "items": {
         "type": "object",
         "properties": {
@@ -20,6 +25,6 @@
         }
       }
     },
-    "notes": { "type": "string" }
+    "notes": { "type": ["string", "null"] }
   }
 }

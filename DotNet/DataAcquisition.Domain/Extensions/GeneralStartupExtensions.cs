@@ -81,12 +81,7 @@ public static class GeneralStartupExtensions
             builder.RegisterRedis();
         }
 
-        // Determine if secret manager should be enabled based on configuration
-        var configureSecretManager = builder.Configuration.GetValue<bool>("SecretManagement:Enabled");
-        if (configureSecretManager)
-        {
-            builder.Services.RegisterSecretManager(builder.Configuration);
-        }
+        builder.Services.RegisterSecretManager(builder.Configuration);
 
         builder.Services.RegisterInMemoryCache();
         builder.Services.RegisterHittpClient();
