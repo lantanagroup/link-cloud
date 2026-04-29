@@ -69,7 +69,6 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             measures,
             profiles,
             totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
-            patientIdPrefix: "RegenPatient",
             generationSeed: GenerationSeed,
             acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
             {

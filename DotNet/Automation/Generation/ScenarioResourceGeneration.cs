@@ -187,7 +187,6 @@ internal static class ScenarioResourceGeneration
         string primaryDxId,
         string attendingPractId,
         string careTeamId,
-        string patientIdPrefix,
         int totalResourcesPerPatient,
         int baseSeed,
         int patientOrdinal,
@@ -267,7 +266,7 @@ internal static class ScenarioResourceGeneration
 
         var listId = $"SyntheticList-{patientId}";
         entries.Add(Entry($"List/{listId}",
-            CensusListFactory.Generate(listId, patientId, patientIdPrefix, encStart)));
+            CensusListFactory.Generate(listId, patientId, encStart)));
     }
 
     // ------------------------------------------------------------------
@@ -481,7 +480,6 @@ internal static class ScenarioResourceGeneration
         int patientIndex,
         int baseSeed,
         int totalResourcesPerPatient,
-        string patientIdPrefix,
         DateTime encStart,
         DateTime encEnd,
         FhirGenerationCodes.ClinicalScenarioDefinition scenario,
@@ -526,7 +524,7 @@ internal static class ScenarioResourceGeneration
         var scenarioIdx = FhirGenerationCodes.GetScenarioArrayPosition(scenario);
         GenerateScenarioDrivenResources(entries, scenarioIdx, patientId, anchors.EncounterId,
             encStart, encEnd, anchors.PrimaryDxId, anchors.AttendingPractId, anchors.CareTeamId,
-            patientIdPrefix, totalResourcesPerPatient, baseSeed, patientIndex,
+            totalResourcesPerPatient, baseSeed, patientIndex,
             sharedPractitionerIds, sharedMedicationIds, config, ids);
     }
 

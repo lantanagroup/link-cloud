@@ -478,7 +478,7 @@ public class AutomationRunManager : IAutomationRunManager
 
             output.WriteLine($"Starting {state.Scenario} run: {state.RunId}");
             output.WriteLine($"Measure context: {string.Join(", ", state.Options.SelectedMeasures.Select(m => $"{ProfiledMeasureCatalog.GetDisplayName(m)} ({m})"))}");
-            output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, prefix={state.Options.Prefix}, seed={state.Options.Seed}");
+            output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, seed={state.Options.Seed}");
 
             List<string> patientIds;
             List<string> expectedSubmittedPatientIds;
@@ -492,14 +492,56 @@ public class AutomationRunManager : IAutomationRunManager
 
             await fhirDataLoader.WaitForServerAsync(output);
 
-            if (state.Options.PatientProfiles is { Count: > 0 })
+            if (state.Options.PatientProfiles is { Count: > 0 }
+                || state.Options.ImportedPatientIds.Count > 0
+                || state.Options.ImportedPatientBundles.Count > 0)
             {
                 var profiles = state.Options.PatientProfiles;
                 var selectedMeasures = (IReadOnlyList<ProfiledMeasureType>)state.Options.SelectedMeasures;
                 var qualAllCount = profiles.Count(p => p.QualifiesForAll(selectedMeasures));
                 var nqAllCount = profiles.Count(p => p.QualifiesForNone(selectedMeasures));
                 var mixedCount = profiles.Count - qualAllCount - nqAllCount;
-                output.WriteLine($"Using measure-eligibility profiles: {qualAllCount} qualifying-all, {nqAllCount} non-qualifying-all, {mixedCount} mixed");
+                var importedTotal = state.Options.ImportedPatientIds.Count + state.Options.ImportedPatientBundles.Count;
+                output.WriteLine($"Using measure-eligibility profiles: {qualAllCount} qualifying-all, {nqAllCount} non-qualifying-all, {mixedCount} mixed" +
+                                 (importedTotal > 0 ? $" + {importedTotal} imported patient(s)" : string.Empty));
+
+                var importedPatients = new List<ImportedPatientInput>(
+                    state.Options.ImportedPatientIds.Count + state.Options.ImportedPatientBundles.Count);
+                importedPatients.AddRange(state.Options.ImportedPatientIds);
+                importedPatients.AddRange(state.Options.ImportedPatientBundles);
+
+                // Pre-load imported patient FHIR data so the pipeline can reuse it without
+                // re-fetching, and surface — but do NOT enforce — whether each imported
+                // encounter sits inside the scenario's configured reporting period. A
+                // mismatched scenario is a legitimate test case (proper disqualification by
+                // measure-eval); the run continues either way.
+                if (importedPatients.Count > 0)
+                {
+                    output.WriteLine($"Pre-loading {importedPatients.Count} imported patient(s) (report period [{scenarioConfig.StartDate} ? {scenarioConfig.EndDate}])...");
+                    await ImportedPatientLoader.LoadAllAsync(fhirDataLoader, importedPatients, output, state.RunCancellation.Token);
+
+                    var (impStart, impEnd) = ImportedPatientLoader.ComputeEncounterDateRange(importedPatients);
+                    if (impStart.HasValue || impEnd.HasValue)
+                    {
+                        var periodStart = TryParseUtc(scenarioConfig.StartDate);
+                        var periodEnd = TryParseUtc(scenarioConfig.EndDate);
+
+                        var beforeStart = periodStart.HasValue && impStart.HasValue && impStart.Value < periodStart.Value;
+                        var afterEnd = periodEnd.HasValue && impEnd.HasValue && impEnd.Value > periodEnd.Value;
+
+                        if (beforeStart || afterEnd)
+                        {
+                            output.WriteLine($"  WARNING: Imported encounter dates [{impStart:yyyy-MM-dd} ? {impEnd:yyyy-MM-dd}] fall " +
+                                             $"{(beforeStart ? "before" : "")}{(beforeStart && afterEnd ? "/" : "")}{(afterEnd ? "after" : "")} " +
+                                             "the configured Report Period. Affected resources will be filtered by measure-eval / CQL " +
+                                             "and may cause the patient to be classified non-qualifying.");
+                        }
+                        else
+                        {
+                            output.WriteLine($"  Imported encounter dates [{impStart:yyyy-MM-dd} ? {impEnd:yyyy-MM-dd}] sit inside the report period.");
+                        }
+                    }
+                }
 
                 // Use the streaming pipeline: generate ? upload ? dispose per patient.
                 // The pipeline builds the manifest incrementally and runs acquisition
@@ -510,7 +552,6 @@ public class AutomationRunManager : IAutomationRunManager
                     selectedMeasures,
                     profiles,
                     state.Options.ResourcesPerPatient,
-                    state.Options.Prefix,
                     state.Options.Seed,
                     generationConfig,
                     acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
@@ -518,19 +559,23 @@ public class AutomationRunManager : IAutomationRunManager
                         QueryPlan = QueryPlanDefaults.GetDefaultAsInput(),
                         ClinicalPeriodStart = scenarioConfig.StartDate,
                         ClinicalPeriodEnd = scenarioConfig.EndDate
-                    });
+                    },
+                    importedPatients: importedPatients.Count > 0 ? importedPatients : null);
 
                 patientIds = pipelineResult.PatientIds;
                 generationManifest = pipelineResult.Manifest;
 
-                expectedSubmittedPatientIds = patientIds
-                    .Where((_, idx) => idx < profiles.Count && profiles[idx].QualifiesForAny(selectedMeasures))
+                // Manifest preserves order: generated profiles first, imported patients appended.
+                // Use the manifest's parallel PatientIds + Profiles arrays as the source of truth.
+                expectedSubmittedPatientIds = generationManifest.PatientIds
+                    .Where((_, idx) => idx < generationManifest.Profiles.Count
+                                       && generationManifest.Profiles[idx].QualifiesForAny(selectedMeasures))
                     .ToList();
             }
             else
             {
                 var (genPatientIds, bundles) = FhirBundleGenerator.Generate(
-                    output, state.Options.PatientCount, state.Options.ResourcesPerPatient, state.Options.Prefix, state.Options.Seed,
+                    output, state.Options.PatientCount, state.Options.ResourcesPerPatient, state.Options.Seed,
                     generationConfig);
 
                 patientIds = genPatientIds;
@@ -926,8 +971,12 @@ public class AutomationRunManager : IAutomationRunManager
         {
             MeasureBundleLocation = bundleLocations.Count > 0 ? bundleLocations[0] : "",
             AdditionalMeasureBundleLocations = bundleLocations.Count > 1 ? bundleLocations.Skip(1).ToList() : [],
-            StartDate = "2023-01-01T00:00:00Z",
-            EndDate = "2023-12-31T23:59:59Z",
+            StartDate = options.ReportPeriodStart.HasValue
+                ? options.ReportPeriodStart.Value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                : "2023-01-01T00:00:00Z",
+            EndDate = options.ReportPeriodEnd.HasValue
+                ? options.ReportPeriodEnd.Value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                : "2023-12-31T23:59:59Z",
             PatientIds = [],
             CleanupServiceData = options.CleanupServiceData,
             CleanupFhirData = options.CleanupFhirData,
@@ -943,27 +992,20 @@ public class AutomationRunManager : IAutomationRunManager
         var defaultMeasures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
         var defaults = request.Scenario switch
         {
-            AutomationScenarioKind.AdhocReportTest => new ResolvedRunOptions(1, 1000, "AdhocPatient", 20260326, 3, 0, 30, false, true, defaultMeasures, [], []),
-            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, "MultiPatient", 20260328, 3, 0, 30, false, true, defaultMeasures, [], []),
-            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, "MegaPatient", 20260327, 3, 0, 30, false, true, defaultMeasures, [], []),
-            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, "CustomPatient", 20260329, 3, 0, 30, false, true, defaultMeasures, [], []),
+            AutomationScenarioKind.AdhocReportTest => new ResolvedRunOptions(1, 1000, 20260326, 3, 0, 30, false, true, defaultMeasures, [], []),
+            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, 20260328, 3, 0, 30, false, true, defaultMeasures, [], []),
+            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, 20260327, 3, 0, 30, false, true, defaultMeasures, [], []),
+            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, 0, 30, false, true, defaultMeasures, [], []),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Scenario), request.Scenario, null)
         };
 
         if (request.Scenario != AutomationScenarioKind.Custom)
             return defaults;
 
-        var prefix = string.IsNullOrWhiteSpace(request.PatientPrefix)
-            ? defaults.Prefix
-            : request.PatientPrefix.Trim();
-
-        var profiles = request.PatientProfiles is { Count: > 0 }
-            ? request.PatientProfiles
-            : defaults.PatientProfiles;
-
         var effectiveMeasures = request.SelectedMeasures is { Count: > 0 }
             ? request.SelectedMeasures
-            : defaults.SelectedMeasures;
+            : ExtractSelectedMeasuresFromJson(request.RunConfigurationJson)
+              ?? defaults.SelectedMeasures;
 
         var cohorts = request.PatientCohorts is { Count: > 0 }
             ? request.PatientCohorts
@@ -976,37 +1018,93 @@ public class AutomationRunManager : IAutomationRunManager
                       request.ResourcesPerPatient ?? defaults.ResourcesPerPatient)
               ];
 
-        // Resolve measures: prefer SelectedMeasures list, fall back to single SelectedMeasure, then defaults
-        var measures = request.SelectedMeasures is { Count: > 0 }
-            ? request.SelectedMeasures
-            : request.SelectedMeasure.HasValue
-                ? [request.SelectedMeasure.Value]
-                : effectiveMeasures;
+        // Cohorts are the single source of truth for patient profiles; expand them.
+        var profiles = ExpandProfilesFromCohorts(cohorts, request.Seed ?? defaults.Seed);
 
-        // Always expand profiles from cohorts — cohorts are the single source of truth.
-        profiles = ExpandProfilesFromCohorts(cohorts, request.Seed ?? defaults.Seed);
+        var importedIds = request.ImportedPatientIds is { Count: > 0 }
+            ? request.ImportedPatientIds
+            : ExtractImportedFromJson(request.RunConfigurationJson, "importedPatientIds")
+              ?? [];
+
+        var importedBundles = request.ImportedPatientBundles is { Count: > 0 }
+            ? request.ImportedPatientBundles
+            : ExtractImportedFromJson(request.RunConfigurationJson, "importedPatientBundles")
+              ?? [];
+
+        var (reportStart, reportEnd) = ResolveReportPeriod(request);
 
         return defaults with
         {
             PatientCount = request.PatientCount ?? defaults.PatientCount,
             ResourcesPerPatient = request.ResourcesPerPatient ?? defaults.ResourcesPerPatient,
-            Prefix = prefix,
             Seed = request.Seed ?? defaults.Seed,
             PollingIntervalSeconds = 3,
             MaxPollingDurationMinutes = 0,
             LokiScrapeWindowMinutes = 30,
             CleanupServiceData = request.CleanupServiceData ?? defaults.CleanupServiceData,
             CleanupFhirData = request.CleanupFhirData ?? defaults.CleanupFhirData,
-            SelectedMeasures = measures,
+            SelectedMeasures = effectiveMeasures,
             PatientProfiles = profiles,
             PatientCohorts = cohorts,
             ReportMethod = request.ReportMethod,
-            QueryPlanTemplateId = request.QueryPlanTemplateId
+            QueryPlanTemplateId = request.QueryPlanTemplateId,
+            ImportedPatientIds = importedIds,
+            ImportedPatientBundles = importedBundles,
+            ReportPeriodStart = reportStart,
+            ReportPeriodEnd = reportEnd
         };
+    }
+
+    /// <summary>
+    /// Resolves the run's reporting period. The request's explicit values win; otherwise we
+    /// pull from the saved scenario JSON. When neither is set, the period is null and
+    /// <see cref="BuildScenarioConfig"/> falls back to its hard-coded default.
+    /// </summary>
+    private static (DateTimeOffset? Start, DateTimeOffset? End) ResolveReportPeriod(StartScenarioRequest request)
+    {
+        var start = request.ReportPeriodStart;
+        var end = request.ReportPeriodEnd;
+
+        if ((start.HasValue && end.HasValue) || string.IsNullOrWhiteSpace(request.RunConfigurationJson))
+            return (start, end);
+
+        try
+        {
+            using var doc = JsonDocument.Parse(request.RunConfigurationJson);
+            if (!start.HasValue && doc.RootElement.TryGetProperty("reportPeriodStart", out var s) && s.ValueKind == JsonValueKind.String
+                && DateTimeOffset.TryParse(s.GetString(), System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal, out var parsedStart))
+            {
+                start = parsedStart;
+            }
+
+            if (!end.HasValue && doc.RootElement.TryGetProperty("reportPeriodEnd", out var e) && e.ValueKind == JsonValueKind.String
+                && DateTimeOffset.TryParse(e.GetString(), System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal, out var parsedEnd))
+            {
+                end = parsedEnd;
+            }
+        }
+        catch
+        {
+            // Fall through with whatever we have.
+        }
+
+        return (start, end);
     }
 
     private static List<PatientProfile> ExpandProfilesFromCohorts(IReadOnlyList<PatientCohortDefinition> cohorts, int seed)
         => PatientCohortDefinition.ExpandProfiles(cohorts, seed);
+
+    private static DateTime? TryParseUtc(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return null;
+        if (DateTimeOffset.TryParse(s, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal,
+                out var dto))
+            return dto.UtcDateTime;
+        return null;
+    }
 
     /// <summary>
     /// Extracts cohort definitions from the <c>RunConfigurationJson</c> blob.
@@ -1093,6 +1191,80 @@ public class AutomationRunManager : IAutomationRunManager
             }
 
             return cohorts.Count > 0 ? cohorts : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Extracts the <c>selectedMeasures</c> array from the saved scenario's
+    /// <c>RunConfigurationJson</c>. Quick Launch's hidden-input form doesn't carry the
+    /// measures list, so without this extraction every Quick-Launch run would silently
+    /// fall back to the scenario-kind default (ACH Monthly), discarding whatever the
+    /// user had checked on the saved scenario.
+    /// Returns null on any parse failure or when the array is missing/empty so the
+    /// caller can fall back to defaults.
+    /// </summary>
+    private static List<ProfiledMeasureType>? ExtractSelectedMeasuresFromJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+
+            if (!doc.RootElement.TryGetProperty("selectedMeasures", out var arr)
+                || arr.ValueKind != JsonValueKind.Array
+                || arr.GetArrayLength() == 0)
+                return null;
+
+            var measures = new List<ProfiledMeasureType>();
+            foreach (var item in arr.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.String) continue;
+                if (Enum.TryParse<ProfiledMeasureType>(item.GetString(), ignoreCase: true, out var parsed))
+                    measures.Add(parsed);
+            }
+
+            return measures.Count > 0 ? measures : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Extracts an imported-patient list (<c>importedPatientIds</c> or <c>importedPatientBundles</c>)
+    /// from the saved scenario's <c>RunConfigurationJson</c>. Returns null on any parse failure or
+    /// when the array is missing/empty so the caller can fall back to defaults.
+    /// </summary>
+    private static List<ImportedPatientInput>? ExtractImportedFromJson(string? json, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+
+            if (!doc.RootElement.TryGetProperty(propertyName, out var arr)
+                || arr.ValueKind != JsonValueKind.Array
+                || arr.GetArrayLength() == 0)
+                return null;
+
+            var serializerOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = true
+            };
+            serializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+
+            var list = JsonSerializer.Deserialize<List<ImportedPatientInput>>(arr.GetRawText(), serializerOptions);
+            return list != null && list.Count > 0 ? list : null;
         }
         catch
         {
@@ -1196,9 +1368,11 @@ public class AutomationRunManager : IAutomationRunManager
                 RunName = state.RunNameOverride ?? GetRunName(state.Scenario, state.Options.SelectedMeasures),
                 Scenario = state.Scenario,
                 SelectedMeasure = string.Join(", ", state.Options.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName)),
-                PatientCount = state.Options.PatientProfiles is { Count: > 0 }
+                PatientCount = (state.Options.PatientProfiles is { Count: > 0 }
                     ? state.Options.PatientProfiles.Count
-                    : state.Options.PatientCount,
+                    : state.Options.PatientCount)
+                    + state.Options.ImportedPatientIds.Count
+                    + state.Options.ImportedPatientBundles.Count,
                 ResourcesPerPatient = state.Options.ResourcesPerPatient,
                 Seed = state.Options.Seed,
                 RunConfigurationJson = state.RunConfigurationJson,
@@ -1272,7 +1446,6 @@ public class AutomationRunManager : IAutomationRunManager
     private record ResolvedRunOptions(
         int PatientCount,
         int ResourcesPerPatient,
-        string Prefix,
         int Seed,
         int PollingIntervalSeconds,
         int MaxPollingDurationMinutes,
@@ -1283,7 +1456,24 @@ public class AutomationRunManager : IAutomationRunManager
         List<PatientProfile> PatientProfiles,
         List<PatientCohortDefinition> PatientCohorts,
         ReportMethod ReportMethod = ReportMethod.Adhoc,
-        Guid? QueryPlanTemplateId = null);
+        Guid? QueryPlanTemplateId = null)
+    {
+        /// <summary>
+        /// Imported patients (referenced by ID, fetched from FHIR server at run time).
+        /// </summary>
+        public List<ImportedPatientInput> ImportedPatientIds { get; init; } = [];
+
+        /// <summary>
+        /// Imported patients (supplied as FHIR transaction bundle JSON, uploaded at run time).
+        /// </summary>
+        public List<ImportedPatientInput> ImportedPatientBundles { get; init; } = [];
+
+        /// <summary>Reporting period start (UTC). Null = use system default.</summary>
+        public DateTimeOffset? ReportPeriodStart { get; init; }
+
+        /// <summary>Reporting period end (UTC). Null = use system default.</summary>
+        public DateTimeOffset? ReportPeriodEnd { get; init; }
+    }
 
     /// <summary>
     /// Resolves the query plan template for a run. Returns null to use built-in defaults.

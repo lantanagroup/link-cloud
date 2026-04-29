@@ -124,10 +124,11 @@
                         <input type="hidden" name="Seed" id="qlSeed" value="20260329" />
                         <input type="hidden" name="PatientCount" id="qlPatientCount" value="10" />
                         <input type="hidden" name="ResourcesPerPatient" id="qlResourcesPerPatient" value="250" />
-                        <input type="hidden" name="PatientPrefix" id="qlPatientPrefix" value="CustomPatient" />
-                        <input type="hidden" name="CleanupFhirData" value="true" />
-                        <input type="hidden" name="CleanupServiceData" value="false" />
+                        <input type="hidden" name="CleanupFhirData" id="qlCleanupFhirData" value="true" />
+                        <input type="hidden" name="CleanupServiceData" id="qlCleanupServiceData" value="false" />
                         <input type="hidden" name="QueryPlanTemplateId" id="qlQueryPlanTemplateId" value="" />
+                        <input type="hidden" name="ReportPeriodStart" id="qlReportPeriodStart" value="" />
+                        <input type="hidden" name="ReportPeriodEnd" id="qlReportPeriodEnd" value="" />
                         <button type="submit" class="btn btn-au-run w-100" id="qlRunButton" disabled>
                             <i class="bi bi-play-fill me-1"></i> Run
                         </button>
@@ -491,10 +492,17 @@
                 document.getElementById('qlScenarioName').value = s.name || 'Scenario';
                 document.getElementById('qlReportMethod').value = s.reportMethod || 'Adhoc';
                 document.getElementById('qlSeed').value = s.seed || 20260329;
-                document.getElementById('qlPatientCount').value = s.patientCount || 10;
+                document.getElementById('qlPatientCount').value = (typeof s.patientCount === 'number') ? s.patientCount : 10;
                 document.getElementById('qlResourcesPerPatient').value = s.resourcesPerPatientMax || 250;
-                document.getElementById('qlPatientPrefix').value = s.patientPrefix || 'CustomPatient';
                 document.getElementById('qlQueryPlanTemplateId').value = s.queryPlanTemplateId || '';
+                document.getElementById('qlReportPeriodStart').value = s.reportPeriodStart || '';
+                document.getElementById('qlReportPeriodEnd').value = s.reportPeriodEnd || '';
+                // Mirror the scenario's saved cleanup preferences into the form so the
+                // Quick Launch run honours them. Without this, the static defaults
+                // (CleanupFhirData=true, CleanupServiceData=false) silently override
+                // whatever the user saved on the scenario.
+                document.getElementById('qlCleanupFhirData').value = (s.cleanupFhirData === false) ? 'false' : 'true';
+                document.getElementById('qlCleanupServiceData').value = (s.cleanupServiceData === true) ? 'true' : 'false';
                 document.getElementById('qlRunConfigJson').value = JSON.stringify(s);
             });
     });

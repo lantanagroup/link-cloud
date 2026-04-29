@@ -1,4 +1,4 @@
-# Automation.UI
+﻿# Automation.UI
 
 `Automation.UI` is the interactive web host for Link automation runs. It lets users create and
 manage test scenarios, configure FHIR query plans, start runs, watch progress in real time,
@@ -213,7 +213,6 @@ A `TestScenarioDefinition` captures everything needed to run a test:
 | `Seed` | Deterministic generation seed. |
 | `PatientCount` | Computed from cohorts. |
 | `ResourcesPerPatientMin/Max` | Resource count range per patient. |
-| `PatientPrefix` | FHIR Patient ID prefix. |
 | `PatientCohorts` | List of cohort definitions (count, eligibility, clinical profiles, resource range). |
 | `QueryPlanTemplateId` | Optional override for the FHIR query plan (null = system default). |
 | `CleanupServiceData` | Remove facility config and run artifacts after completion. |

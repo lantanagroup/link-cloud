@@ -303,7 +303,7 @@ public class FhirDataLoader
             {
                 output.WriteLine($"  {progress} FAILED {name}: {response.StatusCode} {response.Content}");
 
-                // Abort the sequence � later bundles depend on earlier ones.
+                // Abort the sequence — later bundles depend on earlier ones.
                 for (var j = i + 1; j < bundles.Count; j++)
                 {
                     var skippedProgress = string.IsNullOrEmpty(progressPrefix)
@@ -353,6 +353,157 @@ public class FhirDataLoader
         {
             output.WriteLine($"  {progress} Error parsing response for {name}: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Fetches a patient and their related resources from the FHIR server using the
+    /// <c>Patient/{id}/$everything</c> operation and follows <c>Bundle.link[next]</c>
+    /// pages until the server stops emitting one. Returns a single merged FHIR
+    /// <c>Bundle</c> JSON string (the first page's envelope, with the union of every
+    /// page's <c>entry</c> array). Used to materialize imported patients (referenced
+    /// by ID) into bundle entries that can be fed through the manifest / simulator
+    /// paths.
+    ///
+    /// <para>
+    /// Pagination is non-negotiable for real-world servers (Cerner / Epic / HAPI
+    /// sandboxes default to 20–100 entries per page). Without this, the simulator
+    /// only sees the first page of the patient's data and predicts <c>expected=0</c>
+    /// for every resource type that spilled past the page boundary, while the
+    /// production DA pipeline — which queries the server directly per resource type
+    /// — sees everything. That manifests as the validator complaining
+    /// <c>"expected=0, actual=N"</c> for Observation / ServiceRequest / Procedure /
+    /// etc.
+    /// </para>
+    /// </summary>
+    public async Task<string> FetchPatientEverythingAsync(string patientId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(patientId))
+            throw new ArgumentException("Patient ID is required.", nameof(patientId));
+
+        // Page 1: anchored at the operation URL relative to the configured server base.
+        var firstPage = await GetPageAsync(
+            $"Patient/{patientId}/$everything",
+            useFullUrl: false,
+            descriptionForError: $"Patient/{patientId}/$everything",
+            ct);
+
+        var rootBundle = JsonNode.Parse(firstPage)
+            ?? throw new InvalidOperationException(
+                $"FHIR server returned an unparseable response for Patient/{patientId}/$everything.");
+
+        var mergedEntries = (rootBundle["entry"] as JsonArray) ?? new JsonArray();
+
+        // Capture the next link, then strip the entire `link` block from the merged
+        // bundle. The first page's link block describes only the first page (self/next/last)
+        // and is meaningless on the merged result; leaving it in causes downstream FHIR
+        // deserializers to choke on a null/empty link array shape.
+        var nextUrl = ExtractNextLink(rootBundle);
+        if (rootBundle is JsonObject rootObj)
+            rootObj.Remove("link");
+
+        // Defensive cap: a server that returns the same next link forever would otherwise
+        // hang the run. 1000 pages × ~100 entries/page = ~100k resources is well past any
+        // realistic single-patient $everything; if we hit it we want to surface it.
+        const int MaxPages = 1000;
+        var pageCount = 1;
+
+        while (!string.IsNullOrWhiteSpace(nextUrl))
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (++pageCount > MaxPages)
+            {
+                throw new InvalidOperationException(
+                    $"Patient/{patientId}/$everything exceeded the {MaxPages}-page safety cap; refusing to continue.");
+            }
+
+            var pageJson = await GetPageAsync(
+                nextUrl!,
+                useFullUrl: true,
+                descriptionForError: $"Patient/{patientId}/$everything (page {pageCount})",
+                ct);
+
+            var pageNode = JsonNode.Parse(pageJson);
+            if (pageNode?["entry"] is JsonArray pageEntries)
+            {
+                foreach (var entry in pageEntries.ToList())
+                {
+                    // Detach from the source array before appending; JsonArray.Add
+                    // throws on already-parented nodes.
+                    pageEntries.Remove(entry);
+                    mergedEntries.Add(entry);
+                }
+            }
+
+            nextUrl = pageNode != null ? ExtractNextLink(pageNode) : null;
+        }
+
+        rootBundle["entry"] = mergedEntries;
+        // Reflect the merged total so consumers that read it (and humans debugging)
+        // see the post-pagination count rather than the first page's count.
+        rootBundle["total"] = mergedEntries.Count;
+
+        return rootBundle.ToJsonString();
+    }
+
+    /// <summary>
+    /// Performs a single GET against the FHIR server and returns the response body.
+    /// When <paramref name="useFullUrl"/> is true the URL is treated as absolute
+    /// (used for paging links); otherwise it is resolved against the configured
+    /// server base URL via the existing <see cref="_restClient"/>.
+    /// </summary>
+    private async Task<string> GetPageAsync(string url, bool useFullUrl, string descriptionForError, CancellationToken ct)
+    {
+        RestResponse response;
+        if (useFullUrl)
+        {
+            // Absolute URLs returned by the server may point to a different host (e.g.
+            // an internal pagination service). Use a one-off RestClient so the host
+            // resolves correctly and we don't accidentally combine it with the
+            // configured base URL.
+            using var oneOffClient = new RestClient(url);
+            var request = new RestRequest("", Method.Get);
+            request.AddHeader("Accept", "application/fhir+json");
+            if (!string.IsNullOrEmpty(_authorization))
+                request.AddHeader("Authorization", _authorization);
+            response = await oneOffClient.ExecuteAsync(request, ct);
+        }
+        else
+        {
+            var request = new RestRequest(url, Method.Get);
+            request.AddHeader("Accept", "application/fhir+json");
+            if (!string.IsNullOrEmpty(_authorization))
+                request.AddHeader("Authorization", _authorization);
+            response = await _restClient.ExecuteAsync(request, ct);
+        }
+
+        if (!response.IsSuccessful || string.IsNullOrWhiteSpace(response.Content))
+        {
+            throw new InvalidOperationException(
+                $"FHIR server returned {(int)response.StatusCode} {response.StatusCode} for {descriptionForError}: {response.Content}");
+        }
+
+        return response.Content;
+    }
+
+    /// <summary>
+    /// Returns the absolute URL of the <c>Bundle.link</c> entry whose <c>relation</c>
+    /// is <c>"next"</c>, or <c>null</c> when the bundle has no further pages.
+    /// </summary>
+    private static string? ExtractNextLink(JsonNode bundle)
+    {
+        if (bundle["link"] is not JsonArray links) return null;
+
+        foreach (var link in links)
+        {
+            var relation = link?["relation"]?.GetValue<string>();
+            if (string.Equals(relation, "next", StringComparison.OrdinalIgnoreCase))
+            {
+                return link?["url"]?.GetValue<string>();
+            }
+        }
+
+        return null;
     }
 
     private async Task<RestResponse> PostBundleWithRetryAsync(

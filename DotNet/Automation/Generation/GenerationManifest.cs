@@ -15,8 +15,8 @@ public sealed class GenerationManifest
     /// Resource types that are pipeline-derived (not produced by our FHIR generator).
     /// They appear in ABS as a deterministic function of the pipeline, not of generated input:
     /// <list type="bullet">
-    ///   <item><c>MeasureReport</c> — MeasureEval writes one per submitted patient per measure.</item>
-    ///   <item><c>OperationOutcome</c> — one per patient that fails validation. Normally 0;
+    ///   <item><c>MeasureReport</c> â€” MeasureEval writes one per submitted patient per measure.</item>
+    ///   <item><c>OperationOutcome</c> â€” one per patient that fails validation. Normally 0;
     ///         callers set <see cref="ExpectedOperationOutcomeCountByPatient"/> when failures are expected.</item>
     /// </list>
     /// These types are never compared key-for-key; instead a count-level prediction is added
@@ -124,6 +124,14 @@ public sealed class GenerationManifest
     /// <summary>Total number of generated resource entries across all bundles.</summary>
     public int TotalResourceCount { get; init; }
 
+    /// <summary>
+    /// Patient IDs whose data was already on the FHIR server before the run (imported by ID).
+    /// These patients are included in the manifest and report, but their resources are NOT
+    /// tracked for cleanup expunge â€” only resources we uploaded during the run are tracked.
+    /// </summary>
+    public IReadOnlySet<string> PreExistingPatientIds { get; init; }
+        = new HashSet<string>(StringComparer.Ordinal);
+
     // ----- Acquired / Expected-in-ABS resource type filters -----
 
     /// <summary>
@@ -184,7 +192,7 @@ public sealed class GenerationManifest
         if (CqlReferencedResourceTypes.Count > 0)
             return CqlReferencedResourceTypes.Contains(resourceType);
 
-        // Fallback when CQL analysis is unavailable — assume all acquired types pass
+        // Fallback when CQL analysis is unavailable â€” assume all acquired types pass
         return true;
     }
 
@@ -193,11 +201,11 @@ public sealed class GenerationManifest
     /// expected in the ABS patient NDJSON artifact (generated ? query-plan-acquired ?
     /// CQL-referenced), plus deterministic pipeline-derived additions:
     /// <list type="bullet">
-    ///   <item><c>Patient</c> — always 1 for patients that qualify for any selected measure
+    ///   <item><c>Patient</c> â€” always 1 for patients that qualify for any selected measure
     ///         (MeasureEval's CQL engine loads Patient implicitly, so it always lands in ABS).</item>
-    ///   <item><c>MeasureReport</c> — one per measure the patient qualifies for
+    ///   <item><c>MeasureReport</c> â€” one per measure the patient qualifies for
     ///         (MeasureEval writes exactly one MeasureReport per submitted patient per measure).</item>
-    ///   <item><c>OperationOutcome</c> — the caller-supplied expectation from
+    ///   <item><c>OperationOutcome</c> â€” the caller-supplied expectation from
     ///         <see cref="ExpectedOperationOutcomeCountByPatient"/> (default 0). Appended
     ///         directly to the patient aggregate blob by <c>ValidationCompleteListener</c>
     ///         for any patient whose <c>ValidationComplete.IsValid == false</c>.</item>
@@ -215,7 +223,7 @@ public sealed class GenerationManifest
             .GroupBy(t => t, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
-        // Pipeline-derived additions — count-level only because IDs are assigned downstream.
+        // Pipeline-derived additions â€” count-level only because IDs are assigned downstream.
         AddPipelineDerivedExpectedCounts(patientId, counts);
 
         return counts;
@@ -228,7 +236,7 @@ public sealed class GenerationManifest
     /// acquisition simulation is unavailable.
     ///
     /// For patients qualifying for any selected measure, <c>Patient/{patientId}</c> is always
-    /// included — MeasureEval's CQL engine loads the Patient resource as an implicit anchor
+    /// included â€” MeasureEval's CQL engine loads the Patient resource as an implicit anchor
     /// even if the query plan has no explicit Patient query.
     ///
     /// Pipeline-derived resources (<c>MeasureReport</c>, <c>OperationOutcome</c>) are
@@ -464,6 +472,7 @@ public sealed class GenerationManifest
         private readonly Dictionary<string, Dictionary<string, int>> _countsByPatientType = new(StringComparer.Ordinal);
         private readonly Dictionary<string, int> _totalsByType = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, HashSet<string>> _simulatedAcquiredKeys = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _preExistingPatientIds = new(StringComparer.Ordinal);
         private int _totalCount;
 
         /// <summary>
@@ -559,6 +568,20 @@ public sealed class GenerationManifest
         }
 
         /// <summary>
+        /// Marks the given patient as one whose data already existed on the FHIR server
+        /// (imported by ID rather than generated or uploaded). The cleanup step uses this
+        /// to skip expunging the patient's resources.
+        /// </summary>
+        public void MarkPreExistingPatient(string patientId)
+        {
+            if (string.IsNullOrEmpty(patientId)) return;
+            lock (_lock)
+            {
+                _preExistingPatientIds.Add(patientId);
+            }
+        }
+
+        /// <summary>
         /// Builds the final <see cref="GenerationManifest"/> from all accumulated data.
         /// Call once after all patients have been processed.
         /// </summary>
@@ -576,7 +599,8 @@ public sealed class GenerationManifest
                     TotalCountsByType = new Dictionary<string, int>(_totalsByType, StringComparer.OrdinalIgnoreCase),
                     TotalResourceCount = _totalCount,
                     SimulatedAcquiredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_simulatedAcquiredKeys, StringComparer.Ordinal),
-                    CqlFilteredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_cqlFilteredKeys, StringComparer.Ordinal)
+                    CqlFilteredResourceKeysByPatient = new Dictionary<string, HashSet<string>>(_cqlFilteredKeys, StringComparer.Ordinal),
+                    PreExistingPatientIds = new HashSet<string>(_preExistingPatientIds, StringComparer.Ordinal)
                 };
             }
         }

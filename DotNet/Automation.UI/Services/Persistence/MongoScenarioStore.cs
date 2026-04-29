@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Automation.UI.Models;
 using LantanaGroup.Automation.Generation;
 using MongoDB.Driver;
@@ -59,17 +59,14 @@ public sealed class MongoScenarioStore : IScenarioStore
         PatientCount = model.PatientCount,
         ResourcesPerPatientMin = model.ResourcesPerPatientMin,
         ResourcesPerPatientMax = model.ResourcesPerPatientMax,
-        PatientPrefix = model.PatientPrefix,
-        UseMeasureEligibilityProfiles = model.UseMeasureEligibilityProfiles,
-        PatientProfilesJson = JsonSerializer.Serialize(model.PatientProfiles),
         PatientCohortsJson = JsonSerializer.Serialize(model.PatientCohorts),
-        SelectedClinicalScenarioIds = model.SelectedClinicalScenarioIds,
-        DischargeCount = model.DischargeCount,
-        DischargeQualifyingCount = model.DischargeQualifyingCount,
-        DischargeNonQualifyingCount = model.DischargeNonQualifyingCount,
         QueryPlanTemplateId = model.QueryPlanTemplateId,
         CleanupServiceData = model.CleanupServiceData,
         CleanupFhirData = model.CleanupFhirData,
+        ReportPeriodStart = model.ReportPeriodStart?.UtcDateTime,
+        ReportPeriodEnd = model.ReportPeriodEnd?.UtcDateTime,
+        ImportedPatientIdsJson = JsonSerializer.Serialize(model.ImportedPatientIds),
+        ImportedPatientBundlesJson = JsonSerializer.Serialize(model.ImportedPatientBundles),
         UpdatedAt = model.UpdatedAt
     };
 
@@ -89,34 +86,16 @@ public sealed class MongoScenarioStore : IScenarioStore
         PatientCount = doc.PatientCount,
         ResourcesPerPatientMin = doc.ResourcesPerPatientMin,
         ResourcesPerPatientMax = doc.ResourcesPerPatientMax,
-        PatientPrefix = doc.PatientPrefix,
-        UseMeasureEligibilityProfiles = doc.UseMeasureEligibilityProfiles,
-        PatientProfiles = DeserializeProfiles(doc.PatientProfilesJson),
         PatientCohorts = DeserializeCohorts(doc.PatientCohortsJson),
-        SelectedClinicalScenarioIds = doc.SelectedClinicalScenarioIds ?? [],
-        DischargeCount = doc.DischargeCount,
-        DischargeQualifyingCount = doc.DischargeQualifyingCount,
-        DischargeNonQualifyingCount = doc.DischargeNonQualifyingCount,
         QueryPlanTemplateId = doc.QueryPlanTemplateId,
         CleanupServiceData = doc.CleanupServiceData,
         CleanupFhirData = doc.CleanupFhirData,
+        ReportPeriodStart = doc.ReportPeriodStart.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(doc.ReportPeriodStart.Value, DateTimeKind.Utc)) : null,
+        ReportPeriodEnd = doc.ReportPeriodEnd.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(doc.ReportPeriodEnd.Value, DateTimeKind.Utc)) : null,
+        ImportedPatientIds = DeserializeImported(doc.ImportedPatientIdsJson),
+        ImportedPatientBundles = DeserializeImported(doc.ImportedPatientBundlesJson),
         UpdatedAt = doc.UpdatedAt
     };
-
-    private static List<PatientProfile> DeserializeProfiles(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return [];
-
-        try
-        {
-            return JsonSerializer.Deserialize<List<PatientProfile>>(json) ?? [];
-        }
-        catch
-        {
-            return [];
-        }
-    }
 
     private static List<PatientCohortDefinition> DeserializeCohorts(string? json)
     {
@@ -126,6 +105,21 @@ public sealed class MongoScenarioStore : IScenarioStore
         try
         {
             return JsonSerializer.Deserialize<List<PatientCohortDefinition>>(json) ?? [];
+        }
+        catch
+        {
+            return [];
+        }
+    }
+
+    private static List<ImportedPatientInput> DeserializeImported(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return [];
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<ImportedPatientInput>>(json) ?? [];
         }
         catch
         {

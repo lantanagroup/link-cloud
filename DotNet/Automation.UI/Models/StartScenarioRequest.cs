@@ -13,14 +13,14 @@ public class StartScenarioRequest
     /// </summary>
     public ReportMethod ReportMethod { get; set; } = ReportMethod.Adhoc;
 
-    [Range(1, 10000)]
+    // Zero is permitted: a scenario with imported patients only (no cohorts) generates
+    // nothing and relies entirely on the imported-patient list. The run will fail
+    // separately if neither generated nor imported patients are configured.
+    [Range(0, 10000)]
     public int? PatientCount { get; set; }
 
     [Range(1, int.MaxValue)]
     public int? ResourcesPerPatient { get; set; }
-
-    [StringLength(64)]
-    public string? PatientPrefix { get; set; }
 
     [Range(1, int.MaxValue)]
     public int? Seed { get; set; }
@@ -41,28 +41,33 @@ public class StartScenarioRequest
     public bool? CleanupFhirData { get; set; }
 
     /// <summary>
-    /// Single measure for backward compatibility. When set and <see cref="SelectedMeasures"/>
-    /// is empty, this measure is used.
-    /// </summary>
-    public ProfiledMeasureType? SelectedMeasure { get; set; }
-
-    /// <summary>
     /// Measures selected for this run. When multiple measures are selected, the report
     /// is generated with all of them as report types, and qualifying patients must
     /// qualify for every selected measure.
     /// </summary>
     public List<ProfiledMeasureType> SelectedMeasures { get; set; } = [];
 
-    /// <summary>
-    /// Per-patient eligibility profiles for measure-eligibility generation mode.
-    /// When provided, the Custom scenario uses profile-driven pipeline generation instead
-    /// of the standard <c>Generate()</c> code path. Each entry controls whether that
-    /// patient qualifies for the measure's Initial Population.
-    /// When null or empty, standard random generation is used.
-    /// </summary>
-    public List<PatientProfile>? PatientProfiles { get; set; }
-
     public List<PatientCohortDefinition>? PatientCohorts { get; set; }
+
+    /// <summary>
+    /// Patients to fetch from the FHIR server by ID and include alongside the generated pool.
+    /// </summary>
+    public List<ImportedPatientInput>? ImportedPatientIds { get; set; }
+
+    /// <summary>
+    /// Patients supplied as FHIR transaction bundles (one bundle per patient).
+    /// </summary>
+    public List<ImportedPatientInput>? ImportedPatientBundles { get; set; }
+
+    /// <summary>
+    /// Reporting period start (UTC). When null, the system default is used.
+    /// </summary>
+    public DateTimeOffset? ReportPeriodStart { get; set; }
+
+    /// <summary>
+    /// Reporting period end (UTC). When null, the system default is used.
+    /// </summary>
+    public DateTimeOffset? ReportPeriodEnd { get; set; }
 
     /// <summary>
     /// Optional query plan template ID. When set, the run uses this template's

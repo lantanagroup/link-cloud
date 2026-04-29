@@ -122,7 +122,6 @@ public sealed class MultiMeasureTest : IAsyncLifetime, IClassFixture<BackendE2ET
             measures,
             profiles,
             totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
-            patientIdPrefix: "MultiMeasurePatient",
             generationSeed: GenerationSeed,
             acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
             {
