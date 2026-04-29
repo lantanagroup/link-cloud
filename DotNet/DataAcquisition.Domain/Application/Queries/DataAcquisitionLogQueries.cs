@@ -394,6 +394,15 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
                 var first = groupLogs.First();
 
+                var resourceTypes = await _dbContext.DataAcquisitionLogs
+                    .Where(l =>
+                        l.FacilityId == group.FacilityId
+                        && l.CorrelationId == group.CorrelationId
+                        && l.QueryPhase == group.QueryPhase)
+                    .SelectMany(l => l.FhirQueries.SelectMany(q => q.FhirQueryResourceTypes.Select(r => r.ResourceType)))
+                    .Distinct()
+                    .ToListAsync(cancellationToken);
+
                 results.Add(new TailingMessageModel
                 {
                     FacilityId = group.FacilityId ?? string.Empty,
@@ -408,7 +417,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                             ? new List<ScheduledReport> { first.ScheduledReport }
                             : new List<ScheduledReport>(),
                         CacheType = ResourceCacheType.Redis, //TODO: also support ABS
-                        CacheKeys = group.CorrelationId != null ? [group.CorrelationId] : new List<string>()
+                        CacheKeys = resourceTypes
+                            .Select(rt => $"{group.CorrelationId}:{rt}")
+                            .ToList()
                     }
                 });
 

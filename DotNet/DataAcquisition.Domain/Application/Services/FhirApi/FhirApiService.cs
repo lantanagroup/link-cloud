@@ -369,7 +369,7 @@ public class FhirApiService : IFhirApiService
             && !string.IsNullOrWhiteSpace(resourceAcquired.ResourceType)
             && Enum.TryParse<ResourceType>(resourceAcquired.ResourceType, out var resourceType))
         {
-            _resourceCache.UpdateCorrelationCache(correlationId, new List<DomainResource> { domainResource }, resourceType);
+            _resourceCache.UpdateCorrelationCache($"{correlationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType);
         }
     }
 

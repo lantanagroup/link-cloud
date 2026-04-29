@@ -872,6 +872,15 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             return null;
         }
 
+        var resourceTypes = await _dbContext.DataAcquisitionLogs
+            .Where(l =>
+                l.FacilityId == groupInfo.FacilityId
+                && l.CorrelationId == groupInfo.CorrelationId
+                && l.QueryPhase == groupInfo.QueryPhase)
+            .SelectMany(l => l.FhirQueries.SelectMany(q => q.FhirQueryResourceTypes.Select(r => r.ResourceType)))
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
         return new TailCompletionResult
         {
             FacilityId = groupInfo.FacilityId,
@@ -886,10 +895,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                     ? new List<ScheduledReport> { representative.ScheduledReport }
                     : new List<ScheduledReport>(),
                 CacheType = ResourceCacheType.Redis, //TODO: also support ABS
-                CacheKeys = new List<string>
-                {
-                    groupInfo.CorrelationId
-                }
+                CacheKeys = resourceTypes
+                    .Select(rt => $"{groupInfo.CorrelationId}:{rt}")
+                    .ToList()
             }
         };
     }

@@ -480,7 +480,7 @@ public class ReferenceResourceService : IReferenceResourceService
             && !string.IsNullOrWhiteSpace(resource.TypeName)
             && Enum.TryParse<ResourceType>(resource.TypeName, out var resourceType))
         {
-            _resourceCache.UpdateCorrelationCache(primaryLog.CorrelationId!, new List<DomainResource> { domainResource }, resourceType);
+            _resourceCache.UpdateCorrelationCache($"{primaryLog.CorrelationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType);
         }
     }
 
