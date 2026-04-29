@@ -3,8 +3,10 @@
   "title": "ReadyToAcquire",
   "type": "object",
   "properties": {
-    "LogId": { "type": "string" },
-    "FacilityId": { "type": "string" }
+    "logId": { "type": ["integer", "null" ] },
+    "facilityId": { "type": ["string", "null"] },
+    "reportTrackingId": { "type": "string" }
   },
-  "required": [ "LogId", "FacilityId" ]
+  "required": ["reportTrackingId"],
+  "additionalProperties": false
 }
