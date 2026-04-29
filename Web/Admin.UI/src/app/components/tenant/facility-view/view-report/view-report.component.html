@@ -22,7 +22,7 @@
         <fa-icon [icon]="faFileInvoice"></fa-icon>
         Acquisition Log
       </button>
-      <button type="button" class="link-button primary" aria-label="Download Report" (click)="onDownload()" *ngIf="reportSummary.submitted">
+      <button type="button" class="link-button primary" aria-label="Download Report" (click)="onDownload()" *ngIf="reportSummary.payloadRootUri">
         <fa-icon [icon]="faFileArrowDown"></fa-icon>
         Download
       </button>
