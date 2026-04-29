@@ -64,6 +64,7 @@
     <Content Include=".docker\prometheus.yml" />
     <Content Include=".docker\tempo.yml" />
     <Content Include=".env" />
+    <Content Include="app-config.yaml" />
     <Content Include="Azure_Pipelines\azure-pipelines.account.cd.yaml" />
     <Content Include="Azure_Pipelines\azure-pipelines.admin-ui.cd.yaml" />
     <Content Include="Azure_Pipelines\azure-pipelines.admin.cd.yaml" />
