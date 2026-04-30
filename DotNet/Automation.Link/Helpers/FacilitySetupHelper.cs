@@ -121,7 +121,7 @@ public static class FacilitySetupHelper
         string ehrDescription,
         QueryPlanInput? externalQueryPlan = null)
     {
-        // Query plans are keyed by (facilityId, type) — not per measure.
+        // Query plans are keyed by (facilityId, type) â€” not per measure.
         // Create each plan type once using the first measure as the plan name.
         var planName = measureIds.Count > 0 ? measureIds[0] : null;
         await EnsureQueryPlanAsync(dataAcqClient, output, facilityId, planName, ehrDescription, "Discharge", externalQueryPlan);
@@ -141,7 +141,7 @@ public static class FacilitySetupHelper
         var created = await dataAcqClient.CreateFhirQueryConfigurationAsync(new CreateFhirQueryConfigurationRequestApiModel
         {
             FacilityId = facilityId,
-            FhirServerBaseUrl = config.InternalFhirServerBase,
+            FhirServerBaseUrl = config.FhirServerBase,
             MaxConcurrentRequests = effectiveMaxConcurrentRequests,
             MaxRetries = 3,
             MinAcquisitionPullTime = config.FhirQuery.MinAcquisitionPullTime,

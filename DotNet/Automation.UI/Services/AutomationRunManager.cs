@@ -195,7 +195,7 @@ public class AutomationRunManager : IAutomationRunManager
             var normalizationClient = scope.ServiceProvider.GetRequiredService<INormalizationServiceClient>();
             var queryDispatchClient = scope.ServiceProvider.GetRequiredService<IQueryDispatchServiceClient>();
             var fhirDataLoader = state.FhirDataLoader
-                ?? new FhirDataLoader(_automationConfig.ExternalFhirServerBase, _automationConfig.FhirServerOAuth, _automationConfig.FhirServerBasicAuth);
+                ?? new FhirDataLoader(_automationConfig.FhirServerBase, _automationConfig.FhirServerOAuth, _automationConfig.FhirServerBasicAuth);
 
             await RunCleanupHelper.CleanupCancelledRunAsync(
                 facilityClient,

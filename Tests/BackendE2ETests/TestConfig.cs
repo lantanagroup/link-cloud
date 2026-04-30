@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using System.Reflection;
 
@@ -12,9 +12,11 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 /// </summary>
 public static class TestConfig
 {
-    // FHIR server
-    public static string ExternalFhirServerBase => Environment.GetEnvironmentVariable("EXTERNAL_FHIR_SERVER_BASE_URL") ?? "http://localhost:6157/fhir";
-    public static string InternalFhirServerBase => Environment.GetEnvironmentVariable("INTERNAL_FHIR_SERVER_BASE_URL") ?? "http://fhir-server:8080/fhir";
+    // FHIR server (one URL; the same URL is registered on each test facility's query
+    // config so Link's services hit the same instance).
+    public static string FhirServerBase => Environment.GetEnvironmentVariable("FHIR_SERVER_BASE_URL")
+        ?? Environment.GetEnvironmentVariable("EXTERNAL_FHIR_SERVER_BASE_URL") // legacy name
+        ?? "http://localhost:6157/fhir";
 
     // Service URLs — direct to each service (not through BFF)
     public static string TenantServiceBase => Environment.GetEnvironmentVariable("TENANT_SERVICE_BASE_URL") ?? "http://localhost:8074";
@@ -43,8 +45,7 @@ public static class TestConfig
     /// </summary>
     public static AutomationConfig BuildAutomationConfig() => new()
     {
-        ExternalFhirServerBase = ExternalFhirServerBase,
-        InternalFhirServerBase = InternalFhirServerBase,
+        FhirServerBase = FhirServerBase,
         AdminBffBase = AdminBffBase,
         LokiBaseUrl = LokiBaseUrl,
         DownloadPath = AdhocReportTestDownloadPath,

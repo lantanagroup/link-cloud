@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Automation.Link.Configuration;
+namespace LantanaGroup.Link.Automation.Link.Configuration;
 
 /// <summary>
 /// Configuration for the Link automation library.
@@ -7,8 +7,17 @@
 /// </summary>
 public class AutomationConfig
 {
-    public string ExternalFhirServerBase { get; set; } = "http://localhost:6157/fhir";
-    public string InternalFhirServerBase { get; set; } = "http://fhir-server:8080/fhir";
+    /// <summary>
+    /// Base URL of the FHIR server Automation talks to. The exact same URL is also
+    /// registered on each test facility's query config (via <c>FacilitySetupHelper</c>)
+    /// so Link's services hit the same server &mdash; there is only ever one FHIR
+    /// server in play. In a Docker-compose run this is the in-network name
+    /// (e.g. <c>http://fhir-server:8080/fhir</c>); in dev-from-host it's whatever
+    /// host-reachable URL points at the same instance
+    /// (e.g. <c>http://host.docker.internal:6157/fhir</c> so DataAcquisition inside
+    /// the container can resolve it too).
+    /// </summary>
+    public string FhirServerBase { get; set; } = "http://localhost:6157/fhir";
     public string AdminBffBase { get; set; } = "http://localhost:8063/api";
     public string LokiBaseUrl { get; set; } = "http://localhost:3100";
     public string? DownloadPath { get; set; }

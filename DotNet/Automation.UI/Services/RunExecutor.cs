@@ -82,24 +82,8 @@ internal sealed class RunExecutor
             using var services = BuildRunServiceProvider(output);
 
             var lokiScraper = services.GetRequiredService<LokiScraper>();
-
-            // Two FHIR endpoints are in play:
-            //   * ExternalFhirServerBase — what end-users / imported-patient sources address.
-            //     Used here ONLY to read existing patients via Patient/{id}/$everything.
-            //   * InternalFhirServerBase — what Link's services (Tenant/DataAcquisition/...)
-            //     point at via FacilitySetupHelper. All run-side writes (bundle uploads,
-            //     generation pipeline uploads, readiness probe, post-run cleanup) must land
-            //     on this base, otherwise DataAcquisition would query a different server
-            //     than the one Automation populated.
-            var externalFhirDataLoader = services.GetRequiredService<FhirDataLoader>();
-            var internalFhirDataLoader = new FhirDataLoader(
-                _automationConfig.InternalFhirServerBase,
-                _automationConfig.FhirServerOAuth,
-                _automationConfig.FhirServerBasicAuth);
-
-            // The cleanup-on-cancel path on AutomationRunManager reuses this loader to
-            // expunge generated FHIR resources, so it must point at the internal base too.
-            state.FhirDataLoader = internalFhirDataLoader;
+            var fhirDataLoader = services.GetRequiredService<FhirDataLoader>();
+            state.FhirDataLoader = fhirDataLoader;
             var measureEvalClient = services.GetRequiredService<IMeasureEvalServiceClient>();
             var sdkValidationClient = services.GetRequiredService<IValidationServiceClient>();
 
@@ -128,7 +112,7 @@ internal sealed class RunExecutor
             var primaryMeasure = state.Options.SelectedMeasures[0];
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
 
-            await internalFhirDataLoader.WaitForServerAsync(output);
+            await fhirDataLoader.WaitForServerAsync(output);
 
             if (state.Options.PatientProfiles is { Count: > 0 }
                 || state.Options.ImportedPatientIds.Count > 0
@@ -156,7 +140,7 @@ internal sealed class RunExecutor
                 if (importedPatients.Count > 0)
                 {
                     output.WriteLine($"Pre-loading {importedPatients.Count} imported patient(s) (report period [{scenarioConfig.StartDate} ? {scenarioConfig.EndDate}])...");
-                    await ImportedPatientLoader.LoadAllAsync(externalFhirDataLoader, importedPatients, output, state.RunCancellation.Token);
+                    await ImportedPatientLoader.LoadAllAsync(fhirDataLoader, importedPatients, output, state.RunCancellation.Token);
 
                     var (impStart, impEnd) = ImportedPatientLoader.ComputeEncounterDateRange(importedPatients);
                     if (impStart.HasValue || impEnd.HasValue)
@@ -186,7 +170,7 @@ internal sealed class RunExecutor
                 // simulation per-patient, so no serialized FHIR JSON is retained.
                 var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
                     output,
-                    internalFhirDataLoader,
+                    fhirDataLoader,
                     selectedMeasures,
                     profiles,
                     state.Options.ResourcesPerPatient,
@@ -219,7 +203,7 @@ internal sealed class RunExecutor
                 patientIds = genPatientIds;
                 expectedSubmittedPatientIds = patientIds.ToList();
 
-                await internalFhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
+                await fhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
             }
 
             if (scenarioConfig.PatientIds.Count == 0)
@@ -502,7 +486,7 @@ internal sealed class RunExecutor
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 services.GetRequiredService<IQueryDispatchServiceClient>(),
                 services.GetRequiredService<IReportServiceClient>(),
-                internalFhirDataLoader,
+                fhirDataLoader,
                 output,
                 facilityId,
                 reportId);
@@ -573,7 +557,7 @@ internal sealed class RunExecutor
         services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<IAutomationOutput>(), sp.GetRequiredService<AutomationConfig>()))
             .AddSingleton(sp => {
                 var cfg = sp.GetRequiredService<AutomationConfig>();
-                return new FhirDataLoader(cfg.ExternalFhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
+                return new FhirDataLoader(cfg.FhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
             })
             .AddSingleton<PipelineDataReader>();
 

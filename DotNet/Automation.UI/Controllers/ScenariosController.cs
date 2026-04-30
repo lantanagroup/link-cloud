@@ -158,7 +158,7 @@ public class ScenariosController(
                     return BadRequest("PatientId is required for ExistingId source.");
 
                 var cfg = automationConfig.Value;
-                var loader = new FhirDataLoader(cfg.ExternalFhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
+                var loader = new FhirDataLoader(cfg.FhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
                 bundleJson = await loader.FetchPatientEverythingAsync(request.PatientId.Trim(), ct);
             }
             else
