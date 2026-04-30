@@ -343,23 +343,4 @@ public class ResourcesAcquiredListener : BackgroundService
 
         return correlationId;
     }
-
-    private DomainResource DeserializeStringToResource(string json)
-    {
-        return JsonSerializer.Deserialize<DomainResource>(json, LinkFhirSerializerOptions.ForFhirLenientSerialization);
-    }
-
-    private DomainResource DeserializeResource(object resource)
-    {
-
-        switch (resource)
-        {
-            case JsonElement:
-                return DeserializeStringToResource(resource.ToString());
-            case string:
-                return DeserializeStringToResource((string)resource);
-            default:
-                throw new DeserializationUnsupportedTypeException();
-        }
-    }
 }

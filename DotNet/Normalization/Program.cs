@@ -75,7 +75,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
-    //builder.Services.AddSingleton<IResourceCache, ABSResourceCache>();
     builder.Services.AddSingleton<ABSResourceCache>();
 
     builder.Services.AddRedisCache(options =>
