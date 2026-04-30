@@ -1,4 +1,4 @@
-﻿using Flurl.Http;
+using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -93,6 +93,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         int pageNumber = 1,
         string sortBy = "Id",
         string sortOrder = "Ascending",
+        string? searchTerm = null,
         CancellationToken cancellationToken = default) =>
         Request("data/acquisition-logs")
             .SetQueryParam("facilityId", facilityId)
@@ -101,6 +102,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
             .SetQueryParam("pageNumber", pageNumber)
             .SetQueryParam("sortBy", sortBy)
             .SetQueryParam("sortOrder", sortOrder)
+            .SetQueryParam("searchTerm", string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm)
             .GetJsonAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(cancellationToken: cancellationToken);
 
     public Task<DataAcquisitionLogApiModel?> GetAcquisitionLogByIdAsync(

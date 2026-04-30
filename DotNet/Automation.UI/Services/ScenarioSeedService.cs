@@ -77,7 +77,6 @@ public sealed class ScenarioSeedService : IHostedService
             PatientCount = 1,
             ResourcesPerPatientMin = 1000,
             ResourcesPerPatientMax = 1000,
-            PatientPrefix = "AdhocPatient",
             PatientCohorts =
             [
                 new PatientCohortDefinition
@@ -98,7 +97,7 @@ public sealed class ScenarioSeedService : IHostedService
         {
             Id = MultiPatientId,
             Name = "Multi Patient Test",
-            Description = "Volume test with 150 patients, 25–50 resources each. Mirrors the MultiPatientTest backend E2E test.",
+            Description = "Volume test with 150 patients, 25â€“50 resources each. Mirrors the MultiPatientTest backend E2E test.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
@@ -106,7 +105,6 @@ public sealed class ScenarioSeedService : IHostedService
             PatientCount = 150,
             ResourcesPerPatientMin = 25,
             ResourcesPerPatientMax = 50,
-            PatientPrefix = "MultiPatient",
             PatientCohorts =
             [
                 new PatientCohortDefinition
@@ -135,7 +133,6 @@ public sealed class ScenarioSeedService : IHostedService
             PatientCount = FhirBundleGenerator.DefaultPatientCount,
             ResourcesPerPatientMin = FhirBundleGenerator.DefaultResourcesPerPatient,
             ResourcesPerPatientMax = FhirBundleGenerator.DefaultResourcesPerPatient,
-            PatientPrefix = "MegaPatient",
             PatientCohorts =
             [
                 new PatientCohortDefinition
@@ -156,7 +153,7 @@ public sealed class ScenarioSeedService : IHostedService
         {
             Id = MegaMultiPatientId,
             Name = "Mega Multi Patient Test",
-            Description = "Hybrid stress + volume test: one mega patient with ~5,000 resources plus 149 patients with 25–50 resources each.",
+            Description = "Hybrid stress + volume test: one mega patient with ~5,000 resources plus 149 patients with 25â€“50 resources each.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
@@ -164,7 +161,6 @@ public sealed class ScenarioSeedService : IHostedService
             PatientCount = 150,
             ResourcesPerPatientMin = 25,
             ResourcesPerPatientMax = 5000,
-            PatientPrefix = "MegaMultiPatient",
             PatientCohorts =
             [
                 new PatientCohortDefinition
@@ -201,7 +197,6 @@ public sealed class ScenarioSeedService : IHostedService
             PatientCount = 1,
             ResourcesPerPatientMin = 1000,
             ResourcesPerPatientMax = 1000,
-            PatientPrefix = "ScheduledPatient",
             PatientCohorts =
             [
                 new PatientCohortDefinition
@@ -213,12 +208,11 @@ public sealed class ScenarioSeedService : IHostedService
                     ResourcesPerPatientMax = 1000
                 }
             ],
-            DischargeCount = 1,
             CleanupServiceData = false,
             CleanupFhirData = true,
         },
 
-        // --- Regenerate Report Test (regenerate, 1 patient, 100 resources) ---
+        // --- Regenerate Report Test
         new TestScenarioDefinition
         {
             Id = RegenerateReportId,
@@ -231,7 +225,6 @@ public sealed class ScenarioSeedService : IHostedService
             PatientCount = 1,
             ResourcesPerPatientMin = 100,
             ResourcesPerPatientMax = 100,
-            PatientPrefix = "RegenPatient",
             PatientCohorts =
             [
                 new PatientCohortDefinition
@@ -264,7 +257,6 @@ public sealed class ScenarioSeedService : IHostedService
             PatientCount = 2,
             ResourcesPerPatientMin = 250,
             ResourcesPerPatientMax = 250,
-            PatientPrefix = "MultiMeasurePatient",
             PatientCohorts =
             [
                 // Cohort 1: qualifies for both ACH and Hypo (inpatient + diabetic med)

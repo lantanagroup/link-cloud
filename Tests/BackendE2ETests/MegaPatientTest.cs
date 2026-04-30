@@ -57,7 +57,6 @@ public sealed class MegaPatientTest : IAsyncLifetime, IClassFixture<BackendE2ETe
             measures,
             profiles,
             totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
-            patientIdPrefix: "MegaPatient",
             generationSeed: GenerationSeed,
             acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
             {

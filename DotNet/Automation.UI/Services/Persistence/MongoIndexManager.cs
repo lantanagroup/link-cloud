@@ -33,6 +33,7 @@ public sealed class MongoIndexManager
         EnsureRunIndexes();
         EnsureSnapshotIndexes();
         EnsureScenarioIndexes();
+        EnsureImportedBundleIndexes();
         EnsureQueryPlanTemplateIndexes();
     }
 
@@ -104,6 +105,25 @@ public sealed class MongoIndexManager
 
         // Sort index for GetAllAsync (ORDER BY Name ASC).
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+    }
+
+    // --- automation_imported_bundles ---
+
+    private void EnsureImportedBundleIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("automation_imported_bundles");
+
+        // Unique index on the SHA-256 ContentHash powers the cross-scenario "find or
+        // insert" upsert in MongoScenarioStore.ResolveOrInsertBundleRefsAsync &mdash;
+        // it guarantees identical bundle JSON resolves to a single document even
+        // under concurrent saves. CreateIndexSafe gracefully handles Cosmos DB's
+        // restriction on modifying unique indexes after collection creation.
+        CreateIndexSafe(collection, new BsonDocument { { "ContentHash", 1 } }, unique: true, "idx_contentHash_unique");
+
+        // Multikey index on ScenarioIds backs the orphan-prune path
+        // (DetachAndPruneOrphansAsync): "find every bundle that references this scenario"
+        // would otherwise scan the entire collection on every save and delete.
+        CreateIndexSafe(collection, new BsonDocument { { "ScenarioIds", 1 } }, unique: false, "idx_scenarioIds");
     }
 
     // --- automation_query_plan_templates ---

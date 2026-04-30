@@ -225,4 +225,264 @@ public class CqlFilterSimulatorTests
         Assert.Contains("Condition/P-Condition-001", excluded);
         Assert.DoesNotContain("Observation/o-lab", excluded);
     }
+
+    // ---------- Procedure profile (ACH only) ----------
+
+    private static CqlFilterSimulator.PatientCqlInput InputWithProcedures(params CqlFilterSimulator.ProcedureContext[] procedures)
+        => new(
+            PatientId: "P1",
+            EncounterId: "E1",
+            EncounterStart: EncStart,
+            EncounterEnd: EncEnd,
+            Conditions: Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Observations: Array.Empty<CqlFilterSimulator.ObservationContext>())
+        { Procedures = procedures };
+
+    [Fact]
+    public void Ach_Procedure_PerformedOverlapsEncounter_IsKept()
+    {
+        var proc = new CqlFilterSimulator.ProcedureContext("P-001", EncStart.AddHours(1), EncStart.AddHours(2), $"Encounter/E1");
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[] { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation },
+            InputWithProcedures(proc));
+
+        Assert.DoesNotContain("Procedure/P-001", excluded);
+    }
+
+    [Fact]
+    public void Ach_Procedure_PerformedOutsideEncounter_IsExcluded()
+    {
+        var proc = new CqlFilterSimulator.ProcedureContext("P-002", EncEnd.AddDays(2), EncEnd.AddDays(2).AddHours(1), $"Encounter/E1");
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[] { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation },
+            InputWithProcedures(proc));
+
+        Assert.Contains("Procedure/P-002", excluded);
+    }
+
+    [Fact]
+    public void Hypoglycemic_Procedure_HasNoSdeRetrieve_DoesNotApply()
+    {
+        // Hypoglycemic doesn't retrieve Procedure via SDE. Per the per-type intersection
+        // rule, when no profile applies to a resource type, no exclusion is contributed
+        // (an empty bucket means the inner loop skips it).
+        var proc = new CqlFilterSimulator.ProcedureContext("P-003", EncEnd.AddDays(2), EncEnd.AddDays(2).AddHours(1), $"Encounter/E1");
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[] { ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation },
+            InputWithProcedures(proc));
+
+        Assert.DoesNotContain("Procedure/P-003", excluded);
+    }
+
+    // ---------- MedicationRequest profile (ACH + Hypo) ----------
+
+    private static CqlFilterSimulator.PatientCqlInput InputWithMedicationRequests(params CqlFilterSimulator.MedicationRequestContext[] medReqs)
+        => new(
+            PatientId: "P1",
+            EncounterId: "E1",
+            EncounterStart: EncStart,
+            EncounterEnd: EncEnd,
+            Conditions: Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Observations: Array.Empty<CqlFilterSimulator.ObservationContext>())
+        { MedicationRequests = medReqs };
+
+    [Theory]
+    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)]
+    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)]
+    [InlineData(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)]
+    public void MedicationRequest_AuthoredDuringEncounter_IsKept(ProfiledMeasureType measure)
+    {
+        var mr = new CqlFilterSimulator.MedicationRequestContext("MR-001", EncStart.AddHours(2), $"Encounter/E1");
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(new[] { measure }, InputWithMedicationRequests(mr));
+
+        Assert.DoesNotContain("MedicationRequest/MR-001", excluded);
+    }
+
+    [Theory]
+    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)]
+    [InlineData(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)]
+    public void MedicationRequest_AuthoredOutsideEncounter_IsExcluded(ProfiledMeasureType measure)
+    {
+        var mr = new CqlFilterSimulator.MedicationRequestContext("MR-002", EncEnd.AddDays(5), $"Encounter/E1");
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(new[] { measure }, InputWithMedicationRequests(mr));
+
+        Assert.Contains("MedicationRequest/MR-002", excluded);
+    }
+
+    // ---------- MedicationAdministration profile (Hypo only) ----------
+
+    [Fact]
+    public void Hypoglycemic_MedicationAdministration_EffectiveOverlapsEncounter_IsKept()
+    {
+        var ma = new CqlFilterSimulator.MedicationAdministrationContext("MA-001", EncStart.AddHours(2), EncStart.AddHours(3), "Encounter/E1");
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            "P1", "E1", EncStart, EncEnd,
+            Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Array.Empty<CqlFilterSimulator.ObservationContext>())
+        { MedicationAdministrations = new[] { ma } };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[] { ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation }, input);
+
+        Assert.DoesNotContain("MedicationAdministration/MA-001", excluded);
+    }
+
+    [Fact]
+    public void Hypoglycemic_MedicationAdministration_EffectiveOutsideEncounter_IsExcluded()
+    {
+        var ma = new CqlFilterSimulator.MedicationAdministrationContext("MA-002", EncEnd.AddDays(2), EncEnd.AddDays(2).AddHours(1), "Encounter/E1");
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            "P1", "E1", EncStart, EncEnd,
+            Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Array.Empty<CqlFilterSimulator.ObservationContext>())
+        { MedicationAdministrations = new[] { ma } };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[] { ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation }, input);
+
+        Assert.Contains("MedicationAdministration/MA-002", excluded);
+    }
+
+    [Fact]
+    public void Ach_MedicationAdministration_HasNoSdeRetrieve_DoesNotApply()
+    {
+        var ma = new CqlFilterSimulator.MedicationAdministrationContext("MA-003", EncEnd.AddDays(2), EncEnd.AddDays(2).AddHours(1), "Encounter/E1");
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            "P1", "E1", EncStart, EncEnd,
+            Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Array.Empty<CqlFilterSimulator.ObservationContext>())
+        { MedicationAdministrations = new[] { ma } };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[] { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation }, input);
+
+        Assert.DoesNotContain("MedicationAdministration/MA-003", excluded);
+    }
+
+    // ---------- Coverage profile ----------
+
+    [Theory]
+    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)]
+    [InlineData(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)]
+    public void Coverage_PeriodOverlapsEncounter_IsKept(ProfiledMeasureType measure)
+    {
+        // Coverage spans both before and after the encounter — clearly overlaps.
+        var cov = new CqlFilterSimulator.CoverageContext("COV-001", EncStart.AddDays(-30), EncEnd.AddDays(180));
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            "P1", "E1", EncStart, EncEnd,
+            Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Array.Empty<CqlFilterSimulator.ObservationContext>())
+        { Coverages = new[] { cov } };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(new[] { measure }, input);
+
+        Assert.DoesNotContain("Coverage/COV-001", excluded);
+    }
+
+    [Theory]
+    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)]
+    [InlineData(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)]
+    public void Coverage_PeriodEntirelyBeforeEncounter_IsExcluded(ProfiledMeasureType measure)
+    {
+        var cov = new CqlFilterSimulator.CoverageContext("COV-002", EncStart.AddYears(-2), EncStart.AddYears(-1));
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            "P1", "E1", EncStart, EncEnd,
+            Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Array.Empty<CqlFilterSimulator.ObservationContext>())
+        { Coverages = new[] { cov } };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(new[] { measure }, input);
+
+        Assert.Contains("Coverage/COV-002", excluded);
+    }
+
+    [Theory]
+    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)]
+    [InlineData(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)]
+    public void Coverage_OpenEndedAfterEncounterStart_IsKept(ProfiledMeasureType measure)
+    {
+        // CQL semantics for Hypoglycemic explicitly handle null period.end as "still active".
+        // Our overlap check honors it via the extractor clamping null end to MaxValue.
+        var cov = new CqlFilterSimulator.CoverageContext("COV-003", EncStart.AddDays(-30), DateTime.MaxValue);
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            "P1", "E1", EncStart, EncEnd,
+            Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Array.Empty<CqlFilterSimulator.ObservationContext>())
+        { Coverages = new[] { cov } };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(new[] { measure }, input);
+
+        Assert.DoesNotContain("Coverage/COV-003", excluded);
+    }
+
+    // ---------- ServiceRequest profile ----------
+
+    [Theory]
+    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)]
+    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)]
+    [InlineData(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)]
+    public void ServiceRequest_AuthoredDuringEncounter_IsKept(ProfiledMeasureType measure)
+    {
+        var sr = new CqlFilterSimulator.ServiceRequestContext("SR-001", EncStart.AddHours(3), $"Encounter/E1");
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            "P1", "E1", EncStart, EncEnd,
+            Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Array.Empty<CqlFilterSimulator.ObservationContext>())
+        { ServiceRequests = new[] { sr } };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(new[] { measure }, input);
+
+        Assert.DoesNotContain("ServiceRequest/SR-001", excluded);
+    }
+
+    [Theory]
+    [InlineData(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)]
+    [InlineData(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)]
+    public void ServiceRequest_AuthoredOutsideEncounter_IsExcluded(ProfiledMeasureType measure)
+    {
+        var sr = new CqlFilterSimulator.ServiceRequestContext("SR-002", EncEnd.AddDays(7), $"Encounter/E1");
+
+        var input = new CqlFilterSimulator.PatientCqlInput(
+            "P1", "E1", EncStart, EncEnd,
+            Array.Empty<CqlFilterSimulator.ConditionContext>(),
+            Array.Empty<CqlFilterSimulator.ObservationContext>())
+        { ServiceRequests = new[] { sr } };
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(new[] { measure }, input);
+
+        Assert.Contains("ServiceRequest/SR-002", excluded);
+    }
+
+    // ---------- Multi-measure intersection across new types ----------
+
+    [Fact]
+    public void MedicationRequest_OutsideEncounter_BothMeasuresExclude_StillExcluded()
+    {
+        // Both ACH and Hypoglycemic apply the same predicate (authoredOn during IP). Both
+        // exclude an out-of-window MedicationRequest, so the intersection (which keeps a key
+        // only if every applicable profile excludes it) keeps it excluded.
+        var mr = new CqlFilterSimulator.MedicationRequestContext("MR-multi-out", EncEnd.AddDays(10), $"Encounter/E1");
+
+        var excluded = CqlFilterSimulator.ComputeFilteredKeys(
+            new[]
+            {
+                ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
+                ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
+            },
+            InputWithMedicationRequests(mr));
+
+        Assert.Contains("MedicationRequest/MR-multi-out", excluded);
+    }
 }

@@ -20,6 +20,14 @@ public class LogSearchParameters : GenericLogSearchParameters
     public AcquisitionPriority? Priority { get; set; }
     public string? ResourceType { get; set; }
     public DateTime? CreatedBefore { get; set; }
+
+    /// <summary>
+    /// Free-text term applied as a case-insensitive substring match against the most
+    /// commonly searched columns (PatientId, ResourceType names) plus an exact match
+    /// against Id when the term parses as a numeric id. Combined with the structured
+    /// filters via AND — within the term itself, the column predicates are OR’d.
+    /// </summary>
+    public string? SearchTerm { get; set; }
 }
 
 public class SftpLogSearchParameters : GenericLogSearchParameters

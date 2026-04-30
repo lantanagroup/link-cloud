@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.Automation.Link;
+using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Automation.Link.Services;
@@ -67,7 +67,7 @@ public sealed class BackendE2ETestFixture : IDisposable
         builder.Services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<IAutomationOutput>(), sp.GetRequiredService<AutomationConfig>()));
         builder.Services.AddSingleton(sp => {
             var cfg = sp.GetRequiredService<AutomationConfig>();
-            return new FhirDataLoader(cfg.ExternalFhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
+            return new FhirDataLoader(cfg.FhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
         });
         builder.Services.AddSingleton<PipelineDataReader>();
 

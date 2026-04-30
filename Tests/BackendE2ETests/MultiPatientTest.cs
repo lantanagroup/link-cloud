@@ -63,7 +63,6 @@ public sealed class MultiPatientTest : IAsyncLifetime, IClassFixture<BackendE2ET
             measures,
             profiles,
             totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
-            patientIdPrefix: "MultiPatient",
             generationSeed: GenerationSeed,
             acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
             {

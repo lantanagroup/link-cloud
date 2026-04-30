@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Application.Models;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
@@ -101,6 +101,7 @@ public class LogController : Controller
                 patientId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.PatientId);
                 reportId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ReportId);
                 resourceId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ResourceId);
+                var searchTerm = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.SearchTerm);
 
                 var result = await _logQueries.SearchQueryLogSummaryAsync(
                     new SearchDataAcquisitionLogRequest
@@ -119,7 +120,8 @@ public class LogController : Controller
                         SortBy = queryParameters.SortBy,
                         SortOrder = queryParameters.SortOrder,
                         IncludeDeleted = queryParameters.IncludeDeleted,
-                        CreatedBefore = queryParameters.CreatedBefore
+                        CreatedBefore = queryParameters.CreatedBefore,
+                        SearchTerm = string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm
                     }, cancellationToken);
 
                 return Ok(result);

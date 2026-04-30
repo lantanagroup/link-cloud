@@ -1,4 +1,4 @@
-﻿{
+{
   "$schema": "http://json.schemastore.org/launchsettings.json",
   "profiles": {
     "http": {
@@ -37,7 +37,8 @@
         "ServiceRegistry__MeasureServiceUrl": "http://localhost:8067",
         "ServiceRegistry__ValidationServiceUrl": "http://localhost:8075",
         "ServiceRegistry__SubmissionServiceUrl": "http://localhost:8073",
-        "Automation__ExternalFhirServerBase": "http://localhost:6157/fhir",
+        "Automation__FhirServerBase": "http://localhost:6157/fhir",
+        "Automation__FacilityFhirServerBase": "http://fhir-server:8080/fhir",
         "Automation__AdminBffBase": "http://localhost:8063/api",
         "Automation__LokiBaseUrl": "http://localhost:3100",
         "Automation__Database__Server": "localhost,1433",
