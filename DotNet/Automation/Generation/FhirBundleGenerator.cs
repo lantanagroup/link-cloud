@@ -22,7 +22,7 @@ public static class FhirBundleGenerator
     private const int MaxEntriesPerBundle = 500;
 
     // Legacy shared infrastructure IDs - kept for backward compatibility / reference.
-    // New runs should use SharedIds derived from the patient prefix.
+    // New runs should use SharedIds, which derives all IDs from a per-run RunTag.
     public const string HospitalLocationId = "Gen-Location-Hospital";
     public const string IcuLocationId = "Gen-Location-ICU";
     public const string EdLocationId = "Gen-Location-ED";
@@ -38,42 +38,39 @@ public static class FhirBundleGenerator
     public const string HypoInsulinGlargineMedicationId = "Gen-Medication-HypoInsulinGlargine";
 
     /// <summary>
-    /// Prefix-scoped shared infrastructure IDs. A short GUID tag ensures concurrent
+    /// Run-scoped shared infrastructure IDs. A short GUID tag (RunTag) ensures concurrent
     /// test runs against the same FHIR server don't conflict on infrastructure resources.
     /// </summary>
-    public sealed record SharedIds(string Prefix)
+    public sealed record SharedIds()
     {
         /// <summary>Short unique tag for this generation run (8 hex chars from a GUID).</summary>
         public string RunTag { get; } = Guid.NewGuid().ToString("N")[..8];
 
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<int, string> _patientIds = new();
-
-        public string HospitalLocation => $"{Prefix}-{RunTag}-Loc-Hospital";
-        public string IcuLocation => $"{Prefix}-{RunTag}-Loc-ICU";
-        public string EdLocation => $"{Prefix}-{RunTag}-Loc-ED";
-        public string StepDownLocation => $"{Prefix}-{RunTag}-Loc-StepDown";
-        public string OutpatientLocation => $"{Prefix}-{RunTag}-Loc-Outpatient";
-        public string Organization => $"{Prefix}-{RunTag}-Org-Hospital";
-        public string HypoInsulinGlargineMedication => $"{Prefix}-{RunTag}-Med-HypoInsulinGlargine";
-        public string DevicePulseOx => $"{Prefix}-{RunTag}-Dev-PulseOx";
-        public string DeviceVentilator => $"{Prefix}-{RunTag}-Dev-Ventilator";
-        public string DeviceCPAP => $"{Prefix}-{RunTag}-Dev-CPAP";
-        public string MedicationId(int index) => $"{Prefix}-{RunTag}-Med-{index + 1:D3}";
+        public string HospitalLocation => $"{RunTag}-Loc-Hospital";
+        public string IcuLocation => $"{RunTag}-Loc-ICU";
+        public string EdLocation => $"{RunTag}-Loc-ED";
+        public string StepDownLocation => $"{RunTag}-Loc-StepDown";
+        public string OutpatientLocation => $"{RunTag}-Loc-Outpatient";
+        public string Organization => $"{RunTag}-Org-Hospital";
+        public string HypoInsulinGlargineMedication => $"{RunTag}-Med-HypoInsulinGlargine";
+        public string DevicePulseOx => $"{RunTag}-Dev-PulseOx";
+        public string DeviceVentilator => $"{RunTag}-Dev-Ventilator";
+        public string DeviceCPAP => $"{RunTag}-Dev-CPAP";
+        public string MedicationId(int index) => $"{RunTag}-Med-{index + 1:D3}";
 
         /// <summary>
-        /// Returns a stable unique patient ID for the given index.
-        /// The GUID component is generated once per index and cached.
+        /// Returns a stable unique patient ID for the given index. RunTag scopes the run,
+        /// the ordinal segment is the patient index.
         /// </summary>
-        public string PatientId(int index) =>
-            _patientIds.GetOrAdd(index, i => $"{Prefix}-{i + 1:D3}-{Guid.NewGuid().ToString("N")[..8]}");
+        public string PatientId(int index) => $"Patient-{RunTag}-{index + 1:D3}";
 
         /// <summary>Generate a unique practitioner ID scoped to this run.</summary>
-        public string PractitionerId(int index) => $"{Prefix}-{RunTag}-Pract-{index + 1:D3}";
+        public string PractitionerId(int index) => $"{RunTag}-Pract-{index + 1:D3}";
     }
 
     /// <summary>
     /// Abbreviates a FHIR resource type name for use in generated resource IDs.
-    /// Keeps IDs under the FHIR 64-character limit even with longer patient ID prefixes.
+    /// Keeps IDs under the FHIR 64-character limit.
     /// </summary>
     internal static string AbbreviateResourceType(string resourceType) => resourceType switch
     {
@@ -93,7 +90,6 @@ public static class FhirBundleGenerator
         IAutomationOutput output,
         int patientCount = DefaultPatientCount,
         int totalResourcesPerPatient = DefaultResourcesPerPatient,
-        string patientIdPrefix = "MegaPatient",
         int? generationSeed = null,
         FhirGenerationConfig? config = null,
         DateTime? clinicalPeriodStart = null,
@@ -102,7 +98,7 @@ public static class FhirBundleGenerator
         var patientIds = new List<string>();
         var allEntries = new List<(string PatientId, List<Bundle.EntryComponent> Entries)>();
         var baseSeed = generationSeed.GetValueOrDefault();
-        var ids = new SharedIds(patientIdPrefix);
+        var ids = new SharedIds();
 
         output.WriteLine($"Generating {patientCount} patients with ~{totalResourcesPerPatient} resources each..." +
                          (generationSeed.HasValue ? $" (seed={generationSeed.Value})" : string.Empty));
@@ -140,7 +136,7 @@ public static class FhirBundleGenerator
 
             ScenarioResourceGeneration.AddPatientCoreAndScenarioResources(
                 entries, patientId, patientSeed, p, baseSeed, totalResourcesPerPatient,
-                patientIdPrefix, encStart, encEnd, scenario, anchors, encounter,
+                encStart, encEnd, scenario, anchors, encounter,
                 sharedPractitionerIds, sharedMedicationIds, config, ids);
 
             output.WriteLine($"  Patient {patientId}: {entries.Count} entries | scenario={scenario.PrimaryDxDisplay} | " +

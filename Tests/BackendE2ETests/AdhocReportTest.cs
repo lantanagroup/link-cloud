@@ -59,7 +59,6 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
             measures,
             profiles,
             totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
-            patientIdPrefix: "AdhocPatient",
             generationSeed: GenerationSeed,
             acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
             {

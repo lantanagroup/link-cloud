@@ -1,20 +1,14 @@
 using Automation.UI.Models;
+using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
-using LantanaGroup.Link.Automation.Link.Services;
-using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
-using LantanaGroup.Link.Sdk.DependencyInjection;
-using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
-using System.Text.Json;
 
 namespace Automation.UI.Services;
 
@@ -26,7 +20,9 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly IServiceProvider _hostServices;
     private readonly RunSnapshotOrchestrator _orchestrator;
     private readonly ISnapshotStore _snapshotStore;
-    private readonly IQueryPlanTemplateStore _queryPlanTemplateStore;
+    private readonly QueryPlanTemplateResolver _queryPlanResolver;
+    private readonly DashboardStatsAggregator _dashboardAggregator;
+    private readonly RunExecutor _runExecutor;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
 
     public AutomationRunManager(
@@ -44,13 +40,21 @@ public class AutomationRunManager : IAutomationRunManager
         _hostServices = hostServices;
         _orchestrator = orchestrator;
         _snapshotStore = snapshotStore;
-        _queryPlanTemplateStore = queryPlanTemplateStore;
+        _queryPlanResolver = new QueryPlanTemplateResolver(queryPlanTemplateStore);
+        _dashboardAggregator = new DashboardStatsAggregator(snapshotStore);
+        _runExecutor = new RunExecutor(
+            _automationConfig,
+            _hostServices,
+            _snapshotStore,
+            _orchestrator,
+            _queryPlanResolver,
+            _logger);
     }
 
     public Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
     {
         var runId = Guid.NewGuid();
-        var options = ResolveRunOptions(request);
+        var options = StartScenarioRequestResolver.Resolve(request);
 
         var runNameOverride = string.IsNullOrWhiteSpace(request.ScenarioName) ? null : request.ScenarioName.Trim();
         var state = new MutableRunState(runId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
@@ -62,7 +66,13 @@ public class AutomationRunManager : IAutomationRunManager
         {
             try
             {
-                await ExecuteAsync(state, state.RunCancellation.Token);
+                var output = new RunAutomationOutput(message => WriteLog(state, message));
+                var callbacks = new RunExecutor.ExecutorCallbacks(
+                    Output: output,
+                    BroadcastStatus: () => BroadcastStatus(state),
+                    PersistRunSummary: () => PersistRunSummaryAsync(state));
+
+                await _runExecutor.ExecuteAsync(state, callbacks, state.RunCancellation.Token);
             }
             catch (OperationCanceledException) when (state.CancelRequested)
             {
@@ -89,7 +99,7 @@ public class AutomationRunManager : IAutomationRunManager
 
     public async Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default)
     {
-        // ── Path 1: zombie run (exists in the store but no in-memory state) ────────
+        // â”€â”€ Path 1: zombie run (exists in the store but no in-memory state) â”€â”€â”€â”€â”€â”€â”€â”€
         // _runs is lost on every app restart, so any run that was Running when the
         // previous process died is a zombie: still flagged Running in Mongo, but
         // with no execution task to signal. Returning false here was the reason the
@@ -100,10 +110,10 @@ public class AutomationRunManager : IAutomationRunManager
         if (state.Status is not AutomationRunStatus.Queued and not AutomationRunStatus.Running)
             return false;
 
-        // ── Path 2: live in-process run ────────────────────────────────────────────
+        // â”€â”€ Path 2: live in-process run â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // Flip the in-memory state, broadcast, persist. BroadcastStatus calls
         // PersistRunSummaryAsync internally, so the row is marked Cancelled in Mongo
-        // before we return — the UI will see the updated status on its next refresh
+        // before we return â€” the UI will see the updated status on its next refresh
         // regardless of how long cleanup takes.
         state.CancelRequested = true;
         state.Status = AutomationRunStatus.Cancelled;
@@ -185,7 +195,7 @@ public class AutomationRunManager : IAutomationRunManager
             var normalizationClient = scope.ServiceProvider.GetRequiredService<INormalizationServiceClient>();
             var queryDispatchClient = scope.ServiceProvider.GetRequiredService<IQueryDispatchServiceClient>();
             var fhirDataLoader = state.FhirDataLoader
-                ?? new FhirDataLoader(_automationConfig.ExternalFhirServerBase, _automationConfig.FhirServerOAuth, _automationConfig.FhirServerBasicAuth);
+                ?? new FhirDataLoader(_automationConfig.FhirServerBase, _automationConfig.FhirServerOAuth, _automationConfig.FhirServerBasicAuth);
 
             await RunCleanupHelper.CleanupCancelledRunAsync(
                 facilityClient,
@@ -282,7 +292,7 @@ public class AutomationRunManager : IAutomationRunManager
 
     public async Task<PipelineSummarySnapshotBuilder.PipelineSummarySnapshot?> GetPipelineSnapshotAsync(Guid runId, CancellationToken cancellationToken = default)
     {
-        // Always read from Mongo — the poller writes domain data there,
+        // Always read from Mongo â€” the poller writes domain data there,
         // and logs are persisted as they're written. One data flow, no branching.
         var summary = await _snapshotStore.GetRunSummaryAsync(runId, cancellationToken);
 
@@ -387,717 +397,13 @@ public class AutomationRunManager : IAutomationRunManager
         return await SafeGetDomainAsync<AbsUploadSnapshot>(runId, "absUpload", cancellationToken);
     }
 
-    public async Task<RunDashboardStats> GetDashboardStatsAsync(CancellationToken cancellationToken = default)
+    public Task<RunDashboardStats> GetDashboardStatsAsync(CancellationToken cancellationToken = default)
     {
-        var since = DateTimeOffset.UtcNow.AddDays(-14);
-        var allRuns = await _snapshotStore.GetAllRunSummariesAsync(since, cancellationToken);
-
-        // Merge in-memory active runs that may not yet be persisted
+        // Snapshot live in-memory runs so the aggregator can merge any that
+        // haven't yet been persisted (brand-new runs round-trip through Mongo
+        // on the next BroadcastStatus tick).
         var inMemory = _runs.Values.Select(ToSummary).ToList();
-        var persistedRunIds = new HashSet<Guid>(allRuns.Select(r => r.RunId));
-        var merged = allRuns
-            .Concat(inMemory.Where(m => !persistedRunIds.Contains(m.RunId)))
-            .ToList();
-
-        var stats = new RunDashboardStats
-        {
-            TotalRuns = merged.Count,
-            Succeeded = merged.Count(r => r.Status == AutomationRunStatus.Succeeded),
-            Failed = merged.Count(r => r.Status == AutomationRunStatus.Failed),
-            Cancelled = merged.Count(r => r.Status == AutomationRunStatus.Cancelled),
-            Running = merged.Count(r => r.Status == AutomationRunStatus.Running),
-            Queued = merged.Count(r => r.Status == AutomationRunStatus.Queued),
-        };
-
-        var completedWithDuration = merged
-            .Where(r => r.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed && r.FinishedAt.HasValue)
-            .Select(r => (r.FinishedAt!.Value - r.CreatedAt).TotalSeconds)
-            .Where(d => d > 0)
-            .ToList();
-
-        stats.AvgDurationSeconds = completedWithDuration.Count > 0
-            ? Math.Round(completedWithDuration.Average(), 1)
-            : 0;
-
-        // Last 14 days histogram
-        var cutoff = DateTimeOffset.UtcNow.AddDays(-13).Date;
-        for (var d = cutoff; d <= DateTime.UtcNow.Date; d = d.AddDays(1))
-            stats.RunsPerDay[d.ToString("yyyy-MM-dd")] = new RunDayBucket();
-
-        foreach (var run in merged.Where(r => r.CreatedAt.Date >= cutoff))
-        {
-            var key = run.CreatedAt.Date.ToString("yyyy-MM-dd");
-            if (!stats.RunsPerDay.TryGetValue(key, out var bucket))
-            {
-                bucket = new RunDayBucket();
-                stats.RunsPerDay[key] = bucket;
-            }
-
-            switch (run.Status)
-            {
-                case AutomationRunStatus.Succeeded: bucket.Succeeded++; break;
-                case AutomationRunStatus.Failed: bucket.Failed++; break;
-                case AutomationRunStatus.Cancelled: bucket.Cancelled++; break;
-                default: bucket.Other++; break;
-            }
-        }
-
-        return stats;
-    }
-
-    private async Task ExecuteAsync(MutableRunState state, CancellationToken cancellationToken)
-    {
-        state.Status = AutomationRunStatus.Running;
-        state.StartedAt = DateTimeOffset.UtcNow;
-        await BroadcastStatus(state);
-
-        var output = new RunAutomationOutput(message => WriteLog(state, message));
-
-        try
-        {
-            var scenarioConfig = BuildScenarioConfig(state.Scenario, state.Options);
-
-            using var services = BuildRunServiceProvider(output);
-
-            var lokiScraper = services.GetRequiredService<LokiScraper>();
-            var fhirDataLoader = services.GetRequiredService<FhirDataLoader>();
-            state.FhirDataLoader = fhirDataLoader;
-            var measureEvalClient = services.GetRequiredService<IMeasureEvalServiceClient>();
-            var sdkValidationClient = services.GetRequiredService<IValidationServiceClient>();
-
-            var reportHelper = services.GetRequiredService<ReportApiHelper>();
-
-            var validationHelper = services.GetRequiredService<ValidationApiHelper>();
-            var reportValidator = services.GetRequiredService<ReportDatabaseValidator>();
-            var reportAbsValidator = services.GetRequiredService<ReportAbsManifestValidator>();
-            var dataAcqValidator = services.GetRequiredService<DataAcquisitionDatabaseValidator>();
-            var normalizationValidator = services.GetRequiredService<NormalizationDatabaseValidator>();
-            var tenantValidator = services.GetRequiredService<TenantDatabaseValidator>();
-            var validationResultsValidator = services.GetRequiredService<ValidationResultsValidator>();
-            var pipelineSnapshot = services.GetRequiredService<PipelineSnapshot>();
-
-            output.WriteLine($"Starting {state.Scenario} run: {state.RunId}");
-            output.WriteLine($"Measure context: {string.Join(", ", state.Options.SelectedMeasures.Select(m => $"{ProfiledMeasureCatalog.GetDisplayName(m)} ({m})"))}");
-            output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, prefix={state.Options.Prefix}, seed={state.Options.Seed}");
-
-            List<string> patientIds;
-            List<string> expectedSubmittedPatientIds;
-            GenerationManifest? generationManifest = null;
-
-            // Use the first measure for generation context (profile-driven generation picks
-            // the most restrictive measure — patients qualifying for all measures must meet
-            // the criteria of each). For multi-measure, the pipeline handles the union.
-            var primaryMeasure = state.Options.SelectedMeasures[0];
-            var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
-
-            await fhirDataLoader.WaitForServerAsync(output);
-
-            if (state.Options.PatientProfiles is { Count: > 0 })
-            {
-                var profiles = state.Options.PatientProfiles;
-                var selectedMeasures = (IReadOnlyList<ProfiledMeasureType>)state.Options.SelectedMeasures;
-                var qualAllCount = profiles.Count(p => p.QualifiesForAll(selectedMeasures));
-                var nqAllCount = profiles.Count(p => p.QualifiesForNone(selectedMeasures));
-                var mixedCount = profiles.Count - qualAllCount - nqAllCount;
-                output.WriteLine($"Using measure-eligibility profiles: {qualAllCount} qualifying-all, {nqAllCount} non-qualifying-all, {mixedCount} mixed");
-
-                // Use the streaming pipeline: generate ? upload ? dispose per patient.
-                // The pipeline builds the manifest incrementally and runs acquisition
-                // simulation per-patient, so no serialized FHIR JSON is retained.
-                var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
-                    output,
-                    fhirDataLoader,
-                    selectedMeasures,
-                    profiles,
-                    state.Options.ResourcesPerPatient,
-                    state.Options.Prefix,
-                    state.Options.Seed,
-                    generationConfig,
-                    acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
-                    {
-                        QueryPlan = QueryPlanDefaults.GetDefaultAsInput(),
-                        ClinicalPeriodStart = scenarioConfig.StartDate,
-                        ClinicalPeriodEnd = scenarioConfig.EndDate
-                    });
-
-                patientIds = pipelineResult.PatientIds;
-                generationManifest = pipelineResult.Manifest;
-
-                expectedSubmittedPatientIds = patientIds
-                    .Where((_, idx) => idx < profiles.Count && profiles[idx].QualifiesForAny(selectedMeasures))
-                    .ToList();
-            }
-            else
-            {
-                var (genPatientIds, bundles) = FhirBundleGenerator.Generate(
-                    output, state.Options.PatientCount, state.Options.ResourcesPerPatient, state.Options.Prefix, state.Options.Seed,
-                    generationConfig);
-
-                patientIds = genPatientIds;
-                expectedSubmittedPatientIds = patientIds.ToList();
-
-                await fhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
-            }
-
-            if (scenarioConfig.PatientIds.Count == 0)
-                scenarioConfig.PatientIds = patientIds;
-
-            var expectedAllPatientIds = scenarioConfig.PatientIds;
-
-            await validationHelper.InitializeArtifactsAsync();
-            await validationHelper.InitializeCategoriesAsync();
-
-            var measureLoader = new MeasureLoader(measureEvalClient, sdkValidationClient, output, scenarioConfig);
-            await measureLoader.LoadAllAsync();
-            var measureIds = measureLoader.MeasureIds;
-            if (measureIds.Count == 0)
-                throw new InvalidOperationException("MeasureLoader did not produce any MeasureIds");
-            var measureId = measureIds[0];
-
-            var facilityId = state.RunId.ToString();
-            state.FacilityId = facilityId;
-
-            // Resolve the query plan template (null = use built-in defaults).
-            var queryPlanResolution = await ResolveQueryPlanAsync(state.Options.QueryPlanTemplateId);
-            var queryPlanInput = queryPlanResolution.Input;
-            if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
-                output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
-
-            // Finalize manifest metadata now that we have measure IDs and query plan.
-            if (generationManifest != null)
-            {
-                generationManifest.MeasureIds = measureIds;
-                var effectiveQueryPlanInput = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
-                generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlanInput);
-                generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlanInput);
-                generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
-
-                // Persist a lightweight manifest snapshot for the UI.
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), CancellationToken.None);
-            }
-
-            await FacilitySetupHelper.EnsureFacilityAsync(
-                services.GetRequiredService<IFacilityServiceClient>(),
-                output, facilityId, measureIds);
-            await FacilitySetupHelper.EnsureNormalizationConfigAsync(
-                services.GetRequiredService<INormalizationServiceClient>(),
-                output, facilityId);
-            await FacilitySetupHelper.EnsureQueryPlansAsync(
-                services.GetRequiredService<IDataAcquisitionServiceClient>(),
-                output, facilityId, measureIds, "Epic", queryPlanInput);
-            await FacilitySetupHelper.EnsureQueryConfigAsync(
-                services.GetRequiredService<IDataAcquisitionServiceClient>(),
-                services.GetRequiredService<AutomationConfig>(),
-                output, facilityId);
-            await FacilitySetupHelper.EnsureQueryDispatchConfigAsync(
-                services.GetRequiredService<IQueryDispatchServiceClient>(),
-                output,
-                facilityId);
-
-            var reportId = await reportHelper.GenerateReportAsync(facilityId, measureIds, scenarioConfig);
-            lock (state.Sync)
-            {
-                state.ReportId = reportId;
-            }
-
-            // Register with orchestrator so store-backed pollers start automatically.
-            await _orchestrator.RegisterRunAsync(state.RunId, facilityId, reportId);
-
-            var diagnosticsPollInterval = scenarioConfig.PatientIds.Count >= 500
-                ? TimeSpan.FromSeconds(15)
-                : TimeSpan.FromSeconds(5);
-
-            await using (var diagnostics = new BackgroundDiagnosticsMonitor(
-                output,
-                lokiScraper,
-                _automationConfig,
-                scenarioConfig.PatientIds.Count,
-                pollInterval: diagnosticsPollInterval,
-                forwardInternalLogsToOutput: true,
-                pipelineReader: services.GetRequiredService<PipelineDataReader>()))
-            {
-                await diagnostics.StartAsync(facilityId, reportId);
-                var submitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, diagnostics);
-                await diagnostics.StopAsync();
-
-                if (!submitted)
-                    throw new InvalidOperationException($"Expected report with id {reportId} to be submitted but it was not.");
-            }
-
-            // RegenerateReport: the first report is just a prerequisite.
-            // Now trigger regeneration and track the *new* report through the full pipeline.
-            if (state.Options.ReportMethod == ReportMethod.RegenerateReport)
-            {
-                output.WriteLine("---------------------------------------------------------------");
-                output.WriteLine("Initial report submitted. Beginning REGENERATION phase...");
-                output.WriteLine("---------------------------------------------------------------");
-
-                // Flush stale domain data so the regenerated report starts fresh.
-                services.GetRequiredService<PipelineDataReader>().InvalidateCache();
-
-                var regeneratedReportId = await reportHelper.RegenerateReportAsync(facilityId, reportId);
-                reportId = regeneratedReportId;
-                lock (state.Sync)
-                {
-                    state.ReportId = reportId;
-                }
-
-                // Re-register the run with the new report ID so pollers track the regenerated report.
-                await _orchestrator.UpdateRunAsync(state.RunId, facilityId, reportId, cancellationToken);
-                await PersistRunSummaryAsync(state);
-
-                output.WriteLine($"Tracking regenerated report: {reportId}");
-
-                await using var regenDiagnostics = new BackgroundDiagnosticsMonitor(
-                    output,
-                    lokiScraper,
-                    _automationConfig,
-                    scenarioConfig.PatientIds.Count,
-                    pollInterval: diagnosticsPollInterval,
-                    forwardInternalLogsToOutput: true,
-                    pipelineReader: services.GetRequiredService<PipelineDataReader>(),
-                    expectsDataAcquisition: false);
-
-                await regenDiagnostics.StartAsync(facilityId, reportId);
-                var regenSubmitted = await reportHelper.CheckSubmissionStatusAsync(reportId, scenarioConfig, regenDiagnostics);
-                await regenDiagnostics.StopAsync();
-
-                if (!regenSubmitted)
-                    throw new InvalidOperationException($"Expected regenerated report with id {reportId} to be submitted but it was not.");
-
-                output.WriteLine("Regenerated report submitted successfully.");
-            }
-
-            await pipelineSnapshot.WriteFullSnapshotAsync(output, facilityId, reportId);
-
-            var downloadedResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig);
-            var internalAbsResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig, external: false);
-
-            // Capture a lightweight ABS upload snapshot for the manifest detail page.
-            try
-            {
-                var absSnapshot = AbsUploadSnapshot.Build(internalAbsResources);
-                await _snapshotStore.SetDomainAsync(state.RunId, "absUpload", absSnapshot, CancellationToken.None);
-            }
-            catch (Exception absEx)
-            {
-                output.WriteLine($"[WARN] Failed to build/store ABS upload snapshot: {absEx.Message}");
-            }
-
-            // Persist raw ABS file contents (NDJSON + serialized FHIR resources) so the
-            // diagnostics export can re-emit them later without a live re-download.
-            // Best-effort: a serialization or store-size failure must not abort the run.
-            try
-            {
-                var absFiles = new Dictionary<string, string>(internalAbsResources.Count, StringComparer.OrdinalIgnoreCase);
-                var fhirSerializer = new Hl7.Fhir.Serialization.FhirJsonSerializer(
-                    new Hl7.Fhir.Serialization.SerializerSettings { Pretty = true });
-                foreach (var (key, value) in internalAbsResources)
-                {
-                    absFiles[key] = value switch
-                    {
-                        string s => s,
-                        Hl7.Fhir.Model.Resource r => fhirSerializer.SerializeToString(r),
-                        _ => value?.ToString() ?? string.Empty
-                    };
-                }
-                await _snapshotStore.SetDomainAsync(state.RunId, "absFiles", absFiles, CancellationToken.None);
-            }
-            catch (Exception absFilesEx)
-            {
-                output.WriteLine($"[WARN] Failed to persist raw ABS files for export: {absFilesEx.Message}");
-            }
-
-            if (!downloadedResources.ContainsKey("manifest.ndjson"))
-                throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
-
-            foreach (var patientId in expectedSubmittedPatientIds)
-            {
-                if (!downloadedResources.ContainsKey($"patient-{patientId}.ndjson"))
-                    throw new InvalidOperationException($"Expected report to include patient-{patientId}.ndjson but it was not");
-            }
-
-            // Flush stale cache from diagnostics polling so validators read authoritative data.
-            services.GetRequiredService<PipelineDataReader>().InvalidateCache();
-
-            // Regeneration reuses prior data acquisition — no new DA logs exist for the regenerated report.
-            var expectDataAcquisitionData = state.Options.ReportMethod != ReportMethod.RegenerateReport;
-
-            // Pipeline-built manifest already has all metadata; no need to re-parse bundles.
-            // For non-profile runs (no pipeline), generationManifest remains null.
-
-            var validatorResults = new List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>();
-
-            async Task RunValidator(string name, Func<Task> action)
-            {
-                try
-                {
-                    await action();
-                    validatorResults.Add(new PipelineSummarySnapshotBuilder.ValidatorResultSnapshot
-                    {
-                        Name = name,
-                        Outcome = "Passed",
-                        IssueCount = 0
-                    });
-                }
-                catch (Exception ex)
-                {
-                    // Extract issue count from the conventional message format:
-                    // "... failed with N issue(s)."
-                    var issueCount = 0;
-                    var match = System.Text.RegularExpressions.Regex.Match(ex.Message, @"(\d+)\s+issue\(s\)");
-                    if (match.Success)
-                        int.TryParse(match.Groups[1].Value, out issueCount);
-
-                    validatorResults.Add(new PipelineSummarySnapshotBuilder.ValidatorResultSnapshot
-                    {
-                        Name = name,
-                        Outcome = "Failed",
-                        IssueCount = issueCount
-                    });
-                    // Re-throw so the run still fails as before.
-                    throw;
-                }
-                finally
-                {
-                    // Persist after each validator so partial results are visible
-                    // in the dashboard even if a later validator throws.
-                    await _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", validatorResults, CancellationToken.None);
-                }
-            }
-
-            await RunValidator("REPORT INTERNAL ABS MANIFEST VALIDATION", () =>
-                reportAbsValidator.ValidateAllAsync(
-                    internalAbsResources,
-                    expectedSubmittedPatientIds,
-                    measureIds,
-                    scenarioConfig.StartDate,
-                    scenarioConfig.EndDate,
-                    facilityId,
-                    reportId,
-                    generatedBundles: null,
-                    expectedManifestPatientListIds: expectedAllPatientIds,
-                    expectDataAcquisitionData: expectDataAcquisitionData,
-                    manifest: generationManifest));
-
-            // The ABS manifest validator enriches the manifest with downstream-derived
-            // predictions that are not known at generation time — most notably the
-            // per-patient OperationOutcome count (one OO is appended to the ABS blob for
-            // every patient whose ReportingStatus is FailedValidation). Re-persist the
-            // snapshot so the Runs dashboard shows the final, fully-enriched predictions
-            // rather than the pre-validation snapshot taken at line ~506.
-            if (generationManifest != null)
-            {
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), CancellationToken.None);
-            }
-
-            await RunValidator("REPORT DATABASE VALIDATION", () =>
-                reportValidator.ValidateAllAsync(
-                    facilityId,
-                    reportId,
-                    measureIds,
-                    expectedAllPatientIds,
-                    expectedSubmittedPatientIds: expectedSubmittedPatientIds,
-                    manifest: generationManifest));
-
-            await RunValidator("DATA ACQUISITION DATABASE VALIDATION", () =>
-                dataAcqValidator.ValidateAllAsync(facilityId, reportId, measureIds[0], expectedAllPatientIds, expectDataAcquisitionData: expectDataAcquisitionData));
-
-            await RunValidator("NORMALIZATION DATABASE VALIDATION", () =>
-                normalizationValidator.ValidateAllAsync(facilityId));
-
-            await RunValidator("TENANT DATABASE VALIDATION", () =>
-                tenantValidator.ValidateAllAsync(facilityId, measureId));
-
-            await RunValidator("VALIDATION RESULTS (API)", () =>
-                validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow));
-
-            await RunCleanupHelper.CleanupAfterRunAsync(
-                scenarioConfig,
-                services.GetRequiredService<IFacilityServiceClient>(),
-                services.GetRequiredService<INormalizationServiceClient>(),
-                services.GetRequiredService<IDataAcquisitionServiceClient>(),
-                services.GetRequiredService<IQueryDispatchServiceClient>(),
-                services.GetRequiredService<IReportServiceClient>(),
-                fhirDataLoader,
-                output,
-                facilityId,
-                reportId);
-
-            if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
-                throw new OperationCanceledException("Run was cancelled.");
-
-            state.Status = AutomationRunStatus.Succeeded;
-            state.FinishedAt = DateTimeOffset.UtcNow;
-            await _orchestrator.CompleteRunAsync(state.RunId);
-            await BroadcastStatus(state);
-            WriteLog(state, "Run completed successfully.");
-        }
-        catch (OperationCanceledException) when (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
-        {
-            _logger.LogInformation("Run {RunId} cancellation acknowledged.", state.RunId);
-        }
-        catch (Exception ex)
-        {
-            if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
-            {
-                _logger.LogInformation("Run {RunId} faulted after cancel request: {Message}", state.RunId, ex.Message);
-                return;
-            }
-
-            _logger.LogError(ex, "Run {RunId} failed", state.RunId);
-            state.Status = AutomationRunStatus.Failed;
-            state.Error = ex.Message;
-            state.FinishedAt = DateTimeOffset.UtcNow;
-            await _orchestrator.CompleteRunAsync(state.RunId);
-            await BroadcastStatus(state);
-            WriteLog(state, $"Run failed: {ex.Message}");
-        }
-    }
-
-    private static FhirGenerationConfig ResolveFhirGenerationConfig(AutomationConfig automationConfig)
-    {
-        var includeLowValueOptionalReferences = automationConfig.FhirGeneration?.IncludeLowValueOptionalReferences ?? true;
-        var distribution = automationConfig.FhirGeneration?.ResourceDistribution;
-        if (distribution == null || distribution.Count == 0)
-            return new FhirGenerationConfig
-            {
-                IncludeLowValueOptionalReferences = includeLowValueOptionalReferences
-            };
-
-        return new FhirGenerationConfig
-        {
-            IncludeLowValueOptionalReferences = includeLowValueOptionalReferences,
-            ResourceDistribution = new Dictionary<string, double>(distribution, StringComparer.OrdinalIgnoreCase)
-        };
-    }
-
-    private ServiceProvider BuildRunServiceProvider(IAutomationOutput output)
-    {
-        var services = new ServiceCollection();
-
-        services.AddSingleton(_automationConfig);
-        services.AddSingleton(output);
-
-        // Forward host-level configuration into the per-run container
-        services.AddSingleton(_hostServices.GetRequiredService<IOptions<ServiceRegistry>>());
-        services.AddSingleton(_hostServices.GetRequiredService<IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>>());
-        services.AddSingleton(_hostServices.GetRequiredService<IOptions<LinkTokenServiceSettings>>());
-        services.AddSingleton(_hostServices.GetRequiredService<ICreateSystemToken>());
-
-        services.AddLinkSdk();
-
-        services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<IAutomationOutput>(), sp.GetRequiredService<AutomationConfig>()))
-            .AddSingleton(sp => {
-                var cfg = sp.GetRequiredService<AutomationConfig>();
-                return new FhirDataLoader(cfg.ExternalFhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
-            })
-            .AddSingleton<PipelineDataReader>();
-
-        services.AddTransient<ValidationApiHelper>();
-        services.AddTransient<ReportApiHelper>();
-        services.AddTransient<ReportDatabaseValidator>();
-        services.AddTransient<ReportAbsManifestValidator>();
-        services.AddTransient<DataAcquisitionDatabaseValidator>();
-        services.AddTransient<NormalizationDatabaseValidator>();
-        services.AddTransient<TenantDatabaseValidator>();
-        services.AddTransient<ValidationResultsValidator>();
-        services.AddTransient<PipelineSnapshot>();
-
-        return services.BuildServiceProvider();
-    }
-
-    private static TestScenarioConfig BuildScenarioConfig(AutomationScenarioKind scenario, ResolvedRunOptions options)
-    {
-        var downloadFileName = scenario switch
-        {
-            AutomationScenarioKind.AdhocReportTest => "adhoc-report-submission.zip",
-            AutomationScenarioKind.MultiPatientTest => "multi-patient-submission.zip",
-            AutomationScenarioKind.MegaPatientTest => "mega-patient-submission.zip",
-            AutomationScenarioKind.Custom => "custom-submission.zip",
-            _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, null)
-        };
-
-        var bundleLocations = options.SelectedMeasures
-            .Select(ProfiledMeasureCatalog.GetBundleLocation)
-            .ToList();
-
-        return new TestScenarioConfig
-        {
-            MeasureBundleLocation = bundleLocations.Count > 0 ? bundleLocations[0] : "",
-            AdditionalMeasureBundleLocations = bundleLocations.Count > 1 ? bundleLocations.Skip(1).ToList() : [],
-            StartDate = "2023-01-01T00:00:00Z",
-            EndDate = "2023-12-31T23:59:59Z",
-            PatientIds = [],
-            CleanupServiceData = options.CleanupServiceData,
-            CleanupFhirData = options.CleanupFhirData,
-            PollingIntervalSeconds = options.PollingIntervalSeconds,
-            MaxPollingDurationMinutes = options.MaxPollingDurationMinutes,
-            DownloadFileName = downloadFileName,
-            LokiScrapeWindowMinutes = options.LokiScrapeWindowMinutes
-        };
-    }
-
-    private ResolvedRunOptions ResolveRunOptions(StartScenarioRequest request)
-    {
-        var defaultMeasures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
-        var defaults = request.Scenario switch
-        {
-            AutomationScenarioKind.AdhocReportTest => new ResolvedRunOptions(1, 1000, "AdhocPatient", 20260326, 3, 0, 30, false, true, defaultMeasures, [], []),
-            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, "MultiPatient", 20260328, 3, 0, 30, false, true, defaultMeasures, [], []),
-            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, "MegaPatient", 20260327, 3, 0, 30, false, true, defaultMeasures, [], []),
-            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, "CustomPatient", 20260329, 3, 0, 30, false, true, defaultMeasures, [], []),
-            _ => throw new ArgumentOutOfRangeException(nameof(request.Scenario), request.Scenario, null)
-        };
-
-        if (request.Scenario != AutomationScenarioKind.Custom)
-            return defaults;
-
-        var prefix = string.IsNullOrWhiteSpace(request.PatientPrefix)
-            ? defaults.Prefix
-            : request.PatientPrefix.Trim();
-
-        var profiles = request.PatientProfiles is { Count: > 0 }
-            ? request.PatientProfiles
-            : defaults.PatientProfiles;
-
-        var effectiveMeasures = request.SelectedMeasures is { Count: > 0 }
-            ? request.SelectedMeasures
-            : defaults.SelectedMeasures;
-
-        var cohorts = request.PatientCohorts is { Count: > 0 }
-            ? request.PatientCohorts
-            : ExtractCohortsFromJson(request.RunConfigurationJson, effectiveMeasures)
-              ?? [
-                  PatientCohortDefinition.AllQualifying(
-                      effectiveMeasures,
-                      request.PatientCount ?? defaults.PatientCount,
-                      request.ResourcesPerPatient ?? defaults.ResourcesPerPatient,
-                      request.ResourcesPerPatient ?? defaults.ResourcesPerPatient)
-              ];
-
-        // Resolve measures: prefer SelectedMeasures list, fall back to single SelectedMeasure, then defaults
-        var measures = request.SelectedMeasures is { Count: > 0 }
-            ? request.SelectedMeasures
-            : request.SelectedMeasure.HasValue
-                ? [request.SelectedMeasure.Value]
-                : effectiveMeasures;
-
-        // Always expand profiles from cohorts — cohorts are the single source of truth.
-        profiles = ExpandProfilesFromCohorts(cohorts, request.Seed ?? defaults.Seed);
-
-        return defaults with
-        {
-            PatientCount = request.PatientCount ?? defaults.PatientCount,
-            ResourcesPerPatient = request.ResourcesPerPatient ?? defaults.ResourcesPerPatient,
-            Prefix = prefix,
-            Seed = request.Seed ?? defaults.Seed,
-            PollingIntervalSeconds = 3,
-            MaxPollingDurationMinutes = 0,
-            LokiScrapeWindowMinutes = 30,
-            CleanupServiceData = request.CleanupServiceData ?? defaults.CleanupServiceData,
-            CleanupFhirData = request.CleanupFhirData ?? defaults.CleanupFhirData,
-            SelectedMeasures = measures,
-            PatientProfiles = profiles,
-            PatientCohorts = cohorts,
-            ReportMethod = request.ReportMethod,
-            QueryPlanTemplateId = request.QueryPlanTemplateId
-        };
-    }
-
-    private static List<PatientProfile> ExpandProfilesFromCohorts(IReadOnlyList<PatientCohortDefinition> cohorts, int seed)
-        => PatientCohortDefinition.ExpandProfiles(cohorts, seed);
-
-    /// <summary>
-    /// Extracts cohort definitions from the <c>RunConfigurationJson</c> blob.
-    /// The JSON is the full scenario payload produced by the UI and contains a
-    /// <c>patientCohorts</c> array.  Returns null when parsing fails or the
-    /// array is empty so the caller can fall back to defaults.
-    /// </summary>
-    private static List<PatientCohortDefinition>? ExtractCohortsFromJson(string? json, List<ProfiledMeasureType> measures)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return null;
-
-        try
-        {
-            using var doc = JsonDocument.Parse(json);
-
-            if (!doc.RootElement.TryGetProperty("patientCohorts", out var cohortsEl)
-                || cohortsEl.ValueKind != JsonValueKind.Array
-                || cohortsEl.GetArrayLength() == 0)
-                return null;
-
-            var cohorts = new List<PatientCohortDefinition>();
-
-            foreach (var item in cohortsEl.EnumerateArray())
-            {
-                var count = item.TryGetProperty("patientCount", out var pc) ? pc.GetInt32() : 0;
-                var min = item.TryGetProperty("resourcesPerPatientMin", out var rmin) ? rmin.GetInt32() : 50;
-                var max = item.TryGetProperty("resourcesPerPatientMax", out var rmax) ? rmax.GetInt32() : min;
-
-                var eligibilities = new Dictionary<ProfiledMeasureType, MeasureEligibility>();
-                if (item.TryGetProperty("measureEligibilities", out var meEl) && meEl.ValueKind == JsonValueKind.Object)
-                {
-                    foreach (var prop in meEl.EnumerateObject())
-                    {
-                        if (Enum.TryParse<ProfiledMeasureType>(prop.Name, ignoreCase: true, out var mt))
-                        {
-                            MeasureEligibility eligibility;
-                            if (prop.Value.ValueKind == JsonValueKind.String)
-                            {
-                                eligibility = Enum.TryParse<MeasureEligibility>(prop.Value.GetString(), ignoreCase: true, out var parsed)
-                                    ? parsed
-                                    : MeasureEligibility.Qualifying;
-                            }
-                            else if (prop.Value.ValueKind == JsonValueKind.Number)
-                            {
-                                eligibility = prop.Value.GetInt32() == 0
-                                    ? MeasureEligibility.Qualifying
-                                    : MeasureEligibility.NonQualifying;
-                            }
-                            else
-                            {
-                                eligibility = MeasureEligibility.Qualifying;
-                            }
-                            eligibilities[mt] = eligibility;
-                        }
-                    }
-                }
-
-                // Ensure every selected measure has an entry (default to qualifying).
-                foreach (var m in measures)
-                {
-                    eligibilities.TryAdd(m, MeasureEligibility.Qualifying);
-                }
-
-                var scenarioIds = new List<string>();
-                if (item.TryGetProperty("eligibleClinicalScenarioIds", out var sEl) && sEl.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var s in sEl.EnumerateArray())
-                    {
-                        var sv = s.GetString();
-                        if (!string.IsNullOrEmpty(sv))
-                            scenarioIds.Add(sv);
-                    }
-                }
-
-                cohorts.Add(new PatientCohortDefinition
-                {
-                    PatientCount = count,
-                    MeasureEligibilities = eligibilities,
-                    EligibleClinicalScenarioIds = scenarioIds,
-                    ResourcesPerPatientMin = min,
-                    ResourcesPerPatientMax = max
-                });
-            }
-
-            return cohorts.Count > 0 ? cohorts : null;
-        }
-        catch
-        {
-            return null;
-        }
+        return _dashboardAggregator.BuildAsync(inMemory, cancellationToken);
     }
 
     private void WriteLog(MutableRunState state, string message)
@@ -1196,9 +502,11 @@ public class AutomationRunManager : IAutomationRunManager
                 RunName = state.RunNameOverride ?? GetRunName(state.Scenario, state.Options.SelectedMeasures),
                 Scenario = state.Scenario,
                 SelectedMeasure = string.Join(", ", state.Options.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName)),
-                PatientCount = state.Options.PatientProfiles is { Count: > 0 }
+                PatientCount = (state.Options.PatientProfiles is { Count: > 0 }
                     ? state.Options.PatientProfiles.Count
-                    : state.Options.PatientCount,
+                    : state.Options.PatientCount)
+                    + state.Options.ImportedPatientIds.Count
+                    + state.Options.ImportedPatientBundles.Count,
                 ResourcesPerPatient = state.Options.ResourcesPerPatient,
                 Seed = state.Options.Seed,
                 RunConfigurationJson = state.RunConfigurationJson,
@@ -1230,105 +538,4 @@ public class AutomationRunManager : IAutomationRunManager
             _ => "Custom"
         };
     }
-
-    private sealed class MutableRunState(
-        Guid runId,
-        AutomationScenarioKind scenario,
-        ResolvedRunOptions options,
-        string? runNameOverride,
-        string? runConfigurationJson)
-    {
-        public object Sync { get; } = new();
-        public Guid RunId { get; } = runId;
-        public AutomationScenarioKind Scenario { get; } = scenario;
-        public ResolvedRunOptions Options { get; } = options;
-        public string? RunNameOverride { get; } = runNameOverride;
-        public string? RunConfigurationJson { get; } = runConfigurationJson;
-        public DateTimeOffset CreatedAt { get; } = DateTimeOffset.UtcNow;
-        public DateTimeOffset? StartedAt { get; set; }
-        public DateTimeOffset? FinishedAt { get; set; }
-        public string? FacilityId { get; set; }
-        public string? ReportId { get; set; }
-        public AutomationRunStatus Status { get; set; } = AutomationRunStatus.Queued;
-        public string? Error { get; set; }
-        public List<string> Logs { get; } = [];
-        public CancellationTokenSource RunCancellation { get; } = new();
-        public bool CancelRequested { get; set; }
-        public Task? ExecutionTask { get; set; }
-        public FhirDataLoader? FhirDataLoader { get; set; }
-    }
-
-    private sealed class NullAutomationOutput : IAutomationOutput
-    {
-        public void WriteLine(string message)
-        {
-        }
-
-        public void WriteLine(string format, params object[] args)
-        {
-        }
-    }
-
-    private record ResolvedRunOptions(
-        int PatientCount,
-        int ResourcesPerPatient,
-        string Prefix,
-        int Seed,
-        int PollingIntervalSeconds,
-        int MaxPollingDurationMinutes,
-        int LokiScrapeWindowMinutes,
-        bool CleanupServiceData,
-        bool CleanupFhirData,
-        List<ProfiledMeasureType> SelectedMeasures,
-        List<PatientProfile> PatientProfiles,
-        List<PatientCohortDefinition> PatientCohorts,
-        ReportMethod ReportMethod = ReportMethod.Adhoc,
-        Guid? QueryPlanTemplateId = null);
-
-    /// <summary>
-    /// Resolves the query plan template for a run. Returns null to use built-in defaults.
-    /// </summary>
-    private async Task<QueryPlanResolution> ResolveQueryPlanAsync(Guid? templateId)
-    {
-        QueryPlanTemplate? template = null;
-
-        if (templateId.HasValue)
-            template = await _queryPlanTemplateStore.GetByIdAsync(templateId.Value);
-
-        // Fall back to the default template if no explicit one was provided or it wasn't found.
-        template ??= await _queryPlanTemplateStore.GetDefaultAsync();
-
-        if (template == null)
-            return new QueryPlanResolution(null, "Built-in Default");
-
-        return new QueryPlanResolution(ToQueryPlanInput(template), template.Name);
-    }
-
-    private static QueryPlanInput ToQueryPlanInput(QueryPlanTemplate template) => new()
-    {
-        EhrDescription = template.EhrDescription,
-        LookBack = template.LookBack,
-        InitialQueries = template.InitialQueries.Select(ToQueryPlanQueryEntry).ToList(),
-        SupplementalQueries = template.SupplementalQueries.Select(ToQueryPlanQueryEntry).ToList()
-    };
-
-    private static QueryPlanQueryEntry ToQueryPlanQueryEntry(QueryEntry src) => new()
-    {
-        ResourceType = src.ResourceType,
-        QueryConfigType = src.QueryConfigType,
-        OperationType = src.OperationType,
-        Paged = src.Paged,
-        Parameters = src.Parameters.Select(p => new QueryPlanParameterEntry
-        {
-            ParameterType = p.ParameterType,
-            Name = p.Name,
-            Variable = p.Variable,
-            Format = p.Format,
-            Literal = p.Literal,
-            Resource = p.Resource,
-            PagedValue = p.PagedValue
-        }).ToList()
-    };
-
-    private sealed record QueryPlanResolution(QueryPlanInput? Input, string Name);
 }
