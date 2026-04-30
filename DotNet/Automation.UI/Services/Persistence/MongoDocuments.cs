@@ -28,16 +28,10 @@ public sealed class AutomationRunDocument
     // array [ticks, offsetMinutes], which is not indexable and makes $gte/$lte fall
     // into Mongo's per-element array match semantics (silently dropping docs).
     //
-    // Compatibility notes:
-    //   - Reads: the driver's DateTimeOffsetSerializer is polymorphic on the read path
-    //     (handles Array, DateTime, Document, and String representations), so legacy
-    //     array-form documents still deserialize correctly.
-    //   - Writes: all new writes use ISODate because of the attribute below.
-    //   - Range queries: NOT transparently compatible. BSON canonical type order
-    //     places every Array value below every Date value, so a $gte against an
-    //     ISODate excludes legacy array-form docs entirely. A one-time startup
-    //     migration in MongoIndexManager.MigrateLegacyRunDateFields rewrites any
-    //     pre-existing documents so the 14-day dashboard query sees them again.
+    // Reads remain compatible with legacy array-form documents because the driver's
+    // DateTimeOffsetSerializer is polymorphic on the read path (Array, DateTime,
+    // Document, and String representations all deserialize correctly). New writes
+    // use ISODate because of the attribute below.
     [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset CreatedAt { get; set; }
     public bool IsActive { get; set; } = true;

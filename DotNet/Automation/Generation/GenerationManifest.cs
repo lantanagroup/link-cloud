@@ -245,14 +245,23 @@ public sealed class GenerationManifest
     /// </summary>
     public HashSet<string> GetExpectedAbsKeysForPatient(string patientId)
     {
+        var filtered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Non-qualifying patients are never submitted by measure-eval, so PatientAggregator
+        // never emits a patient-{id}.ndjson artifact for them and nothing about them
+        // appears in ABS — even though their resources were uploaded to the FHIR server
+        // and acquired by Data Acquisition. Returning an empty expectation here is what
+        // keeps mixed Q + NQ manifests (e.g. NQ cohorts combined with imported bundles)
+        // from generating spurious "missing expected resource" errors against ABS.
+        if (!QualifiesForAnySelectedMeasure(patientId))
+            return filtered;
+
         HashSet<string>? sourceKeys = null;
 
         if (SimulatedAcquiredResourceKeysByPatient.TryGetValue(patientId, out var simulated) && simulated.Count > 0)
             sourceKeys = simulated;
         else if (ResourceKeysByPatient.TryGetValue(patientId, out var generated) && generated.Count > 0)
             sourceKeys = generated;
-
-        var filtered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         if (sourceKeys != null)
         {
@@ -271,10 +280,8 @@ public sealed class GenerationManifest
         }
 
         // MeasureEval's CQL engine always loads Patient as the context anchor, regardless
-        // of whether the query plan has an explicit Patient query. For any patient that
-        // qualifies for at least one selected measure, Patient/{id} is guaranteed in ABS.
-        if (QualifiesForAnySelectedMeasure(patientId))
-            filtered.Add($"Patient/{patientId}");
+        // of whether the query plan has an explicit Patient query.
+        filtered.Add($"Patient/{patientId}");
 
         return filtered;
     }
