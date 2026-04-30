@@ -35,9 +35,15 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             List<DomainResource> resources = new List<DomainResource>();
 
             foreach (var entry in hashEntries) {
-                //TODO: Daniel - Add Null check or something
-                DomainResource resource = JsonSerializer.Deserialize<DomainResource>(entry.Value, LinkFhirSerializerOptions.ForFhirLenientSerialization);
-                resources.Add(resource);
+                try
+                {
+                    DomainResource resource = JsonSerializer.Deserialize<DomainResource>(entry.Value, LinkFhirSerializerOptions.ForFhirLenientSerialization);
+                    resources.Add(resource);
+                }
+                catch (Exception ex) 
+                {
+                    throw new Exception($"Failed to deserialize FHIR DomainResource for the following Redis entry: " + entry.Name.ToString());
+                }
             }
 
             return resources;

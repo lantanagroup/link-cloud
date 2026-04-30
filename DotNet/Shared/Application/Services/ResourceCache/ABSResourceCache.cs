@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Options;
+using SharpCompress.Common;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
@@ -55,11 +56,18 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 while (reader.Peek() >= 0)
                 {
                     //Skip first line. It's the reference of the resource, not the resource itself
-                    reader.ReadLine();
+                    string resourceReference = reader.ReadLine();
                     string resourceString = reader.ReadLine();
 
-                    DomainResource resource = JsonSerializer.Deserialize<DomainResource>(resourceString, LinkFhirSerializerOptions.ForFhirLenientSerialization);
-                    resources.Add(resource);
+                    try
+                    {
+                        DomainResource resource = JsonSerializer.Deserialize<DomainResource>(resourceString, LinkFhirSerializerOptions.ForFhirLenientSerialization);
+                        resources.Add(resource);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception($"Failed to deserialize FHIR DomainResource for the following ABS entry: " + resourceReference);
+                    }
                 }
             }
 
