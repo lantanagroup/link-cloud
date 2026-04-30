@@ -6,14 +6,49 @@ namespace LantanaGroup.Automation.Generation;
 /// Classifies an imported patient's FHIR resources into per-measure Q/NQ eligibilities
 /// and (best-effort) the clinical scenario their data matches.
 ///
-/// The classifier intentionally uses the same heuristics as the generator:
-///   * ACH-Monthly / ACH-Daily eligibility   = patient has an inpatient encounter (class IMP).
-///   * Hypoglycemic eligibility              = patient qualifies for ACH AND has a Condition
-///                                              whose code matches one of the diabetic
-///                                              clinical scenarios (DKA / Diabetic Hypoglycemia).
-///   * DetectedClinicalScenarioId            = best match against
-///                                              <see cref="FhirGenerationCodes.ClinicalScenarios"/>
-///                                              by SNOMED or ICD primary diagnosis code.
+/// IP-membership predicates (encounter <c>class.code</c> + <c>status</c>) and the
+/// approximate "Diabetes Medications" value set are delegated to
+/// <see cref="EncounterIpClassification"/>, which is the single source of truth shared
+/// with <see cref="MeasureInitialPopulationResolver"/>. This guarantees the classifier
+/// and the resolver can never disagree about which encounter classes count as IP.
+///
+/// <para>
+/// Heuristics (tracking the canonical NHSN CQL retrieves where feasible):
+/// <list type="bullet">
+///   <item>
+///     <b>ACH-Monthly / ACH-Daily eligibility</b> &mdash; patient has an encounter with
+///     a class code in <c>{IMP, ACUTE, NONAC, SS, EMER, OBSENC}</c> and a valid
+///     IP status.
+///   </item>
+///   <item>
+///     <b>Hypoglycemic eligibility</b> &mdash; patient has an encounter with a class
+///     code in <c>{IMP, ACUTE, NONAC, SS}</c> and a valid IP status, AND either:
+///     <list type="bullet">
+///       <item>An antidiabetic <c>MedicationRequest</c> or <c>MedicationAdministration</c>
+///             whose code matches <see cref="EncounterIpClassification.DiabetesMedicationCodes"/>
+///             (closer to the CQL "Antidiabetic Drugs Administered or Ordered" predicate), OR</item>
+///       <item>A diabetic <c>Condition</c> matching one of the diabetic clinical scenarios
+///             (DKA / Diabetic Hypoglycemia) &mdash; retained as a permissive fallback for
+///             sparse imported bundles that don't carry medication resources.</item>
+///     </list>
+///   </item>
+///   <item>
+///     <b>DetectedClinicalScenarioId</b> &mdash; best match against
+///     <see cref="FhirGenerationCodes.ClinicalScenarios"/> by SNOMED or ICD primary
+///     diagnosis code.
+///   </item>
+/// </list>
+/// </para>
+///
+/// <para>
+/// <b>Known modeling gaps</b> (mirrors those documented on
+/// <see cref="EncounterIpClassification"/>): encounter-type-based IP qualification,
+/// encounter-location-type-based IP qualification, and the full Diabetes Medications
+/// value-set expansion (currently only RxNorm codes the generator emits are matched).
+/// As a result, the classifier may under-detect Q/NQ for externally-authored bundles
+/// that qualify via these unmodeled pathways &mdash; the user can always override the
+/// pre-populated checkboxes in the scenario editor.
+/// </para>
 ///
 /// Results are advisory only and are intended to be presented to the user as
 /// pre-populated checkboxes that they can override before saving the scenario.
@@ -34,6 +69,8 @@ public static class ImportedPatientClassifier
     {
         var encounters = new List<Encounter>();
         var conditions = new List<Condition>();
+        var medicationRequests = new List<MedicationRequest>();
+        var medicationAdministrations = new List<MedicationAdministration>();
 
         foreach (var e in entries)
         {
@@ -41,10 +78,24 @@ public static class ImportedPatientClassifier
             {
                 case Encounter enc: encounters.Add(enc); break;
                 case Condition cond: conditions.Add(cond); break;
+                case MedicationRequest mr: medicationRequests.Add(mr); break;
+                case MedicationAdministration ma: medicationAdministrations.Add(ma); break;
             }
         }
 
-        var hasInpatientEncounter = encounters.Any(IsInpatient);
+        var hasAchIpEncounter = encounters.Any(enc => QualifiesForIp(enc, EncounterIpClassification.IpProfile.Ach));
+        var hasHypoIpEncounter = encounters.Any(enc => QualifiesForIp(enc, EncounterIpClassification.IpProfile.Hypoglycemic));
+
+        // Heuristic for the CQL "Antidiabetic Drugs Administered or Ordered" predicate.
+        // CQL additionally requires the drug to occur during the encounter's hospitalization
+        // window; we currently only check existence — encounter linkage is a known gap.
+        var hasAntidiabeticMedication =
+            medicationRequests.Any(IsAntidiabeticMedicationRequest)
+            || medicationAdministrations.Any(IsAntidiabeticMedicationAdministration);
+
+        // Permissive fallback for bundles that don't carry medications. Generator-produced
+        // qualifying patients always include a diabetic Condition in the bundle, so this
+        // keeps existing test fixtures green.
         var hasDiabeticCondition = conditions.Any(IsDiabeticHypoglycemicCondition);
 
         var detectedScenarioId = DetectScenario(conditions);
@@ -55,11 +106,13 @@ public static class ImportedPatientClassifier
             elig[m] = m switch
             {
                 ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation
-                    => hasInpatientEncounter ? MeasureEligibility.Qualifying : MeasureEligibility.NonQualifying,
+                    => hasAchIpEncounter ? MeasureEligibility.Qualifying : MeasureEligibility.NonQualifying,
                 ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation
-                    => hasInpatientEncounter ? MeasureEligibility.Qualifying : MeasureEligibility.NonQualifying,
+                    => hasAchIpEncounter ? MeasureEligibility.Qualifying : MeasureEligibility.NonQualifying,
                 ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
-                    => (hasInpatientEncounter && hasDiabeticCondition) ? MeasureEligibility.Qualifying : MeasureEligibility.NonQualifying,
+                    => (hasHypoIpEncounter && (hasAntidiabeticMedication || hasDiabeticCondition))
+                        ? MeasureEligibility.Qualifying
+                        : MeasureEligibility.NonQualifying,
                 _ => MeasureEligibility.NonQualifying
             };
         }
@@ -67,13 +120,29 @@ public static class ImportedPatientClassifier
         return new ClassificationResult(elig, detectedScenarioId);
     }
 
-    private static bool IsInpatient(Encounter enc)
+    private static bool QualifiesForIp(Encounter? enc, EncounterIpClassification.IpProfile profile)
     {
-        var code = enc?.Class?.Code;
-        if (string.IsNullOrWhiteSpace(code)) return false;
-        return string.Equals(code, "IMP", StringComparison.OrdinalIgnoreCase)
-               || string.Equals(code, "ACUTE", StringComparison.OrdinalIgnoreCase)
-               || string.Equals(code, "NONAC", StringComparison.OrdinalIgnoreCase);
+        if (enc == null) return false;
+        if (!EncounterIpClassification.ClassCodeQualifiesIp(enc.Class?.Code, profile)) return false;
+        if (!EncounterIpClassification.IsValidIpEncounterStatus(enc.Status?.ToString())) return false;
+        return true;
+    }
+
+    private static bool IsAntidiabeticMedicationRequest(MedicationRequest mr)
+        => HasAntidiabeticCoding((mr?.Medication as CodeableConcept)?.Coding);
+
+    private static bool IsAntidiabeticMedicationAdministration(MedicationAdministration ma)
+        => HasAntidiabeticCoding((ma?.Medication as CodeableConcept)?.Coding);
+
+    private static bool HasAntidiabeticCoding(IEnumerable<Coding>? codings)
+    {
+        if (codings == null) return false;
+        foreach (var coding in codings)
+        {
+            if (EncounterIpClassification.IsDiabetesMedicationCode(coding?.Code))
+                return true;
+        }
+        return false;
     }
 
     private static bool IsDiabeticHypoglycemicCondition(Condition cond)

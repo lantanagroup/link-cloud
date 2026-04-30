@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Automation.UI.Models;
 
-public class StartScenarioRequest
+public class StartScenarioRequest : IValidatableObject
 {
     [Required]
     public AutomationScenarioKind Scenario { get; set; }
@@ -74,4 +74,21 @@ public class StartScenarioRequest
     /// query plan instead of the built-in defaults. When null, the system default is used.
     /// </summary>
     public Guid? QueryPlanTemplateId { get; set; }
+
+    /// <summary>
+    /// Cross-field validation. Rejects inverted report windows
+    /// (<see cref="ReportPeriodStart"/> &gt; <see cref="ReportPeriodEnd"/>) at the request
+    /// boundary so that invalid windows are never forwarded to
+    /// <c>StartScenarioRequestResolver</c> or downstream pipeline stages.
+    /// </summary>
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (ReportPeriodStart.HasValue && ReportPeriodEnd.HasValue
+            && ReportPeriodStart.Value > ReportPeriodEnd.Value)
+        {
+            yield return new ValidationResult(
+                "ReportPeriodStart must be on or before ReportPeriodEnd.",
+                new[] { nameof(ReportPeriodStart), nameof(ReportPeriodEnd) });
+        }
+    }
 }

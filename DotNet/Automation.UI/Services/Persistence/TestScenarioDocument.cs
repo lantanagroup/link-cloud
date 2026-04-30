@@ -47,8 +47,27 @@ public sealed class TestScenarioDocument
     /// <summary>Serialized List&lt;ImportedPatientInput&gt; for ID-based imported patients.</summary>
     public string ImportedPatientIdsJson { get; set; } = "[]";
 
-    /// <summary>Serialized List&lt;ImportedPatientInput&gt; for bundle-based imported patients.</summary>
+    /// <summary>
+    /// Serialized List&lt;ImportedPatientInput&gt; for bundle-based imported patients.
+    /// <para>
+    /// As of the bundle-externalization migration, each entry's <c>BundleJson</c> is
+    /// stored as <c>null</c> here and the raw bundle payload lives in the
+    /// <c>automation_imported_bundles</c> collection (one document per bundle, keyed by
+    /// <see cref="ImportedBundleReference.BundleId"/>). <see cref="MongoScenarioStore"/>
+    /// hydrates <c>BundleJson</c> on read using <see cref="ImportedBundleRefs"/>. Legacy
+    /// documents written before the migration may still contain inline bundle JSON;
+    /// those are accepted on read and converted to the externalized layout on the next
+    /// upsert.
+    /// </para>
+    /// </summary>
     public string ImportedPatientBundlesJson { get; set; } = "[]";
+
+    /// <summary>
+    /// References from each entry in <see cref="ImportedPatientBundlesJson"/> (matched by
+    /// <c>PatientId</c>) to its row in the <c>automation_imported_bundles</c> collection.
+    /// Empty for legacy documents that still embed bundle JSON inline.
+    /// </summary>
+    public List<ImportedBundleReference> ImportedBundleRefs { get; set; } = [];
 
     public DateTimeOffset UpdatedAt { get; set; }
 }

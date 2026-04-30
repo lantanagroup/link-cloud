@@ -30,8 +30,12 @@ public class MeasureInitialPopulationResolverTests
 
     [Theory]
     [InlineData("IMP", true)]
+    [InlineData("ACUTE", true)]
+    [InlineData("NONAC", true)]
+    [InlineData("SS", true)]
     [InlineData("EMER", true)]
-    [InlineData("AMB", true)]
+    [InlineData("OBSENC", true)]
+    [InlineData("AMB", false)] // ambulatory is NOT in the ACH IP per CQL
     [InlineData("HH", false)]
     [InlineData("VR", false)]
     [InlineData("", false)]
@@ -47,7 +51,11 @@ public class MeasureInitialPopulationResolverTests
 
     [Theory]
     [InlineData("IMP", true)]
+    [InlineData("ACUTE", true)]
+    [InlineData("NONAC", true)]
+    [InlineData("SS", true)]
     [InlineData("EMER", false)]
+    [InlineData("OBSENC", false)]
     [InlineData("AMB", false)]
     public void Hypoglycemic_IpMembership_RequiresInpatientClass(string classCode, bool expectIp)
     {
@@ -55,6 +63,25 @@ public class MeasureInitialPopulationResolverTests
 
         var ipWindows = MeasureInitialPopulationResolver.Resolve(
             new[] { ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation }, input);
+
+        Assert.Equal(expectIp ? 1 : 0, ipWindows.Count);
+    }
+
+    [Theory]
+    [InlineData("finished", true)]
+    [InlineData("in-progress", true)]
+    [InlineData("triaged", true)]
+    [InlineData("onleave", true)]
+    [InlineData("entered-in-error", true)]
+    [InlineData("planned", false)]
+    [InlineData("cancelled", false)]
+    [InlineData("arrived", false)]
+    public void Ach_IpMembership_FiltersByEncounterStatus(string status, bool expectIp)
+    {
+        var input = InputWithEncounters(Enc("E1", "IMP", status: status));
+
+        var ipWindows = MeasureInitialPopulationResolver.Resolve(
+            new[] { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation }, input);
 
         Assert.Equal(expectIp ? 1 : 0, ipWindows.Count);
     }

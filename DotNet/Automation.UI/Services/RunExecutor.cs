@@ -82,8 +82,24 @@ internal sealed class RunExecutor
             using var services = BuildRunServiceProvider(output);
 
             var lokiScraper = services.GetRequiredService<LokiScraper>();
-            var fhirDataLoader = services.GetRequiredService<FhirDataLoader>();
-            state.FhirDataLoader = fhirDataLoader;
+
+            // Two FHIR endpoints are in play:
+            //   * ExternalFhirServerBase — what end-users / imported-patient sources address.
+            //     Used here ONLY to read existing patients via Patient/{id}/$everything.
+            //   * InternalFhirServerBase — what Link's services (Tenant/DataAcquisition/...)
+            //     point at via FacilitySetupHelper. All run-side writes (bundle uploads,
+            //     generation pipeline uploads, readiness probe, post-run cleanup) must land
+            //     on this base, otherwise DataAcquisition would query a different server
+            //     than the one Automation populated.
+            var externalFhirDataLoader = services.GetRequiredService<FhirDataLoader>();
+            var internalFhirDataLoader = new FhirDataLoader(
+                _automationConfig.InternalFhirServerBase,
+                _automationConfig.FhirServerOAuth,
+                _automationConfig.FhirServerBasicAuth);
+
+            // The cleanup-on-cancel path on AutomationRunManager reuses this loader to
+            // expunge generated FHIR resources, so it must point at the internal base too.
+            state.FhirDataLoader = internalFhirDataLoader;
             var measureEvalClient = services.GetRequiredService<IMeasureEvalServiceClient>();
             var sdkValidationClient = services.GetRequiredService<IValidationServiceClient>();
 
@@ -112,7 +128,7 @@ internal sealed class RunExecutor
             var primaryMeasure = state.Options.SelectedMeasures[0];
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
 
-            await fhirDataLoader.WaitForServerAsync(output);
+            await internalFhirDataLoader.WaitForServerAsync(output);
 
             if (state.Options.PatientProfiles is { Count: > 0 }
                 || state.Options.ImportedPatientIds.Count > 0
@@ -140,7 +156,7 @@ internal sealed class RunExecutor
                 if (importedPatients.Count > 0)
                 {
                     output.WriteLine($"Pre-loading {importedPatients.Count} imported patient(s) (report period [{scenarioConfig.StartDate} ? {scenarioConfig.EndDate}])...");
-                    await ImportedPatientLoader.LoadAllAsync(fhirDataLoader, importedPatients, output, state.RunCancellation.Token);
+                    await ImportedPatientLoader.LoadAllAsync(externalFhirDataLoader, importedPatients, output, state.RunCancellation.Token);
 
                     var (impStart, impEnd) = ImportedPatientLoader.ComputeEncounterDateRange(importedPatients);
                     if (impStart.HasValue || impEnd.HasValue)
@@ -170,7 +186,7 @@ internal sealed class RunExecutor
                 // simulation per-patient, so no serialized FHIR JSON is retained.
                 var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
                     output,
-                    fhirDataLoader,
+                    internalFhirDataLoader,
                     selectedMeasures,
                     profiles,
                     state.Options.ResourcesPerPatient,
@@ -203,7 +219,7 @@ internal sealed class RunExecutor
                 patientIds = genPatientIds;
                 expectedSubmittedPatientIds = patientIds.ToList();
 
-                await fhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
+                await internalFhirDataLoader.LoadTransactionBundlesFromJsonAsync(output, bundles);
             }
 
             if (scenarioConfig.PatientIds.Count == 0)
@@ -240,7 +256,7 @@ internal sealed class RunExecutor
                 generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
 
                 // Persist a lightweight manifest snapshot for the UI.
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), CancellationToken.None);
+                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             await FacilitySetupHelper.EnsureFacilityAsync(
@@ -344,7 +360,7 @@ internal sealed class RunExecutor
             try
             {
                 var absSnapshot = AbsUploadSnapshot.Build(internalAbsResources);
-                await _snapshotStore.SetDomainAsync(state.RunId, "absUpload", absSnapshot, CancellationToken.None);
+                await _snapshotStore.SetDomainAsync(state.RunId, "absUpload", absSnapshot, cancellationToken);
             }
             catch (Exception absEx)
             {
@@ -368,7 +384,7 @@ internal sealed class RunExecutor
                         _ => value?.ToString() ?? string.Empty
                     };
                 }
-                await _snapshotStore.SetDomainAsync(state.RunId, "absFiles", absFiles, CancellationToken.None);
+                await _snapshotStore.SetDomainAsync(state.RunId, "absFiles", absFiles, cancellationToken);
             }
             catch (Exception absFilesEx)
             {
@@ -429,7 +445,7 @@ internal sealed class RunExecutor
                 {
                     // Persist after each validator so partial results are visible
                     // in the dashboard even if a later validator throws.
-                    await _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", validatorResults, CancellationToken.None);
+                    await _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", validatorResults, cancellationToken);
                 }
             }
 
@@ -455,7 +471,7 @@ internal sealed class RunExecutor
             // rather than the pre-validation snapshot taken at line ~506.
             if (generationManifest != null)
             {
-                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), CancellationToken.None);
+                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             await RunValidator("REPORT DATABASE VALIDATION", () =>
@@ -486,7 +502,7 @@ internal sealed class RunExecutor
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 services.GetRequiredService<IQueryDispatchServiceClient>(),
                 services.GetRequiredService<IReportServiceClient>(),
-                fhirDataLoader,
+                internalFhirDataLoader,
                 output,
                 facilityId,
                 reportId);
@@ -508,7 +524,7 @@ internal sealed class RunExecutor
         {
             if (state.CancelRequested || state.Status == AutomationRunStatus.Cancelled)
             {
-                _logger.LogInformation("Run {RunId} faulted after cancel request: {Message}", state.RunId, ex.Message);
+                _logger.LogInformation(ex, "Run {RunId} faulted after cancel request: {ExceptionType}", state.RunId, ex.GetType().Name);
                 return;
             }
 

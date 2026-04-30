@@ -7,16 +7,28 @@ namespace LantanaGroup.Automation.Generation;
 /// modeled by computing the IP windows once per simulator call and then having each
 /// profile test its resources against those windows.
 ///
-/// The resolver currently uses encounter <c>class.code</c> as the IP-membership
-/// predicate, mirroring the value-set bound retrieves the CQL libraries declare:
+/// IP-membership predicate (encounter <c>class.code</c> + <c>status</c>) is delegated to
+/// <see cref="EncounterIpClassification"/>, which is the single source of truth across
+/// the resolver and <see cref="ImportedPatientClassifier"/>. The class-code sets mirror
+/// the canonical NHSN measure CQL retrieves:
 /// <list type="bullet">
-///   <item>ACH Monthly + ACH Daily — class in {IMP, EMER, AMB} (inpatient, ED, observation/short-stay)</item>
-///   <item>Hypoglycemic — class IMP (inpatient encounter)</item>
+///   <item>ACH Monthly + ACH Daily — class in <c>"NHSN Inpatient Encounter Class Codes"</c>
+///         <c>{IMP, ACUTE, NONAC, SS}</c> ∪ <c>{EMER, OBSENC}</c></item>
+///   <item>Hypoglycemic — class in <c>"NHSN Inpatient Encounter Class Codes"</c> only.</item>
 /// </list>
+/// Encounters whose <c>status</c> falls outside
+/// <c>{in-progress, finished, triaged, onleave, entered-in-error}</c> are excluded.
 ///
-/// Encounters that don't match any selected measure's class predicate are excluded
-/// from the IP set; the simulator's Encounter profile additionally drops encounters
-/// that don't overlap any IP window (matching the "SDE Encounter overlaps IP.period"
+/// <para>
+/// Known modeling gaps (see <see cref="EncounterIpClassification"/> for details):
+/// encounter-type-based qualification and encounter-location-type-based qualification
+/// are not yet replicated here, and the Hypoglycemic measure's "antidiabetic drug
+/// during encounter" requirement is approximated only by the importer's classifier.
+/// </para>
+///
+/// Encounters that don't match any selected measure's IP predicate are excluded from
+/// the IP set; the simulator's Encounter profile additionally drops encounters that
+/// don't overlap any IP window (matching the <c>"SDE Encounter overlaps IP.period"</c>
 /// CQL retrieve).
 /// </summary>
 public static class MeasureInitialPopulationResolver
@@ -76,30 +88,24 @@ public static class MeasureInitialPopulationResolver
 
     private static bool IsIpForMeasure(CqlFilterSimulator.EncounterContext enc, ProfiledMeasureType measure)
     {
-        var cls = enc.ClassCode ?? string.Empty;
-        return measure switch
+        EncounterIpClassification.IpProfile profile;
+        switch (measure)
         {
-            // ACH measures: inpatient, emergency, observation/short-stay (AMB) all qualify.
-            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation or
-            ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation =>
-                MatchesClass(cls, "IMP", "EMER", "AMB"),
-
-            // Hypoglycemic: inpatient encounter only.
-            ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation =>
-                MatchesClass(cls, "IMP"),
-
-            _ => false
-        };
-    }
-
-    private static bool MatchesClass(string cls, params string[] accepted)
-    {
-        foreach (var a in accepted)
-        {
-            if (string.Equals(cls, a, StringComparison.OrdinalIgnoreCase))
-                return true;
+            case ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation:
+            case ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation:
+                profile = EncounterIpClassification.IpProfile.Ach;
+                break;
+            case ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation:
+                profile = EncounterIpClassification.IpProfile.Hypoglycemic;
+                break;
+            default:
+                return false;
         }
-        return false;
+
+        if (!EncounterIpClassification.IsValidIpEncounterStatus(enc.Status))
+            return false;
+
+        return EncounterIpClassification.ClassCodeQualifiesIp(enc.ClassCode, profile);
     }
 
     /// <summary>

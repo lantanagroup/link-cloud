@@ -1,9 +1,7 @@
 using Automation.UI.Models;
-using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation;
-using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;

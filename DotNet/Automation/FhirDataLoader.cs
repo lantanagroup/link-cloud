@@ -17,6 +17,12 @@ public class FhirDataLoader
     private readonly ConcurrentBag<string> _createdResources = new();
     private string? _authorization;
     private readonly RestClient _restClient;
+    /// <summary>
+    /// Configured FHIR server base. Captured at construction time so that paging
+    /// follow-up requests can be validated against the origin we authenticated to,
+    /// and the bearer/basic credential is never forwarded to a different host.
+    /// </summary>
+    private readonly Uri _baseUri;
     private readonly OAuthConfig? _oauthConfig;
     private readonly BasicAuthConfig? _basicAuthConfig;
 
@@ -28,7 +34,9 @@ public class FhirDataLoader
     {
         _oauthConfig = oauthConfig;
         _basicAuthConfig = basicAuthConfig;
-        _restClient = new RestClient(fhirServerBaseUrl.TrimEnd('/'));
+        var trimmed = fhirServerBaseUrl.TrimEnd('/');
+        _baseUri = new Uri(trimmed, UriKind.Absolute);
+        _restClient = new RestClient(trimmed);
         GetAuthorization();
     }
 
@@ -417,8 +425,10 @@ public class FhirDataLoader
                     $"Patient/{patientId}/$everything exceeded the {MaxPages}-page safety cap; refusing to continue.");
             }
 
+            var validatedNextUrl = ResolveAndValidateSameOrigin(nextUrl!, $"Patient/{patientId}/$everything (page {pageCount})");
+
             var pageJson = await GetPageAsync(
-                nextUrl!,
+                validatedNextUrl.AbsoluteUri,
                 useFullUrl: true,
                 descriptionForError: $"Patient/{patientId}/$everything (page {pageCount})",
                 ct);
@@ -449,18 +459,33 @@ public class FhirDataLoader
     /// <summary>
     /// Performs a single GET against the FHIR server and returns the response body.
     /// When <paramref name="useFullUrl"/> is true the URL is treated as absolute
-    /// (used for paging links); otherwise it is resolved against the configured
-    /// server base URL via the existing <see cref="_restClient"/>.
+    /// (used for paging links) and is required to share scheme+host+port with
+    /// <see cref="_baseUri"/>; otherwise it is resolved against the configured server
+    /// base URL via the existing <see cref="_restClient"/>. The <c>Authorization</c>
+    /// header is only forwarded when the request target's origin matches the configured
+    /// FHIR base, so a server-supplied <c>next</c> link can never harvest the credential.
     /// </summary>
     private async Task<string> GetPageAsync(string url, bool useFullUrl, string descriptionForError, CancellationToken ct)
     {
         RestResponse response;
         if (useFullUrl)
         {
-            // Absolute URLs returned by the server may point to a different host (e.g.
-            // an internal pagination service). Use a one-off RestClient so the host
-            // resolves correctly and we don't accidentally combine it with the
-            // configured base URL.
+            // Defense-in-depth: callers (the paging loop) already validate via
+            // ResolveAndValidateSameOrigin, but re-check here so a future caller can't
+            // bypass the origin guard.
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var target))
+            {
+                throw new InvalidOperationException(
+                    $"Refusing to issue request for {descriptionForError}: '{url}' is not an absolute URI.");
+            }
+            if (!IsSameOrigin(_baseUri, target))
+            {
+                throw new InvalidOperationException(
+                    $"Refusing to issue request for {descriptionForError}: target origin " +
+                    $"{target.GetLeftPart(UriPartial.Authority)} differs from configured FHIR base " +
+                    $"{_baseUri.GetLeftPart(UriPartial.Authority)}.");
+            }
+
             using var oneOffClient = new RestClient(url);
             var request = new RestRequest("", Method.Get);
             request.AddHeader("Accept", "application/fhir+json");
@@ -485,6 +510,50 @@ public class FhirDataLoader
 
         return response.Content;
     }
+
+    /// <summary>
+    /// Resolves a Bundle <c>next</c> link returned by the FHIR server and rejects
+    /// links that would cause a cross-origin request:
+    /// <list type="bullet">
+    ///   <item>Relative links are resolved against <see cref="_baseUri"/>.</item>
+    ///   <item>Absolute links must share scheme, host, and port with <see cref="_baseUri"/>.</item>
+    /// </list>
+    /// Throws <see cref="InvalidOperationException"/> when the link is malformed or points
+    /// to a different origin, so pagination stops with an informative error rather than
+    /// silently following an attacker-controlled link (and potentially forwarding the
+    /// configured Authorization header to it).
+    /// </summary>
+    private Uri ResolveAndValidateSameOrigin(string nextLink, string descriptionForError)
+    {
+        if (!Uri.TryCreate(nextLink, UriKind.RelativeOrAbsolute, out var parsed))
+        {
+            throw new InvalidOperationException(
+                $"Refusing to follow Bundle next link for {descriptionForError}: '{nextLink}' is not a valid URI.");
+        }
+
+        var absolute = parsed.IsAbsoluteUri ? parsed : new Uri(_baseUri, parsed);
+
+        if (!absolute.IsAbsoluteUri)
+        {
+            throw new InvalidOperationException(
+                $"Refusing to follow Bundle next link for {descriptionForError}: could not resolve '{nextLink}' against base '{_baseUri}'.");
+        }
+
+        if (!IsSameOrigin(_baseUri, absolute))
+        {
+            throw new InvalidOperationException(
+                $"Refusing to follow Bundle next link for {descriptionForError}: target origin " +
+                $"{absolute.GetLeftPart(UriPartial.Authority)} differs from configured FHIR base " +
+                $"{_baseUri.GetLeftPart(UriPartial.Authority)}.");
+        }
+
+        return absolute;
+    }
+
+    private static bool IsSameOrigin(Uri left, Uri right) =>
+        string.Equals(left.Scheme, right.Scheme, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(left.Host, right.Host, StringComparison.OrdinalIgnoreCase)
+        && left.Port == right.Port;
 
     /// <summary>
     /// Returns the absolute URL of the <c>Bundle.link</c> entry whose <c>relation</c>
