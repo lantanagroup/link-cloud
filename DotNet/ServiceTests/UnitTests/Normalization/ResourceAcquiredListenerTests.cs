@@ -3,11 +3,13 @@ using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Listeners;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -31,6 +33,8 @@ public class ResourceAcquiredListenerTests
     private readonly Mock<CodeMapOperationService> _codeMapOperationServiceMock;
     private readonly Mock<ConditionalTransformOperationService> _conditionalTransformOperationServiceMock;
     private readonly Mock<CopyLocationOperationService> _copyLocationOperationServiceMock;
+    private readonly Mock<RedisResourceCache> _redisResourceCache;
+    private readonly Mock<ABSResourceCache> _absResourceCache;
 
     public ResourceAcquiredListenerTests()
     {
@@ -49,6 +53,9 @@ public class ResourceAcquiredListenerTests
         _codeMapOperationServiceMock = new Mock<CodeMapOperationService>(new Mock<ILogger<CodeMapOperationService>>().Object, null);
         _conditionalTransformOperationServiceMock = new Mock<ConditionalTransformOperationService>(new Mock<ILogger<ConditionalTransformOperationService>>().Object, null);
         _copyLocationOperationServiceMock = new Mock<CopyLocationOperationService>(new Mock<ILogger<CopyLocationOperationService>>().Object, null);
+
+        _redisResourceCache = new Mock<RedisResourceCache>();
+        _absResourceCache = new Mock<ABSResourceCache>();
     }
 
     [Fact]
@@ -68,25 +75,27 @@ public class ResourceAcquiredListenerTests
             _copyPropertyOperationServiceMock.Object,
             _codeMapOperationServiceMock.Object,
             _conditionalTransformOperationServiceMock.Object,
-            _copyLocationOperationServiceMock.Object);
+            _copyLocationOperationServiceMock.Object,
+            _redisResourceCache.Object,
+            _absResourceCache.Object);
 
         var facilityId = "TestFacility";
         var correlationId = "TestCorrelationId";
         var resource = new Patient { Id = "TestPatient" };
         var messageValue = new ResourcesAcquiredValue
         {
-            PatientId = "TestPatient",
             QueryType = "TestQuery",
             ScheduledReports = new List<ScheduledReport> { new ScheduledReport { ReportTypes = new List<string> { "TestReport" } } },
             ReportableEvent = "TestEvent",
-            AcquisitionComplete = false
+            CacheType = ResourceCacheType.ABS,
+            CacheKeys = new List<string>() { correlationId + ":" + ResourceType.Patient.ToString() }
         };
 
         var consumeResult = new ConsumeResult<ResourceKey, ResourcesAcquiredValue>
         {
             Message = new Message<ResourceKey, ResourcesAcquiredValue>
             {
-                Key = new ResourceKey { FacilityId = facilityId, CorrelationId = correlationId },
+                Key = new ResourceKey { FacilityId = facilityId, PatientId = "TestPatient"},
                 Value = messageValue
             }
         };
@@ -136,25 +145,28 @@ public class ResourceAcquiredListenerTests
             _copyPropertyOperationServiceMock.Object,
             _codeMapOperationServiceMock.Object,
             _conditionalTransformOperationServiceMock.Object,
-            _copyLocationOperationServiceMock.Object);
+            _copyLocationOperationServiceMock.Object,
+            _redisResourceCache.Object,
+            _absResourceCache.Object);
 
         var facilityId = "TestFacility";
         var correlationId = "TestCorrelationId";
         DomainResource resource = null; // This is the case we want to test
+        
         var messageValueNull = new ResourcesAcquiredValue
         {
-            PatientId = "TestPatient",
             QueryType = "TestQuery",
             ScheduledReports = new List<ScheduledReport> { new ScheduledReport { ReportTypes = new List<string> { "TestReport" } } },
             ReportableEvent = "TestEvent",
-            AcquisitionComplete = true // Typical for null resource
+            CacheType = ResourceCacheType.Redis,
+            CacheKeys = new List<string>() { correlationId + ":" + ResourceType.Patient.ToString() }
         };
 
         var consumeResultNull = new ConsumeResult<ResourceKey, ResourcesAcquiredValue>
         {
             Message = new Message<ResourceKey, ResourcesAcquiredValue>
             {
-                Key = new ResourceKey { FacilityId = facilityId, CorrelationId = correlationId },
+                Key = new ResourceKey { FacilityId = facilityId, PatientId = "TestPatient"},
                 Value = messageValueNull
             }
         };
