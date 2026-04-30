@@ -1,7 +1,9 @@
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using System.Text.Json;
 
@@ -10,10 +12,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
     public class RedisResourceCache : IResourceCache
     {
         private readonly IDatabase _db;
+        private readonly ILogger<RedisResourceCache> _logger;
 
-        public RedisResourceCache(IConnectionMultiplexer redis)
+        public RedisResourceCache(IConnectionMultiplexer redis, ILogger<RedisResourceCache> logger)
         {
             _db = redis.GetDatabase();
+            _logger = logger;
         }
 
         public void Delete(List<string> cacheKeys)
@@ -42,7 +46,8 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 }
                 catch (Exception ex) 
                 {
-                    throw new Exception($"Failed to deserialize FHIR DomainResource for the following Redis entry: " + entry.Name.ToString());
+                    //We aren't going to dead letter the event if we have issues deserializing the resource, but will log it.
+                    _logger.LogError("Failed to deserialize FHIR Domain resource for Redis entry: {entryName}", entry.Name.ToString());
                 }
             }
 

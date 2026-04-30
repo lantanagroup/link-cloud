@@ -141,14 +141,16 @@ public class ResourcesAcquiredListener : BackgroundService
                                     ResourceType = resourceType.ToString(),
                                 });
 
-                                if (sequences == null || sequences.Count == 0) {
+                                if (sequences == null || sequences.Count == 0)
+                                {
                                     resourceCache.Skipped(cacheKey, correlationId);
                                     continue;
                                 }
 
                                 List<DomainResource> resources = resourceCache.Get(cacheKey);
 
-                                foreach (var resource in resources) {
+                                foreach (var resource in resources)
+                                {
                                     sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
 
                                     foreach (var sequence in sequences)
@@ -190,7 +192,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
                                 resourceCache.UpdateCorrelationCache(correlationId, resources, resourceType);
                             }
-                                
+
                             await ProduceResourcesNormalizedMessage(message, message.Message.Key.FacilityId, correlationId);
 
                             resourceCache.Delete(message.Message.Value.CacheKeys);

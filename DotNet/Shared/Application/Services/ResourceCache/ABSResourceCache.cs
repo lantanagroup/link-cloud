@@ -2,9 +2,11 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SharpCompress.Common;
 using System.Text.Json;
@@ -15,10 +17,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
     {
         private readonly BlobContainerClient _containerClient;
         private readonly ResourceCacheBlobStorageSettings _settings;
+        private readonly ILogger<RedisResourceCache> _logger;
 
-        public ABSResourceCache(IOptions<ResourceCacheBlobStorageSettings> settings)
+        public ABSResourceCache(IOptions<ResourceCacheBlobStorageSettings> settings, ILogger<RedisResourceCache> logger)
         {
             _settings = settings.Value;
+            _logger = logger;
             _containerClient = new BlobContainerClient(_settings.ConnectionString, _settings.BlobContainerName);
         }
 
@@ -66,7 +70,8 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     }
                     catch (Exception ex)
                     {
-                        throw new Exception($"Failed to deserialize FHIR DomainResource for the following ABS entry: " + resourceReference);
+                        //We aren't going to dead letter the event if we have issues deserializing the resource, but will log it. 
+                        _logger.LogError("Failed to deserialize FHIR DomainResource for the following ABS entry: {reference}", resourceReference);
                     }
                 }
             }
