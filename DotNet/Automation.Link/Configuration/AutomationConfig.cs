@@ -8,16 +8,35 @@ namespace LantanaGroup.Link.Automation.Link.Configuration;
 public class AutomationConfig
 {
     /// <summary>
-    /// Base URL of the FHIR server Automation talks to. The exact same URL is also
-    /// registered on each test facility's query config (via <c>FacilitySetupHelper</c>)
-    /// so Link's services hit the same server &mdash; there is only ever one FHIR
-    /// server in play. In a Docker-compose run this is the in-network name
-    /// (e.g. <c>http://fhir-server:8080/fhir</c>); in dev-from-host it's whatever
-    /// host-reachable URL points at the same instance
-    /// (e.g. <c>http://host.docker.internal:6157/fhir</c> so DataAcquisition inside
-    /// the container can resolve it too).
+    /// FHIR server URL <b>Automation.UI itself</b> talks to for outbound calls
+    /// (readiness probe, bundle uploads, generation pipeline, <c>$everything</c> reads,
+    /// cleanup). Reflects whatever URL is reachable from wherever Automation.UI is hosted:
+    /// <list type="bullet">
+    ///   <item>When Automation.UI runs <i>inside</i> the docker compose network this is
+    ///         the in-network DNS name (e.g. <c>http://fhir-server:8080/fhir</c>).</item>
+    ///   <item>When Automation.UI runs <i>on the host</i> against a dockerized stack this
+    ///         is the host-reachable URL via the published port mapping
+    ///         (e.g. <c>http://localhost:6157/fhir</c>).</item>
+    /// </list>
+    /// In real deployments the URL comes from environment / Azure config; both fields
+    /// typically resolve to the same value since there is only one FHIR server in play.
     /// </summary>
-    public string FhirServerBase { get; set; } = "http://localhost:6157/fhir";
+    public string FhirServerBase { get; set; } = "http://fhir-server:8080/fhir";
+
+    /// <summary>
+    /// FHIR server URL Automation registers on each test facility's
+    /// <c>FhirQueryConfiguration</c> (via <c>FacilitySetupHelper</c>). This URL is
+    /// persisted in the Tenant DB and later read back by <b>Link's own services</b>
+    /// (DataAcquisition, Normalization, &hellip;) when they need to query the FHIR
+    /// server. Their vantage point is <i>inside</i> the docker network, so this URL
+    /// must be resolvable from there &mdash; in compose, that's always the service DNS
+    /// name <c>http://fhir-server:8080/fhir</c>, regardless of where Automation.UI itself
+    /// is hosted. There is only one physical FHIR server; this property exists separately
+    /// from <see cref="FhirServerBase"/> only because the consumer's network vantage
+    /// point can differ.
+    /// </summary>
+    public string FacilityFhirServerBase { get; set; } = "http://fhir-server:8080/fhir";
+
     public string AdminBffBase { get; set; } = "http://localhost:8063/api";
     public string LokiBaseUrl { get; set; } = "http://localhost:3100";
     public string? DownloadPath { get; set; }

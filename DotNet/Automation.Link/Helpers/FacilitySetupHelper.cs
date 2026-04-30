@@ -141,7 +141,7 @@ public static class FacilitySetupHelper
         var created = await dataAcqClient.CreateFhirQueryConfigurationAsync(new CreateFhirQueryConfigurationRequestApiModel
         {
             FacilityId = facilityId,
-            FhirServerBaseUrl = config.FhirServerBase,
+            FhirServerBaseUrl = config.FacilityFhirServerBase,
             MaxConcurrentRequests = effectiveMaxConcurrentRequests,
             MaxRetries = 3,
             MinAcquisitionPullTime = config.FhirQuery.MinAcquisitionPullTime,
