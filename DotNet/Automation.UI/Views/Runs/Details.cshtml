@@ -351,7 +351,7 @@
                            id="daLogSearch"
                            class="form-control form-control-sm"
                            style="max-width:360px;"
-                           placeholder="Filter loaded rows (Id, patient, status, phase, resource types…)"
+                           placeholder="Filter all logs (Id, patient, status, phase, resource types…)"
                            autocomplete="off" />
                     <span class="small text-muted" id="daLogFilterInfo"></span>
                 </div>
@@ -584,12 +584,10 @@
             try { parsed = JSON.parse(rawJson); } catch { return; }
             if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
 
-            // Keys rendered elsewhere or deprecated.
+            // Keys rendered elsewhere or otherwise not surfaced as plain key/value pairs.
             const skip = new Set([
-                'id', 'isSystemScenario', 'useMeasureEligibilityProfiles',
-                'patientProfiles', 'patientCohorts',
-                'selectedClinicalScenarioIds', 'dischargeCount',
-                'dischargeQualifyingCount', 'dischargeNonQualifyingCount',
+                'id', 'isSystemScenario',
+                'patientCohorts',
                 'resourcesPerPatientMin', 'resourcesPerPatientMax',
                 'queryPlanTemplateId', 'updatedAt'
             ]);
@@ -601,7 +599,6 @@
                 selectedMeasures: 'Measures',
                 seed: 'Seed',
                 patientCount: 'Patients',
-                patientPrefix: 'Patient Prefix',
                 queryPlanTemplateName: 'Query Plan',
                 cleanupServiceData: 'Cleanup Service Data',
                 cleanupFhirData: 'Cleanup FHIR Data'
@@ -1389,6 +1386,10 @@
         const daLogPageSize = 50;
         let daSortBy = 'Id';
         let daSortOrder = 'Ascending';
+        // Current free-text search term, sent to the server on every fetch. Server
+        // applies the filter and returns paged results just like the unfiltered case,
+        // so pagination stays straightforward and works the same in either mode.
+        let daSearchTerm = '';
 
         function updateDaSortIcons() {
             const map = {
@@ -1416,7 +1417,12 @@
             tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Loading...</td></tr>';
 
             try {
-                const res = await fetch(`${dataAcqLogsUrl}?id=${encodeURIComponent(runId)}&pageNumber=${page}&pageSize=${daLogPageSize}&sortBy=${encodeURIComponent(daSortBy)}&sortOrder=${encodeURIComponent(daSortOrder)}`);
+                let url = `${dataAcqLogsUrl}?id=${encodeURIComponent(runId)}&pageNumber=${page}&pageSize=${daLogPageSize}&sortBy=${encodeURIComponent(daSortBy)}&sortOrder=${encodeURIComponent(daSortOrder)}`;
+                if (daSearchTerm) {
+                    url += `&searchTerm=${encodeURIComponent(daSearchTerm)}`;
+                }
+
+                const res = await fetch(url);
                 if (!res.ok) {
                     tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Failed to load logs.</td></tr>';
                     return;
@@ -1427,48 +1433,57 @@
                 const totalCount = data.metadata?.totalCount || data.Metadata?.TotalCount || 0;
                 const totalPages = Math.max(1, Math.ceil(totalCount / daLogPageSize));
 
-                document.getElementById('dataAcqLogPaginationInfo').textContent =
-                    `Page ${page} of ${totalPages} (${totalCount} total)`;
+                document.getElementById('dataAcqLogPaginationInfo').textContent = daSearchTerm
+                    ? `Page ${page} of ${totalPages} (${totalCount} match(es), filtered)`
+                    : `Page ${page} of ${totalPages} (${totalCount} total)`;
 
                 document.getElementById('dataAcqLogPrev').disabled = page <= 1;
                 document.getElementById('dataAcqLogNext').disabled = page >= totalPages;
 
-                if (!records.length) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No logs found.</td></tr>';
-                    return;
-                }
-
-                tbody.innerHTML = records.map(r => {
-                    const status = r.status ?? r.Status ?? '-';
-                    const phase = r.queryPhase ?? r.QueryPhase ?? '-';
-                    const isReference = r.isReferenceLog === true || r.IsReferenceLog === true;
-                    const refCount = r.referenceResourceCount ?? r.ReferenceResourceCount ?? 0;
-                    const resourceTypes = r.resourceTypes || r.ResourceTypes || [];
-                    const patient = r.patientId ?? r.PatientId ?? '-';
-                    const logId = r.id ?? r.Id;
-                    const statusKey = String(status).toLowerCase();
-                    const statusBadge = statusKey === 'completed' ? 'au-badge-success'
-                        : statusKey === 'failed' ? 'au-badge-danger'
-                        : statusKey === 'processing' ? 'au-badge-muted'
-                        : 'au-badge-muted';
-                    return `<tr>
-                        <td class="small">${logId ?? '-'}</td>
-                        <td class="small">${escapeHtml(patient)}</td>
-                        <td><span class="badge ${statusBadge}">${escapeHtml(status)}</span></td>
-                        <td class="small">${escapeHtml(phase)}</td>
-                        <td class="small">${refCount > 0 ? `<span class="badge" style="background:var(--au-accent);color:#fff;">${refCount} ref</span>` : isReference ? '<span class="badge au-badge-muted">Ref</span>' : '<span class="text-muted">-</span>'}</td>
-                        <td class="small" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(resourceTypes.join(', '))}">${escapeHtml(resourceTypes.join(', ') || '-')}</td>
-                        <td class="small text-end">
-                            <button type="button" class="btn btn-sm btn-au-action da-detail-btn" data-logid="${logId}" title="View details"><i class="bi bi-file-text"></i></button>
-                        </td>
-                    </tr>`;
-                }).join('');
-
-                for (const btn of tbody.querySelectorAll('.da-detail-btn')) {
-                    btn.addEventListener('click', () => openDaLogDetails(btn.getAttribute('data-logid')));
-                }
+                renderDaLogRows(records, daSearchTerm ? 'No matching logs.' : 'No logs found.');
             } catch {
                 tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading logs.</td></tr>';
+            }
+        }
+
+        // Renders the table body for a list of records and (re-)wires the per-row
+        // detail buttons. Hoisted out of loadDataAcqLogs so future server-paged
+        // call sites have a single rendering contract.
+        function renderDaLogRows(records, emptyMessage) {
+            const tbody = document.getElementById('dataAcqLogTableBody');
+            if (!records.length) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">${escapeHtml(emptyMessage || 'No logs found.')}</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = records.map(r => {
+                const status = r.status ?? r.Status ?? '-';
+                const phase = r.queryPhase ?? r.QueryPhase ?? '-';
+                const isReference = r.isReferenceLog === true || r.IsReferenceLog === true;
+                const refCount = r.referenceResourceCount ?? r.ReferenceResourceCount ?? 0;
+                const resourceTypes = r.resourceTypes || r.ResourceTypes || [];
+                const patient = r.patientId ?? r.PatientId ?? '-';
+                const logId = r.id ?? r.Id;
+                const statusKey = String(status).toLowerCase();
+                const statusBadge = statusKey === 'completed' ? 'au-badge-success'
+                    : statusKey === 'failed' ? 'au-badge-danger'
+                    : statusKey === 'processing' ? 'au-badge-muted'
+                    : 'au-badge-muted';
+                return `<tr>
+                    <td class="small">${logId ?? '-'}</td>
+                    <td class="small">${escapeHtml(patient)}</td>
+                    <td><span class="badge ${statusBadge}">${escapeHtml(status)}</span></td>
+                    <td class="small">${escapeHtml(phase)}</td>
+                    <td class="small">${refCount > 0 ? `<span class="badge" style="background:var(--au-accent);color:#fff;">${refCount} ref</span>` : isReference ? '<span class="badge au-badge-muted">Ref</span>' : '<span class="text-muted">-</span>'}</td>
+                    <td class="small" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(resourceTypes.join(', '))}">${escapeHtml(resourceTypes.join(', ') || '-')}</td>
+                    <td class="small text-end">
+                        <button type="button" class="btn btn-sm btn-au-action da-detail-btn" data-logid="${logId}" title="View details"><i class="bi bi-file-text"></i></button>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            for (const btn of tbody.querySelectorAll('.da-detail-btn')) {
+                btn.addEventListener('click', () => openDaLogDetails(btn.getAttribute('data-logid')));
             }
         }
 
@@ -1577,48 +1592,23 @@
         document.getElementById('dataAcqLogPrev').addEventListener('click', () => { if (daLogPage > 1) loadDataAcqLogs(daLogPage - 1); });
         document.getElementById('dataAcqLogNext').addEventListener('click', () => loadDataAcqLogs(daLogPage + 1));
 
-        // Client-side filter over the currently loaded page. Hides rows whose
-        // visible cell text doesn't match. Server-side search would require
-        // SDK changes; for now this gives quick narrowing within the 50 rows
-        // already on screen and clearly indicates the visible/total ratio.
+        // Search input updates the server-side search term. Each fetch passes the term
+        // along; the server applies it as PatientId LIKE %term% (and Id/ResourceType
+        // exact matches when applicable), then returns a normally-paged result. So
+        // pagination behaves identically to the unfiltered case — page 1 is page 1
+        // of the filtered set, no client-side row hiding, no bulk pre-fetch.
         (function () {
             const input = document.getElementById('daLogSearch');
-            const info = document.getElementById('daLogFilterInfo');
             if (!input) return;
 
             let timer = null;
-            function applyFilter() {
-                const term = (input.value || '').trim().toLowerCase();
-                const tbody = document.getElementById('dataAcqLogTableBody');
-                if (!tbody) return;
-
-                let visible = 0;
-                let total = 0;
-                for (const tr of tbody.querySelectorAll('tr')) {
-                    if (!tr.querySelector('td')) continue; // skip empty/loading rows
-                    total++;
-                    const matches = !term || tr.textContent.toLowerCase().includes(term);
-                    tr.style.display = matches ? '' : 'none';
-                    if (matches) visible++;
-                }
-
-                if (info) {
-                    info.textContent = term
-                        ? `Showing ${visible} of ${total} loaded row(s)`
-                        : '';
-                }
-            }
-
             input.addEventListener('input', () => {
                 clearTimeout(timer);
-                timer = setTimeout(applyFilter, 120);
+                timer = setTimeout(() => {
+                    daSearchTerm = (input.value || '').trim();
+                    loadDataAcqLogs(1);
+                }, 250);
             });
-
-            // Re-apply when a new page is loaded so the filter persists across pagination.
-            const tbody = document.getElementById('dataAcqLogTableBody');
-            if (tbody) {
-                new MutationObserver(applyFilter).observe(tbody, { childList: true });
-            }
         })();
 
         document.getElementById('closeDaLogFlyout').addEventListener('click', () => {

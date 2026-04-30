@@ -1,9 +1,8 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 
@@ -25,4 +24,11 @@ public class SearchDataAcquisitionLogRequest
     public string? ResourceType { get; set; }
     public bool IncludeDeleted { get; set; } = false;
     public DateTime? CreatedBefore { get; set; }
+
+    /// <summary>
+    /// Free-text term applied as case-insensitive substring against PatientId and
+    /// resource-type names, plus exact match on numeric Id when the term parses as long.
+    /// Null/empty means no extra filtering.
+    /// </summary>
+    public string? SearchTerm { get; set; }
 }

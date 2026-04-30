@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Generation;
 
 namespace Automation.UI.Models;
 
@@ -45,19 +45,7 @@ public class TestScenarioDefinition
     /// <summary>Maximum resources per patient (inclusive). When equal to Min, every patient gets the same count.</summary>
     public int ResourcesPerPatientMax { get; set; } = 250;
 
-    /// <summary>Patient ID prefix string.</summary>
-    public string PatientPrefix { get; set; } = "CustomPatient";
-
     // ----- Generation Mode -----
-
-    /// <summary>
-    /// When true, uses per-patient profiles (PatientProfiles) instead of random generation.
-    /// PatientCount is ignored when profiles are provided.
-    /// </summary>
-    public bool UseMeasureEligibilityProfiles { get; set; }
-
-    /// <summary>Per-patient eligibility profiles for measure-eligibility mode.</summary>
-    public List<PatientProfile> PatientProfiles { get; set; } = [];
 
     /// <summary>
     /// Cohort-based configuration for measure-eligibility mode.
@@ -65,30 +53,6 @@ public class TestScenarioDefinition
     /// and which clinical scenario indices are allowed as the source pool.
     /// </summary>
     public List<PatientCohortDefinition> PatientCohorts { get; set; } = [];
-
-    /// <summary>
-    /// Stable clinical scenario IDs selected for inclusion.
-    /// </summary>
-    public List<string> SelectedClinicalScenarioIds { get; set; } = [];
-
-    // ----- Discharge Control (Scheduled Report only) -----
-
-    /// <summary>
-    /// Number of patients to discharge during the report period.
-    /// Only applicable when ReportMethod is ScheduledReport.
-    /// For Standard mode, this is the total count of random patients that get discharged.
-    /// </summary>
-    public int DischargeCount { get; set; }
-
-    /// <summary>
-    /// When using measure-eligibility profiles: how many qualifying patients to discharge.
-    /// </summary>
-    public int DischargeQualifyingCount { get; set; }
-
-    /// <summary>
-    /// When using measure-eligibility profiles: how many non-qualifying patients to discharge.
-    /// </summary>
-    public int DischargeNonQualifyingCount { get; set; }
 
     // ----- Housekeeping -----
 
@@ -108,6 +72,38 @@ public class TestScenarioDefinition
     /// Expunge all data from the FHIR server after the run.
     /// </summary>
     public bool CleanupFhirData { get; set; } = true;
+
+    // ----- Reporting Period -----
+
+    /// <summary>
+    /// Reporting period start (UTC). When null, the system default
+    /// (<c>2023-01-01T00:00:00Z</c>) is used. The UI auto-suggests a value that
+    /// encompasses imported-patient encounter dates when imports are added.
+    /// </summary>
+    public DateTimeOffset? ReportPeriodStart { get; set; }
+
+    /// <summary>
+    /// Reporting period end (UTC). When null, the system default
+    /// (<c>2023-12-31T23:59:59Z</c>) is used.
+    /// </summary>
+    public DateTimeOffset? ReportPeriodEnd { get; set; }
+
+    // ----- Imported Patients (supplemental, separate from cohorts/random pool) -----
+
+    /// <summary>
+    /// Patients to fetch from the FHIR server by ID and include alongside the generated pool.
+    /// These patients are assumed to already exist on the server; their data is fetched at run
+    /// time, classified, and added to the manifest. They are NOT uploaded and NOT expunged on
+    /// cleanup.
+    /// </summary>
+    public List<ImportedPatientInput> ImportedPatientIds { get; set; } = [];
+
+    /// <summary>
+    /// Patients supplied as FHIR transaction bundles (one bundle per patient). These are
+    /// uploaded to the FHIR server during the run, included in the manifest, and expunged on
+    /// cleanup like any generated patient.
+    /// </summary>
+    public List<ImportedPatientInput> ImportedPatientBundles { get; set; } = [];
 
     /// <summary>When the scenario was created or last updated.</summary>
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

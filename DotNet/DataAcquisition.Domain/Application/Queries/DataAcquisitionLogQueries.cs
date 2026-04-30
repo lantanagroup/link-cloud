@@ -935,6 +935,31 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             query = query.Where(log => log.CreateDate <= model.CreatedBefore.Value);
         }
 
+        // Free-text search: applied as an OR across the columns surfaced in the UI's
+        // log table. Each branch is gated by whether the term is structurally compatible
+        // with that column so we never ship a guaranteed-no-match clause to SQL:
+        //   * PatientId   — case-insensitive substring (LIKE %term%) — the dominant use case.
+        //   * Id          — exact match, only when the term parses as long.
+        //   * ResourceType — exact match against the FHIR enum value, only when the term
+        //                    parses as a known ResourceType (the column is stored as the
+        //                    enum string via EnumToStringConverter, so a partial match
+        //                    would require raw-SQL escape hatches; exact is enough for
+        //                    "Observation", "Encounter", etc.).
+        // Combined with the structured filters above via AND, as expected.
+        if (!string.IsNullOrWhiteSpace(model.SearchTerm))
+        {
+            var term = model.SearchTerm.Trim();
+            var likeTerm = $"%{term}%";
+            var hasIdMatch = long.TryParse(term, out var parsedId);
+            var hasTypeMatch = Enum.TryParse<Hl7.Fhir.Model.ResourceType>(term, ignoreCase: true, out var parsedResourceType);
+
+            query = query.Where(log =>
+                (log.PatientId != null && EF.Functions.Like(log.PatientId, likeTerm))
+                || (hasIdMatch && log.Id == parsedId)
+                || (hasTypeMatch && log.FhirQueries.Any(q =>
+                        q.FhirQueryResourceTypes.Any(rt => rt.ResourceType == parsedResourceType))));
+        }
+
         return query;
     }
 
