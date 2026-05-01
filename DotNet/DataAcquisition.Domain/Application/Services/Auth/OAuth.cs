@@ -84,7 +84,7 @@ public class OAuth : IAuth
         }
         catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException)
         {
-            _logger.LogError(ex, "Error acquiring OAuth access token for facility {FacilityId}", facilityId.SanitizeUntrustedString());
+            _logger.LogError(ex, "Error acquiring OAuth access token for facility {FacilityId}", facilityId.SanitizeForLog());
         }
 
         return (false, null);

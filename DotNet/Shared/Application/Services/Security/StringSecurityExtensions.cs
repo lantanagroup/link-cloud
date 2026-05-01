@@ -30,7 +30,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security
         /// <remarks>
         /// Security: Removes control characters (0-31, 127) that could be used for log injection.
         /// </remarks>
-        public static string SanitizeUntrustedString(this string originalString)
+        public static string SanitizeForLog(this string originalString)
         {
             if (originalString is null) return null;
             StringBuilder builder = new(originalString.Length);
@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security
         /// </remarks>
         public static string MaskForLog(this string? value)
         {
-            var sanitized = value.SanitizeUntrustedString();
+            var sanitized = value.SanitizeForLog();
             if (string.IsNullOrEmpty(sanitized))
                 return string.Empty;
             return new string('*', sanitized.Length);

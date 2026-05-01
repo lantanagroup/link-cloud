@@ -34,7 +34,7 @@ public class ExceptionLogger<T> : IExceptionLogger<T>
             _logger.Log(level, ex, "{Caller}: {Message}. FacilityId: {FacilityId} (Context: {Context})",
                 typeof(T).Name,
                 message,
-                facilityId?.SanitizeUntrustedString() ?? "N/A",
+                facilityId?.SanitizeForLog() ?? "N/A",
                 context ?? "None");
         }
         catch (Exception loggingEx)
