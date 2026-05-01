@@ -16,6 +16,8 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Docker",
         "ConnectionStrings__Redis": "localhost:6379",
+        "CacheBlobStorage__ConnectionString": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://localhost:10000/devstoreaccount1",
+        "CacheBlobStorage__BlobContainerName": "cache",
         "KafkaConnection__BootstrapServers__0": "localhost:9094",
         "ConnectionStrings__DatabaseConnection": "Server=tcp:localhost,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;",
         "Serilog__WriteTo__0__Args__uri": "http://localhost:3100",

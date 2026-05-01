@@ -26,6 +26,8 @@ using Microsoft.Extensions.Logging;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using UnitTests.Admin.BFF.Aggregation;
 
 namespace UnitTests.DataAcquisition;
 
@@ -124,16 +126,17 @@ public class FhirApiServiceTests
         var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
+        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourcesAcquired>>();
         var logger = new Mock<ILogger<FhirApiService>>();
+        var resourceCache = new Mock<IResourceCache>();
 
         var service = new FhirApiService(
             referenceResourceManager.Object,
             referenceResourceQueries.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
-            kafkaProducer.Object,
-            logger.Object
+            logger.Object,
+            resourceCache.Object
         );
 
         var resource = new Patient();
@@ -164,14 +167,15 @@ public class FhirApiServiceTests
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
         var logger = new Mock<ILogger<FhirApiService>>();
+        var resourceCache = new Mock<IResourceCache>();
 
         var service = new FhirApiService(
             referenceResourceManager.Object,
             referenceResourceQueries.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
-            kafkaProducer.Object,
-            logger.Object
+            logger.Object,
+            resourceCache.Object
         );
 
         var resource = new Patient();
@@ -216,14 +220,15 @@ public class FhirApiServiceTests
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
         var logger = new Mock<ILogger<FhirApiService>>();
+        var resourceCache = new Mock<IResourceCache>();
 
         var service = new FhirApiService(
             referenceResourceManager.Object,
             referenceResourceQueries.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
-            kafkaProducer.Object,
-            logger.Object
+            logger.Object,
+            resourceCache.Object
         );
 
         var log = new DataAcquisitionLogModel
@@ -267,8 +272,8 @@ public class FhirApiServiceTests
             new Mock<IReferenceResourcesQueries>().Object,
             new Mock<ISearchFhirCommand>().Object,
             readFhirCommand.Object,
-            new Mock<IProducer<ResourceKey, ResourceAcquired>>().Object,
-            new Mock<ILogger<FhirApiService>>().Object
+            new Mock<ILogger<FhirApiService>>().Object,
+            new Mock<IResourceCache>().Object
         );
 
         var log = new DataAcquisitionLogModel { FacilityId = "123", ResourceId = "res-1" };
@@ -295,8 +300,8 @@ public class FhirApiServiceTests
             new Mock<IReferenceResourcesQueries>().Object,
             searchFhirCommand.Object,
             new Mock<IReadFhirCommand>().Object,
-            new Mock<IProducer<ResourceKey, ResourceAcquired>>().Object,
-            new Mock<ILogger<FhirApiService>>().Object
+            new Mock<ILogger<FhirApiService>>().Object,
+            new Mock<IResourceCache>().Object
         );
 
         var log = new DataAcquisitionLogModel { FacilityId = "123", CorrelationId = "c-1" };
@@ -324,8 +329,8 @@ public class FhirApiServiceTests
             new Mock<IReferenceResourcesQueries>().Object,
             searchFhirCommand.Object,
             new Mock<IReadFhirCommand>().Object,
-            kafkaProducer.Object,
-            new Mock<ILogger<FhirApiService>>().Object
+            new Mock<ILogger<FhirApiService>>().Object,
+            new Mock<IResourceCache>().Object
         );
 
         var patient = new Patient { Id = "p1" };
@@ -383,6 +388,7 @@ public class FhirApiServiceTests
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
         var logger = new Mock<ILogger<FhirApiService>>();
+        var resourceCache = new Mock<IResourceCache>();
 
         // Prepare a shared resource (e.g., Location) with no patient context
         var location = new Location
@@ -430,8 +436,8 @@ public class FhirApiServiceTests
             referenceResourceQueries.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
-            kafkaProducer.Object,
-            logger.Object
+            logger.Object,
+            resourceCache.Object
         );
 
         var log = new DataAcquisitionLogModel
