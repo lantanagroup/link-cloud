@@ -1,4 +1,4 @@
-﻿using DataAcquisition.Domain.Application.Models;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using System.Net.Http.Headers;
@@ -41,10 +41,8 @@ public class BasicAuth : IAuth
 
             credentialsArray = $"{userName}:{password}".ToCharArray();
 
-            var pw = Convert.ToBase64String(Encoding.UTF8.GetBytes(credentialsArray));
-
             return (false,
-                new AuthenticationHeaderValue("basic", pw));
+                new AuthenticationHeaderValue("basic", Convert.ToBase64String(Encoding.UTF8.GetBytes(credentialsArray))));
         }
         finally
         {
