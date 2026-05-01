@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Tenant.Models.Messages;
+﻿namespace LantanaGroup.Link.Tenant.Models.Messages;
 
 public class ReportScheduledMessage
 {

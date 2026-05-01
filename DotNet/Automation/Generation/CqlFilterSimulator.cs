@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Generation;
+﻿namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
 /// Simulates measure-specific CQL SDE <c>where</c>-clause filtering at the individual-resource level.

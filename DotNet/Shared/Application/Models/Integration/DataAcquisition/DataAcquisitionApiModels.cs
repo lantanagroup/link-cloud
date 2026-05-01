@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Shared.Application.Utilities;
+﻿using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 

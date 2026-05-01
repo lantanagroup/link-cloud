@@ -1,4 +1,4 @@
-using LantanaGroup.Automation.Generation;
+﻿using LantanaGroup.Automation.Generation;
 using System.ComponentModel.DataAnnotations;
 
 namespace Automation.UI.Models;

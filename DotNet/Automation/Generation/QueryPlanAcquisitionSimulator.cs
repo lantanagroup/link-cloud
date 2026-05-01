@@ -1,4 +1,4 @@
-using LantanaGroup.Automation.Helpers;
+﻿using LantanaGroup.Automation.Helpers;
 using System.Globalization;
 using System.Text.Json;
 

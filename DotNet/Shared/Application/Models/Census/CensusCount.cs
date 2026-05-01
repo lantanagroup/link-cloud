@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Shared.Application.Models.Census;
+﻿namespace LantanaGroup.Link.Shared.Application.Models.Census;
 
 public class CensusCount
 {

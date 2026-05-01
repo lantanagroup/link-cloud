@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Shared.Application.Interfaces.Services;
+﻿using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Logging;

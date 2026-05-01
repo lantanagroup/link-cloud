@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.Shared.Application.Extensions;

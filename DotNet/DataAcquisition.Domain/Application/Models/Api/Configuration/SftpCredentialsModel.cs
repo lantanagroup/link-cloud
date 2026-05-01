@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 
 /// <summary>
 /// Model for SFTP basic authentication credentials.
