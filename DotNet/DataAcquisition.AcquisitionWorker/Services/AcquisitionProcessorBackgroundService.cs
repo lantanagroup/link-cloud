@@ -140,7 +140,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 var blockingList = string.Join(", ", depResult.BlockingResourceTypes);
                 _logger.LogInformation(
                     "Log {LogId} has unmet dependencies ({BlockingTypes}). Deferring to Pending.",
-                    log.Id, blockingList);
+                    log.Id.SanitizeForLog(), blockingList.SanitizeForLog());
 
                 await logManager.TrySetLogStatusAsync(
                     log.Id,
@@ -262,7 +262,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
             _logger.LogInformation(
                 "Produced inline AcquisitionComplete tail for FacilityId={FacilityId}, CorrelationId={CorrelationId}",
-                tailResult.FacilityId, tailResult.CorrelationId);
+                tailResult.FacilityId.SanitizeForLog(), tailResult.CorrelationId.SanitizeForLog());
         }
         catch (OperationCanceledException)
         {

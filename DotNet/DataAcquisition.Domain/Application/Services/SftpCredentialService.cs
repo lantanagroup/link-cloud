@@ -110,7 +110,7 @@ public class SftpCredentialService : ISftpCredentialService
 
             if (string.IsNullOrEmpty(value))
             {
-                _logger.LogDebug("No SFTP credentials found for organization {OrganizationId}", organizationId);
+                _logger.LogDebug("No SFTP credentials found for organization {OrganizationId}", organizationId.SanitizeForLog());
                 return null;
             }
 

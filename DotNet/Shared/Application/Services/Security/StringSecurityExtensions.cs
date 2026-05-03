@@ -24,14 +24,16 @@ namespace LantanaGroup.Link.Shared.Application.Services.Security
         /// This method helps prevent log injection attacks by removing control characters including
         /// newlines (CR/LF) that could be used to forge log entries.
         /// </summary>
-        /// <param name="originalString">The string to clean</param>
+        /// <param name="obj">The object whose string representation will be sanitized</param>
         /// <returns>A cleaned string with printable ASCII (32-255) preserved. 
         /// Control characters (0-31) and DEL (127) are replaced with spaces.</returns>
         /// <remarks>
         /// Security: Removes control characters (0-31, 127) that could be used for log injection.
         /// </remarks>
-        public static string SanitizeForLog(this string originalString)
+        public static string SanitizeForLog(this object? obj)
         {
+            if (obj is null) return null;
+            string? originalString = obj.ToString();
             if (originalString is null) return null;
             StringBuilder builder = new(originalString.Length);
             foreach (char ch in originalString)

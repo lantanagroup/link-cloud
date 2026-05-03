@@ -1,6 +1,7 @@
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Net;
 using System.Text.Json;
 
@@ -28,7 +29,7 @@ public static class SoftDeleteReport
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Exception fetching report schedule {ReportScheduleId} for pre-check", reportScheduleId);
+            logger.LogError(ex, "Exception fetching report schedule {ReportScheduleId} for pre-check", reportScheduleId.SanitizeForLog());
             return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
         }
 
@@ -50,7 +51,7 @@ public static class SoftDeleteReport
                 if (string.Equals(statusStr, nameof(ScheduleStatus.New), StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(statusStr, nameof(ScheduleStatus.EndOfPeriod), StringComparison.OrdinalIgnoreCase))
                 {
-                    logger.LogWarning("Soft-delete blocked for report schedule {ReportScheduleId}: status is {Status}", reportScheduleId, statusStr);
+                    logger.LogWarning("Soft-delete blocked for report schedule {ReportScheduleId}: status is {Status}", reportScheduleId.SanitizeForLog(), statusStr.SanitizeForLog());
                     return Results.Problem(
                         $"Report schedule '{reportScheduleId}' cannot be deleted because it is currently in progress (status: {statusStr}).",
                         statusCode: StatusCodes.Status409Conflict);
@@ -59,7 +60,7 @@ public static class SoftDeleteReport
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Exception parsing report schedule status for {ReportScheduleId}", reportScheduleId);
+            logger.LogError(ex, "Exception parsing report schedule status for {ReportScheduleId}", reportScheduleId.SanitizeForLog());
             return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
         }
 
@@ -71,14 +72,14 @@ public static class SoftDeleteReport
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Exception soft-deleting report schedule {ReportScheduleId}", reportScheduleId);
+            logger.LogError(ex, "Exception soft-deleting report schedule {ReportScheduleId}", reportScheduleId.SanitizeForLog());
             return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
         }
 
         if (!reportResponse.IsSuccessStatusCode)
         {
             var detail = await ReadDetailAsync(reportResponse);
-            logger.LogWarning("Report schedule soft-delete failed for {ReportScheduleId} with status {StatusCode}", reportScheduleId, reportResponse.StatusCode);
+            logger.LogWarning("Report schedule soft-delete failed for {ReportScheduleId} with status {StatusCode}", reportScheduleId.SanitizeForLog(), reportResponse.StatusCode);
             return ProblemDetailsExtension.UserFacingProblem(detail ?? "Failed to soft-delete report schedule.", (int)reportResponse.StatusCode);
         }
 
@@ -90,19 +91,19 @@ public static class SoftDeleteReport
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Exception soft-deleting acquisition logs for report {ReportScheduleId} — rolling back step 1", reportScheduleId);
+            logger.LogError(ex, "Exception soft-deleting acquisition logs for report {ReportScheduleId} — rolling back step 1", reportScheduleId.SanitizeForLog());
             await RollbackReportScheduleAsync(reportService, context, reportScheduleId, logger);
             return ProblemDetailsExtension.UserFacingProblem("Failed to soft-delete acquisition logs. Report soft-delete has been rolled back.", StatusCodes.Status500InternalServerError);
         }
 
         if (!daResponse.IsSuccessStatusCode)
         {
-            logger.LogWarning("Acquisition log soft-delete failed for report {ReportScheduleId} with status {StatusCode} — rolling back step 1", reportScheduleId, daResponse.StatusCode);
+            logger.LogWarning("Acquisition log soft-delete failed for report {ReportScheduleId} with status {StatusCode} — rolling back step 1", reportScheduleId.SanitizeForLog(), daResponse.StatusCode);
             await RollbackReportScheduleAsync(reportService, context, reportScheduleId, logger);
             return ProblemDetailsExtension.UserFacingProblem("Failed to soft-delete acquisition logs. Report soft-delete has been rolled back.", StatusCodes.Status500InternalServerError);
         }
 
-        logger.LogInformation("Report schedule {ReportScheduleId} and its acquisition logs were successfully soft deleted", reportScheduleId);
+        logger.LogInformation("Report schedule {ReportScheduleId} and its acquisition logs were successfully soft deleted", reportScheduleId.SanitizeForLog());
         return Results.NoContent();
     }
 
@@ -112,11 +113,11 @@ public static class SoftDeleteReport
         {
             var response = await reportService.RestoreReportScheduleAsync(context.User, reportScheduleId, context.RequestAborted);
             if (!response.IsSuccessStatusCode)
-                logger.LogError("Rollback failed: could not restore report schedule {ReportScheduleId} (status {StatusCode})", reportScheduleId, response.StatusCode);
+                logger.LogError("Rollback failed: could not restore report schedule {ReportScheduleId} (status {StatusCode})", reportScheduleId.SanitizeForLog(), response.StatusCode);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Rollback failed: exception restoring report schedule {ReportScheduleId}", reportScheduleId);
+            logger.LogError(ex, "Rollback failed: exception restoring report schedule {ReportScheduleId}", reportScheduleId.SanitizeForLog());
         }
     }
 
