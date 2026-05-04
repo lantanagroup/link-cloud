@@ -41,6 +41,15 @@ public class LogSearchParameters : GenericLogSearchParameters
 
     [DataMember]
     public DateTime? CreatedBefore { get; set; }
+
+    /// <summary>
+    /// Free-text term applied as a case-insensitive substring match against the most
+    /// commonly searched columns (PatientId, ResourceType names) plus an exact match
+    /// against Id when the term parses as a numeric id. Combined with the structured
+    /// filters via AND — within the term itself, the column predicates are OR’d.
+    /// </summary>
+    [DataMember]
+    public string? SearchTerm { get; set; }
 }
 
 [DataContract]

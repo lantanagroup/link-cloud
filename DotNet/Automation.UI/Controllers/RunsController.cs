@@ -284,6 +284,7 @@ public class RunsController(
         int pageSize = 50,
         string sortBy = "Id",
         string sortOrder = "Ascending",
+        string? searchTerm = null,
         CancellationToken cancellationToken = default)
     {
         var run = await runManager.GetRunAsync(id, cancellationToken);
@@ -306,6 +307,10 @@ public class RunsController(
             ? "Descending"
             : "Ascending";
 
+        // Trim to keep server-side LIKE %term% predictable; whitespace-only terms collapse
+        // to no-search.
+        var normalizedSearchTerm = string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm.Trim();
+
         if (string.IsNullOrWhiteSpace(facilityId) || string.IsNullOrWhiteSpace(reportId))
             return Json(new { records = Array.Empty<object>(), metadata = new { totalCount = 0 } });
 
@@ -318,6 +323,7 @@ public class RunsController(
                 pageNumber,
                 sortBy,
                 sortOrder,
+                normalizedSearchTerm,
                 cancellationToken);
 
             if ((result?.Records?.Count ?? 0) == 0)
@@ -329,6 +335,7 @@ public class RunsController(
                     pageNumber,
                     sortBy,
                     sortOrder,
+                    normalizedSearchTerm,
                     cancellationToken);
             }
 

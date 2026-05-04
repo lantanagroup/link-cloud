@@ -70,7 +70,6 @@ public sealed class ReportScheduledTest : IAsyncLifetime, IClassFixture<BackendE
             measures,
             profiles,
             totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
-            patientIdPrefix: "ScheduledPatient",
             generationSeed: GenerationSeed,
             acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
             {

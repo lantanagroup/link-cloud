@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Automation.Generation;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using System.Reflection;
 
@@ -12,9 +12,19 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 /// </summary>
 public static class TestConfig
 {
-    // FHIR server
-    public static string ExternalFhirServerBase => Environment.GetEnvironmentVariable("EXTERNAL_FHIR_SERVER_BASE_URL") ?? "http://localhost:6157/fhir";
-    public static string InternalFhirServerBase => Environment.GetEnvironmentVariable("INTERNAL_FHIR_SERVER_BASE_URL") ?? "http://fhir-server:8080/fhir";
+    // FHIR server. Two URLs reflect two vantage points on the same physical server:
+    // FhirServerBase is what the test process itself reaches; FacilityFhirServerBase
+    // is registered on each facility's FhirQueryConfiguration so Link's services
+    // (DataAcquisition, Normalization, ...) running inside docker can reach the same
+    // instance from their own network. In a fully-containerized run both collapse to
+    // the in-network DNS name; in dev-from-host they differ.
+    public static string FhirServerBase => Environment.GetEnvironmentVariable("FHIR_SERVER_BASE_URL")
+        ?? Environment.GetEnvironmentVariable("EXTERNAL_FHIR_SERVER_BASE_URL") // legacy name
+        ?? "http://localhost:6157/fhir";
+
+    public static string FacilityFhirServerBase => Environment.GetEnvironmentVariable("FACILITY_FHIR_SERVER_BASE_URL")
+        ?? Environment.GetEnvironmentVariable("INTERNAL_FHIR_SERVER_BASE_URL") // legacy name
+        ?? "http://fhir-server:8080/fhir";
 
     // Service URLs — direct to each service (not through BFF)
     public static string TenantServiceBase => Environment.GetEnvironmentVariable("TENANT_SERVICE_BASE_URL") ?? "http://localhost:8074";
@@ -43,8 +53,8 @@ public static class TestConfig
     /// </summary>
     public static AutomationConfig BuildAutomationConfig() => new()
     {
-        ExternalFhirServerBase = ExternalFhirServerBase,
-        InternalFhirServerBase = InternalFhirServerBase,
+        FhirServerBase = FhirServerBase,
+        FacilityFhirServerBase = FacilityFhirServerBase,
         AdminBffBase = AdminBffBase,
         LokiBaseUrl = LokiBaseUrl,
         DownloadPath = AdhocReportTestDownloadPath,
