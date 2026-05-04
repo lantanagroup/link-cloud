@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.lantanagroup.link.shared.serdes.FhirIdDeserializer;
 import lombok.Getter;
 import lombok.Setter;
-import org.hl7.fhir.instance.model.api.IBaseResource;
+import org.bson.Document;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
@@ -30,7 +30,7 @@ public class Resource {
     @JsonDeserialize(using = FhirIdDeserializer.class)
     private String resourceId;
 
-    private IBaseResource resource;
+    private Document resource;
 
     @CreatedDate
     private Date createdDate;

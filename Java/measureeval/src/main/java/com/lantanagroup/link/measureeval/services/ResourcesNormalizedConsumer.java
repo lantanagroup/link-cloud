@@ -1,10 +1,11 @@
 package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
-import com.lantanagroup.link.measureeval.records.ResourceNormalized;
+import com.lantanagroup.link.measureeval.records.ResourcesNormalized;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
 import org.hl7.fhir.r4.model.MeasureReport;
+import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.stereotype.Service;
@@ -12,8 +13,8 @@ import org.springframework.stereotype.Service;
 import java.util.function.Predicate;
 
 @Service
-public class ResourceNormalizedConsumer extends AbstractResourceConsumer<ResourceNormalized> {
-  public ResourceNormalizedConsumer (
+public class ResourcesNormalizedConsumer extends AbstractResourceConsumer<ResourcesNormalized> {
+  public ResourcesNormalizedConsumer (
           ResourceRepository resourceRepository,
           PatientReportingEvaluationStatusRepository patientStatusRepository,
           Predicate<MeasureReport> reportabilityPredicate,
@@ -23,7 +24,9 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
           PatientStatusBundler patientStatusBundler,
           BlobStorageService blobStorageService,
           ConsumerRecordRecoverer recoverer,
-          MeasureReportGeneratedProducer measureReportGeneratedProducer){
+          MeasureReportGeneratedProducer measureReportGeneratedProducer,
+          RedisResourceService redisResourceService,
+          MongoOperations mongoOperations){
     super(
             resourceRepository,
             patientStatusRepository,
@@ -34,6 +37,8 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
             patientStatusBundler,
             blobStorageService,
             recoverer,
-            measureReportGeneratedProducer);
+            measureReportGeneratedProducer,
+            redisResourceService,
+            mongoOperations);
   }
 }
