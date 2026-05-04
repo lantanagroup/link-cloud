@@ -28,7 +28,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
         public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType)
         {
-            string blobName = _settings.BlobRoot + "/" + correlationId + "/" + resourceType.ToString();
+            string blobName = correlationId + "/" + resourceType.ToString();
 
             AppendBlobClient writeBlobClient = _containerClient.GetAppendBlobClient(blobName);
 
