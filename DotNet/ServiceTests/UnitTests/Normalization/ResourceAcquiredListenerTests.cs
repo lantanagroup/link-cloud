@@ -1,3 +1,4 @@
+using Azure.Storage.Blobs;
 using Confluent.Kafka;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
@@ -8,11 +9,14 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
+using StackExchange.Redis;
 using Task = System.Threading.Tasks.Task;
 
 namespace UnitTests.Normalization;
@@ -54,8 +58,8 @@ public class ResourceAcquiredListenerTests
         _conditionalTransformOperationServiceMock = new Mock<ConditionalTransformOperationService>(new Mock<ILogger<ConditionalTransformOperationService>>().Object, null);
         _copyLocationOperationServiceMock = new Mock<CopyLocationOperationService>(new Mock<ILogger<CopyLocationOperationService>>().Object, null);
 
-        _redisResourceCache = new Mock<RedisResourceCache>();
-        _absResourceCache = new Mock<ABSResourceCache>();
+        _redisResourceCache = new Mock<RedisResourceCache>(new Mock<IConnectionMultiplexer>().Object, new Mock<ILogger<RedisResourceCache>>().Object);
+        _absResourceCache = new Mock<ABSResourceCache>(new Mock<IOptions<ResourceCacheBlobStorageSettings>>().Object, new Mock<ILogger<RedisResourceCache>>().Object);
     }
 
     [Fact]

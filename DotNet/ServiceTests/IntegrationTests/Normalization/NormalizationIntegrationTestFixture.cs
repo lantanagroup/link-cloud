@@ -1,88 +1,252 @@
+using Azure.Storage.Blobs;
+using Confluent.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.Normalization.Application.Models.Messages;
+using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Domain.Repositories;
+using LantanaGroup.Link.Normalization.Listeners;
+using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Application.Options;
+using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.KafkaProducers;
+using LantanaGroup.Link.Report.Listeners;
+using LantanaGroup.Link.Report.Models;
+using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Moq;
+using StackExchange.Redis;
+using System.Resources;
+using Testcontainers.Azurite;
+using Testcontainers.Redis;
 using ResourceType = LantanaGroup.Link.Normalization.Domain.Entities.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Normalization
 {
-    public class NormalizationIntegrationTestFixture : IDisposable
+    public class NormalizationIntegrationTestFixture : IAsyncLifetime, IDisposable
     {
         public IServiceProvider ServiceProvider { get; private set; }
-        private readonly IHost _host;
+        public IServiceScopeFactory ScopeFactory { get; private set; } = null!;
+        public Mock<IKafkaConsumerFactory<ResourceKey, ResourcesAcquiredValue>> ResourcesAcquiredConsumerFactoryMock { get; } = new();
+        public Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>> ResourcesAcquiredTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>> ResourcesAcquiredDeadLetterHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>> ConsumeExceptionHandlerMock { get; } = new();
+        public Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> ResourcesNormalizedProducerMock { get; private set; } = new();
+        public Mock<RedisResourceCache> RedisMock { get; } = new Mock<RedisResourceCache>(new Mock<IConnectionMultiplexer>().Object, new Mock<ILogger<RedisResourceCache>>().Object);
 
-        public NormalizationIntegrationTestFixture()
+        public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
+        public string RedisConnectionString => _redisContainer.GetConnectionString();
+
+        private IHost _host;
+        private readonly AzuriteContainer _azuriteContainer = new AzuriteBuilder()
+            .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
+            .Build();
+        private readonly RedisContainer _redisContainer = new RedisBuilder()
+            .WithImage("redis:latest") 
+            .Build();
+
+        //public async Task NormalizationIntegrationTestFixture()
+        //{
+            
+
+
+        //    _host = Host.CreateDefaultBuilder()
+        //        .ConfigureServices((context, services) =>
+        //        {
+        //            // Add in-memory with warning suppression
+        //            services.AddDbContext<NormalizationDbContext>(options =>
+        //            {
+        //                options.UseInMemoryDatabase("NormalizationDatabase");
+        //                options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+        //            });
+
+        //            // Register CopyPropertyOperationService as a singleton and hosted service
+        //            services.AddSingleton<CopyPropertyOperationService>();
+        //            services.AddSingleton<CopyLocationOperationService>();
+        //            services.AddSingleton<CodeMapOperationService>();
+        //            services.AddSingleton<ConditionalTransformOperationService>();
+
+
+        //            // Register other services
+        //            var serviceInformation = new ServiceInformation
+        //            {
+        //                ServiceName = "NormalizationIntegrationTest",
+        //                ServiceConfigName = "NormalizationIntegrationTest",
+        //                Version = "1.0.0-test"
+        //            };
+
+        //            services.AddSingleton(serviceInformation);
+
+        //            services.AddScoped<IEntityRepository<Operation>, OperationRepository>();
+        //            services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
+        //            services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
+        //            services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
+        //            services.AddScoped<IEntityRepository<Vendor>, VendorRepository>();
+        //            services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
+        //            services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
+
+        //            //services.AddScoped<StackExchange.Redis.IDatabase, Database>();
+        //            services.AddScoped<LantanaGroup.Link.Normalization.Domain.IDatabase, Database>();
+
+        //            services.AddScoped<IOperationManager, OperationManager>();
+        //            services.AddScoped<IResourceManager, ResourceManager>();
+        //            services.AddScoped<IVendorManager, VendorManager>();
+
+        //            services.AddScoped<IOperationQueries, OperationQueries>();
+        //            services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
+        //            services.AddScoped<IVendorQueries, VendorQueries>();
+        //            services.AddScoped<IResourceQueries, ResourceQueries>();
+
+        //            services.AddSingleton(ResourcesAcquiredConsumerFactoryMock.Object);
+        //            services.AddSingleton(ResourcesAcquiredDeadLetterHandlerMock.Object);
+        //            services.AddSingleton(ResourcesAcquiredTransientHandlerMock.Object);
+        //            services.AddSingleton(ConsumeExceptionHandlerMock.Object);
+        //            services.AddSingleton(ResourcesNormalizedProducerMock.Object);
+        //            services.AddTransient<ResourcesAcquiredListener>();
+        //            services.AddTransient<INormalizationServiceMetrics, NormalizationServiceMetrics>();
+        //            services.AddSingleton(RedisMock.Object);
+        //            services.AddTransient<ABSResourceCache>();
+        //            services.Configure<BlobStorageSettings>(context.Configuration.GetSection("BlobStorage"));
+
+        //            services.Configure<ResourceCacheBlobStorageSettings>(opts => opts.ConnectionString = _azuriteContainer.GetConnectionString());
+        //            services.Configure<ResourceCacheBlobStorageSettings>(opts => opts.BlobContainerName = "cache");
+
+        //            services.AddMemoryCache();
+
+        //            var provider = services.BuildServiceProvider();
+        //            var cache = provider.GetRequiredService<IMemoryCache>();
+        //        })
+        //        .Build();
+
+        //    // Start the host
+        //    _host.StartAsync().GetAwaiter().GetResult();
+        //    ServiceProvider = _host.Services;
+        //    ScopeFactory = ServiceProvider.GetRequiredService<IServiceScopeFactory>();
+
+        //    using var scope = ServiceProvider.CreateScope();
+        //    var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
+        //    InitializeDatabase(resourceManager).GetAwaiter().GetResult();
+        //}
+
+
+        private async Task InitializeDatabase(IResourceManager resourceManager)
         {
-            _host = Host.CreateDefaultBuilder()
-                .ConfigureServices((context, services) =>
-                {
-                    // Add in-memory with warning suppression
-                    services.AddDbContext<NormalizationDbContext>(options =>
-                    {
-                        options.UseInMemoryDatabase("NormalizationDatabase");
-                        options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
-                    });
+            await resourceManager.InitializeResources();
+        }
 
-                    // Register CopyPropertyOperationService as a singleton and hosted service
-                    services.AddSingleton<CopyPropertyOperationService>();
-                    services.AddSingleton<CopyLocationOperationService>();
-                    services.AddSingleton<CodeMapOperationService>();
-                    services.AddSingleton<ConditionalTransformOperationService>();
+        public async Task InitializeAsync()
+        {
+            await _azuriteContainer.StartAsync();
+            await _redisContainer.StartAsync();
 
-                    // Register other services
-                    services.AddScoped<IEntityRepository<Operation>, OperationRepository>();
-                    services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
-                    services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
-                    services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
-                    services.AddScoped<IEntityRepository<Vendor>, VendorRepository>();
-                    services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
-                    services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
+            var builder = Host.CreateApplicationBuilder();
 
-                    services.AddScoped<IDatabase, Database>();
+            // Add in-memory with warning suppression
+            builder.Services.AddDbContext<NormalizationDbContext>(options =>
+            {
+                options.UseInMemoryDatabase("NormalizationDatabase");
+                options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+            });
 
-                    services.AddScoped<IOperationManager, OperationManager>();
-                    services.AddScoped<IResourceManager, ResourceManager>();
-                    services.AddScoped<IVendorManager, VendorManager>();
+            // Register CopyPropertyOperationService as a singleton and hosted service
+            builder.Services.AddSingleton<CopyPropertyOperationService>();
+            builder.Services.AddSingleton<CopyLocationOperationService>();
+            builder.Services.AddSingleton<CodeMapOperationService>();
+            builder.Services.AddSingleton<ConditionalTransformOperationService>();
 
-                    services.AddScoped<IOperationQueries, OperationQueries>();
-                    services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
-                    services.AddScoped<IVendorQueries, VendorQueries>();
-                    services.AddScoped<IResourceQueries, ResourceQueries>();
 
-                    services.AddMemoryCache();
+            // Register other services
+            var serviceInformation = new ServiceInformation
+            {
+                ServiceName = "NormalizationIntegrationTest",
+                ServiceConfigName = "NormalizationIntegrationTest",
+                Version = "1.0.0-test"
+            };
 
-                    var provider = services.BuildServiceProvider();
-                    var cache = provider.GetRequiredService<IMemoryCache>();
-                })
-                .Build();
+            builder.Services.AddSingleton(serviceInformation);
+            builder.Services.AddScoped<IEntityRepository<Operation>, OperationRepository>();
+            builder.Services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
+            builder.Services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
+            builder.Services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
+            builder.Services.AddScoped<IEntityRepository<Vendor>, VendorRepository>();
+            builder.Services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
+            builder.Services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
 
-            // Start the host
-            _host.StartAsync().GetAwaiter().GetResult();
+            //services.AddScoped<StackExchange.Redis.IDatabase, Database>();
+            builder.Services.AddScoped<LantanaGroup.Link.Normalization.Domain.IDatabase, LantanaGroup.Link.Normalization.Domain.Database>();
+            builder.Services.AddScoped<IOperationManager, OperationManager>();
+            builder.Services.AddScoped<IResourceManager, LantanaGroup.Link.Normalization.Domain.Managers.ResourceManager>();
+            builder.Services.AddScoped<IVendorManager, VendorManager>();
+            builder.Services.AddScoped<IOperationQueries, OperationQueries>();
+            builder.Services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
+            builder.Services.AddScoped<IVendorQueries, VendorQueries>();
+            builder.Services.AddScoped<IResourceQueries, ResourceQueries>();
+            builder.Services.AddSingleton(ResourcesAcquiredConsumerFactoryMock.Object);
+            builder.Services.AddSingleton(ResourcesAcquiredDeadLetterHandlerMock.Object);
+            builder.Services.AddSingleton(ResourcesAcquiredTransientHandlerMock.Object);
+            builder.Services.AddSingleton(ConsumeExceptionHandlerMock.Object);
+            builder.Services.AddSingleton(ResourcesNormalizedProducerMock.Object);
+            builder.Services.AddTransient<ResourcesAcquiredListener>();
+            builder.Services.AddTransient<INormalizationServiceMetrics, NormalizationServiceMetrics>();
+            builder.Services.AddSingleton(RedisMock.Object);
+            builder.Services.AddTransient<ABSResourceCache>();
+            builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection("BlobStorage"));
+            builder.Services.Configure<ResourceCacheBlobStorageSettings>(opts => opts.ConnectionString = _azuriteContainer.GetConnectionString());
+            builder.Services.Configure<ResourceCacheBlobStorageSettings>(opts => opts.BlobContainerName = "cache");
+            builder.Services.AddMemoryCache();
+
+            var provider = builder.Services.BuildServiceProvider();
+            var cache = provider.GetRequiredService<IMemoryCache>();
+
+            _host = builder.Build();
+            await _host.StartAsync();
+
             ServiceProvider = _host.Services;
+            ScopeFactory = ServiceProvider.GetRequiredService<IServiceScopeFactory>();
+
+            //var configuration = ServiceProvider.GetRequiredService<IConfiguration>();
+            //var blobConnectionString = configuration["BlobStorage:ConnectionString"];
+            //var containerName = configuration["BlobStorage:BlobContainerName"] ?? "cache";
+            //var blobServiceClient = new BlobServiceClient(blobConnectionString);
+            //var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+            //await containerClient.CreateIfNotExistsAsync();
 
             using var scope = ServiceProvider.CreateScope();
+            //var dbContext = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+            //dbContext.Database.EnsureCreated();
+
             var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
             InitializeDatabase(resourceManager).GetAwaiter().GetResult();
         }
 
-        public void Dispose()
+        public async Task DisposeAsync()
         {
             _host.StopAsync().GetAwaiter().GetResult();
             _host.Dispose();
         }
 
-        private async Task InitializeDatabase(IResourceManager resourceManager)
+        public void Dispose()
         {
-            await resourceManager.InitializeResources();
+            throw new NotImplementedException();
         }
     }
 }
