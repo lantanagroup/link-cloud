@@ -42,12 +42,7 @@ public class MeasureReportGeneratedProducer {
         String reportUri = null;
 
         if (payloadUri != null) {
-            int lastSlashIndex = payloadUri.lastIndexOf('/');
-            if (lastSlashIndex == -1) {
-                throw new IllegalArgumentException("payloadUri must contain at least one forward slash");
-            }
-
-            reportUri = payloadUri.substring(0, lastSlashIndex);
+            reportUri = payloadUri;
         }
 
         MeasureReportGenerated value = new MeasureReportGenerated(

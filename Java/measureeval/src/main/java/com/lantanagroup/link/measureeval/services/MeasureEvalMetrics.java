@@ -16,11 +16,12 @@ public class MeasureEvalMetrics {
   private final LongCounter measureEvaluatedCounter;
   private final LongCounter recordsReceivedCounter;
   private final LongHistogram evaluationDuration;
+  private final LongHistogram normalizedToReportGeneratedDuration;
 
   public MeasureEvalMetrics(OpenTelemetry openTelemetry)
   {
 
-    Meter meter = openTelemetry.getMeter("com.lantanagroup.link.measureeval.services.ResourceNormalizedConsumer");
+    Meter meter = openTelemetry.getMeter("com.lantanagroup.link.measureeval.services.ResourcesNormalizedConsumer");
 
     patientReportableCounter = meter
             .counterBuilder("Patient_Reportable_Counter")
@@ -39,6 +40,10 @@ public class MeasureEvalMetrics {
     evaluationDuration = meter.histogramBuilder("MeasureEval.evaluation.duration")
           .ofLongs()
           .setDescription("The duration of the evaluation of a measure").setUnit("ms").build();
+
+    normalizedToReportGeneratedDuration = meter.histogramBuilder("MeasureEval.normalized_to_report_generated.duration")
+          .ofLongs()
+          .setDescription("End-to-end duration from Kafka Normalized message ingestion to MeasureReportGenerated production").setUnit("ms").build();
   }
 
   public void IncrementPatientReportableCounter(Attributes attributes)
@@ -63,6 +68,10 @@ public class MeasureEvalMetrics {
 
   void MeasureEvalDuration(long elapsedTime, Attributes attributes) {
     evaluationDuration.record(elapsedTime, attributes);
+  }
+
+  void recordNormalizedToReportGeneratedDuration(long elapsedTimeMs, Attributes attributes) {
+    normalizedToReportGeneratedDuration.record(elapsedTimeMs, attributes);
   }
 
 }
