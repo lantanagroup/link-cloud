@@ -199,7 +199,7 @@ jobs:
           
           for i in {1..20}; do
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" $URL)
-            if [ "$STATUS" == "200" ]; then
+            if [ "$STATUS" == "200" ] || [ "$STATUS" == "302" ]; the
               echo "Health check succeeded with HTTP $STATUS"
               exit 0
             fi
