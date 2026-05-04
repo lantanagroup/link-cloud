@@ -340,8 +340,8 @@ public class SftpAcquisitionHandler(
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.AddException(ex);
 
-            logger.LogError(ex, "Invalid operation for SFTP acquisition log {LogId} for facility {FacilityId}: {Message}",
-                log.Id.SanitizeForLog(), log.FacilityId.SanitizeForLog(), ex.Message);
+            logger.LogError(ex, "Invalid operation for SFTP acquisition log {LogId} for facility {FacilityId}",
+                log.Id.SanitizeForLog(), log.FacilityId.SanitizeForLog());
 
             // InvalidOperationException typically indicates a configuration issue (e.g., missing acquisition config, invalid remote directory)
             await logManager.SetConfigurationRequiredAsync(log.Id, ex.Message, cancellationToken);
