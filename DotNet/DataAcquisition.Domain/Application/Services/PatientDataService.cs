@@ -700,7 +700,7 @@ public class PatientDataService : IPatientDataService
                     "Queued->Processing transition skipped for LogId {LogId}. " +
                     "Fetched status was {FetchedStatus}; current DB status is {DbStatus}. " +
                     "Another worker likely owns this log now.",
-                    log.Id, log.Status, currentDbStatus);
+                    log.Id.SanitizeForLog(), log.Status.SanitizeForLog(), currentDbStatus.SanitizeForLog());
             }
         }
         catch (OpOutcomeException ex)

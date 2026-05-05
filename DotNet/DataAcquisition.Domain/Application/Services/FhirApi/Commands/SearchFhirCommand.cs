@@ -100,16 +100,15 @@ public class SearchFhirCommand : ISearchFhirCommand
 
         var maxConcurrent = request.queryConfig.GetMaxConcurrentRequestsOrDefault();
         var semWaitStart = DateTime.UtcNow;
-        var maskedFacilityId = request.facilityId.MaskForLog();
         _logger.LogDebug(
             "Semaphore: SearchPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
-            maskedFacilityId, request.resourceType, request.correlationId, maxConcurrent);
+            request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), maxConcurrent.SanitizeForLog());
         using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
             var semAcquiredAt = DateTime.UtcNow;
             _logger.LogDebug(
                 "Semaphore: SearchPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
-                maskedFacilityId, request.resourceType, request.correlationId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
+                request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
 
             var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
@@ -151,7 +150,7 @@ public class SearchFhirCommand : ISearchFhirCommand
 
             _logger.LogDebug(
                 "Semaphore: SearchPaging releasing facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} holdMs={HoldMs}",
-                maskedFacilityId, request.resourceType, request.correlationId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
+                request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
         }
 
         if (resultBundle != null)
@@ -165,19 +164,19 @@ public class SearchFhirCommand : ISearchFhirCommand
                 {
                     _logger.LogDebug(
                         "Semaphore: SearchPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
-                        maskedFacilityId, request.resourceType, request.correlationId, maxConcurrent);
+                        request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), maxConcurrent.SanitizeForLog());
                     using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
                     {
                         var semAcquiredAt = DateTime.UtcNow;
                         _logger.LogDebug(
                             "Semaphore: SearchPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
-                            maskedFacilityId, request.resourceType, request.correlationId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
+                            request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
 
                         resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
 
                         _logger.LogDebug(
                             "Semaphore: SearchPaging releasing facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} holdMs={HoldMs}",
-                            maskedFacilityId, request.resourceType, request.correlationId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
+                            request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
                     }
                 }
                 catch (FhirOperationException ex) when (ex.Status == HttpStatusCode.TooManyRequests)
@@ -223,16 +222,15 @@ public class SearchFhirCommand : ISearchFhirCommand
 
         var maxConcurrent = request.queryConfig.GetMaxConcurrentRequestsOrDefault();
         var semWaitStart = DateTime.UtcNow;
-        var maskedFacilityId = request.facilityId.MaskForLog();
         _logger.LogDebug(
             "Semaphore: SearchNonPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
-            maskedFacilityId, request.resourceType, request.correlationId, maxConcurrent);
+            request.facilityId.SanitizeForLog(), request.resourceType, request.correlationId, maxConcurrent);
         using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
             var semAcquiredAt = DateTime.UtcNow;
             _logger.LogDebug(
                 "Semaphore: SearchNonPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
-                maskedFacilityId, request.resourceType, request.correlationId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
+                request.facilityId.SanitizeForLog(), request.resourceType, request.correlationId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
 
             // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
             var innerHandler = CreateInnerHttpMessageHandler();
@@ -273,7 +271,7 @@ public class SearchFhirCommand : ISearchFhirCommand
             IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
             _logger.LogDebug(
                 "Semaphore: SearchNonPaging releasing facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} holdMs={HoldMs}",
-                maskedFacilityId, request.resourceType, request.correlationId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
+                request.facilityId.SanitizeForLog(), request.resourceType, request.correlationId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
             return resultBundle;
         }
     }

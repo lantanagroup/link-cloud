@@ -229,7 +229,7 @@ public class AuthenticationConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> UpdateAuthenticationSettings(
         string facilityId,
-        QueryConfigurationTypePathParameter queryConfigurationTypePathParameter,
+        QueryConfigurationTypePathParameter? queryConfigurationTypePathParameter,
         AuthenticationConfigurationModel? authenticationConfiguration,
         CancellationToken cancellationToken)
     {

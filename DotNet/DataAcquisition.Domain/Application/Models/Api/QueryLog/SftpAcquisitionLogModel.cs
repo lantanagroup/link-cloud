@@ -7,23 +7,50 @@ using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.Da
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using System.Runtime.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 
+[DataContract]
 public class SftpAcquisitionLogModel
 {
+    [DataMember]
     public Guid? ExternalId { get; set; }
+
+    [DataMember]
     public string FacilityId { get; set; } = string.Empty;
+
+    [DataMember]
     public SftpAcquisitionType AcquisitionType { get; set; }
+
+    [DataMember]
     public SftpAcquisitionSubType SubType { get; set; } = SftpAcquisitionSubType.None;
+
+    [DataMember]
     public List<string> FileNames { get; set; } = [];
+
+    [DataMember]
     public DateTime? ScheduledDate { get; set; }
+
+    [DataMember]
     public DateTime? ProcessDate { get; set; }
+
+    [DataMember]
     public int? RetryAttempts { get; set; }
+
+    [DataMember]
     public RequestStatus Status { get; set; }
+
+    [DataMember]
     public string? OriginatingTraceId { get; set; }
+
+    [DataMember]
     public string? OriginatingSpanId { get; set; }
+
+    [DataMember]
     public List<string> Notes { get; set; } = [];
+
+    [DataMember]
     public List<SftpAcquisitionBenchmark>? Benchmarks { get; set; }
 }
 
@@ -33,10 +60,11 @@ public record PagedSftpAcquisitionLogModel : IPagedModel<SftpAcquisitionLogModel
     public PaginationMetadata Metadata { get; set; } = new();
 }
 
+[DataContract]
 public record CreateSftpLogRequest(
-    string FacilityId,
-    SftpAcquisitionType AcquisitionType,
-    SftpAcquisitionSubType SubType = SftpAcquisitionSubType.None);
+    [property: DataMember] string FacilityId,
+    [property: DataMember] SftpAcquisitionType AcquisitionType,
+    [property: DataMember] SftpAcquisitionSubType SubType = SftpAcquisitionSubType.None);
 
 public static class SftpAcquisitionLogModelExtensions
 {

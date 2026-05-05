@@ -181,7 +181,7 @@ namespace LantanaGroup.Link.Tenant.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to schedule trigger for job {JobName} (Facility: {FacilityId}, Frequency: {Frequency})", jobName, facility.FacilityId, frequency);
+                    _logger.LogError(ex, "Failed to schedule trigger for job {JobName} (Facility: {FacilityId}, Frequency: {Frequency})", jobName.SanitizeForLog(), facility.FacilityId.SanitizeForLog(), frequency.SanitizeForLog());
                     throw;
                 }
             }

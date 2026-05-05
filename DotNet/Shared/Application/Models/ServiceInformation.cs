@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using System.Text.Json;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -79,7 +80,7 @@ public class ServiceInformation
 
                 serviceInfo.SwaggerUrl = baseUrl + serviceInfo.SwaggerUrl;
 
-                logger.LogDebug("Service information for {ServiceName} Swagger URL is now {SwaggerUrl}", serviceName, serviceInfo.SwaggerUrl);
+                logger.LogDebug("Service information for {ServiceName} Swagger URL is now {SwaggerUrl}", serviceName, serviceInfo.SwaggerUrl.SanitizeForLog());
             }
 
             return serviceInfo;

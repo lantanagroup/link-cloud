@@ -366,7 +366,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         log.Status = RequestStatus.ConfigurationRequired;
 
         await database.SaveChangesAsync();
-        logger.LogWarning("SFTP acquisition log {LogId} marked as configuration required: {Error}", id, errorMessage);
+        logger.LogWarning("SFTP acquisition log {LogId} marked as configuration required: {Error}", id.SanitizeForLog(), errorMessage.SanitizeForLog());
     }
 
     /// <inheritdoc/>

@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
 using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using System.Text;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
 {
@@ -41,7 +42,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task Produce(Guid scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId)
         {
-            _logger.LogDebug("Producing ReadyForValidation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, patientId, scheduleId);
+            _logger.LogDebug("Producing ReadyForValidation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId.SanitizeForLog(), patientId.SanitizeForLog(), scheduleId.SanitizeForLog());
 
             _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
                 new Message<ReadyForValidationKey, ReadyForValidationValue>
