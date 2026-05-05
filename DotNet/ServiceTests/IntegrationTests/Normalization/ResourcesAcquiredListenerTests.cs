@@ -35,7 +35,7 @@ namespace IntegrationTests.Normalization
         }
 
         [Fact]
-        public async Task Consume_Redis_Event() 
+        public async Task ConsumeRedisEvent() 
         {
             _fixture.ResourcesNormalizedProducerMock.Reset();
 
@@ -46,7 +46,6 @@ namespace IntegrationTests.Normalization
             string facilityId = "Facility1";
             string patientId = "Patient1";
             string correlationId = Guid.NewGuid().ToString();
-
 
             await LoadFacilityLocationConfig(facilityId, scope);
 
@@ -88,7 +87,7 @@ namespace IntegrationTests.Normalization
         }
 
         [Fact]
-        public async Task Consume_ABS_Event()
+        public async Task ConsumeABSEvent()
         {
             _fixture.ResourcesNormalizedProducerMock.Reset();
 
@@ -100,7 +99,6 @@ namespace IntegrationTests.Normalization
             string facilityId = "Facility1";
             string patientId = "Patient1";
             var correlationId = Guid.NewGuid().ToString();
-
 
             await LoadFacilityLocationConfig(facilityId, scope);
 
