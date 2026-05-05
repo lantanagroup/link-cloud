@@ -22,6 +22,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Medallion.Threading;
 using Moq;
 using OpenTelemetry.Trace;
 using Testcontainers.MsSql;
@@ -133,6 +134,20 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IDatabase, Database>();
             builder.Services.AddScoped<IQueryPlanValidator, QueryPlanValidator>();
             builder.Services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
+
+            // Register a mock IDistributedSemaphoreProvider that always grants the lock.
+            // Integration tests run against a real database but do not need distributed
+            // coordination; the mock keeps tests fast and self-contained.
+            var semaphoreHandle = new Mock<IDistributedSynchronizationHandle>();
+            var semaphore = new Mock<IDistributedSemaphore>();
+            var semaphoreProvider = new Mock<IDistributedSemaphoreProvider>();
+            semaphore
+                .Setup(s => s.TryAcquireAsync(It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+                .Returns(new ValueTask<IDistributedSynchronizationHandle?>(semaphoreHandle.Object));
+            semaphoreProvider
+                .Setup(p => p.CreateSemaphore(It.IsAny<string>(), It.IsAny<int>()))
+                .Returns(semaphore.Object);
+            builder.Services.AddSingleton<IDistributedSemaphoreProvider>(semaphoreProvider.Object);
 
             // Register managers                    
             builder.Services.AddScoped<IQueryPlanManager, QueryPlanManager>();
