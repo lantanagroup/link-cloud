@@ -45,9 +45,8 @@ public class PatientStatusBundler {
         bundle.setType(Bundle.BundleType.COLLECTION);
         for (Resource r : resources) {
             org.hl7.fhir.r4.model.Resource parsed =
-                    (org.hl7.fhir.r4.model.Resource) fhirJsonParser.parseResource(r.getResource().toJson());
+                    (org.hl7.fhir.r4.model.Resource) fhirJsonParser.parseResource(r.getResource());
             bundle.addEntry().setResource(parsed);
-            r.setResource(null);
         }
         bundle.setTotal(bundle.getEntry().size());
         return bundle;

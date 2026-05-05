@@ -3,7 +3,6 @@ package com.lantanagroup.link.measureeval.services;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.ResourcesAcquired;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
-import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -15,7 +14,6 @@ import java.util.function.Predicate;
 @Service
 public class ResourcesAcquiredErrorConsumer extends AbstractResourceConsumer<ResourcesAcquired> {
     public ResourcesAcquiredErrorConsumer(
-            ResourceRepository resourceRepository,
             PatientReportingEvaluationStatusRepository patientStatusRepository,
             Predicate<MeasureReport> reportabilityPredicate,
             MeasureEvalMetrics measureEvalMetrics,
@@ -28,7 +26,6 @@ public class ResourcesAcquiredErrorConsumer extends AbstractResourceConsumer<Res
             RedisResourceService redisResourceService,
             MongoOperations mongoOperations){
         super(
-                resourceRepository,
                 patientStatusRepository,
                 reportabilityPredicate,
                 measureEvalMetrics,

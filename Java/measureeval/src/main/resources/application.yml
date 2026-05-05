@@ -27,6 +27,7 @@ management:
 logging:
   level:
     com.lantanagroup.link: debug
+    com.lantanagroup.link.performance: info
 
 server:
   port: 5135

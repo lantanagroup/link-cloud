@@ -1,7 +1,6 @@
 package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.entities.Resource;
-import org.bson.Document;
 import org.hl7.fhir.r4.model.ResourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,14 +30,13 @@ public class RedisResourceService {
         Map<String, String> fields = hashOps.entries(correlationId);
         List<Resource> resources = new ArrayList<>();
 
-        if (fields == null || fields.isEmpty()) {
+        if (fields.isEmpty()) {
             logger.debug("No Redis entries for correlationId='{}'", correlationId);
             return resources;
         }
 
         int malformedFields = 0;
         int unknownTypes = 0;
-        int parseFailures = 0;
 
         for (Map.Entry<String, String> entry : fields.entrySet()) {
             String field = entry.getKey();
@@ -66,27 +64,18 @@ public class RedisResourceService {
                 continue;
             }
 
-            Document parsed;
-            try {
-                parsed = Document.parse(json);
-            } catch (Exception e) {
-                logger.warn("Failed to parse JSON for field '{}' in key '{}'. Skipping.", field, correlationId);
-                parseFailures++;
-                continue;
-            }
-
             Resource resource = new Resource();
             resource.setFacilityId(facilityId);
             resource.setCorrelationId(correlationId);
             resource.setPatientId(patientId);
             resource.setResourceType(resourceType);
             resource.setResourceId(resourceId);
-            resource.setResource(parsed);
+            resource.setResource(json);
             resources.add(resource);
         }
 
-        logger.debug("Read {} resources for correlationId='{}' (malformed={}, unknownTypes={}, parseFailures={})",
-                resources.size(), correlationId, malformedFields, unknownTypes, parseFailures);
+        logger.debug("Read {} resources for correlationId='{}' (malformed={}, unknownTypes={})",
+                resources.size(), correlationId, malformedFields, unknownTypes);
         return resources;
     }
 

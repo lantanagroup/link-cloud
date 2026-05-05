@@ -7,7 +7,6 @@ import com.lantanagroup.link.measureeval.entities.Resource;
 import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
-import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Headers;
@@ -20,13 +19,11 @@ import org.apache.commons.collections4.map.PassiveExpiringMap;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeaders;
-import com.mongodb.bulk.BulkWriteError;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
-import org.springframework.data.mongodb.BulkOperationException;
 import org.springframework.data.mongodb.core.BulkOperations;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -43,10 +40,8 @@ import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
 public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AsyncListener<ResourceKey, T> {
     private static final Logger logger = LoggerFactory.getLogger(AbstractResourceConsumer.class);
-    private static final Logger performanceLogger =LoggerFactory.getLogger(
-            "com.lantanagroup.link.performance." + AbstractResourceConsumer.class.getSimpleName());
+    private static final Logger performanceLogger = LoggerFactory.getLogger("com.lantanagroup.link.performance." + AbstractResourceConsumer.class.getSimpleName());
 
-    private final ResourceRepository resourceRepository;
     private final PatientReportingEvaluationStatusRepository patientStatusRepository;
     private final Map<String, PatientReportingEvaluationStatus> patientStatusCache;
     private final Predicate<MeasureReport> reportabilityPredicate;
@@ -60,7 +55,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private final MongoOperations mongoOperations;
 
     public AbstractResourceConsumer (
-            ResourceRepository resourceRepository,
             PatientReportingEvaluationStatusRepository patientStatusRepository,
             Predicate<MeasureReport> reportabilityPredicate,
             MeasureEvalMetrics measureEvalMetrics,
@@ -72,7 +66,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             RedisResourceService redisResourceService,
             MongoOperations mongoOperations) {
         super(recoverer);
-        this.resourceRepository = resourceRepository;
         this.patientStatusRepository = patientStatusRepository;
         this.measureReportGeneratedProducer = measureReportGeneratedProducer;
         patientStatusCache = Collections.synchronizedMap(new PassiveExpiringMap<>(1L, TimeUnit.MINUTES));
@@ -88,16 +81,17 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
     @Override
     protected void process(ConsumerRecord<ResourceKey, T> record) {
-        StopWatch totalStopWatch = new StopWatch();
-        StopWatch taskStopWatch = new StopWatch();
-        totalStopWatch.start();
+        boolean perf = performanceLogger.isInfoEnabled();
+        StopWatch totalStopWatch = perf ? new StopWatch() : null;
+        StopWatch taskStopWatch = perf ? new StopWatch() : null;
+        if (perf) totalStopWatch.start();
 
         try {
             Span currentSpan = Span.current();
             MDC.put("traceId", currentSpan.getSpanContext().getTraceId());
             MDC.put("spanId", currentSpan.getSpanContext().getSpanId());
 
-            taskStopWatch.start("validateRecord");
+            if (perf) taskStopWatch.start("validateRecord");
             ResourceKey key = record.key();
             if (key == null || key.getFacilityId() == null || key.getFacilityId().isEmpty()) {
                 throw new ValidationException("Facility ID is null or empty.");
@@ -117,17 +111,16 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             if (value.getCacheType() == null) {
                 throw new ValidationException("Cache Type is null.");
             }
-            String cacheKey = value.getCacheKey();
-            if (cacheKey == null || cacheKey.isEmpty()) {
+            String correlationId = value.getCacheKey();
+            if (correlationId == null || correlationId.isEmpty()) {
                 throw new ValidationException("Cache Key is null or empty.");
             }
-            String correlationId = cacheKey;
-            taskStopWatch.stop();
+            if (perf) taskStopWatch.stop();
 
-            taskStopWatch.start("incrementRecordCount");
+            if (perf) taskStopWatch.start("incrementRecordCount");
             Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.CORRELATION_ID), correlationId).build();
             measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
-            taskStopWatch.stop();
+            if (perf) taskStopWatch.stop();
 
             if (logger.isDebugEnabled()) {
                 logger.debug(
@@ -140,17 +133,17 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
             CacheType cacheType = value.getCacheType();
 
-            taskStopWatch.start("readResources");
-            long readStart = System.nanoTime();
+            if (perf) taskStopWatch.start("readResources");
+            long readStart = perf ? System.nanoTime() : 0;
             List<Resource> resources;
             switch (cacheType) {
                 case REDIS -> resources = redisResourceService.readResources(
-                        facilityId, cacheKey, patientId);
+                        facilityId, correlationId, patientId);
 
                 default -> throw new IllegalStateException("Unexpected cache type: " + cacheType);
             }
-            long readMs = (System.nanoTime() - readStart) / 1_000_000;
-            taskStopWatch.stop();
+            long readMs = perf ? (System.nanoTime() - readStart) / 1_000_000 : 0;
+            if (perf) taskStopWatch.stop();
             if (logger.isDebugEnabled()) {
                 Map<String, Long> resourceTypeCounts = resources.stream()
                         .collect(Collectors.groupingBy(r -> r.getResourceType() != null ? r.getResourceType().name() : "Unknown", Collectors.counting()));
@@ -166,11 +159,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             logger.trace("Beginning patient status update");
 
             PatientReportingEvaluationStatus patientStatus = patientStatusCache.computeIfAbsent(correlationId, k -> {
-                taskStopWatch.start("retrieveOrCreatePatientStatus");
+                if (perf) taskStopWatch.start("retrieveOrCreatePatientStatus");
                 PatientReportingEvaluationStatus _patientStatus = Objects.requireNonNullElseGet(
                         retrievePatientStatus(facilityId, correlationId),
                         () -> createPatientStatus(facilityId, correlationId, patientId, value));
-                taskStopWatch.stop();
+                if (perf) taskStopWatch.stop();
 
                 return _patientStatus;
             });
@@ -179,37 +172,26 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 logger.trace("Setting patient status patient ID: {}", patientId);
                 patientStatus.setPatientId(patientId);
 
-                taskStopWatch.start("setPatientStatusPatientId");
+                if (perf) taskStopWatch.start("setPatientStatusPatientId");
                 patientStatus = patientStatusRepository.setPatientId(patientStatus);
-                taskStopWatch.stop();
+                if (perf) taskStopWatch.stop();
 
                 patientStatusCache.put(correlationId, patientStatus);
             }
 
             // Build the FHIR Bundle from the read resources.
-            taskStopWatch.start("createBundle");
+            if (perf) taskStopWatch.start("createBundle");
             Bundle bundle = patientStatusBundler.createBundleFromResources(resources);
-            taskStopWatch.stop();
-            resources = null;
+            if (perf) taskStopWatch.stop();
 
             // Evaluate measures and determine reportability.
-            taskStopWatch.start("evaluateMeasures");
+            if (perf) taskStopWatch.start("evaluateMeasures");
             long kafkaIngestTimestamp = record.timestamp();
             boolean reportablePatient = evaluateMeasures(value, patientStatus, bundle, kafkaIngestTimestamp);
-            taskStopWatch.stop();
+            if (perf) taskStopWatch.stop();
 
             bundle = null;
 
-
-            //   - Not reportable:            write resources to Mongo.
-            //                                Non-reportable MeasureReportGenerated already produced by evaluateMeasures.
-            //   - Reportable + INITIAL:      skip Mongo write (SUPPLEMENTAL pass will persist).
-            //                                DataAcquisitionRequested already produced by evaluateMeasures.
-            //   - Reportable + SUPPLEMENTAL: write resources to Mongo.
-            //                                Reportable MeasureReportGenerated already produced by evaluateMeasures.
-            //   - INITIAL + reportable:      keep cache (SUPPLEMENTAL will reuse it).
-            //   - INITIAL + not reportable:  clean up cache (no SUPPLEMENTAL pass).
-            //   - SUPPLEMENTAL:              clean up cache (final pass).
             boolean initialReportable =
                     value.getQueryType() == QueryType.INITIAL && reportablePatient;
 
@@ -217,18 +199,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 logger.debug("Skipping Mongo write for INITIAL reportable patient, correlationId={}",
                         correlationId);
             } else {
-                taskStopWatch.start("reReadForMongo");
-                List<Resource> mongoResources = redisResourceService.readResources(
-                        facilityId, cacheKey, patientId);
-                taskStopWatch.stop();
-
-                taskStopWatch.start("bulkWriteToMongo");
-                long bulkStart = System.nanoTime();
-                bulkWriteResources(mongoResources);
-                long bulkMs = (System.nanoTime() - bulkStart) / 1_000_000;
-                taskStopWatch.stop();
-                logger.debug("Bulk wrote {} resources to Mongo in {} ms for correlationId={}",
-                        mongoResources.size(), bulkMs, correlationId);
+                if (perf) taskStopWatch.start("bulkWriteToMongo");
+                bulkWriteResources(resources);
+                if (perf) taskStopWatch.stop();
+                logger.debug("Bulk wrote {} resources to Mongo for correlationId={}",
+                        resources.size(), correlationId);
             }
 
             // Clean up cache after SUPPLEMENTAL, or after INITIAL if patient is not reportable.
@@ -236,30 +211,32 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             if (initialReportable) {
                 logger.debug("Keeping cache for SUPPLEMENTAL pass, correlationId={}", correlationId);
             } else {
-                taskStopWatch.start("cleanupCache");
+                if (perf) taskStopWatch.start("cleanupCache");
                 switch (cacheType) {
-                    case REDIS -> redisResourceService.cleanup(cacheKey);
+                    case REDIS -> redisResourceService.cleanup(correlationId);
                 }
-                taskStopWatch.stop();
+                if (perf) taskStopWatch.stop();
                 logger.debug("Cache cleanup complete for correlationId={}, cacheType={}", correlationId, cacheType);
             }
 
         } finally {
-            totalStopWatch.stop();
-            for (StopWatch.TaskInfo task : taskStopWatch.getTaskInfo()) {
-                performanceLogger.info("{}: {} ms", task.getTaskName(), task.getTimeNanos() / 1_000_000);
+            if (perf) {
+                totalStopWatch.stop();
+                for (StopWatch.TaskInfo task : taskStopWatch.getTaskInfo()) {
+                    performanceLogger.info("{}: {} ms", task.getTaskName(), task.getTimeNanos() / 1_000_000);
+                }
+                performanceLogger.info("SUM_OF_TASKS: {} ms", taskStopWatch.getTotalTimeNanos() / 1_000_000);
+                performanceLogger.info("TOTAL: {} ms", totalStopWatch.getTotalTimeNanos() / 1_000_000);
             }
-            performanceLogger.info("SUM_OF_TASKS: {} ms", taskStopWatch.getTotalTimeNanos() / 1_000_000);
-            performanceLogger.info("TOTAL: {} ms", totalStopWatch.getTotalTimeNanos() / 1_000_000);
         }
     }
 
     /**
-     * Bulk insert all resources to Mongo in chunks, using deterministic _id
+     * Bulk upsert all resources to Mongo in chunks, using deterministic _id
      * ({facilityId}:{correlationId}:{resourceType}:{resourceId})
      */
     private static final int MONGO_BULK_BATCH_SIZE = 500;
-    private static final int MONGO_DUPLICATE_KEY_CODE = 11000;
+    // private static final int MONGO_DUPLICATE_KEY_CODE = 11000;
 
     private void bulkWriteResources(List<Resource> resources) {
         if (resources.isEmpty()) {
@@ -267,8 +244,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         }
 
         String correlationId = resources.get(0).getCorrelationId();
-        int totalInserted = 0;
-        int totalDuplicates = 0;
+        int totalUpserted = 0;
 
         for (int i = 0; i < resources.size(); i += MONGO_BULK_BATCH_SIZE) {
             List<Resource> chunk = resources.subList(
@@ -281,37 +257,72 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             }
 
             BulkOperations bulkOps = mongoOperations.bulkOps(BulkOperations.BulkMode.UNORDERED, Resource.class);
-            bulkOps.insert(chunk);
-            try {
-                var result = bulkOps.execute();
-                totalInserted += result.getInsertedCount();
-            } catch (BulkOperationException e) {
-                int dupCount = 0;
-                List<BulkWriteError> fatal = new ArrayList<>();
-                for (BulkWriteError err : e.getErrors()) {
-                    if (err.getCode() == MONGO_DUPLICATE_KEY_CODE) {
-                        dupCount++;
-                    } else {
-                        fatal.add(err);
-                    }
-                }
-                if (!fatal.isEmpty()) {
-                    throw e;
-                }
-                totalInserted += (chunk.size() - dupCount);
-                totalDuplicates += dupCount;
-                logger.debug("Skipped {} duplicate resource(s) on retry for correlationId={}",
-                        dupCount, correlationId);
+            for (Resource r : chunk) {
+                org.springframework.data.mongodb.core.query.Query query =
+                        org.springframework.data.mongodb.core.query.Query.query(
+                                org.springframework.data.mongodb.core.query.Criteria.where("_id").is(r.getId()));
+                bulkOps.replaceOne(query, r, org.springframework.data.mongodb.core.FindAndReplaceOptions.options().upsert());
             }
+            var result = bulkOps.execute();
+            totalUpserted += result.getUpserts().size() + result.getModifiedCount();
         }
 
-        logger.info("Bulk insert complete: inserted={} duplicatesSkipped={} total={} correlationId={}",
-                totalInserted, totalDuplicates, resources.size(), correlationId);
+        logger.info("Bulk upsert complete: upserted={} total={} correlationId={}",
+                totalUpserted, resources.size(), correlationId);
     }
 
+    // private void bulkInsertResources(List<Resource> resources) {
+    //     if (resources.isEmpty()) {
+    //         return;
+    //     }
+    //
+    //     String correlationId = resources.get(0).getCorrelationId();
+    //     int totalInserted = 0;
+    //     int totalDuplicates = 0;
+    //
+    //     for (int i = 0; i < resources.size(); i += MONGO_BULK_BATCH_SIZE) {
+    //         List<Resource> chunk = resources.subList(
+    //                 i, Math.min(i + MONGO_BULK_BATCH_SIZE, resources.size()));
+    //
+    //         for (Resource r : chunk) {
+    //             if (r.getId() == null) {
+    //                 r.setId(buildDeterministicId(r));
+    //             }
+    //         }
+    //
+    //         BulkOperations bulkOps = mongoOperations.bulkOps(BulkOperations.BulkMode.UNORDERED, Resource.class);
+    //         bulkOps.insert(chunk);
+    //         try {
+    //             var result = bulkOps.execute();
+    //             totalInserted += result.getInsertedCount();
+    //         } catch (BulkOperationException e) {
+    //             int dupCount = 0;
+    //             List<BulkWriteError> fatal = new ArrayList<>();
+    //             for (BulkWriteError err : e.getErrors()) {
+    //                 if (err.getCode() == MONGO_DUPLICATE_KEY_CODE) {
+    //                     dupCount++;
+    //                 } else {
+    //                     fatal.add(err);
+    //                 }
+    //             }
+    //             if (!fatal.isEmpty()) {
+    //                 throw e;
+    //             }
+    //             totalInserted += (chunk.size() - dupCount);
+    //             totalDuplicates += dupCount;
+    //             logger.debug("Skipped {} duplicate resource(s) on retry for correlationId={}",
+    //                     dupCount, correlationId);
+    //         }
+    //     }
+    //
+    //     logger.info("Bulk insert complete: inserted={} duplicatesSkipped={} total={} correlationId={}",
+    //             totalInserted, totalDuplicates, resources.size(), correlationId);
+    // }
+
     private static String buildDeterministicId(Resource r) {
-        return r.getFacilityId() + ":" + r.getCorrelationId() + ":"
+        String composite = r.getFacilityId() + ":" + r.getCorrelationId() + ":"
                 + r.getResourceType().name() + ":" + r.getResourceId();
+        return UUID.nameUUIDFromBytes(composite.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
     }
 
     private PatientReportingEvaluationStatus retrievePatientStatus (String facilityId, String correlationId) {
