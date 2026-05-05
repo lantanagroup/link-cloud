@@ -65,90 +65,6 @@ namespace IntegrationTests.Normalization
             .WithImage("redis:latest") 
             .Build();
 
-        //public async Task NormalizationIntegrationTestFixture()
-        //{
-            
-
-
-        //    _host = Host.CreateDefaultBuilder()
-        //        .ConfigureServices((context, services) =>
-        //        {
-        //            // Add in-memory with warning suppression
-        //            services.AddDbContext<NormalizationDbContext>(options =>
-        //            {
-        //                options.UseInMemoryDatabase("NormalizationDatabase");
-        //                options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
-        //            });
-
-        //            // Register CopyPropertyOperationService as a singleton and hosted service
-        //            services.AddSingleton<CopyPropertyOperationService>();
-        //            services.AddSingleton<CopyLocationOperationService>();
-        //            services.AddSingleton<CodeMapOperationService>();
-        //            services.AddSingleton<ConditionalTransformOperationService>();
-
-
-        //            // Register other services
-        //            var serviceInformation = new ServiceInformation
-        //            {
-        //                ServiceName = "NormalizationIntegrationTest",
-        //                ServiceConfigName = "NormalizationIntegrationTest",
-        //                Version = "1.0.0-test"
-        //            };
-
-        //            services.AddSingleton(serviceInformation);
-
-        //            services.AddScoped<IEntityRepository<Operation>, OperationRepository>();
-        //            services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
-        //            services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
-        //            services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
-        //            services.AddScoped<IEntityRepository<Vendor>, VendorRepository>();
-        //            services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
-        //            services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
-
-        //            //services.AddScoped<StackExchange.Redis.IDatabase, Database>();
-        //            services.AddScoped<LantanaGroup.Link.Normalization.Domain.IDatabase, Database>();
-
-        //            services.AddScoped<IOperationManager, OperationManager>();
-        //            services.AddScoped<IResourceManager, ResourceManager>();
-        //            services.AddScoped<IVendorManager, VendorManager>();
-
-        //            services.AddScoped<IOperationQueries, OperationQueries>();
-        //            services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
-        //            services.AddScoped<IVendorQueries, VendorQueries>();
-        //            services.AddScoped<IResourceQueries, ResourceQueries>();
-
-        //            services.AddSingleton(ResourcesAcquiredConsumerFactoryMock.Object);
-        //            services.AddSingleton(ResourcesAcquiredDeadLetterHandlerMock.Object);
-        //            services.AddSingleton(ResourcesAcquiredTransientHandlerMock.Object);
-        //            services.AddSingleton(ConsumeExceptionHandlerMock.Object);
-        //            services.AddSingleton(ResourcesNormalizedProducerMock.Object);
-        //            services.AddTransient<ResourcesAcquiredListener>();
-        //            services.AddTransient<INormalizationServiceMetrics, NormalizationServiceMetrics>();
-        //            services.AddSingleton(RedisMock.Object);
-        //            services.AddTransient<ABSResourceCache>();
-        //            services.Configure<BlobStorageSettings>(context.Configuration.GetSection("BlobStorage"));
-
-        //            services.Configure<ResourceCacheBlobStorageSettings>(opts => opts.ConnectionString = _azuriteContainer.GetConnectionString());
-        //            services.Configure<ResourceCacheBlobStorageSettings>(opts => opts.BlobContainerName = "cache");
-
-        //            services.AddMemoryCache();
-
-        //            var provider = services.BuildServiceProvider();
-        //            var cache = provider.GetRequiredService<IMemoryCache>();
-        //        })
-        //        .Build();
-
-        //    // Start the host
-        //    _host.StartAsync().GetAwaiter().GetResult();
-        //    ServiceProvider = _host.Services;
-        //    ScopeFactory = ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-
-        //    using var scope = ServiceProvider.CreateScope();
-        //    var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
-        //    InitializeDatabase(resourceManager).GetAwaiter().GetResult();
-        //}
-
-
         private async Task InitializeDatabase(IResourceManager resourceManager)
         {
             await resourceManager.InitializeResources();
@@ -198,7 +114,6 @@ namespace IntegrationTests.Normalization
             builder.Services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
             builder.Services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
 
-            //services.AddScoped<StackExchange.Redis.IDatabase, Database>();
             builder.Services.AddScoped<LantanaGroup.Link.Normalization.Domain.IDatabase, LantanaGroup.Link.Normalization.Domain.Database>();
             builder.Services.AddScoped<IOperationManager, OperationManager>();
             builder.Services.AddScoped<IResourceManager, LantanaGroup.Link.Normalization.Domain.Managers.ResourceManager>();
@@ -212,11 +127,9 @@ namespace IntegrationTests.Normalization
             builder.Services.AddSingleton(ResourcesAcquiredTransientHandlerMock.Object);
             builder.Services.AddSingleton(ConsumeExceptionHandlerMock.Object);
             builder.Services.AddSingleton(ResourcesNormalizedProducerMock.Object);
-          
             
             builder.Services.AddTransient<ResourcesAcquiredListener>();
             builder.Services.AddTransient<INormalizationServiceMetrics, NormalizationServiceMetrics>();
-            //builder.Services.AddSingleton(RedisMock.Object);
             builder.Services.AddTransient<RedisResourceCache>();
             builder.Services.AddTransient<ABSResourceCache>();
             builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection("BlobStorage"));
