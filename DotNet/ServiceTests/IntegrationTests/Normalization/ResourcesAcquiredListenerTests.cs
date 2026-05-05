@@ -1,8 +1,15 @@
 using Azure.Storage.Blobs;
 using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
+using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
+using LantanaGroup.Link.Normalization.Application.Operations;
+using LantanaGroup.Link.Normalization.Domain.Entities;
+using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Listeners;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -11,6 +18,7 @@ using Moq;
 using StackExchange.Redis;
 using System.Text;
 using Testcontainers.Azurite;
+using ResourceType = LantanaGroup.Link.Normalization.Domain.Entities.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Normalization
@@ -33,6 +41,9 @@ namespace IntegrationTests.Normalization
 
             using var scope = _fixture.ScopeFactory.CreateScope();
             var listener = scope.ServiceProvider.GetRequiredService<ResourcesAcquiredListener>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<NormalizationDbContext>();
+
+            await LoadFacilityLocationConfig("Facility1", scope);
 
             var correlationId = Guid.NewGuid().ToString();
 
@@ -81,7 +92,11 @@ namespace IntegrationTests.Normalization
             _fixture.ResourcesNormalizedProducerMock.Reset();
 
             using var scope = _fixture.ScopeFactory.CreateScope();
+
             var listener = scope.ServiceProvider.GetRequiredService<ResourcesAcquiredListener>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<NormalizationDbContext>();
+
+            await LoadFacilityLocationConfig("Facility1", scope);
 
             var correlationId = Guid.NewGuid().ToString();
 
@@ -161,7 +176,7 @@ namespace IntegrationTests.Normalization
                 }
             };
 
-            var blobClient = _containerClient.GetBlobClient("Location");
+            var blobClient = _containerClient.GetBlobClient(correlationId + "/Location");
 
             StringBuilder sb = new StringBuilder();
 
@@ -172,6 +187,37 @@ namespace IntegrationTests.Normalization
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes(sb.ToString()));
 
             blobClient.Upload(stream, overwrite: true);
+        }
+
+        private async Task LoadFacilityLocationConfig(string facilityId, IServiceScope scope) 
+        {
+            var operationManager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
+
+            var result = await operationManager.CreateOperation(new CreateOperationModel()
+            {
+                FacilityId = facilityId,
+                OperationJson = "{\"OperationType\":4,\"Name\":\"Copy Location Operation\",\"Description\":\"Copies each Location Identifier 'System' and 'Value' fields into Location.Type as a CodeableConcept\"}",
+                OperationType = OperationType.CopyLocation.ToString(),
+                IsDisabled = false,
+                Name = "Copy Location Operation",
+                ResourceTypes = new List<string>() { "Location" }
+            });
+
+            var operation = (OperationModel)result.ObjectResult;
+
+            operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
+            {
+                FacilityId = facilityId,
+                ResourceType = "Location",
+                OperationSequences = new List<CreateOperationSequenceModel>()
+                {
+                    new CreateOperationSequenceModel()
+                    {
+                        OperationId = operation.Id,
+                        Sequence = 1
+                    }
+                }
+            });
         }
     }
 }
