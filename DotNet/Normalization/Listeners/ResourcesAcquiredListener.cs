@@ -1,6 +1,7 @@
 using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Utility;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
@@ -10,6 +11,7 @@ using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -17,12 +19,11 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Text;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
 
@@ -113,90 +114,7 @@ public class ResourcesAcquiredListener : BackgroundService
                 {
                     try
                     {
-                        message = result;
-
-                        ValidateResourcesAcquiredEvent(message, out string correlationId);
-
-                        IResourceCache resourceCache;
-
-                        switch (message.Message.Value.CacheType)
-                        {
-                            case ResourceCacheType.ABS: resourceCache = _absCache; break;
-                            case ResourceCacheType.Redis: resourceCache = _redisCache; break;
-                            default:
-                                throw new DeadLetterException($"Cache Type '{message.Message.Value.CacheType.ToString()}' not supported");
-                        }
-
-                        using (var scope = _scopeFactory.CreateScope())
-                        {
-                            foreach (var cacheKey in message.Message.Value.CacheKeys)
-                            {
-                                ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
-
-                                var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
-
-                                var sequences = await operationSequenceQueries.Search(new OperationSequenceSearchModel()
-                                {
-                                    FacilityId = message.Message.Key.FacilityId,
-                                    ResourceType = resourceType.ToString(),
-                                });
-
-                                if (sequences == null || sequences.Count == 0)
-                                {
-                                    resourceCache.Skipped(cacheKey, correlationId);
-                                    continue;
-                                }
-
-                                List<DomainResource> resources = resourceCache.Get(cacheKey);
-
-                                foreach (var resource in resources)
-                                {
-                                    sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
-
-                                    foreach (var sequence in sequences)
-                                    {
-                                        var dbEntity = sequence.OperationResourceType.Operation;
-
-                                        var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
-
-                                        if (operation == null)
-                                        {
-                                            throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
-                                        }
-
-                                        var operationResult = operation.OperationType switch
-                                        {
-                                            OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource),
-                                            OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource),
-                                            OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource),
-                                            OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource),
-                                            _ => null
-                                        };
-
-                                        if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
-                                        {
-                                            _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
-                                                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, message.Message.Key.FacilityId),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.PatientId, message.Message.Key.PatientId),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.Resource, resource.TypeName),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.QueryType, message.Message.Value.QueryType),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.NormalizationOperation, operation.OperationType.ToString())});
-                                        }
-                                        else
-                                        {
-                                            _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", message.Message.Key.FacilityId, correlationId, operation.OperationType, operationResult?.ErrorMessage ?? "No Operation Result Error Message");
-                                        }
-                                    }
-                                }
-
-                                resourceCache.UpdateCorrelationCache(correlationId, resources, resourceType);
-                            }
-
-                            await ProduceResourcesNormalizedMessage(message, message.Message.Key.FacilityId, correlationId);
-
-                            resourceCache.Delete(message.Message.Value.CacheKeys);
-                        }
+                        await ProcessMessageAsync(result,  cancellationToken);
                     }
                     catch (DeadLetterException ex)
                     {
@@ -257,6 +175,92 @@ public class ResourcesAcquiredListener : BackgroundService
                 }
                 continue;
             }
+        }
+    }
+
+    public async Task ProcessMessageAsync(ConsumeResult<ResourceKey, ResourcesAcquiredValue> result, CancellationToken cancellationToken)
+    {
+        ValidateResourcesAcquiredEvent(result, out string correlationId);
+
+        IResourceCache resourceCache;
+
+        switch (result.Message.Value.CacheType)
+        {
+            case ResourceCacheType.ABS: resourceCache = _absCache; break;
+            case ResourceCacheType.Redis: resourceCache = _redisCache; break;
+            default:
+                throw new DeadLetterException($"Cache Type '{result.Message.Value.CacheType.ToString()}' not supported");
+        }
+
+        using (var scope = _scopeFactory.CreateScope())
+        {
+            foreach (var cacheKey in result.Message.Value.CacheKeys)
+            {
+                ResourceType resourceType = resourceCache.GetResourceTypeByCacheKey(cacheKey);
+
+                var operationSequenceQueries = scope.ServiceProvider.GetRequiredService<IOperationSequenceQueries>();
+
+                var sequences = await operationSequenceQueries.Search(new OperationSequenceSearchModel()
+                {
+                    FacilityId = result.Message.Key.FacilityId,
+                    ResourceType = resourceType.ToString(),
+                });
+
+                if (sequences == null || sequences.Count == 0)
+                {
+                    resourceCache.Skipped(cacheKey, correlationId);
+                    continue;
+                }
+
+                List<DomainResource> resources = resourceCache.Get(cacheKey);
+
+                foreach (var resource in resources)
+                {
+                    sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
+
+                    foreach (var sequence in sequences)
+                    {
+                        var dbEntity = sequence.OperationResourceType.Operation;
+
+                        var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
+
+                        if (operation == null)
+                        {
+                            throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
+                        }
+
+                        var operationResult = operation.OperationType switch
+                        {
+                            OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource),
+                            OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource),
+                            OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource),
+                            OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource),
+                            _ => null
+                        };
+
+                        if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
+                        {
+                            _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
+                                                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, result.Message.Key.FacilityId),
+                                                new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
+                                                new KeyValuePair<string, object?>(DiagnosticNames.PatientId, result.Message.Key.PatientId),
+                                                new KeyValuePair<string, object?>(DiagnosticNames.Resource, resource.TypeName),
+                                                new KeyValuePair<string, object?>(DiagnosticNames.QueryType, result.Message.Value.QueryType),
+                                                new KeyValuePair<string, object?>(DiagnosticNames.NormalizationOperation, operation.OperationType.ToString())});
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", result.Message.Key.FacilityId, correlationId, operation.OperationType, operationResult?.ErrorMessage ?? "No Operation Result Error result");
+                        }
+                    }
+                }
+
+                resourceCache.UpdateCorrelationCache(correlationId, resources, resourceType);
+            }
+
+            await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId);
+
+            resourceCache.Delete(result.Message.Value.CacheKeys);
         }
     }
 
