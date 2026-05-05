@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;

@@ -1,4 +1,4 @@
-using LantanaGroup.Automation.Configuration;
+﻿using LantanaGroup.Automation.Configuration;
 using LantanaGroup.Automation.Helpers;
 using System.Collections.Concurrent;
 

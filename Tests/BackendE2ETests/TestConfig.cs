@@ -1,4 +1,4 @@
-using LantanaGroup.Automation.Generation;
+﻿using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using System.Reflection;
 

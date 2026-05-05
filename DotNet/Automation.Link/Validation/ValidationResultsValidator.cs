@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Automation.Link.Helpers;
+﻿using LantanaGroup.Link.Automation.Link.Helpers;
 
 namespace LantanaGroup.Link.Automation.Link.Validation;
 

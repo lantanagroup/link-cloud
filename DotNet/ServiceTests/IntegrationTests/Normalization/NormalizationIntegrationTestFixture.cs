@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Normalization.Application.Services.Operations;
+﻿using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Managers;

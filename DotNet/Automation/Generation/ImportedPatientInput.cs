@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Generation;
+﻿namespace LantanaGroup.Automation.Generation;
 
 using Hl7.Fhir.Model;
 using System.Text.Json.Serialization;

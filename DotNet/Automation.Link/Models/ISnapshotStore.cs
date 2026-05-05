@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Automation.Link.Models;
+﻿namespace LantanaGroup.Link.Automation.Link.Models;
 
 /// <summary>
 /// Per-run, per-domain snapshot data stored in the database.

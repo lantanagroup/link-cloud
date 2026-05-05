@@ -1,4 +1,4 @@
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Facility;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
 using System.Text.Json;

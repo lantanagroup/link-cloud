@@ -1,4 +1,4 @@
-using Azure.Storage.Blobs;
+﻿using Azure.Storage.Blobs;
 using Confluent.Kafka;
 using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Application.Interfaces;

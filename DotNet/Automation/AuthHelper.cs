@@ -1,4 +1,4 @@
-using LantanaGroup.Automation.Configuration;
+﻿using LantanaGroup.Automation.Configuration;
 using RestSharp;
 using System.Text;
 using System.Text.Json;

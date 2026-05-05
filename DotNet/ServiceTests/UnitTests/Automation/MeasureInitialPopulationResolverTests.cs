@@ -1,4 +1,4 @@
-using LantanaGroup.Automation.Generation;
+﻿using LantanaGroup.Automation.Generation;
 
 namespace UnitTests.Automation;
 

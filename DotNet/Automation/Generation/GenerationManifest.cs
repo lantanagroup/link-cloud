@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using System.Text.Json;
 
 namespace LantanaGroup.Automation.Generation;

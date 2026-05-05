@@ -1,4 +1,4 @@
-namespace Automation.UI.Services;
+﻿namespace Automation.UI.Services;
 
 /// <summary>
 /// Builds the diagnostic ZIP package for a single run. Implementations are

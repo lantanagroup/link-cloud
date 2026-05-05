@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Shared.Application.Interfaces;
+﻿using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Account.Infrastructure.Health;

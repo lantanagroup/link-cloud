@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services;
 using FluentAssertions;
 using LantanaGroup.Automation.Generation;

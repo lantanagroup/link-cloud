@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using LantanaGroup.Automation.Generation;
 
 namespace UnitTests.Automation;

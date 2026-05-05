@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Terminology.Services;
+﻿namespace LantanaGroup.Link.Terminology.Services;
 
 /// <summary>
 /// A hosted service responsible for managing the application's startup and shutdown events.

@@ -1,4 +1,4 @@
-using FluentValidation;
+﻿using FluentValidation;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using Microsoft.Extensions.Options;
 

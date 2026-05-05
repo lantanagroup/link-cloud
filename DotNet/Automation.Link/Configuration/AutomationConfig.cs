@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Automation.Link.Configuration;
+﻿namespace LantanaGroup.Link.Automation.Link.Configuration;
 
 /// <summary>
 /// Configuration for the Link automation library.

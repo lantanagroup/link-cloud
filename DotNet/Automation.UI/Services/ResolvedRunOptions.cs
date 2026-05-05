@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using LantanaGroup.Automation.Generation;
 
 namespace Automation.UI.Services;

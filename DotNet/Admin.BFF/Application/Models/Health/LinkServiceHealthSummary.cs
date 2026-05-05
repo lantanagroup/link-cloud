@@ -1,4 +1,4 @@
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

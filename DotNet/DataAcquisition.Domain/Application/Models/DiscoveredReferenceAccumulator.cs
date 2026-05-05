@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+﻿namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 
 /// <summary>
 /// Per-primary-log-execution collector for reference resource ids discovered while
