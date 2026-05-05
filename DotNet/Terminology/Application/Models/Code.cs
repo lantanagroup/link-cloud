@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Terminology.Application.Models;
+﻿namespace LantanaGroup.Link.Terminology.Application.Models;
 
 /// <summary>
 /// Represents a code (i.e. within a CodeSystem or ValueSet) with a value and display text.

@@ -1,4 +1,5 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 using Renci.SshNet;
 
@@ -56,7 +57,7 @@ public class SftpClientService(ILogger<SftpClientService> logger, ISftpCredentia
 
         logger.LogDebug(
             "Opened SFTP session to {Host}:{Port} for facility {FacilityId}",
-            sftpConfig.Host, sftpConfig.Port, sftpConfig.OrganizationId);
+            sftpConfig.Host.SanitizeForLog(), sftpConfig.Port.SanitizeForLog(), sftpConfig.OrganizationId.SanitizeForLog());
 
         return new SftpSession(client, logger);
     }

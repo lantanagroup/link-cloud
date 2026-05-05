@@ -1,4 +1,4 @@
-using Automation.UI.Services;
+﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using FluentAssertions;
 using LantanaGroup.Link.Automation.Link.Models;

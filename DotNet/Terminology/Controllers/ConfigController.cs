@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Terminology.Services;
+﻿using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 

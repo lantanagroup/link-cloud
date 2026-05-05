@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Automation.Link.Models;
+﻿namespace LantanaGroup.Link.Automation.Link.Models;
 
 public class AutomationRunSummary
 {

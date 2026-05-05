@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -163,7 +163,7 @@ public class AcquisitionProcessingJob : IJob
                 {
                     if (stopwatch.Elapsed.TotalSeconds >= _settings.TimeBudgetPerRunSeconds)
                     {
-                        _logger.LogInformation("ProcessFacilityPendingLogs (MissingConfig) for facility {facilityId} reached time budget of {budget}s. Yielding.", facilityId, _settings.TimeBudgetPerRunSeconds);
+                        _logger.LogInformation("ProcessFacilityPendingLogs (MissingConfig) for facility {facilityId} reached time budget of {budget}s. Yielding.", facilityId.SanitizeForLog(), _settings.TimeBudgetPerRunSeconds.SanitizeForLog());
                         break;
                     }
 
@@ -186,7 +186,7 @@ public class AcquisitionProcessingJob : IJob
 
                 if (batchesProcessedMissing >= _settings.MaxBatchesPerFacilityPerRun)
                 {
-                    _logger.LogInformation("ProcessFacilityPendingLogs (MissingConfig) for facility {facilityId} reached max batch limit of {maxBatches}. Yielding.", facilityId, _settings.MaxBatchesPerFacilityPerRun);
+                    _logger.LogInformation("ProcessFacilityPendingLogs (MissingConfig) for facility {facilityId} reached max batch limit of {maxBatches}. Yielding.", facilityId.SanitizeForLog(), _settings.MaxBatchesPerFacilityPerRun.SanitizeForLog());
                 }
 
                 return;
@@ -194,7 +194,7 @@ public class AcquisitionProcessingJob : IJob
 
             if (!IsWithinAcquisitionWindow(config.MinAcquisitionPullTime, config.MaxAcquisitionPullTime))
             {
-                _logger.LogInformation("Current time {currentTime} is outside the acquisition window for facility {facilityId}.", dateTimeNow.TimeOfDay, facilityId);
+                _logger.LogInformation("Current time {currentTime} is outside the acquisition window for facility {facilityId}.", dateTimeNow.TimeOfDay, facilityId.SanitizeForLog());
                 return;
             }
 
@@ -204,16 +204,16 @@ public class AcquisitionProcessingJob : IJob
             {
                 if (stopwatch.Elapsed.TotalSeconds >= _settings.TimeBudgetPerRunSeconds)
                 {
-                    _logger.LogInformation("ProcessFacilityPendingLogs for facility {facilityId} reached time budget of {budget}s. Yielding.", facilityId, _settings.TimeBudgetPerRunSeconds);
+                    _logger.LogInformation("ProcessFacilityPendingLogs for facility {facilityId} reached time budget of {budget}s. Yielding.", facilityId.SanitizeForLog(), _settings.TimeBudgetPerRunSeconds.SanitizeForLog());
                     break;
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
-                _logger.LogInformation("Fetching batch after Id {lastId} for facility {facilityId}", lastId?.ToString() ?? "null", facilityId);
+                _logger.LogInformation("Fetching batch after Id {lastId} for facility {facilityId}", lastId.SanitizeForLog() ?? "null", facilityId.SanitizeForLog());
                 var requests = await dataAcquisitionLogQueries.GetNextEligibleBatchForFacility(facilityId, lastId, BatchSize, statuses, dateTimeNow, cancellationToken);
                 if (!requests.Any())
                 {
-                    _logger.LogInformation("No more logs to process for facility {facilityId}", facilityId);
+                    _logger.LogInformation("No more logs to process for facility {facilityId}", facilityId.SanitizeForLog());
                     break;
                 }
 
@@ -282,14 +282,14 @@ public class AcquisitionProcessingJob : IJob
 
             if (batchesProcessed >= _settings.MaxBatchesPerFacilityPerRun)
             {
-                _logger.LogDebug("ProcessFacilityPendingLogs for facility {facilityId} reached max batch limit of {maxBatches}. Yielding.", facilityId, _settings.MaxBatchesPerFacilityPerRun);
+                _logger.LogDebug("ProcessFacilityPendingLogs for facility {facilityId} reached max batch limit of {maxBatches}. Yielding.", facilityId.SanitizeForLog(), _settings.MaxBatchesPerFacilityPerRun.SanitizeForLog());
             }
 
-            _logger.LogInformation("Completed processing processable requests for facility {facilityId}.", facilityId);
+            _logger.LogInformation("Completed processing processable requests for facility {facilityId}.", facilityId.SanitizeForLog());
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing acquisition job for facility id: {facilityId}", facilityId);
+            _logger.LogError(ex, "Error processing acquisition job for facility id: {facilityId}", facilityId.SanitizeForLog());
         }
     }
 

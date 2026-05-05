@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 
@@ -23,14 +23,14 @@ public class CustomHeaderAuth : IAuth
         var headers = new Dictionary<string, string>();
         foreach (var header in authSettings.CustomHeaders)
         {
-            var secretName = header.Value;
-            var secretValue = await _secretManager.GetSecretAsync(secretName, CancellationToken.None);
-            if (string.IsNullOrEmpty(secretValue))
+            var name = header.Value;
+            var value = await _secretManager.GetSecretAsync(name, CancellationToken.None);
+            if (string.IsNullOrEmpty(value))
             {
                 throw new InvalidOperationException(
-                    $"Secret for custom auth header '{header.Key}' (secret name: '{secretName}') could not be resolved or is empty.");
+                    $"Secret for custom auth header '{header.Key}' (secret name: '{name}') could not be resolved or is empty.");
             }
-            headers.Add(header.Key, secretValue);
+            headers.Add(header.Key, value);
         }
 
         return (false, headers);

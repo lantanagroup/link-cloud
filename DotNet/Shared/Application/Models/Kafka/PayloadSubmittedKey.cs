@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Shared.Application.Models.Kafka;
+﻿namespace LantanaGroup.Link.Shared.Application.Models.Kafka;
 
 public class PayloadSubmittedKey
 {

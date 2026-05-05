@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Models;
 
