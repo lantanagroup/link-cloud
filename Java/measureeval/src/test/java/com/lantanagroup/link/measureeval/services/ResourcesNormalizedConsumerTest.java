@@ -5,7 +5,6 @@ import com.lantanagroup.link.measureeval.entities.QueryType;
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.ResourcesNormalized;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
-import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.junit.jupiter.api.AfterEach;
@@ -25,9 +24,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ResourcesNormalizedConsumerTest {
-
-    @Mock
-    private ResourceRepository resourceRepository;
 
     @Mock
     private PatientReportingEvaluationStatusRepository patientStatusRepository;
@@ -69,7 +65,6 @@ class ResourcesNormalizedConsumerTest {
     void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
         consumer = new ResourcesNormalizedConsumer(
-                resourceRepository,
                 patientStatusRepository,
                 reportabilityPredicate,
                 measureEvalMetrics,

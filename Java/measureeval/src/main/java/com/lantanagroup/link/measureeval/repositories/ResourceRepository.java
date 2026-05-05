@@ -7,6 +7,6 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface ResourceRepository extends MongoRepository<Resource, String>, ResourceUpsertingRepository {
+public interface ResourceRepository extends MongoRepository<Resource, String> {
     List<Resource> findByFacilityIdAndCorrelationId(String facilityId, String correlationId);
 }

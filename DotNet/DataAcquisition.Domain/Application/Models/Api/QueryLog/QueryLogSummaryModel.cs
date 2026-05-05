@@ -60,6 +60,7 @@ public record QueryLogSummaryModel
             RetryAttempts = log.RetryAttempts,
             Status = log.Status,
             ReportTrackingId = log.ReportTrackingId,
+            IsDeleted = log.IsDeleted,
             IsReferenceLog = log.FhirQuery?.Any(q => q.IsReference == true) == true
         };
     }
