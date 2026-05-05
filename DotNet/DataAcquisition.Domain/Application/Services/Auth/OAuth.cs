@@ -51,11 +51,9 @@ public class OAuth : IAuth
             if (string.IsNullOrWhiteSpace(clientSecret))
                 throw new InvalidOperationException($"No value found in secret manager for ClientSecret");
 
-            var credentials = Convert.ToBase64String(
-                System.Text.Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}"));
-
             var request = new HttpRequestMessage(HttpMethod.Post, authSettings.TokenUrl);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
+                Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}")));
 
             var parameters = new Dictionary<string, string>
             {
@@ -86,7 +84,7 @@ public class OAuth : IAuth
         }
         catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException)
         {
-            _logger.LogError(ex, "Error acquiring OAuth access token for facility {FacilityId}", facilityId.SanitizeUntrustedString());
+            _logger.LogError(ex, "Error acquiring OAuth access token for facility {FacilityId}", facilityId.SanitizeForLog());
         }
 
         return (false, null);
