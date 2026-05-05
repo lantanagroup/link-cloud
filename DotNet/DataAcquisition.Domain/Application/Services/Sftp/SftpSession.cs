@@ -1,6 +1,7 @@
-﻿using System.Text.RegularExpressions;
+﻿using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 using Renci.SshNet;
+using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp;
 
@@ -117,7 +118,7 @@ public class SftpSession : ISftpSession
 
         _logger.LogDebug(
             "Listed {FileCount} files in {Directory} matching pattern {Pattern}",
-            files.Count, remoteDirectory, fileNamePattern ?? "(all)");
+            files.Count.SanitizeForLog(), remoteDirectory.SanitizeForLog(), fileNamePattern.SanitizeForLog() ?? "(all)");
 
         return Task.FromResult(files);
     }
@@ -152,7 +153,7 @@ public class SftpSession : ISftpSession
         if (!_client.Exists(destinationDirectory))
         {
             _client.CreateDirectory(destinationDirectory);
-            _logger.LogDebug("Created directory {Directory}", destinationDirectory);
+            _logger.LogDebug("Created directory {Directory}", destinationDirectory.SanitizeForLog());
         }
 
         // Build destination path (preserve file name)
@@ -161,7 +162,7 @@ public class SftpSession : ISftpSession
 
         // Move processed file to processed directory
         _client.RenameFile(sourceFilePath, destinationPath);
-        _logger.LogDebug("Moved file {Source} to {Destination}", sourceFilePath, destinationPath);
+        _logger.LogDebug("Moved file {Source} to {Destination}", sourceFilePath.SanitizeForLog(), destinationPath.SanitizeForLog());
 
         return Task.CompletedTask;
     }

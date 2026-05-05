@@ -53,7 +53,7 @@ public class QueryPlanManager : IQueryPlanManager
         // Remove carriage return and line feed characters that can break log structure.
         return value.Replace("\r", string.Empty)
                     .Replace("\n", string.Empty)
-                    .SanitizeUntrustedString();
+                    .SanitizeForLog();
     }
 
     /// <summary>
