@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;

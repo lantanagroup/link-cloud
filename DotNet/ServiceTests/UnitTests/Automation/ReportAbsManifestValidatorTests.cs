@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using LantanaGroup.Automation.Helpers;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link.Helpers;

@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Shared.Application.Interfaces.Services;
+﻿using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using Link.Authorization.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.Extensions.Logging;
@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
         private readonly IDataProtector _protector;
         private readonly string _secretsFilePath;
         private readonly object _fileLock = new();
-        private Dictionary<string, string> _secrets = [];
+        private Dictionary<string, string> _values = [];
 
         private const string ProtectorPurpose = "LocalSecretManager.Secrets.v1";
         private const string SecretsFileName = "link-local-secrets.enc";
@@ -35,9 +35,9 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
 
             // Store secrets file in user's local app data folder
             var appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            var linkSecretsPath = Path.Combine(appDataPath, "Link", "Secrets");
-            Directory.CreateDirectory(linkSecretsPath);
-            _secretsFilePath = Path.Combine(linkSecretsPath, SecretsFileName);
+            var managerPath = Path.Combine(appDataPath, "Link", "Secrets");
+            Directory.CreateDirectory(managerPath);
+            _secretsFilePath = Path.Combine(managerPath, SecretsFileName);
 
             // Load existing secrets from file
             LoadSecretsFromFile();
@@ -45,12 +45,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
             // Ensure the bearer key exists (generate if not present)
             EnsureBearerKeyExists();
 
-            _logger.LogInformation("Local Secret Manager initialized with persistence at {SecretsPath}", linkSecretsPath);
+            _logger.LogInformation("Local Secret Manager initialized with persistence at {SecretsPath}", managerPath);
         }
 
         public Task<string?> GetSecretAsync(string secretName, CancellationToken cancellationToken)
         {
-            var secret = _secrets.GetValueOrDefault(secretName);
+            var secret = _values.GetValueOrDefault(secretName);
             return Task.FromResult(secret);
         }
 
@@ -62,7 +62,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
 
         public Task<bool> SetSecretAsync(string secretName, string secretValue, CancellationToken cancellationToken)
         {
-            _secrets[secretName] = secretValue;
+            _values[secretName] = secretValue;
             SaveSecretsToFile();
             _logger.LogInformation("Secret {SecretName} saved to local secret manager", secretName.SanitizeAndRemove());
             return Task.FromResult(true);
@@ -70,7 +70,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
 
         public Task<bool> DeleteSecretAsync(string secretName, CancellationToken cancellationToken)
         {
-            var removed = _secrets.Remove(secretName);
+            var removed = _values.Remove(secretName);
             if (removed)
             {
                 SaveSecretsToFile();
@@ -98,19 +98,19 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
                     }
 
                     var decryptedContent = _protector.Unprotect(encryptedContent);
-                    _secrets = JsonSerializer.Deserialize<Dictionary<string, string>>(decryptedContent) ?? [];
+                    _values = JsonSerializer.Deserialize<Dictionary<string, string>>(decryptedContent) ?? [];
 
-                    _logger.LogInformation("Loaded {Count} secrets from encrypted file", _secrets.Count);
+                    _logger.LogInformation("Loaded {Count} secrets from encrypted file", _values.Count);
                 }
                 catch (CryptographicException ex)
                 {
                     _logger.LogWarning(ex, "Failed to decrypt secrets file (encryption key may have changed). Starting with empty secrets.");
-                    _secrets = [];
+                    _values = [];
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error loading secrets from file. Starting with empty secrets.");
-                    _secrets = [];
+                    _values = [];
                 }
             }
         }
@@ -121,8 +121,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
             {
                 try
                 {
-                    var json = JsonSerializer.Serialize(_secrets, _jsonSerializerOptions);
-                    var encryptedContent = _protector.Protect(json);
+                    var encryptedContent = _protector.Protect(JsonSerializer.Serialize(_values, _jsonSerializerOptions));
                     File.WriteAllText(_secretsFilePath, encryptedContent);
                     _logger.LogDebug("Secrets persisted to encrypted file");
                 }
@@ -138,10 +137,10 @@ namespace LantanaGroup.Link.Shared.Application.Services.SecretManager
         {
             const string bearerKeyName = LinkAuthorizationConstants.LinkBearerService.LinkBearerKeyName;
 
-            if (_secrets.ContainsKey(bearerKeyName)) return;
+            if (_values.ContainsKey(bearerKeyName)) return;
 
             var key = GenerateRandomKey(64);
-            _secrets[bearerKeyName] = key;
+            _values[bearerKeyName] = key;
 
             SaveSecretsToFile();
         }

@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Collections.Immutable;
 using System.Text.Json;
 
@@ -58,7 +59,7 @@ public class MeasureReportAggregator
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to deserialize PopulationCodeJson for population {PopulationId}. Using empty CodeableConcept.", groupPopulation.PopulationId);
+                    _logger.LogWarning(ex, "Failed to deserialize PopulationCodeJson for population {PopulationId}. Using empty CodeableConcept.", groupPopulation.PopulationId.SanitizeForLog());
                     populationCode = new CodeableConcept();
                 }
 
@@ -97,7 +98,7 @@ public class MeasureReportAggregator
         }
 
         _logger.LogInformation("Successfully created {Count} aggregate MeasureReport(s) for schedule {ScheduleId}",
-            aggregates.Count, reportSchedule.Id);
+            aggregates.Count, reportSchedule.Id.SanitizeForLog());
 
         return aggregates;
     }

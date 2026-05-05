@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -82,12 +82,9 @@ public class SftpCredentialService : ISftpCredentialService
         if (string.IsNullOrWhiteSpace(credentials.Password))
             throw new ArgumentException("Password cannot be empty", nameof(credentials));
 
-        var secretName = GetSecretName(organizationId);
-        var secretValue = JsonSerializer.Serialize(credentials);
-
         _logger.LogInformation("Setting SFTP credentials for organization {OrganizationId}", organizationId);
 
-        var result = await _secretManager.SetSecretAsync(secretName, secretValue, cancellationToken);
+        var result = await _secretManager.SetSecretAsync(GetSecretName(organizationId), JsonSerializer.Serialize(credentials), cancellationToken);
 
         if (result)
         {
@@ -107,19 +104,17 @@ public class SftpCredentialService : ISftpCredentialService
         if (string.IsNullOrWhiteSpace(organizationId))
             throw new ArgumentNullException(nameof(organizationId));
 
-        var secretName = GetSecretName(organizationId);
-
         try
         {
-            var secretValue = await _secretManager.GetSecretAsync(secretName, cancellationToken);
+            var value = await _secretManager.GetSecretAsync(GetSecretName(organizationId), cancellationToken);
 
-            if (string.IsNullOrEmpty(secretValue))
+            if (string.IsNullOrEmpty(value))
             {
-                _logger.LogDebug("No SFTP credentials found for organization {OrganizationId}", organizationId);
+                _logger.LogDebug("No SFTP credentials found for organization {OrganizationId}", organizationId.SanitizeForLog());
                 return null;
             }
 
-            return JsonSerializer.Deserialize<SftpCredentialsModel>(secretValue);
+            return JsonSerializer.Deserialize<SftpCredentialsModel>(value);
         }
         catch (JsonException ex)
         {
@@ -134,11 +129,9 @@ public class SftpCredentialService : ISftpCredentialService
         if (string.IsNullOrWhiteSpace(organizationId))
             throw new ArgumentNullException(nameof(organizationId));
 
-        var secretName = GetSecretName(organizationId);
-
         _logger.LogInformation("Deleting SFTP credentials for organization {OrganizationId}", organizationId.SanitizeAndRemove());
 
-        var result = await _secretManager.DeleteSecretAsync(secretName, cancellationToken);
+        var result = await _secretManager.DeleteSecretAsync(GetSecretName(organizationId), cancellationToken);
 
         if (result)
         {

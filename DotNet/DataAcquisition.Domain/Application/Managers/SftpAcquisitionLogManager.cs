@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -366,7 +366,7 @@ public class SftpAcquisitionLogManager(ILogger<SftpAcquisitionLogManager> logger
         log.Status = RequestStatus.ConfigurationRequired;
 
         await database.SaveChangesAsync();
-        logger.LogWarning("SFTP acquisition log {LogId} marked as configuration required: {Error}", id, errorMessage);
+        logger.LogWarning("SFTP acquisition log {LogId} marked as configuration required: {Error}", id.SanitizeForLog(), errorMessage.SanitizeForLog());
     }
 
     /// <inheritdoc/>
