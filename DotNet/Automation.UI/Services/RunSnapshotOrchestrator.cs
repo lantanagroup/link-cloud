@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using LantanaGroup.Link.Automation.Link.Helpers;
 
 namespace Automation.UI.Services;

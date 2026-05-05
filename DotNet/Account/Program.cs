@@ -1,4 +1,4 @@
-using Azure.Identity;
+﻿using Azure.Identity;
 using FluentValidation;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Account.Application.Interfaces.Infrastructure;

@@ -6,6 +6,7 @@ using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LinqKit;
 using Microsoft.EntityFrameworkCore;
@@ -365,13 +366,13 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     }
                     else
                     {
-                        _logger.LogWarning("Skipping Quartz job re-schedule for report schedule {ReportScheduleId}: ReportEndDate {ReportEndDate} is in the past", r.Id, r.ReportEndDate);
+                        _logger.LogWarning("Skipping Quartz job re-schedule for report schedule {ReportScheduleId}: ReportEndDate {ReportEndDate} is in the past", r.Id.SanitizeForLog(), r.ReportEndDate);
                     }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Failed to {Action} Quartz job for report schedule {ReportScheduleId}",
-                        deleted ? "delete" : "re-schedule", r.Id);
+                        deleted ? "delete" : "re-schedule", r.Id.SanitizeForLog());
                     quartzFailedIds.Add(r.Id);
                 }
             }
@@ -443,7 +444,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to delete Quartz job for report schedule {ReportScheduleId}", entity.Id);
+                    _logger.LogWarning(ex, "Failed to delete Quartz job for report schedule {ReportScheduleId}", entity.Id.SanitizeForLog());
                     throw new InvalidOperationException($"Failed to delete scheduled job for report schedule '{reportTrackingId}'.");
                 }
             }
@@ -482,13 +483,13 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Failed to re-schedule Quartz job for report schedule {ReportScheduleId}", entity.Id);
+                        _logger.LogWarning(ex, "Failed to re-schedule Quartz job for report schedule {ReportScheduleId}", entity.Id.SanitizeForLog());
                         throw new InvalidOperationException($"Failed to re-schedule job for report schedule '{reportTrackingId}'.");
                     }
                 }
                 else
                 {
-                    _logger.LogWarning("Skipping Quartz job re-schedule for report schedule {ReportScheduleId}: ReportEndDate {ReportEndDate} is in the past", entity.Id, entity.ReportEndDate);
+                    _logger.LogWarning("Skipping Quartz job re-schedule for report schedule {ReportScheduleId}: ReportEndDate {ReportEndDate} is in the past", entity.Id.SanitizeForLog(), entity.ReportEndDate);
                 }
             }
 

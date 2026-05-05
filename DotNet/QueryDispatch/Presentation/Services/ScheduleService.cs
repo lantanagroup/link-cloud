@@ -2,6 +2,7 @@
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Quartz;
 using Quartz.Impl.Matchers;
@@ -93,7 +94,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
                         if (matchingDispatch == null)
                         {
                             await Scheduler.UnscheduleJob(trigger.Key);
-                            _logger.LogInformation("Removed orphan trigger for patient {PatientId} in facility {FacilityId}.", patientId, facilityId);
+                            _logger.LogInformation("Removed orphan trigger for patient {PatientId} in facility {FacilityId}.", patientId.SanitizeForLog(), facilityId.SanitizeForLog());
                         }
                     }
 
@@ -111,7 +112,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
                             {
                                 ITrigger trigger = CreateTrigger(dispatch, jobKey);
                                 await Scheduler.ScheduleJob(trigger);
-                                _logger.LogInformation("Added trigger for patient in facility {FacilityId}.", facilityId);
+                                _logger.LogInformation("Added trigger for patient in facility {FacilityId}.", facilityId.SanitizeForLog());
                             }
                         }
                     }

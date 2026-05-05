@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
@@ -19,6 +19,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -152,7 +153,7 @@ public class ReferenceResourceService : IReferenceResourceService
         {
             _logger.LogWarning(ex,
                 "FetchAndPersistAsync: cannot map ReportableEvent {ReportableEvent} to a Frequency for facility {FacilityId} correlation {CorrelationId}; dropping {Count} discovered reference type(s).",
-                primaryLog.ReportableEvent, primaryLog.FacilityId, primaryLog.CorrelationId, accumulator.ByType.Count);
+                primaryLog.ReportableEvent.SanitizeForLog(), primaryLog.FacilityId.SanitizeForLog(), primaryLog.CorrelationId.SanitizeForLog(), accumulator.ByType.Count.SanitizeForLog());
             return;
         }
 
@@ -161,7 +162,7 @@ public class ReferenceResourceService : IReferenceResourceService
         {
             _logger.LogWarning(
                 "FetchAndPersistAsync: no query plan found for facility {FacilityId} frequency {Frequency}; dropping {Count} discovered reference type(s).",
-                primaryLog.FacilityId, planFrequency, accumulator.ByType.Count);
+                primaryLog.FacilityId.SanitizeForLog(), planFrequency.SanitizeForLog(), accumulator.ByType.Count.SanitizeForLog());
             return;
         }
 
@@ -177,7 +178,7 @@ public class ReferenceResourceService : IReferenceResourceService
             {
                 _logger.LogDebug(
                     "FetchAndPersistAsync: no ReferenceQueryConfig for type {ResourceType} in facility {FacilityId} plan; skipping {Count} discovered id(s).",
-                    resourceType, primaryLog.FacilityId, idSet.Count);
+                    resourceType.SanitizeForLog(), primaryLog.FacilityId.SanitizeForLog(), idSet.Count.SanitizeForLog());
                 continue;
             }
 
@@ -287,7 +288,7 @@ public class ReferenceResourceService : IReferenceResourceService
             {
                 _logger.LogWarning(ex,
                     "PrepareReferenceLogExecutionAsync: failed to deserialize cached reference {ResourceType}/{ResourceId} for log {LogId}.",
-                    resourceType, cached.ResourceId, log.Id);
+                    resourceType.SanitizeForLog(), cached.ResourceId.SanitizeForLog(), log.Id.SanitizeForLog());
                 continue;
             }
 
@@ -478,7 +479,7 @@ public class ReferenceResourceService : IReferenceResourceService
         {
             _logger.LogDebug(
                 "FetchAndPersistAsync: created reference log {ReferenceLogId} for {FacilityId}/{CorrelationId}/{QueryPhase}/{ResourceType}.",
-                referenceLogId, primaryLog.FacilityId, primaryLog.CorrelationId, primaryLog.QueryPhase, resourceType);
+                referenceLogId.SanitizeForLog(), primaryLog.FacilityId.SanitizeForLog(), primaryLog.CorrelationId.SanitizeForLog(), primaryLog.QueryPhase.SanitizeForLog(), resourceType.SanitizeForLog());
         }
     }
 

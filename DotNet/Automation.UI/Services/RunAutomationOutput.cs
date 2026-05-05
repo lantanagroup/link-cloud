@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Automation.Link.Helpers;
+﻿using LantanaGroup.Link.Automation.Link.Helpers;
 
 namespace Automation.UI.Services;
 

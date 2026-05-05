@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Report.Services.ResourceMerger.Strategies;
+﻿using LantanaGroup.Link.Report.Services.ResourceMerger.Strategies;
 using Microsoft.Extensions.Logging;
 using Moq;
 
