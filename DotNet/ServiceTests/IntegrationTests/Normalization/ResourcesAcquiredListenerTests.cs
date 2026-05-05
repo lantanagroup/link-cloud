@@ -43,15 +43,16 @@ namespace IntegrationTests.Normalization
             var listener = scope.ServiceProvider.GetRequiredService<ResourcesAcquiredListener>();
             var dbContext = scope.ServiceProvider.GetRequiredService<NormalizationDbContext>();
 
-            await LoadFacilityLocationConfig("Facility1", scope);
+            string facilityId = "Facility1";
+            string patientId = "Patient1";
+            string correlationId = Guid.NewGuid().ToString();
 
-            var correlationId = Guid.NewGuid().ToString();
+
+            await LoadFacilityLocationConfig(facilityId, scope);
 
             UploadResourceCacheRedis(correlationId);
 
-            string patientId = "Patient1";
-
-            var key = new ResourceKey() { FacilityId = "Facility1", PatientId = patientId };
+            var key = new ResourceKey() { FacilityId = facilityId, PatientId = patientId };
             var value = new ResourcesAcquiredValue()
             {
                 QueryType = QueryType.Initial.ToString(),
@@ -96,15 +97,16 @@ namespace IntegrationTests.Normalization
             var listener = scope.ServiceProvider.GetRequiredService<ResourcesAcquiredListener>();
             var dbContext = scope.ServiceProvider.GetRequiredService<NormalizationDbContext>();
 
-            await LoadFacilityLocationConfig("Facility1", scope);
-
+            string facilityId = "Facility1";
+            string patientId = "Patient1";
             var correlationId = Guid.NewGuid().ToString();
+
+
+            await LoadFacilityLocationConfig(facilityId, scope);
 
             UploadResourceCacheABS(correlationId);
 
-            string patientId = "Patient1";
-
-            var key = new ResourceKey() { FacilityId = "Facility1", PatientId = patientId };
+            var key = new ResourceKey() { FacilityId = facilityId, PatientId = patientId };
             var value = new ResourcesAcquiredValue()
             {
                 QueryType = QueryType.Initial.ToString(),
