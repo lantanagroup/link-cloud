@@ -339,13 +339,13 @@ public class ReferenceResourceService : IReferenceResourceService
         long referenceLogId = 0;
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
+        await strategy.ExecuteAsync(async (ct) =>
         {
             _dbContext.ChangeTracker.Clear();
             created = false;
 
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
-            await AcquireLockAsync(primaryLog, resourceType, cancellationToken);
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, ct);
+            await AcquireLockAsync(primaryLog, resourceType, ct);
 
             try
             {
@@ -356,7 +356,7 @@ public class ReferenceResourceService : IReferenceResourceService
                         && l.QueryPhase == primaryLog.QueryPhase
                         && l.ReferenceResourceType == resourceType.ToString())
                     .Select(l => (long?)l.Id)
-                    .FirstOrDefaultAsync(cancellationToken);
+                    .FirstOrDefaultAsync(ct);
 
                 if (existingLogId.HasValue)
                 {
@@ -398,7 +398,7 @@ public class ReferenceResourceService : IReferenceResourceService
                                 QueryParameters = new List<string>()
                             }
                         }
-                    }, cancellationToken);
+                    }, ct);
 
                     referenceLogId = createdLog.Id;
                     created = true;
@@ -419,28 +419,28 @@ public class ReferenceResourceService : IReferenceResourceService
                                 && l.CorrelationId == primaryLog.CorrelationId
                                 && l.QueryPhase == primaryLog.QueryPhase
                                 && l.SiblingCount != null,
-                            cancellationToken);
+                            ct);
 
                     await _dbContext.DataAcquisitionLogs
                         .Where(l => l.Id == referenceLogId)
                         .ExecuteUpdateAsync(setters => setters
                             .SetProperty(l => l.SiblingCount, stampedSiblingCount + 1)
                             .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                            cancellationToken);
+                            ct);
                 }
 
                 var existingPendingIds = await _dbContext.PendingReferenceIds
                     .AsNoTracking()
                     .Where(p => p.DataAcquisitionLogId == referenceLogId)
                     .Select(p => p.ResourceId)
-                    .ToListAsync(cancellationToken);
+                    .ToListAsync(ct);
 
                 var existingAcquiredIds = await _dbContext.DataAcquisitionLogResourceIds
                     .AsNoTracking()
                     .Where(r => r.DataAcquisitionLogId == referenceLogId
                         && r.ResourceId.StartsWith(resourceType + "/"))
                     .Select(r => r.ResourceId)
-                    .ToListAsync(cancellationToken);
+                    .ToListAsync(ct);
 
                 var acquiredBareIds = existingAcquiredIds
                     .Select(id => id.SplitReference())
@@ -463,17 +463,17 @@ public class ReferenceResourceService : IReferenceResourceService
                 if (toInsert.Count > 0)
                 {
                     _dbContext.PendingReferenceIds.AddRange(toInsert);
-                    await _dbContext.SaveChangesAsync(cancellationToken);
+                    await _dbContext.SaveChangesAsync(ct);
                 }
 
-                await transaction.CommitAsync(cancellationToken);
+                await transaction.CommitAsync(ct);
             }
             catch
             {
-                await transaction.RollbackAsync(cancellationToken);
+                await transaction.RollbackAsync(ct);
                 throw;
             }
-        });
+        }, cancellationToken);
 
         if (created)
         {

@@ -44,20 +44,20 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
             var batch = group.ToList();
 
             var strategy = _dbContext.Database.CreateExecutionStrategy();
-            await strategy.ExecuteAsync(async () =>
+            await strategy.ExecuteAsync(async (ct) =>
             {
                 _dbContext.ChangeTracker.Clear();
 
-                await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, cancellationToken);
+                await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
 
-                await AcquireLockAsync($"ReferenceResources:{facilityId}:{resourceType}", cancellationToken);
+                await AcquireLockAsync($"ReferenceResources:{facilityId}:{resourceType}", ct);
 
                 try
                 {
                     var now = DateTime.UtcNow;
                     var resourceIds = batch.Select(m => m.ResourceId).Distinct().ToList();
 
-                    var existingKeys = await GetExistingResourceIdsAsync(facilityId, resourceType, resourceIds, cancellationToken);
+                    var existingKeys = await GetExistingResourceIdsAsync(facilityId, resourceType, resourceIds, ct);
 
                     var toInsert = batch
                         .Where(m => !existingKeys.Contains(m.ResourceId))
@@ -78,20 +78,20 @@ public class ReferenceResourcesManager : IReferenceResourcesManager
                         foreach (var chunk in Chunk(toInsert, InsertChunkSize))
                         {
                             _dbContext.ReferenceResources.AddRange(chunk);
-                            await _dbContext.SaveChangesAsync(cancellationToken);
+                            await _dbContext.SaveChangesAsync(ct);
                         }
                     }
 
                     _dbContext.ChangeTracker.Clear();
 
-                    await transaction.CommitAsync(cancellationToken);
+                    await transaction.CommitAsync(ct);
                 }
                 catch
                 {
                     await transaction.RollbackAsync(cancellationToken);
                     throw;
                 }
-            });
+            }, cancellationToken);
         }
     }
 
