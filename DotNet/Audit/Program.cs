@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Audit.Application.Interfaces;

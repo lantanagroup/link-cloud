@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Automation.Link.Helpers;
+﻿using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;

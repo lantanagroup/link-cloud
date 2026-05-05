@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;

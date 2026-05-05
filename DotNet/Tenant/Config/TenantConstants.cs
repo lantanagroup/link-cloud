@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Tenant.Config
+﻿namespace LantanaGroup.Link.Tenant.Config
 {
     public static class TenantConstants
     {
