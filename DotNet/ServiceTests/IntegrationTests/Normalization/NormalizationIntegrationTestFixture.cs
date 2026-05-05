@@ -147,17 +147,7 @@ namespace IntegrationTests.Normalization
             ServiceProvider = _host.Services;
             ScopeFactory = ServiceProvider.GetRequiredService<IServiceScopeFactory>();
 
-            //var configuration = ServiceProvider.GetRequiredService<IConfiguration>();
-            //var blobConnectionString = configuration["BlobStorage:ConnectionString"];
-            //var containerName = configuration["BlobStorage:BlobContainerName"] ?? "cache";
-            //var blobServiceClient = new BlobServiceClient(blobConnectionString);
-            //var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-            //await containerClient.CreateIfNotExistsAsync();
-
             using var scope = ServiceProvider.CreateScope();
-            //var dbContext = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
-            //dbContext.Database.EnsureCreated();
-
             var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
             InitializeDatabase(resourceManager).GetAwaiter().GetResult();
         }
