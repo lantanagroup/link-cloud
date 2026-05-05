@@ -4,6 +4,7 @@ using Confluent.Kafka;
 using IntegrationTests.Normalization;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
+using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Report.Listeners;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -31,8 +32,10 @@ namespace IntegrationTests.Normalization
         }
 
         [Fact]
-        public void Consume_Redis_Event() 
+        public async Task Consume_Redis_Event() 
         {
+            _fixture.ResourcesNormalizedProducerMock.Reset();
+
             using var scope = _fixture.ScopeFactory.CreateScope();
             var listener = scope.ServiceProvider.GetRequiredService<ResourcesAcquiredListener>();
 
@@ -40,17 +43,41 @@ namespace IntegrationTests.Normalization
 
             UploadResourceCacheRedis(correlationId);
 
-            var key = new ResourceKey() { FacilityId = "Facility1", PatientId = "Patient1" };
-            var value = new ResourcesAcquired()
+            string patientId = "Patient1";
+
+            var key = new ResourceKey() { FacilityId = "Facility1", PatientId = patientId };
+            var value = new ResourcesAcquiredValue()
             {
                 QueryType = QueryType.Initial.ToString(),
                 CacheType = ResourceCacheType.Redis,
                 CacheKeys = new List<string>() { correlationId + ":Patient" },
-                ReportableEvent = ReportableEvent.Discharge,
-                ScheduledReports = new List<ScheduledReport>()
+                ReportableEvent = ReportableEvent.Discharge.ToString(),
+                ScheduledReports = new List<ScheduledReport>() { 
+                    new ScheduledReport() 
+                    { 
+                        ReportTrackingId = "Report1",
+                        StartDate = DateTime.Now,
+                        EndDate = DateTime.Now,
+                        Frequency = Frequency.Discharge,
+                        ReportTypes = new List<string>() { "NHSNAcuteCareHospitalMonthlyInitialPopulation" }
+                    } 
+                }
+            };
+            var headers = new Headers { { "X-Correlation-Id", Encoding.UTF8.GetBytes(correlationId) } };
+
+            var consumeResult = new ConsumeResult<ResourceKey, ResourcesAcquiredValue>
+            {
+                Message = new Message<ResourceKey, ResourcesAcquiredValue> { Key = key, Value = value, Headers = headers }
             };
 
-            Assert.True(1 == 1);
+            await listener.ProcessMessageAsync(consumeResult, CancellationToken.None);
+
+            _fixture.ResourcesNormalizedProducerMock.Verify(
+                p => p.ProduceAsync(
+                    It.IsAny<string>(),
+                    It.Is<Message<ResourceKey, ResourcesNormalizedValue>>(m => m.Key.PatientId == patientId),
+                    It.IsAny<CancellationToken>()),
+                Times.Once);
         }
 
         private void UploadResourceCacheRedis(string correlationId) 

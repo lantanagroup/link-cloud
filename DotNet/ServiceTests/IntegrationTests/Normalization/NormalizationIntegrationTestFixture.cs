@@ -37,6 +37,7 @@ using StackExchange.Redis;
 using System.Resources;
 using Testcontainers.Azurite;
 using Testcontainers.Redis;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 using ResourceType = LantanaGroup.Link.Normalization.Domain.Entities.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -50,7 +51,7 @@ namespace IntegrationTests.Normalization
         public Mock<ITransientExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>> ResourcesAcquiredTransientHandlerMock { get; } = new();
         public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>> ResourcesAcquiredDeadLetterHandlerMock { get; } = new();
         public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>> ConsumeExceptionHandlerMock { get; } = new();
-        public Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> ResourcesNormalizedProducerMock { get; private set; } = new();
+        public Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> ResourcesNormalizedProducerMock { get; } = new();
         public Mock<RedisResourceCache> RedisMock { get; } = new Mock<RedisResourceCache>(new Mock<IConnectionMultiplexer>().Object, new Mock<ILogger<RedisResourceCache>>().Object);
 
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
@@ -160,6 +161,12 @@ namespace IntegrationTests.Normalization
 
             var builder = Host.CreateApplicationBuilder();
 
+            var connection = await ConnectionMultiplexer.ConnectAsync(_redisContainer.GetConnectionString());
+
+            builder.Services.AddSingleton<IConnectionMultiplexer>(connection);
+            builder.Services.AddSingleton(sp => sp.GetRequiredService<IConnectionMultiplexer>().GetDatabase());
+            builder.Services.AddSingleton<StackExchange.Redis.IDatabase>(connection.GetDatabase());
+
             // Add in-memory with warning suppression
             builder.Services.AddDbContext<NormalizationDbContext>(options =>
             {
@@ -205,13 +212,17 @@ namespace IntegrationTests.Normalization
             builder.Services.AddSingleton(ResourcesAcquiredTransientHandlerMock.Object);
             builder.Services.AddSingleton(ConsumeExceptionHandlerMock.Object);
             builder.Services.AddSingleton(ResourcesNormalizedProducerMock.Object);
+          
+            
             builder.Services.AddTransient<ResourcesAcquiredListener>();
             builder.Services.AddTransient<INormalizationServiceMetrics, NormalizationServiceMetrics>();
-            builder.Services.AddSingleton(RedisMock.Object);
+            //builder.Services.AddSingleton(RedisMock.Object);
+            builder.Services.AddTransient<RedisResourceCache>();
             builder.Services.AddTransient<ABSResourceCache>();
             builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection("BlobStorage"));
             builder.Services.Configure<ResourceCacheBlobStorageSettings>(opts => opts.ConnectionString = _azuriteContainer.GetConnectionString());
             builder.Services.Configure<ResourceCacheBlobStorageSettings>(opts => opts.BlobContainerName = "cache");
+            
             builder.Services.AddMemoryCache();
 
             var provider = builder.Services.BuildServiceProvider();
@@ -246,7 +257,8 @@ namespace IntegrationTests.Normalization
 
         public void Dispose()
         {
-            throw new NotImplementedException();
+            _host.StopAsync().GetAwaiter().GetResult();
+            _host.Dispose();
         }
     }
 }
