@@ -415,7 +415,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             {
                 FacilityId = model.FacilityId,
                 ResourceType = model.ResourceType
-            });
+            }, false);
         }
 
         public async Task<bool> DeleteOperationSequence(DeleteOperationSequencesModel model)
