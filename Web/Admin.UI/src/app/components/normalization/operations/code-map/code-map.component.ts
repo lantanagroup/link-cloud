@@ -506,6 +506,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
 
     const rows = this.parseTsv(text);
     if (rows === null) {
+      this.clearClipboard();
       this.showTsvFormatError();
       return;
     }
@@ -519,6 +520,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
 
     const rows = this.parseCsv(text);
     if (rows === null) {
+      this.clearClipboard();
       this.showCsvFormatError();
       return;
     }
@@ -527,12 +529,11 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private showTsvFormatError(): void {
-    const tab = '&nbsp;&nbsp;&nbsp;&nbsp;';
-    const exampleLine = `source code${tab}target code${tab}optional display`;
+    const exampleLine = '"source code"\t"target code"\t"optional display"';
     const messageHtml = `
-    <p>The clipboard contents are not in the expected tab-separated values (TSV) format.</p>
-    <p class="csv-error-label"><strong>Expected (columns separated by tabs):</strong></p>
-    <pre class="csv-error-example">${exampleLine}\n${exampleLine}\n${exampleLine}</pre>`;
+    <p>The clipboard contents are not in the expected tab-separated values format.</p>
+    <p class="csv-error-label"><strong>Expected:</strong></p>
+    <pre class="csv-error-code">${exampleLine}\n${exampleLine}\n${exampleLine}</pre>`;
     this.showPasteError(messageHtml, 'Paste Excel Error', true);
   }
 
@@ -541,7 +542,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
     const messageHtml = `
     <p>The clipboard contents are not in the expected comma-separated values (CSV) format.</p>
     <p class="csv-error-label"><strong>Expected:</strong></p>
-    <pre class="csv-error-example">${exampleLine}\n${exampleLine}\n${exampleLine}</pre>`;
+    <pre class="csv-error-code">${exampleLine}\n${exampleLine}\n${exampleLine}</pre>`;
     this.showPasteError(messageHtml, 'Paste CSV Error', true);
   }
 
@@ -583,7 +584,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
     const rows: { source: string; target: string; display: string }[] = [];
     for (const line of lines) {
       const cols = this.parseCsvLine(line);
-      if (cols === null || cols.length < 2 || cols.length > 3) return null;
+      if (cols.length < 2 || cols.length > 3) return null;
       const source = cols[0].trim();
       const target = cols[1].trim();
       const display = cols.length >= 3 ? cols[2].trim() : '';
@@ -593,7 +594,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
     return rows.length > 0 ? rows : null;
   }
 
-  private parseCsvLine(line: string): string[] | null {
+  private parseCsvLine(line: string): string[] {
     const fields: string[] = [];
     let i = 0;
     while (i < line.length) {
@@ -644,6 +645,12 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
     dialogRef.afterClosed().subscribe(confirmed => {
       if (confirmed) {
         const codeMaps = this.codeMapsAt(codeSystemIndex);
+        for (let k = codeMaps.length - 1; k >= 0; k--) {
+          const cm = codeMaps.at(k) as FormGroup;
+          if (!cm.get('key')?.value && !cm.get('value.code')?.value) {
+            codeMaps.removeAt(k);
+          }
+        }
         for (const row of rows) {
           codeMaps.push(this.fb.group({
             key: [row.source, Validators.required],
@@ -653,8 +660,13 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
             }),
           }));
         }
+        this.clearClipboard();
       }
     });
+  }
+
+  private clearClipboard(): void {
+    navigator.clipboard.writeText('').catch(() => {});
   }
 
   private showPasteError(message: string, title: string = 'Paste Error', isHtml: boolean = false): void {
