@@ -274,23 +274,26 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                     List<CreateOperationSequenceModel> createSequences = new List<CreateOperationSequenceModel>();
 
-                    //foreach (var result in results)
-                    //{
-                    //    createSequences.Add(new CreateOperationSequenceModel() { OperationId = result.OperationResourceType.OperationId, Sequence = result.Sequence });
-                    //}
+                    if (results != null && results.Count() > 0)
+                    {
+                        foreach (var result in results)
+                        {
+                            createSequences.Add(new CreateOperationSequenceModel() { OperationId = result.OperationResourceType.OperationId, Sequence = result.Sequence });
+                        }
+                    }
 
-                    //createSequences.Add(new CreateOperationSequenceModel()
-                    //{
-                    //    OperationId = operationModel.Id,
-                    //    Sequence = maxSequence
-                    //});
+                    createSequences.Add(new CreateOperationSequenceModel()
+                    {
+                        OperationId = operationModel.Id,
+                        Sequence = maxSequence
+                    });
 
-                    //var sequences = await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
-                    //{
-                    //    FacilityId = model.FacilityId,
-                    //    ResourceType = resourceType,
-                    //    OperationSequences = createSequences
-                    //});
+                    var sequences = await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
+                    {
+                        FacilityId = model.FacilityId,
+                        ResourceType = resourceType,
+                        OperationSequences = createSequences
+                    });
                 }
                 return Created("", taskResult.ObjectResult);
             }
