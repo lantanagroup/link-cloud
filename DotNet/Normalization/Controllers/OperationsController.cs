@@ -288,12 +288,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
                         Sequence = maxSequence
                     });
 
-                    var sequences = await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
-                    {
-                        FacilityId = model.FacilityId,
-                        ResourceType = resourceType,
-                        OperationSequences = createSequences
-                    });
+                    //var sequences = await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
+                    //{
+                    //    FacilityId = model.FacilityId,
+                    //    ResourceType = resourceType,
+                    //    OperationSequences = createSequences
+                    //});
                 }
                 return Created("", taskResult.ObjectResult);
             }
