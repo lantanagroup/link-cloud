@@ -268,7 +268,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     {
                         ResourceType = resourceType,
                         FacilityId = model.FacilityId ?? string.Empty
-                    });
+                    }, false);
 
                     int maxSequence = results == null || results.Count == 0 ? 1 : results.Select(x => x.Sequence).Max() + 1;
 
@@ -276,7 +276,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                     foreach (var result in results) 
                     {
-                        createSequences.Add(new CreateOperationSequenceModel() { OperationId = operationModel.Id, Sequence = result.Sequence });
+                        createSequences.Add(new CreateOperationSequenceModel() { OperationId = result.OperationResourceType.OperationId, Sequence = result.Sequence });
                     }
 
                     createSequences.Add(new CreateOperationSequenceModel()
