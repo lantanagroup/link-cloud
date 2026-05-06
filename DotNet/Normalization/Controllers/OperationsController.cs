@@ -299,7 +299,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error: " +  ex.Message );
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
         }
