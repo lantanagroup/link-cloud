@@ -31,8 +31,9 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             string blobName = correlationId + "/" + resourceType.ToString();
 
             AppendBlobClient writeBlobClient = _containerClient.GetAppendBlobClient(blobName);
+            writeBlobClient.CreateIfNotExists();
 
-            using (Stream write_stream = writeBlobClient.OpenWrite(true))
+            using (Stream write_stream = writeBlobClient.OpenWrite(false))
             using (StreamWriter writer = new StreamWriter(write_stream)) 
             {
                 foreach (var resource in resources) 
