@@ -8,6 +8,7 @@ export interface AlertDialogData {
   message: string;
   icon?: string;
   iconColor?: string;
+  isHtml?: boolean;
 }
 
 @Component({

@@ -40,6 +40,9 @@ import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatCheckbox} from "@angular/material/checkbox";
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
+import {MatDialog} from "@angular/material/dialog";
+import {DeleteConfirmationDialogComponent} from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
+import {AlertDialogComponent} from "../../../core/alert-dialog/alert-dialog.component";
 
 @Component({
   selector: 'app-code-map',
@@ -110,7 +113,8 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   constructor(
     private fb: FormBuilder,
     private snackBar: MatSnackBar,
-    private operationService: OperationService
+    private operationService: OperationService,
+    private dialog: MatDialog
   ) {
     this.form = this.fb.group({
       selectedResourceTypes: new FormControl([], Validators.required),
@@ -495,6 +499,175 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
 
+
+  async pasteFromExcel(codeSystemIndex: number): Promise<void> {
+    const text = await this.readClipboard();
+    if (text === null) return;
+
+    const rows = this.parseTsv(text);
+    if (rows === null) {
+      this.showTsvFormatError();
+      return;
+    }
+
+    this.confirmAndAddCodeMaps(codeSystemIndex, rows);
+  }
+
+  async pasteFromCsv(codeSystemIndex: number): Promise<void> {
+    const text = await this.readClipboard();
+    if (text === null) return;
+
+    const rows = this.parseCsv(text);
+    if (rows === null) {
+      this.showCsvFormatError();
+      return;
+    }
+
+    this.confirmAndAddCodeMaps(codeSystemIndex, rows);
+  }
+
+  private showTsvFormatError(): void {
+    const tab = '&nbsp;&nbsp;&nbsp;&nbsp;';
+    const exampleLine = `source code${tab}target code${tab}optional display`;
+    const messageHtml = `
+    <p>The clipboard contents are not in the expected tab-separated values (TSV) format.</p>
+    <p class="csv-error-label"><strong>Expected (columns separated by tabs):</strong></p>
+    <pre class="csv-error-example">${exampleLine}\n${exampleLine}\n${exampleLine}</pre>`;
+    this.showPasteError(messageHtml, 'Paste Excel Error', true);
+  }
+
+  private showCsvFormatError(): void {
+    const exampleLine = '"source code","target code","optional display"';
+    const messageHtml = `
+    <p>The clipboard contents are not in the expected comma-separated values (CSV) format.</p>
+    <p class="csv-error-label"><strong>Expected:</strong></p>
+    <pre class="csv-error-example">${exampleLine}\n${exampleLine}\n${exampleLine}</pre>`;
+    this.showPasteError(messageHtml, 'Paste CSV Error', true);
+  }
+
+  private async readClipboard(): Promise<string | null> {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text || !text.trim()) {
+        this.showPasteError('Clipboard is empty.');
+        return null;
+      }
+      return text;
+    } catch {
+      this.showPasteError('Unable to read clipboard. Please ensure clipboard access is allowed by your browser.');
+      return null;
+    }
+  }
+
+  private parseTsv(text: string): { source: string; target: string; display: string }[] | null {
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length === 0) return null;
+
+    const rows: { source: string; target: string; display: string }[] = [];
+    for (const line of lines) {
+      const cols = line.split('\t');
+      if (cols.length < 2 || cols.length > 3) return null;
+      const source = cols[0].trim();
+      const target = cols[1].trim();
+      const display = cols.length >= 3 ? cols[2].trim() : '';
+      if (!source || !target) return null;
+      rows.push({source, target, display});
+    }
+    return rows.length > 0 ? rows : null;
+  }
+
+  private parseCsv(text: string): { source: string; target: string; display: string }[] | null {
+    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length === 0) return null;
+
+    const rows: { source: string; target: string; display: string }[] = [];
+    for (const line of lines) {
+      const cols = this.parseCsvLine(line);
+      if (cols === null || cols.length < 2 || cols.length > 3) return null;
+      const source = cols[0].trim();
+      const target = cols[1].trim();
+      const display = cols.length >= 3 ? cols[2].trim() : '';
+      if (!source || !target) return null;
+      rows.push({source, target, display});
+    }
+    return rows.length > 0 ? rows : null;
+  }
+
+  private parseCsvLine(line: string): string[] | null {
+    const fields: string[] = [];
+    let i = 0;
+    while (i < line.length) {
+      if (line[i] === '"') {
+        i++;
+        let field = '';
+        while (i < line.length) {
+          if (line[i] === '"') {
+            if (i + 1 < line.length && line[i + 1] === '"') {
+              field += '"';
+              i += 2;
+            } else {
+              i++;
+              break;
+            }
+          } else {
+            field += line[i];
+            i++;
+          }
+        }
+        fields.push(field);
+        if (i < line.length && line[i] === ',') i++;
+      } else {
+        const next = line.indexOf(',', i);
+        if (next === -1) {
+          fields.push(line.substring(i));
+          i = line.length;
+        } else {
+          fields.push(line.substring(i, next));
+          i = next + 1;
+        }
+      }
+    }
+    return fields;
+  }
+
+  private confirmAndAddCodeMaps(codeSystemIndex: number, rows: { source: string; target: string; display: string }[]): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      data: {
+        title: 'Paste Code Maps',
+        message: `${rows.length} code map(s) will be added. Continue?`,
+        confirmButtonText: 'Add',
+        icon: 'playlist_add',
+        iconColor: 'primary'
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(confirmed => {
+      if (confirmed) {
+        const codeMaps = this.codeMapsAt(codeSystemIndex);
+        for (const row of rows) {
+          codeMaps.push(this.fb.group({
+            key: [row.source, Validators.required],
+            value: this.fb.group({
+              code: [row.target, Validators.required],
+              display: [row.display || row.target, Validators.required],
+            }),
+          }));
+        }
+      }
+    });
+  }
+
+  private showPasteError(message: string, title: string = 'Paste Error', isHtml: boolean = false): void {
+    this.dialog.open(AlertDialogComponent, {
+      data: {
+        title,
+        message,
+        isHtml,
+        icon: 'error',
+        iconColor: 'warn'
+      }
+    });
+  }
 
   ngOnDestroy(): void {
     this.destroy$.next();

@@ -27,3 +27,18 @@
   display: flex;
   justify-content: center;
 }
+
+::ng-deep .csv-error-label {
+  margin-bottom: 4px;
+}
+
+::ng-deep .csv-error-example {
+  text-align: left;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 12px;
+  font-size: 13px;
+  color: #333;
+  overflow-x: auto;
+}
