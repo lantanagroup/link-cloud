@@ -9,6 +9,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -39,7 +40,24 @@ public class DataAcquisitionLogManagerTests
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-        return new DataAcquisitionLogManager(logger, database, dbContext, queries);
+        var semaphoreProvider = CreateSemaphoreProviderMock();
+        return new DataAcquisitionLogManager(logger, database, dbContext, queries, semaphoreProvider);
+    }
+
+    private static IDistributedSemaphoreProvider CreateSemaphoreProviderMock()
+    {
+        var handle = new Mock<IDistributedSynchronizationHandle>();
+        var semaphore = new Mock<IDistributedSemaphore>();
+        var provider = new Mock<IDistributedSemaphoreProvider>();
+
+        semaphore
+            .Setup(s => s.TryAcquireAsync(It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .Returns(new ValueTask<IDistributedSynchronizationHandle?>(handle.Object));
+        provider
+            .Setup(p => p.CreateSemaphore(It.IsAny<string>(), It.IsAny<int>()))
+            .Returns(semaphore.Object);
+
+        return provider.Object;
     }
 
     [Fact]

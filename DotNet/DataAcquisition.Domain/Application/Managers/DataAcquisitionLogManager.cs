@@ -14,6 +14,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -66,13 +67,15 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     public readonly IDatabase _database;
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly IDataAcquisitionLogQueries _logQueries;
+    private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
 
-    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext, IDataAcquisitionLogQueries logQueries)
+    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext, IDataAcquisitionLogQueries logQueries, IDistributedSemaphoreProvider distributedSemaphoreProvider)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logQueries = logQueries;
+        _distributedSemaphoreProvider = distributedSemaphoreProvider ?? throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
     }
 
     public async Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel model, CancellationToken cancellationToken = default)
@@ -749,11 +752,25 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
 
-        return await _dbContext.DataAcquisitionLogs
+        // SELECT the target IDs in ascending PK order first, then UPDATE by PK.
+        // A broad WHERE-clause UPDATE acquires row/page locks in query-plan order (non-deterministic),
+        // which can deadlock against any other concurrent UPDATE that touches overlapping pages.
+        // Fetching IDs ordered by PK and then updating by PK ensures every caller acquires
+        // locks in the same ascending order, eliminating the lock-ordering inversion that
+        // causes deadlocks regardless of which other operation is running concurrently.
+        var logIds = await _dbContext.DataAcquisitionLogs
             .Where(l => l.FacilityId == facilityId
                 && l.CorrelationId == correlationId
                 && l.QueryPhase == queryPhase
                 && l.SiblingCount == null)
+            .OrderBy(l => l.Id)
+            .Select(l => l.Id)
+            .ToListAsync(cancellationToken);
+
+        if (logIds.Count == 0) return 0;
+
+        return await _dbContext.DataAcquisitionLogs
+            .Where(l => logIds.Contains(l.Id) && l.SiblingCount == null)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(l => l.SiblingCount, siblingCount)
                 .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
@@ -786,6 +803,19 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             || groupInfo.CorrelationId == null
             || groupInfo.QueryPhase == null)
         {
+            return null;
+        }
+
+        // Acquire a per-group mutex so at most one worker evaluates tail completion
+        // at a time for a given (FacilityId, CorrelationId, QueryPhase) group.
+        // This prevents redundant competing COUNT + UPDATE calls from concurrent workers.
+        var lockKey = $"da:tail:{groupInfo.FacilityId}:{groupInfo.CorrelationId}:{groupInfo.QueryPhase}";
+        var semaphore = _distributedSemaphoreProvider.CreateSemaphore(lockKey, maxCount: 1);
+        await using var handle = await semaphore.TryAcquireAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        if (handle == null)
+        {
+            // Another worker is already evaluating this group's tail.
+            // TailMessageRecoveryJob will cover any missed tail.
             return null;
         }
 
