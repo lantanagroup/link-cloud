@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -101,13 +102,15 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     private readonly IDatabase _database;
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly ILogger<DataAcquisitionLogQueries> _logger;
+    private readonly IResourceCache _resourceCache;
 
     public DataAcquisitionLogQueries(IDatabase database, DataAcquisitionDbContext dbContext,
-        ILogger<DataAcquisitionLogQueries> logger)
+        ILogger<DataAcquisitionLogQueries> logger, IResourceCache resourceCache)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
     }
 
     public async Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId,
@@ -417,7 +420,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         ScheduledReports = first.ScheduledReport != null
                             ? new List<ScheduledReport> { first.ScheduledReport }
                             : new List<ScheduledReport>(),
-                        CacheType = ResourceCacheType.Redis, //TODO: also support ABS
+                        CacheType = _resourceCache.GetCacheTypeForCorrelationId(group.CorrelationId ?? string.Empty),
                         CacheKeys = resourceTypes
                             .Select(rt => $"{group.CorrelationId}:{rt}")
                             .ToList()

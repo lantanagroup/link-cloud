@@ -109,6 +109,7 @@ services:
     ports:
       - "10000:10000"
     container_name: azurite
+    command: azurite --skipApiVersionCheck -l /data --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
     volumes:
       - azurite_data:/data
     healthcheck:
@@ -579,9 +580,11 @@ services:
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Redis__Password: ${REDIS_PASS}
-      CacheBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
-      CacheBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
-      CacheBlobStorage__BlobRoot: resource-cache
+      ResourceCache__Redis__ConnectionString: redis_cache:6379
+      ResourceCache__Redis__Password: ${REDIS_PASS}
+      ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+      ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
+      ResourceCache__BlobStorage__BlobRoot: resource-cache
     ports:
       - "8065:8065"
     build:
@@ -619,9 +622,11 @@ services:
        KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
        ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
        Redis__Password: ${REDIS_PASS}
-       CacheBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
-       CacheBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
-       CacheBlobStorage__BlobRoot: resource-cache
+       ResourceCache__Redis__ConnectionString: redis_cache:6379
+       ResourceCache__Redis__Password: ${REDIS_PASS}
+       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+       ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
+       ResourceCache__BlobStorage__BlobRoot: resource-cache
      ports:
        - "8078:8078"
      build:
@@ -734,10 +739,11 @@ services:
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      Redis__Password: ${REDIS_PASS}
-      CacheBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
-      CacheBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
-      CacheBlobStorage__BlobRoot: resource-cache
+      ResourceCache__Redis__ConnectionString: redis_cache:6379
+      ResourceCache__Redis__Password: ${REDIS_PASS}
+      ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
+      ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
+      ResourceCache__BlobStorage__BlobRoot: resource-cache
     ports:
       - "8068:8068"
     build:

@@ -1,5 +1,6 @@
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.SerDes;
@@ -90,6 +91,18 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             var hashEntries = _db.HashGetAll(sourceCache);
 
             _db.HashSet(correlationId, hashEntries);
+        }
+
+        public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
+        {
+            return ResourceCacheType.Redis;
+        }
+
+        public IResourceCache GetImplementation(ResourceCacheType cacheType)
+        {
+            if (cacheType != ResourceCacheType.Redis)
+                throw new NotSupportedException($"{nameof(RedisResourceCache)} does not support cache type '{cacheType}'.");
+            return this;
         }
     }
 }

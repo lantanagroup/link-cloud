@@ -2,6 +2,7 @@ using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -26,9 +27,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             _containerClient = new BlobContainerClient(_settings.ConnectionString, _settings.BlobContainerName);
         }
 
+        private string GetBlobKey(string key) =>
+            string.IsNullOrEmpty(_settings.BlobRoot) ? key : $"{_settings.BlobRoot}/{key}";
+
         public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType)
         {
-            string blobName = correlationId + "/" + resourceType.ToString();
+            string blobName = GetBlobKey(correlationId);
 
             AppendBlobClient writeBlobClient = _containerClient.GetAppendBlobClient(blobName);
             writeBlobClient.CreateIfNotExists();
@@ -53,7 +57,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
             List<DomainResource> resources = new List<DomainResource>();
 
-            BlockBlobClient readBlobClient = _containerClient.GetBlockBlobClient(cacheKey);
+            BlockBlobClient readBlobClient = _containerClient.GetBlockBlobClient(GetBlobKey(cacheKey));
 
             using (Stream read_stream = readBlobClient.OpenRead(true))
             using (StreamReader reader = new StreamReader(read_stream))
@@ -82,9 +86,14 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
         public ResourceType GetResourceTypeByCacheKey(string cacheKey)
         {
-            string[] splitKey = cacheKey.Split("/");
+            string[] splitKey = cacheKey.Split(":");
 
-            if (Enum.TryParse<ResourceType>(splitKey.Last(), out var resourceType))
+            if (splitKey.Length != 2)
+            {
+                throw new Exception($"Cache key '{cacheKey}' does not contain required ':' divider. Expected format is <correlation id>:<resource type>");
+            }
+
+            if (Enum.TryParse<ResourceType>(splitKey[1], out var resourceType))
             {
                 return resourceType;
             }
@@ -94,14 +103,37 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
         }
 
+        public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
+        {
+            return ResourceCacheType.ABS;
+        }
+
+        public IResourceCache GetImplementation(ResourceCacheType cacheType)
+        {
+            if (cacheType != ResourceCacheType.ABS)
+                throw new NotSupportedException($"{nameof(ABSResourceCache)} does not support cache type '{cacheType}'.");
+            return this;
+        }
+
         public void Skipped(string sourceCache, string destinationCache)
         {
-            //Nothing to do
+            BlockBlobClient sourceBlobClient = _containerClient.GetBlockBlobClient(GetBlobKey(sourceCache));
+            AppendBlobClient destinationBlobClient = _containerClient.GetAppendBlobClient(GetBlobKey(destinationCache));
+            destinationBlobClient.CreateIfNotExists();
+
+            using (Stream sourceStream = sourceBlobClient.OpenRead(true))
+            using (Stream destinationStream = destinationBlobClient.OpenWrite(false))
+            {
+                sourceStream.CopyTo(destinationStream);
+            }
         }
 
         public void Delete(List<string> cacheKeys)
         {
-            //Nothing to do
+            foreach (var cacheKey in cacheKeys)
+            {
+                _containerClient.DeleteBlobIfExists(GetBlobKey(cacheKey));
+            }
         }
     }
 }

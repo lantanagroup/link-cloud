@@ -82,6 +82,7 @@ public static class DistributedLockSettingsExtensions
         {
             EndPoints = { distributedLockSettings.ConnectionString },
             AbortOnConnectFail = false,
+            AllowAdmin = true, // Required to access INFO command for memory checks.
         };
 
         if (distributedLockSettings?.Password != null)

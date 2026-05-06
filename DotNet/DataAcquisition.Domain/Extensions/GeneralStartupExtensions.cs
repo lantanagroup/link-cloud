@@ -52,6 +52,7 @@ using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
 using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
@@ -91,6 +92,7 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterRepositories();
         builder.Services.RegisterManagers();
         builder.Services.RegisterServices();
+        builder.Services.AddResourceCache(builder.Configuration);
         builder.Services.RegisterFactories(builder.Configuration);
         builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceInformation.ServiceConfigName);
         builder.Services.RegisterProblemDetails((IHostingEnvironment)builder.Environment);
@@ -256,7 +258,6 @@ public static class GeneralStartupExtensions
         services.AddTransient<IQueryListProcessor, QueryListProcessor>();
         services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
         services.AddTransient<IAcquisitionDependencyChecker, AcquisitionDependencyChecker>();
-        services.AddSingleton<IResourceCache, RedisResourceCache>();
 
         //Data Pull Commands
         services.AddTransient<IReadFhirCommand, ReadFhirCommand>();

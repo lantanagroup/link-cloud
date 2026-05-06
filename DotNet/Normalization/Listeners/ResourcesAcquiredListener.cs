@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Utility;
@@ -19,7 +19,6 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
-using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Text;
 using System.Text.Json;
@@ -44,8 +43,7 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly CodeMapOperationService _codeMapOperationService;
     private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
     private readonly CopyLocationOperationService _copyLocationOperationService;
-    private readonly RedisResourceCache _redisCache;
-    private readonly ABSResourceCache _absCache;
+    private readonly IResourceCache _resourceCache;
 
     public ResourcesAcquiredListener(
         ILogger<ResourcesAcquiredListener> logger,
@@ -60,9 +58,8 @@ public class ResourcesAcquiredListener : BackgroundService
         CopyPropertyOperationService copyPropertyOperationService,
         CodeMapOperationService codeMapOperationService,
         ConditionalTransformOperationService conditionalTransformOperationService,
-        CopyLocationOperationService copyLocationOperationService, 
-        RedisResourceCache redisCache,
-        ABSResourceCache absCache)
+        CopyLocationOperationService copyLocationOperationService,
+        IResourceCache resourceCache)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -86,8 +83,7 @@ public class ResourcesAcquiredListener : BackgroundService
         _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
         _conditionalTransformOperationService = conditionalTransformOperationService ?? throw new ArgumentNullException(nameof(conditionalTransformOperationService));
         _copyLocationOperationService = copyLocationOperationService ?? throw new ArgumentNullException(nameof(copyLocationOperationService));
-        _redisCache = redisCache ?? throw new ArgumentNullException(nameof(redisCache));
-        _absCache = absCache;
+        _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -107,7 +103,6 @@ public class ResourcesAcquiredListener : BackgroundService
 
         while (!cancellationToken.IsCancellationRequested && !_cancelled)
         {
-            ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message = default;
             try
             {
                 await kafkaConsumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
@@ -118,21 +113,21 @@ public class ResourcesAcquiredListener : BackgroundService
                     }
                     catch (DeadLetterException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(message, ex, message.Message.Key?.FacilityId ?? string.Empty);
+                        _deadLetterExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
                     }
                     catch (TransientException ex)
                     {
-                        _transientExceptionHandler.HandleException(message, ex, message.Message.Key?.FacilityId ?? string.Empty);
+                        _transientExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                        _transientExceptionHandler.HandleException(message, new TransientException("Normalization Exception thrown: " + ex.Message, ex), message.Message.Key?.FacilityId ?? string.Empty);
+                        _transientExceptionHandler.HandleException(result, new TransientException("Normalization Exception thrown: " + ex.Message, ex), result.Message.Key?.FacilityId ?? string.Empty);
                     }
                     finally
                     {
-                        kafkaConsumer.Commit(message);
+                        kafkaConsumer.Commit(result);
                     }
                 }, cancellationToken);
             }
@@ -182,15 +177,7 @@ public class ResourcesAcquiredListener : BackgroundService
     {
         ValidateResourcesAcquiredEvent(result, out string correlationId);
 
-        IResourceCache resourceCache;
-
-        switch (result.Message.Value.CacheType)
-        {
-            case ResourceCacheType.ABS: resourceCache = _absCache; break;
-            case ResourceCacheType.Redis: resourceCache = _redisCache; break;
-            default:
-                throw new DeadLetterException($"Cache Type '{result.Message.Value.CacheType.ToString()}' not supported");
-        }
+        IResourceCache resourceCache = _resourceCache.GetImplementation(result.Message.Value.CacheType);
 
         using (var scope = _scopeFactory.CreateScope())
         {

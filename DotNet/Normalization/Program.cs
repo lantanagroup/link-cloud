@@ -75,29 +75,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<KafkaConnection>(builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>());
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
-    builder.Services.AddSingleton<ABSResourceCache>();
-
-    builder.Services.AddRedisCache(options =>
-    {
-        options.Environment = builder.Environment;
-
-        var redisConnection = builder.Configuration.GetConnectionString("Redis");
-
-        if (string.IsNullOrEmpty(redisConnection))
-            throw new NullReferenceException("Redis Connection String is required.");
-
-        options.ConnectionString = redisConnection;
-
-        var redisPassword = builder.Configuration.GetValue<string>("Redis:Password");
-        options.Password = redisPassword;
-
-        var configOptions = new ConfigurationOptions { EndPoints = { redisConnection } };
-        if (!string.IsNullOrEmpty(redisPassword))
-            configOptions.Password = redisPassword;
-        builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(configOptions));
-    });
-    
-    builder.Services.AddSingleton<RedisResourceCache>();
+    builder.Services.AddResourceCache(builder.Configuration);
 
     // Additional configuration is required to successfully run gRPC on macOS.
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
