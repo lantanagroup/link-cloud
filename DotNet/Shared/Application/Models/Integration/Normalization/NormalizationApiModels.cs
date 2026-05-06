@@ -54,5 +54,5 @@ public class NormalizationOperationSequenceApiModel
 public class NormalizationOperationResourceTypeSequenceApiModel
 {
     public NormalizationOperationApiModel? Operation { get; set; }
-    public NormalizationResourceApiModel? ResourceType { get; set; }
+    public NormalizationResourceApiModel? Resource { get; set; }
 }
