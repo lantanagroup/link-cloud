@@ -109,7 +109,7 @@ namespace IntegrationTests.Normalization
             {
                 QueryType = QueryType.Initial.ToString(),
                 CacheType = ResourceCacheType.ABS,
-                CacheKeys = new List<string>() { correlationId + "/Location" },
+                CacheKeys = new List<string>() { correlationId + ":Location" },
                 ReportableEvent = ReportableEvent.Discharge.ToString(),
                 ScheduledReports = new List<ScheduledReport>() {
                     new ScheduledReport()
@@ -156,7 +156,7 @@ namespace IntegrationTests.Normalization
                 }
             };
 
-            HashEntry entry = new HashEntry(location.TypeName + "/" + location.Id, location.ToJson());
+            HashEntry entry = new HashEntry(location.TypeName + ":" + location.Id, location.ToJson());
 
             db.HashSet(correlationId + ":" + location.TypeName, new HashEntry[] { entry });
         }
@@ -176,7 +176,7 @@ namespace IntegrationTests.Normalization
                 }
             };
 
-            var blobClient = _containerClient.GetBlobClient(correlationId + "/Location");
+            var blobClient = _containerClient.GetBlobClient(correlationId + ":Location");
 
             StringBuilder sb = new StringBuilder();
 

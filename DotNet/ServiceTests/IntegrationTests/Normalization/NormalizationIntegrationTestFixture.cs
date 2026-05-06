@@ -39,6 +39,7 @@ using Testcontainers.Azurite;
 using Testcontainers.Redis;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 using ResourceType = LantanaGroup.Link.Normalization.Domain.Entities.ResourceType;
+using ResourceCacheType = LantanaGroup.Link.Shared.Application.Enums.ResourceCacheType;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Normalization
@@ -60,6 +61,7 @@ namespace IntegrationTests.Normalization
         private IHost _host;
         private readonly AzuriteContainer _azuriteContainer = new AzuriteBuilder()
             .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
+            .WithCommand("--skipApiVersionCheck")
             .Build();
         private readonly RedisContainer _redisContainer = new RedisBuilder()
             .WithImage("redis:latest") 
@@ -130,11 +132,18 @@ namespace IntegrationTests.Normalization
             
             builder.Services.AddTransient<ResourcesAcquiredListener>();
             builder.Services.AddTransient<INormalizationServiceMetrics, NormalizationServiceMetrics>();
-            builder.Services.AddTransient<RedisResourceCache>();
-            builder.Services.AddTransient<ABSResourceCache>();
             builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection("BlobStorage"));
             builder.Services.Configure<ResourceCacheBlobStorageSettings>(opts => opts.ConnectionString = _azuriteContainer.GetConnectionString());
             builder.Services.Configure<ResourceCacheBlobStorageSettings>(opts => opts.BlobContainerName = "cache");
+            builder.Services.Configure<ResourceCacheSettings>(opts =>
+            {
+                opts.Redis.ConnectionString = _redisContainer.GetConnectionString();
+                opts.BlobStorage.ConnectionString = _azuriteContainer.GetConnectionString();
+                opts.BlobStorage.BlobContainerName = "cache";
+            });
+            builder.Services.AddKeyedSingleton<IResourceCache, RedisResourceCache>(ResourceCacheType.Redis);
+            builder.Services.AddKeyedSingleton<IResourceCache, ABSResourceCache>(ResourceCacheType.ABS);
+            builder.Services.AddSingleton<IResourceCache, HybridResourceCache>();
             
             builder.Services.AddMemoryCache();
 

@@ -10,6 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using Microsoft.EntityFrameworkCore;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -39,7 +40,8 @@ public class DataAcquisitionLogManagerTests
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-        return new DataAcquisitionLogManager(logger, database, dbContext, queries);
+        var resourceCache = scope.ServiceProvider.GetRequiredService<IResourceCache>();
+        return new DataAcquisitionLogManager(logger, database, dbContext, queries, resourceCache);
     }
 
     [Fact]

@@ -6,6 +6,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -24,6 +25,7 @@ public class DataAcquisitionLogManagerTests
     private readonly Mock<IDatabase> _database = new();
     private readonly Mock<IDataAcquisitionLogQueries> _queries = new();
     private readonly Mock<IEntityRepository<DataAcquisitionLog>> _logRepo = new();
+    private readonly Mock<IResourceCache> _resourceCache = new();
     private readonly DataAcquisitionDbContext _dbContext;
 
     public DataAcquisitionLogManagerTests()
@@ -39,7 +41,7 @@ public class DataAcquisitionLogManagerTests
     }
 
     private DataAcquisitionLogManager CreateManager() =>
-        new(_logger.Object, _database.Object, _dbContext, _queries.Object);
+        new(_logger.Object, _database.Object, _dbContext, _queries.Object, _resourceCache.Object);
 
     [Fact]
     public async Task CreateAsync_NullModel_ThrowsArgumentNull()
