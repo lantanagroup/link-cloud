@@ -260,42 +260,43 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
 
-                //OperationModel operationModel = (OperationModel)taskResult.ObjectResult;
+                OperationModel operationModel = (OperationModel)taskResult.ObjectResult;
 
-                //foreach (var resourceType in model.ResourceTypes)
-                //{
-                //    var results = await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
-                //    {
-                //        ResourceType = resourceType,
-                //        FacilityId = model.FacilityId ?? string.Empty
-                //    }, false);
+                foreach (var resourceType in model.ResourceTypes)
+                {
+                    var results = await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
+                    {
+                        ResourceType = resourceType,
+                        FacilityId = model.FacilityId ?? string.Empty
+                    }, false);
 
-                //    int maxSequence = results == null || results.Count == 0 ? 1 : results.Select(x => x.Sequence).Max() + 1;
+                    int maxSequence = results == null || results.Count == 0 ? 1 : results.Select(x => x.Sequence).Max() + 1;
 
-                //    List<CreateOperationSequenceModel> createSequences = new List<CreateOperationSequenceModel>();
+                    List<CreateOperationSequenceModel> createSequences = new List<CreateOperationSequenceModel>();
 
-                //    foreach (var result in results) 
-                //    {
-                //        createSequences.Add(new CreateOperationSequenceModel() { OperationId = result.OperationResourceType.OperationId, Sequence = result.Sequence });
-                //    }
+                    //foreach (var result in results)
+                    //{
+                    //    createSequences.Add(new CreateOperationSequenceModel() { OperationId = result.OperationResourceType.OperationId, Sequence = result.Sequence });
+                    //}
 
-                //    createSequences.Add(new CreateOperationSequenceModel()
-                //    {
-                //        OperationId = operationModel.Id,
-                //        Sequence = maxSequence
-                //    });
+                    //createSequences.Add(new CreateOperationSequenceModel()
+                    //{
+                    //    OperationId = operationModel.Id,
+                    //    Sequence = maxSequence
+                    //});
 
-                //    var sequences = await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
-                //    {
-                //        FacilityId = model.FacilityId,
-                //        ResourceType = resourceType,
-                //        OperationSequences = createSequences
-                //    });
-                //}
+                    //var sequences = await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
+                    //{
+                    //    FacilityId = model.FacilityId,
+                    //    ResourceType = resourceType,
+                    //    OperationSequences = createSequences
+                    //});
+                }
                 return Created("", taskResult.ObjectResult);
             }
             catch (Exception ex)
             {
+                Console.WriteLine("Error: " +  ex.Message );
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
         }
