@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.measureeval.records.*;
 import com.lantanagroup.link.measureeval.services.EvaluationRequestedConsumer;
-import com.lantanagroup.link.measureeval.services.ResourcesAcquiredErrorConsumer;
 import com.lantanagroup.link.measureeval.services.ResourcesNormalizedConsumer;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Properties;
@@ -62,7 +61,6 @@ public class KafkaConfig {
     @Bean
     public Deserializer<?> keyDeserializer(ObjectMapper objectMapper) {
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.RESOURCES_ACQUIRED_ERROR, new JsonDeserializer<>(ResourceKey.class, objectMapper),
                 Topics.RESOURCES_NORMALIZED, new JsonDeserializer<>(ResourceKey.class, objectMapper),
                 Topics.RESOURCES_NORMALIZED_ERROR, new JsonDeserializer<>(ResourceKey.class, objectMapper),
                 Topics.RESOURCES_NORMALIZED_RETRY, new JsonDeserializer<>(ResourceKey.class, objectMapper),
@@ -76,10 +74,6 @@ public class KafkaConfig {
     @Bean
     public Deserializer<?> valueDeserializer(ObjectMapper objectMapper) {
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.RESOURCES_ACQUIRED_ERROR, new JsonDeserializer<>(ResourcesAcquired.class, objectMapper)
-                        .trustedPackages("*")
-                        .ignoreTypeHeaders()
-                        .typeResolver(KafkaConfig::resolveType),
                 Topics.RESOURCES_NORMALIZED, new JsonDeserializer<>(ResourcesNormalized.class, objectMapper)
                         .trustedPackages("*")
                         .ignoreTypeHeaders()
@@ -116,7 +110,6 @@ public class KafkaConfig {
     public static JavaType resolveType(String topic, byte[] data, Headers headers) {
         return switch (topic) {
             case Topics.DATA_ACQUISITION_REQUESTED -> new ObjectMapper().constructType(DataAcquisitionRequested.class);
-            case Topics.RESOURCES_ACQUIRED_ERROR -> new ObjectMapper().constructType(ResourcesAcquired.class);
             case Topics.RESOURCES_NORMALIZED -> new ObjectMapper().constructType(ResourcesNormalized.class);
             case Topics.RESOURCES_NORMALIZED_ERROR -> new ObjectMapper().constructType(ResourcesNormalized.class);
             case Topics.RESOURCES_NORMALIZED_RETRY -> new ObjectMapper().constructType(ResourcesNormalized.class);
@@ -233,13 +226,6 @@ public class KafkaConfig {
             ConcurrentKafkaListenerContainerFactory<String, EvaluationRequested> factory,
             EvaluationRequestedConsumer consumer) {
         return getAsyncListenerContainer(factory, consumer, Topics.EVALUATION_REQUESTED);
-    }
-
-    @Bean
-    public ConcurrentMessageListenerContainer<String, ResourcesAcquired> resourcesAcquiredErrorContainer(
-            ConcurrentKafkaListenerContainerFactory<String, ResourcesAcquired> factory,
-            ResourcesAcquiredErrorConsumer consumer) {
-        return getAsyncListenerContainer(factory, consumer, Topics.RESOURCES_ACQUIRED_ERROR);
     }
 
     @Bean
