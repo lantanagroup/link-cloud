@@ -189,6 +189,14 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     this.form.valueChanges.subscribe(() => {
+      if (this.form.invalid) {
+        const invalid: string[] = [];
+        Object.keys(this.form.controls).forEach(key => {
+          const ctrl = this.form.get(key);
+          if (ctrl?.invalid) invalid.push(key);
+        });
+        console.log('Invalid controls:', invalid, 'Form errors:', this.form.errors);
+      }
       this.formValueChanged.emit(this.form.invalid);
     });
   }
@@ -505,28 +513,28 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
     const text = await this.readClipboard();
     if (text === null) return;
 
-    const rows = this.parseTsv(text);
-    if (rows === null) {
+    const parsed = this.parseTsv(text);
+    if (parsed === null) {
       this.clearClipboard();
       this.showTsvFormatError();
       return;
     }
 
-    this.confirmAndAddCodeMaps(codeSystemIndex, rows);
+    this.confirmAndAddCodeMaps(codeSystemIndex, parsed.rows, parsed.skipped);
   }
 
   async pasteFromCsv(codeSystemIndex: number): Promise<void> {
     const text = await this.readClipboard();
     if (text === null) return;
 
-    const rows = this.parseCsv(text);
-    if (rows === null) {
+    const parsed = this.parseCsv(text);
+    if (parsed === null) {
       this.clearClipboard();
       this.showCsvFormatError();
       return;
     }
 
-    this.confirmAndAddCodeMaps(codeSystemIndex, rows);
+    this.confirmAndAddCodeMaps(codeSystemIndex, parsed.rows, parsed.skipped);
   }
 
   private showTsvFormatError(): void {
@@ -561,24 +569,28 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  private parseTsv(text: string): { source: string; target: string; display: string }[] | null {
+  private parseTsv(text: string): { rows: { source: string; target: string; display: string }[]; skipped: number } | null {
     const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
     if (lines.length === 0) return null;
 
     const rows: { source: string; target: string; display: string }[] = [];
+    let skipped = 0;
     for (const line of lines) {
       const cols = line.split('\t');
       if (cols.length < 2 || cols.length > 3) return null;
       const source = cols[0].trim();
       const target = cols[1].trim();
       const display = cols.length >= 3 ? cols[2].trim() : '';
-      if (!source || !target) return null;
+      if (!source || !target) {
+        skipped++;
+        continue;
+      }
       rows.push({source, target, display});
     }
-    return rows.length > 0 ? rows : null;
+    return rows.length > 0 ? { rows, skipped } : null;
   }
 
-  private parseCsv(text: string): { source: string; target: string; display: string }[] | null {
+  private parseCsv(text: string): { rows: { source: string; target: string; display: string }[]; skipped: number } | null {
     const result = Papa.parse<string[]>(text, {
       header: false,
       skipEmptyLines: true,
@@ -587,22 +599,32 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
     if (result.errors.length > 0 || result.data.length === 0) return null;
 
     const rows: { source: string; target: string; display: string }[] = [];
+    let skipped = 0;
     for (const cols of result.data) {
       if (cols.length < 2 || cols.length > 3) return null;
       const source = cols[0].trim();
       const target = cols[1].trim();
       const display = cols.length >= 3 ? cols[2].trim() : '';
-      if (!source || !target) return null;
+      if (!source || !target) {
+        skipped++;
+        continue;
+      }
       rows.push({source, target, display});
     }
-    return rows.length > 0 ? rows : null;
+    return rows.length > 0 ? { rows, skipped } : null;
   }
 
-  private confirmAndAddCodeMaps(codeSystemIndex: number, rows: { source: string; target: string; display: string }[]): void {
+  private confirmAndAddCodeMaps(codeSystemIndex: number, rows: { source: string; target: string; display: string }[], skipped: number = 0): void {
+    let message = `${rows.length} code map(s) will be added.`;
+    if (skipped > 0) {
+      message += ` ${skipped} row(s) were skipped because they are missing source or target values.`;
+    }
+    message += ' Continue?';
+
     const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
       data: {
         title: 'Paste Code Maps',
-        message: `${rows.length} code map(s) will be added. Continue?`,
+        message,
         confirmButtonText: 'Add',
         icon: 'playlist_add',
         iconColor: 'primary'
@@ -623,7 +645,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
             key: [row.source, Validators.required],
             value: this.fb.group({
               code: [row.target, Validators.required],
-              display: [row.display || '', Validators.required],
+              display: [row.display || row.target, Validators.required],
             }),
           }));
         }
