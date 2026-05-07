@@ -43,6 +43,7 @@ import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocom
 import {MatDialog} from "@angular/material/dialog";
 import {DeleteConfirmationDialogComponent} from "../../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 import {AlertDialogComponent} from "../../../core/alert-dialog/alert-dialog.component";
+import Papa from 'papaparse';
 
 @Component({
   selector: 'app-code-map',
@@ -529,12 +530,12 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private showTsvFormatError(): void {
-    const exampleLine = '"source code"\t"target code"\t"optional display"';
+    const exampleLine = 'source code \\t target code \\t optional display';
     const messageHtml = `
-    <p>The clipboard contents are not in the expected tab-separated values format.</p>
+    <p>The clipboard contents are not in the expected tab-separated values (TSV) format.</p>
     <p class="csv-error-label"><strong>Expected:</strong></p>
     <pre class="csv-error-code">${exampleLine}\n${exampleLine}\n${exampleLine}</pre>`;
-    this.showPasteError(messageHtml, 'Paste Excel Error', true);
+    this.showPasteError(messageHtml, 'Paste from Excel Error', true);
   }
 
   private showCsvFormatError(): void {
@@ -543,7 +544,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
     <p>The clipboard contents are not in the expected comma-separated values (CSV) format.</p>
     <p class="csv-error-label"><strong>Expected:</strong></p>
     <pre class="csv-error-code">${exampleLine}\n${exampleLine}\n${exampleLine}</pre>`;
-    this.showPasteError(messageHtml, 'Paste CSV Error', true);
+    this.showPasteError(messageHtml, 'Paste from CSV Error', true);
   }
 
   private async readClipboard(): Promise<string | null> {
@@ -578,12 +579,15 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private parseCsv(text: string): { source: string; target: string; display: string }[] | null {
-    const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
-    if (lines.length === 0) return null;
+    const result = Papa.parse<string[]>(text, {
+      header: false,
+      skipEmptyLines: true,
+    });
+
+    if (result.errors.length > 0 || result.data.length === 0) return null;
 
     const rows: { source: string; target: string; display: string }[] = [];
-    for (const line of lines) {
-      const cols = this.parseCsvLine(line);
+    for (const cols of result.data) {
       if (cols.length < 2 || cols.length > 3) return null;
       const source = cols[0].trim();
       const target = cols[1].trim();
@@ -592,43 +596,6 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
       rows.push({source, target, display});
     }
     return rows.length > 0 ? rows : null;
-  }
-
-  private parseCsvLine(line: string): string[] {
-    const fields: string[] = [];
-    let i = 0;
-    while (i < line.length) {
-      if (line[i] === '"') {
-        i++;
-        let field = '';
-        while (i < line.length) {
-          if (line[i] === '"') {
-            if (i + 1 < line.length && line[i + 1] === '"') {
-              field += '"';
-              i += 2;
-            } else {
-              i++;
-              break;
-            }
-          } else {
-            field += line[i];
-            i++;
-          }
-        }
-        fields.push(field);
-        if (i < line.length && line[i] === ',') i++;
-      } else {
-        const next = line.indexOf(',', i);
-        if (next === -1) {
-          fields.push(line.substring(i));
-          i = line.length;
-        } else {
-          fields.push(line.substring(i, next));
-          i = next + 1;
-        }
-      }
-    }
-    return fields;
   }
 
   private confirmAndAddCodeMaps(codeSystemIndex: number, rows: { source: string; target: string; display: string }[]): void {
@@ -656,7 +623,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
             key: [row.source, Validators.required],
             value: this.fb.group({
               code: [row.target, Validators.required],
-              display: [row.display || row.target, Validators.required],
+              display: [row.display || '', Validators.required],
             }),
           }));
         }
