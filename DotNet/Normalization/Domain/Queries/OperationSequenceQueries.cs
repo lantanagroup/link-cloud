@@ -1,4 +1,4 @@
-﻿using AngleSharp;
+﻿﻿﻿using AngleSharp;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain.Entities;
@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 
         public async Task<List<OperationSequenceModel>> Search(OperationSequenceSearchModel model, bool useCache = true)
         {
-            if (!useCache)
+            if (!useCache) 
             {
                 return Query(model);
             }

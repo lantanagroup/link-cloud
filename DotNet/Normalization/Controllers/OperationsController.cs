@@ -1,4 +1,4 @@
-﻿using Hl7.Fhir.Model;
+﻿﻿﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
@@ -8,7 +8,6 @@ using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
-using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services;
@@ -17,7 +16,6 @@ using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.Normalization.Controllers
 {
@@ -35,9 +33,8 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly CodeMapOperationService _codeMapOperationService;
         private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
         private readonly CopyLocationOperationService _copyLocationOperationService;
-        private readonly ILogger<OperationsController> _logger;
 
-        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IVendorQueries vendorQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService, ILogger<OperationsController> logger)
+        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IVendorQueries vendorQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService)
         {
             _operationManager = operationManager;
             _operationQueries = operationQueries;
@@ -48,7 +45,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
             _codeMapOperationService = codeMapOperationService;
             _conditionalTransformOperationService = conditionalTransformOperationService;
             _copyLocationOperationService = copyLocationOperationService;
-            _logger = logger;
         }
 
         [HttpGet("")]
@@ -264,46 +260,49 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
                 }
 
-                OperationModel operationModel = (OperationModel)taskResult.ObjectResult;
-
-                foreach (var resourceType in model.ResourceTypes)
+                if (!string.IsNullOrEmpty(model.FacilityId))
                 {
-                    var results = await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
+                    OperationModel operationModel = (OperationModel)taskResult.ObjectResult;
+
+                    foreach (var resourceType in model.ResourceTypes)
                     {
-                        ResourceType = resourceType,
-                        FacilityId = model.FacilityId ?? string.Empty
-                    }, false);
-
-                    int maxSequence = results == null || results.Count == 0 ? 1 : results.Select(x => x.Sequence).Max() + 1;
-
-                    List<CreateOperationSequenceModel> createSequences = new List<CreateOperationSequenceModel>();
-
-                    if (results != null && results.Count() > 0)
-                    {
-                        foreach (var result in results)
+                        var results = await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
                         {
-                            createSequences.Add(new CreateOperationSequenceModel() { OperationId = result.OperationResourceType.OperationId, Sequence = result.Sequence });
+                            ResourceType = resourceType,
+                            FacilityId = model.FacilityId
+                        }, false);
+
+                        int maxSequence = results == null || results.Count == 0 ? 1 : results.Select(x => x.Sequence).Max() + 1;
+
+                        List<CreateOperationSequenceModel> createSequences = new List<CreateOperationSequenceModel>();
+
+                        if (results != null && results.Count() > 0)
+                        {
+                            foreach (var result in results)
+                            {
+                                createSequences.Add(new CreateOperationSequenceModel() { OperationId = result.OperationResourceType.OperationId, Sequence = result.Sequence });
+                            }
                         }
+
+                        createSequences.Add(new CreateOperationSequenceModel()
+                        {
+                            OperationId = operationModel.Id,
+                            Sequence = maxSequence
+                        });
+
+                        await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
+                        {
+                            FacilityId = model.FacilityId,
+                            ResourceType = resourceType,
+                            OperationSequences = createSequences,
+                        });
                     }
-
-                    createSequences.Add(new CreateOperationSequenceModel()
-                    {
-                        OperationId = operationModel.Id,
-                        Sequence = maxSequence
-                    });
-
-                    var sequences = await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
-                    {
-                        FacilityId = model.FacilityId ?? string.Empty,
-                        ResourceType = resourceType,
-                        OperationSequences = createSequences
-                    });
                 }
+
                 return Created("", taskResult.ObjectResult);
             }
             catch (Exception ex)
             {
-                _logger.LogError("Unexpected Operations Post error: {Message}", ex.Message);
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
         }

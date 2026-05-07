@@ -1,4 +1,4 @@
-﻿using Flurl.Http;
+﻿﻿using Flurl.Http;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -34,16 +34,30 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
             .SetQueryParam("pageNumber", pageNumber)
             .GetJsonAsync<PagedConfigModel<NormalizationOperationApiModel>>(cancellationToken: cancellationToken);
 
-    public Task CreateOperationAsync(
+    public async Task CreateOperationAsync(
         CreateNormalizationOperationRequestApiModel requestBody,
-        CancellationToken cancellationToken = default) =>
-        Request("normalization/Operations")
-            .PostJsonAsync(requestBody, cancellationToken: cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await Request("normalization/Operations")
+                .PostJsonAsync(requestBody, cancellationToken: cancellationToken);
+        }
+        catch (FlurlHttpException ex)
+        {
+            string responseBody;
+            try { responseBody = await ex.GetResponseStringAsync(); }
+            catch { responseBody = "(unable to read response body)"; }
+
+            throw new InvalidOperationException(
+                $"POST normalization/Operations failed (HTTP {ex.StatusCode}): {responseBody}", ex);
+        }
+    }
 
     public Task DeleteFacilityOperationsAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"normalization/Operations/facility/{facilityId}")
+        DeleteOrIgnoreAsync(() => Request($"normalization/operations/facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<List<NormalizationOperationSequenceApiModel>> GetOperationSequencesAsync(
