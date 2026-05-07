@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             return (await Search(new ResourceSearchModel()
             {
                 Name = resourceName
-            })).SingleOrDefault();
+            })).FirstOrDefault();
         }
 
         public async Task<List<ResourceModel>> GetAll()
