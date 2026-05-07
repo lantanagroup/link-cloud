@@ -147,7 +147,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError("Unexpected Operations Post error: {Message}", ex.Message);
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
         }
@@ -293,12 +292,12 @@ namespace LantanaGroup.Link.Normalization.Controllers
                         Sequence = maxSequence
                     });
 
-                    //var sequences = await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
-                    //{
-                    //    FacilityId = model.FacilityId ?? string.Empty,
-                    //    ResourceType = resourceType,
-                    //    OperationSequences = createSequences
-                    //});
+                    var sequences = await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
+                    {
+                        FacilityId = model.FacilityId ?? string.Empty,
+                        ResourceType = resourceType,
+                        OperationSequences = createSequences
+                    });
                 }
                 return Created("", taskResult.ObjectResult);
             }

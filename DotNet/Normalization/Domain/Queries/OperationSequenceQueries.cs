@@ -51,21 +51,21 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 
         public async Task<List<OperationSequenceModel>> Search(OperationSequenceSearchModel model, bool useCache = true)
         {
-            if (!useCache) 
-            {
+            //if (!useCache) 
+            //{
                 return Query(model);
-            }
+            //}
 
-            //Daniel - 4/2026: Temporarily adding queried configs into memory cache to reduce the amount of queries made to the database.
-            var cacheKey = BuildCacheKey(model);
-            var cacheResult = _cache.GetOrCreate(cacheKey, entry =>
-            {
-                entry.AbsoluteExpirationRelativeToNow = _cacheTtl;
+            ////Daniel - 4/2026: Temporarily adding queried configs into memory cache to reduce the amount of queries made to the database.
+            //var cacheKey = BuildCacheKey(model);
+            //var cacheResult = _cache.GetOrCreate(cacheKey, entry =>
+            //{
+            //    entry.AbsoluteExpirationRelativeToNow = _cacheTtl;
 
-                return Query(model);
-            });
+            //    return Query(model);
+            //});
 
-            return cacheResult;
+            //return cacheResult;
         }
 
         public void ClearCache(OperationSequenceSearchModel model) {
