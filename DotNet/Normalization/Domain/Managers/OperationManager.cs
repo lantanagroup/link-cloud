@@ -390,7 +390,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             var sequences = model.OperationSequences.OrderBy(s => s.Sequence).ToList();
 
-            var resource = await _database.ResourceTypes.SingleOrDefaultAsync(r => r.Name == model.ResourceType);
+            var resource = await _database.ResourceTypes.FirstOrDefaultAsync(r => r.Name == model.ResourceType);
 
             if (resource == null)
             {
