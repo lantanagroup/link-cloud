@@ -304,6 +304,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError("Unexpected Operations Post error: {Message}", ex.Message);
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
         }
