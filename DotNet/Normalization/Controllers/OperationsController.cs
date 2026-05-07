@@ -8,6 +8,7 @@ using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services;
@@ -33,8 +34,9 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly CodeMapOperationService _codeMapOperationService;
         private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
         private readonly CopyLocationOperationService _copyLocationOperationService;
+        private readonly ILogger<OperationsController> _logger;
 
-        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IVendorQueries vendorQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService)
+        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IVendorQueries vendorQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService, ILogger<OperationsController> logger)
         {
             _operationManager = operationManager;
             _operationQueries = operationQueries;
@@ -45,6 +47,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             _codeMapOperationService = codeMapOperationService;
             _conditionalTransformOperationService = conditionalTransformOperationService;
             _copyLocationOperationService = copyLocationOperationService;
+            _logger = logger;
         }
 
         [HttpGet("")]
@@ -143,6 +146,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
             catch (Exception ex)
             {
+                _logger.LogError("Error: " + ex.Message, null);
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
         }
