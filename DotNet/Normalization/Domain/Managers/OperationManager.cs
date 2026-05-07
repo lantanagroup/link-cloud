@@ -390,17 +390,17 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             var sequences = model.OperationSequences.OrderBy(s => s.Sequence).ToList();
 
-            var resource = await _database.ResourceTypes.FirstOrDefaultAsync(r => r.Name == model.ResourceType);
+            var resourceExists = await _database.ResourceTypes.AnyAsync(r => r.Name == model.ResourceType);
 
-            if (resource == null)
+            if (!resourceExists)
             {
                 throw new InvalidOperationException("No Resource Found.");
             }
 
             foreach (var sequence in sequences)
             {
-                var operation = await _database.Operations.SingleAsync(o => o.Id == sequence.OperationId);
-                var operationResourceTypeMap = await _database.OperationResourceTypes.SingleAsync(ort => ort.OperationId == operation.Id && ort.ResourceTypeId == resource.Id);
+                var operation = await _database.Operations.FirstAsync(o => o.Id == sequence.OperationId);
+                var operationResourceTypeMap = await _database.OperationResourceTypes.FirstAsync(ort => ort.OperationId == operation.Id && ort.ResourceType.Name == model.ResourceType);
                 await _database.OperationSequences.AddAsync(new OperationSequence()
                 {
                     FacilityId = model.FacilityId,
