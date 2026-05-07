@@ -399,7 +399,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             foreach (var sequence in sequences)
             {
-                var operation = await _database.Operations.SingleAsync(o => o.Id == sequence.OperationId);
+                var operation = await _database.Operations.FirstAsync(o => o.Id == sequence.OperationId);
                 var operationResourceTypeMap = await _database.OperationResourceTypes.SingleAsync(ort => ort.OperationId == operation.Id && ort.ResourceTypeId == resource.Id);
                 await _database.OperationSequences.AddAsync(new OperationSequence()
                 {
