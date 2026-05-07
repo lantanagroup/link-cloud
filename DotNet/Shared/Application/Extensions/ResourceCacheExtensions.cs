@@ -12,15 +12,30 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
     public static class ResourceCacheExtensions
     {
         /// <summary>
-        /// Registers both Redis and ABS resource cache implementations as keyed singletons,
-        /// and registers <see cref="HybridResourceCache"/> as the <see cref="IResourceCache"/>
-        /// singleton. The hybrid implementation selects the appropriate cache per correlationId
-        /// based on Redis memory pressure at write time.
+        /// Registers an <see cref="IResourceCache"/> implementation based on the
+        /// <c>ResourceCache:CacheImplementation</c> configuration value.
+        /// <list type="bullet">
+        ///   <item><description>
+        ///     <see cref="ResourceCacheType.Hybrid"/> (default) — registers
+        ///     <see cref="HybridResourceCache"/>, which dynamically selects Redis or ABS per
+        ///     correlationId based on Redis memory pressure. Both Redis and BlobStorage must be
+        ///     configured.
+        ///   </description></item>
+        ///   <item><description>
+        ///     <see cref="ResourceCacheType.Redis"/> — registers <see cref="RedisResourceCache"/>
+        ///     directly. Only Redis must be configured; BlobStorage is not required.
+        ///   </description></item>
+        ///   <item><description>
+        ///     <see cref="ResourceCacheType.ABS"/> — registers <see cref="ABSResourceCache"/>
+        ///     directly. Only BlobStorage must be configured; Redis is not required.
+        ///   </description></item>
+        /// </list>
         /// </summary>
         /// <remarks>
         /// Expects a config section named <c>ResourceCache</c> with the shape:
         /// <code>
         /// "ResourceCache": {
+        ///   "CacheImplementation": "Hybrid",
         ///   "Redis": { "ConnectionString": "", "Password": "", "MemoryThresholdPercent": 80.0 },
         ///   "BlobStorage": { "ConnectionString": "", "BlobContainerName": "", "BlobRoot": "" }
         /// }
@@ -28,6 +43,9 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
         /// An <see cref="IConnectionMultiplexer"/> will be registered if one has not already
         /// been added (e.g. by <c>DistributedLockBuildAndAddToDI</c>).
         /// </remarks>
+        /// <exception cref="InvalidOperationException">
+        /// Thrown when the required connection settings for the selected implementation are missing.
+        /// </exception>
         public static IServiceCollection AddResourceCache(
             this IServiceCollection services,
             IConfiguration configuration)
@@ -35,16 +53,45 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             var section = configuration.GetSection(ResourceCacheSettings.SectionName);
             services.Configure<ResourceCacheSettings>(section);
 
-            var redisSettings = section.GetSection("Redis").Get<ResourceCacheRedisSettings>()
-                ?? new ResourceCacheRedisSettings();
+            var settings = section.Get<ResourceCacheSettings>() ?? new ResourceCacheSettings();
 
+            switch (settings.CacheImplementation)
+            {
+                case ResourceCacheType.Redis:
+                    ValidateRedisSettings(settings.Redis);
+                    RegisterRedisMultiplexer(services, settings.Redis);
+                    services.AddSingleton<IResourceCache, RedisResourceCache>();
+                    break;
+
+                case ResourceCacheType.ABS:
+                    ValidateBlobStorageSettings(settings.BlobStorage);
+                    services.Configure<ResourceCacheBlobStorageSettings>(section.GetSection("BlobStorage"));
+                    services.AddSingleton<IResourceCache, ABSResourceCache>();
+                    break;
+
+                default: // Hybrid
+                    ValidateRedisSettings(settings.Redis);
+                    ValidateBlobStorageSettings(settings.BlobStorage);
+                    RegisterRedisMultiplexer(services, settings.Redis);
+                    services.Configure<ResourceCacheBlobStorageSettings>(section.GetSection("BlobStorage"));
+                    services.AddKeyedSingleton<IResourceCache, RedisResourceCache>(ResourceCacheType.Redis);
+                    services.AddKeyedSingleton<IResourceCache, ABSResourceCache>(ResourceCacheType.ABS);
+                    services.AddSingleton<IResourceCache, HybridResourceCache>();
+                    break;
+            }
+
+            return services;
+        }
+
+        private static void RegisterRedisMultiplexer(IServiceCollection services, ResourceCacheRedisSettings redisSettings)
+        {
             // Only register IConnectionMultiplexer if no other registration is present.
             services.TryAddSingleton<IConnectionMultiplexer>(_ =>
             {
                 var configOptions = new ConfigurationOptions
                 {
                     AbortOnConnectFail = false,
-                    EndPoints = { redisSettings.ConnectionString ?? string.Empty },
+                    EndPoints = { redisSettings.ConnectionString! },
                     AllowAdmin = true, // Required to access INFO command for memory checks.
                 };
 
@@ -55,19 +102,20 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
 
                 return ConnectionMultiplexer.Connect(configOptions);
             });
+        }
 
-            // Also make IOptions<ResourceCacheBlobStorageSettings> available for ABSResourceCache.
-            services.Configure<ResourceCacheBlobStorageSettings>(section.GetSection("BlobStorage"));
+        private static void ValidateRedisSettings(ResourceCacheRedisSettings redis)
+        {
+            if (string.IsNullOrEmpty(redis.ConnectionString))
+                throw new InvalidOperationException(
+                    $"ResourceCache:Redis:ConnectionString must be configured when using the {nameof(ResourceCacheType.Redis)} or {nameof(ResourceCacheType.Hybrid)} cache implementation.");
+        }
 
-            // Keyed registrations so HybridResourceCache (and Normalization's listener) can
-            // resolve the concrete implementation by cache type.
-            services.AddKeyedSingleton<IResourceCache, RedisResourceCache>(ResourceCacheType.Redis);
-            services.AddKeyedSingleton<IResourceCache, ABSResourceCache>(ResourceCacheType.ABS);
-
-            // The non-keyed IResourceCache resolves to the hybrid wrapper.
-            services.AddSingleton<IResourceCache, HybridResourceCache>();
-
-            return services;
+        private static void ValidateBlobStorageSettings(ResourceCacheBlobStorageSettings blob)
+        {
+            if (string.IsNullOrEmpty(blob.ConnectionString))
+                throw new InvalidOperationException(
+                    $"ResourceCache:BlobStorage:ConnectionString must be configured when using the {nameof(ResourceCacheType.ABS)} or {nameof(ResourceCacheType.Hybrid)} cache implementation.");
         }
     }
 }

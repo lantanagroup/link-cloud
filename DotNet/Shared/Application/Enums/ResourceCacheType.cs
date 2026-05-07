@@ -9,6 +9,7 @@ namespace LantanaGroup.Link.Shared.Application.Enums
     public enum ResourceCacheType
     {
         ABS,
-        Redis
+        Redis,
+        Hybrid
     }
 }

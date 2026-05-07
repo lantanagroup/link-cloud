@@ -123,7 +123,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
                 if (server == null)
                 {
-                    _logger.LogWarning("No connected Redis server found; falling back to ABS resource cache.");
+                    _logger.LogDebug("No connected Redis server found; falling back to ABS resource cache.");
                     return ResourceCacheType.ABS;
                 }
 
@@ -131,7 +131,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
                 if (memoryInfo == null)
                 {
-                    _logger.LogWarning("Redis INFO memory returned no results; falling back to ABS resource cache.");
+                    _logger.LogDebug("Redis INFO memory returned no results; falling back to ABS resource cache.");
                     return ResourceCacheType.ABS;
                 }
 
@@ -140,7 +140,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 if (!infoDict.TryGetValue("used_memory", out var usedMemoryStr) ||
                     !long.TryParse(usedMemoryStr, out var usedMemory))
                 {
-                    _logger.LogWarning("Could not parse Redis used_memory; defaulting to Redis resource cache.");
+                    _logger.LogDebug("Could not parse Redis used_memory; defaulting to Redis resource cache.");
                     return ResourceCacheType.Redis;
                 }
 
@@ -149,6 +149,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     maxMemory == 0)
                 {
                     // No memory limit configured — Redis is unconstrained, always use it.
+                    _logger.LogDebug("Redis maxmemory is not configured or unlimited; defaulting to Redis resource cache.");
                     return ResourceCacheType.Redis;
                 }
 
@@ -156,7 +157,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
                 if (usagePercent >= _settings.Redis.MemoryThresholdPercent)
                 {
-                    _logger.LogInformation(
+                    _logger.LogDebug(
                         "Redis memory usage {UsagePercent:F1}% meets or exceeds threshold {Threshold}%; using ABS resource cache.",
                         usagePercent, _settings.Redis.MemoryThresholdPercent);
                     return ResourceCacheType.ABS;
