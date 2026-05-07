@@ -24,14 +24,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             _dbContext = dbContext;
         }
 
-        public async Task<OperationModel> Get(Guid id, string? facilityId = null)
+        public async Task<OperationModel?> Get(Guid id, string? facilityId = null)
         {
             return (await Search(new OperationSearchModel()
             {
                 OperationId = id,
                 FacilityId = facilityId,
                 IncludeDisabled = true
-            })).Records.Single();
+            })).Records.FirstOrDefault();
         }
 
         public async Task<PagedConfigModel<OperationModel>> Search(OperationSearchModel model)

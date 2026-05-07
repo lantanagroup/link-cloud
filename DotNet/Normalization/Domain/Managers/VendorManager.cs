@@ -57,7 +57,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 Version = "default"
             });
 
-            return await _vendorQueries.GetVendor(vendor.Id);
+            var vendorResult = await _vendorQueries.GetVendor(vendor.Id);
+            if (vendorResult == null)
+            {
+                throw new InvalidOperationException($"Created vendor {vendor.Id} could not be retrieved.");
+            }
+            return vendorResult;
         }
 
         public async Task<VendorVersionModel> CreateVendorVersion(CreateVendorVersionModel model)
@@ -89,7 +94,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             await _database.SaveChangesAsync();
 
-            return await _vendorQueries.GetVendorVersionOperationPreset(result.Id);
+            var preset = await _vendorQueries.GetVendorVersionOperationPreset(result.Id);
+            if (preset == null)
+            {
+                throw new InvalidOperationException($"Created vendor operation preset {result.Id} could not be retrieved.");
+            }
+            return preset;
         }
 
         public async Task DeleteVendor(string vendor)
@@ -106,7 +116,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         public async Task DeleteVendor(Guid vendorId)
         {
-            var foundVendor = await _database.Vendors.SingleAsync(v => v.Id == vendorId);
+            var foundVendor = await _database.Vendors.FirstOrDefaultAsync(v => v.Id == vendorId);
+
+            if (foundVendor == null)
+            {
+                throw new InvalidOperationException($"Vendor with ID {vendorId} not found.");
+            }
 
             //Delete all of the Operations that have no other links other than this vendor
             var orts = await _database.OperationResourceTypes.FindAsync(ort => ort.VendorVersionOperationPresets.All(vp => vp.VendorVersion.VendorId == vendorId));
