@@ -1,4 +1,4 @@
-﻿using Hl7.Fhir.Model;
+﻿﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
@@ -26,6 +26,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
     {
         private readonly IOperationManager _operationManager;
         private readonly IOperationQueries _operationQueries;
+        private readonly IOperationSequenceQueries _operationSequenceQueries;
         private readonly IVendorQueries _vendorQueries;
         private readonly ITenantApiService _tenantApiService;
         private readonly CopyPropertyOperationService _copyPropertyOperationService;
@@ -33,10 +34,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
         private readonly CopyLocationOperationService _copyLocationOperationService;
 
-        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IVendorQueries vendorQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService)
+        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IVendorQueries vendorQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService)
         {
             _operationManager = operationManager;
             _operationQueries = operationQueries;
+            _operationSequenceQueries = operationSequenceQueries;
             _vendorQueries = vendorQueries;
             _tenantApiService = tenantApiService;
             _copyPropertyOperationService = copyPropertyService;
@@ -247,7 +249,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationType = operationType.ToString(),
                     OperationJson = JsonSerializer.Serialize(operationImplementation),
                     ResourceTypes = model.ResourceTypes,
-                    FacilityId = model.FacilityId == string.Empty ? null : model.FacilityId,
+                    FacilityId = model.FacilityId ?? string.Empty,
                     Name = model.Operation.Name,
                     Description = model.Operation.Description,
                     VendorIds = model.VendorIds
@@ -256,6 +258,45 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 if (!taskResult.IsSuccess)
                 {
                     return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
+                }
+
+                if (!string.IsNullOrEmpty(model.FacilityId))
+                {
+                    OperationModel operationModel = (OperationModel)taskResult.ObjectResult;
+
+                    foreach (var resourceType in model.ResourceTypes)
+                    {
+                        var results = await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
+                        {
+                            ResourceType = resourceType,
+                            FacilityId = model.FacilityId
+                        }, false);
+
+                        int maxSequence = results == null || results.Count == 0 ? 1 : results.Select(x => x.Sequence).Max() + 1;
+
+                        List<CreateOperationSequenceModel> createSequences = new List<CreateOperationSequenceModel>();
+
+                        if (results != null && results.Count() > 0)
+                        {
+                            foreach (var result in results)
+                            {
+                                createSequences.Add(new CreateOperationSequenceModel() { OperationId = result.OperationResourceType.OperationId, Sequence = result.Sequence });
+                            }
+                        }
+
+                        createSequences.Add(new CreateOperationSequenceModel()
+                        {
+                            OperationId = operationModel.Id,
+                            Sequence = maxSequence
+                        });
+
+                        await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
+                        {
+                            FacilityId = model.FacilityId,
+                            ResourceType = resourceType,
+                            OperationSequences = createSequences,
+                        });
+                    }
                 }
 
                 return Created("", taskResult.ObjectResult);
