@@ -28,22 +28,22 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             _cache = cache;
         }
 
-        public async Task<OperationSequenceModel> Get(string FacilityId, Guid id)
+        public async Task<OperationSequenceModel?> Get(string FacilityId, Guid id)
         {
             return (await Search(new OperationSequenceSearchModel()
             {
                 ResourceTypeId = id,
                 FacilityId = FacilityId,
-            })).Single();
+            })).FirstOrDefault();
         }
 
-        public async Task<OperationSequenceModel> Get(string FacilityId, string resourceType)
+        public async Task<OperationSequenceModel?> Get(string FacilityId, string resourceType)
         {
             return (await Search(new OperationSequenceSearchModel()
             {
                 ResourceType = resourceType,
                 FacilityId = FacilityId,
-            })).Single();
+            })).FirstOrDefault();
         }
 
         private static (string? FacilityId, string? ResourceType, Guid? ResourceTypeId) BuildCacheKey(OperationSequenceSearchModel model) => (model.FacilityId, model.ResourceType, model.ResourceTypeId);
