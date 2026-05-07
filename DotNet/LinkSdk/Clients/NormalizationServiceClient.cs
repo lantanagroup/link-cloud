@@ -28,7 +28,7 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         int pageSize = 100,
         int pageNumber = 1,
         CancellationToken cancellationToken = default) =>
-        Request($"normalization/operations/facility/{facilityId}")
+        Request($"normalization/Operations/facility/{facilityId}")
             .SetQueryParam("includeDisabled", includeDisabled)
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
@@ -37,13 +37,13 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
     public Task CreateOperationAsync(
         CreateNormalizationOperationRequestApiModel requestBody,
         CancellationToken cancellationToken = default) =>
-        Request("normalization/operations")
+        Request("normalization/Operations")
             .PostJsonAsync(requestBody, cancellationToken: cancellationToken);
 
     public Task DeleteFacilityOperationsAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"normalization/operations/facility/{facilityId}")
+        DeleteOrIgnoreAsync(() => Request($"normalization/Operations/facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<List<NormalizationOperationSequenceApiModel>> GetOperationSequencesAsync(
