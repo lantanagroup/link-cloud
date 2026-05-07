@@ -17,6 +17,7 @@ using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace LantanaGroup.Link.Normalization.Controllers
 {
@@ -146,7 +147,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError("Error: " + ex.Message, null);
+                _logger.LogError("Unexpected Operations Post error: {Message}", ex.Message);
                 return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
             }
         }
