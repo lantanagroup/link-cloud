@@ -237,69 +237,82 @@ namespace LantanaGroup.Link.Normalization.Controllers
 
                 var operationType = model.Operation.OperationType;
 
-                var operationImplementation = OperationServiceHelper.GetOperationImplementation(model.Operation);
+                using var transaction = await _operationManager.BeginTransactionAsync();
 
-                if (operationImplementation == null)
+                try
                 {
-                    return BadRequest("Operation did not match any existing Operation Types.");
-                }
+                    var operationImplementation = OperationServiceHelper.GetOperationImplementation(model.Operation);
 
-                var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
-                {
-                    OperationType = operationType.ToString(),
-                    OperationJson = JsonSerializer.Serialize(operationImplementation),
-                    ResourceTypes = model.ResourceTypes,
-                    FacilityId = model.FacilityId ?? string.Empty,
-                    Name = model.Operation.Name,
-                    Description = model.Operation.Description,
-                    VendorIds = model.VendorIds
-                });
-
-                if (!taskResult.IsSuccess)
-                {
-                    return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
-                }
-
-                if (!string.IsNullOrEmpty(model.FacilityId))
-                {
-                    OperationModel operationModel = (OperationModel)taskResult.ObjectResult;
-
-                    foreach (var resourceType in model.ResourceTypes)
+                    if (operationImplementation == null)
                     {
-                        var results = await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
-                        {
-                            ResourceType = resourceType,
-                            FacilityId = model.FacilityId
-                        }, false);
-
-                        int maxSequence = results == null || results.Count == 0 ? 1 : results.Select(x => x.Sequence).Max() + 1;
-
-                        List<CreateOperationSequenceModel> createSequences = new List<CreateOperationSequenceModel>();
-
-                        if (results != null && results.Count() > 0)
-                        {
-                            foreach (var result in results)
-                            {
-                                createSequences.Add(new CreateOperationSequenceModel() { OperationId = result.OperationResourceType.OperationId, Sequence = result.Sequence });
-                            }
-                        }
-
-                        createSequences.Add(new CreateOperationSequenceModel()
-                        {
-                            OperationId = operationModel.Id,
-                            Sequence = maxSequence
-                        });
-
-                        await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
-                        {
-                            FacilityId = model.FacilityId,
-                            ResourceType = resourceType,
-                            OperationSequences = createSequences,
-                        });
+                        return BadRequest("Operation did not match any existing Operation Types.");
                     }
-                }
 
-                return Created("", taskResult.ObjectResult);
+                    var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
+                    {
+                        OperationType = operationType.ToString(),
+                        OperationJson = JsonSerializer.Serialize(operationImplementation),
+                        ResourceTypes = model.ResourceTypes,
+                        FacilityId = model.FacilityId ?? string.Empty,
+                        Name = model.Operation.Name,
+                        Description = model.Operation.Description,
+                        VendorIds = model.VendorIds
+                    });
+
+                    if (!taskResult.IsSuccess)
+                    {
+                        await transaction.RollbackAsync();
+                        return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
+                    }
+
+                    if (!string.IsNullOrEmpty(model.FacilityId))
+                    {
+                        OperationModel operationModel = (OperationModel)taskResult.ObjectResult;
+
+                        foreach (var resourceType in model.ResourceTypes)
+                        {
+                            var results = await _operationSequenceQueries.Search(new OperationSequenceSearchModel()
+                            {
+                                ResourceType = resourceType,
+                                FacilityId = model.FacilityId
+                            }, false);
+
+                            int maxSequence = results == null || results.Count == 0 ? 1 : results.Select(x => x.Sequence).Max() + 1;
+
+                            List<CreateOperationSequenceModel> createSequences = new List<CreateOperationSequenceModel>();
+
+                            if (results != null && results.Count() > 0)
+                            {
+                                foreach (var result in results)
+                                {
+                                    createSequences.Add(new CreateOperationSequenceModel() { OperationId = result.OperationResourceType.OperationId, Sequence = result.Sequence });
+                                }
+                            }
+
+                            createSequences.Add(new CreateOperationSequenceModel()
+                            {
+                                OperationId = operationModel.Id,
+                                Sequence = maxSequence
+                            });
+
+                            await _operationManager.CreateOperationSequences(new CreateOperationSequencesModel()
+                            {
+                                FacilityId = model.FacilityId,
+                                ResourceType = resourceType,
+                                OperationSequences = createSequences,
+                            });
+                        }
+                    }
+
+                    await transaction.CommitAsync();
+
+                    return Created("", taskResult.ObjectResult);
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+                }
             }
             catch (Exception ex)
             {
@@ -346,24 +359,37 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     return BadRequest("Operation did not match any existing Operation Types.");
                 }
 
-                var taskResult = await _operationManager.UpdateOperation(new UpdateOperationModel()
-                {
-                    Id = model.Id.Value,
-                    OperationJson = JsonSerializer.Serialize(operationImplementation),
-                    ResourceTypes = model.ResourceTypes,
-                    FacilityId = string.IsNullOrWhiteSpace(model.FacilityId) ? null : model.FacilityId,
-                    Name = model.Operation.Name,
-                    Description = model.Operation.Description,
-                    IsDisabled = model.IsDisabled,
-                    VendorIds = model.VendorIds
-                });
+                using var transaction = await _operationManager.BeginTransactionAsync();
 
-                if (!taskResult.IsSuccess)
+                try
                 {
-                    return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
+                    var taskResult = await _operationManager.UpdateOperation(new UpdateOperationModel()
+                    {
+                        Id = model.Id.Value,
+                        OperationJson = JsonSerializer.Serialize(operationImplementation),
+                        ResourceTypes = model.ResourceTypes,
+                        FacilityId = string.IsNullOrWhiteSpace(model.FacilityId) ? null : model.FacilityId,
+                        Name = model.Operation.Name,
+                        Description = model.Operation.Description,
+                        IsDisabled = model.IsDisabled,
+                        VendorIds = model.VendorIds
+                    });
+
+                    if (!taskResult.IsSuccess)
+                    {
+                        await transaction.RollbackAsync();
+                        return Problem(detail: taskResult.ErrorMessage, statusCode: StatusCodes.Status422UnprocessableEntity);
+                    }
+
+                    await transaction.CommitAsync();
+
+                    return Accepted("", taskResult.ObjectResult);
                 }
-
-                return Accepted("", taskResult.ObjectResult);
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    return Problem(detail: ex.Message, statusCode: StatusCodes.Status500InternalServerError);
+                }
             }
             catch (Exception ex)
             {
