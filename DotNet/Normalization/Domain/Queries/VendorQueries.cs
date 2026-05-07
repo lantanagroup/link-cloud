@@ -7,12 +7,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
     public interface IVendorQueries
     {
-        Task<VendorModel?> GetVendor(Guid Id);
+        Task<VendorModel> GetVendor(Guid Id);
         Task<VendorModel?> GetVendor(string name);
         Task<List<VendorModel>> GetAllVendors();
-        Task<VendorVersionModel?> GetVendorVersion(Guid vendorId);
+        Task<VendorVersionModel> GetVendorVersion(Guid vendorId);
         Task<List<VendorModel>> SearchVendors(VendorSearchModel model);
-        Task<VendorVersionOperationPresetModel?> GetVendorVersionOperationPreset(Guid Id);
+        Task<VendorVersionOperationPresetModel> GetVendorVersionOperationPreset(Guid Id);
         Task<List<VendorVersionOperationPresetModel>> SearchVendorVersionOperationPreset(VendorOperationPresetSearchModel model);
     }
 
@@ -24,12 +24,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             _dbContext = dbContext;
         }
 
-        public async Task<VendorModel?> GetVendor(Guid Id)
+        public async Task<VendorModel> GetVendor(Guid Id)
         {
             return (await SearchVendors(new VendorSearchModel()
             {
                 VendorId = Id,
-            })).FirstOrDefault();
+            })).Single();
         }
 
         public async Task<List<VendorModel>> GetAllVendors()
@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
             })).SingleOrDefault();
         }
 
-        public async Task<VendorVersionModel?> GetVendorVersion(Guid vendorId)
+        public async Task<VendorVersionModel> GetVendorVersion(Guid vendorId)
         {
             var query = from vv in _dbContext.VendorVersions
                         where vv.VendorId == vendorId
@@ -55,15 +55,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                             VendorId = vv.VendorId
                         };
 
-            return await query.FirstOrDefaultAsync();
+            return await query.FirstAsync();
         }
 
-        public async Task<VendorVersionOperationPresetModel?> GetVendorVersionOperationPreset(Guid Id)
+        public async Task<VendorVersionOperationPresetModel> GetVendorVersionOperationPreset(Guid Id)
         {
             return (await SearchVendorVersionOperationPreset(new VendorOperationPresetSearchModel()
             {
                 Id = Id,
-            })).FirstOrDefault();
+            })).Single();
         }
 
         public async Task<List<VendorModel>> SearchVendors(VendorSearchModel model)

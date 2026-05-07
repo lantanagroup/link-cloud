@@ -24,7 +24,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
         Task UpdateOperationResourceTypesForOperation(Guid operationId, List<string> resourceTypes);
         Task<List<OperationSequenceModel>> CreateOperationSequences(CreateOperationSequencesModel model);
         Task<bool> DeleteOperationSequence(DeleteOperationSequencesModel deleteOperationSequencesModel);
-        Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync();
     }
 
     public class OperationManager : IOperationManager
@@ -72,7 +71,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                 var operation = new Operation()
                 {
-                    Id = Guid.NewGuid(),
                     OperationType = model.OperationType,
                     OperationJson = model.OperationJson,
                     FacilityId = model.FacilityId,
@@ -90,12 +88,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 await UpdateVendorPresetsForOperation(operation.Id, model.VendorIds);
 
                 taskResult.IsSuccess = true;
-                var createdOperationModel = await _operationQueries.Get(operation.Id, operation.FacilityId);
-                if (createdOperationModel == null)
-                {
-                    throw new InvalidOperationException($"Created operation {operation.Id} could not be retrieved.");
-                }
-                taskResult.ObjectResult = createdOperationModel;
+                taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId);
             }
             catch (Exception ex)
             {
@@ -126,7 +119,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 {
                     OperationId = model.Id,
                     IncludeDisabled = true
-                })).Records.FirstOrDefault();
+                })).Records.SingleOrDefault();
 
                 if (operationModel == null)
                 {
@@ -171,12 +164,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 await UpdateVendorPresetsForOperation(model.Id, model.VendorIds);
 
                 taskResult.IsSuccess = true;
-                var updatedOperationModel = await _operationQueries.Get(operation.Id, operation.FacilityId);
-                if (updatedOperationModel == null)
-                {
-                    throw new InvalidOperationException($"Updated operation {operation.Id} could not be retrieved.");
-                }
-                taskResult.ObjectResult = updatedOperationModel;
+                taskResult.ObjectResult = await _operationQueries.Get(operation.Id, operation.FacilityId);
             }
             catch (Exception ex)
             {
@@ -208,15 +196,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     {
                         if (!await _database.VendorVersionOperationPresets.AnyAsync(vop => vop.VendorVersion.VendorId == vendorId && vop.OperationResourceTypeId == ort))
                         {
-                            var version = await _database.VendorVersions.FirstOrDefaultAsync(vv => vv.VendorId == vendorId);
-                            if (version == null)
-                            {
-                                throw new InvalidOperationException($"Vendor version for vendor ID {vendorId} not found.");
-                            }
-
+                            var version = await _database.VendorVersions.FirstAsync(vv => vv.VendorId == vendorId);
                             await _database.VendorVersionOperationPresets.AddAsync(new VendorVersionOperationPreset()
                             {
-                                Id = Guid.NewGuid(),
                                 OperationResourceTypeId = ort,
                                 VendorVersionId = version.Id
                             });
@@ -263,37 +245,34 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             var operation = await _database.Operations.GetAsync(operationId);
             operation.OperationResourceTypes = await _database.OperationResourceTypes.FindAsync(m => m.OperationId == operationId);
 
-            //Ensure operation.OperationResourceTypes doesn't contain stale data if we're in the same context
-            var existingResourceTypeIds = operation.OperationResourceTypes.Select(ort => ort.ResourceTypeId).ToHashSet();
-
             //Delete any OperationResourceTypes that exist in the DB but not on the incoming model
-            var toRemove = operation.OperationResourceTypes.Where(ort => !resources.Any(r => r.ResourceTypeId == ort.ResourceTypeId)).ToList();
-            foreach (var ort in toRemove)
+            foreach (var ort in operation.OperationResourceTypes)
             {
-                var sequences = await _database.OperationSequences.FindAsync(os => os.OperationResourceTypeId == ort.Id);
-                sequences.ForEach(_database.OperationSequences.Remove);
+                if (!resources.Any(r => r.ResourceTypeId == ort.ResourceTypeId))
+                {
+                    var sequences = await _database.OperationSequences.FindAsync(os => os.OperationResourceTypeId == os.OperationResourceTypeId);
+                    sequences.ForEach(_database.OperationSequences.Remove);
 
-                var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceTypeId == ort.Id);
-                vops.ForEach(_database.VendorVersionOperationPresets.Remove);
+                    var vops = await _database.VendorVersionOperationPresets.FindAsync(vop => vop.OperationResourceTypeId == vop.OperationResourceTypeId);
+                    vops.ForEach(_database.VendorVersionOperationPresets.Remove);
 
-                _database.OperationResourceTypes.Remove(ort);
-                existingResourceTypeIds.Remove(ort.ResourceTypeId);
+                    _database.OperationResourceTypes.Remove(ort);
+                }
             }
 
             //Create any OperationResourceTypes that exist on the incoming model but not in the DB
             foreach (var resource in resources)
             {
-                if (!existingResourceTypeIds.Contains(resource.ResourceTypeId))
+                if (!operation.OperationResourceTypes.Any(ort => ort.ResourceTypeId == resource.ResourceTypeId && ort.Operation.Id == operation.Id))
                 {
                     var ort = new OperationResourceType()
                     {
-                        Id = Guid.NewGuid(),
                         OperationId = operation.Id,
                         ResourceTypeId = resource.ResourceTypeId
                     };
 
+                    operation.OperationResourceTypes.Add(ort);
                     await _database.OperationResourceTypes.AddAsync(ort);
-                    existingResourceTypeIds.Add(resource.ResourceTypeId);
                 }
             }
 
@@ -355,10 +334,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                             vops.ForEach(_database.VendorVersionOperationPresets.Remove);
 
                             var op = await _database.Operations.GetAsync(operation.Id);
-                            if (op != null)
-                            {
-                                _database.Operations.Remove(op);
-                            }
+                            _database.Operations.Remove(op);
                         }
 
                         await _database.SaveChangesAsync();
@@ -418,27 +394,15 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             if (resource == null)
             {
-                throw new InvalidOperationException($"Resource Type '{model.ResourceType}' not found.");
+                throw new InvalidOperationException("No Resource Found.");
             }
 
             foreach (var sequence in sequences)
             {
-                var operation = await _database.Operations.FirstOrDefaultAsync(o => o.Id == sequence.OperationId);
-                if (operation == null)
-                {
-                    throw new InvalidOperationException($"Operation with ID {sequence.OperationId} not found.");
-                }
-
-                var operationResourceTypeMap = await _database.OperationResourceTypes.FirstOrDefaultAsync(ort => ort.OperationId == operation.Id && ort.ResourceTypeId == resource.Id);
-
-                if (operationResourceTypeMap == null)
-                {
-                    throw new InvalidOperationException($"Operation {operation.Name} (ID: {operation.Id}) is not associated with Resource Type {resource.Name} (ID: {resource.Id}).");
-                }
-
+                var operation = await _database.Operations.SingleAsync(o => o.Id == sequence.OperationId);
+                var operationResourceTypeMap = await _database.OperationResourceTypes.SingleAsync(ort => ort.OperationId == operation.Id && ort.ResourceTypeId == resource.Id);
                 await _database.OperationSequences.AddAsync(new OperationSequence()
                 {
-                    Id = Guid.NewGuid(),
                     FacilityId = model.FacilityId,
                     OperationResourceTypeId = operationResourceTypeMap.Id,
                     Sequence = sequence.Sequence,
@@ -451,7 +415,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             {
                 FacilityId = model.FacilityId,
                 ResourceType = model.ResourceType
-            }, false) ?? new List<OperationSequenceModel>();
+            },false);
         }
 
         public async Task<bool> DeleteOperationSequence(DeleteOperationSequencesModel model)
@@ -477,11 +441,6 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
             }
 
             return false;
-        }
-
-        public async Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginTransactionAsync()
-        {
-            return await _database.BeginTransactionAsync();
         }
     }
 }

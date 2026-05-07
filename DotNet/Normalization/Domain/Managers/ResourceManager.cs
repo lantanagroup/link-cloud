@@ -61,14 +61,14 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
         public async Task DeleteResource(string resource)
         {
-            var resourceEntityList = await _database.ResourceTypes.FindAsync(r => r.Name == resource);
+            var resourceEntity = await _database.ResourceTypes.FindAsync(r => r.Name == resource);
 
-            if (resourceEntityList == null || resourceEntityList.Count != 1)
+            if (resourceEntity == null || resourceEntity.Count > 1 || resourceEntity.Count == 0)
             {
-                throw new InvalidOperationException($"An Error has occurred while deleting the Resource '{resource.Sanitize()}'. Found {resourceEntityList?.Count ?? 0} matches.");
+                throw new InvalidOperationException("An Error has occurred while deleting the Resource.");
             }
 
-            _database.ResourceTypes.Remove(resourceEntityList.First());
+            _database.ResourceTypes.Remove(resourceEntity.Single());
 
             await _database.SaveChangesAsync();
         }
