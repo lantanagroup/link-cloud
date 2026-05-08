@@ -1,0 +1,11 @@
+<!-- delete-confirmation-dialog.component.html -->
+<div class="dialog-container">
+  <mat-icon class="delete-icon" [color]="iconColor">{{ icon }}</mat-icon>
+  <h1 class="dialog-title">{{ title }}</h1>
+  <p class="dialog-message">{{ data.message }}</p>
+
+  <div class="dialog-actions">
+    <button mat-stroked-button color="primary" (click)="onCancel()">Cancel</button>
+    <button mat-raised-button [color]="iconColor" (click)="onConfirm()">{{ confirmButtonText }}</button>
+  </div>
+</div>

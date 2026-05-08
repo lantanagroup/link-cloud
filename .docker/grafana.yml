@@ -1,0 +1,70 @@
+apiVersion: 1
+datasources:
+- name: Loki
+  type: loki
+  access: proxy
+  orgId: 1
+  url: http://loki:3100
+  basicAuth: false
+  isDefault: true
+  version: 1
+  editable: true
+  jsonData:
+    maxLines: 1000
+    derivedFields:
+      - datasourceUid: Tempo
+        matcherRegex: .*TraceId\":"(\w{32}).*
+        name: TraceID
+        url: '$${__value.raw}'
+- name: Tempo
+  type: tempo
+  access: proxy
+  orgId: 1
+  url: http://tempo:3200
+  basicAuth: false
+  isDefault: false
+  version: 1
+  editable: true
+  apiVersion: 1
+  uid: tempo
+  jsonData:
+      tracesToLogsV2:
+        # Field with an internal link pointing to a logs data source in Grafana.
+        # datasourceUid value must match the uid value of the logs data source.
+        datasourceUid: Loki
+        spanStartTimeShift: '1h'
+        spanEndTimeShift: '-1h'
+        tags: ['job', 'instance', 'pod', 'namespace']
+        filterByTraceID: false
+        filterBySpanID: false
+        customQuery: true
+        #query: 'TraceID="${__span.tags.method}"'
+        query: '{app="{Link-BoTW}"} |= `` | json | TraceId = `${__span.tags.traceId}`'
+      tracesToMetrics:
+        datasourceUid: Prometheus
+        spanStartTimeShift: '1h'
+        spanEndTimeShift: '-1h'
+        tags: [{ key: 'service.name', value: 'service' }, { key: 'job' }]
+        queries:
+          - name: 'Sample query'
+            query: 'sum(rate(process_runtime_dotnet_gc_committed_memory_size_bytes{$__tags}[5m]))'
+      serviceMap:
+        datasourceUid: Prometheus
+      nodeGraph:
+        enabled: true
+      search:
+        hide: false
+      lokiSearch:
+        datasourceUid: Loki
+      traceQuery:
+        timeShiftEnabled: true
+        spanStartTimeShift: '1h'
+        spanEndTimeShift: '-1h'
+      spanBar:
+        type: 'Tag'
+        tag: 'http.path'
+- name: Prometheus
+  type: prometheus
+  url: http://prometheus:9090
+  access: proxy
+  editable: true

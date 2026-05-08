@@ -1,0 +1,46 @@
+﻿
+namespace LantanaGroup.Link.DataAcquisition.Domain.Settings;
+
+public static class DataAcquisitionConstants
+{
+    public const string ServiceName = "DataAcquisition";
+
+    public static class AppSettingsSectionNames
+    {
+        public const string ServiceInformation = "ServiceInformation";
+        public const string DatabaseProvider = "DatabaseProvider";
+        public const string Serilog = "Serilog";
+    }
+
+    public static class HeaderNames
+    {
+        public const string CorrelationId = "X-Correlation-Id";
+    }
+
+    public static class Extension
+    {
+        public const string DateReceivedExtensionUri = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-received-date-extension";
+    }
+
+    public static class LoggingIds
+    {
+        public const int GenerateItems = 1000;
+        //public const int ListItems = 1001;
+        public const int GetItem = 1002;
+        public const int InsertItem = 1003;
+        public const int UpdateItem = 1004;
+        public const int DeleteItem = 1005;
+        //public const int GetItemNotFound = 1006;
+        //public const int UpdateItemNotFound = 1007;
+        //public const int KafkaConsumer = 10008;
+        //public const int KafkaProducer = 10009;
+        //public const int HealthCheck = 10010;
+    }
+
+    public static class Auth
+    {
+        public const string Bearer = "Bearer";
+        //public const string Basic = "basic";
+        //public const string FormUrlEncoded = "application/x-www-form-urlencoded";
+    }
+}

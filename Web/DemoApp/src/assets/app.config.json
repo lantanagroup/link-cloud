@@ -1,8 +1,0 @@
-{
-  "production": false,
-  "baseApiUrl": "/api",
-  "idpIssuer": "",
-  "idpClientId": "",
-  "idpClientSecret": "",
-  "idpScope": "openid profile email botwdemogatewayapi.read botwdemogatewayapi.write botwdemogatewayapi.delete"
-}

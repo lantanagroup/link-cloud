@@ -1,15 +1,14 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.QueryDispatch;
-using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
-using LantanaGroup.Link.QueryDispatch.Application.Models;
-using LantanaGroup.Link.QueryDispatch.Application.PatientDispatch.Commands;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Interfaces;
-using Quartz;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using System.Text;
+using LantanaGroup.Link.Shared.Application.Services.Security;
+using Quartz;
+using QueryDispatch.Application.Models;
 using QueryDispatch.Application.Settings;
+using QueryDispatch.Domain.Managers;
+using System.Text;
 
 namespace LanatanGroup.Link.QueryDispatch.Jobs
 {
@@ -17,100 +16,108 @@ namespace LanatanGroup.Link.QueryDispatch.Jobs
     public class QueryDispatchJob : IJob
     {
         private readonly ILogger<QueryDispatchJob> _logger;
-        private readonly IKafkaProducerFactory<string, DataAcquisitionRequestedValue> _acquisitionProducerFactory;
-        private readonly IKafkaProducerFactory<string, AuditEventMessage> _auditProducerFactory;
-        private readonly IDeletePatientDispatchCommand _deletePatientDispatchCommand;
-   
-        public QueryDispatchJob(ILogger<QueryDispatchJob> logger, IKafkaProducerFactory<string, DataAcquisitionRequestedValue> acquisitionProducerFactory, IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory, IDeletePatientDispatchCommand deletePatientDispatchCommand)
+        private readonly IProducer<string, DataAcquisitionRequestedValue> _acquisitionProducer;
+        private readonly IProducer<string, AuditEventMessage> _auditProducer;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
+
+        public QueryDispatchJob(
+            ILogger<QueryDispatchJob> logger,
+            IServiceScopeFactory serviceScopeFactory,
+            IProducer<string, DataAcquisitionRequestedValue> acquisitionProducer,
+            IProducer<string, AuditEventMessage> auditProducer)
         {
             _logger = logger;
-            _acquisitionProducerFactory = acquisitionProducerFactory ?? throw new ArgumentNullException(nameof(acquisitionProducerFactory));
-            _auditProducerFactory = auditProducerFactory ?? throw new ArgumentNullException(nameof(auditProducerFactory));
-            _deletePatientDispatchCommand = deletePatientDispatchCommand;
+            _serviceScopeFactory = serviceScopeFactory;
+            _acquisitionProducer = acquisitionProducer;
+            _auditProducer = auditProducer;
         }
-        
-        public Task Execute(IJobExecutionContext context)
+
+        public async Task Execute(IJobExecutionContext context)
         {
             JobDataMap triggerMap = context.Trigger.JobDataMap!;
-            PatientDispatchEntity patientDispatchEntity = (PatientDispatchEntity)triggerMap["PatientDispatchEntity"];
+            var patientDispatchEntity = triggerMap.GetObject<PatientDispatchEntity>("PatientDispatchEntity");
 
             ProducerConfig config = new ProducerConfig()
             {
                 ClientId = "QueryDispatch_DataAcquisitionScheduled"
             };
 
-            using (var producer = _acquisitionProducerFactory.CreateProducer(config))
+
+            try
             {
-                try
+                using var scope = _serviceScopeFactory.CreateScope();
+                var patientDispatchMgr = scope.ServiceProvider.GetRequiredService<IPatientDispatchManager>();
+
+                var dataAcquisitionRequestedValue = new DataAcquisitionRequestedValue()
                 {
-                    DataAcquisitionRequestedValue dataAcquisitionRequestedValue = new DataAcquisitionRequestedValue()
-                    {
-                        PatientId = patientDispatchEntity.PatientId,
-                        ScheduledReports = new List<ScheduledReport>()
-                    };
+                    PatientId = patientDispatchEntity.PatientId,
+                    ScheduledReports = new List<ScheduledReport>(),
+                    QueryType = QueryType.Initial.ToString(),
+                    ReportableEvent = ReportableEvents.Discharge.ToString()
+                };
 
-                    foreach (var scheduledReportPeriod in patientDispatchEntity.ScheduledReportPeriods)
+                foreach (var scheduledReportPeriod in patientDispatchEntity.ScheduledReportPeriods)
+                {
+                    dataAcquisitionRequestedValue.ScheduledReports.Add(new ScheduledReport
                     {
-                        dataAcquisitionRequestedValue.ScheduledReports.Add(new ScheduledReport
-                        {
-                            ReportType = scheduledReportPeriod.ReportType,
-                            StartDate = scheduledReportPeriod.StartDate,
-                            EndDate = scheduledReportPeriod.EndDate
-                        });
-                    }
+                        ReportTypes = scheduledReportPeriod.ReportTypes,
+                        Frequency = (Frequency)scheduledReportPeriod.Frequency,
+                        StartDate = scheduledReportPeriod.StartDate,
+                        EndDate = scheduledReportPeriod.EndDate,
+                        ReportTrackingId = scheduledReportPeriod.ReportTrackingId
+                    });
+                }
 
-                    var headers = new Headers
+                var acqHeaders = new Headers
                     {
                         { "X-Correlation-Id", Encoding.UTF8.GetBytes(patientDispatchEntity.CorrelationId) }
                     };
 
-                    producer.Produce(nameof(KafkaTopic.DataAcquisitionRequested), new Message<string, DataAcquisitionRequestedValue>
-                    {
-                        Key = patientDispatchEntity.FacilityId,
-                        Value = dataAcquisitionRequestedValue,
-                        Headers = headers
-                    });
-
-                    producer.Flush();
-
-                    _logger.LogInformation($"Produced Data Acquisition Requested event for facilityId: { patientDispatchEntity.FacilityId }");
-
-                    _deletePatientDispatchCommand.Execute(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId);
-                }
-                catch (Exception ex)
+                _acquisitionProducer.Produce(nameof(KafkaTopic.DataAcquisitionRequested), new Message<string, DataAcquisitionRequestedValue>
                 {
-                    _logger.LogError($"Failed to generate a Data Acquisition Requested event", ex);
-                }
+                    Key = patientDispatchEntity.FacilityId,
+                    Value = dataAcquisitionRequestedValue,
+                    Headers = acqHeaders
+                });
+
+                _acquisitionProducer.Flush();
+
+                _logger.LogInformation("Produced Data Acquisition Requested event for facilityId: {FacilityId}", HtmlInputSanitizer.Sanitize(patientDispatchEntity.FacilityId));
+
+                await patientDispatchMgr.deletePatientDispatch(patientDispatchEntity.FacilityId, patientDispatchEntity.PatientId);
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to generate a Data Acquisition Requested event");
             }
 
 
-            using (var producer = _auditProducerFactory.CreateAuditEventProducer())
-            {
-                var headers = new Headers
+
+
+            var headers = new Headers
                 {
                     { "X-Correlation-Id", Encoding.UTF8.GetBytes(patientDispatchEntity.CorrelationId) }
                 };
 
-                var auditMessage = new AuditEventMessage 
-                { 
-                    FacilityId = patientDispatchEntity.FacilityId,
-                    ServiceName = QueryDispatchConstants.ServiceName,
-                    Action = AuditEventType.Create,
-                    EventDate = DateTime.UtcNow,
-                    Resource = nameof(KafkaTopic.DataAcquisitionRequested),
-                    Notes = $"Produced Data Acquisition Event for facilityId: {patientDispatchEntity.FacilityId}"                    
-                };
+            var auditMessage = new AuditEventMessage
+            {
+                FacilityId = patientDispatchEntity.FacilityId,
+                ServiceName = QueryDispatchConstants.ServiceName,
+                Action = AuditEventType.Create,
+                EventDate = DateTime.UtcNow,
+                Resource = nameof(KafkaTopic.DataAcquisitionRequested),
+                Notes = $"Produced Data Acquisition Event for facilityId: {patientDispatchEntity.FacilityId}"
+            };
 
-                producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-                {
-                    Value = auditMessage,
-                    Headers = headers
-                });
+            _auditProducer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
+            {
+                Value = auditMessage,
+                Headers = headers
+            });
 
-                producer.Flush();
-            }
+            _auditProducer.Flush();
 
-            return Task.CompletedTask;
         }
     }
 }

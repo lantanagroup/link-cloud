@@ -11,9 +11,9 @@ namespace LantanaGroup.Link.Shared.Application.Factories;
 public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumerFactory<TConsumerKey, TConsumerValue>
 {
     private readonly ILogger<KafkaConsumerFactory<TConsumerKey, TConsumerValue>> _logger;
-    private readonly IOptions<KafkaConnection> _kafkaConnection;
+    private readonly KafkaConnection _kafkaConnection;
 
-    public KafkaConsumerFactory(ILogger<KafkaConsumerFactory<TConsumerKey, TConsumerValue>> logger, IOptions<KafkaConnection> kafkaConnection)
+    public KafkaConsumerFactory(ILogger<KafkaConsumerFactory<TConsumerKey, TConsumerValue>> logger, KafkaConnection kafkaConnection)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _kafkaConnection = kafkaConnection ?? throw new ArgumentNullException(nameof(kafkaConnection));
@@ -28,18 +28,16 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
                 throw new ArgumentException("No Kafka Group Id set in consumer configuration");
             }
 
-            config.BootstrapServers = string.Join(", ", _kafkaConnection.Value.BootstrapServers);
-            config.ReceiveMessageMaxBytes = _kafkaConnection.Value.ReceiveMessageMaxBytes;
-            config.ClientId = _kafkaConnection.Value.ClientId;
-            config.GroupId = _kafkaConnection.Value.GroupId;
+            config.BootstrapServers = string.Join(", ", _kafkaConnection.BootstrapServers);
+            config.ReceiveMessageMaxBytes = _kafkaConnection.ReceiveMessageMaxBytes;
+            config.ClientId = _kafkaConnection.ClientId;
 
-            if (_kafkaConnection.Value.SaslProtocolEnabled)
+            if (_kafkaConnection.SaslProtocolEnabled)
             {
-                config.SecurityProtocol = SecurityProtocol.SaslSsl;
-                config.SaslMechanism = SaslMechanism.Plain;
-                config.SaslUsername = _kafkaConnection.Value.SaslUsername;
-                config.SaslPassword = _kafkaConnection.Value.SaslPassword;
-                config.ApiVersionRequest = _kafkaConnection.Value.ApiVersionRequest;
+                config.SecurityProtocol = _kafkaConnection.Protocol;
+                config.SaslMechanism = _kafkaConnection.Mechanism;
+                config.SaslUsername = _kafkaConnection.SaslUsername;
+                config.SaslPassword = _kafkaConnection.SaslPassword;
             }
 
             var consumerBuilder = new ConsumerBuilder<TConsumerKey, TConsumerValue>(config);
@@ -58,7 +56,8 @@ public class KafkaConsumerFactory<TConsumerKey, TConsumerValue> : IKafkaConsumer
         }
         catch (Exception ex)
         {
-            _logger.LogError("Failed to create " + config.GroupId + " Kafka consumer.", ex);
+            string configOutput = $"\nBootstrap Server: {config.BootstrapServers}\nClient ID: {config.ClientId}\nGroup ID: {config.GroupId}\nSecurity Protocol: {config.SecurityProtocol.ToString()}";
+            _logger.LogError(ex, "Failed to create Kafka consumer: {ErrorMessage}. Configuration: {Config}", ex.Message, configOutput);
             throw new Exception("Failed to create " + config.GroupId + " Kafka consumer.");
         }
     }

@@ -1,7 +1,9 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Models;
+using LantanaGroup.Link.Notification.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
@@ -12,9 +14,9 @@ namespace LantanaGroup.Link.Notification.Application.Factory
     public class KafkaConsumerFactory : IKafkaConsumerFactory
     {
         private readonly ILogger<KafkaConsumerFactory> _logger;
-        private readonly IOptions<BrokerConnection> _brokerConnection;
+        private readonly IOptions<KafkaConnection> _brokerConnection;
 
-        public KafkaConsumerFactory(ILogger<KafkaConsumerFactory> logger, IOptions<BrokerConnection> brokerConnection)
+        public KafkaConsumerFactory(ILogger<KafkaConsumerFactory> logger, IOptions<KafkaConnection> brokerConnection)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _brokerConnection = brokerConnection ?? throw new ArgumentNullException(nameof(brokerConnection));
@@ -25,6 +27,7 @@ namespace LantanaGroup.Link.Notification.Application.Factory
             try
             {
                 var config = _brokerConnection.Value.CreateConsumerConfig();
+                config.GroupId = ServiceName;
                 config.EnableAutoCommit = enableAutoCommit;
                 return new ConsumerBuilder<string, NotificationMessage>(config).SetValueDeserializer(new JsonWithFhirMessageDeserializer<NotificationMessage>()).Build();
             }

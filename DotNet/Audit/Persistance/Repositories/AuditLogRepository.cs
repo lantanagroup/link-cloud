@@ -26,8 +26,8 @@ namespace LantanaGroup.Link.Audit.Persistance.Repositories
         public async Task<AuditLog?> GetAsync(AuditId id, bool noTracking = false, CancellationToken cancellationToken = default)
         {
             var log = noTracking ?
-                await _dbContext.AuditLogs.AsNoTracking().FirstOrDefaultAsync(x => x.AuditId == id, cancellationToken) :
-                await _dbContext.AuditLogs.FindAsync(id, cancellationToken);
+                await _dbContext.AuditLogs.AsNoTracking().FirstOrDefaultAsync(x => x.AuditId.Equals(id), cancellationToken) :
+                await _dbContext.AuditLogs.FindAsync([id, cancellationToken], cancellationToken: cancellationToken);
 
             return log;
         }

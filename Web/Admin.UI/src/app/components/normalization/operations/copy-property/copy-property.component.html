@@ -1,0 +1,145 @@
+<mat-card-content>
+
+  @if (errorMessage) {
+    <div class="error-snackbar" #errorDiv>
+      <mat-icon color="warn">error_outline</mat-icon>
+      {{ errorMessage }}
+    </div>
+  }
+  <form [formGroup]="form" class="operation-form">
+    <h2 class="section-title">Operation Details</h2>
+
+    <!-- Facility Id -->
+    @if (!isVendorMode) {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Facility Id</mat-label>
+        <input matInput formControlName="facilityId" [disabled]="true" placeholder="Facility Id"/>
+      </mat-form-field>
+    }
+
+    <!-- Vendor Id -->
+    @if (isVendorMode) {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Select Vendor</mat-label>
+        <mat-select formControlName="selectedVendor" [disabled]="viewOnly" multiple>
+          @for (vendor of vendors; track vendor) {
+            <mat-option [value]="vendor.id">{{ vendor.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    @if (showFacilityOrVendorError) {
+      <div class="validation-error">
+        Vendor is <strong>required</strong>
+      </div>
+    }
+
+
+    <!-- Name -->
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Name</mat-label>
+      <input matInput formControlName="name" [readonly]="viewOnly"/>
+      @if (nameControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear" (click)="clearName()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+      @if (nameControl?.hasError('required') && (nameControl.touched || nameControl.dirty)) {
+        <mat-error>
+          Name is <strong>required</strong>
+        </mat-error>
+      }
+    </mat-form-field>
+
+    <!-- Description -->
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Description</mat-label>
+      <input matInput formControlName="description" [readonly]="viewOnly"/>
+      @if (descriptionControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear"
+          (click)="clearDescription()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+
+    <!-- Resource Types -->
+    @if (selectedResourceTypesControl.value?.length > 0) {
+      <div class="selected-resource-types">
+        <strong>Selected Resource Types: </strong> {{ selectedResourceTypesControl.value.join(', ') }}
+      </div>
+    }
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Select Resource Types</mat-label>
+      <input
+        matInput
+        placeholder="Start typing to search"
+        [formControl]="resourceTypeControl"
+        [matAutocomplete]="auto"
+        (keydown)="onInputKeydown($event)"
+        (mousedown)="userClicked = true"
+        [readonly]="viewOnly"
+        (focus)="openAutocompletePanel()"
+        />
+
+        <mat-autocomplete #auto="matAutocomplete" autoActiveFirstOption="">
+          @for (type of filteredResourceTypes; track type) {
+            <mat-option [value]="type">
+              <mat-checkbox [checked]="selectedResourceTypesControl.value?.includes(type)"
+                (click)="$event.stopPropagation()"
+                (change)="toggleSelection(type, $event.source.checked)">
+                {{ type }}
+              </mat-checkbox>
+            </mat-option>
+          }
+        </mat-autocomplete>
+      </mat-form-field>
+
+      @if (selectedResourceTypesControl.hasError('required')  &&  (resourceTypeControl.touched || resourceTypeControl.dirty )) {
+        <div class="validation-error"
+          >
+          Resource Type is <strong>required</strong>
+        </div>
+      }
+
+      <!-- Source/Target Paths -->
+      <div class="form-row">
+        <mat-form-field appearance="fill" class="half-width">
+          <mat-label>Source FHIR path</mat-label>
+          <input matInput formControlName="sourceFhirPath" [readonly]="viewOnly"/>
+          @if (sourceFhirPathControl.value && !viewOnly) {
+            <button matSuffix mat-icon-button aria-label="Clear"
+              (click)="clearSourcePath()">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+          @if (sourceFhirPathControl.hasError('required')) {
+            <mat-error>
+              Source path is <strong>required</strong>
+            </mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="fill" class="half-width">
+          <mat-label>Target FHIR path</mat-label>
+          <input matInput formControlName="targetFhirPath" [readonly]="viewOnly"/>
+          @if (targetFhirPathControl.value && !viewOnly) {
+            <button matSuffix mat-icon-button aria-label="Clear"
+              (click)="clearTargetPath()">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+          @if (targetFhirPathControl.hasError('required')) {
+            <mat-error>
+              Target path is <strong>required</strong>
+            </mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <!-- Enable/Disable checkbox -->
+      <mat-checkbox formControlName="isEnabled">Enabled</mat-checkbox>
+    </form>
+  </mat-card-content>

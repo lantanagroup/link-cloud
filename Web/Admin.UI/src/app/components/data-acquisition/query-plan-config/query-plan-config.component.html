@@ -1,0 +1,206 @@
+<form [formGroup]="planForm" class="dialog-form">
+
+  <div>
+    <mat-form-field class="form-select" appearance="outline">
+      <mat-label>Type</mat-label>
+      <mat-select matInput formControlName="type" (selectionChange)="onTypeChange($event)">
+        @for (type of types; track type) {
+          <mat-option [disabled] = "!viewOnly" [value]="type.value">
+            {{ type.label }}
+          </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input ">
+      <mat-label>Facility Id</mat-label>
+      <input matInput formControlName="facilityId" [disabled]="true" placeholder="Facility Id">
+    </mat-form-field>
+  </div>
+
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input ">
+      <mat-label>Plan Name</mat-label>
+      <input matInput formControlName="planName" [readonly]="viewOnly" placeholder="Plan Name">
+      @if (planNameControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear"
+          (click)="clearPlanName()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+      @if ( !viewOnly && planNameControl.hasError('required')) {
+        <mat-error>
+          A plan name is <strong>required</strong>
+        </mat-error>
+      }
+    </mat-form-field>
+  </div>
+
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input">
+      <mat-label>Ehr Description</mat-label>
+      <input matInput formControlName="ehrDescription" [readonly]="viewOnly" placeholder="Ehr Description">
+      @if (ehrDescriptionControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear"
+          (click)="clearEhrDescription()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+      @if ( !viewOnly && ehrDescriptionControl.hasError('required')) {
+        <mat-error>
+          An Ehr description is <strong>required</strong>
+        </mat-error>
+      }
+    </mat-form-field>
+  </div>
+
+  <div class="form-input">
+    <mat-form-field appearance="outline" class="subject-input form-input">
+      <mat-label>Look Back</mat-label>
+      <input matInput formControlName="lookBack" [readonly]="viewOnly" placeholder="Look Back">
+      @if (lookBackControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear"
+          (click)="clearLookBack()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+      @if ( !viewOnly && lookBackControl.hasError('required')) {
+        <mat-error>
+          A look back is <strong>required</strong>
+        </mat-error>
+      }
+    </mat-form-field>
+  </div>
+
+  <div class="queries-container">
+    <div class="section-header">
+      <h3>Initial Queries</h3>
+      @if (!viewOnly) {
+        <button mat-stroked-button color="primary" type="button" (click)="addInitialQuery()">
+          <mat-icon>add</mat-icon> Add Initial Query
+        </button>
+      }
+    </div>
+
+    <table mat-table [dataSource]="initialQueries" cdkDropList (cdkDropListDropped)="dropInitial($event)" [cdkDropListDisabled]="viewOnly" class="queries-table">
+      <ng-container matColumnDef="drag">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let element" class="drag-handle">
+          @if (!viewOnly) {
+            <mat-icon cdkDragHandle>drag_handle</mat-icon>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="resourceType">
+        <th mat-header-cell *matHeaderCellDef> Resource Type </th>
+        <td mat-cell *matCellDef="let element"> {{element.resourceType}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="queryConfigType">
+        <th mat-header-cell *matHeaderCellDef> Type </th>
+        <td mat-cell *matCellDef="let element"> {{element.queryConfigType}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="details">
+        <th mat-header-cell *matHeaderCellDef> Details </th>
+        <td mat-cell *matCellDef="let element">
+          @if (element.queryConfigType === 'Reference') {
+            Page: {{element.paged}}, Op: {{getOperationTypeDisplay(element.operationType)}}
+          } @else {
+            Params: {{element.parameters?.length || 0}}
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef> Actions </th>
+        <td mat-cell *matCellDef="let element; let i = index">
+          <button mat-icon-button (click)="editInitialQuery(i)">
+            <mat-icon>{{viewOnly ? 'visibility' : 'edit'}}</mat-icon>
+          </button>
+          @if (!viewOnly) {
+            <button mat-icon-button color="warn" (click)="deleteInitialQuery(i)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          }
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" cdkDrag [cdkDragData]="row"></tr>
+    </table>
+
+    <div class="section-header">
+      <h3>Supplemental Queries</h3>
+      @if (!viewOnly) {
+        <button mat-stroked-button color="primary" type="button" (click)="addSupplementalQuery()">
+          <mat-icon>add</mat-icon> Add Supplemental Query
+        </button>
+      }
+    </div>
+
+    <table mat-table [dataSource]="supplementalQueries" cdkDropList (cdkDropListDropped)="dropSupplemental($event)" [cdkDropListDisabled]="viewOnly" class="queries-table">
+      <ng-container matColumnDef="drag">
+        <th mat-header-cell *matHeaderCellDef></th>
+        <td mat-cell *matCellDef="let element" class="drag-handle">
+          @if (!viewOnly) {
+            <mat-icon cdkDragHandle>drag_handle</mat-icon>
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="resourceType">
+        <th mat-header-cell *matHeaderCellDef> Resource Type </th>
+        <td mat-cell *matCellDef="let element"> {{element.resourceType}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="queryConfigType">
+        <th mat-header-cell *matHeaderCellDef> Type </th>
+        <td mat-cell *matCellDef="let element"> {{element.queryConfigType}} </td>
+      </ng-container>
+
+      <ng-container matColumnDef="details">
+        <th mat-header-cell *matHeaderCellDef> Details </th>
+        <td mat-cell *matCellDef="let element">
+          @if (element.queryConfigType === 'Reference') {
+            Page: {{element.paged}}, Op: {{getOperationTypeDisplay(element.operationType)}}
+          } @else {
+            Params: {{element.parameters?.length || 0}}
+          }
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef> Actions </th>
+        <td mat-cell *matCellDef="let element; let i = index">
+          <button mat-icon-button (click)="editSupplementalQuery(i)">
+            <mat-icon>{{viewOnly ? 'visibility' : 'edit'}}</mat-icon>
+          </button>
+          @if (!viewOnly) {
+            <button mat-icon-button color="warn" (click)="deleteSupplementalQuery(i)">
+              <mat-icon>delete</mat-icon>
+            </button>
+          }
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns;" cdkDrag [cdkDragData]="row"></tr>
+    </table>
+  </div>
+
+  <div class="json-preview-container">
+    <mat-expansion-panel>
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          JSON Representation
+        </mat-panel-title>
+      </mat-expansion-panel-header>
+      <pre><code>{{ currentPlanJson }}</code></pre>
+    </mat-expansion-panel>
+  </div>
+
+</form>

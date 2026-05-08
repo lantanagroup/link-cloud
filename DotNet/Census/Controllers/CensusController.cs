@@ -1,116 +1,102 @@
-﻿using LantanaGroup.Link.Census.Application.Commands;
-using LantanaGroup.Link.Census.Application.Settings;
-using LantanaGroup.Link.Census.Domain.Entities;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using MediatR;
+﻿using Hl7.Fhir.Model;
+using LantanaGroup.Link.Census.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.Services.Security;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LantanaGroup.Link.Census.Controllers;
 
 [Route("api/census/{facilityId}")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class CensusController : Controller
 {
     private readonly ILogger<CensusController> _logger;
-    private readonly IMediator _mediator;
+    private readonly IPatientEncounterQueries _patientEncounterQueries;
+    private readonly IPatientEventQueries _patientEventQueries;
 
-    public CensusController(ILogger<CensusController> logger, IMediator mediator)
+    public CensusController(ILogger<CensusController> logger, IPatientEncounterQueries patientEncounterQueries, IPatientEventQueries patientEventQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _patientEncounterQueries = patientEncounterQueries ?? throw new ArgumentNullException(nameof(_patientEncounterQueries));
+        _patientEventQueries = patientEventQueries ?? throw new ArgumentNullException(nameof(_patientEventQueries));
     }
 
     /// <summary>
-    /// Gets Patient List history for a facility.
+    /// Gets the admitted patients for a facility within a date range.
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <returns></returns>
-    [HttpGet("history")]
-    public async Task<ActionResult<List<PatientCensusHistoricEntity>>> GetCensusHistory(string facilityId)
+    /// <param name="startDate"></param>
+    /// <param name="endDate"></param>
+    /// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Hl7.Fhir.Model.List))]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [HttpGet("history/admitted")]
+    public async Task<ActionResult<Hl7.Fhir.Model.List>> GetAdmittedPatients(string facilityId, DateTime startDate, DateTime endDate)
     {
+        facilityId = HtmlInputSanitizer.Sanitize(facilityId);
+        if (string.IsNullOrWhiteSpace(facilityId))
+            return BadRequest("facilityId is required.");
+
+        if (startDate > endDate)
+            return BadRequest("startDate must be less than or equal to endDate.");
+
         try
         {
-            var history = await _mediator.Send(new GetCensusHistoryQuery
-            {
-                FacilityId = facilityId
-            });
-            return Ok(history);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Error encountered:\n{ex.Message}\n{ex.InnerException}");
-            await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
-            return StatusCode(500);
-        }
-    }
+            var patients = (await _patientEncounterQueries.GetAdmittedPatientEncounterModelsByDateRange(facilityId, startDate, endDate))?.ToList();
 
-    /// <summary>
-    /// Gets the current census for a facility.
-    /// </summary>
-    /// <param name="facilityId"></param>
-    /// <returns></returns>
-    [HttpGet("current")]
-    public async Task<ActionResult<List<CensusPatientListEntity>>> GetCurrentCensus(string facilityId)
-    {
-        try
-        {
-            var patients = await _mediator.Send(new GetCurrentCensusQuery
+            if (patients == null || !patients.Any())
             {
-                FacilityId = facilityId
-            });
-            return Ok(patients);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Error encountered:\n{ex.Message}\n{ex.InnerException}");
-            await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
-            return StatusCode(500);
-        }
-    }
-
-    /// <summary>
-    /// Gets all patient list records for a facility.
-    /// </summary>
-    /// <param name="facilityId"></param>
-    /// <returns></returns>
-    [HttpGet("all")]
-    public async Task<ActionResult<List<CensusPatientListEntity>>> GetAllPatientsForFacility(string facilityId)
-    {
-        try
-        {
-            var patients = await _mediator.Send(new GetAllPatientsForFacilityQuery
-            {
-                FacilityId = facilityId
-            });
-            return Ok(patients);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Error encountered:\n{ex.Message}\n{ex.InnerException}");
-            await SendAudit($"Error encountered:\n{ex.Message}\n{ex.InnerException}", null, facilityId, AuditEventType.Query);
-            return StatusCode(500);
-        }
-    }
-
-    [ApiExplorerSettings(IgnoreApi = true)]
-    private async Task SendAudit(string message, string correlationId, string facilityId, AuditEventType type)
-    {
-        await _mediator.Send(new TriggerAuditEventCommand
-        {
-            AuditableEvent = new AuditEventMessage
-            {
-                FacilityId = facilityId,
-                CorrelationId = correlationId,
-                Action = type,
-                EventDate = DateTime.UtcNow,
-                ServiceName = CensusConstants.ServiceName,
-                //PropertyChanges = "example",
-                Resource = "Census",
-                User = "example",
-                UserId = "example",
-                Notes = $"{type}: {facilityId}\n{message}"
+                return NotFound($"No patients found for facilityId {facilityId}");
             }
-        });
+
+            var fhirList = new Hl7.Fhir.Model.List();
+            fhirList.Status = List.ListStatus.Current;
+            fhirList.Mode = ListMode.Snapshot;
+            fhirList.Extension.Add(new Extension()
+            {
+                Url = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension",
+                Value = new Period()
+                {
+                    StartElement = new FhirDateTime(new DateTimeOffset(startDate)),
+                    EndElement = new FhirDateTime(new DateTimeOffset(endDate))
+                }
+            });
+
+            foreach (var patient in patients)
+            {
+
+                var identifier = patient.PatientIdentifiers.FirstOrDefault();
+
+                if (identifier != null)
+                {
+                    fhirList.Entry.Add(new List.EntryComponent()
+                    {
+                        Item = new ResourceReference(identifier.Identifier.StartsWith("Patient/") ? identifier.Identifier : $"Patient/" + identifier.Identifier)
+                    });
+                }
+            }
+
+            return Ok(fhirList);
+        }
+        catch (ArgumentException argEx)
+        {
+            _logger.LogError(argEx, "Invalid argument in CensusController.GetAdmittedPatients");
+            return BadRequest(argEx.Message);
+        }
+        catch (InvalidOperationException invOpEx)
+        {
+            _logger.LogError(invOpEx, "Invalid operation in CensusController.GetAdmittedPatients");
+            return BadRequest(invOpEx.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception encountered in CensusController.GetAdmittedPatients");
+            return Problem(detail: "An error occurred while retrieving facility admitted patients.", statusCode: StatusCodes.Status500InternalServerError);
+        }
     }
 }

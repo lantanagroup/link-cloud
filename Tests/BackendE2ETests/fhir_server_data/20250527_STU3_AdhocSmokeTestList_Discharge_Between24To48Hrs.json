@@ -1,0 +1,50 @@
+{
+  "resourceType": "Bundle",
+  "type": "transaction",
+  "entry": [
+    {
+      "request": {
+        "method": "PUT",
+        "url": "List/Stu3-AdHocSmokeTest-Discharge-Between24To48Hrs"
+      },
+      "resource": {
+        "resourceType": "List",
+        "id": "Stu3-AdHocSmokeTest-Discharge-Between24To48Hrs",
+        "status": "current",
+        "mode": "working",
+        "title": "Patient List 2: Barry078 Carl065 Wagner044, Caleb058 Ryan027 Vasquez055",
+        "code": {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/list-example-use-codes",
+              "code": "patients",
+              "display": "Patient List"
+            }
+          ],
+          "text": "Patient List"
+        },
+        "date": "2024-12-27T18:48:08.238+00:00",
+        "entry": [
+          {
+            "item": {
+              "reference": "Patient/MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM",
+              "display": "Barry078 Carl065 Wagner044"
+            }
+          },
+          {
+            "item": {
+              "reference": "Patient/CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3",
+              "display": "Caleb058 Ryan027 Vasquez055"
+            }
+          },
+          {
+            "item": {
+              "reference": "Patient/9i6Xi6uG2WjuGxHTmpbin4ct2ZwevRwTWhIkJkRjVFZ4C",
+              "display": "Chloe017 Matthew058 Martinez091"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

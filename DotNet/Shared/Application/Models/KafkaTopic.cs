@@ -5,49 +5,68 @@ namespace LantanaGroup.Link.Shared.Application.Models;
 public enum KafkaTopic
 {
     DataAcquired,
-    PatientIDsAcquired,
+    [StringValue("PatientListsAcquired")]
+    PatientListsAcquired,
+    [StringValue("PatientListsAcquired-Retry")]
+    PatientListsAcquiredRetry,
     PatientAcquired,
+    ResourceAcquired,
+    [StringValue("ResourceAcquired-Retry")]
+    ResourceAcquiredRetry,
     [StringValue("PatientAcquired-Retry")]
     PatientAcquiredRetry,
     DataAcquisitionScheduled,
     DataAcquisitionRequested,
+    [StringValue("DataAcquisitionRequested-Retry")]
+    DataAcquisitionRequestedRetry,
     DataAcquisitionFailed,
     PatientDataEvaluated,
     PatientNormalized,
+    ResourceNormalized,
     PatientDischarged,
     PatientDataAcquired,
+    ReadyToAcquire,
+    [StringValue("ReadyToAcquire-Retry")]
+    ReadyToAcquireRetry,
     ReportBundled,
     ReportFailed,
     ReportRequestRejected,
     ReportScheduled,
-    ResourceAcquired,
     RetentionCheckScheduled,
     PatientResourcesNormalized,
     MeasureChanged,
     MeasureEvalFailed,
     FHIRValidationFailed,
     AuditableEventOccurred,
+    [StringValue("AuditableEventOccurred-Retry")]
+    AuditableEventOccurredRetry,
     NotificationRequested,
     PatientCensusScheduled,
+    [StringValue("PatientCensusScheduled-Retry")]
+    PatientCensusScheduledRetry,
     PatientEvent,
     [StringValue("PatientEvent-Retry")]
     PatientEventRetry,
-    MeasureEvaluated,
-    ReportSubmitted,
+    MeasureReportGenerated,
+    PayloadSubmitted,
     BundleEvalRequested,
-    PatientsToQuery,
-    SubmitReport,
-    [StringValue("MeasureEvaluated-Retry")]
-    MeasureEvaluatedRetry,
-    [StringValue("ReportSubmitted-Retry")]
-    ReportSubmittedRetry,
+    [StringValue("MeasureReportGenerated-Retry")]
+    MeasureReportGeneratedRetry,
+    [StringValue("PayloadSubmitted-Retry")]
+    PayloadSubmittedRetry,
     [StringValue("BundleEvalRequested-Retry")]
     BundleEvalRequestedRetry,
-    [StringValue("PatientsToQuery-Retry")]
-    PatientsToQueryRetry,
-    [StringValue("SubmitReport-Retry")]
-    SubmitReportRetry,
     [StringValue("ReportScheduled-Retry")]
-    ReportScheduledRetry
-
+    ReportScheduledRetry,
+    GenerateReportRequested,
+    [StringValue("GenerateReportRequested-Retry")]
+    GenerateReportRequestedRetry,
+    EvaluationRequested,
+    ReadyForValidation,
+    ValidationComplete,
+    [StringValue("ValidationComplete-Retry")]
+    ValidationCompleteRetry,
+    SubmitPayload,
+    [StringValue("SubmitPayload-Retry")]
+    SubmitPayloadRetry
 }

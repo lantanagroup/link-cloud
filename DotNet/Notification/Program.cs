@@ -1,6 +1,5 @@
 using Azure.Identity;
 using HealthChecks.UI.Client;
-using LantanaGroup.Link.Notification.Application.Extensions;
 using LantanaGroup.Link.Notification.Application.Factory;
 using LantanaGroup.Link.Notification.Application.Interfaces;
 using LantanaGroup.Link.Notification.Application.Interfaces.Clients;
@@ -13,14 +12,18 @@ using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.EmailService;
 using LantanaGroup.Link.Notification.Infrastructure.Health;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
+using LantanaGroup.Link.Notification.Infrastructure.Telemetry;
 using LantanaGroup.Link.Notification.Listeners;
 using LantanaGroup.Link.Notification.Persistence;
 using LantanaGroup.Link.Notification.Persistence.Interceptors;
 using LantanaGroup.Link.Notification.Persistence.Repositories;
 using LantanaGroup.Link.Notification.Presentation.Clients;
-using LantanaGroup.Link.Notification.Presentation.Services;
 using LantanaGroup.Link.Notification.Settings;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
@@ -28,11 +31,14 @@ using Microsoft.Extensions.Compliance.Redaction;
 using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Serilog;
 using Serilog.Enrichers.Span;
-using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using System.Diagnostics;
 using System.Reflection;
 using System.Text;
+using LantanaGroup.Link.Shared.Application.Models;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.OpenApi.Models;
+using LantanaGroup.Link.Shared.Application.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -106,10 +112,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     // Add services to the container. 
-    builder.Services.Configure<BrokerConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Kafka));
+    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
+    var kafkaConnection = builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    builder.Services.AddSingleton<KafkaConnection>(kafkaConnection);
     builder.Services.Configure<SmtpConnection>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Smtp));
     builder.Services.Configure<Channels>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Channels));
-    builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.ServiceRegistry));
+    builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+    builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
 
     // Add HttpClients
     builder.Services.AddHttpClient<IFacilityClient, FacilityClient>();
@@ -141,9 +150,24 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add factories
     builder.Services.AddTransient<INotificationConfigurationFactory, NotificationConfigurationFactory>();
     builder.Services.AddTransient<INotificationFactory, NotificationFactory>();
+    
     builder.Services.AddTransient<IKafkaProducerFactory, KafkaProducerFactory>();
+    builder.Services.AddSingleton(new KafkaProducerFactory(kafkaConnection).CreateAuditEventProducer());
+
     builder.Services.AddTransient<IKafkaConsumerFactory, KafkaConsumerFactory>();
     builder.Services.AddTransient<IAuditEventFactory, AuditEventFactory>();
+
+    // Add Link Security
+    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    builder.Services.AddLinkBearerServiceAuthentication(options =>
+    {
+        options.Environment = builder.Environment;
+        options.AllowAnonymous = allowAnonymousAccess;
+        options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+        options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+        options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+        options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
+    });
 
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
@@ -155,10 +179,15 @@ static void RegisterServices(WebApplicationBuilder builder)
         
         switch (builder.Configuration.GetValue<string>(NotificationConstants.AppSettingsSectionNames.DatabaseProvider))
         {
-            case "SqlServer":
-                options.UseSqlServer(
-                    builder.Configuration.GetValue<string>(NotificationConstants.AppSettingsSectionNames.DatabaseConnectionString))
-                .AddInterceptors(updateBaseEntityInterceptor);                    
+            case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
+                string? connectionString =
+                    builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+                
+                if (string.IsNullOrEmpty(connectionString))
+                    throw new InvalidOperationException("Database connection string is null or empty.");
+                
+                options.UseSqlServer(connectionString)
+                    .AddInterceptors(updateBaseEntityInterceptor);                    
                 break;
             default:
                 throw new InvalidOperationException("Database provider not supported.");
@@ -170,35 +199,59 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 
     //Add health checks
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, NotificationConstants.ServiceName).GetHealthCheckOptions();
+
     builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database");
+        .AddCheck<DatabaseHealthCheck>("Database")
+        .AddKafka(kafkaHealthOptions);
 
     //Add Hosted Services
     builder.Services.AddHostedService<NotificationRequestedListener>();
 
     //Add infrastructure
-    builder.Services.AddTransient<IEmailService, EmailService>();    
+    builder.Services.AddTransient<IEmailService, EmailService>();
 
     //configure CORS
-    builder.Services.AddCorsService(builder.Environment);
-
-    //configure servive api security   
-    var idpConfig = builder.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.IdentityProvider).Get<IdentityProviderConfig>();
-    if (idpConfig != null)
-    {
-        builder.Services.AddAuthenticationService(idpConfig, builder.Environment);
-    }
-    else
-    {
-        throw new NullReferenceException("Identity Provider Configuration was null.");
-    }
-
-    //builder.Services.AddAuthorizationService();
+    builder.Services.AddLinkCorsService(options => {
+        options.Environment = builder.Environment;
+    });    
 
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
+        if (!allowAnonymousAccess)
+        {
+            #region Authentication Schemas
+
+            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Description = $"Authorization using JWT",
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                BearerFormat = "JWT",
+                In = ParameterLocation.Header,
+                Scheme = JwtBearerDefaults.AuthenticationScheme
+            });
+
+            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference
+                        {
+                            Id = "Bearer",
+                            Type = ReferenceType.SecurityScheme
+                        }
+                    },
+                    new List<string>()
+                }
+            });
+
+            #endregion
+        }
+
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
@@ -227,7 +280,7 @@ static void RegisterServices(WebApplicationBuilder builder)
                     .ReadFrom.Configuration(builder.Configuration, loggerOptions)
                     .Filter.ByExcluding("RequestPath like '/health%'")
                     .Filter.ByExcluding("RequestPath like '/swagger%'")
-                    .Enrich.WithExceptionDetails()
+                    //.Enrich.WithExceptionDetails()
                     .Enrich.FromLogContext()
                     .Enrich.WithSpan()
                     .Enrich.With<ActivityEnricher>()
@@ -235,16 +288,15 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     //Serilog.Debugging.SelfLog.Enable(Console.Error);  
 
-    var telemetryConfig = builder.Configuration.GetRequiredSection(NotificationConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
-    if (telemetryConfig != null)
+    //Add telemetry if enabled
+    builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
-        builder.Services.AddOpenTelemetryService(telemetryConfig, builder.Environment);
-    }
-    else
-    {
-        //throw new NullReferenceException("Telemetry Configuration was null.");
-    }
+        options.Environment = builder.Environment;
+        options.ServiceName = NotificationConstants.ServiceName;
+        options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
+    });
 
+    builder.Services.AddSingleton<INotificationServiceMetrics, NotificationServiceMetrics>();   
 }
 
 #endregion
@@ -263,33 +315,28 @@ static void SetupMiddleware(WebApplication app)
     }
 
     // Configure the HTTP request pipeline.
-    if (app.Configuration.GetValue<bool>(NotificationConstants.AppSettingsSectionNames.EnableSwagger))
-    {
-        var serviceInformation = app.Configuration.GetSection(NotificationConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-        app.UseSwagger();
-        app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v1/swagger.json", serviceInformation != null ? $"{serviceInformation.Name} - {serviceInformation.Version}" : "Link Notification Service"));
-    }
-
+    app.ConfigureSwagger();
     app.UseRouting();
-    app.UseCors("CorsPolicy");
-    app.UseAuthentication();
-    app.UseMiddleware<UserScopeMiddleware>();
-    app.UseAuthorization();    
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
+
+    //check for anonymous access
+    var allowAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    if (!allowAnonymousAccess)
+    {
+        app.UseAuthentication();
+        app.UseMiddleware<UserScopeMiddleware>();
+    }
+    app.UseAuthorization();
+
+    app.MapGet("/api/notification/info", () => Results.Ok($"Welcome to {ServiceActivitySource.ServiceName} version {ServiceActivitySource.Instance.Version}!")).AllowAnonymous();
 
     //map health check middleware
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    });
+    }).RequireCors("HealthCheckPolicy");
 
     app.UseEndpoints(endpoints => endpoints.MapControllers());
-
-    if (app.Configuration.GetValue<bool>(NotificationConstants.AppSettingsSectionNames.EnableSwagger))
-    {
-        app.MapGrpcReflectionService();
-    }
-
-    app.MapGrpcService<NotificationService>();
 }
 
 #endregion

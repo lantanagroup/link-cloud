@@ -1,10 +1,10 @@
-﻿using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
+﻿using LantanaGroup.Link.Shared.Application.Services.Telemetry;
 
 namespace LantanaGroup.Link.Audit.Application.Interfaces
 {
     public interface IAuditServiceMetrics
     {
         void IncrementAuditableEventCounter(List<KeyValuePair<string, object?>> tags);
-        TrackedRequestDuration MeasureAuditSearchDuration();
+        TrackedRequestDuration MeasureAuditSearchDuration(List<KeyValuePair<string, object?>> tags);
     }
 }

@@ -3,115 +3,62 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Trace;
+using System.Diagnostics;
 using System.Text;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
+    // TODO: Remove unused facility ID parameters?
     public class TransientExceptionHandler<K, V> : ITransientExceptionHandler<K, V>
     {
         protected readonly ILogger<TransientExceptionHandler<K, V>> Logger;
-        protected readonly IKafkaProducerFactory<string, AuditEventMessage> AuditProducerFactory;
         protected readonly IKafkaProducerFactory<K, V> ProducerFactory;
+        protected readonly ServiceInformation ServiceInformation;
 
         public string Topic { get; set; } = string.Empty;
 
-        public string ServiceName { get; set; } = string.Empty;
+        protected string ServiceName { get; set; } = string.Empty;
 
         public TransientExceptionHandler(ILogger<TransientExceptionHandler<K, V>> logger,
-            IKafkaProducerFactory<string, AuditEventMessage> auditProducerFactory,
-            IKafkaProducerFactory<K, V> producerFactory)
+            IKafkaProducerFactory<K, V> producerFactory,
+            ServiceInformation serviceInformation)
         {
             Logger = logger;
-            AuditProducerFactory = auditProducerFactory;
             ProducerFactory = producerFactory;
+            ServiceInformation = serviceInformation;
+
+            ServiceName = ServiceInformation.ServiceConfigName ?? throw new ArgumentNullException("ServiceName must be populated");
         }
 
-        public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId, AuditEventType auditEventType, string message = "")
+        public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, string facilityId)
         {
-            try
-            {
-                message = message ?? "";
-                if (consumeResult == null)
-                {
-                    Logger.LogError($"{GetType().Name}|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or Retry events: " + message);
-                    return;
-                }
-
-                Logger.LogError($"{GetType().Name}: Failed to process {ServiceName} Event: " + message);
-
-                var auditValue = new AuditEventMessage
-                {
-                    FacilityId = facilityId,
-                    Action = auditEventType,
-                    ServiceName = ServiceName,
-                    EventDate = DateTime.UtcNow,
-                    Notes = $"{GetType().Name}: processing failure in {ServiceName} \nException Message: {message}",
-                };
-
-                ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
-                ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
-                    consumeResult.Message.Headers, facilityId);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
-                throw;
-            }
-        }
-
-        public virtual void HandleException(ConsumeResult<K, V> consumeResult, Exception ex, AuditEventType auditEventType, string facilityId)
-        {
-            var tEx = new TransientException(ex.Message, auditEventType, ex.InnerException);
+            var tEx = new TransientException(ex.Message, ex);
             HandleException(consumeResult, tEx, facilityId);
         }
 
-        public virtual void HandleException(ConsumeResult<K, V>? consumeResult, TransientException ex, string facilityId)
+        public virtual void HandleException(ConsumeResult<K, V> consumeResult, TransientException ex, string facilityId)
         {
             try
             {
-                if (consumeResult == null)
-                {
-                    Logger.LogError(message: $"{GetType().Name}|{ServiceName}|{Topic}: consumeResult is null, cannot produce Audit or Retry events", exception: ex);
-                    return;
-                }
+                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                Activity.Current?.AddException(ex);
+                
+                Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
 
-                Logger.LogError(message: $"{GetType().Name}: Failed to process {ServiceName} Event.", exception: ex);
-
-                var auditValue = new AuditEventMessage
-                {
-                    FacilityId = facilityId,
-                    Action = ex.AuditEventType,
-                    ServiceName = ServiceName,
-                    EventDate = DateTime.UtcNow,
-                    Notes = $"{GetType().Name}: processing failure in {ServiceName} \nException Message: {ex.Message}",
-                };
-
-                ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
                 ProduceRetryScheduledEvent(consumeResult.Message.Key, consumeResult.Message.Value,
-                    consumeResult.Message.Headers, facilityId);
+                    consumeResult.Message.Headers, facilityId, ex.Message, ex.StackTrace ?? string.Empty);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, $"Error in {GetType().Name}.HandleException: " + e.Message);
+                Logger.LogError(e, "Error in {Name}.HandleException: {Message}", GetType().Name, e.Message);
                 throw;
             }
         }
 
-        public virtual void ProduceAuditEvent(AuditEventMessage auditValue, Headers headers)
-        {
-            using var producer = AuditProducerFactory.CreateAuditEventProducer();
-            producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-            {
-                Value = auditValue,
-                Headers = headers
-            });
-            producer.Flush();
-        }
-
-        public virtual void ProduceRetryScheduledEvent(K key, V value, Headers headers, string facilityId)
+        public virtual void ProduceRetryScheduledEvent(K key, V value, Headers headers, string facilityId, string message = "", string stackTrace = "")
         {
             if (string.IsNullOrWhiteSpace(Topic))
             {
@@ -119,24 +66,55 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     $"{GetType().Name}.Topic has not been configured. Cannot Produce Retry Event for {ServiceName}");
             }
 
+            headers ??= [];
+
             if (!headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
             {
                 headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
             }
 
-            if (!headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var topicValue))
+            //Exception Message
+            if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.RetryExceptionMessage, out var exceptionValue))
+            {
+                headers.Remove(KafkaConstants.HeaderConstants.RetryExceptionMessage);
+            }
+
+            headers.Add(KafkaConstants.HeaderConstants.RetryExceptionMessage, Encoding.UTF8.GetBytes(message + Environment.NewLine + stackTrace));
+
+            // Retry Count
+            if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.RetryCount, out var retryValue))
+            {
+                // Parse the current value, increment, and update the header
+                var retryCountString = Encoding.UTF8.GetString(retryValue);
+                if (!int.TryParse(retryCountString, out var retryCount))
+                {
+                    retryCount = 0;
+                }
+                retryCount++;
+                headers.Remove(KafkaConstants.HeaderConstants.RetryCount);
+                headers.Add(KafkaConstants.HeaderConstants.RetryCount, Encoding.UTF8.GetBytes(retryCount.ToString()));
+            }
+            else
+            {
+                headers.Add(KafkaConstants.HeaderConstants.RetryCount, Encoding.UTF8.GetBytes(1.ToString()));
+            }
+
+            if (!string.IsNullOrEmpty(facilityId) && !headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var topicValue))
             {
                 headers.Add(KafkaConstants.HeaderConstants.ExceptionFacilityId, Encoding.UTF8.GetBytes(facilityId));
             }
 
-            using var producer = ProducerFactory.CreateProducer(new ProducerConfig());
+            using var producer = ProducerFactory.CreateProducer(new ProducerConfig(), useOpenTelemetry: false);
             producer.Produce(Topic, new Message<K, V>
             {
                 Key = key,
                 Value = value,
                 Headers = headers
             });
+
             producer.Flush();
         }
+
+ 
     }
 }

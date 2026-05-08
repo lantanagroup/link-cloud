@@ -1,13 +1,15 @@
-﻿using LantanaGroup.Link.Census.Application.Interfaces;
+﻿using Census.Domain.Entities;
+using LantanaGroup.Link.Census.Application.Settings;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace LantanaGroup.Link.Census.Application.HealthChecks
 {
     public class DatabaseHealthCheck : IHealthCheck
     {
-        private readonly ICensusConfigRepository _datastore;
+        private readonly IBaseEntityRepository<CensusConfigEntity> _datastore;
 
-        public DatabaseHealthCheck(ICensusConfigRepository datastore)
+        public DatabaseHealthCheck(IBaseEntityRepository<CensusConfigEntity> datastore)
         {
             _datastore = datastore ?? throw new ArgumentNullException(nameof(datastore));
         }
@@ -16,16 +18,7 @@ namespace LantanaGroup.Link.Census.Application.HealthChecks
         {
             try
             {
-                bool outcome = await _datastore.HealthCheck();
-
-                if (outcome)
-                {
-                    return HealthCheckResult.Healthy();
-                }
-                else
-                {
-                    return HealthCheckResult.Unhealthy();
-                }
+                return await _datastore.HealthCheck(CensusConstants.CensusLoggingIds.HealthCheck);
 
             }
             catch (Exception ex)

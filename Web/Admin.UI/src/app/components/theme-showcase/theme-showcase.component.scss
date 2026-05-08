@@ -1,0 +1,19 @@
+@use "@angular/material" as mat;
+
+$color-variants: primary, secondary, tertiary, error, success, warning;
+
+.content {
+  margin: 1em;
+   @each $variant in $color-variants {
+    .mat-#{$variant} {
+      @include mat.theme-overrides(
+          (
+            primary: var(--mat-sys-#{$variant}),
+            on-primary: var(--mat-sys-on-#{$variant}),
+          )
+      );
+    }
+  }
+}
+
+

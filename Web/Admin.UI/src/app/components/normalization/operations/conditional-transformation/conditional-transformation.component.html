@@ -1,0 +1,191 @@
+<mat-card-content>
+
+  @if (errorMessage) {
+    <div class="error-snackbar" #errorDiv>
+      <mat-icon color="warn">error_outline</mat-icon>
+      {{ errorMessage }}
+    </div>
+  }
+  <form [formGroup]="form" class="operation-form">
+    <h2 class="section-title">Operation Details</h2>
+
+    <!-- Facility Id -->
+    @if (!isVendorMode) {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Facility Id</mat-label>
+        <input matInput formControlName="facilityId" [disabled]="true" placeholder="Facility Id"/>
+      </mat-form-field>
+    }
+
+    <!-- Vendor Id -->
+    @if (isVendorMode) {
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>Select Vendor</mat-label>
+        <mat-select formControlName="selectedVendor" [disabled]="viewOnly" multiple>
+          @for (vendor of vendors; track vendor) {
+            <mat-option [value]="vendor.id">{{ vendor.name }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+    }
+
+    @if (showFacilityOrVendorError) {
+      <div class="validation-error">
+        Vendor is <strong>required</strong>
+      </div>
+    }
+
+    <!-- Name -->
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Name</mat-label>
+      <input matInput formControlName="name" [readonly]="viewOnly"/>
+      @if (nameControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear" (click)="clearName()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+      @if (nameControl?.hasError('required') && (nameControl.touched || nameControl.dirty)) {
+        <mat-error>
+          Name is <strong>required</strong>
+        </mat-error>
+      }
+    </mat-form-field>
+
+    <!-- Description -->
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Description</mat-label>
+      <input matInput [formControl]="descriptionControl" [readonly]="viewOnly"/>
+      @if (descriptionControl.value && !viewOnly) {
+        <button matSuffix mat-icon-button aria-label="Clear"
+          (click)="clearDescription()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </mat-form-field>
+
+    <!-- Resource Types -->
+    @if (selectedResourceTypesControl.value?.length > 0) {
+      <div class="selected-resource-types">
+        <strong>Selected Resource Types: </strong> {{ selectedResourceTypesControl.value.join(', ') }}
+      </div>
+    }
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Select Resource Types</mat-label>
+      <input
+        matInput
+        placeholder="Start typing to search"
+        [formControl]="resourceTypeControl"
+        [matAutocomplete]="auto"
+        (keydown)="onInputKeydown($event)"
+        (mousedown)="userClicked = true"
+        [readonly]="viewOnly"
+        (focus)="openAutocompletePanel()"
+        />
+
+        <mat-autocomplete #auto="matAutocomplete" autoActiveFirstOption="">
+          @for (type of filteredResourceTypes; track type) {
+            <mat-option [value]="type">
+              <mat-checkbox [checked]="selectedResourceTypesControl.value?.includes(type)"
+                (click)="$event.stopPropagation()"
+                (change)="toggleSelection(type, $event.source.checked)">
+                {{ type }}
+              </mat-checkbox>
+            </mat-option>
+          }
+        </mat-autocomplete>
+      </mat-form-field>
+
+      @if (selectedResourceTypesControl.hasError('required')  &&  (resourceTypeControl.touched || resourceTypeControl.dirty )) {
+        <div class="validation-error">
+          Resource Type is <strong>required</strong>
+        </div>
+      }
+
+      <!-- Target Fhir Path -->
+      <div class="form-row">
+        <mat-form-field appearance="fill" class="half-width">
+          <mat-label>Target FHIR path</mat-label>
+          <input matInput formControlName="targetFhirPath" [readonly]="viewOnly"/>
+          @if (targetFhirPathControl.value && !viewOnly) {
+            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearTargetFhirPath()">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+          @if (targetFhirPathControl.hasError('required') && (targetFhirPathControl.touched || targetFhirPathControl.dirty)) {
+            <mat-error>
+              Fhir path is <strong>required</strong>
+            </mat-error>
+          }
+        </mat-form-field>
+
+        <!-- Target Value -->
+        <mat-form-field appearance="fill" class="half-width">
+          <mat-label>Target Value</mat-label>
+          <input matInput formControlName="targetValue" [readonly]="viewOnly"/>
+          @if (targetValueControl.value && !viewOnly) {
+            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearTargetValue()">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+          @if (targetValueControl.hasError('required') && (targetValueControl.touched || targetValueControl.dirty)) {
+            <mat-error>
+              Value is <strong>required</strong>
+            </mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <!-- Conditions -->
+      <h2 class="section-title">Conditions</h2>
+      <div class="condition-section" formArrayName="conditions">
+        @for (condition of conditions.controls; track condition; let i = $index) {
+          <div [formGroupName]="i" class="condition-block">
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Condition FHIRPathSource</mat-label>
+              <input matInput formControlName="FhirPathSource">
+              @if (condition.get('FhirPathSource')?.hasError('required')) {
+                <mat-error>Fhir Source Path is required</mat-error>
+              }
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Operator*</mat-label>
+              <mat-select formControlName="operator">
+                @for (op of operatorList; track op) {
+                  <mat-option [value]="op.value">{{ op.label }}</mat-option>
+                }
+              </mat-select>
+              @if (condition.get('operator')?.hasError('required')) {
+                <mat-error>Operator is required</mat-error>
+              }
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="third-width">
+              <mat-label>Value (optional)</mat-label>
+              <input matInput formControlName="value">
+            </mat-form-field>
+            @if (!viewOnly) {
+              <button mat-icon-button color="warn" matTooltip="Delete Condition" (click)="removeCondition(i)">
+                <mat-icon>delete</mat-icon>
+              </button>
+            }
+          </div>
+        }
+
+        <div class="add-condition-btn">
+          @if (!viewOnly) {
+            <button type="button" mat-stroked-button color="primary" (click)="addCondition()" class="add-condition-btn">
+              <mat-icon>add</mat-icon>Add Condition
+            </button>
+          }
+        </div>
+      </div>
+      @if (form.get('conditions')?.hasError('atLeastOneRequired')) {
+        <div class="validation-error">
+          At least one condition is required.
+        </div>
+      }
+      <!-- Enable/Disable checkbox -->
+      <mat-checkbox formControlName="isEnabled">Enabled</mat-checkbox>
+
+    </form>
+  </mat-card-content>

@@ -1,0 +1,383 @@
+<div class="content">
+  <div class="link-card" style="position: relative;">
+    <div class="link-card-header">
+      <div class="split-container" style="margin-bottom: 0;">
+        <div class="left-pane">
+          <p class="title">Global Operations Search</p>
+        </div>
+        <div class="right-pane">
+          <div class="link-button-group">
+            <button type="button" class="link-button info" aria-label="Toggle show disabled operations"
+              (click)="toggleDisabledInclusion()">
+              <fa-icon [icon]="includeDisabledFilter ? faEyeSlash : faEye"></fa-icon>
+              {{ includeDisabledFilter ? 'Hide Disabled' : 'Show Disabled' }}
+            </button>
+            <button type="button" class="filter-button link-button purple" aria-label="Show filters"
+              (click)="toggleFilterPanel()">
+              <fa-icon [icon]="faFilter"></fa-icon>
+              Filters
+            </button>
+            @if (filtersApplied) {
+              <button type="button"
+                class="link-button secondary"
+                aria-label="Clear filters"
+                (click)="clearFilters()"
+                [@fadeInOutScale]>
+                <fa-icon [icon]="faXmark"></fa-icon>
+                Clear Filters
+              </button>
+            }
+            <button type="button" class="link-button primary" aria-label="Reload operations"
+              (click)="onRefresh()">
+              <fa-icon [icon]="faRotate"></fa-icon>
+              Refresh
+            </button>
+            <mat-action-row>
+              <mat-menu #addMenu="matMenu" class="custom-menu">
+                <button mat-menu-item (click)="showOperationDialog(OperationType.CopyProperty)">
+                  <mat-icon>content_copy</mat-icon>
+                  <span>Add Vendor Copy Property</span>
+                </button>
+                <button mat-menu-item (click)="showOperationDialog(OperationType.CodeMap)">
+                  <mat-icon>code</mat-icon>
+                  <span>Add Vendor Code Map</span>
+                </button>
+                <button mat-menu-item (click)="showOperationDialog(OperationType.ConditionalTransform)">
+                  <mat-icon>transform</mat-icon>
+                  <span>Add Vendor Conditional Transformation</span>
+                </button>
+                <button mat-menu-item (click)="showOperationDialog(OperationType.CopyLocation)">
+                  <mat-icon>transform</mat-icon>
+                  <span>Add Vendor Copy Location</span>
+                </button>
+              </mat-menu>
+              <button type="button" class="link-button success" [matMenuTriggerFor]="addMenu"
+                matTooltip="Add Vendor Operation" aria-label="Add Vendor Operation">
+                <fa-icon [icon]="faAdd"></fa-icon>
+                Add
+              </button>
+            </mat-action-row>
+          </div>
+
+          <button type="button" class="link-button light" style="margin-left: 1em;"
+            aria-label="Navigate to previous page" (click)="navBack()">
+            <fa-icon [icon]="faArrowLeft"></fa-icon>
+            Back
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="filter-container">
+      @if (filterPanelOpen) {
+        <div class="filter-panel" [@fadeGrowRightOut]>
+          <div class="filter-row" style="justify-content: flex-end;">
+            <div class="filter-item" style="flex: 0 0 auto;">
+              <div class="link-button-group">
+                <button class="link-button success" (click)="applyFilters()">Apply Filters</button>
+                <button class="link-button primary" (click)="clearFilters()">Clear Filters</button>
+              </div>
+            </div>
+          </div>
+          <div class="filter-row">
+            <div class="filter-item">
+              <label>Operation Id</label>
+              <input id="operationId" type="text" [(ngModel)]="operationIdFilter"
+                placeholder="Enter an operation Id">
+              </div>
+              <div class="filter-item">
+                <label>Operation Type</label>
+                <select [(ngModel)]="operationTypeFilter">
+                  @for (option of operationTypeOptions; track option) {
+                    <option [value]="option">{{ option }}
+                    </option>
+                  }
+                </select>
+              </div>
+              <div class="filter-item">
+                <label>Resource</label>
+                <select [(ngModel)]="resourceFilter">
+                  @for (resource of resourceFilterOptions; track resource) {
+                    <option
+                      [value]="resource">{{ resource }}
+                    </option>
+                  }
+                </select>
+              </div>
+              <div class="filter-item">
+                <label>Facility</label>
+                <select [(ngModel)]="facilityFilter">
+                  <option value="Any">Any</option>
+                  @for (option of facilityFilterOptions | keyvalue; track option) {
+                    <option [value]="option.key">{{ option.value }}
+                    </option>
+                  }
+                </select>
+              </div>
+              <div class="filter-item">
+                <label>Vendor</label>
+                <select [(ngModel)]="vendorFilter">
+                  <option value="Any">Any</option>
+                  @for (option of vendorFilterOptions | keyvalue; track option) {
+                    <option [value]="option.key">{{ option.value }}
+                    </option>
+                  }
+                </select>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+      @if (operations.length > 0) {
+        <div class="table-container no-border">
+          <table class="link-table">
+            <thead class="table-head">
+              <tr>
+                <th scope="col" class="header-column sortable" (click)="onSort('operationType')"
+                  style="cursor:pointer;">
+                  Type
+                  <fa-icon [icon]="getSortIcon('operationType')" size="sm"></fa-icon>
+                </th>
+                <th scope="col" class="header-column">Operation Id</th>
+                <th scope="col" class="header-column">Resources</th>
+                <th scope="col" class="header-column">Name</th>
+                <th scope="col" class="header-column">Description</th>
+                <th scope="col" class="header-column sortable" (click)="onSort('facilityId')"
+                  style="cursor:pointer;">
+                  Facility
+                  <fa-icon [icon]="getSortIcon('facilityId')" size="sm"></fa-icon>
+                </th>
+                <th scope="col" class="header-column">
+                  Vendor
+                </th>
+                <th scope="col" class="header-column sortable" (click)="onSort('isDisabled')"
+                  style="cursor:pointer;">
+                  Enabled
+                  <fa-icon [icon]="getSortIcon('isDisabled')" size="sm"></fa-icon>
+                </th>
+                <th scope="col" class="header-column sortable" (click)="onSort('createDate')"
+                  style="cursor:pointer;">
+                  Created
+                  <fa-icon [icon]="getSortIcon('createDate')" size="sm"></fa-icon>
+                </th>
+                <th scope="col" class="header-column"></th>
+              </tr>
+            </thead>
+            <tbody class="table-body">
+              @for (op of operations; track op; let i = $index) {
+                <tr (click)="toggleOperationDetails(i)" class="operations-row"
+                  [class.details-row-parent]="expandedRow === i" @fadeInSlideUp>
+                  <td class="data-col table-cell">{{ op.operationType }}</td>
+                  <td>{{op.id}}</td>
+                  <td class="data-col table-cell">
+                    @if (op.operationResourceTypes && op.operationResourceTypes.length) {
+                      {{ getResourceNames(op.operationResourceTypes) }}
+                    } @else {
+                      <span class="text-muted">None</span>
+                    }
+                  </td>
+                  <td class="data-col table-cell">{{ op.parsedOperationJson.Name }}</td>
+                  <td class="data-col table-cell">{{ op.description }}</td>
+                  <td class="data-col table-cell">{{ op.facilityId }}</td>
+                  <td class="data-col table-cell">{{ getVendorNames(op) }}</td>
+                  <td class="data-col table-cell">
+                    <span
+                            [ngClass]="{
+                            'status-enabled': !op.isDisabled,
+                            'status-disabled': op.isDisabled
+                        }"
+                    >{{ !op.isDisabled ? 'Yes' : 'No' }}</span>
+                  </td>
+                  <td class="data-col table-cell">{{ op.createDate | date: 'shortDate' }}</td>
+                  <ng-container matColumnDef="Actions">
+                    <th mat-header-cell *matHeaderCellDef> Actions</th>
+                    <td mat-cell>
+                      <div class="actions">
+                        <button mat-icon-button class="edit-column" aria-label="Edit facility"
+                          matTooltip="Edit Operation Configuration"
+                          (click)="$event.stopPropagation();showOperationEditDialog(op)">
+                          <mat-icon>edit</mat-icon>
+                        </button>
+                        <button mat-icon-button  class="delete-column" aria-label="Delete facility"  title="Delete operation"
+                          matTooltip="Delete Operation" (click)="$event.stopPropagation();onDelete(op)">
+                          <mat-icon>delete</mat-icon>
+                        </button>
+                        <button mat-icon-button  class="test-column"  matTooltip="Test Operation" aria-label="Test Operation" (click)="openTestDialog(op)">
+                          <mat-icon>play_arrow</mat-icon>
+                        </button>
+                      </div>
+                    </td>
+                  </ng-container>
+                </tr>
+                @if (expandedRow === i) {
+                  <tr class="details-row" [class.details-row-last]="i === operations.length - 1">
+                    <td colspan="8">
+                      <div class="operations-details-container">
+                        <div class="main-header">
+                          Operation Details
+                        </div>
+                        @if (op.operationType === OperationType.CopyProperty) {
+                          <div class="operations-details-row">
+                            <div>
+                              <div class="data-label">
+                                Name
+                                <span class="data-value selectable-value">{{ op.parsedOperationJson.Name }}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <div class="data-label">
+                                Source FHIR Path
+                                <span class="data-value selectable-value">{{ op.parsedOperationJson.SourceFhirPath }}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <div class="data-label">
+                                Target FHIR Path
+                                <span class="data-value selectable-value">{{ op.parsedOperationJson.TargetFhirPath }}</span>
+                              </div>
+                            </div>
+                          </div>
+                        }
+                        @if (op.operationType === OperationType.ConditionalTransform) {
+                          <div class="operations-details-row">
+                            <div>
+                              <div class="data-label">
+                                Name
+                                <span class="data-value selectable-value">{{ op.parsedOperationJson.Name }}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <div class="data-label">
+                                Target FHIR Path
+                                <span class="data-value selectable-value">{{ op.parsedOperationJson.TargetFhirPath }}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <div class="data-label">
+                                Target Value
+                                <span class="data-value selectable-value">{{ op.parsedOperationJson.TargetValue }}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="sub-header">
+                            Conditions
+                          </div>
+                          @for (condition of op.parsedOperationJson.Conditions; track condition) {
+                            <div class="operations-details-row"
+                              >
+                              <div>
+                                <div class="data-label">
+                                  Fhir Path Source
+                                  <span class="data-value selectable-value">{{ condition.FhirPathSource }}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <div class="data-label">
+                                  Operator
+                                  <span class="data-value selectable-value">{{ condition.Operator }}</span>
+                                </div>
+                              </div>
+                              <div>
+                                <div class="data-label">
+                                  Value
+                                  <span class="data-value selectable-value">{{ condition.Value }}</span>
+                                </div>
+                              </div>
+                            </div>
+                          }
+                        }
+                        @if (op.operationType === OperationType.CodeMap) {
+                          <div class="operations-details-row">
+                            <div>
+                              <div class="data-label">
+                                Name
+                                <span class="data-value selectable-value">{{ op.parsedOperationJson.Name }}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="operations-details-row">
+                            <div>
+                              <div class="data-label">
+                                Fhir Path
+                                <span class="data-value selectable-value">{{ op.parsedOperationJson.FhirPath }}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div class="sub-header">
+                            Code Maps
+                          </div>
+                          @for (systemMap of op.parsedOperationJson.CodeSystemMaps; track systemMap) {
+                            <div class="code-system-map">
+                              <!-- Headers -->
+                              <div class="header" style="display: flex; gap: 16px; margin-bottom: 12px;">
+                                <div class="column fixed data-label">Source System</div>
+                                <div class="column fixed data-label">Target System</div>
+                                <div class="column flex data-label">Source Code</div>
+                                <div class="column flex data-label">Target Code</div>
+                                <div class="column flex data-label">Display</div>
+                              </div>
+                              <!-- Rows -->
+                              @for (entry of systemMap.CodeMaps | keyvalue; track entry; let i = $index) {
+                                <div class="code-row" >
+                                  <!-- Source System shown only once (on first row) -->
+                                  <div class="column fixed data-value">
+                                    @if (i === 0) {
+                                      <span>{{ systemMap.SourceSystem }}</span>
+                                    }
+                                  </div>
+                                  <!-- Target System shown only once (on first row) -->
+                                  <div class="column fixed data-value">
+                                    @if (i === 0) {
+                                      <span>{{ systemMap.TargetSystem }}</span>
+                                    }
+                                  </div>
+                                  <!-- Code and Display -->
+                                  <div class="column flex data-value">{{ entry.key }}</div>
+                                  <div class="column flex data-value">{{ entry.value.Code }}</div>
+                                  <div class="column flex data-value">{{ entry.value.Display }}</div>
+                                </div>
+                              }
+                            </div>
+                          }
+                        }
+                        @if (op.operationType === OperationType.CopyLocation) {
+                          <div class="operations-details-row">
+                            <div>
+                              <div class="data-label">
+                                Name
+                                <span class="data-value selectable-value">{{ op.parsedOperationJson.Name }}</span>
+                              </div>
+                            </div>
+                          </div>
+                        }
+                        @if (op.operationType !== OperationType.CopyProperty && op.operationType != OperationType.ConditionalTransform && op.operationType !== OperationType.CodeMap && op.operationType !== OperationType.CopyLocation) {
+                          <p class="no-results-subtext">
+                            Unknown operation type: {{ op.operationType }}. No additional details
+                            available.
+                          </p>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+          <mat-paginator [length]="paginationMetadata.totalCount"
+            [pageIndex]="paginationMetadata.pageNumber"
+            [pageSize]="paginationMetadata.pageSize"
+            [pageSizeOptions]="[5, 10, 20]"
+            (page)="pagedEvent($event)"
+            showFirstLastButtons
+            aria-label="Select page of operations">
+          </mat-paginator>
+        </div>
+      } @else {
+        <div class="no-results">
+          <h2 class="no-results-title">No Operations Found</h2>
+          <p class="no-results-subtext">
+            Try adjusting your filters or search keywords and try again.
+          </p>
+        </div>
+      }
+    </div>
+  </div>

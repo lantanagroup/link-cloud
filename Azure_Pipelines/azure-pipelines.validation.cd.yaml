@@ -1,29 +1,37 @@
+resources:
+  pipelines:
+  - pipeline: pipeline-trigger
+    source: Build_And_Push_All
+    trigger: true
+
 trigger:
   branches:
     include:
-    - main
+    - dev
+    - release/*
+    - linkathon/*
   paths:
     include:
     - Java/validation/*
+    - Java/shared/*
+    exclude:
+    - '*'
+    
 pr: none
 
 pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-- group: Link_BOTW_Build_Package_Variables
-- name: tags1
-  value: 'latest'
-- name: tags2
-  value: '$(Build.BuildId)'
-- name: registry-repo-Name
+- group: link-cloud-variables
+- name: repositoryName
   value: 'link-validation'
 - name: dockerPath
   value: 'Java/validation/Dockerfile'
 - name: serviceName
   value: 'Validation'
-- name: containerRegistry
-  value: 'NHSNLink ACR Premium'
+- name: projectDir
+  value: 'Java/validation/'
 
 steps:
   - task: JavaToolInstaller@0
@@ -32,37 +40,53 @@ steps:
       jdkArchitectureOption: 'x64'
       jdkSourceOption: 'PreInstalled'
 
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        GIT_COMMIT=$(git rev-parse --short HEAD)
+        echo "GIT_COMMIT: ${GIT_COMMIT}"
+        echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+        
+  - task: PythonScript@0
+    displayName: "Inject Service Info"
+    inputs:
+      scriptSource: 'filePath'
+      scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
+      workingDirectory: '$(Build.SourcesDirectory)'
+      arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
+
   - task: Maven@2
     displayName: Maven Install
-    env:
-      SHARED_BOTW_FEED_TOKEN: $(SHARED_BOTW_FEED_TOKEN)
     inputs:
-      mavenPomFile: 'Java/validation/pom.xml'
+      mavenPomFile: 'Java/pom.xml'
       goals: install
-      options: '-s Java/validation/.m2/settings.xml'
-
-  - task: Docker@2
-    displayName: "Build Docker Image"
+      options: '-pl validation -am'
+  
+  - task: PowerShell@2
     inputs:
-      containerRegistry: $(containerRegistry)
-      repository: $(registry-repo-name)
-      command: build
+      targetType: 'inline'
+      script: |
+        if ("$(Build.SourceBranch)" -like "*release/*") {
+        $myTag1 = "release-$(Build.SourceBranchName)-$(GIT_COMMIT)"
+        }
+        else { 
+        $myTag1 = "$(Build.SourceBranchName)-$(GIT_COMMIT)"
+        }
+        Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
+        Write-Host "Set MyTag to: $myTag1"
+  - task: Docker@2
+    displayName: "Build & Push Audit Docker Image"
+    condition: always()
+    inputs:
+      containerRegistry: $(containerRegistry) # Variable Group
+      repository: $(repositoryName)
+      command: 'buildAndPush'
       Dockerfile: $(dockerPath)
-      arguments: '--build-arg SHARED_BOTW_FEED_TOKEN_ARG=$(SHARED_BOTW_FEED_TOKEN)'
       tags: |
-        $(tags1)
-        $(tags2)
-      buildContext: 'Java/validation'
-
-  - task: Docker@2
-    displayName: "Push Docker Image"
-    inputs:
-      containerRegistry: $(containerRegistry)
-      repository: $(registry-repo-name)
-      command: push
-      tags: |
-        $(tags1)
-        $(tags2)
+        latest
+        $(MyTag)
+      buildContext: 'Java/'
 
   - task: PublishPipelineArtifact@1
     inputs:

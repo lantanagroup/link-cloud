@@ -1,14 +1,18 @@
 package com.lantanagroup.link.shared.security;
 
+import com.lantanagroup.link.shared.auth.JwtAuthenticationEntryPoint;
+import com.lantanagroup.link.shared.auth.JwtAuthenticationFilter;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 public class SecurityHelper {
-    public static SecurityFilterChain build(HttpSecurity http) throws Exception {
+  /*  public static SecurityFilterChain build(HttpSecurity http) throws Exception {
         http
+                .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(authorizeRequests -> {
                     //TODO: Add more specific authorization rules here
                     // - create security folder in src/main/java/com/lantanagroup/link/validation
@@ -17,9 +21,17 @@ public class SecurityHelper {
                     // - Ex: authorizeRequests.requestMatchers("/endpoint").access(customAuthorizationManager());
                     // - Ex: authorizeRequests.requestMatchers("/endpoint").hasRole("ROLE_USER");
 
-                    authorizeRequests.requestMatchers(HttpMethod.GET, "/_health").permitAll();
+                    authorizeRequests
+                            .requestMatchers(HttpMethod.GET,
+                                    "/health",
+                                    "/swagger/**",
+                                    "/swagger-ui/**",
+                                    "/v3/**",
+                                    "/swagger*")
+                            .permitAll();
                     authorizeRequests.anyRequest().authenticated();
                 })
+
                 .oauth2ResourceServer(resourceServer -> {
                     resourceServer.jwt(Customizer.withDefaults());
                 })
@@ -27,5 +39,50 @@ public class SecurityHelper {
                     sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS);
                 });
         return http.build();
+    }
+*/
+  public static SecurityFilterChain build(HttpSecurity http, JwtAuthenticationEntryPoint point, JwtAuthenticationFilter authFilter, String infoRoute) throws Exception {
+    http.csrf(AbstractHttpConfigurer::disable).addFilterBefore(authFilter, UsernamePasswordAuthenticationFilter.class)
+            .authorizeRequests().
+            requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/health").permitAll()
+            .requestMatchers(HttpMethod.GET, infoRoute).permitAll()
+            .requestMatchers(HttpMethod.GET, "/v3/api-docs/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/swagger-ui.html").permitAll()
+            .requestMatchers(HttpMethod.GET, "/swagger-ui/**").permitAll()
+            //requestMatchers("/api/**").access("hasRole('LinkUser') and hasAuthority('IsLinkAdmin')").and().exceptionHandling(ex -> ex.authenticationEntryPoint(point)  - done in the specific end points using annotations for more granular control
+            .requestMatchers("/api/**").authenticated().and().exceptionHandling(ex -> ex.authenticationEntryPoint(point))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .headers(headers -> headers
+                  .contentSecurityPolicy(csp -> csp
+                          .policyDirectives(
+                          "default-src 'self'; " +
+                          "script-src 'self'; " +
+                          "style-src 'self' 'unsafe-inline'; " +
+                          "img-src 'self' data:;" +
+                          "connect-src 'self';"
+                          )
+                  )
+            );
+    return http.build();
+  }
+
+
+  public static SecurityFilterChain buildAnonymous(HttpSecurity http) throws Exception {
+        return http
+                .csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(authorizeRequests -> authorizeRequests.anyRequest().permitAll())
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp
+                                .policyDirectives(
+                                    "default-src 'self'; " +
+                                    "script-src 'self'; " +
+                                    "style-src 'self' 'unsafe-inline'; " +
+                                    "img-src 'self' data:;" +
+                                    "connect-src 'self';"
+                                )
+                        )
+                )
+                .build();
     }
 }

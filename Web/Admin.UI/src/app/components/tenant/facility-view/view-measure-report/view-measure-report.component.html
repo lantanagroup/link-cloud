@@ -1,0 +1,54 @@
+<div class="link-dialog-header">
+  <div class="link-dialog-title">
+    {{title}}
+  </div>
+  <div class="link-dialog-button">
+    <button class="link-button light" (click)="onModalClose()">
+      <fa-icon [icon]="faXmark"></fa-icon>
+    </button>
+  </div>
+
+</div>
+
+<div class="link-dialog-content">
+  <div class="split-container">
+    <div class="left-pane">
+      <div class="data-label">
+        Report
+        <span class="data-value selectable-value">{{measureReport.reportScheduleId }}</span>
+      </div>
+      <div class="data-label">
+        Facility
+        <span class="data-value selectable-value">{{facilityId}}</span>
+      </div>
+      <div class="data-label">
+        Measure
+        <span class="data-value selectable-value">
+          @for (report of measureReport.measureReportList; track report.measureReportId; let isLast = $last) {
+            {{report.reportType}}@if (!isLast) {, }
+          }
+        </span>
+      </div>
+      <div class="data-label">
+        Patient
+        <span class="data-value selectable-value">{{measureReport.patientId}}
+          <button class="link-button primary" (click)="downloadReport()">
+            <fa-icon [icon]="faDownload"></fa-icon>
+            Download Measure Eval Input
+          </button></span>
+      </div>
+
+      <div class="data-label">
+        Validation Status
+        <span class="data-value">{{getReportingStatusText(measureReport.reportingStatus)}}</span>
+      </div>
+      <div class="data-label">
+        Submission Status
+        <span class="data-value">{{getSubmissionStatusText(measureReport.submissionStatus)}}</span>
+      </div>
+    </div>
+    <div class="right-pane" style="display: flex; align-items: center;">
+      <app-donut-chart [data]="getAggregatedResourceCount()"></app-donut-chart>
+    </div>
+  </div>
+</div>

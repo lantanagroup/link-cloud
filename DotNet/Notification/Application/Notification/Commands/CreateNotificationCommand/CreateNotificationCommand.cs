@@ -5,6 +5,7 @@ using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using System.Diagnostics;
 
 namespace LantanaGroup.Link.Notification.Application.Notification.Commands
@@ -94,17 +95,16 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
 
                     //add id to current activity
                     var currentActivity = Activity.Current;
-                    currentActivity?.AddTag("notification.id", entity.Id);
+                    currentActivity?.AddTag(DiagnosticNames.NotificationId, entity.Id);
                     if (entity.FacilityId != null)
                     {
-                        currentActivity?.AddTag("facility.id", entity.FacilityId);
+                        currentActivity?.AddTag(DiagnosticNames.FacilityId, entity.FacilityId);
                     }
-
 
                     //update notification creation metric counter                    
                     _metrics.IncrementNotificationCreatedCounter([ 
-                        new KeyValuePair<string, object?>("facility", entity.FacilityId), 
-                        new KeyValuePair<string, object?>("type", entity.NotificationType)
+                        new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, entity.FacilityId), 
+                        new KeyValuePair<string, object?>(DiagnosticNames.NotificationType, entity.NotificationType)
                     ]);
 
                     //Log creation of new notification configuration
@@ -113,9 +113,8 @@ namespace LantanaGroup.Link.Notification.Application.Notification.Commands
                 }              
             }
             catch (Exception ex)
-            {               
-                var currentActivity = Activity.Current;
-                currentActivity?.SetStatus(ActivityStatusCode.Error);
+            {
+                Activity.Current?.SetStatus(ActivityStatusCode.Error, ex.Message);
                 _logger.LogNotificationCreationException(model, ex.Message);
                 throw;
             }

@@ -1,0 +1,78 @@
+{
+  "resourceType": "Encounter",
+  "id": "8bf93cda-ddc6-f736-95d8-334caccefaa3",
+  "meta": {
+    "versionId": "5",
+    "lastUpdated": "2022-07-21T21:31:48.793+00:00",
+    "source": "#9f8fa4f8b0d90be5",
+    "profile": [ "http://hl7.org/fhir/us/core/StructureDefinition/us-core-encounter" ]
+  },
+  "identifier": [
+    {
+      "use": "official",
+      "system": "https://github.com/synthetichealth/synthea",
+      "value": "8bf93cda-ddc6-f736-95d8-334caccefaa3"
+    }
+  ],
+  "status": "finished",
+  "class": {
+    "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+    "code": "AMB"
+  },
+  "type": [
+    {
+      "coding": [
+        {
+          "system": "http://snomed.info/sct",
+          "code": "410620009",
+          "display": "Well child visit (procedure)"
+        }
+      ],
+      "text": "Well child visit (procedure)"
+    }
+  ],
+  "subject": {
+    "reference": "Patient/ent2C00D-WG9ybTd-7AgftA3",
+    "display": "Ms. Hedwig986 Price929"
+  },
+  "participant": [
+    {
+      "type": [
+        {
+          "coding": [
+            {
+              "system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType",
+              "code": "PPRF",
+              "display": "primary performer"
+            }
+          ],
+          "text": "primary performer"
+        }
+      ],
+      "period": {
+        "start": "2013-08-27T16:28:17-04:00",
+        "end": "2013-08-27T16:43:17-04:00"
+      },
+      "individual": {
+        "reference": "Practitioner/7d06edb5-fe31-3578-8618-f289acd26127",
+        "display": "Dr. Leonardo412 Klein929"
+      }
+    }
+  ],
+  "period": {
+    "start": "2013-08-27T16:28:17-04:00",
+    "end": "2013-08-27T16:43:17-04:00"
+  },
+  "location": [
+    {
+      "location": {
+        "reference": "Location/6a01d279-5ac9-361d-b240-37aa46e1b3b8",
+        "display": "PCP29608"
+      }
+    }
+  ],
+  "serviceProvider": {
+    "reference": "Organization/ead3fcfc-c701-3505-b19c-b9e8119bcbe0",
+    "display": "PCP29608"
+  }
+}

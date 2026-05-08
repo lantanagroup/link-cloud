@@ -1,0 +1,28 @@
+
+/*
+
+*.pink-bluegrey {
+  color-scheme: dark;
+}
+*/
+
+/*
+html {
+  color-scheme:  dark;
+  @include mat.theme((
+    color: mat.$violet-palette,
+    typography: Roboto,
+    density: 0
+  ));
+}
+
+body.dark-mode {
+  color-scheme: dark;
+}
+*/
+
+/*
+!*.pink-bluegrey {
+   @include mat.all-component-colors($theme);
+ }*!
+  */

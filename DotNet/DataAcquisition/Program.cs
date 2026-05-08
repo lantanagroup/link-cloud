@@ -1,38 +1,34 @@
-using Azure.Identity;
-using Confluent.Kafka;
-using Confluent.Kafka.Extensions.OpenTelemetry;
 using HealthChecks.UI.Client;
-using LantanaGroup.Link.DataAcquisition.Application.Interfaces;
-using LantanaGroup.Link.DataAcquisition.Application.Models;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories;
-using LantanaGroup.Link.DataAcquisition.Application.Repositories.FhirApi;
-using LantanaGroup.Link.DataAcquisition.Application.Services;
-using LantanaGroup.Link.DataAcquisition.Application.Services.Auth;
-using LantanaGroup.Link.DataAcquisition.Application.Settings;
-using LantanaGroup.Link.DataAcquisition.HealthChecks;
+using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using LantanaGroup.Link.DataAcquisition.Jobs;
 using LantanaGroup.Link.DataAcquisition.Listeners;
-using LantanaGroup.Link.DataAcquisition.Services;
-using LantanaGroup.Link.DataAcquisition.Services.Auth;
-using LantanaGroup.Link.Shared.Application.Error.Handlers;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
+using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Listeners;
+using LantanaGroup.Link.Shared.Application.Middleware;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Wrappers;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Shared.Settings;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
-using Serilog;
-using Serilog.Enrichers.Span;
-using Serilog.Exceptions;
-using System.Net;
+using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();
@@ -44,57 +40,13 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
-    //load external configuration source if specified
-    var externalConfigurationSource = builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ExternalConfigurationSource).Get<string>();
+    var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-    if (!string.IsNullOrEmpty(externalConfigurationSource))
-    {
-        switch (externalConfigurationSource)
-        {
-            case ("AzureAppConfiguration"):
-                builder.Configuration.AddAzureAppConfiguration(options =>
-                {
-                    options.Connect(builder.Configuration.GetConnectionString("AzureAppConfiguration"))
-                            // Load configuration values with no label
-                            .Select("*", LabelFilter.Null)
-                            // Load configuration values for service name
-                            .Select("*", DataAcquisitionConstants.ServiceName)
-                            // Load configuration values for service name and environment
-                            .Select("*", DataAcquisitionConstants.ServiceName + ":" + builder.Environment.EnvironmentName);
+    builder.Services.Configure<AcquisitionJobSettings>(builder.Configuration.GetSection(AcquisitionJobSettings.SectionName));
 
-                    options.ConfigureKeyVault(kv =>
-                    {
-                        kv.SetCredential(new DefaultAzureCredential());
-                    });
+    builder.RegisterAll(DataAcquisitionConstants.ServiceName, true);
 
-                });
-                break;
-        }
-    }
-
-    var serviceInformation = builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-
-    if (serviceInformation != null)
-    {
-        ServiceActivitySource.Initialize(serviceInformation);
-        Counters.Initialize(serviceInformation);
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
-    }
-
-    builder.Services.Configure<TenantApiSettings>(builder.Configuration.GetSection(DataAcquisitionConstants.AppSettingsSectionNames.TenantApiSettings));
-
-    builder.Services.Configure<KafkaConnection>(builder.Configuration.GetRequiredSection(DataAcquisitionConstants.AppSettingsSectionNames.Kafka));
-    builder.Services.Configure<MongoConnection>(builder.Configuration.GetRequiredSection(DataAcquisitionConstants.AppSettingsSectionNames.Mongo));
-
-    builder.Services.AddHttpClient("FhirHttpClient")
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler()
-            {
-                // FhirClient configures its internal HttpClient this way
-                AutomaticDecompression = DecompressionMethods.Deflate | DecompressionMethods.GZip
-            });
+    builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.
@@ -106,100 +58,95 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-    });
-    builder.Services.AddGrpc();
-    builder.Services.AddGrpcReflection();
-    builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(Assembly.GetExecutingAssembly()));
-    builder.Services.AddGrpcClient<LantanaGroup.Link.DataAcquisition.Tenant.TenantClient>(o =>
-    {
-        //TODO: figure out how to handle service url. Need some sort of service discovery.
-        o.Address = new Uri("TBD on what to do here.");
-    });
-
-    //Add health checks
-    builder.Services.AddHealthChecks()
-        .AddCheck<DatabaseHealthCheck>("Database");
-
-    builder.Services.AddSingleton<EpicAuth>();
-    builder.Services.AddSingleton<BasicAuth>();
-    builder.Services.AddScoped<IAuthenticationRetrievalService, AuthenticationRetrievalService>();
-
-    builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-
-    builder.Services.AddSingleton<DataAcqTenantConfigMongoRepo>();
-    builder.Services.AddSingleton<IFhirQueryConfigurationRepository,FhirQueryConfigurationRepository>();
-    builder.Services.AddSingleton<IFhirQueryListConfigurationRepository,FhirQueryListConfigurationRepository>();
-    builder.Services.AddSingleton<IQueryPlanRepository,QueryPlanRepository>();
-    builder.Services.AddSingleton<IReferenceResourcesRepository,ReferenceResourcesRepository>();
-    builder.Services.AddSingleton<IFhirApiRepository,FhirApiRepository>();
-    
-    builder.Services.AddScoped<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddScoped<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
-    builder.Services.AddScoped<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
-    builder.Services.AddScoped<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddScoped<IKafkaWrapper<string, string, string, object>, DataAcquisitionKafkaService<string, string, string, object>>();
-    builder.Services.AddScoped<IKafkaWrapper<Ignore, Ignore, string, string>, KafkaWrapper<Ignore, Ignore, string, string>>();
+        options.JsonSerializerOptions.Converters.Add(new QueryConfigConverter());
+        options.JsonSerializerOptions.Converters.Add(new ParameterConverter());
+        options.JsonSerializerOptions.Converters.Add(new TimeSpanConverter());
+        options.JsonSerializerOptions.ForFhir(ModelInfo.ModelInspector);
+    }); 
 
     //Add Hosted Services
-    builder.Services.AddHostedService<QueryListener>();
+    builder.Services.AddHostedService<AcquisitionProcessingScheduleService>();
 
-    // Logging using Serilog
-    builder.Logging.AddSerilog();
-    Log.Logger = new LoggerConfiguration()
-        .ReadFrom.Configuration(builder.Configuration)
-        .Enrich.WithExceptionDetails()
-        .Enrich.FromLogContext()
-        .Enrich.WithSpan()
-        .Enrich.With<ActivityEnricher>()
-        .CreateLogger();
+    if (!(consumerSettings?.DisableConsumer ?? false))
+    {
+        builder.Services.AddHostedService<DataAcquisitionRequestedListener>();
+        builder.Services.AddHostedService<PatientCensusScheduledListener>();
+    }
 
-    Serilog.Debugging.SelfLog.Enable(Console.Error);
+    if (!(consumerSettings?.DisableRetryConsumer ?? false))
+    {
+        builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue()]));
+        builder.Services.AddHostedService<RetryListener>();
+        builder.Services.AddHostedService<RetryScheduleService>();
+        builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
+    }
 
+    // Add Link Security
+    bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    builder.Services.AddLinkBearerServiceAuthentication(options =>
+    {
+        options.Environment = builder.Environment;
+        options.AllowAnonymous = allowAnonymousAccess;
+        options.Authority = builder.Configuration.GetValue<string>("Authentication:Schemas:LinkBearer:Authority");
+        options.ValidateToken = builder.Configuration.GetValue<bool>("Authentication:Schemas:LinkBearer:ValidateToken");
+        options.ProtectKey = builder.Configuration.GetValue<bool>("DataProtection:Enabled");
+        options.SigningKey = builder.Configuration.GetValue<string>("LinkTokenService:SigningKey");
+    });
+
+    builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
+        if (!allowAnonymousAccess)
+        {
+            #region Authentication Schemas
+            c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+            {
+                Description = $"Authorization using JWT",
+                Name = "Authorization",
+                Type = SecuritySchemeType.Http,
+                BearerFormat = "JWT",
+                In = ParameterLocation.Header,
+                Scheme = JwtBearerDefaults.AuthenticationScheme
+            });
+
+            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            {
+                {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference
+                        {
+                            Id = "Bearer",
+                            Type = ReferenceType.SecurityScheme
+                        }
+                    },
+                    new List<string>()
+                }
+            });
+            #endregion
+        }
+
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
+        c.DocumentFilter<HealthChecksFilter>();
+    });    
+
+    //Add CORS
+    builder.Services.AddLinkCorsService(options => {
+        options.Environment = builder.Environment;
     });
 
-    var telemetryConfig = builder.Configuration.GetRequiredSection(DataAcquisitionConstants.AppSettingsSectionNames.Telemetry).Get<TelemetryConfig>();
-    if (telemetryConfig != null)
-    {
-        var otel = builder.Services.AddOpenTelemetry();
+    //Add Health Check
+    var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>();
+    var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, DataAcquisitionConstants.ServiceName).GetHealthCheckOptions();
 
-        //configure OpenTelemetry resources with application name
-        otel.ConfigureResource(resource => resource
-            .AddService(ServiceActivitySource.Instance.Name, ServiceActivitySource.Instance.Version));
+    builder.Services.AddHealthChecks()
+        .AddDbContextCheck<DataAcquisitionDbContext>(HealthCheckType.Database.ToString())
+        .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
 
-        otel.WithTracing(tracerProviderBuilder =>
-                tracerProviderBuilder
-                    .AddSource(ServiceActivitySource.Instance.Name)
-                    .AddAspNetCoreInstrumentation(options =>
-                    {
-                        options.Filter = (httpContext) => httpContext.Request.Path != "/health"; //do not capture traces for the health check endpoint
-                    })
-                    .AddConfluentKafkaInstrumentation()
-                    .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-        otel.WithMetrics(metricsProviderBuilder =>
-                metricsProviderBuilder
-                    .AddAspNetCoreInstrumentation()
-                    .AddRuntimeInstrumentation()
-                    .AddMeter(Counters.meter.Name)
-                    .AddOtlpExporter(opts => { opts.Endpoint = new Uri(telemetryConfig.TelemetryCollectorEndpoint); }));
-
-        if (builder.Environment.IsDevelopment())
-        {
-            otel.WithTracing(tracerProviderBuilder =>
-                tracerProviderBuilder
-                .AddConsoleExporter());
-
-            //metrics are very verbose, only enable console exporter if you really want to see metric details
-            //otel.WithMetrics(metricsProviderBuilder =>
-            //    metricsProviderBuilder
-            //        .AddConsoleExporter());                
-        }
-    }
+    builder.Services.AddSingleton(TimeProvider.System);
+    builder.Services.AddSingleton<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
 }
 
 #endregion
@@ -208,24 +155,39 @@ static void RegisterServices(WebApplicationBuilder builder)
 
 static void SetupMiddleware(WebApplication app)
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.ConfigureSwagger();
 
-    if (app.Configuration.GetValue<bool>("AllowReflection"))
+    app.AutoMigrateEF<DataAcquisitionDbContext>();
+
+    if (app.Environment.IsDevelopment())
     {
-        app.MapGrpcReflectionService();
+        app.UseDeveloperExceptionPage();
+    }
+    else
+    {
+        app.UseExceptionHandler();
     }
 
-    // Configure the HTTP request pipeline.
-    app.MapGrpcService<DataAcquisitionService>();
-    app.MapGet("/", () => "Communication with gRPC endpoints must be made through a gRPC client. To learn how to create a client, visit: https://go.microsoft.com/fwlink/?linkid=2086909");
+    app.UseRouting();
+    app.UseCors(CorsSettings.DefaultCorsPolicyName);
+
+    //check for anonymous access
+    var allowAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
+    if (!allowAnonymousAccess)
+    {
+        app.UseAuthentication();
+        app.UseMiddleware<UserScopeMiddleware>();
+    }
+    app.UseAuthorization();
+
     app.MapControllers();
 
-    //map health check middleware
+    //map health check middleware and info endpoint
     app.MapHealthChecks("/health", new HealthCheckOptions
     {
-        ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+        ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse,
     });
+    app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "data");
 }
 
 #endregion

@@ -1,45 +1,27 @@
 {
   "profiles": {
-    "Docker": {
-      "commandName": "Docker",
-      "launchBrowser": true,
-      "launchUrl": "http://localhost:7334/swagger",
-      "environmentVariables": {
-        "ExternalConfigurationSource": "AzureAppConfiguration",
-        "Link__Tenant__KafkaConnection__BootstrapServers__0": "kafka:9092/",
-        "Link__Tenant__Logging__Serilog__WriteTo__1__Args__uri": "http://loki:3100",
-        "Link__Tenant__TelemetryConfig__TelemetryCollectorEndpoint": "http://collector:55690",
-        "Kestrel__Endpoints__Http__Url": "http://*:7330",
-        "Kestrel__Endpoints__Https__Url": "http://*:7332",
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "DockerfileRunArguments": "--name=Link-Tenant --network=local-link -p 7334:7330 -p 7335:7332",
-      "dotnetRunMessages": true,
-      "publishAllPorts": true,
-      "useSSL": true
-    },
     "ConsoleApp": {
       "commandName": "Project",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "applicationUrl": "http://localhost:5012;https://localhost:7012",
+      "applicationUrl": "http://localhost:7331;https://localhost:7332",
       "dotnetRunMessages": true
     },
-    "IISExpress": {
-      "commandName": "IISExpress",
+    "http-docker": {
+      "commandName": "Project",
+      "launchBrowser": false,
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Docker",
+        "KafkaConnection__BootstrapServers__0": "localhost:9094",
+        "ConnectionStrings__DatabaseConnection": "Server=tcp:localhost,1433;Initial Catalog=link-tenant;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;",
+        "Serilog__WriteTo__0__Args__uri": "http://localhost:3100",
+        "Telemetry__OtelCollectorEndpoint": "http://localhost:4317",
+        "ServiceRegistry__MeasureServiceUrl": "http://localhost:8067",
+        "ServiceRegistry__ReportServiceUrl": "http://localhost:8072"
       },
-      "ancmHostingModel": "OutOfProcess"
-    }
-  },
-  "iisSettings": {
-    "windowsAuthentication": false,
-    "anonymousAuthentication": true,
-    "iisExpress": {
-      "applicationUrl": "http://localhost:5012",
-      "sslPort": 0
+      "dotnetRunMessages": true,
+      "applicationUrl": "http://localhost:8074"
     }
   }
 }

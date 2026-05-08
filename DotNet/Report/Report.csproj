@@ -8,6 +8,7 @@
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <RootNamespace>LantanaGroup.Link.Report</RootNamespace>
     <DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
+    <Version>0.5.1</Version>
   </PropertyGroup>
 
 	<PropertyGroup>
@@ -16,49 +17,50 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Remove="Attributes\**" />
+	  <Compile Remove="Repositories\**" />
+	  <Content Remove="Attributes\**" />
+	  <Content Remove="Repositories\**" />
+	  <EmbeddedResource Remove="Attributes\**" />
+	  <EmbeddedResource Remove="Repositories\**" />
+	  <None Remove="Attributes\**" />
+	  <None Remove="Repositories\**" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <_ContentIncludedByDefault Remove="appsettings.local.json" />
 	</ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.*" />
+    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
     <PackageReference Include="AutoMapper" Version="13.*" />
-    <PackageReference Include="Azure.Identity" Version="1.10.4" />
-    <PackageReference Include="com.lantanagroup.link.Shared" Version="2.*" />
+    <PackageReference Include="Azure.Identity" Version="1.*" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
-    <PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
-    <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
-    <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
-    <PackageReference Include="MediatR" Version="12.*" />
+    <PackageReference Include="LinqKit.Core" Version="1.*" />
     <PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.*" />
-    <PackageReference Include="Microsoft.AspNetCore.Grpc.Swagger" Version="0.*" />
-    <PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.0.0" />
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
-    <PackageReference Include="MongoDB.Driver" Version="2.*" />
-    <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.7.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.7.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.5.0-rc.1" />
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.7.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.7.1" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.7.1" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="0.5.0-beta.4" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.7.0" />
+    <PackageReference Include="MongoDB.Driver" Version="3.*" />
+    <PackageReference Include="MongoDB.EntityFrameworkCore" Version="8.*" />
     <PackageReference Include="Quartz" Version="3.*" />
+    <PackageReference Include="Quartz.Serialization.Json" Version="3.*" />
+    <PackageReference Include="Reddoxx.Quartz.MongoDbJobStore" Version="2.*" />
+    <PackageReference Include="Reddoxx.Quartz.MongoDbJobStore.Redlock" Version="2.*" />
     <PackageReference Include="Serilog.AspNetCore" Version="8.*" />
     <PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
     <PackageReference Include="Serilog.Exceptions" Version="8.*" />
+    <PackageReference Include="Serilog.Expressions" Version="4.*" />
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
+    <PackageReference Include="StackExchange.Redis.Extensions.Core" Version="11.*" />
+    <PackageReference Include="StackExchange.Redis.Extensions.System.Text.Json" Version="11.*" />
+	<PackageReference Include="StackExchange.Redis.Extensions.AspNetCore" Version="11.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
-    <PackageReference Include="Swashbuckle.AspNetCore.Swagger" Version="6.*" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Shared\Shared.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Update="nuget.config">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
 
 </Project>
+

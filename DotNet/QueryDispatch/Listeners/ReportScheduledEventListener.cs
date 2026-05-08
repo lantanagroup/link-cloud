@@ -1,55 +1,49 @@
 ﻿using Confluent.Kafka;
+using Confluent.Kafka.Extensions.Diagnostics;
 using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
-using LantanaGroup.Link.QueryDispatch.Application.Models;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Commands;
-using LantanaGroup.Link.QueryDispatch.Application.ScheduledReport.Queries;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
-using System.Text;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Shared.Settings;
+using QueryDispatch.Application.Settings;
+using QueryDispatch.Domain.Managers;
+using System.Text;
 
 namespace LantanaGroup.Link.QueryDispatch.Listeners
 {
     public class ReportScheduledEventListener : BackgroundService
     {
         private readonly ILogger<ReportScheduledEventListener> _logger;
-        private readonly IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue> _kafkaConsumerFactory;
+        private readonly IKafkaConsumerFactory<string, ReportScheduledValue> _kafkaConsumerFactory;
         private readonly IQueryDispatchFactory _queryDispatchFactory;
-        private readonly ICreateScheduledReportCommand _createScheduledReportCommand;
-        private readonly IGetScheduledReportQuery _getScheduledReportQuery;
-        private readonly IUpdateScheduledReportCommand _updateScheduledReportQuery;
-        private readonly IKafkaProducerFactory<string, AuditEventMessage> _auditProducerFactory;
-        private readonly IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue> _deadLetterExceptionHandler;
+        private readonly IProducer<string, AuditEventMessage> _auditProducer;
+        private readonly IDeadLetterExceptionHandler<string, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly IDeadLetterExceptionHandler<string, string> _consumeResultDeadLetterExceptionHandler;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
 
         public ReportScheduledEventListener(
             ILogger<ReportScheduledEventListener> logger,
-            IKafkaConsumerFactory<ReportScheduledKey, ReportScheduledValue> kafkaConsumerFactory,
+            IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
             IQueryDispatchFactory queryDispatchFactory, 
-            ICreateScheduledReportCommand createScheduledReportCommand, 
-            IGetScheduledReportQuery getReportScheduledQuery, 
-            IUpdateScheduledReportCommand updateScheduledReportQuery,
-            IKafkaProducerFactory<string, AuditEventMessage> auditProducer, 
-            IDeadLetterExceptionHandler<ReportScheduledKey, ReportScheduledValue> deadLetterExceptionHandler,
-            IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler) 
+            IProducer<string, AuditEventMessage> auditProducer, 
+            IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
+            IDeadLetterExceptionHandler<string, string> consumeResultDeadLetterExceptionHandler,
+            IServiceScopeFactory serviceScopeFactory)
         {
             _logger = logger;
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _queryDispatchFactory = queryDispatchFactory;
-            _createScheduledReportCommand = createScheduledReportCommand;
-            _getScheduledReportQuery = getReportScheduledQuery;
-            _updateScheduledReportQuery = updateScheduledReportQuery;
-            _auditProducerFactory = auditProducer;
+            _auditProducer = auditProducer;
             _deadLetterExceptionHandler = deadLetterExceptionHandler;
             _consumeResultDeadLetterExceptionHandler = consumeResultDeadLetterExceptionHandler;
+            _serviceScopeFactory = serviceScopeFactory;
 
-            _deadLetterExceptionHandler.ServiceName = "QueryDispatch";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
 
-            _consumeResultDeadLetterExceptionHandler.ServiceName = "QueryDispatch";
             _consumeResultDeadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
         }
 
@@ -58,10 +52,12 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
 
-        private async void StartConsumerLoop(CancellationToken cancellationToken) {
+        private async void StartConsumerLoop(CancellationToken cancellationToken)
+        {
 
-            var config = new ConsumerConfig() { 
-                GroupId = "QueryDispatchReportScheduled",
+            var config = new ConsumerConfig()
+            {
+                GroupId = QueryDispatchConstants.ServiceName,
                 EnableAutoCommit = false
             };
 
@@ -70,134 +66,140 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                 try
                 {
                     _reportScheduledConsumer.Subscribe(nameof(KafkaTopic.ReportScheduled));
-                    _logger.LogInformation($"Started query dispatch consumer for topic '{KafkaTopic.ReportScheduled}' at {DateTime.UtcNow}");
+                    _logger.LogInformation("Started query dispatch consumer for topic '{reportScheduled}' at {date}", KafkaTopic.ReportScheduled, DateTime.UtcNow);
 
                     while (!cancellationToken.IsCancellationRequested)
                     {
-                        ConsumeResult<ReportScheduledKey, ReportScheduledValue> consumeResult;
-                        try 
-                        {
-                            consumeResult = _reportScheduledConsumer.Consume(cancellationToken);
-                        }
-                        catch (ConsumeException e)
-                        {
-                            var converted_record = new ConsumeResult<string, string>()
-                            {
-                                Message = new Message<string, string>()
-                                {
-                                    Key = Encoding.UTF8.GetString(e.ConsumerRecord.Message.Key),
-                                    Value = Encoding.UTF8.GetString(e.ConsumerRecord.Message.Value),
-                                    Headers = e.ConsumerRecord.Message.Headers
-                                }
-                            };
-
-                            _consumeResultDeadLetterExceptionHandler.HandleException(converted_record, new DeadLetterException("Consume Result exception: " + e.InnerException.Message, AuditEventType.Create), string.Empty);
-
-                            _reportScheduledConsumer.Commit();
-
-                            continue;
-                        }
+                        ConsumeResult<string, ReportScheduledValue>? consumeResult;
 
                         try
                         {
-                            string correlationId = string.Empty;
-
-                            if (consumeResult.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
+                            await _reportScheduledConsumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
                             {
-                                correlationId = Encoding.UTF8.GetString(headerValue);
-                            }
-                            else
-                            {
-                                throw new DeadLetterException("Correlation Id missing", AuditEventType.Create);
-                            }
-                            
-                            ReportScheduledKey key = consumeResult.Message.Key;
-                            ReportScheduledValue value = consumeResult.Message.Value;
+                                consumeResult = result;
 
-                            DateTime startDate = new DateTime();
-                            DateTime endDate = new DateTime();
+                                try
+                                {
+                                    using var scope = _serviceScopeFactory.CreateScope();
 
-                            var startDatePair = value.Parameters.Where(x => x.Key.ToLower() == "startdate").FirstOrDefault();
-                            var endDatePair = value.Parameters.Where(x => x.Key.ToLower() == "enddate").FirstOrDefault();
+                                    var scheduledReportMgr = scope.ServiceProvider.GetRequiredService<IScheduledReportManager>();
 
-                            if (startDatePair.Key == null || !DateTime.TryParse(startDatePair.Value, out startDate))
-                            {
-                                throw new DeadLetterException($"{key.ReportType} report start date is missing or improperly formatted for Facility {key.FacilityId}", AuditEventType.Query);
-                            }
+                                    var scheduledReportRepo = scope.ServiceProvider.GetRequiredService<IBaseEntityRepository<ScheduledReportEntity>>();
 
-                            if (endDatePair.Key == null || !DateTime.TryParse(endDatePair.Value, out endDate))
-                            {
-                                throw new DeadLetterException($"{key.ReportType} report end date is missing or improperly formatted for Facility {key.FacilityId}", AuditEventType.Query);
-                            }
+                                    ReportScheduledValue value = consumeResult.Message.Value;
 
-                            _logger.LogInformation($"Consumed Event for: Facility '{key.FacilityId}' has a report type of '{key.ReportType}' with a report period of {startDate} to {endDate}");
+                                    if (consumeResult == null
+                                    || string.IsNullOrWhiteSpace(consumeResult.Message.Key)
+                                    || !value.IsValid())
+                                    {
+                                        throw new DeadLetterException("Invalid Report Scheduled event");
+                                    }
 
-                            var existingRecord = _getScheduledReportQuery.Execute(key.FacilityId);
+                                    string reportTrackingId = value.ReportTrackingId;
 
-                            if (existingRecord != null)
-                            {
-                                _logger.LogInformation($"Facility {key.FacilityId} found");
-                                ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key.FacilityId, key.ReportType, startDate, endDate, correlationId);
-                                await _updateScheduledReportQuery.Execute(existingRecord, scheduledReport);
-                            }
-                            else
-                            {
-                                ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key.FacilityId, key.ReportType, startDate, endDate, correlationId);
-                                await _createScheduledReportCommand.Execute(scheduledReport);
-                            }
+                                    string key = consumeResult.Message.Key;
 
-                            _reportScheduledConsumer.Commit(consumeResult);
-                           
+                                    var startDate = value.StartDate.UtcDateTime;
+                                    var endDate = value.EndDate.UtcDateTime;
+                                    var frequency = value.Frequency;
+
+                                    _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key, value.ReportTypes, startDate, endDate);
+
+                                    var existingRecord = await scheduledReportRepo.FirstOrDefaultAsync(x => x.FacilityId == key);
+
+                                    if (existingRecord != null)
+                                    {
+                                        _logger.LogInformation("Facility {facilityId} found", key);
+										
+                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
+                                        await scheduledReportMgr.UpdateScheduledReport(existingRecord, scheduledReport);
+                                    }
+                                    else
+                                    {
+                                        ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
+                                        await scheduledReportMgr.createScheduledReport(scheduledReport);                                     
+                                    }
+
+                                    _reportScheduledConsumer.Commit(consumeResult);
+
+                                }
+                                catch (DeadLetterException ex)
+                                {
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key);
+                                    _reportScheduledConsumer.Commit(consumeResult);
+                                }
+                                catch (Exception ex)
+                                {
+                                    _logger.LogError(ex, "Failed to process Report Scheduled event");
+
+                                    var auditValue = new AuditEventMessage
+                                    {
+                                        FacilityId = consumeResult.Message.Key,
+                                        Action = AuditEventType.Query,
+                                        ServiceName = "QueryDispatch",
+                                        EventDate = DateTime.UtcNow,
+                                        Notes = $"Report Scheduled event processing failure \nException Message: {ex}",
+                                    };
+
+                                    ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
+
+                                    _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message), consumeResult.Message.Key);
+
+                                    _reportScheduledConsumer.Commit(consumeResult);
+                                }
+
+                            }, cancellationToken);
                         }
-                        catch (DeadLetterException ex)
+                        catch (ConsumeException ex)
                         {
-                            _deadLetterExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key.FacilityId);
-                            _reportScheduledConsumer.Commit(consumeResult);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogError($"Failed to process Report Scheduled event.", ex);
+                            _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", _reportScheduledConsumer.Subscription), DateTime.UtcNow);
 
-                            var auditValue = new AuditEventMessage
+                            if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                             {
-                                FacilityId = consumeResult.Message.Key.FacilityId,
-                                Action = AuditEventType.Query,
-                                ServiceName = "QueryDispatch",
-                                EventDate = DateTime.UtcNow,
-                                Notes = $"Report Scheduled event processing failure \nException Message: {ex}",
-                            };
+                                throw new OperationCanceledException(ex.Error.Reason, ex);
+                            }
 
-                            ProduceAuditEvent(auditValue, consumeResult.Message.Headers);
+                            var facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
 
-                            _deadLetterExceptionHandler.HandleException(consumeResult, new DeadLetterException("Query Dispatch Exception thrown: " + ex.Message, AuditEventType.Create), consumeResult.Message.Key.FacilityId);
+                            _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
 
-                            _reportScheduledConsumer.Commit(consumeResult);
-
-                            continue;
+                            var offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                            _reportScheduledConsumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                         }
                     }
+
                     _reportScheduledConsumer.Close();
                     _reportScheduledConsumer.Dispose();
                 }
                 catch (OperationCanceledException oce)
                 {
-                    _logger.LogError($"Operation Canceled: {oce.Message}", oce);
+                    _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
                     _reportScheduledConsumer.Close();
                     _reportScheduledConsumer.Dispose();
                 }
             }
         }
 
+        private static string GetFacilityIdFromHeader(Headers headers)
+        {
+            string facilityId = string.Empty;
+
+            if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var facilityIdBytes))
+            {
+                facilityId = Encoding.UTF8.GetString(facilityIdBytes);
+            }
+
+            return facilityId;
+        }
+
         private void ProduceAuditEvent(AuditEventMessage auditEvent, Headers headers)
         {
-            using (var producer = _auditProducerFactory.CreateAuditEventProducer())
+            _auditProducer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
             {
-                producer.Produce(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
-                {
-                    Value = auditEvent,
-                    Headers = headers
-                });
-            }
+                Value = auditEvent,
+                Headers = headers
+            });
+
         }
     }
 }

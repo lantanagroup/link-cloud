@@ -1,0 +1,51 @@
+@use '../../../../styles/validation-theme.scss' as vd;
+
+$vd-container-margin-x: vd.$vd-container-margin-x;
+$vd-box-shadow: vd.$vd-box-shadow;
+$vd-primary-900: vd.$vd-primary-900;
+$vd-neutral-0: vd.$vd-neutral-0;
+
+.sub-pre-qual-report-summary {
+  margin: $vd-container-margin-x;
+  margin-bottom: 80px;
+
+  &--heading-row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+
+    h4 {
+      @include vd.vd-subheading-01();
+    }
+  }
+
+  &--action-button-group {
+    display: flex;
+    gap: 1.5rem;
+  }
+
+  &--graph-block {
+    box-shadow: $vd-box-shadow;
+  }
+
+  &--graph-header {
+    background: $vd-primary-900;
+    padding: .5rem 1.5rem;
+
+    h6 {
+      @include vd.vd-subheading-03;
+      color: $vd-neutral-0;
+
+    }
+  }
+
+  &--graph-wrapper {
+    padding: 2rem 3.5rem 1.5rem;
+    background-color: $vd-neutral-0;
+
+    >canvas {
+      max-height: 450px;
+    }
+  }
+}

@@ -1,29 +1,19 @@
 #See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS base
-WORKDIR /app
-#EXPOSE 80
-#EXPOSE 443
-
-ENV \
-    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false \
-    LC_ALL=en_US.UTF-8 \
-    LANG=en_US.UTF-8
-RUN apk add --no-cache \
-    icu-data-full \
-    icu-libs
+FROM lantanagroup/aspnet8-run AS base
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Audit/Audit.csproj", "DotNet/Audit/"]
-COPY ["DotNet/Audit/nuget.config", "DotNet/Audit/"]
-RUN dotnet restore "DotNet/Audit/Audit.csproj" --configfile "DotNet/Audit/nuget.config"
+RUN dotnet restore "DotNet/Audit/Audit.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Audit"
-RUN dotnet build "Audit.csproj" -c Release -o /app/build
+RUN dotnet build "Audit.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
-RUN dotnet publish "Audit.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "Audit.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app

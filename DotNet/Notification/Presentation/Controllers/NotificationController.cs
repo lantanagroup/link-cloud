@@ -3,6 +3,8 @@ using LantanaGroup.Link.Notification.Application.Models;
 using LantanaGroup.Link.Notification.Application.Notification.Queries;
 using LantanaGroup.Link.Notification.Domain.Entities;
 using LantanaGroup.Link.Notification.Infrastructure.Logging;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 using System.Text.Json;
@@ -10,6 +12,7 @@ using System.Text.Json;
 namespace LantanaGroup.Link.Notification.Presentation.Controllers
 {
     [Route("api/notification")]
+    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
     public class NotificationController : ControllerBase
     {

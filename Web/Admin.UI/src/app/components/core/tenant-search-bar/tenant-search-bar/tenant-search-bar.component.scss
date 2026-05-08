@@ -1,0 +1,57 @@
+.tenant-search-bar {
+  position: relative;
+  display: inline-block;
+  width: 250px;
+  margin-right: 16px;  
+
+  .search-icon {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #888;
+    pointer-events: none;
+    font-size: 18px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    padding: 6px 8px 6px 32px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    outline: none;
+  }
+
+  .autocomplete-list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-top: none;
+    max-height: 180px;
+    overflow-y: auto;
+    z-index: 10;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    min-width: 290px; // Ensure it matches input width 250px +  40px of margin
+
+    li {
+      padding: 8px 12px;
+      cursor: pointer;
+      color: #222;         
+      font-size: .8rem;
+      font-weight: 500;  
+      &:hover {
+        background: #f0f0f0;
+      }
+    }
+  }
+}
+
+// .tenant-search-bar input:focus {
+//   outline: none;
+//   box-shadow: 0 0 6px 2px #3b82f6; 
+//   border-color: #3b82f6;
+// }

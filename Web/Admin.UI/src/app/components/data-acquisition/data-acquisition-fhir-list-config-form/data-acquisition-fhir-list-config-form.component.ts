@@ -1,0 +1,288 @@
+import {
+  IDataAcquisitionFhirListConfigModel,
+  IEhrPatientListModel
+} from '../../../interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
+import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
+
+import {
+  AbstractControl,
+  FormArray,
+  FormBuilder,
+  FormControl,
+  FormGroup,
+  ReactiveFormsModule, ValidationErrors, ValidatorFn,
+  Validators
+} from '@angular/forms';
+import {MatButtonModule} from '@angular/material/button';
+import {MatChipsModule} from '@angular/material/chips';
+import {MatFormFieldModule} from '@angular/material/form-field';
+import {MatIconModule} from '@angular/material/icon';
+import {MatInputModule} from '@angular/material/input';
+import {MatSlideToggleModule} from '@angular/material/slide-toggle';
+import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
+import {MatToolbarModule} from '@angular/material/toolbar';
+import {FormMode} from 'src/app/models/FormMode.enum';
+import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
+import {ENTER, COMMA} from '@angular/cdk/keycodes';
+import {DataAcquisitionService} from 'src/app/services/gateway/data-acquisition/data-acquisition.service';
+import {MatSelectModule} from "@angular/material/select";
+
+@Component({
+  selector: 'app-data-acquisition-fhir-list-config-form',
+  standalone: true,
+  imports: [
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatIconModule,
+    MatChipsModule,
+    MatSlideToggleModule,
+    ReactiveFormsModule,
+    MatSnackBarModule,
+    MatToolbarModule,
+    MatSelectModule,
+    ReactiveFormsModule,
+    MatSelectModule
+  ],
+  templateUrl: './data-acquisition-fhir-list-config-form.component.html',
+  styleUrls: ['./data-acquisition-fhir-list-config-form.component.scss']
+})
+export class DataAcquisitionFhirListConfigFormComponent implements OnInit, OnChanges {
+  @Input() item!: IDataAcquisitionFhirListConfigModel;
+
+  @Input() formMode!: FormMode;
+
+  private _viewOnly: boolean = false;
+  @Input()
+  set viewOnly(v: boolean) {
+    if (v !== null) this._viewOnly = v;
+  }
+
+  get viewOnly() {
+    return this._viewOnly;
+  }
+
+  @Output() formValueChanged = new EventEmitter<boolean>();
+
+  @Output() submittedConfiguration = new EventEmitter<IEntityCreatedResponse>();
+
+  configForm!: FormGroup;
+  addOnBlur = true;
+  readonly separatorKeysCodes = [ENTER, COMMA] as const;
+
+  reportTypes: string[] = [];
+  statuses = ['Admit', 'Discharge'];
+  timeCategories: string[] = ['LessThan24Hours', 'Between24To48Hours', 'MoreThan48Hours'];
+
+  constructor(
+    private snackBar: MatSnackBar,
+    private dataAcquisitionService: DataAcquisitionService,
+    private fb: FormBuilder
+  ) {
+    // Initialize form with a single patient row
+    this.configForm = this.fb.group({
+      facilityId: this.fb.control('', Validators.required),
+      fhirServerBaseUrl: this.fb.control('', Validators.required),
+      patientListControl: this.fb.array(
+        [this.createPatientFormGroup()],
+        { validators: this.fhirIdDuplicateValidator }
+      )
+    });
+  }
+
+  private fhirIdDuplicateValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+    if (!(control instanceof FormArray)) {
+      return null;
+    }
+
+    const values = control.controls.map(ctrl =>
+      ctrl.get('fhirId')?.value?.trim()
+    );
+
+    const seen = new Map<string, number[]>();
+
+    values.forEach((val, index) => {
+      if (!val) return;
+      if (!seen.has(val)) seen.set(val, []);
+      seen.get(val)!.push(index);
+    });
+
+    // Find only actual duplicates (size > 1)
+    const duplicates = [...seen.entries()]
+      .filter(([_, indexes]) => indexes.length > 1)
+      .flatMap(([_, indexes]) => indexes);
+
+    // Assign errors to duplicate fields
+    control.controls.forEach((ctrl, index) => {
+      const fhirId = ctrl.get('fhirId');
+      if (!fhirId) return;
+
+      if (duplicates.includes(index)) {
+        fhirId.setErrors({ ...fhirId.errors, duplicate: true });
+      } else {
+        if (fhirId.errors && fhirId.errors['duplicate']) {
+          delete fhirId.errors['duplicate'];
+          if (Object.keys(fhirId.errors).length === 0) {
+            fhirId.setErrors(null);
+          }
+        }
+      }
+    });
+
+    return duplicates.length ? { duplicateFhirId: true } : null;
+  };
+
+ // Method must be a class-level method, not inside constructor
+  createPatientFormGroup(ehrPatient?: IEhrPatientListModel): FormGroup {
+    return this.fb.group({
+      status: this.fb.control(ehrPatient?.status ?? '', Validators.required),
+      timeFrame: this.fb.control(ehrPatient?.timeFrame ?? '', Validators.required),
+      fhirId: this.fb.control(ehrPatient?.fhirId ?? '', Validators.required)
+    });
+  }
+
+  ngOnInit(): void {
+    this.configForm.reset();
+
+    if (this.item) {
+      console.log("DataAcquisitionFhirListConfigFormComponent ngOnInit");
+      console.log(this.item);
+      //set form values
+      this.facilityIdControl.setValue(this.item.facilityId);
+      this.facilityIdControl.updateValueAndValidity();
+
+      this.fhirServerBaseUrlControl.setValue(this.item.fhirBaseServerUrl);
+      this.fhirServerBaseUrlControl.updateValueAndValidity();
+
+      this.populateAllCombinations(this.item.ehrPatientLists);
+      this.patientListControl.setValidators(this.fhirIdDuplicateValidator);
+      this.patientListControl.updateValueAndValidity();
+    } else {
+      this.populateAllCombinations();
+      this.formMode = FormMode.Create;
+    }
+
+    this.configForm.valueChanges.subscribe(() => {
+      this.formValueChanged.emit(this.configForm.invalid);
+    });
+  }
+
+  private populateAllCombinations(ehrPatientList?: IEhrPatientListModel[]): void {
+    this.patientListControl.clear();
+
+    for (const status of this.statuses) {
+      for (const time of this.timeCategories) {
+        const existingPatient = ehrPatientList?.find(p => p.status === status && p.timeFrame === time);
+        this.patientListControl.push(this.fb.group({
+          status: [{value: status, disabled: true}],
+          timeFrame: [{value: time, disabled: true}],
+          fhirId: [existingPatient?.fhirId ?? '', Validators.required]
+        }));
+      }
+    }
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+
+    if (changes['item'] && changes['item'].currentValue) {
+      this.facilityIdControl.setValue(this.item.facilityId);
+      this.facilityIdControl.updateValueAndValidity();
+
+      this.fhirServerBaseUrlControl.setValue(this.item.fhirBaseServerUrl);
+      this.fhirServerBaseUrlControl.updateValueAndValidity();
+
+      //this.loadPatientLists(this.item.ehrPatientLists);
+      this.populateAllCombinations(this.item.ehrPatientLists);
+      this.patientListControl.updateValueAndValidity();
+
+      // toggle view
+      this.toggleViewOnly(this.viewOnly);
+    }
+  }
+
+  // Dynamically disable or enable the form control based on viewOnly
+  toggleViewOnly(viewOnly: boolean) {
+    this.facilityIdControl.disable();
+    if (viewOnly) {
+      this.fhirServerBaseUrlControl.disable();
+      this.patientListControl.disable();
+    } else {
+      this.fhirServerBaseUrlControl.enable();
+      this.patientListControl.enable();
+    }
+  }
+
+  get facilityIdControl(): FormControl {
+    return this.configForm.get('facilityId') as FormControl;
+  }
+
+  get fhirServerBaseUrlControl(): FormControl {
+    return this.configForm.get('fhirServerBaseUrl') as FormControl;
+  }
+
+  get patientListControl() {
+    return this.configForm.get('patientListControl') as FormArray;
+  }
+
+  clearFhirServerBaseUrl(): void {
+    this.fhirServerBaseUrlControl.setValue('');
+    this.fhirServerBaseUrlControl.updateValueAndValidity();
+  }
+
+  clearFhirId(patientForm: FormGroup) {
+    const control = patientForm.get('fhirId');
+    control?.setValue('');        // Clear the value
+    control?.markAsTouched();     // Mark it touched so error shows immediately
+  }
+
+  submitConfiguration(): void {
+    if (this.configForm.valid) {
+      const ehrPatientLists = this.patientListControl.controls.map(control => {
+        const patientForm = control as FormGroup;
+        return {
+          status: patientForm.get('status')?.value,
+          timeFrame: patientForm.get('timeFrame')?.value,
+          fhirId: patientForm.get('fhirId')?.value
+        } as IEhrPatientListModel;
+      });
+      if (this.formMode == FormMode.Create) {
+        this.dataAcquisitionService.createFhirListConfiguration(this.facilityIdControl.value, {
+          facilityId: this.facilityIdControl.value,
+          fhirBaseServerUrl: this.fhirServerBaseUrlControl.value,
+          ehrPatientLists: ehrPatientLists
+        } as IDataAcquisitionFhirListConfigModel).subscribe({
+          next: (response) => {
+            this.submittedConfiguration.emit({id: response.id, message: "Patient List Created"});
+          },
+          error: (err) => {
+            this.submittedConfiguration.emit({id: this.item.id ?? '', message: err.message});
+          }
+        });
+      } else if (this.formMode == FormMode.Edit) {
+        this.dataAcquisitionService.updateFhirListConfiguration(
+          this.facilityIdControl.value,
+          {
+            facilityId: this.facilityIdControl.value,
+            fhirBaseServerUrl: this.fhirServerBaseUrlControl.value,
+            ehrPatientLists: ehrPatientLists
+          } as IDataAcquisitionFhirListConfigModel).subscribe({
+            next: (response) => {
+              this.submittedConfiguration.emit({id: response.id, message: "Patient List Updated"});
+            },
+            error: (err) => {
+              this.submittedConfiguration.emit({id: this.item.id ?? '', message: err.message});
+            }
+          }
+        );
+      }
+    } else {
+      this.snackBar.open(`Invalid form, please check for errors.`, '', {
+        duration: 3500,
+        panelClass: 'error-snackbar',
+        horizontalPosition: 'end',
+        verticalPosition: 'top'
+      });
+    }
+  }
+
+}

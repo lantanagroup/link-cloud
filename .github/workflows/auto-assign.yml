@@ -1,0 +1,129 @@
+﻿name: Auto Assign PR
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'DotNet/**'
+      - 'Java/**'
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to test auto-assign on'
+        required: true
+        type: string
+
+jobs:
+  auto-assign:
+    if: github.event.pull_request.draft == false || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Auto-assign PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request?.number || parseInt(context.payload.inputs?.pr_number);
+            
+            if (!pull_number) {
+              core.setFailed('Could not determine PR number. Provide it via input if running manually.');
+              return;
+            }
+
+            let prAuthor = context.payload.pull_request?.user?.login;
+            if (!prAuthor) {
+              try {
+                const { data: pr } = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number,
+                });
+                prAuthor = pr.user.login;
+              } catch (error) {
+                console.warn(`Could not fetch PR author: ${error.message}`);
+                prAuthor = 'unknown';
+              }
+            }
+
+            console.log(`Processing PR #${pull_number} by ${prAuthor}`);
+
+            // 1. Get changed files in the PR
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number,
+            });
+
+            // 2. Filter for relevant files (DotNet/ or Java/, but not docs/)
+            const relevantFiles = files.filter(f => {
+              const path = f.filename;
+              return (path.startsWith('DotNet/') || path.startsWith('Java/')) && !path.startsWith('docs/');
+            });
+
+            if (relevantFiles.length === 0) {
+              console.log('No relevant files found in DotNet/ or Java/ folders (excluding docs/).');
+              return;
+            }
+
+            console.log(`Found ${relevantFiles.length} relevant files. Examining history...`);
+
+            // 3. Collect unique authors and their latest commit timestamps
+            const authorTimestamps = new Map();
+            const processedFiles = relevantFiles.slice(0, 30); // Limit to avoid excessive API calls
+
+            for (const file of processedFiles) {
+              console.log(`Checking history for ${file.filename}`);
+              try {
+                const commits = await github.rest.repos.listCommits({
+                  owner,
+                  repo,
+                  path: file.filename,
+                  per_page: 10
+                });
+
+                for (const commitData of commits.data) {
+                  // Ensure we have a user (not a ghost or anonymous commit)
+                  if (commitData.author && commitData.author.type === 'User') {
+                    const login = commitData.author.login;
+            
+                    // Skip bots
+                    if (login === 'github-actions[bot]' || 
+                        login.includes('dependabot') ||
+                        login.includes('coderabbit')) {
+                      continue;
+                    }
+
+                    const date = new Date(commitData.commit.author.date).getTime();
+                    if (!authorTimestamps.has(login) || date > authorTimestamps.get(login)) {
+                      authorTimestamps.set(login, date);
+                    }
+                  }
+                }
+              } catch (error) {
+                console.warn(`Could not get commits for ${file.filename}: ${error.message}`);
+              }
+            }
+
+            // 4. Sort authors by latest timestamp and take top 3
+            const sortedAuthors = Array.from(authorTimestamps.entries())
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 3)
+              .map(entry => entry[0]);
+
+            if (sortedAuthors.length > 0) {
+              console.log(`Assigning PR to: ${sortedAuthors.join(', ')}`);
+              try {
+                await github.rest.issues.addAssignees({
+                  owner,
+                  repo,
+                  issue_number: pull_number,
+                  assignees: sortedAuthors,
+                });
+              } catch (error) {
+                console.error(`Failed to add assignees: ${error.message}`);
+              }
+            } else {
+              console.log('No eligible recent contributors found to assign.');
+            }

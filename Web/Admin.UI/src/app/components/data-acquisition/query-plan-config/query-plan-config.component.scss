@@ -1,0 +1,79 @@
+@use '../../../../styles/core.scss';
+
+.large-textarea {
+  width: 100%;
+  height: 200px;
+  resize: both; /* Optional: allows the user to resize the textarea */
+}
+
+
+.queries-container {
+  margin-top: 24px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  margin-top: 16px;
+
+  h3 {
+    margin: 0;
+  }
+}
+
+.queries-table {
+  width: 100%;
+  margin-bottom: 24px;
+  border: 1px solid #e0e0e0;
+
+  th {
+    background-color: #f5f5f5;
+  }
+}
+
+.drag-handle {
+  width: 40px;
+  cursor: move;
+  color: #999;
+}
+
+.cdk-drag-preview {
+  box-sizing: border-box;
+  border-radius: 4px;
+  box-shadow: 0 5px 5px -3px rgba(0, 0, 0, 0.2),
+              0 8px 10px 1px rgba(0, 0, 0, 0.14),
+              0 3px 14px 2px rgba(0, 0, 0, 0.12);
+}
+
+.cdk-drag-placeholder {
+  opacity: 0;
+}
+
+.cdk-drag-animating {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.queries-table.cdk-drop-list-dragging .mat-row:not(.cdk-drag-placeholder) {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.json-preview-container {
+  margin-top: 24px;
+  margin-bottom: 24px;
+
+  pre {
+    background-color: #f8f9fa;
+    padding: 16px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-size: 13px;
+    border: 1px solid #dee2e6;
+    margin: 0;
+  }
+
+  code {
+    color: #212529;
+  }
+}

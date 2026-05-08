@@ -1,18 +1,17 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Commands;
-using LantanaGroup.Link.Report.Application.MeasureReportSchedule.Queries;
-using LantanaGroup.Link.Report.Application.Models;
+using Confluent.Kafka.Extensions.Diagnostics;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
-using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using MediatR;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Settings;
 using Quartz;
-using Quartz.Impl.Triggers;
+using System.Text;
 
 namespace LantanaGroup.Link.Report.Listeners
 {
@@ -20,23 +19,27 @@ namespace LantanaGroup.Link.Report.Listeners
     {
 
         private readonly ILogger<ReportScheduledListener> _logger;
-        private readonly IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue> _kafkaConsumerFactory;
-        private readonly IMediator _mediator;
-        private readonly ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _transientExceptionHandler;
-        private readonly IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> _deadLetterExceptionHandler;
+        private readonly IKafkaConsumerFactory<string, ReportScheduledValue> _kafkaConsumerFactory;
+        private readonly ITransientExceptionHandler<string, ReportScheduledValue> _transientExceptionHandler;
+        private readonly IDeadLetterExceptionHandler<string, ReportScheduledValue> _deadLetterExceptionHandler;
         private readonly ISchedulerFactory _schedulerFactory;
+        private readonly IServiceScopeFactory _serviceScopeFactory;
+        private readonly ServiceInformation _serviceInformation;
+        private readonly BlobStorageService _blobStorageService;
 
-        private string Name => this.GetType().Name;
-
-        public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<MeasureReportScheduledKey, MeasureReportScheduledValue> kafkaConsumerFactory,
-            IMediator mediator, ISchedulerFactory schedulerFactory,
-            ITransientExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> transientExceptionHandler,
-            IDeadLetterExceptionHandler<MeasureReportScheduledKey, MeasureReportScheduledValue> deadLetterExceptionHandler)
+        public ReportScheduledListener(ILogger<ReportScheduledListener> logger, IKafkaConsumerFactory<string, ReportScheduledValue> kafkaConsumerFactory,
+            ISchedulerFactory schedulerFactory,
+            ITransientExceptionHandler<string, ReportScheduledValue> transientExceptionHandler,
+            IDeadLetterExceptionHandler<string, ReportScheduledValue> deadLetterExceptionHandler,
+            IServiceScopeFactory serviceScopeFactory,
+            BlobStorageService blobStorageService,
+            ServiceInformation serviceInformation)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentException(nameof(kafkaConsumerFactory));
             _schedulerFactory = schedulerFactory ?? throw new ArgumentException(nameof(schedulerFactory));
-            _mediator = mediator ?? throw new ArgumentException(nameof(mediator));
+            _serviceScopeFactory = serviceScopeFactory;
+            _serviceInformation = serviceInformation;
 
             _transientExceptionHandler = transientExceptionHandler ??
                                                throw new ArgumentException(nameof(_deadLetterExceptionHandler));
@@ -44,11 +47,10 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler = deadLetterExceptionHandler ??
                                                throw new ArgumentException(nameof(_deadLetterExceptionHandler));
 
-            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _transientExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Retry";
-
-            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.ReportScheduled) + "-Error";
+
+            _blobStorageService = blobStorageService;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -61,7 +63,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = "ReportScheduledEvent",
+                GroupId = _serviceInformation.ServiceConfigName,
                 EnableAutoCommit = false
             };
 
@@ -69,166 +71,152 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 consumer.Subscribe(nameof(KafkaTopic.ReportScheduled));
-                _logger.LogInformation($"Started report scheduled consumer for topic '{nameof(KafkaTopic.ReportScheduled)}' at {DateTime.UtcNow}");
+                _logger.LogInformation("Started report scheduled consumer for topic '{Topic}' at {StartTime}", nameof(KafkaTopic.ReportScheduled), DateTime.UtcNow);
 
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    ConsumeResult<MeasureReportScheduledKey, MeasureReportScheduledValue>? consumeResult = null;
                     string facilityId = string.Empty;
                     try
                     {
-                        consumeResult = consumer.Consume(cancellationToken);
-                        if (consumeResult == null)
+                        await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
-                            throw new DeadLetterException(
-                                $"{Name}: consumeResult is null", AuditEventType.Create);
-                        }
-
-                        var key = consumeResult.Message.Key;
-                        var value = consumeResult.Message.Value;
-                        facilityId = key.FacilityId;
-
-                        if (string.IsNullOrWhiteSpace(key.FacilityId) ||
-                            string.IsNullOrWhiteSpace(key.ReportType))
-                        {
-                            throw new DeadLetterException(
-                                $"{Name}: One or more required Key/Value properties are null or empty.", AuditEventType.Create);
-                        }
-
-                        DateTimeOffset startDateOffset;
-                        if (!DateTimeOffset.TryParse(
-                                value.Parameters.Single(x => x.Key.ToLower() == "startdate").Value,
-                                out startDateOffset))
-                        {
-                            throw new DeadLetterException($"{Name}: Start Date could not be parsed", AuditEventType.Create);
-                        }
-
-                        DateTimeOffset endDateOffset;
-                        if (!DateTimeOffset.TryParse(
-                                value.Parameters.Single(x => x.Key.ToLower() == "enddate").Value,
-                                out endDateOffset))
-                        {
-                            throw new DeadLetterException($"{Name}: End Date could not be parsed", AuditEventType.Create);
-                        }
-
-                        var startDate = startDateOffset.UtcDateTime;
-                        var endDate = endDateOffset.UtcDateTime;
-
-                        var scheduleTrigger = "";
-                        try
-                        {
-                            // There may eventually be a need to have the consumeResult.Message.Value contain a parameter indicating how often the job should run (Daily, Weekly, Monthly, etc)
-                            // This will schedule the job to run once a month on the day, hour and minute specified on the endDate.
-                            // However, when the job runs, it will delete itself from the schedule.
-                            var cronSchedule =
-                                CronScheduleBuilder
-                                    .MonthlyOnDayAndHourAndMinute(endDate.Day, endDate.Hour, endDate.Minute)
-                                    .Build() as CronTriggerImpl;
-                            cronSchedule.StartTimeUtc = startDateOffset;
-                            cronSchedule.EndTimeUtc = endDateOffset;
-                            cronSchedule.SetNextFireTimeUtc(endDateOffset);
-
-                            scheduleTrigger = cronSchedule.CronExpressionString;
-                        }
-                        catch (Exception ex)
-                        {
-                            throw new DeadLetterException(
-                                "ReportScheduledListener: Cron Schedule could not be created from provided dates.", AuditEventType.Create, ex.InnerException);
-                        }
-
-
-                        if (string.IsNullOrWhiteSpace(scheduleTrigger))
-                        {
-                            throw new DeadLetterException(
-                                "ReportScheduledListener: scheduleTrigger is null or empty.", AuditEventType.Create);
-                        }
-
-                        // create or update the consumed report schedule
-                        var existing = await _mediator.Send(
-                            new FindMeasureReportScheduleForReportTypeQuery()
+                            if (result == null)
                             {
-                                FacilityId = key.FacilityId,
-                                ReportStartDate = startDate,
-                                ReportEndDate = endDate,
-                                ReportType = key.ReportType
-                            }, cancellationToken);
-
-                        if (existing != null)
-                        {
-                            existing.FacilityId = key.FacilityId;
-                            existing.ReportStartDate = startDate;
-                            existing.ReportEndDate = endDate;
-                            existing.ScheduledTrigger = scheduleTrigger;
-                            existing.ReportType = key.ReportType;
-
-                            await _mediator.Send(new UpdateMeasureReportScheduleCommand()
-                            {
-                                ReportSchedule = existing
-                            }, cancellationToken);
-
-                            if (existing.ScheduledTrigger != scheduleTrigger)
-                            {
-                                await MeasureReportScheduleService.RescheduleJob(existing,
-                                    await _schedulerFactory.GetScheduler(cancellationToken));
+                                _logger.LogWarning("ReportScheduled event is null. Commiting and moving on.");
+                                consumer.Commit();
+                                return;
                             }
-                        }
-                        else
-                        {
-                            var reportSchedule = await _mediator.Send(new CreateMeasureReportScheduleCommand
-                            {
-                                ReportSchedule = new MeasureReportScheduleModel
-                                {
-                                    FacilityId = key.FacilityId,
-                                    ReportStartDate = startDate,
-                                    ReportEndDate = endDate,
-                                    ScheduledTrigger = scheduleTrigger,
-                                    ReportType = key.ReportType
-                                }
-                            }, cancellationToken);
 
-                            await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
-                                await _schedulerFactory.GetScheduler(cancellationToken));
-                        }
+                            try
+                            {
+                                var key = result.Message.Key;
+                                var value = result.Message.Value;
+
+                                if (!value.IsValid())
+                                {
+                                    throw new DeadLetterException("Invalid Report Scheduled event");
+                                }
+
+                                using var scope = _serviceScopeFactory.CreateScope();
+                                var reportScheduleManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
+
+                                facilityId = key;
+                                var startDate = value.StartDate.UtcDateTime;
+                                var endDate = value.EndDate.UtcDateTime;
+                                var frequency = value.Frequency;
+                                var reportTypes = value.ReportTypes;
+                                var reportId = value.ReportTrackingId;
+
+                                // Check if this already exists
+                                ReportSchedule? existing = null;
+
+                                if (!string.IsNullOrEmpty(reportId))
+                                {
+                                    _logger.LogDebug($"Report ID is not null. Checking if the report already exists.");
+                                    existing = await reportScheduleManager.SingleOrDefaultAsync(
+                                        x => x.Id == reportId, consumeCancellationToken);
+                                }
+                                else
+                                {
+                                    _logger.LogDebug($"Report ID is null. Generating a new ID.");
+                                    reportId = Guid.NewGuid().ToString();
+                                }
+
+                                ReportSchedule? reportSchedule;
+                                if (existing != null) 
+                                {
+                                    _logger.LogError("Report with id {ReportId} already exists. Creating dead letter for event/message.", reportId);
+                                    throw new DeadLetterException($"Report with id {reportId} already exists.");
+                                }
+                                else
+                                {
+                                    _logger.LogInformation("Report with id {ReportId} does not exist... Creating.", reportId);
+                                    reportSchedule = new ReportSchedule
+                                    {
+                                        Id = reportId,
+                                        FacilityId = facilityId,
+                                        ReportStartDate = startDate,
+                                        ReportEndDate = endDate,
+                                        Frequency = frequency,
+                                        ReportTypes = reportTypes,
+                                        Status = ScheduleStatus.Scheduled,
+                                        CreateDate = DateTime.UtcNow
+                                    };
+                                    var reportName = _blobStorageService.GetReportName(reportSchedule);
+                                    reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
+
+                                    reportSchedule = await reportScheduleManager.AddAsync(reportSchedule, consumeCancellationToken);
+
+                                    await MeasureReportScheduleService.CreateJobAndTrigger(reportSchedule,
+                                        await _schedulerFactory.GetScheduler(consumeCancellationToken));
+                                }
+                            }
+                            catch (DeadLetterException ex)
+                            {
+                                _deadLetterExceptionHandler.HandleException(result, ex, facilityId);
+                            }
+                            catch (TransientException ex)
+                            {
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
+                            }
+                            catch (TimeoutException ex)
+                            {
+                                var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [{string.Join(", ", consumer.Subscription)}] at offset: {result.TopicPartitionOffset}";
+                                var transientException = new TransientException(exceptionMessage, ex);
+                                _transientExceptionHandler.HandleException(result, transientException, facilityId);
+                            }
+                            catch (Exception ex)
+                            {
+                                _transientExceptionHandler.HandleException(result, ex, facilityId);
+                            }
+                            finally
+                            {
+                                consumer.Commit(result);
+                            }
+                        }, cancellationToken);
+
                     }
                     catch (ConsumeException ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Create, ex.InnerException), facilityId);
-                    }
-                    catch (DeadLetterException ex)
-                    {
-                        _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
-                    }
-                    catch (TransientException ex)
-                    {
-                        _transientExceptionHandler.HandleException(consumeResult, ex, facilityId);
+                        _logger.LogError(ex, "Error consuming message for topics: [{Topics}] at {Timestamp}", string.Join(", ", consumer.Subscription), DateTime.UtcNow);
+
+                        if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
+                        {
+                            throw new OperationCanceledException(ex.Error.Reason, ex);
+                        }
+
+                        facilityId = GetFacilityIdFromHeader(ex.ConsumerRecord.Message.Headers);
+
+                        _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
+
+                        var offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                        consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                     }
                     catch (Exception ex)
                     {
-                        _deadLetterExceptionHandler.HandleException(consumeResult,
-                            new DeadLetterException($"{Name}: " + ex.Message, AuditEventType.Query, ex.InnerException), facilityId);
-                    }
-                    finally
-                    {
-                        if (consumeResult != null)
-                        {
-                            consumer.Commit(consumeResult);
-                        }
-                        else
-                        {
-                            consumer.Commit();
-                        }
+                        _logger.LogError(ex, "Error encountered in ReportScheduledListener");
+                        consumer.Commit();
                     }
                 }
             }
             catch (OperationCanceledException oce)
             {
-                _logger.LogError($"Operation Canceled: {oce.Message}", oce);
+                _logger.LogError(oce, "Operation Canceled: {Message}", oce.Message);
                 consumer.Close();
-                consumer.Dispose();
             }
 
         }
 
+        private static string GetFacilityIdFromHeader(Headers headers)
+        {
+            string facilityId = string.Empty;
+
+            if (headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionFacilityId, out var facilityIdBytes))
+            {
+                facilityId = Encoding.UTF8.GetString(facilityIdBytes);
+            }
+
+            return facilityId;
+        }
     }
 }

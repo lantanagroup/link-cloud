@@ -1,0 +1,234 @@
+<div class="content">
+  <p>
+    <mat-toolbar class="page-header-bar" color="primary">
+      @if (facilityConfig) {
+        <span>Facility: {{ facilityConfig.facilityId }}</span>
+      }
+      <button mat-raised-button aria-label="Navigate to Tenant Dashboard" matTooltip="Back to Tenant Dashboard"
+        [routerLink]="['/tenant']">
+        <mat-icon>arrow_back</mat-icon>
+        Back
+      </button>
+    </mat-toolbar>
+  </p>
+
+  @if (facilityConfig) {
+    <mat-card>
+      <mat-card-content>
+        <app-facility-config-form [viewOnly]="true" [item]="facilityConfig"></app-facility-config-form>
+        <mat-card-actions align="end">
+          <button mat-mini-fab aria-label="Edit facility" matTooltip="Edit Facility" (click)="showFacilityDialog()">
+            <mat-icon>edit</mat-icon>
+          </button>
+        </mat-card-actions>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <div class="example-action-buttons">
+    <button mat-button (click)="accordion.openAll()">Expand All</button>
+    <button mat-button (click)="accordion.closeAll()">Collapse All</button>
+  </div>
+  <mat-accordion class="example-headers-align" multi>
+    <mat-expansion-panel id="censusPanel" (opened)="loadCensusConfig()">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          Census Configuration
+        </mat-panel-title>
+        <mat-panel-description>
+        </mat-panel-description>
+      </mat-expansion-panel-header>
+      @if (showNoCensusConfigAlert) {
+        <app-link-alert [type]="linkNoConfigAlertType" [message]="noCensusConfigAlertMessage"
+        ></app-link-alert>
+      }
+      <app-census-config-form [item]="censusConfig" [viewOnly]="true"></app-census-config-form>
+      <mat-action-row>
+        @if (showNoCensusConfigAlert) {
+          <button mat-mini-fab aria-label="Add census configuration" matTooltip="Add census configuration"
+            (click)="showCensusDialog()">
+            <mat-icon>add</mat-icon>
+          </button>
+        }
+        @if (!showNoCensusConfigAlert) {
+          <button mat-mini-fab aria-label="Edit census configuration" matTooltip="Edit census configuration"
+            (click)="showCensusDialog()">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button mat-mini-fab aria-label="Delete census configuration" color="warn" (click)="onDeleteCensusConfig()">
+            <mat-icon>delete</mat-icon>
+          </button>
+        }
+      </mat-action-row>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel id="queryDispatchPanel" (opened)="loadQueryDispatchConfig()">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          Query Dispatch Configuration
+        </mat-panel-title>
+        <mat-panel-description>
+        </mat-panel-description>
+      </mat-expansion-panel-header>
+      @if (showNoQueryDispatchConfigAlert) {
+        <app-link-alert [type]="linkNoConfigAlertType" [message]="noQueryDispatchConfigAlertMessage"
+        ></app-link-alert>
+      }
+      <app-query-dispatch-config-form [item]="queryDispatchConfig" [viewOnly]="true"></app-query-dispatch-config-form>
+      <mat-action-row>
+        @if (showNoQueryDispatchConfigAlert) {
+          <button mat-mini-fab aria-label="Add query dispatch configuration" matTooltip="Add query dispatch configuration"
+            (click)="showQueryDispatchDialog()">
+            <mat-icon>add</mat-icon>
+          </button>
+        }
+        @if (!showNoQueryDispatchConfigAlert) {
+          <button mat-mini-fab aria-label="Edit query dispatch configuration" matTooltip="Edit query dispatch configuration"
+            (click)="showQueryDispatchDialog()">
+            <mat-icon>edit</mat-icon>
+          </button>
+          <button mat-mini-fab aria-label="Delete query dispatch configuration" color="warn" (click)="onDeleteQueryDispatchConfig()">
+            <mat-icon>delete</mat-icon>
+          </button>
+        }
+      </mat-action-row>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel id="dataacqPanel" (opened)="loadDataAcquisitionConfig()">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          Data Acquisition Configuration
+        </mat-panel-title>
+        <mat-panel-description>
+        </mat-panel-description>
+      </mat-expansion-panel-header>
+
+      <mat-tab-group>
+        <mat-tab label="Fhir Query" id="fhirQueryTab">
+          @if (showNoDataAcqFhirQueryConfigAlert) {
+            <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirQueryConfigAlertMessage"
+            ></app-link-alert>
+          }
+          <app-data-acquisition-fhir-query-config-form [item]="dataAcqFhirQueryConfig"
+          [viewOnly]="true"></app-data-acquisition-fhir-query-config-form>
+          <mat-action-row>
+            @if (showNoDataAcqFhirQueryConfigAlert) {
+              <button mat-mini-fab aria-label="Add Fhir Resource Query configuration"
+                matTooltip="Add Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()"
+                >
+                <mat-icon>add</mat-icon>
+              </button>
+            }
+            @if (!showNoDataAcqFhirQueryConfigAlert) {
+              <button mat-mini-fab aria-label="Edit Fhir Resource Query configuration"
+                matTooltip="Edit Fhir Resource Query configuration" (click)="showDataAcqFhirQueryDialog()"
+                >
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-mini-fab aria-label="Delete Fhir Resource Query configuration" color="warn" (click)="onDeleteFhirQueryConfig()">
+                <mat-icon>delete</mat-icon>
+              </button>
+            }
+          </mat-action-row>
+        </mat-tab>
+        <mat-tab label="Fhir List">
+          @if (showNoDataAcqFhirListConfigAlert) {
+            <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqFhirListConfigAlertMessage"
+            ></app-link-alert>
+          }
+          <app-data-acquisition-fhir-list-config-form [item]="dataAcqFhirListConfig"
+          [viewOnly]="true"></app-data-acquisition-fhir-list-config-form>
+          <mat-action-row>
+            @if (showNoDataAcqFhirListConfigAlert) {
+              <button mat-mini-fab aria-label="Add Fhir List configuration" matTooltip="Add Fhir List configuration"
+                (click)="showDataAcqFhirListDialog()">
+                <mat-icon>add</mat-icon>
+              </button>
+            }
+            @if (!showNoDataAcqFhirListConfigAlert) {
+              <button mat-mini-fab aria-label="Edit Fhir List configuration" matTooltip="Edit Fhir List configuration"
+                (click)="showDataAcqFhirListDialog()">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-mini-fab aria-label="Delete Fhir List Query configuration" color="warn" (click)="onDeleteFhirQueryListConfig()">
+                <mat-icon>delete</mat-icon>
+              </button>
+            }
+          </mat-action-row>
+        </mat-tab>
+        <mat-tab label="Query Plan">
+          @if (showNoDataAcqQueryPlanConfigAlert) {
+            <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqQueryPlanConfigAlertMessage"
+            ></app-link-alert>
+          }
+          <app-query-plan-config-form [item]="dataAcqQueryPlanConfig" [viewOnly]="true"
+          (planSelected)="onPlanSelected($event)"></app-query-plan-config-form>
+          <mat-action-row>
+            @if (showNoDataAcqQueryPlanConfigAlert) {
+              <button mat-mini-fab aria-label="Add Query Plan configuration" matTooltip="Add Query Plan configuration"
+                (click)="showDataAcqQueryPlanDialog()">
+                <mat-icon>add</mat-icon>
+              </button>
+            }
+            @if (!showNoDataAcqQueryPlanConfigAlert) {
+              <button mat-mini-fab aria-label="Edit Query Plan configuration" matTooltip="Edit Query Plan configuration"
+                (click)="showDataAcqQueryPlanDialog()">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-mini-fab aria-label="Delete Fhir Query Plan configuration" color="warn" (click)="onDeleteFhirQueryPlanConfig()">
+                <mat-icon>delete</mat-icon>
+              </button>
+            }
+          </mat-action-row>
+        </mat-tab>
+      </mat-tab-group>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel id="operationsPanel">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          Normalization Configuration
+        </mat-panel-title>
+        <mat-panel-description>
+        </mat-panel-description>
+      </mat-expansion-panel-header>
+      <app-operations-list [items]="operations" [facilityId]="facilityId"></app-operations-list>
+      <mat-action-row>
+        <mat-menu #addMenu="matMenu" class="custom-menu">
+          <button mat-menu-item (click)="showOperationDialog(OperationType.CopyProperty)">
+            <mat-icon>content_copy</mat-icon>
+            <span>Add Copy Property</span>
+          </button>
+          <button mat-menu-item (click)="showOperationDialog(OperationType.CodeMap)">
+            <mat-icon>code</mat-icon>
+            <span>Add Code Map</span>
+          </button>
+          <button mat-menu-item (click)="showOperationDialog(OperationType.ConditionalTransform)">
+            <mat-icon>transform</mat-icon>
+            <span>Add Conditional Transformation</span>
+          </button>
+          <button mat-menu-item (click)="showOperationDialog(OperationType.CopyLocation)">
+            <mat-icon>content_copy</mat-icon>
+            <span>Add Copy Location</span>
+          </button>
+        </mat-menu>
+        <button mat-fab color="primary" [matMenuTriggerFor]="addMenu" matTooltip="Add Operation">
+          <mat-icon>add</mat-icon>
+        </button>
+      </mat-action-row>
+    </mat-expansion-panel>
+
+    <mat-expansion-panel id="guidedOnboardingPanel">
+      <mat-expansion-panel-header>
+        <mat-panel-title>
+          Guided Onboarding
+        </mat-panel-title>
+        <mat-panel-description>
+        </mat-panel-description>
+      </mat-expansion-panel-header>
+      <div>Placeholder for managing Guided Onboarding.</div>
+    </mat-expansion-panel>
+  </mat-accordion>
+</div>
+
+

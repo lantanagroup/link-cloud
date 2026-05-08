@@ -1,0 +1,128 @@
+<h1 mat-dialog-title class="dialog-form-header">Create a notification</h1>
+<div mat-dialog-content>
+  <form [formGroup]="createNotificationForm" class="dialog-form">
+    <div class="select-container">
+      <div class="form-input" style="width: 100%;">
+        <mat-form-field appearance="outline">
+          <mat-label>Notification Type</mat-label>
+          <mat-select formControlName="notificationType">
+            @for (type of notificationTypeOptions; track type) {
+              <mat-option [value]="type">
+                {{type}}
+              </mat-option>
+            }
+          </mat-select>
+          @if (notificationTypeControl.hasError('required')) {
+            <mat-error>
+              A notification type is <strong>required</strong>
+            </mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      <div class="form-input">
+        <mat-form-field class="form-select" appearance="outline">
+          <mat-label>Facility Id</mat-label>
+          <!--<mat-select formControlName="facilityId">
+          <mat-option>None</mat-option>
+          <mat-option *ngFor="let facility of facilityOptions" [value]="facility">
+            {{facility}}
+          </mat-option>
+        </mat-select>-->
+        <input matInput formControlName="facilityId">
+      </mat-form-field>
+    </div>
+  </div>
+
+  <mat-form-field class="chip-list form-input " appearance="outline">
+    <mat-label>Recipients</mat-label>
+    <mat-chip-grid id="recipientChip" formControlName="recipients" #recipientChipGrid aria-label="Enter recipient email addresses">
+      @for (email of recipientControl.value; track email) {
+        <mat-chip-row
+          (removed)="removeRecipient(email)"
+          [editable]="true"
+          (edited)="editRecipient(email, $event)"
+          [aria-description]="'press enter to edit ' + email">
+          {{email}}
+          <button matChipRemove [attr.aria-label]="'remove ' + email">
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip-row>
+      }
+      <input placeholder="New email address..."
+        [matChipInputFor]="recipientChipGrid"
+        [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+        [matChipInputAddOnBlur]="addOnBlur"
+        (matChipInputTokenEnd)="addRecipient($event)" />
+      </mat-chip-grid>
+      @if (recipientControl.hasError('required')) {
+        <mat-error>
+          At least one recipient is <strong>required</strong>
+        </mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field class="chip-list form-input " appearance="outline">
+      <mat-label>Bcc</mat-label>
+      <mat-chip-grid id="bccChip" formControlName="bcc" #bccChipGrid aria-label="Enter bcc email addresses">
+        @for (email of bccControl.value; track email) {
+          <mat-chip-row
+            (removed)="removeBcc(email)"
+            [editable]="true"
+            (edited)="editBcc(email, $event)"
+            [aria-description]="'press enter to edit ' + email">
+            {{email}}
+            <button matChipRemove [attr.aria-label]="'remove ' + email">
+              <mat-icon>cancel</mat-icon>
+            </button>
+          </mat-chip-row>
+        }
+        <input placeholder="New email address..."
+          [matChipInputFor]="bccChipGrid"
+          [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+          [matChipInputAddOnBlur]="addOnBlur"
+          (matChipInputTokenEnd)="addBcc($event)" />
+        </mat-chip-grid>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="subject-input form-input ">
+        <mat-label>Subject</mat-label>
+        <input matInput formControlName="subject">
+        @if (subjectControl.value) {
+          <button matSuffix mat-icon-button aria-label="Clear" (click)="clearSubjet()">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+        @if (subjectControl.hasError('required')) {
+          <mat-error>
+            A notification subject is <strong>required</strong>
+          </mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="body-input form-input ">
+        <mat-label>Message</mat-label>
+        <textarea matInput
+          formControlName="body"
+          cdkTextareaAutosize
+          #autosize="cdkTextareaAutosize"
+          cdkAutosizeMinRows="2"
+        cdkAutosizeMaxRows="10"></textarea>
+        @if (messageControl.hasError('required')) {
+          <mat-error>
+            A notification message is <strong>required</strong>
+          </mat-error>
+        }
+      </mat-form-field>
+
+    </form>
+  </div>
+  <div mat-dialog-actions align="end">
+    <button mat-raised-button color="primary" [disabled]="createNotificationForm.invalid" (click)="sendNotification()">
+      <mat-icon>send</mat-icon>
+      Send Notification
+    </button>
+    <button mat-raised-button mat-dialog-close>Close</button>
+  </div>
+
+

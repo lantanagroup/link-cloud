@@ -1,37 +1,173 @@
 package com.lantanagroup.link.measureeval.controllers;
 
-import com.lantanagroup.link.measureeval.models.UpdateMeasureDefinitionResponse;
-import com.lantanagroup.link.measureeval.services.MeasureDefinitionCache;
+import ca.uhn.fhir.context.FhirContext;
+import com.fasterxml.jackson.annotation.JsonView;
+import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
+import com.lantanagroup.link.measureeval.models.RelatedArtifactInfo;
+import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
+import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidator;
+import com.lantanagroup.link.measureeval.services.MeasureEvaluator;
+import com.lantanagroup.link.measureeval.services.MeasureEvaluatorCache;
+import com.lantanagroup.link.measureeval.services.MeasureValidationService;
+import com.lantanagroup.link.measureeval.utils.CqlUtils;
+import com.lantanagroup.link.shared.auth.PrincipalUser;
+import com.lantanagroup.link.shared.serdes.Views;
+import io.opentelemetry.api.trace.Span;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import javassist.NotFoundException;
+import org.apache.commons.text.StringEscapeUtils;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.MeasureReport;
+import org.hl7.fhir.r4.model.Parameters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.WebDataBinder;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-@RestController
-@RequestMapping("/api/measure-definition")
-public class MeasureDefinitionController {
-    private final MeasureDefinitionCache measureDefinitionCache;
+import java.util.List;
 
-    public MeasureDefinitionController(MeasureDefinitionCache measureDefinitionCache) {
-        this.measureDefinitionCache = measureDefinitionCache;
+@RestController
+@RequestMapping("/api/measureeval/measure-definition")
+@PreAuthorize("hasAnyRole('LinkUser', 'LinkAdministrator')")
+public class MeasureDefinitionController {
+
+    private final Logger _logger = LoggerFactory.getLogger(MeasureDefinitionController.class);
+    private final MeasureDefinitionRepository repository;
+    private final MeasureDefinitionBundleValidator bundleValidator;
+    private final MeasureEvaluatorCache evaluatorCache;
+    private final MeasureValidationService validationService;
+
+    final String[] DISALLOWED_FIELDS = new String[]{};
+    @InitBinder
+    public void initBinder(WebDataBinder binder) {
+        binder.setDisallowedFields(DISALLOWED_FIELDS);
+    }
+
+    public MeasureDefinitionController(
+            MeasureDefinitionRepository repository,
+            MeasureDefinitionBundleValidator bundleValidator,
+            MeasureEvaluatorCache evaluatorCache,
+            MeasureValidationService validationService){
+        this.repository = repository;
+        this.bundleValidator = bundleValidator;
+        this.evaluatorCache = evaluatorCache;
+        this.validationService = validationService;
+    }
+
+    @GetMapping
+    @JsonView(Views.Summary.class)
+    @Operation(summary = "Get all measure definitions", tags = {"Measure Definitions"})
+    public List<MeasureDefinition> getAll(@AuthenticationPrincipal PrincipalUser user) {
+        _logger.info("Get all measure definitions");
+
+        if (user != null){
+            Span currentSpan = Span.current();
+            currentSpan.setAttribute("user", user.getEmailAddress());
+        }
+        return repository.findAll();
+
+    }
+
+    @GetMapping("/{id}")
+    @JsonView(Views.Detail.class)
+    @Operation(summary = "Get a measure definition", tags = {"Measure Definitions"})
+    public MeasureDefinition getOne(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id) {
+
+        if (user != null){
+            Span currentSpan = Span.current();
+            currentSpan.setAttribute("user", user.getEmailAddress());
+        }
+
+        return repository.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
     @PutMapping
-    public UpdateMeasureDefinitionResponse createOrUpdate(@RequestBody Bundle bundle) {
-        if (!bundle.hasId()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bundle must have an id");
+    @PreAuthorize("hasAuthority('IsLinkAdmin')")
+    @Operation(summary = "Put (create or update) a measure definition", tags = {"Measure Definitions"})
+    @JsonView(Views.Detail.class)
+    public MeasureDefinition put(@AuthenticationPrincipal PrincipalUser user, @RequestBody Bundle bundle) {
+
+        if (user != null){
+            Span currentSpan = Span.current();
+            currentSpan.setAttribute("user", user.getEmailAddress());
+        }
+        if (bundle == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Request body must be a FHIR Bundle");
+        }
+        String id = (bundle.getIdElement() != null) ? bundle.getIdElement().getIdPart() : null;
+        if (id == null || id.isBlank()) {
+           throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Bundle.id is required");
+        }
+        bundleValidator.validate(bundle);
+        MeasureDefinition entity = repository.findById(id).orElseGet(() -> {
+            MeasureDefinition _entity = new MeasureDefinition();
+            _entity.setId(id);
+            return _entity;
+        });
+        entity.setBundle(bundle);
+        repository.save(entity);
+        evaluatorCache.remove(id);
+        return entity;
+    }
+
+    @GetMapping("/{id}/{library-id}/$cql")
+    @PreAuthorize("hasAuthority('IsLinkAdmin')")
+    @Operation(summary = "Get the CQL for a measure definition's library", tags = {"Measure Definitions"})
+    @Parameter(name = "id", description = "The ID of the measure definition", required = true)
+    @Parameter(name = "library-id", description = "The ID of the library in the measure definition", required = true)
+    @Parameter(name = "range", description = "The range of the CQL to return (e.g. 37:1-38:22)", required = false)
+    public String getMeasureLibraryCQL(
+            @PathVariable("id") String measureId,
+            @PathVariable("library-id") String libraryId,
+            @RequestParam(value = "range", required = false) String range) {
+
+        // Test that the range format is correct (i.e. "37:1-38:22")
+        if (range != null && !range.matches("\\d+:\\d+-\\d+:\\d+")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid range format");
         }
 
-        // TODO: Validate the measure definition bundle
+        // Get the measure definition from the repo by ID
+        MeasureDefinition measureDefinition = repository.findById(measureId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
-        // TODO: Persist the measure definition bundle
+        try {
+            return CqlUtils.getCql(measureDefinition.getBundle(), libraryId, range);
+        } catch (NotFoundException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage(), e);
+        }
+    }
 
-        // Update the cache with the latest measure definition bundle
-        this.measureDefinitionCache.updateMeasureDefinition(bundle);
+    @PostMapping("/{id}/$evaluate")
+    @PreAuthorize("hasAuthority('IsLinkAdmin')")
+    @Operation(summary = "Evaluate a measure against data in request body", tags = {"Measure Definitions"})
+    @Parameter(name = "id", description = "The ID of the measure definition", required = true)
+    @Parameter(name = "parameters", description = "The parameters to use in the evaluation", required = true)
+    @Parameter(name = "debug", description = "Whether to log CQL debugging information during evaluation", required = false)
+    public MeasureReport evaluate(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Parameters parameters, @RequestParam(required = false, defaultValue = "false") boolean debug) {
 
-        return new UpdateMeasureDefinitionResponse(true);
+        if (user != null){
+            Span currentSpan = Span.current();
+            currentSpan.setAttribute("user", user.getEmailAddress());
+        }
+
+        try {
+            // Ensure that a measure evaluator is cached (so that CQL logging can use it)
+            MeasureEvaluator evaluator = evaluatorCache.get(id);
+            // But recompile the bundle every time because the debug flag may not match what's in the cache
+            return MeasureEvaluator.compileAndEvaluate(FhirContext.forR4(), evaluator.getBundle(), parameters, debug);
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
+        }
+    }
+
+    @GetMapping("/{id}/relatedArtifact")
+    @Operation(summary = "Get related artifacts for a measure definition", tags = {"Measure Definitions"})
+    @Parameter(name = "id", description = "The ID of the measure definition", required = true)
+    public List<RelatedArtifactInfo> getRelatedArtifacts(@PathVariable String id) {
+        return validationService.getRelatedArtifacts(id);
     }
 }

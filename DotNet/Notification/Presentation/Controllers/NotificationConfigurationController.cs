@@ -10,10 +10,13 @@ using LantanaGroup.Link.Notification.Presentation.Models;
 using System.Diagnostics;
 using System.Net;
 using LantanaGroup.Link.Notification.Domain.Entities;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LantanaGroup.Link.Notification.Presentation.Controllers
 {
     [Route("api/notification/configuration")]
+    [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
     public class NotificationConfigurationController : ControllerBase
     {
@@ -30,7 +33,7 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
         private readonly IGetFacilityConfigurationListQuery _getFacilityConfigurationListQuery;
         private readonly IDeleteFacilityConfigurationCommand _deleteFacilityConfigurationCommand;
 
-        private int maxNotificationConfigurationPageSize = 20;
+        private readonly int maxNotificationConfigurationPageSize = 20;
 
         public NotificationConfigurationController(ILogger<NotificationConfigurationController> logger, INotificationConfigurationFactory configurationFactory, 
             IFacilityClient facilityClient, ICreateFacilityConfigurationCommand createFacilityConfigurationCommand, 
@@ -171,7 +174,6 @@ namespace LantanaGroup.Link.Notification.Presentation.Controllers
                 _logger.LogNotificationConfigurationCreationException(config, ex.Message);
                 throw;
             }
-
         }
 
         /// <summary>

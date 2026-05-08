@@ -1,0 +1,111 @@
+resources:
+  pipelines:
+  - pipeline: pipeline-trigger
+    source: Build_And_Push_All
+    trigger: true
+
+trigger:
+  branches:
+    include:
+    - dev
+    - release/*
+    - linkathon/*
+  paths:
+    include:
+    - DotNet/DataAcquisition.AcquisitionWorker/*
+    - DotNet/DataAcquisition.Domain/*
+    - DotNet/Shared/*
+
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: link-cloud-variables
+- name: project
+  value: 'DotNet/DataAcquisition.AcquisitionWorker/DataAcquisition.AcquisitionWorker.csproj'
+- name: domainProject
+  value: 'DotNet/DataAcquisition.Domain/DataAcquisition.Domain.csproj'
+- name: testProject
+  value: 'DotNet/DataAcquisition.AcquisitionWorker/DataAcquisition.AcquisitionWorker.csproj'
+- name: nugetPath
+  value: 'DotNet/DataAcquisition.AcquisitionWorker/nuget.config'
+- name: tags1
+  value: 'latest'
+- name: tags2
+  value: '$(Build.BuildId)_$(Build.SourceBranchName)'
+- name: registry-repo-Name
+  value: 'link-dataacquisition-worker'
+- name: dockerPath
+  value: '**/DotNet/DataAcquisition.AcquisitionWorker/Dockerfile'
+- name: serviceName
+  value: 'DataAcquisition.AcquisitionWorker'
+- name: projectDir
+  value: 'DotNet/DataAcquisition.AcquisitionWorker'
+
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        GIT_COMMIT=$(git rev-parse --short HEAD)
+        echo "GIT_COMMIT: ${GIT_COMMIT}"
+        echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+  - task: PythonScript@0
+    displayName: "Inject Service Info"
+    inputs:
+      scriptSource: 'filePath'
+      scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
+      workingDirectory: '$(Build.SourcesDirectory)'
+      arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
+  
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+
+  # - task: DotNetCoreCLI@2
+  #   inputs:
+  #     command: 'test'
+  #     projects: $(testProject)'
+  #   displayName: 'Run Tests'
+  
+  - task: PowerShell@2
+    inputs:
+      targetType: 'inline'
+      script: |
+        if ("$(Build.SourceBranch)" -like "*release/*") {
+        $myTag1 = "release-$(Build.SourceBranchName)-$(GIT_COMMIT)"
+        }
+        else { 
+        $myTag1 = "$(Build.SourceBranchName)-$(GIT_COMMIT)"
+        }
+        Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
+        Write-Host "Set MyTag to: $myTag1"
+  - task: Docker@2
+    displayName: "Build & Push DataAcquisition-Worker Docker Image"
+    condition: always()
+    inputs:
+      containerRegistry: $(containerRegistry) # Variable Group
+      repository: $(registry-repo-name)
+      command: 'buildAndPush'
+      Dockerfile: $(dockerPath)
+      tags: |
+        $(tags1)
+        $(MyTag)
+      buildContext: '$(Build.Repository.LocalPath)'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      ArtifactName: 'drop'
+      publishLocation: 'Container'

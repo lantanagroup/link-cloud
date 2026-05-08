@@ -1,34 +1,42 @@
-﻿using LantanaGroup.Link.Census.Application.Commands;
+﻿using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Exceptions;
-using LantanaGroup.Link.Census.Application.Settings;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
-using MediatR;
+using LantanaGroup.Link.Census.Domain.Managers;
+using Link.Authorization.Policies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Quartz;
 
 namespace Census.Controllers;
 
 [Route("api/census/config/")]
+[Authorize(Policy = PolicyNames.IsLinkAdmin)]
 [ApiController]
 public class CensusConfigController : Controller
 {
     private readonly ILogger<CensusConfigController> _logger;
-    private readonly IMediator _mediator;
+    private readonly ICensusConfigManager _censusConfigManager;
 
-    public CensusConfigController(ILogger<CensusConfigController> logger, IMediator mediator)
+    public CensusConfigController(ILogger<CensusConfigController> logger, ICensusConfigManager censusConfigManager)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _mediator = mediator ?? throw new ArgumentNullException(nameof(mediator));
+        _censusConfigManager = censusConfigManager ?? throw new ArgumentNullException(nameof(censusConfigManager));
     }
 
     /// <summary>
     /// Creates a CensusConfig for o given censusConfig
     /// </summary>
     /// <param name="censusConfig"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Created: 201
+    ///     Bad Request: 400
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(CensusConfigEntity))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] CensusConfigModel censusConfig)
+    public async Task<IActionResult> Create(CensusConfigModel censusConfig)
     {
         if (string.IsNullOrWhiteSpace(censusConfig.FacilityId))
         {
@@ -40,42 +48,69 @@ public class CensusConfigController : Controller
             return BadRequest("ScheduledTrigger is required.");
         }
 
+        if (!CronExpression.IsValidExpression(censusConfig.ScheduledTrigger))
+        {
+            return BadRequest("ScheduledTrigger is not a valid cron expression.");
+        }
+
         try
         {
-            await _mediator.Send(new CreateCensusConfigCommand
-            {
-                CensusConfigEntity = censusConfig
-            });
-            SendAudit("", censusConfig.FacilityId, AuditEventType.Create);
+            var entity =  CensusConfigModel.FromDomain(await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig));
+
+            return Created(entity.FacilityId, entity);
         }
         catch (MissingTenantConfigurationException ex)
         {
-            _logger.LogError(ex.Message);
-            SendAudit(string.Empty, censusConfig.FacilityId, AuditEventType.Create, ex.Message);
-            return BadRequest(ex.Message);
+            return Problem(
+                detail: "No Facility for the provided FacilityId was found.",
+                statusCode: StatusCodes.Status404NotFound
+            );
         }
         catch (Exception ex)
         {
-            _logger.LogError($"Error encountered:\n{ex.Message}\n{ex.InnerException}");
-            SendAudit(string.Empty, censusConfig.FacilityId, AuditEventType.Create, $"Error encountered:\n{ex.Message}\n{ex.InnerException}");
-            return StatusCode(500);
+            _logger.LogError(ex, "Exception encountered in CensusConfigController.Create");
+            return Problem(
+                detail: "An error occurred while processing your request.",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
         }
-
-        return Accepted();
     }
 
     /// <summary>
     /// Returns the CensusConfig for a given facilityId
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Success: 200
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(CensusConfigModel))]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpGet("{facilityId}")]
     public async Task<ActionResult<CensusConfigModel>> Get(string facilityId)
     {
-        var response = await _mediator.Send(new GetCensusConfigQuery { FacilityId = facilityId });
-        if (response == null)
-            return NoContent();
-        return Ok(response);
+        try
+        {
+            var response = await _censusConfigManager.GetCensusConfigByFacilityId(facilityId);
+            if (response is null)
+                return NotFound();
+
+            CensusConfigModel model = new CensusConfigModel
+            {
+                FacilityId = response.FacilityID,
+                ScheduledTrigger = response.ScheduledTrigger,
+                Enabled = response.Enabled
+            };
+            return Ok(model);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception encountered in CensusConfigController.Get");
+            return Problem(
+                detail: "An error occurred while processing your request.",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
+        }
     }
 
     /// <summary>
@@ -83,9 +118,19 @@ public class CensusConfigController : Controller
     /// </summary>
     /// <param name="censusConfig"></param>
     /// <param name="facilityId"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     Created: 201
+    ///     Accepted: 202
+    ///     Bad Scheduled Trigger: 400
+    ///     Missing Facility ID: 400
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status202Accepted, Type = typeof(CensusConfigEntity))]
+    [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(CensusConfigEntity))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpPut("{facilityId}")]
-    public async Task<ActionResult<CensusConfigModel>> Put([FromBody] CensusConfigModel censusConfig, string facilityId)
+    public async Task<ActionResult<CensusConfigModel>> Put(CensusConfigModel censusConfig, string facilityId)
     {
         if (string.IsNullOrWhiteSpace(censusConfig.FacilityId))
         {
@@ -102,85 +147,64 @@ public class CensusConfigController : Controller
             return BadRequest($"FacilityID in request path does not match facility in request body.");
         }
 
-        CensusConfigModel configResponse = null;
+        if (!CronExpression.IsValidExpression(censusConfig.ScheduledTrigger))
+        {
+            return BadRequest("ScheduledTrigger is not a valid cron expression.");
+        }
+
         try
         {
-            configResponse = await _mediator.Send(new UpdateCensusCommand
+            var existingEntity = await _censusConfigManager.GetCensusConfigByFacilityId(censusConfig.FacilityId);
+            var entity = await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig);
+            if (existingEntity != null)
             {
-                Config = censusConfig,
-            });
-            SendAudit("", facilityId, AuditEventType.Update);
+                return Accepted(CensusConfigModel.FromDomain(entity));
+            }
+            else
+            {
+                return Created(entity.Id.ToString(), CensusConfigModel.FromDomain(entity));
+            }
         }
         catch (MissingTenantConfigurationException ex)
         {
-            _logger.LogError(ex.Message);
-            SendAudit(string.Empty, censusConfig.FacilityId, AuditEventType.Create, ex.Message);
             return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex.Message);
-            SendAudit(string.Empty, censusConfig.FacilityId, AuditEventType.Create, $"Error encountered:\n{ex.Message}\n{ex.InnerException}");
-            return StatusCode(500);
+            _logger.LogError(ex, "Exception encountered in CensusConfigController.Put");
+            return Problem(
+                detail: "An error occurred while processing your request.",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
         }
-
-        if (configResponse == null)
-        {
-            return NoContent();
-        }
-
-        return Ok(configResponse);
     }
 
     /// <summary>
     /// Deletes the CensusConfig for a given facilityId
     /// </summary>
     /// <param name="facilityId"></param>
-    /// <returns></returns>
+    /// <returns>
+    ///     No Content: 204
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     [HttpDelete("{facilityId}")]
     public async Task<IActionResult> Delete(string facilityId)
     {
-        CensusConfigModel configResponse = null;
         try
         {
-            await _mediator.Send(new DeleteCensusConfigCommand { FacilityId = facilityId });
-            SendAudit("", facilityId, AuditEventType.Delete);
+            await _censusConfigManager.DeleteCensusConfigByFacilityId(facilityId);
+
+            return Accepted();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex.Message);
-            SendAudit(string.Empty, facilityId, AuditEventType.Create, $"Error encountered:\n{ex.Message}\n{ex.InnerException}");
-            return StatusCode(500);
-        }
-
-        return Ok();
-    }
-
-    [ApiExplorerSettings(IgnoreApi = true)]
-    private void SendAudit(string correlationId, string facilityId, AuditEventType type, string? notes = null)
-    {
-        try
-        {
-            _mediator.Send(new TriggerAuditEventCommand
-            {
-                AuditableEvent = new AuditEventMessage
-                {
-                    FacilityId = facilityId,
-                    CorrelationId = correlationId,
-                    Action = type,
-                    EventDate = DateTime.UtcNow,
-                    ServiceName = CensusConstants.ServiceName,
-                    //PropertyChanges = "example",
-                    Resource = "CensusConfig",
-                    User = "example",
-                    UserId = "example",
-                    Notes = notes ?? $"{type}: {facilityId}"
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError("There was an issue sending an audit.", ex);
+            _logger.LogError(ex, "Exception encountered in CensusConfigController.Delete");
+            return Problem(
+                detail: "An error occurred while processing your request.",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
         }
     }
 }

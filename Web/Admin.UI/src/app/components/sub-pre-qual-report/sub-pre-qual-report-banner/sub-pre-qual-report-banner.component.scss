@@ -1,0 +1,23 @@
+@use '../../../../styles/validation-theme.scss' as vt;
+
+.sub-pre-qual-report-banner {
+  background-image: url('/assets/backgrounds/bg-blue-md.png');
+  background-repeat: no-repeat;
+  background-size: cover;
+  padding: 35px vt.$vd-container-padding-x;
+  color: vt.$vd-neutral-0;
+  text-transform: uppercase;
+
+  &--kicker {
+    @include vt.vd-subheading-02();
+
+    .sub-id {
+      font-weight: vt.$vd-font-weight-bold;
+    }
+  }
+
+  &--heading {
+    @include vt.vd-heading-02();
+    margin-top: .5rem;
+  }
+}

@@ -1,0 +1,25 @@
+<div class="sub-pre-qual-report-categories-table">
+  <div class="vd-mat-table limited-height">
+    <table mat-table #outerSort="matSort" [dataSource]="dataSource" multiTemplateDataRows matSort>
+      <!-- Level 1 (Category) Columns -->
+      @for (column of categoryColumns; track column) {
+        <ng-container [matColumnDef]="column.key">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column.header}} </th>
+          <td mat-cell *matCellDef="let category">
+            @if (column.key === 'name') {
+              <a [routerLink]="[category['id']]">{{ category[column.key] }}</a>
+            } @else {
+              {{ category[column.key] }}
+            }
+          </td>
+        </ng-container>
+      }
+
+      <!-- Main Header Row -->
+      <tr mat-header-row *matHeaderRowDef="categoryColumnKeys; sticky: true"></tr>
+      <!-- Main Data Row -->
+      <tr mat-row *matRowDef="let row; columns: categoryColumnKeys;" class="main-row">
+      </tr>
+    </table>
+  </div>
+</div>

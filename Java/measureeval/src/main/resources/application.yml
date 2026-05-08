@@ -1,29 +1,108 @@
+service-information:
+  service-name: Link Measure Evaluation Service
+
+management:
+  endpoints:
+    web:
+      base-path: /
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+  health:
+    discover-composite:
+      enabled: false
+    ping:
+      enabled: false
+    refresh:
+      enabled: false
+    diskspace:
+      enabled: false
+    mongo:
+      enabled: false
+    kafka:
+      enabled: true  # Ensures Kafka health is checked
+
+logging:
+  level:
+    com.lantanagroup.link: debug
+
+server:
+  port: 5135
+
+telemetry:
+  exporterEndpoint: http://localhost:55690
+
+loki:
+  enabled: true
+  url: http://localhost:3100
+  app: link-cloud
+
 springdoc:
   api-docs:
-    path: /api-docs
+    enabled: false
   swagger-ui:
-    path: /swagger-ui.html
+    enabled: false
+
 spring:
+
+  cloud:
+    discovery:
+      enabled: false
+
   application:
     name: measureeval
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: http://localhost:7080/realms/master
-  main:
-    allow-bean-definition-overriding: true
+
   data:
     mongodb:
-      uri: mongodb://localhost:27017/measureeval
+      uri: mongodb://localhost:27017/${spring.application.name}?serverSelectionTimeoutMS=4000
+      database: ${spring.application.name}
+
+  jackson:
+    mapper:
+      accept-case-insensitive-enums: true
+      accept-case-insensitive-properties: true
+
   kafka:
     bootstrap-servers: localhost:9092
+
     consumer:
-      group-id: measureeval
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      group-id: ${spring.application.name}
+
     producer:
-      client-id: measureeval
-    properties:
-      security.protocol: SASL_SSL
-      sasl.mechanism: PLAIN
-      #sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="$ConnectionString" password="";
+      client-id: ${spring.application.name}
+      properties:
+        max.request.size: 10485760
+
+    retry:
+      maxAttempts: 3
+      retry-backoff-ms: 3000
+
+link:
+  info-route: /api/measureeval/info
+  reportability-predicate: com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation
+  cql-debug: false
+
+  report:
+    base-url: http://localhost:5110
+    routes:
+      submission-model:
+        path: /api/Report/Bundle/Patient
+        query:
+          - facilityId={facilityId}
+          - patientId={patientId}
+          - reportScheduleId={reportId}
+      report-schedules:
+        path: /api/schedules/{reportId}
+
+secret-management:
+  key-vault-uri: ''
+
+authentication:
+  anonymous: false
+  authority: 'https://localhost:7004'
+
+internal-blob-storage:
+  connection-string: ''
+  blob-container-name: ''

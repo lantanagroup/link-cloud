@@ -1,13 +1,17 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
-using LantanaGroup.Link.Audit.Application.Commands;
-using LantanaGroup.Link.Audit.Application.Interfaces;
-using LantanaGroup.Link.Audit.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
+using LantanaGroup.Link.Audit.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Shared.Application.Error.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
-using Microsoft.Extensions.Options;
+using OpenTelemetry.Trace;
 using System.Diagnostics;
+using System.Text;
+using LantanaGroup.Link.Audit.Application.Interfaces;
+using static Confluent.Kafka.ConfigPropertyNames;
 
 namespace LantanaGroup.Link.Audit.Listeners
 {
@@ -15,15 +19,25 @@ namespace LantanaGroup.Link.Audit.Listeners
     {
         private readonly ILogger<AuditEventListener> _logger;
         private readonly IServiceScopeFactory _scopeFactory;
-        private readonly IAuditFactory _auditFactory;
-        private readonly IKafkaConsumerFactory _kafkaConsumerFactory;      
-      
-        public AuditEventListener(ILogger<AuditEventListener> logger, IServiceScopeFactory scopeFactory, IAuditFactory auditFactory, IKafkaConsumerFactory kafkaConsumerFactory, IOptions<KafkaConnection> kafkaConnection) 
-        { 
+        private readonly IKafkaConsumerFactory<string, AuditEventMessage> _kafkaConsumerFactory;
+        private readonly IDeadLetterExceptionHandler<string, AuditEventMessage> _deadLetterExceptionHandler;
+        private readonly ITransientExceptionHandler<string, AuditEventMessage> _transientExceptionHandler;
+
+        public AuditEventListener(ILogger<AuditEventListener> logger, IServiceScopeFactory scopeFactory, IKafkaConsumerFactory<string, 
+            AuditEventMessage> kafkaConsumerFactory, IDeadLetterExceptionHandler<string, AuditEventMessage> deadLetterExceptionHandler, 
+            ITransientExceptionHandler<string, AuditEventMessage> transientExceptionHandler)
+        {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
-            _auditFactory = auditFactory ?? throw new ArgumentNullException(nameof(auditFactory));
-            _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));     
+            _kafkaConsumerFactory = kafkaConsumerFactory ?? throw new ArgumentNullException(nameof(kafkaConsumerFactory));
+            _deadLetterExceptionHandler = deadLetterExceptionHandler ?? throw new ArgumentNullException(nameof(deadLetterExceptionHandler));
+            _transientExceptionHandler = transientExceptionHandler ?? throw new ArgumentNullException(nameof(transientExceptionHandler));
+
+            //configure deadletter exception handlers
+            _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.AuditableEventOccurred) + "-Error";
+
+            //configure transient exception handler
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.AuditableEventOccurred) + "-Retry";            
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -33,7 +47,13 @@ namespace LantanaGroup.Link.Audit.Listeners
 
         private async void StartConsumerLoop(CancellationToken cancellationToken)
         {
-            using (var _consumer = _kafkaConsumerFactory.CreateAuditableEventConsumer(enableAutoCommit: false))
+            var config = new ConsumerConfig()
+            {
+                GroupId = AuditConstants.ServiceName,
+                EnableAutoCommit = false
+            };
+
+            using (var _consumer = _kafkaConsumerFactory.CreateConsumer(config))
             {
                 try 
                 {                
@@ -43,52 +63,53 @@ namespace LantanaGroup.Link.Audit.Listeners
                     while (!cancellationToken.IsCancellationRequested)
                     {
                         try
-                        {                         
-                            await _consumer.ConsumeWithInstrumentation(async (result, cancellationToken) => {
+                        {
+                            var result = _consumer.Consume(cancellationToken);
 
-                                if (result != null && result.Message.Value != null)
-                                {      
-                                    AuditEventMessage messageValue = result.Message.Value;
+                            try
+                            {       
+                                //process the audit event
+                                var _auditEventProcessor = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<IAuditEventProcessor>();
+                                _ = await _auditEventProcessor.ProcessAuditEvent(result, cancellationToken);
 
-                                    if (result.Message.Headers.TryGetLastBytes("X-Correlation-Id", out var headerValue))
-                                    {
-                                        messageValue.CorrelationId = System.Text.Encoding.UTF8.GetString(headerValue);                                        
-                                    }                                   
+                                //consume the result and offset
+                                _consumer.Commit(result);
+                            }
+                            catch (DeadLetterException ex)
+                            {
+                                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                                Activity.Current?.AddException(ex);
 
-                                    //create audit event
-                                    CreateAuditEventModel eventModel = _auditFactory.Create(result.Message.Key, messageValue.ServiceName, messageValue.CorrelationId, messageValue.EventDate, messageValue.UserId, messageValue.User, messageValue.Action, messageValue.Resource, messageValue.PropertyChanges, messageValue.Notes);                                                                      
-                                    _logger.LogAuditableEventConsumption(result.Message.Key, messageValue.ServiceName ?? string.Empty, eventModel);
-
-                                    //create scoped create audit event command
-                                    //deals with issue of non-singleton services being used within singleton hosted service
-                                    using (var scope = _scopeFactory.CreateScope())
-                                    {
-                                        var _createAuditEventCommand = scope.ServiceProvider.GetRequiredService<ICreateAuditEventCommand>();
-                                        _ = await _createAuditEventCommand.Execute(eventModel, cancellationToken);
-                                    }                                                                      
-
-                                    //consume the result and offset
-                                    _consumer.Commit(result);
-
-                                }
-                            }, cancellationToken);          
-
-                        }
+                                //TODO: may need to make dead letter exception handler accept nulls as that is a possibility for throwing a dead letter exception
+                                _deadLetterExceptionHandler.HandleException(result, ex, result?.Message.Key);                                   
+                                _consumer.Commit(result);                                    
+                            }
+                            catch (TransientException ex)
+                            {
+                                Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                                Activity.Current?.AddException(ex);                                   
+                                _transientExceptionHandler.HandleException(result, ex, result.Message.Key);
+                                _consumer.Commit(result);
+                            }      
+                        }                        
                         catch (ConsumeException ex)
                         {
-                            Activity.Current?.SetStatus(ActivityStatusCode.Error);                                                     
+                            Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                            Activity.Current?.AddException(ex);
                             _logger.LogConsumerException(nameof(KafkaTopic.AuditableEventOccurred), ex.Message);
-                            if (ex.Error.IsFatal)
+
+                            if (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
                             {
-                                break;
+                                throw new OperationCanceledException(ex.Error.Reason, ex);
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            Activity.Current?.SetStatus(ActivityStatusCode.Error);                            
-                            _logger.LogConsumerException(nameof(KafkaTopic.AuditableEventOccurred), ex.Message);
-                            break;
-                        }
+
+                            var facilityId = ex.ConsumerRecord.Message.Key != null ? Encoding.UTF8.GetString(ex.ConsumerRecord.Message.Key) : "";
+
+                            _deadLetterExceptionHandler.HandleConsumeException(ex, facilityId);
+
+                            var offset = ex.ConsumerRecord?.TopicPartitionOffset;
+                            _consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                        }                        
                     }
 
                     _consumer.Close();
@@ -97,7 +118,8 @@ namespace LantanaGroup.Link.Audit.Listeners
                 }
                 catch(OperationCanceledException oce)
                 {
-                    Activity.Current?.SetStatus(ActivityStatusCode.Error);                    
+                    Activity.Current?.SetStatus(ActivityStatusCode.Error);
+                    Activity.Current?.AddException(oce);
                     _logger.LogOperationCanceledException(nameof(KafkaTopic.AuditableEventOccurred), oce.Message);
                     _consumer.Close();
                     _consumer.Dispose();

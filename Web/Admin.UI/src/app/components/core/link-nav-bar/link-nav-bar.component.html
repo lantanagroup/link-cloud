@@ -1,0 +1,53 @@
+<nav class="subnavbar">
+  <ul class="subnav-menu">
+    @for (item of subnavItems; track item) {
+      <li class="subnav-item" [class.dropdown]="item.children"
+        [class.active]="(item.path && isRouteActive(item.path)) || (item.children && isChildRouteActive(item.children))">
+        <!-- Top-level item with path -->
+        @if (item.path) {
+          <a [routerLink]="[item.path]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+            {{ item.label }}
+            @if (item.children) {
+              <div class="dropdown-icon">
+                <vd-icon filePath="../../../assets/icons/chevron-default.svg"></vd-icon>
+              </div>
+            }
+          </a>
+        }
+        <!-- Dropdown toggle without path -->
+        @if (!item.path && item.children) {
+          <a role="button"
+            tabindex="0"
+            [attr.aria-haspopup]="true"
+            [attr.aria-expanded]="isChildRouteActive(item.children)">
+            {{ item.label }}
+            <div class="dropdown-icon">
+              <vd-icon filePath="../../../assets/icons/chevron-default.svg"></vd-icon>
+            </div>
+          </a>
+        }
+        @if (item.children) {
+          <ul class="dropdown-menu">
+            @for (child of item.children; track child) {
+              <li>
+                @if (child.path?.startsWith('/')) {
+                  <a [routerLink]="[child.path]" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+                    {{ child.label }}
+                  </a>
+                }
+                @if (child.path && !child.path.startsWith('/')) {
+                  <a
+                    [href]="child.path"
+                    [attr.target]="child.path.startsWith('http') ? '_blank' : null"
+                    [attr.rel]="child.path.startsWith('http') ? 'noopener noreferrer' : null">
+                    {{ child.label }}
+                  </a>
+                }
+              </li>
+            }
+          </ul>
+        }
+      </li>
+    }
+  </ul>
+</nav>

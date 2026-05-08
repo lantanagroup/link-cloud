@@ -1,4 +1,5 @@
 ﻿using Confluent.Kafka;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Tenant.Config;
@@ -7,7 +8,8 @@ using Quartz;
 
 namespace LantanaGroup.Link.Tenant.Jobs
 {
-
+    //This is currently unused. It was designed to be incorporated into a retention system, but was never fully developed.
+    //Leaving here for potential future use.
     [DisallowConcurrentExecution]
     public class RetentionCheckScheduledJob : IJob
     {
@@ -28,11 +30,11 @@ namespace LantanaGroup.Link.Tenant.Jobs
 
                 JobDataMap triggerMap = context.Trigger.JobDataMap!;
 
-                string trigger = (string)triggerMap[TenantConstants.Scheduler.JobTrigger];
+                string trigger = triggerMap.GetObject<string>(TenantConstants.Scheduler.JobTrigger);
 
-                string tenant = (string)dataMap[TenantConstants.Scheduler.JobName];
+                string tenant = dataMap.GetObject<string>(TenantConstants.Scheduler.JobName);
 
-                _logger.LogInformation($" RetentionCheckScheduledJob -  Produce event for:  {tenant} and crontrigger: {trigger}");
+                _logger.LogInformation(" RetentionCheckScheduledJob -  Produce event for:  {Tenant} and crontrigger: {Trigger}", tenant, trigger);
 
                 var headers = new Headers();
 

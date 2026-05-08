@@ -1,0 +1,22 @@
+# Add 'config-change' label to any file changes within the 'docs/config' folder or the docs/README.md file
+config-change:
+- changed-files:
+  - any-glob-to-any-file: 
+    - 'docs/docs/config/*'
+    - 'docs/**/services/**'
+    - 'docs/README.md'
+    - 'DotNet/**/appsettings.json'
+    - 'Java/**/application*.yml'
+
+# Add 'kafka-topic-change' label to any changes to the topics.txt file
+kafka-topic-change:
+- changed-files:
+  - any-glob-to-any-file:
+    - 'topics.txt'
+
+# Add 'db-change' label to any file changes within the migrations folders
+db-change:
+- changed-files:
+  - any-glob-to-any-file: 
+    - 'DotNet/**/Migrations/*'
+    - 'Java/**/migrations/*'

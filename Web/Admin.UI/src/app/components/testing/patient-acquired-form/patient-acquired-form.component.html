@@ -1,0 +1,45 @@
+<form [formGroup]="patientForm">
+  <div class="enter-test-data">
+    <b>Admit/Discharge Patients</b>
+  </div>
+  <div>
+    <mat-form-field appearance="outline">
+      <mat-label>Census Patients</mat-label>
+      <input matInput formControlName="patients" placeholder="Enter comma-delimited string of patients" />
+    </mat-form-field>
+    <button mat-raised-button color="primary" type="button" class="custom-height-button" (click)="addPatient()">Add</button>
+  </div>
+  <div class="input-container">
+    <thead>
+      @if (patients.length > 0) {
+        <tr>
+          <th>Patient</th>
+          <th>Discharge</th>
+          <th>Delete</th>
+        </tr>
+      }
+    </thead>
+    @for (patient of patients; track patient; let i = $index) {
+      <tr >
+        <td>{{ patient }}</td>
+        <td>
+          <mat-checkbox  (change)="dischargePatient($event, i)"></mat-checkbox>
+        </td>
+        <td>
+          @if (patients.length > 1) {
+            <button mat-icon-button color="warn" (click)="removePatient(i)">
+              <mat-icon>remove_circle</mat-icon>
+            </button>
+          }
+        </td>
+      </tr>
+    }
+  </div>
+</form>
+<div class="form-bar">
+  <button mat-raised-button color="primary" [disabled]="patientForm.invalid || patients.length < 1" (click)="generateEvent()">
+    <mat-icon>event</mat-icon>
+    Finish
+  </button>
+</div>
+

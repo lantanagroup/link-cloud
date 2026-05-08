@@ -11,7 +11,15 @@ namespace LantanaGroup.Link.Shared.Application.Utilities
 
             try
             {
-                retVal = value.GetAttributeOnEnum<StringValueAttribute>().StringValue;
+                var x = value.GetAttributeOnEnum<StringValueAttribute>();
+                if (x != null)
+                {
+                    retVal = value.GetAttributeOnEnum<StringValueAttribute>().StringValue;
+                }
+                else
+                {
+                    retVal = value?.ToString() ?? string.Empty;
+                }
             }
             catch
             {

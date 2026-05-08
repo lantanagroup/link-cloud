@@ -1,0 +1,25 @@
+
+.file-input {
+  display: none;
+}
+
+.file-upload {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.file-field {
+  flex: 1;
+}
+
+.upload-btn {
+  margin-left: 10px;
+  margin-bottom: 15px;
+}
+
+.progress-bar {
+  margin-bottom: 10px;
+}
+
+

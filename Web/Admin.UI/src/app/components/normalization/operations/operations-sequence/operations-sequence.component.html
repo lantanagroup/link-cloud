@@ -1,0 +1,159 @@
+<mat-card class="operation-card">
+  <form [formGroup]="form" class="operation-form">
+    <h2 class="section-title">Sequence Facility/Vendor Operations</h2>
+    <!-- Vendors -->
+    <mat-form-field appearance="outline" floatLabel="always" class="full-width">
+      <mat-label>Select Vendor</mat-label>
+      <mat-select formControlName="selectedVendorId" [disabled]="isVendorLocked">
+        <mat-option [value]="null" selected>-- None Selected --</mat-option>
+        @for (vendorId of vendorIds; track vendorId) {
+          <mat-option [value]="vendorId">
+            {{ vendorFilterOptions[vendorId] }}
+          </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <!-- Resource Types -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Resource Types</mat-label>
+      <mat-select
+        formControlName="selectedResourceType">
+        @for (type of resourceTypes; track type) {
+          <mat-option [value]="type">
+            {{ type }}
+          </mat-option>
+        }
+      </mat-select>
+      @if (selectedResourceTypeControl.hasError('required') && (selectedResourceTypeControl.dirty || selectedResourceTypeControl.touched)) {
+        <mat-error
+          >
+          Resource type is required
+        </mat-error>
+      }
+    </mat-form-field>
+
+    <div class="delete-buttons-row" style="display: flex; justify-content: flex-end; gap: 1rem; margin-bottom: 1rem;">
+      <button
+        [disabled]="!hasFacilityResourceTypeSequences"
+        mat-raised-button color="primary"
+        (click)="deleteResourceTypeSequences()"
+        matTooltip="Delete all sequences for the {{ selectedResourceTypeControl.value }} type">
+        <mat-icon>delete</mat-icon>
+        Delete {{ selectedResourceTypeControl.value }} Sequences
+      </button>
+
+      <button
+        [disabled]="!hasFacilitySequences"
+        mat-raised-button color="primary"
+        (click)="deleteFacilitySequences()"
+        matTooltip="Delete all sequences for the facility">
+        <mat-icon>delete</mat-icon>
+        Delete All Sequences
+      </button>
+    </div>
+
+    <div class="no-border">
+      @if (operationsArray.controls.length > 0 && selectedResourceTypeControl.value) {
+        <table class="link-table"
+          >
+          <thead class="table-head">
+            <tr>
+              <th scope="col" class="header-column">Operation Details</th>
+              <th scope="col" class="header-column">Operation Type</th>
+              <th scope="col" class="header-column">Operation Name</th>
+              <th scope="col" class="header-column">Operation ID</th>
+              <th scope="col" class="header-column">Vendor</th> <!-- NEW -->
+              <th scope="col" class="header-column">Sequence</th>
+            </tr>
+          </thead>
+          <tbody class="table-body" formArrayName="operations">
+            @for (group of operationsArray.controls; track group; let i = $index) {
+              <!-- Main Row -->
+              <tr [formGroupName]="i">
+                <td>
+                  <button mat-icon-button (click)="toggleDetails(i)" aria-label="Toggle operation details">
+                    <mat-icon>{{ showDetailsMap[i] ? 'expand_less' : 'expand_more' }}</mat-icon>
+                  </button>
+                </td>
+                <td class="data-col table-cell">{{ group.get('operationType')?.value }}</td>
+                <td class="data-col table-cell">{{ group.get('operationName')?.value }}</td>
+                <td class="data-col table-cell">{{ group.get('operationId')?.value }}</td>
+                <td class="data-col table-cell">
+                  {{ group.get('vendorName')?.value || 'Facility Only' }}
+                </td>
+                <td class="data-col table-cell">
+                  <div class="sequence-wrapper">
+                    <input type="number" formControlName="sequence" class="sequence-input" min="1"
+                      placeholder="Unassigned (leave empty)"/>
+                      @if (sequencesLoaded && group.get('sequence')?.value) {
+                        <button
+                          mat-icon-button
+                          class="clear-sequence-btn"
+                          aria-label="Clear sequence"
+                          (click)="clearSequence(group)"
+                          matTooltip="Clear Sequence"
+                          type="button">
+                          <mat-icon>close</mat-icon>
+                        </button>
+                      }
+                    </div>
+                    @if (group.get('sequence')?.invalid && (group.get('sequence')?.touched || group.get('sequence')?.dirty)) {
+                      <div
+                        class="inline-error-message">
+                        @if (group.get('sequence')?.errors?.['min']) {
+                          <span>Sequence must be greater than 0.</span>
+                        }
+                      </div>
+                    }
+                  </td>
+                </tr>
+                <!-- Expandable Details Row -->
+                @if (showDetailsMap[i]) {
+                  <tr>
+                    <td colspan="6" class="expanded-row">
+                      <pre class="operation-json"> {{ group.get('parsedOperationJson')?.value | json }}</pre>
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        } @else {
+          @if (selectedResourceTypeControl.value) {
+            <div class="empty-state">
+              No operations found for the selected vendor and resource type.
+            </div>
+          }
+        }
+      </div>
+
+      <!-- Empty State -->
+
+    </form>
+
+    @if (sequencesLoaded && hasDuplicateSequences() && isSequenceArrayTouched()) {
+      <div class="error-message"
+        style="margin-top: 1rem;">
+        Sequence numbers must be unique.
+      </div>
+    }
+
+    @if (sequencesLoaded && !atLeastOneSequenceHasValue() && isSequenceArrayTouched()) {
+      <div class="error-message"
+        style="margin-top: 0.5rem;">
+        At least one operation must be assigned a sequence number.
+      </div>
+    }
+
+    <div class="button-row mt-3" style="display: flex; justify-content: flex-end; gap: 1rem;">
+      <button mat-raised-button color="primary" type="submit" (click)="onSave()"
+        [disabled]="form.invalid || hasDuplicateSequences() || !haveSequencesChanged() ||  !atLeastOneSequenceHasValue()">
+        Save
+      </button>
+      <button mat-stroked-button color="warn" type="button" (click)="onClose()">
+        Close
+      </button>
+    </div>
+
+  </mat-card>
