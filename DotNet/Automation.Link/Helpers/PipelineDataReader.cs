@@ -15,7 +15,7 @@ public class PipelineDataReader
     private readonly IFacilityServiceClient _facilityClient;
 
     // ---------------------------------------------------------------
-    // Time-based cache � collapses duplicate HTTP calls from the
+    // Time-based cache collapses duplicate HTTP calls from the
     // many consumers (ProgressMonitor, PipelineProgressTracker,
     // MilestoneValidationOrchestrator, StoreBackedServicePoller,
     // PipelineSnapshot) into a single call per TTL window.
