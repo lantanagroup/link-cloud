@@ -512,7 +512,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
     if (parsed.rows.length === 0) {
-      this.showPasteError('All rows were skipped because they are missing source or target values.');
+      this.showPasteError('All rows were skipped because they are invalid.');
       return;
     }
     this.confirmAndAddCodeMaps(codeSystemIndex, parsed.rows, parsed.skipped);
@@ -529,7 +529,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
       return;
     }
     if (parsed.rows.length === 0) {
-      this.showPasteError('All rows were skipped because they are missing source or target values.');
+      this.showPasteError('All rows were skipped because they are invalid.');
       return;
     }
     this.confirmAndAddCodeMaps(codeSystemIndex, parsed.rows, parsed.skipped);
@@ -575,14 +575,13 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
     let skipped = 0;
     for (const line of lines) {
       const cols = line.split('\t');
-      if (cols.length < 2 || cols.length > 3) return { rows: [], skipped, formatError: true };
-      const source = cols[0].trim();
-      const target = cols[1].trim();
-      const display = cols.length >= 3 ? cols[2].trim() : '';
-      if (!source || !target) {
+      if (cols.length < 2 || !cols[0].trim() || !cols[1].trim()) {
         skipped++;
         continue;
       }
+      const source = cols[0].trim();
+      const target = cols[1].trim();
+      const display = cols.length >= 3 ? cols[2].trim() : '';
       rows.push({source, target, display});
     }
     return { rows, skipped, formatError: false };
@@ -594,19 +593,18 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
       skipEmptyLines: true,
     });
 
-    if (result.errors.length > 0 || result.data.length === 0) return null;
+    if (result.data.length === 0) return null;
 
     const rows: { source: string; target: string; display: string }[] = [];
     let skipped = 0;
     for (const cols of result.data) {
-      if (cols.length < 2 || cols.length > 3) return { rows: [], skipped, formatError: true };
-      const source = cols[0].trim();
-      const target = cols[1].trim();
-      const display = cols.length >= 3 ? cols[2].trim() : '';
-      if (!source || !target) {
+      if (cols.length < 2 || !cols[0].trim() || !cols[1].trim()) {
         skipped++;
         continue;
       }
+      const source = cols[0].trim();
+      const target = cols[1].trim();
+      const display = cols.length >= 3 ? cols[2].trim() : ''
       rows.push({source, target, display});
     }
     return { rows, skipped, formatError: false };
@@ -615,7 +613,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
   private confirmAndAddCodeMaps(codeSystemIndex: number, rows: { source: string; target: string; display: string }[], skipped: number = 0): void {
     let message = `${rows.length} code map(s) will be added.`;
     if (skipped > 0) {
-      message += ` ${skipped} row(s) were skipped because they are missing source or target values.`;
+      message += ` ${skipped} invalid row(s) were skipped.`;
     }
     message += ' Continue?';
 
