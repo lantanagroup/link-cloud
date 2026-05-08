@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -105,15 +106,7 @@ public static class FacilitySetupHelper
         }
         catch (Exception ex)
         {
-            output.WriteLine($"CreateOperationAsync failed for facility '{facilityId}': {ex.Message}");
-
-            var retryResponse = await normalizationClient.SearchFacilityOperationsAsync(facilityId);
-            if (retryResponse?.Records?.Count > 0)
-            {
-                output.WriteLine($"Normalization config for facility '{facilityId}' was created by a concurrent request. Continuing.");
-                return;
-            }
-
+            output.WriteLine($"CreateOperationAsync failed for facility '{facilityId.SanitizeForLog()}': {ex.GetType().Name}");
             throw;
         }
     }
