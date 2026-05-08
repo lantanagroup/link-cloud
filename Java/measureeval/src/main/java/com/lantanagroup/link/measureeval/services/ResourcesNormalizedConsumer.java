@@ -24,6 +24,7 @@ public class ResourcesNormalizedConsumer extends AbstractResourceConsumer<Resour
           ConsumerRecordRecoverer recoverer,
           MeasureReportGeneratedProducer measureReportGeneratedProducer,
           RedisResourceService redisResourceService,
+          AbsResourceService absResourceService,
           MongoOperations mongoOperations){
     super(
             patientStatusRepository,
@@ -36,6 +37,7 @@ public class ResourcesNormalizedConsumer extends AbstractResourceConsumer<Resour
             recoverer,
             measureReportGeneratedProducer,
             redisResourceService,
+            absResourceService,
             mongoOperations);
   }
 }
