@@ -154,7 +154,13 @@ public static class GeneralStartupExtensions
                     if (string.IsNullOrEmpty(connectionString))
                         throw new InvalidOperationException("Database connection string is null or empty.");
 
-                    options.UseSqlServer(connectionString)
+                    options.UseSqlServer(connectionString, sqlOptions =>
+                        {
+                            sqlOptions.EnableRetryOnFailure(
+                                maxRetryCount: 5,
+                                maxRetryDelay: TimeSpan.FromSeconds(10),
+                                errorNumbersToAdd: null);
+                        })
                        .AddInterceptors(updateBaseEntityInterceptor);
 
                     break;
