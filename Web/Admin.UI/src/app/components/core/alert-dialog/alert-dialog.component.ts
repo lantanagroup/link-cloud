@@ -5,9 +5,15 @@ import { MatButtonModule } from '@angular/material/button';
 
 export interface AlertDialogData {
   title: string;
+  /**
+   * SECURITY: When {@link isHtml} is true, `message` is bound via [innerHTML].
+   * Angular sanitizes scripts and event handlers, but passive HTML passes through.
+   * Only use isHtml with hardcoded strings — never with user input or API responses.
+   */
   message: string;
   icon?: string;
   iconColor?: string;
+  isHtml?: boolean;
 }
 
 @Component({

@@ -333,144 +333,151 @@ public class ReferenceResourceService : IReferenceResourceService
         List<string> resourceIds,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, cancellationToken);
-        await AcquireLockAsync(primaryLog, resourceType, cancellationToken);
+        bool created = false;
+        long referenceLogId = 0;
 
-        try
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async (ct) =>
         {
-            var existingLogId = await _dbContext.DataAcquisitionLogs
-                .AsNoTracking()
-                .Where(l => l.FacilityId == primaryLog.FacilityId
-                    && l.CorrelationId == primaryLog.CorrelationId
-                    && l.QueryPhase == primaryLog.QueryPhase
-                    && l.ReferenceResourceType == resourceType.ToString())
-                .Select(l => (long?)l.Id)
-                .FirstOrDefaultAsync(cancellationToken);
+            _dbContext.ChangeTracker.Clear();
+            created = false;
 
-            var created = false;
-            long referenceLogId;
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, ct);
+            await AcquireLockAsync(primaryLog, resourceType, ct);
 
-            if (existingLogId.HasValue)
+            try
             {
-                referenceLogId = existingLogId.Value;
-            }
-            else
-            {
-                var fhirQueryType = MapOperationType(refConfig.OperationType);
-                var pageSize = refConfig.Paged > 0 ? (int?)refConfig.Paged : null;
-
-                var createdLog = await _dataAcquisitionLogManager.CreateAsync(new CreateDataAcquisitionLogModel
-                {
-                    FacilityId = primaryLog.FacilityId,
-                    CorrelationId = primaryLog.CorrelationId,
-                    ReportTrackingId = primaryLog.ReportTrackingId,
-                    ReportableEvent = primaryLog.ReportableEvent,
-                    Priority = primaryLog.Priority,
-                    PatientId = primaryLog.PatientId,
-                    ReferenceResourceType = resourceType.ToString(),
-                    FhirVersion = "R4",
-                    QueryType = fhirQueryType,
-                    QueryPhase = primaryLog.QueryPhase,
-                    Status = RequestStatus.Pending,
-                    ExecutionDate = DateTime.UtcNow,
-                    TraceId = primaryLog.TraceId,
-                    Notes = new List<string>
-                    {
-                        $"Reference aggregation log for {resourceType} created from primary correlation discovery."
-                    },
-                    FhirQuery = new List<CreateFhirQueryModel>
-                    {
-                        new CreateFhirQueryModel
-                        {
-                            FacilityId = primaryLog.FacilityId,
-                            IsReference = true,
-                            QueryType = fhirQueryType,
-                            Paged = pageSize,
-                            ResourceTypes = new List<ResourceType> { resourceType },
-                            QueryParameters = new List<string>()
-                        }
-                    }
-                }, cancellationToken);
-
-                referenceLogId = createdLog.Id;
-                created = true;
-
-                // Stamp ONLY the new reference log's SiblingCount with a single-row
-                // UPDATE so it participates in TryCompleteTailAsync's count-based tail
-                // gate. We deliberately avoid the previous wide-range UPDATE over every
-                // log in the (facility, correlation, phase) group: that wide UPDATE
-                // deadlocked with TryCompleteTailAsync's wide TailSent UPDATE on the
-                // same range. The exact stamped value is not significant for the tail
-                // threshold (which now COUNTs stamped siblings instead of trusting one
-                // row's value); we use the post-insert sibling count purely for human
-                // readability when inspecting the row.
-                var stampedSiblingCount = await _dbContext.DataAcquisitionLogs
+                var existingLogId = await _dbContext.DataAcquisitionLogs
                     .AsNoTracking()
-                    .CountAsync(
-                        l => l.FacilityId == primaryLog.FacilityId
-                            && l.CorrelationId == primaryLog.CorrelationId
-                            && l.QueryPhase == primaryLog.QueryPhase
-                            && l.SiblingCount != null,
-                        cancellationToken);
+                    .Where(l => l.FacilityId == primaryLog.FacilityId
+                        && l.CorrelationId == primaryLog.CorrelationId
+                        && l.QueryPhase == primaryLog.QueryPhase
+                        && l.ReferenceResourceType == resourceType.ToString())
+                    .Select(l => (long?)l.Id)
+                    .FirstOrDefaultAsync(ct);
 
-                await _dbContext.DataAcquisitionLogs
-                    .Where(l => l.Id == referenceLogId)
-                    .ExecuteUpdateAsync(setters => setters
-                        .SetProperty(l => l.SiblingCount, stampedSiblingCount + 1)
-                        .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
-                        cancellationToken);
-            }
-
-            var existingPendingIds = await _dbContext.PendingReferenceIds
-                .AsNoTracking()
-                .Where(p => p.DataAcquisitionLogId == referenceLogId)
-                .Select(p => p.ResourceId)
-                .ToListAsync(cancellationToken);
-
-            var existingAcquiredIds = await _dbContext.DataAcquisitionLogResourceIds
-                .AsNoTracking()
-                .Where(r => r.DataAcquisitionLogId == referenceLogId
-                    && r.ResourceId.StartsWith(resourceType + "/"))
-                .Select(r => r.ResourceId)
-                .ToListAsync(cancellationToken);
-
-            var acquiredBareIds = existingAcquiredIds
-                .Select(id => id.SplitReference())
-                .ToHashSet(StringComparer.Ordinal);
-
-            var pendingLookup = existingPendingIds.ToHashSet(StringComparer.Ordinal);
-            var toInsert = resourceIds
-                .Where(id => !pendingLookup.Contains(id) && !acquiredBareIds.Contains(id))
-                .Select(id => new PendingReferenceId
+                if (existingLogId.HasValue)
                 {
-                    DataAcquisitionLogId = referenceLogId,
-                    FacilityId = primaryLog.FacilityId,
-                    CorrelationId = primaryLog.CorrelationId!,
-                    ResourceType = resourceType.ToString(),
-                    ResourceId = id,
-                    CreateDate = DateTime.UtcNow
-                })
-                .ToList();
+                    referenceLogId = existingLogId.Value;
+                }
+                else
+                {
+                    var fhirQueryType = MapOperationType(refConfig.OperationType);
+                    var pageSize = refConfig.Paged > 0 ? (int?)refConfig.Paged : null;
 
-            if (toInsert.Count > 0)
-            {
-                _dbContext.PendingReferenceIds.AddRange(toInsert);
-                await _dbContext.SaveChangesAsync(cancellationToken);
+                    var createdLog = await _dataAcquisitionLogManager.CreateAsync(new CreateDataAcquisitionLogModel
+                    {
+                        FacilityId = primaryLog.FacilityId,
+                        CorrelationId = primaryLog.CorrelationId,
+                        ReportTrackingId = primaryLog.ReportTrackingId,
+                        ReportableEvent = primaryLog.ReportableEvent,
+                        Priority = primaryLog.Priority,
+                        PatientId = primaryLog.PatientId,
+                        ReferenceResourceType = resourceType.ToString(),
+                        FhirVersion = "R4",
+                        QueryType = fhirQueryType,
+                        QueryPhase = primaryLog.QueryPhase,
+                        Status = RequestStatus.Pending,
+                        ExecutionDate = DateTime.UtcNow,
+                        TraceId = primaryLog.TraceId,
+                        Notes = new List<string>
+                        {
+                            $"Reference aggregation log for {resourceType} created from primary correlation discovery."
+                        },
+                        FhirQuery = new List<CreateFhirQueryModel>
+                        {
+                            new CreateFhirQueryModel
+                            {
+                                FacilityId = primaryLog.FacilityId,
+                                IsReference = true,
+                                QueryType = fhirQueryType,
+                                Paged = pageSize,
+                                ResourceTypes = new List<ResourceType> { resourceType },
+                                QueryParameters = new List<string>()
+                            }
+                        }
+                    }, ct);
+
+                    referenceLogId = createdLog.Id;
+                    created = true;
+
+                    // Stamp ONLY the new reference log's SiblingCount with a single-row
+                    // UPDATE so it participates in TryCompleteTailAsync's count-based tail
+                    // gate. We deliberately avoid the previous wide-range UPDATE over every
+                    // log in the (facility, correlation, phase) group: that wide UPDATE
+                    // deadlocked with TryCompleteTailAsync's wide TailSent UPDATE on the
+                    // same range. The exact stamped value is not significant for the tail
+                    // threshold (which now COUNTs stamped siblings instead of trusting one
+                    // row's value); we use the post-insert sibling count purely for human
+                    // readability when inspecting the row.
+                    var stampedSiblingCount = await _dbContext.DataAcquisitionLogs
+                        .AsNoTracking()
+                        .CountAsync(
+                            l => l.FacilityId == primaryLog.FacilityId
+                                && l.CorrelationId == primaryLog.CorrelationId
+                                && l.QueryPhase == primaryLog.QueryPhase
+                                && l.SiblingCount != null,
+                            ct);
+
+                    await _dbContext.DataAcquisitionLogs
+                        .Where(l => l.Id == referenceLogId)
+                        .ExecuteUpdateAsync(setters => setters
+                            .SetProperty(l => l.SiblingCount, stampedSiblingCount + 1)
+                            .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                            ct);
+                }
+
+                var existingPendingIds = await _dbContext.PendingReferenceIds
+                    .AsNoTracking()
+                    .Where(p => p.DataAcquisitionLogId == referenceLogId)
+                    .Select(p => p.ResourceId)
+                    .ToListAsync(ct);
+
+                var existingAcquiredIds = await _dbContext.DataAcquisitionLogResourceIds
+                    .AsNoTracking()
+                    .Where(r => r.DataAcquisitionLogId == referenceLogId
+                        && r.ResourceId.StartsWith(resourceType + "/"))
+                    .Select(r => r.ResourceId)
+                    .ToListAsync(ct);
+
+                var acquiredBareIds = existingAcquiredIds
+                    .Select(id => id.SplitReference())
+                    .ToHashSet(StringComparer.Ordinal);
+
+                var pendingLookup = existingPendingIds.ToHashSet(StringComparer.Ordinal);
+                var toInsert = resourceIds
+                    .Where(id => !pendingLookup.Contains(id) && !acquiredBareIds.Contains(id))
+                    .Select(id => new PendingReferenceId
+                    {
+                        DataAcquisitionLogId = referenceLogId,
+                        FacilityId = primaryLog.FacilityId,
+                        CorrelationId = primaryLog.CorrelationId!,
+                        ResourceType = resourceType.ToString(),
+                        ResourceId = id,
+                        CreateDate = DateTime.UtcNow
+                    })
+                    .ToList();
+
+                if (toInsert.Count > 0)
+                {
+                    _dbContext.PendingReferenceIds.AddRange(toInsert);
+                    await _dbContext.SaveChangesAsync(ct);
+                }
+
+                await transaction.CommitAsync(ct);
             }
-
-            await transaction.CommitAsync(cancellationToken);
-
-            if (created)
+            catch
             {
-                _logger.LogDebug(
-                    "FetchAndPersistAsync: created reference log {ReferenceLogId} for {FacilityId}/{CorrelationId}/{QueryPhase}/{ResourceType}.",
-                    referenceLogId.SanitizeForLog(), primaryLog.FacilityId.SanitizeForLog(), primaryLog.CorrelationId.SanitizeForLog(), primaryLog.QueryPhase.SanitizeForLog(), resourceType.SanitizeForLog());
+                await transaction.RollbackAsync(ct);
+                throw;
             }
-        }
-        catch
+        }, cancellationToken);
+
+        if (created)
         {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
+            _logger.LogDebug(
+                "FetchAndPersistAsync: created reference log {ReferenceLogId} for {FacilityId}/{CorrelationId}/{QueryPhase}/{ResourceType}.",
+                referenceLogId.SanitizeForLog(), primaryLog.FacilityId.SanitizeForLog(), primaryLog.CorrelationId.SanitizeForLog(), primaryLog.QueryPhase.SanitizeForLog(), resourceType.SanitizeForLog());
         }
     }
 

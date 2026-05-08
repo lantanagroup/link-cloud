@@ -10,6 +10,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Medallion.Threading;
 using Moq;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
@@ -38,6 +39,15 @@ public class DataAcquisitionLogManagerTests
             .UseInMemoryDatabase($"DataAcquisitionLogManagerTests_{Guid.NewGuid():N}")
             .Options;
         _dbContext = new DataAcquisitionDbContext(options);
+
+        var semaphoreHandle = new Mock<IDistributedSynchronizationHandle>();
+        var semaphore = new Mock<IDistributedSemaphore>();
+        semaphore
+            .Setup(s => s.TryAcquireAsync(It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .Returns(new ValueTask<IDistributedSynchronizationHandle?>(semaphoreHandle.Object));
+        _semaphoreProvider
+            .Setup(p => p.CreateSemaphore(It.IsAny<string>(), It.IsAny<int>()))
+            .Returns(semaphore.Object);
     }
 
     private DataAcquisitionLogManager CreateManager() =>

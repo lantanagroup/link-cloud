@@ -9,6 +9,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
