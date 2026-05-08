@@ -105,7 +105,7 @@ public static class FacilitySetupHelper
         }
         catch (Exception ex)
         {
-            output.WriteLine($"CreateOperationAsync failed for facility '{facilityId}': {ex.StackTrace}");
+            output.WriteLine($"CreateOperationAsync failed for facility '{facilityId}': {ex.Message}");
 
             var retryResponse = await normalizationClient.SearchFacilityOperationsAsync(facilityId);
             if (retryResponse?.Records?.Count > 0)
