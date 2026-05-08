@@ -41,8 +41,25 @@ public class DataAcquisitionLogManagerTests
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        var semaphoreProvider = CreateSemaphoreProviderMock();
         var resourceCache = scope.ServiceProvider.GetRequiredService<IResourceCache>();
-        return new DataAcquisitionLogManager(logger, database, dbContext, queries, resourceCache);
+        return new DataAcquisitionLogManager(logger, database, dbContext, queries, semaphoreProvider, resourceCache);
+    }
+
+    private static IDistributedSemaphoreProvider CreateSemaphoreProviderMock()
+    {
+        var handle = new Mock<IDistributedSynchronizationHandle>();
+        var semaphore = new Mock<IDistributedSemaphore>();
+        var provider = new Mock<IDistributedSemaphoreProvider>();
+
+        semaphore
+            .Setup(s => s.TryAcquireAsync(It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .Returns(new ValueTask<IDistributedSynchronizationHandle?>(handle.Object));
+        provider
+            .Setup(p => p.CreateSemaphore(It.IsAny<string>(), It.IsAny<int>()))
+            .Returns(semaphore.Object);
+
+        return provider.Object;
     }
 
     [Fact]

@@ -69,14 +69,16 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     public readonly IDatabase _database;
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly IDataAcquisitionLogQueries _logQueries;
+    private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
     private readonly IResourceCache _resourceCache;
 
-    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext, IDataAcquisitionLogQueries logQueries, IResourceCache resourceCache)
+    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext, IDataAcquisitionLogQueries logQueries, IDistributedSemaphoreProvider distributedSemaphoreProvider, IResourceCache resourceCache)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logQueries = logQueries;
+        _distributedSemaphoreProvider = distributedSemaphoreProvider ?? throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
         _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
     }
 
