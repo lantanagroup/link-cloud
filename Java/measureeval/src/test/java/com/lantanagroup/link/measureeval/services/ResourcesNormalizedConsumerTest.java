@@ -75,6 +75,7 @@ class ResourcesNormalizedConsumerTest {
                 recoverer,
                 measureReportGeneratedProducer,
                 redisResourceService,
+                null,
                 mongoOperations);
     }
 
