@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Report.Data;
+﻿using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
@@ -262,7 +262,7 @@ namespace LantanaGroup.Link.Report.Controllers
             string? reportType = null,
             DateTime? reportStartDate = null,
             DateTime? reportEndDate = null,
-            [FromQuery] ScheduleStatus[]? status = null,
+            [FromQuery] List<ScheduleStatus>? status = null,
             bool? endOfReportPeriodJobHasRun = null,
             bool includeDeleted = false,
             string? sortBy = null,
@@ -294,7 +294,7 @@ namespace LantanaGroup.Link.Report.Controllers
                     reportType,
                     reportStartDate,
                     reportEndDate,
-                    statuses: status,
+                    statuses: status?.ToArray(),
                     endOfReportPeriodJobHasRun,
                     includeDeleted,
                     sortBy,

@@ -1,4 +1,4 @@
-namespace LantanaGroup.Automation.Generation;
+﻿namespace LantanaGroup.Automation.Generation;
 
 /// <summary>
 /// Simulates measure-specific CQL SDE <c>where</c>-clause filtering at the individual-resource level.
@@ -17,7 +17,13 @@ public static class CqlFilterSimulator
         new AchConditionFilterProfile(),
         new HypoglycemicConditionFilterProfile(),
         new AchObservationFilterProfile(),
-        new HypoglycemicObservationFilterProfile()
+        new HypoglycemicObservationFilterProfile(),
+        new AchProcedureFilterProfile(),
+        new AchHypoMedicationRequestFilterProfile(),
+        new HypoMedicationAdministrationFilterProfile(),
+        new AchHypoCoverageFilterProfile(),
+        new AchHypoServiceRequestFilterProfile(),
+        new AchEncounterFilterProfile()
     ];
 
     /// <summary>
@@ -40,6 +46,24 @@ public static class CqlFilterSimulator
         if (measures == null || measures.Count == 0 || input == null)
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        // Resolve the union of IP windows across all selected (qualifying) measures. Each
+        // profile then queries this set via IpWindowExtensions to model the CQL pattern
+        // "where exists IP InitialPopulation where Resource.X overlaps IP.period".
+        var ipWindows = MeasureInitialPopulationResolver.Resolve(measures, input);
+
+        // Back-compat: if the input was built via the legacy single-encounter positional
+        // ctor (no Encounters list), fall back to a single window from the EncounterId/
+        // Start/End triple. Pre-Landing-3 tests and the synthetic single-encounter
+        // generator path both rely on this.
+        if (ipWindows.Count == 0
+            && (input.Encounters == null || input.Encounters.Count == 0)
+            && !string.IsNullOrEmpty(input.EncounterId))
+        {
+            ipWindows = [new MeasureInitialPopulationResolver.IpWindow(input.EncounterId, input.EncounterStart, input.EncounterEnd)];
+        }
+
+        var enriched = input with { IpWindows = ipWindows };
+
         var perTypeExclusions = new Dictionary<string, List<HashSet<string>>>(StringComparer.OrdinalIgnoreCase);
         foreach (var profile in Profiles)
         {
@@ -51,7 +75,7 @@ public static class CqlFilterSimulator
                 bucket = new List<HashSet<string>>();
                 perTypeExclusions[profile.TargetResourceType] = bucket;
             }
-            bucket.Add(profile.ComputeExcludedKeys(input));
+            bucket.Add(profile.ComputeExcludedKeys(enriched));
         }
 
         var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -73,6 +97,17 @@ public static class CqlFilterSimulator
     /// <summary>
     /// Extracted per-patient inputs used by the simulator.
     /// Build via <see cref="CqlFilterInputExtractor"/>.
+    ///
+    /// New resource-type collections (Procedures / MedicationRequests / etc.) and
+    /// multi-encounter / measurement-period fields are exposed as <c>init</c> properties
+    /// with sensible defaults so older callers / tests using only the positional ctor for
+    /// Conditions + Observations continue to compile and behave the same.
+    ///
+    /// <list type="bullet">
+    ///   <item><see cref="Encounters"/> — ALL encounters extracted from the patient's data. The simulator's IP resolver consumes this list.</item>
+    ///   <item><see cref="MeasurementPeriodStart"/> / <see cref="MeasurementPeriodEnd"/> — when set, IP encounters must overlap this window. Default is open (MinValue/MaxValue) for back-compat.</item>
+    ///   <item><see cref="IpWindows"/> — populated by <see cref="ComputeFilteredKeys"/> before profiles run; never set by the extractor.</item>
+    /// </list>
     /// </summary>
     public sealed record PatientCqlInput(
         string PatientId,
@@ -80,7 +115,31 @@ public static class CqlFilterSimulator
         DateTime EncounterStart,
         DateTime EncounterEnd,
         IReadOnlyList<ConditionContext> Conditions,
-        IReadOnlyList<ObservationContext> Observations);
+        IReadOnlyList<ObservationContext> Observations)
+    {
+        public IReadOnlyList<ProcedureContext> Procedures { get; init; } = Array.Empty<ProcedureContext>();
+        public IReadOnlyList<MedicationRequestContext> MedicationRequests { get; init; } = Array.Empty<MedicationRequestContext>();
+        public IReadOnlyList<MedicationAdministrationContext> MedicationAdministrations { get; init; } = Array.Empty<MedicationAdministrationContext>();
+        public IReadOnlyList<CoverageContext> Coverages { get; init; } = Array.Empty<CoverageContext>();
+        public IReadOnlyList<ServiceRequestContext> ServiceRequests { get; init; } = Array.Empty<ServiceRequestContext>();
+        public IReadOnlyList<EncounterContext> Encounters { get; init; } = Array.Empty<EncounterContext>();
+        public DateTime MeasurementPeriodStart { get; init; } = DateTime.MinValue;
+        public DateTime MeasurementPeriodEnd { get; init; } = DateTime.MaxValue;
+        public IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> IpWindows { get; init; }
+            = Array.Empty<MeasureInitialPopulationResolver.IpWindow>();
+    }
+
+    /// <summary>
+    /// CQL-relevant attributes of a patient's encounter. <see cref="ClassCode"/> is the
+    /// FHIR <c>class.code</c> ('IMP', 'EMER', 'AMB', etc.) used by the IP resolver to
+    /// decide which encounters constitute the Initial Population for each measure.
+    /// </summary>
+    public sealed record EncounterContext(
+        string EncounterId,
+        DateTime PeriodStart,
+        DateTime PeriodEnd,
+        string ClassCode,
+        string Status);
 
     public interface ICqlFilterProfile
     {
@@ -103,15 +162,14 @@ public static class CqlFilterSimulator
 
         protected abstract bool IncludeCondition(
             ConditionContext c,
-            DateTime encounterEnd,
-            string encounterId);
+            IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows);
 
         public HashSet<string> ComputeExcludedKeys(PatientCqlInput input)
         {
             var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var c in input.Conditions)
             {
-                if (!IncludeCondition(c, input.EncounterEnd, input.EncounterId))
+                if (!IncludeCondition(c, input.IpWindows))
                     excluded.Add($"Condition/{c.ResourceId}");
             }
             return excluded;
@@ -120,8 +178,8 @@ public static class CqlFilterSimulator
 
     /// <summary>
     /// ACH Monthly + ACH Daily SDE Condition semantics:
-    /// - problem-list-item requires active + recordedDate strictly before encounter end date
-    /// - OR encounter-diagnosis/health-concern tied to the encounter
+    /// - problem-list-item requires active + recordedDate strictly before the end of any IP encounter
+    /// - OR encounter-diagnosis/health-concern tied to ANY IP encounter
     /// </summary>
     private sealed class AchConditionFilterProfile : ConditionFilterProfileBase
     {
@@ -129,13 +187,16 @@ public static class CqlFilterSimulator
             measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
             || measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation);
 
-        protected override bool IncludeCondition(ConditionContext c, DateTime encounterEnd, string encounterId)
+        protected override bool IncludeCondition(ConditionContext c, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows)
         {
-            if (c.HasCategory("problem-list-item") && c.IsActive && c.RecordedDate < encounterEnd.Date)
+            if (c.HasCategory("problem-list-item") && c.IsActive
+                && ipWindows.AnyEndStrictlyAfter(c.RecordedDate))
+            {
                 return true;
+            }
 
             if ((c.HasCategory("encounter-diagnosis") || c.HasCategory("health-concern"))
-                && EncounterMatches(c.EncounterReference, encounterId))
+                && ipWindows.AnyEncounterMatches(c.EncounterReference))
             {
                 return true;
             }
@@ -146,7 +207,7 @@ public static class CqlFilterSimulator
 
     /// <summary>
     /// Hypoglycemic SDE Condition semantics:
-    /// - conditions overlapping Initial Population period are included
+    /// - conditions whose recordedDate is on or before the end of ANY IP encounter are included
     /// - no active-status constraint in this measure's SDE Condition define.
     /// </summary>
     private sealed class HypoglycemicConditionFilterProfile : ConditionFilterProfileBase
@@ -154,9 +215,9 @@ public static class CqlFilterSimulator
         public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
             measures.Contains(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
 
-        protected override bool IncludeCondition(ConditionContext c, DateTime encounterEnd, string encounterId)
+        protected override bool IncludeCondition(ConditionContext c, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows)
         {
-            return c.RecordedDate <= encounterEnd.Date;
+            return ipWindows.AnyEndOnOrAfter(c.RecordedDate);
         }
     }
 
@@ -173,20 +234,6 @@ public static class CqlFilterSimulator
     {
         public bool HasCategory(string code) =>
             CategoryCodes.Any(c => string.Equals(c, code, StringComparison.OrdinalIgnoreCase));
-    }
-
-    /// <summary>
-    /// Compares a Condition.encounter reference (may be "Encounter/{id}" or just "{id}")
-    /// against the patient's encounter id.
-    /// </summary>
-    private static bool EncounterMatches(string? encounterReference, string encounterId)
-    {
-        if (string.IsNullOrWhiteSpace(encounterReference))
-            return false;
-
-        var slash = encounterReference.IndexOf('/');
-        var refId = slash >= 0 ? encounterReference[(slash + 1)..] : encounterReference;
-        return string.Equals(refId, encounterId, StringComparison.OrdinalIgnoreCase);
     }
 
     // -------------------------------------------------------------------
@@ -225,15 +272,14 @@ public static class CqlFilterSimulator
 
         protected abstract bool IncludeObservation(
             ObservationContext o,
-            DateTime encounterStart,
-            DateTime encounterEnd);
+            IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows);
 
         public HashSet<string> ComputeExcludedKeys(PatientCqlInput input)
         {
             var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var o in input.Observations)
             {
-                if (!IncludeObservation(o, input.EncounterStart, input.EncounterEnd))
+                if (!IncludeObservation(o, input.IpWindows))
                     excluded.Add($"Observation/{o.ResourceId}");
             }
             return excluded;
@@ -268,12 +314,12 @@ public static class CqlFilterSimulator
             measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
             || measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation);
 
-        protected override bool IncludeObservation(ObservationContext o, DateTime encounterStart, DateTime encounterEnd)
+        protected override bool IncludeObservation(ObservationContext o, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows)
         {
             if (!o.CategoryCodes.Any(c => AchCategoryCodes.Contains(c)))
                 return false;
 
-            return o.OverlapsPeriod(encounterStart, encounterEnd);
+            return ipWindows.AnyOverlaps(o.EffectiveStart, o.EffectiveEnd);
         }
     }
 
@@ -300,13 +346,287 @@ public static class CqlFilterSimulator
         public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
             measures.Contains(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
 
-        protected override bool IncludeObservation(ObservationContext o, DateTime encounterStart, DateTime encounterEnd)
+        protected override bool IncludeObservation(ObservationContext o, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows)
         {
             if (!BloodGlucoseLoincCodes.Contains(o.LoincCode))
                 return false;
 
             // Hypoglycemic uses "start of effective during IP" — point-in-IP semantics.
-            return o.EffectiveStart >= encounterStart && o.EffectiveStart <= encounterEnd;
+            return ipWindows.AnyContains(o.EffectiveStart);
         }
+    }
+
+    // -------------------------------------------------------------------
+    //  Procedure / MedicationRequest / MedicationAdministration / Coverage / ServiceRequest
+    //
+    //  These resource types are retrieved by SDE definitions in both ACH and Hypoglycemic
+    //  measures and are filtered against the Initial Population (IP) encounter's period.
+    //  Each profile iterates the resolved IpWindows, modeling the CQL pattern
+    //  "where exists IP InitialPopulation where Resource.X overlaps IP.period".
+    // -------------------------------------------------------------------
+
+    /// <summary>
+    /// CQL-relevant attributes of a Procedure resource. Performed start/end normalize both
+    /// <c>performedDateTime</c> (start == end) and <c>performedPeriod</c> shapes.
+    /// </summary>
+    public sealed record ProcedureContext(
+        string ResourceId,
+        DateTime PerformedStart,
+        DateTime PerformedEnd,
+        string EncounterReference)
+    {
+        public bool OverlapsPeriod(DateTime periodStart, DateTime periodEnd) =>
+            PerformedStart <= periodEnd && PerformedEnd >= periodStart;
+    }
+
+    /// <summary>CQL-relevant attributes of a MedicationRequest. <c>authoredOn</c> is the only date.</summary>
+    public sealed record MedicationRequestContext(
+        string ResourceId,
+        DateTime AuthoredOn,
+        string EncounterReference);
+
+    /// <summary>CQL-relevant attributes of a MedicationAdministration. <c>effective</c> normalizes both DateTime and Period shapes.</summary>
+    public sealed record MedicationAdministrationContext(
+        string ResourceId,
+        DateTime EffectiveStart,
+        DateTime EffectiveEnd,
+        string EncounterReference)
+    {
+        public bool OverlapsPeriod(DateTime periodStart, DateTime periodEnd) =>
+            EffectiveStart <= periodEnd && EffectiveEnd >= periodStart;
+    }
+
+    /// <summary>CQL-relevant attributes of a Coverage. <c>period</c> normalizes start/end with open-end support.</summary>
+    public sealed record CoverageContext(
+        string ResourceId,
+        DateTime PeriodStart,
+        DateTime PeriodEnd)
+    {
+        public bool OverlapsPeriod(DateTime periodStart, DateTime periodEnd) =>
+            PeriodStart <= periodEnd && PeriodEnd >= periodStart;
+    }
+
+    /// <summary>CQL-relevant attributes of a ServiceRequest. <c>authoredOn</c> is the only date.</summary>
+    public sealed record ServiceRequestContext(
+        string ResourceId,
+        DateTime AuthoredOn,
+        string EncounterReference);
+
+    // ----- Procedure profiles -----
+
+    private abstract class ProcedureFilterProfileBase : ICqlFilterProfile
+    {
+        public string TargetResourceType => "Procedure";
+        public abstract bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
+        protected abstract bool IncludeProcedure(ProcedureContext p, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows);
+
+        public HashSet<string> ComputeExcludedKeys(PatientCqlInput input)
+        {
+            var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var p in input.Procedures)
+            {
+                if (!IncludeProcedure(p, input.IpWindows))
+                    excluded.Add($"Procedure/{p.ResourceId}");
+            }
+            return excluded;
+        }
+    }
+
+    /// <summary>
+    /// ACH Monthly + Daily SDE Procedure: <c>Procedures.performed overlaps IP.period</c>
+    /// (overlap against ANY IP encounter window).
+    /// </summary>
+    private sealed class AchProcedureFilterProfile : ProcedureFilterProfileBase
+    {
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            || measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation);
+
+        protected override bool IncludeProcedure(ProcedureContext p, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows) =>
+            ipWindows.AnyOverlaps(p.PerformedStart, p.PerformedEnd);
+    }
+
+    // ----- MedicationRequest profiles -----
+
+    private abstract class MedicationRequestFilterProfileBase : ICqlFilterProfile
+    {
+        public string TargetResourceType => "MedicationRequest";
+        public abstract bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
+        protected abstract bool IncludeMedicationRequest(MedicationRequestContext m, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows);
+
+        public HashSet<string> ComputeExcludedKeys(PatientCqlInput input)
+        {
+            var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var m in input.MedicationRequests)
+            {
+                if (!IncludeMedicationRequest(m, input.IpWindows))
+                    excluded.Add($"MedicationRequest/{m.ResourceId}");
+            }
+            return excluded;
+        }
+    }
+
+    /// <summary>
+    /// ACH Monthly + Daily + Hypoglycemic SDE Medication Request:
+    /// <c>MedicationRequests.authoredOn during IP.period</c> (during ANY IP encounter window).
+    /// (Hypoglycemic actually uses <c>HospitalizationWithObservationOrEmergency(IP)</c> which
+    /// extends the window to include adjacent observation/ED encounters; approximated here
+    /// by relying on the union of IP windows the resolver returns.)
+    /// </summary>
+    private sealed class AchHypoMedicationRequestFilterProfile : MedicationRequestFilterProfileBase
+    {
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            || measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)
+            || measures.Contains(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
+
+        protected override bool IncludeMedicationRequest(MedicationRequestContext m, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows) =>
+            ipWindows.AnyContains(m.AuthoredOn);
+    }
+
+    // ----- MedicationAdministration profiles -----
+
+    private abstract class MedicationAdministrationFilterProfileBase : ICqlFilterProfile
+    {
+        public string TargetResourceType => "MedicationAdministration";
+        public abstract bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
+        protected abstract bool IncludeMedicationAdministration(MedicationAdministrationContext m, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows);
+
+        public HashSet<string> ComputeExcludedKeys(PatientCqlInput input)
+        {
+            var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var m in input.MedicationAdministrations)
+            {
+                if (!IncludeMedicationAdministration(m, input.IpWindows))
+                    excluded.Add($"MedicationAdministration/{m.ResourceId}");
+            }
+            return excluded;
+        }
+    }
+
+    /// <summary>
+    /// Hypoglycemic SDE Medication Administration:
+    /// <c>MedicationAdministrations.effective overlaps HospitalizationWithObservationOrEmergency(IP)</c>.
+    /// Approximated as overlap with ANY IP encounter window. ACH measures do not retrieve
+    /// MedicationAdministration directly.
+    /// </summary>
+    private sealed class HypoMedicationAdministrationFilterProfile : MedicationAdministrationFilterProfileBase
+    {
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
+
+        protected override bool IncludeMedicationAdministration(MedicationAdministrationContext m, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows) =>
+            ipWindows.AnyOverlaps(m.EffectiveStart, m.EffectiveEnd);
+    }
+
+    // ----- Coverage profiles -----
+
+    private abstract class CoverageFilterProfileBase : ICqlFilterProfile
+    {
+        public string TargetResourceType => "Coverage";
+        public abstract bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
+        protected abstract bool IncludeCoverage(CoverageContext c, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows);
+
+        public HashSet<string> ComputeExcludedKeys(PatientCqlInput input)
+        {
+            var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var c in input.Coverages)
+            {
+                if (!IncludeCoverage(c, input.IpWindows))
+                    excluded.Add($"Coverage/{c.ResourceId}");
+            }
+            return excluded;
+        }
+    }
+
+    /// <summary>
+    /// ACH Monthly + Daily + Hypoglycemic SDE Coverage:
+    /// <c>Coverages.period overlaps IP.period</c> (overlap against ANY IP encounter window).
+    /// </summary>
+    private sealed class AchHypoCoverageFilterProfile : CoverageFilterProfileBase
+    {
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            || measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)
+            || measures.Contains(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
+
+        protected override bool IncludeCoverage(CoverageContext c, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows) =>
+            ipWindows.AnyOverlaps(c.PeriodStart, c.PeriodEnd);
+    }
+
+    // ----- ServiceRequest profiles -----
+
+    private abstract class ServiceRequestFilterProfileBase : ICqlFilterProfile
+    {
+        public string TargetResourceType => "ServiceRequest";
+        public abstract bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
+        protected abstract bool IncludeServiceRequest(ServiceRequestContext s, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows);
+
+        public HashSet<string> ComputeExcludedKeys(PatientCqlInput input)
+        {
+            var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var s in input.ServiceRequests)
+            {
+                if (!IncludeServiceRequest(s, input.IpWindows))
+                    excluded.Add($"ServiceRequest/{s.ResourceId}");
+            }
+            return excluded;
+        }
+    }
+
+    /// <summary>
+    /// ACH Monthly + Daily + Hypoglycemic SDE Service Request:
+    /// <c>ServiceRequests.authoredOn during IP.period</c> (during ANY IP encounter window).
+    /// </summary>
+    private sealed class AchHypoServiceRequestFilterProfile : ServiceRequestFilterProfileBase
+    {
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            || measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)
+            || measures.Contains(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
+
+        protected override bool IncludeServiceRequest(ServiceRequestContext s, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows) =>
+            ipWindows.AnyContains(s.AuthoredOn);
+    }
+
+    // ----- Encounter profile -----
+
+    private abstract class EncounterFilterProfileBase : ICqlFilterProfile
+    {
+        public string TargetResourceType => "Encounter";
+        public abstract bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
+        protected abstract bool IncludeEncounter(EncounterContext enc, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows);
+
+        public HashSet<string> ComputeExcludedKeys(PatientCqlInput input)
+        {
+            var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var enc in input.Encounters)
+            {
+                if (!IncludeEncounter(enc, input.IpWindows))
+                    excluded.Add($"Encounter/{enc.EncounterId}");
+            }
+            return excluded;
+        }
+    }
+
+    /// <summary>
+    /// ACH Monthly + Daily Encounter retrieval:
+    /// IP encounters (qualifying class within measurement period) plus SDE Encounter
+    /// (encounters NOT in IP whose period overlaps an IP encounter's period). Both
+    /// reduce to: <c>encounter.period overlaps ANY IP.period</c> — an IP encounter
+    /// trivially overlaps its own period, and SDE Encounter pulls in non-IP overlappers.
+    ///
+    /// Hypoglycemic only retrieves IP encounters (no SDE Encounter equivalent), so the
+    /// same predicate applies — non-IP-overlapping encounters are excluded for both.
+    /// </summary>
+    private sealed class AchEncounterFilterProfile : EncounterFilterProfileBase
+    {
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            || measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation)
+            || measures.Contains(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
+
+        protected override bool IncludeEncounter(EncounterContext enc, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows) =>
+            ipWindows.AnyOverlaps(enc.PeriodStart, enc.PeriodEnd);
     }
 }

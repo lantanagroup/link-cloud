@@ -1,4 +1,4 @@
-# BackendE2ETests
+﻿# BackendE2ETests
 
 End-to-end integration tests that exercise the full Link reporting pipeline against a running
 Link environment (FHIR server, DataAcquisition, Normalization, MeasureEval, Validation, Report,
@@ -161,8 +161,8 @@ variables are below; suite-specific variables use the prefix shown in each test'
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `EXTERNAL_FHIR_SERVER_BASE_URL` | FHIR base URL reachable from the test host | `http://localhost:6157/fhir` |
-| `INTERNAL_FHIR_SERVER_BASE_URL` | FHIR base URL reachable from Link services (in-container DNS) | `http://fhir-server:8080/fhir` |
+| `FHIR_SERVER_BASE_URL` | FHIR base URL the test process itself reaches. (Legacy alias: `EXTERNAL_FHIR_SERVER_BASE_URL`.) | `http://localhost:6157/fhir` |
+| `FACILITY_FHIR_SERVER_BASE_URL` | FHIR base URL registered on each test facility's query config; Link's services in docker read this back. (Legacy alias: `INTERNAL_FHIR_SERVER_BASE_URL`.) | `http://fhir-server:8080/fhir` |
 | `ADMIN_BFF_BASE_URL` | Admin BFF base URL | `http://localhost:8063/api` |
 | `LOKI_BASE_URL` | Loki base URL for log scraping | `http://localhost:3100` |
 | `E2E_GENERATED_FHIR_OUTPUT_PATH` | Override for where generated FHIR bundle snapshots land | `<test-dir>/generated-fhir-snapshots/<TestName>` |

@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;

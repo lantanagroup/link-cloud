@@ -83,12 +83,16 @@
                             <input class="form-control" type="number" min="1" id="Seed" value="20260329" />
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label" for="PatientCount">Patient Count</label>
-                            <input class="form-control" type="number" id="PatientCount" value="10" readonly />
+                            <label class="form-label" for="PatientCount">Total Patients</label>
+                            <input class="form-control" type="number" id="PatientCount" value="10" readonly title="Sum of cohort patients + imported patients (read-only)." />
                         </div>
-                        <div class="col-md-2">
-                            <label class="form-label" for="PatientPrefix">Prefix</label>
-                            <input class="form-control" type="text" id="PatientPrefix" value="CustomPatient" maxlength="64" />
+                        <div class="col-md-3">
+                            <label class="form-label" for="ReportPeriodStart">Report Period Start</label>
+                            <input class="form-control" type="date" id="ReportPeriodStart" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="ReportPeriodEnd">Report Period End</label>
+                            <input class="form-control" type="date" id="ReportPeriodEnd" />
                         </div>
                         <div class="col-12 d-flex gap-3">
                             <div class="form-check">
@@ -104,7 +108,7 @@
                             <div class="au-cohort-card mt-1">
                                 <div class="card-body">
                                     <span class="fw-semibold"><i class="bi bi-people-fill me-1"></i>Cohorts</span>
-                                    <table class="table table-sm table-bordered mb-2 mt-2" id="cohortTable">
+                                    <table class="table table-sm table-bordered au-table mb-2 mt-2" id="cohortTable">
                                         <thead>
                                             <tr>
                                                 <th style="width:40px">#</th>
@@ -121,6 +125,43 @@
                                     <div class="d-flex gap-2" id="cohortActions">
                                         <button type="button" class="btn btn-sm btn-outline-success" id="addQualifyingCohort">+ Qualifying</button>
                                         <button type="button" class="btn btn-sm btn-outline-warning" id="addNonQualifyingCohort">+ Non-Qualifying</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="importedPatientsBuilder" class="col-12">
+                            <div class="au-cohort-card mt-1">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="fw-semibold"><i class="bi bi-cloud-arrow-down-fill me-1"></i>Imported Patients <small class="text-muted ms-1" id="importedSummary"></small></span>
+                                    </div>
+                                    <div class="small text-muted mb-2">
+                                        Supplements the random/cohort generation above. ID-based patients are fetched from the configured FHIR server at run time and are <em>not</em> expunged on cleanup. Bundle uploads are uploaded to the FHIR server during the run and <em>are</em> expunged on cleanup.
+                                    </div>
+                                    <table class="table table-sm table-bordered au-table mb-2" id="importedTable">
+                                        <thead>
+                                            <tr>
+                                                <th style="width:40px">#</th>
+                                                <th style="width:90px">Source</th>
+                                                <th>Patient ID / File</th>
+                                                <th>Measure Eligibility</th>
+                                                <th style="width:170px">Encounter Dates</th>
+                                                <th style="width:90px">Detected</th>
+                                                <th style="width:40px"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="importedRows"></tbody>
+                                    </table>
+                                    <div class="d-flex gap-2 align-items-center flex-wrap" id="importedActions">
+                                        <div class="input-group input-group-sm" style="width:auto;">
+                                            <span class="input-group-text">Patient ID</span>
+                                            <input type="text" class="form-control" id="newImportedPatientId" placeholder="e.g. patient-123" maxlength="128" style="width:200px;" />
+                                            <button type="button" class="btn btn-outline-primary" id="btnAddImportedById">+ Add by ID</button>
+                                        </div>
+                                        <label class="btn btn-outline-primary btn-sm mb-0">
+                                            <i class="bi bi-upload me-1"></i>Upload Bundle JSON
+                                            <input type="file" id="importedBundleFile" accept="application/json,.json" multiple hidden />
+                                        </label>
                                     </div>
                                 </div>
                             </div>
@@ -155,6 +196,7 @@
     var deleteUrl = '@Url.Action("DeleteInline", "Scenarios")';
     var cloneUrl = '@Url.Action("CloneInline", "Scenarios")';
     var getJsonUrl = '@Url.Action("GetJson", "Scenarios")';
+    var classifyImportedUrl = '@Url.Action("ClassifyImported", "Scenarios")';
 
     function notifyChanged(action, id, name) {
         document.dispatchEvent(new CustomEvent('scenario-editor:changed', {
@@ -172,6 +214,8 @@
     function setEditable(e) {
         overlay.style.display = e ? 'none' : '';
         cohortActions.style.display = e ? '' : 'none';
+        var ia = document.getElementById('importedActions');
+        if (ia) ia.style.display = e ? '' : 'none';
         btnSave.style.display = e ? '' : 'none';
     }
 
@@ -308,7 +352,8 @@
     function reindex() { Array.prototype.forEach.call(cohortRows.children, function (r, i) { r.querySelector('td:first-child').textContent = i + 1; }); }
     function syncCount() {
         var t = getCohorts().reduce(function (s, c) { return s + (c.patientCount || 0); }, 0);
-        document.getElementById('PatientCount').value = t > 0 ? t : 0;
+        var importedCount = importedRows ? importedRows.children.length : 0;
+        document.getElementById('PatientCount').value = (t + importedCount) > 0 ? (t + importedCount) : 0;
     }
     function getCohorts() {
         return Array.prototype.map.call(cohortRows.children, function (row) {
@@ -338,11 +383,292 @@
         cb.addEventListener('change', function () { Array.prototype.forEach.call(cohortRows.children, function (r) { rerenderEditor(r); }); });
     });
 
+    // ---- Imported Patients ----
+    var importedRows = document.getElementById('importedRows');
+    var importedSummary = document.getElementById('importedSummary');
+
+    // Auto-suggest a Report Period that encloses the supplied encounter dates, but only
+    // when the period inputs are currently empty (never overwrite a user-set value).
+    function suggestPeriodFromEncounter(encStartIso, encEndIso) {
+        var startEl = document.getElementById('ReportPeriodStart');
+        var endEl = document.getElementById('ReportPeriodEnd');
+        if (!startEl || !endEl) return;
+        var hasStart = !!(startEl.value || '').trim();
+        var hasEnd = !!(endEl.value || '').trim();
+        if (hasStart && hasEnd) return;
+
+        var s = encStartIso ? new Date(encStartIso) : null;
+        var e = encEndIso ? new Date(encEndIso) : s;
+        if (!s && !e) return;
+        if (!s) s = e;
+        if (!e) e = s;
+
+        // Snap to the calendar-month containing the encounter window.
+        var monthStart = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1));
+        var monthEnd = new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth() + 1, 0));
+
+        function pad(n) { return n < 10 ? '0' + n : '' + n; }
+        function iso(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
+
+        if (!hasStart) startEl.value = iso(monthStart);
+        if (!hasEnd) endEl.value = iso(monthEnd);
+    }
+
+    function importedRowEligEditor(elig) {
+        var sel = selectedMeasureTypes();
+        if (!sel.length) return '<span class="text-muted small">Select measures</span>';
+        return sel.map(function (m) {
+            var cb = document.querySelector('.measure-checkbox[value="' + m + '"]');
+            var lbl = cb ? (document.querySelector('label[for="' + cb.id + '"]') || { textContent: m }).textContent : m;
+            var cur = (elig && Object.prototype.hasOwnProperty.call(elig, m)) ? elig[m] : NON_QUALIFYING;
+            return '<div class="form-check form-check-inline me-2 mb-1"><input class="form-check-input imp-elig" type="checkbox" data-measure="' + m + '" ' + (cur === QUALIFYING ? 'checked' : '') + ' /><label class="form-check-label small">' + esc(lbl) + '</label></div>';
+        }).join('');
+    }
+    function readImportedElig(row) {
+        var v = {};
+        row.querySelectorAll('.imp-elig').forEach(function (cb) {
+            v[cb.getAttribute('data-measure')] = cb.checked ? QUALIFYING : NON_QUALIFYING;
+        });
+        // Make sure every selected measure has an explicit entry.
+        selectedMeasureTypes().forEach(function (m) { if (!Object.prototype.hasOwnProperty.call(v, m)) v[m] = NON_QUALIFYING; });
+        return v;
+    }
+    function updateImportedSummary() {
+        var rows = importedRows.children;
+        if (!rows.length) {
+            importedSummary.textContent = '';
+        } else {
+            var qCount = 0;
+            Array.prototype.forEach.call(rows, function (r) {
+                var elig = readImportedElig(r);
+                var any = selectedMeasureTypes().some(function (m) { return elig[m] === QUALIFYING; });
+                if (any) qCount++;
+            });
+            importedSummary.textContent = '(' + rows.length + ' total, ' + qCount + ' Q / ' + (rows.length - qCount) + ' NQ)';
+        }
+        // Imported rows feed the total Patient Count alongside cohort sums, so any change
+        // to the imported list must re-sync the read-only Patient Count field.
+        syncCount();
+    }
+    function reindexImported() {
+        Array.prototype.forEach.call(importedRows.children, function (r, i) { r.querySelector('td:first-child').textContent = i + 1; });
+    }
+    function rerenderImportedEligEditors() {
+        Array.prototype.forEach.call(importedRows.children, function (r) {
+            var elig = readImportedElig(r);
+            var ed = r.querySelector('.imp-elig-editor');
+            if (ed) ed.innerHTML = importedRowEligEditor(elig);
+        });
+        updateImportedSummary();
+    }
+    function addImportedRow(row) {
+        // row = { source, patientId, fileName, bundleJson, autoDetect, measureEligibilities, detectedClinicalScenarioId, encounterStart, encounterEnd }
+        var elig = row.measureEligibilities || {};
+        var sourceLabel = row.source === 'Bundle'
+            ? '<span class="badge bg-info text-dark"><i class="bi bi-file-earmark-arrow-up me-1"></i>Bundle</span>'
+            : '<span class="badge bg-secondary"><i class="bi bi-cloud-arrow-down me-1"></i>By ID</span>';
+        var fileLabel = row.source === 'Bundle' && row.fileName ? '<div class="small text-muted">' + esc(row.fileName) + '</div>' : '';
+        var detectBtn = '<button type="button" class="btn btn-sm btn-outline-secondary btn-detect-imported" title="Re-run auto-detection"><i class="bi bi-magic"></i></button>';
+        var tr = document.createElement('tr');
+        tr.dataset.source = row.source || 'ExistingId';
+        tr.dataset.bundleJson = row.bundleJson || '';
+        tr.dataset.fileName = row.fileName || '';
+        tr.dataset.detectedClinicalScenarioId = row.detectedClinicalScenarioId || '';
+        tr.dataset.autoDetect = String(row.autoDetect !== false);
+        tr.dataset.encounterStart = row.encounterStart || '';
+        tr.dataset.encounterEnd = row.encounterEnd || '';
+        tr.innerHTML =
+            '<td class="text-center align-middle">' + (importedRows.children.length + 1) + '</td>' +
+            '<td class="align-middle">' + sourceLabel + '</td>' +
+            '<td class="align-middle"><input type="text" class="form-control form-control-sm imp-pid" maxlength="128" value="' + esc(row.patientId || '') + '" ' + (row.source === 'Bundle' ? 'readonly' : '') + ' />' + fileLabel + '</td>' +
+            '<td><div class="imp-elig-editor">' + importedRowEligEditor(elig) + '</div></td>' +
+            '<td class="imp-encounter-cell align-middle small"></td>' +
+            '<td class="align-middle text-center">' + detectBtn + '</td>' +
+            '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-imported">&times;</button></td>';
+        importedRows.appendChild(tr);
+        renderImportedEncounterCell(tr);
+        reindexImported();
+        updateImportedSummary();
+    }
+
+    // Renders the encounter-dates cell with an in/out-of-period indicator. Called whenever
+    // the row's encounter dates change OR the Report Period inputs change.
+    function renderImportedEncounterCell(row) {
+        var cell = row.querySelector('.imp-encounter-cell');
+        if (!cell) return;
+        var s = row.dataset.encounterStart || '';
+        var e = row.dataset.encounterEnd || '';
+        if (!s && !e) { cell.innerHTML = '<span class="text-muted">unknown</span>'; return; }
+
+        function fmt(iso) {
+            if (!iso) return '?';
+            var d = new Date(iso);
+            if (isNaN(d.getTime())) return iso;
+            function pad(n) { return n < 10 ? '0' + n : '' + n; }
+            return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+        }
+
+        var label = fmt(s) + (e && e !== s ? ' &rarr; ' + fmt(e) : '');
+        var status = compareEncounterToPeriod(s, e);
+        var badge = status === 'inside'
+            ? '<span class="badge bg-success-subtle text-success border border-success ms-1" title="Inside report period">&#10003; in period</span>'
+            : status === 'outside'
+                ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1" title="Outside report period — measure-eval may filter resources">&#9888; outside period</span>'
+                : '';
+        cell.innerHTML = '<div>' + label + '</div>' + badge;
+    }
+
+    function compareEncounterToPeriod(encStartIso, encEndIso) {
+        var ps = (document.getElementById('ReportPeriodStart').value || '').trim();
+        var pe = (document.getElementById('ReportPeriodEnd').value || '').trim();
+        if (!ps && !pe) return 'unknown';
+        var encS = encStartIso ? new Date(encStartIso) : null;
+        var encE = encEndIso ? new Date(encEndIso) : encS;
+        if (!encS) return 'unknown';
+        var pStart = ps ? new Date(ps + 'T00:00:00Z') : null;
+        var pEnd = pe ? new Date(pe + 'T23:59:59Z') : null;
+        if (pStart && encS < pStart) return 'outside';
+        if (pEnd && (encE || encS) > pEnd) return 'outside';
+        return 'inside';
+    }
+
+    function rerenderImportedEncounterCells() {
+        Array.prototype.forEach.call(importedRows.children, function (r) { renderImportedEncounterCell(r); });
+    }
+
+    async function classifyImportedRow(row) {
+        var pid = (row.querySelector('.imp-pid').value || '').trim();
+        var src = row.dataset.source;
+        if (src === 'ExistingId' && !pid) { showError('Patient ID is required to classify.'); return; }
+        try {
+            var body = {
+                source: src,
+                patientId: pid,
+                bundleJson: src === 'Bundle' ? row.dataset.bundleJson : null,
+                measures: selectedMeasureTypes()
+            };
+            var res = await postJson(classifyImportedUrl, body);
+            if (res && res.measureEligibilities) {
+                // Rebuild the eligibility editor with returned values.
+                var ed = row.querySelector('.imp-elig-editor');
+                ed.innerHTML = importedRowEligEditor(res.measureEligibilities);
+                if (res.detectedClinicalScenarioId) row.dataset.detectedClinicalScenarioId = res.detectedClinicalScenarioId;
+                if (src === 'ExistingId' && res.patientId && !pid) row.querySelector('.imp-pid').value = res.patientId;
+                row.dataset.autoDetect = 'true';
+                if (res.encounterStart) row.dataset.encounterStart = res.encounterStart;
+                if (res.encounterEnd) row.dataset.encounterEnd = res.encounterEnd;
+                renderImportedEncounterCell(row);
+                if (res.encounterStart || res.encounterEnd) {
+                    suggestPeriodFromEncounter(res.encounterStart, res.encounterEnd);
+                }
+                updateImportedSummary();
+            }
+        } catch (err) {
+            showError('Classification failed: ' + (err.message || 'Unknown error'));
+        }
+    }
+
+    document.getElementById('btnAddImportedById').addEventListener('click', async function () {
+        var input = document.getElementById('newImportedPatientId');
+        var pid = (input.value || '').trim();
+        if (!pid) { showError('Enter a Patient ID first.'); return; }
+        addImportedRow({ source: 'ExistingId', patientId: pid, autoDetect: true, measureEligibilities: {} });
+        input.value = '';
+        // Best-effort auto-classify the new row.
+        var row = importedRows.lastElementChild;
+        if (row) await classifyImportedRow(row);
+    });
+
+    document.getElementById('importedBundleFile').addEventListener('change', async function (ev) {
+        var files = Array.prototype.slice.call(ev.target.files || []);
+        for (var i = 0; i < files.length; i++) {
+            var file = files[i];
+            try {
+                var text = await file.text();
+                var parsed; try { parsed = JSON.parse(text); } catch (_) { showError('Bundle "' + file.name + '" is not valid JSON.'); continue; }
+                var patientEntry = (parsed && parsed.entry || []).find(function (e) { return e && e.resource && e.resource.resourceType === 'Patient'; });
+                if (!patientEntry || !patientEntry.resource.id) { showError('Bundle "' + file.name + '" must contain a Patient resource with an id.'); continue; }
+
+                // Best-effort encounter-date sniffing for period auto-suggest. Server-side
+                // classification will overwrite with a more accurate range when it returns.
+                var encEntries = (parsed && parsed.entry || []).map(function (e) { return e && e.resource; }).filter(function (r) { return r && r.resourceType === 'Encounter' && r.period; });
+                var minS = null, maxE = null;
+                if (encEntries.length) {
+                    encEntries.forEach(function (enc) {
+                        if (enc.period.start && (!minS || enc.period.start < minS)) minS = enc.period.start;
+                        var pe = enc.period.end || enc.period.start;
+                        if (pe && (!maxE || pe > maxE)) maxE = pe;
+                    });
+                    if (minS || maxE) suggestPeriodFromEncounter(minS, maxE);
+                }
+
+                addImportedRow({
+                    source: 'Bundle',
+                    patientId: patientEntry.resource.id,
+                    fileName: file.name,
+                    bundleJson: text,
+                    autoDetect: true,
+                    measureEligibilities: {},
+                    encounterStart: minS,
+                    encounterEnd: maxE
+                });
+                var row = importedRows.lastElementChild;
+                if (row) await classifyImportedRow(row);
+            } catch (err) {
+                showError('Failed to read "' + file.name + '": ' + (err.message || 'Unknown error'));
+            }
+        }
+        ev.target.value = '';
+    });
+
+    importedRows.addEventListener('click', function (e) {
+        var rm = e.target.closest('.btn-remove-imported');
+        if (rm) { rm.closest('tr').remove(); reindexImported(); updateImportedSummary(); return; }
+        var det = e.target.closest('.btn-detect-imported');
+        if (det) { classifyImportedRow(det.closest('tr')); return; }
+    });
+    importedRows.addEventListener('change', function (e) {
+        if (e.target.classList.contains('imp-elig')) {
+            // User override — turn off auto-detect implicitly.
+            e.target.closest('tr').dataset.autoDetect = 'false';
+            updateImportedSummary();
+        }
+    });
+
+    function getImportedPatients() {
+        return Array.prototype.map.call(importedRows.children, function (r) {
+            return {
+                source: r.dataset.source || 'ExistingId',
+                patientId: (r.querySelector('.imp-pid').value || '').trim(),
+                fileName: r.dataset.fileName || null,
+                bundleJson: r.dataset.source === 'Bundle' ? (r.dataset.bundleJson || null) : null,
+                autoDetect: r.dataset.autoDetect !== 'false',
+                measureEligibilities: readImportedElig(r),
+                detectedClinicalScenarioId: r.dataset.detectedClinicalScenarioId || null
+            };
+        });
+    }
+
+    // Re-render imported eligibility editors when measure selection changes (parallels cohorts).
+    document.querySelectorAll('.measure-checkbox').forEach(function (cb) {
+        cb.addEventListener('change', rerenderImportedEligEditors);
+    });
+
+    // Recompute the in/out-of-period indicator on every imported row whenever the
+    // Report Period inputs change (so the user gets immediate feedback when adjusting it).
+    ['ReportPeriodStart', 'ReportPeriodEnd'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('change', rerenderImportedEncounterCells);
+    });
+
     // ---- Collect form into JSON payload ----
     function collectModel() {
         var cohorts = getCohorts();
         var mins = cohorts.map(function (c) { return c.resourcesPerPatientMin || 50; });
         var maxes = cohorts.map(function (c) { return c.resourcesPerPatientMax || 100; });
+        var imported = getImportedPatients();
+        var importedIds = imported.filter(function (p) { return p.source === 'ExistingId'; });
+        var importedBundles = imported.filter(function (p) { return p.source === 'Bundle'; });
         return {
             id: idInput.value || null,
             name: document.getElementById('ScenarioName').value,
@@ -351,20 +677,20 @@
             reportMethod: document.getElementById('ReportMethod').value,
             selectedMeasures: selectedMeasureTypes(),
             seed: parseInt(document.getElementById('Seed').value || '20260329', 10),
-            patientCount: parseInt(document.getElementById('PatientCount').value || '0', 10),
+            // Submit the cohort-only sum (NOT the displayed total). The runtime uses
+            // patientCount as a fallback cohort-generation target when no cohorts are
+            // configured; including imported patients here would inflate that fallback.
+            patientCount: cohorts.reduce(function (s, c) { return s + (c.patientCount || 0); }, 0),
             resourcesPerPatientMin: mins.length > 0 ? Math.min.apply(null, mins) : 50,
             resourcesPerPatientMax: maxes.length > 0 ? Math.max.apply(null, maxes) : 100,
-            patientPrefix: document.getElementById('PatientPrefix').value,
-            useMeasureEligibilityProfiles: true,
-            patientProfiles: [],
             patientCohorts: cohorts,
-            selectedClinicalScenarioIds: [],
-            dischargeCount: 0,
-            dischargeQualifyingCount: 0,
-            dischargeNonQualifyingCount: 0,
             cleanupServiceData: document.getElementById('CleanupServiceData').checked,
             cleanupFhirData: document.getElementById('CleanupFhirData').checked,
-            queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null
+            queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null,
+            reportPeriodStart: (document.getElementById('ReportPeriodStart').value || '').trim() ? (document.getElementById('ReportPeriodStart').value + 'T00:00:00Z') : null,
+            reportPeriodEnd: (document.getElementById('ReportPeriodEnd').value || '').trim() ? (document.getElementById('ReportPeriodEnd').value + 'T23:59:59Z') : null,
+            importedPatientIds: importedIds,
+            importedPatientBundles: importedBundles
         };
     }
 
@@ -376,9 +702,18 @@
         document.getElementById('ScenarioDescription').value = data.description || '';
         document.getElementById('ReportMethod').value = data.reportMethod || 'Adhoc';
         document.getElementById('Seed').value = data.seed || 20260329;
-        document.getElementById('PatientPrefix').value = data.patientPrefix || 'CustomPatient';
         document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
         document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;
+        // Report Period (yyyy-MM-dd from any ISO-ish input the server returns).
+        function isoToDateValue(s) {
+            if (!s) return '';
+            var d = new Date(s);
+            if (isNaN(d.getTime())) return '';
+            function pad(n) { return n < 10 ? '0' + n : '' + n; }
+            return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+        }
+        document.getElementById('ReportPeriodStart').value = isoToDateValue(data.reportPeriodStart);
+        document.getElementById('ReportPeriodEnd').value = isoToDateValue(data.reportPeriodEnd);
         var qp = document.getElementById('QueryPlanTemplate');
         if (data.queryPlanTemplateId) qp.value = data.queryPlanTemplateId;
         else { var d = qp.querySelector('[data-is-default="true"]'); if (d) qp.value = d.value; }
@@ -391,6 +726,45 @@
         } else {
             addDefault(data.patientCount || 10, true, data.resourcesPerPatientMin || 50, data.resourcesPerPatientMax || 100);
         }
+        // Imported patients
+        importedRows.innerHTML = '';
+        (data.importedPatientIds || []).forEach(function (p) {
+            addImportedRow({
+                source: 'ExistingId',
+                patientId: p.patientId || '',
+                autoDetect: p.autoDetect !== false,
+                measureEligibilities: p.measureEligibilities || {},
+                detectedClinicalScenarioId: p.detectedClinicalScenarioId || null
+            });
+        });
+        (data.importedPatientBundles || []).forEach(function (p) {
+            // Sniff encounter dates from the saved bundle JSON for the in/out-of-period
+            // indicator (best effort; classifier will refresh on Detect).
+            var encS = null, encE = null;
+            if (p.bundleJson) {
+                try {
+                    var parsed = JSON.parse(p.bundleJson);
+                    var encs = (parsed && parsed.entry || []).map(function (e) { return e && e.resource; }).filter(function (r) { return r && r.resourceType === 'Encounter' && r.period; });
+                    encs.forEach(function (enc) {
+                        if (enc.period.start && (!encS || enc.period.start < encS)) encS = enc.period.start;
+                        var pe = enc.period.end || enc.period.start;
+                        if (pe && (!encE || pe > encE)) encE = pe;
+                    });
+                } catch (_) { /* ignore — sniffing is best-effort */ }
+            }
+            addImportedRow({
+                source: 'Bundle',
+                patientId: p.patientId || '',
+                fileName: p.fileName || null,
+                bundleJson: p.bundleJson || '',
+                autoDetect: p.autoDetect !== false,
+                measureEligibilities: p.measureEligibilities || {},
+                detectedClinicalScenarioId: p.detectedClinicalScenarioId || null,
+                encounterStart: encS,
+                encounterEnd: encE
+            });
+        });
+        updateImportedSummary();
         syncCount();
     }
 
@@ -421,13 +795,16 @@
             document.getElementById('ScenarioDescription').value = '';
             document.getElementById('ReportMethod').value = 'Adhoc';
             document.getElementById('Seed').value = 20260329;
-            document.getElementById('PatientPrefix').value = 'CustomPatient';
             document.getElementById('CleanupFhirData').checked = true;
             document.getElementById('CleanupServiceData').checked = false;
+            document.getElementById('ReportPeriodStart').value = '';
+            document.getElementById('ReportPeriodEnd').value = '';
             document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
             document.getElementById('measure_monthly').checked = true;
             cohortRows.innerHTML = '';
             addDefault(10, true, 50, 100);
+            importedRows.innerHTML = '';
+            updateImportedSummary();
             syncCount();
             openModal();
         }
@@ -443,7 +820,12 @@
         var valid = true;
         if (!(model.name || '').trim()) { markFieldError('ScenarioName', 'Name is required.'); valid = false; }
         if (!model.selectedMeasures.length) { showError('At least one measure must be selected.'); valid = false; }
-        if (!model.patientCohorts.length) { showError('At least one cohort with patients > 0 is required.'); valid = false; }
+        var hasImported = (model.importedPatientIds && model.importedPatientIds.length > 0)
+            || (model.importedPatientBundles && model.importedPatientBundles.length > 0);
+        if (!model.patientCohorts.length && !hasImported) { showError('At least one cohort with patients > 0 (or one imported patient) is required.'); valid = false; }
+        // Imported-by-ID rows must have a non-empty patient id.
+        var badId = (model.importedPatientIds || []).find(function (p) { return !(p.patientId || '').trim(); });
+        if (badId) { showError('Every imported-by-ID row must have a Patient ID.'); valid = false; }
         if (!valid) return;
         model.id = idInput.value || crypto.randomUUID();
         try {

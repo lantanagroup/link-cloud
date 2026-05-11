@@ -19,7 +19,7 @@ public class ReportAbsManifestValidatorTests
     public async Task ValidateAllAsync_WithMockExternalAbsFromGeneratedData_Passes()
     {
         var output = new BufferingAutomationOutput();
-        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120, patientIdPrefix: "AbsUnit");
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120);
         var patientId = patientIds.Single();
 
         var mockExternalAbsResources = BuildMockExternalAbsResources(patientId, bundles, "MEASURE-UT-1", ExpectedStart, ExpectedEnd);
@@ -37,7 +37,7 @@ public class ReportAbsManifestValidatorTests
     public async Task ValidateAllAsync_WithMissingPatientArtifact_Fails()
     {
         var output = new BufferingAutomationOutput();
-        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120, patientIdPrefix: "AbsUnitFailA");
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120);
         var patientId = patientIds.Single();
 
         var mockExternalAbsResources = BuildMockExternalAbsResources(patientId, bundles, "MEASURE-UT-2", ExpectedStart, ExpectedEnd);
@@ -60,7 +60,7 @@ public class ReportAbsManifestValidatorTests
     public async Task ValidateAllAsync_WithUnexpectedMeasureId_Fails()
     {
         var output = new BufferingAutomationOutput();
-        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120, patientIdPrefix: "AbsUnitFailB");
+        var (patientIds, bundles) = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 120);
         var patientId = patientIds.Single();
 
         var mockExternalAbsResources = BuildMockExternalAbsResources(patientId, bundles, "MEASURE-UT-3", ExpectedStart, ExpectedEnd);

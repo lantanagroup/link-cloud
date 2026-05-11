@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
@@ -6,6 +6,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 
@@ -67,7 +68,7 @@ public class AcquisitionDependencyChecker : IAcquisitionDependencyChecker
             catch (ArgumentException ex)
             {
                 _logger.LogWarning(ex, "Could not resolve Frequency from ReportableEvent {Event} for LogId {LogId}; skipping dependency check.",
-                    log.ReportableEvent, log.Id);
+                    log.ReportableEvent.SanitizeForLog(), log.Id.SanitizeForLog());
                 return DependencyCheckResult.Met;
             }
         }
@@ -86,7 +87,7 @@ public class AcquisitionDependencyChecker : IAcquisitionDependencyChecker
         if (queryPlan is null)
         {
             _logger.LogWarning("No query plan found for FacilityId {FacilityId} Frequency {Frequency}; skipping dependency check for LogId {LogId}.",
-                log.FacilityId, frequency, log.Id);
+                log.FacilityId.SanitizeForLog(), frequency.SanitizeForLog(), log.Id.SanitizeForLog());
             return DependencyCheckResult.Met;
         }
 

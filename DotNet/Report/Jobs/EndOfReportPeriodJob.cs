@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.KafkaProducers;
@@ -13,6 +13,7 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Quartz;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Report.Jobs
 {
@@ -71,10 +72,10 @@ namespace LantanaGroup.Link.Report.Jobs
                     return;
                 }
 
-                _logger.LogInformation("Executing EndOfReportPeriodJob for ScheduleId {ScheduleId}", schedule.Id);
+                _logger.LogInformation("Executing EndOfReportPeriodJob for ScheduleId {ScheduleId}", schedule.Id.SanitizeForLog());
 
                 // Mark the end-of-period flag BEFORE attempting to produce the manifest.
-                // ReportManifestProducer.Produce gates on EndOfReportPeriodJobHasRun � if
+                // ReportManifestProducer.Produce gates on EndOfReportPeriodJobHasRun — if
                 // all patient entries already reached a terminal state (e.g., discharge
                 // processing completed before the period ended), the flag must be true
                 // for the manifest to be generated on this call.
@@ -95,11 +96,11 @@ namespace LantanaGroup.Link.Report.Jobs
                     {
                         try
                         {
-                            await _dataAcqProducer.Produce(schedule);
+                            await _dataAcqProducer.Produce(schedule, cancellationToken: context.CancellationToken);
                         }
                         catch (ProduceException<string, DataAcquisitionRequestedValue> ex)
                         {
-                            _logger.LogError(ex, "Error generating Data Acquisition Requested event for FacilityId {FacilityId}", schedule.FacilityId);
+                            _logger.LogError(ex, "Error generating Data Acquisition Requested event for FacilityId {FacilityId}", schedule.FacilityId.SanitizeForLog());
                             throw;
                         }
                     }

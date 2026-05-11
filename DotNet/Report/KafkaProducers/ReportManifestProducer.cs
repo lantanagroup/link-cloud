@@ -134,7 +134,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             catch (Exception ex)
             {
                 payloadUri = null;
-                _logger.LogError(ex, "Failed to upload report manifest to blob storage (ReportId = {ReportId}, FacilityId = {FacilityId}).", schedule.Id, schedule.FacilityId.SanitizeUntrustedString());
+                _logger.LogError(ex, "Failed to upload report manifest to blob storage (ReportId = {ReportId}, FacilityId = {FacilityId}).", schedule.Id.SanitizeForLog(), schedule.FacilityId.SanitizeForLog());
                 AuditEventMessage auditEvent = new()
                 {
                     FacilityId = schedule.FacilityId,
@@ -148,7 +148,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
-            _logger.LogDebug("Manifest generated (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId, schedule.Id);
+            _logger.LogDebug("Manifest generated (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
 
             await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: payloadUri?.ToString());
 

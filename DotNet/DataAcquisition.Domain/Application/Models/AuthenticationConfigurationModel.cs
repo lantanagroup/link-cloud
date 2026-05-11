@@ -4,6 +4,8 @@ using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 
 namespace DataAcquisition.Domain.Application.Models;
+
+[DataContract]
 public class AuthenticationConfigurationModel : IValidatableObject
 {
     [DataMember]

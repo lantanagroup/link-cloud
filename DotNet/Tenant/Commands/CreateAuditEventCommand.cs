@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Tenant.Services;
 using System.Text;
 
@@ -40,7 +41,7 @@ namespace LantanaGroup.Link.Tenant.Commands
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to generate an audit event for create of facility configuration {FacilityId}.", facilityId);
+                    _logger.LogError(ex, "Failed to generate an audit event for create of facility configuration {FacilityId}.", facilityId.SanitizeForLog());
                 }
             }
         }

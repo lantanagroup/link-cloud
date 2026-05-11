@@ -64,6 +64,7 @@
     <ProjectReference Include="..\Terminology\Terminology.csproj" />
     <ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />
     <ProjectReference Include="..\Automation\Automation.csproj" />
+    <ProjectReference Include="..\Automation.UI\Automation.UI.csproj" />
   </ItemGroup>
 
   <ItemGroup>

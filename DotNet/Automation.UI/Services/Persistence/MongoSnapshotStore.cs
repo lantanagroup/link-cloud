@@ -1,4 +1,4 @@
-using System.Text.Json;
+ï»¿using System.Text.Json;
 using MongoDB.Driver;
 using Microsoft.Extensions.Logging;
 
@@ -10,9 +10,9 @@ namespace Automation.UI.Services.Persistence;
 /// Cosmos DB for MongoDB API (deployed environments).
 ///
 /// Collections:
-///   automation_runs       — lightweight run metadata
-///   automation_snapshots  — per-run, per-domain polling data (upsert on RunId+Domain)
-///   automation_logs       — full log output per run
+///   automation_runs       â€” lightweight run metadata
+///   automation_snapshots  â€” per-run, per-domain polling data (upsert on RunId+Domain)
+///   automation_logs       â€” full log output per run
 ///
 /// Indexes are managed centrally by <see cref="MongoIndexManager"/>.
 /// </summary>
@@ -114,14 +114,41 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         return doc == null ? null : ToSummary(doc);
     }
 
-    public async Task<PagedRunResult> GetRunsPageAsync(int pageNumber, int pageSize, CancellationToken ct = default)
+    public async Task<PagedRunResult> GetRunsPageAsync(int pageNumber, int pageSize, string? sortBy = null, bool sortDescending = true, CancellationToken ct = default)
     {
         pageNumber = Math.Max(1, pageNumber);
         pageSize = Math.Clamp(pageSize, 1, 200);
 
         var total = await _runs.CountDocumentsAsync(FilterDefinition<AutomationRunDocument>.Empty, cancellationToken: ct);
+
+        // Build the sort spec from a server-side whitelist. Anything unrecognized
+        // (or null) falls back to CreatedAt DESC, the existing default. The client
+        // sends short friendly tokens (matched case-insensitively) rather than raw
+        // BSON field names so we never bind user input directly into the query.
+        var sortBuilder = Builders<AutomationRunDocument>.Sort;
+        var primary = (sortBy ?? string.Empty).Trim().ToLowerInvariant() switch
+        {
+            "runname"      => sortDescending ? sortBuilder.Descending(r => r.RunName)      : sortBuilder.Ascending(r => r.RunName),
+            "patientcount" => sortDescending ? sortBuilder.Descending(r => r.PatientCount) : sortBuilder.Ascending(r => r.PatientCount),
+            "seed"         => sortDescending ? sortBuilder.Descending(r => r.Seed)         : sortBuilder.Ascending(r => r.Seed),
+            "status"       => sortDescending ? sortBuilder.Descending(r => r.Status)       : sortBuilder.Ascending(r => r.Status),
+            "finishedat"   => sortDescending ? sortBuilder.Descending(r => r.FinishedAt)   : sortBuilder.Ascending(r => r.FinishedAt),
+            "createdat"    => sortDescending ? sortBuilder.Descending(r => r.CreatedAt)    : sortBuilder.Ascending(r => r.CreatedAt),
+            _              => sortBuilder.Descending(r => r.CreatedAt),
+        };
+
+        // Server-side: single-field sort only. Cosmos DB for MongoDB API rejects
+        // multi-field ORDER BY queries that don't have a matching composite index
+        // ("The order by query does not have a corresponding composite index that
+        // it can be served from"), so we cannot append a {RunId: 1} tiebreaker
+        // here without provisioning a {SortField, RunId} compound index for every
+        // sortable column â€” see the matching note in MongoIndexManager about the
+        // per-write RU cost we are deliberately avoiding. Rows that share the same
+        // primary-sort value (e.g. two runs in the same Status bucket) are returned
+        // in storage order; in practice this is stable across consecutive page
+        // requests because the underlying documents do not move.
         var docs = await _runs.Find(FilterDefinition<AutomationRunDocument>.Empty)
-            .SortByDescending(r => r.CreatedAt)
+            .Sort(primary)
             .Skip((pageNumber - 1) * pageSize)
             .Limit(pageSize)
             .ToListAsync(ct);
@@ -132,6 +159,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     public async Task<IReadOnlyList<AutomationRunSummary>> GetAllRunSummariesAsync(DateTimeOffset? since = null, CancellationToken ct = default)
     {
+        // CreatedAt is persisted as BSON ISODate (see AutomationRunDocument), so $gte
+        // evaluates as a proper date comparison and hits the idx_createdAt_desc index.
         var filter = since.HasValue
             ? Builders<AutomationRunDocument>.Filter.Gte(r => r.CreatedAt, since.Value)
             : FilterDefinition<AutomationRunDocument>.Empty;
@@ -253,7 +282,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         }
         catch (MongoCommandException)
         {
-            // Cosmos DB may reject $push/$each in some configurations — fall back to read-modify-write.
+            // Cosmos DB may reject $push/$each in some configurations â€” fall back to read-modify-write.
             var doc = await _logs.Find(filter).FirstOrDefaultAsync(ct);
             if (doc == null)
             {

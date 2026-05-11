@@ -1,10 +1,11 @@
-using LantanaGroup.Link.Automation.Link.Configuration;
+﻿using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -78,28 +79,36 @@ public static class FacilitySetupHelper
         IAutomationOutput output,
         string facilityId)
     {
-        var response = await normalizationClient.SearchFacilityOperationsAsync(facilityId);
-        if (response?.Records?.Count > 0)
+        try
         {
-            output.WriteLine($"Normalization config for facility '{facilityId}' already exists. Skipping create.");
-            return;
-        }
-
-        await normalizationClient.CreateOperationAsync(new CreateNormalizationOperationRequestApiModel
-        {
-            ResourceTypes = ["Location"],
-            FacilityId = facilityId,
-            Operation = new CreateNormalizationOperationDetailsApiModel
+            var response = await normalizationClient.SearchFacilityOperationsAsync(facilityId);
+            if (response?.Records?.Count > 0)
             {
-                OperationType = "CopyProperty",
-                Name = "Copy Location Identifier to Type",
-                Description = "A Test Operation",
-                SourceFhirPath = "identifier.value",
-                TargetFhirPath = "type[0].coding.code"
-            },
-            Description = "Copy Location Identifier to Code",
-            VendorIds = []
-        });
+                output.WriteLine($"Normalization config for facility '{facilityId}' already exists. Skipping create.");
+                return;
+            }
+
+            await normalizationClient.CreateOperationAsync(new CreateNormalizationOperationRequestApiModel
+            {
+                ResourceTypes = ["Location"],
+                FacilityId = facilityId,
+                Operation = new CreateNormalizationOperationDetailsApiModel
+                {
+                    OperationType = "CopyProperty",
+                    Name = "Copy Location Identifier to Type",
+                    Description = "A Test Operation",
+                    SourceFhirPath = "identifier.value",
+                    TargetFhirPath = "type[0].coding.code"
+                },
+                Description = "Copy Location Identifier to Code",
+                VendorIds = []
+            });
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"CreateOperationAsync failed for facility '{facilityId.SanitizeForLog()}': {ex.GetType().Name}");
+            throw;
+        }
     }
 
     public static async Task EnsureQueryPlansAsync(
@@ -121,7 +130,7 @@ public static class FacilitySetupHelper
         string ehrDescription,
         QueryPlanInput? externalQueryPlan = null)
     {
-        // Query plans are keyed by (facilityId, type) � not per measure.
+        // Query plans are keyed by (facilityId, type) — not per measure.
         // Create each plan type once using the first measure as the plan name.
         var planName = measureIds.Count > 0 ? measureIds[0] : null;
         await EnsureQueryPlanAsync(dataAcqClient, output, facilityId, planName, ehrDescription, "Discharge", externalQueryPlan);
@@ -141,7 +150,7 @@ public static class FacilitySetupHelper
         var created = await dataAcqClient.CreateFhirQueryConfigurationAsync(new CreateFhirQueryConfigurationRequestApiModel
         {
             FacilityId = facilityId,
-            FhirServerBaseUrl = config.InternalFhirServerBase,
+            FhirServerBaseUrl = config.FacilityFhirServerBase,
             MaxConcurrentRequests = effectiveMaxConcurrentRequests,
             MaxRetries = 3,
             MinAcquisitionPullTime = config.FhirQuery.MinAcquisitionPullTime,

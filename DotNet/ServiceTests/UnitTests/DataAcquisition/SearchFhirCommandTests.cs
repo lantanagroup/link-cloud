@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Rest;

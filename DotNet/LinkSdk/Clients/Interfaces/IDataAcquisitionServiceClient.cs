@@ -21,6 +21,7 @@ public interface IDataAcquisitionServiceClient
         int pageNumber = 1,
         string sortBy = "Id",
         string sortOrder = "Ascending",
+        string? searchTerm = null,
         CancellationToken cancellationToken = default);
     Task<DataAcquisitionLogApiModel?> GetAcquisitionLogByIdAsync(long id, CancellationToken cancellationToken = default);
     Task<List<string>> GetAcquisitionLogNotesAsync(long id, CancellationToken cancellationToken = default);

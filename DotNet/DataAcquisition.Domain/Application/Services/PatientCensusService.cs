@@ -14,6 +14,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
@@ -299,7 +300,7 @@ public class PatientCensusService : IPatientCensusService
             catch (Exception ex)
             {
                 isFailed = true;
-                _logger.LogError(ex, "Error retrieving patient list for facility {FacilityId} with list id {CensusListId}", query.FacilityId, query.CensusListId);
+                _logger.LogError(ex, "Error retrieving patient list for facility {FacilityId} with list id {CensusListId}", query.FacilityId.SanitizeForLog(), query.CensusListId.SanitizeForLog());
                 notes.Add($"[{DateTime.UtcNow}] Error retrieving patient list for facility {query.FacilityId}. See application logs for details.");
             }
         }
@@ -356,7 +357,7 @@ public class PatientCensusService : IPatientCensusService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred while producing the message to Kafka for facility {facilityId} and log id {logid}.", log.FacilityId, log.Id);
+                _logger.LogError(ex, "An error occurred while producing the message to Kafka for facility {facilityId} and log id {logid}.", log.FacilityId.SanitizeForLog(), log.Id.SanitizeForLog());
                 throw;
             }
         }

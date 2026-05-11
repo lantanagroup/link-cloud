@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using System.Globalization;
 using Confluent.Kafka;
@@ -69,13 +69,12 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
             measures,
             profiles,
             totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
-            patientIdPrefix: "RegenPatient",
             generationSeed: GenerationSeed,
             acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
             {
                 QueryPlan = QueryPlanBuilder.GetDefaultAsInput(),
-                ReportStart = _config.StartDate,
-                ReportEnd = _config.EndDate
+                ClinicalPeriodStart = _config.StartDate,
+                ClinicalPeriodEnd = _config.EndDate
             });
 
         _generationManifest = pipelineResult.Manifest;

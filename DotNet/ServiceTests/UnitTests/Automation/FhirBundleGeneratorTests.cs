@@ -1,4 +1,4 @@
-using LantanaGroup.Automation.Generation;
+﻿using LantanaGroup.Automation.Generation;
 using LantanaGroup.Automation.Helpers;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Text.Json;
@@ -19,26 +19,27 @@ public class FhirBundleGeneratorTests
     // ----------------------------------------------------------------------
 
     [Fact]
-    public void Generate_ReturnsRequestedPatientCountWithPrefixedIds()
+    public void Generate_ReturnsRequestedPatientCountWithStableIds()
     {
         var output = new NullOutputHelper();
 
         var (patientIds, bundles) = FhirBundleGenerator.Generate(
-            output, patientCount: 2, totalResourcesPerPatient: 120, patientIdPrefix: "UTPatient");
+            output, patientCount: 2, totalResourcesPerPatient: 120);
 
         Assert.Equal(2, patientIds.Count);
 
-        // Patient IDs follow "{Prefix}-{ordinal:D3}-{guid8}". The ordinal and prefix are stable;
-        // the GUID suffix makes them collision-safe across concurrent test runs.
-        Assert.StartsWith("UTPatient-001-", patientIds[0]);
-        Assert.StartsWith("UTPatient-002-", patientIds[1]);
-        // Each id ends with an 8-char hex suffix after the ordinal segment.
+        // Patient IDs follow "Patient-{RunTag}-{ordinal:D3}". The ordinal is stable;
+        // RunTag is a per-run 8-char hex tag that makes them collision-safe across
+        // concurrent test runs.
         Assert.All(patientIds, id =>
         {
             var parts = id.Split('-');
             Assert.Equal(3, parts.Length);
-            Assert.Equal(8, parts[^1].Length);
+            Assert.Equal("Patient", parts[0]);
+            Assert.Equal(8, parts[1].Length);
         });
+        Assert.EndsWith("-001", patientIds[0]);
+        Assert.EndsWith("-002", patientIds[1]);
         Assert.NotEmpty(bundles);
     }
 
@@ -48,7 +49,7 @@ public class FhirBundleGeneratorTests
         var output = new NullOutputHelper();
 
         var (_, bundles) = FhirBundleGenerator.Generate(
-            output, patientCount: 1, totalResourcesPerPatient: 2500, patientIdPrefix: "ChunkTest");
+            output, patientCount: 1, totalResourcesPerPatient: 2500);
 
         Assert.True(bundles.Count > 1, "Expected multiple bundles when chunking above 500 entries.");
 
@@ -76,21 +77,21 @@ public class FhirBundleGeneratorTests
         var output = new NullOutputHelper();
 
         var (_, bundles) = FhirBundleGenerator.Generate(
-            output, patientCount: 1, totalResourcesPerPatient: 100, patientIdPrefix: "Infra");
+            output, patientCount: 1, totalResourcesPerPatient: 100);
         var first = ParseBundle(bundles[0].Json);
 
-        // Shared infrastructure IDs are run-tag-scoped: "{Prefix}-{RunTag}-{Kind}".
+        // Shared infrastructure IDs are run-tag-scoped: "{RunTag}-{Kind}".
         // Verify each expected kind exists by URL shape rather than by hardcoded legacy ids.
-        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Organization/Infra-") && e.Request.Url.EndsWith("-Org-Hospital"));
-        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Location/Infra-") && e.Request.Url.EndsWith("-Loc-Hospital"));
-        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Location/Infra-") && e.Request.Url.EndsWith("-Loc-ICU"));
-        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Location/Infra-") && e.Request.Url.EndsWith("-Loc-ED"));
-        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Location/Infra-") && e.Request.Url.EndsWith("-Loc-StepDown"));
-        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Location/Infra-") && e.Request.Url.EndsWith("-Loc-Outpatient"));
-        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Device/Infra-") && e.Request.Url.EndsWith("-Dev-PulseOx"));
-        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Device/Infra-") && e.Request.Url.EndsWith("-Dev-Ventilator"));
-        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Device/Infra-") && e.Request.Url.EndsWith("-Dev-CPAP"));
-        Assert.Contains(first.Entry, e => e.Request.Url!.StartsWith("Practitioner/Infra-"));
+        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Organization/") && e.Request.Url.EndsWith("-Org-Hospital"));
+        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Location/") && e.Request.Url.EndsWith("-Loc-Hospital"));
+        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Location/") && e.Request.Url.EndsWith("-Loc-ICU"));
+        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Location/") && e.Request.Url.EndsWith("-Loc-ED"));
+        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Location/") && e.Request.Url.EndsWith("-Loc-StepDown"));
+        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Location/") && e.Request.Url.EndsWith("-Loc-Outpatient"));
+        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Device/") && e.Request.Url.EndsWith("-Dev-PulseOx"));
+        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Device/") && e.Request.Url.EndsWith("-Dev-Ventilator"));
+        Assert.Single(first.Entry, e => e.Request.Url!.StartsWith("Device/") && e.Request.Url.EndsWith("-Dev-CPAP"));
+        Assert.Contains(first.Entry, e => e.Request.Url!.StartsWith("Practitioner/"));
     }
 
     [Fact]
@@ -99,7 +100,7 @@ public class FhirBundleGeneratorTests
         var output = new NullOutputHelper();
 
         var (patientIds, bundles) = FhirBundleGenerator.Generate(
-            output, patientCount: 1, totalResourcesPerPatient: 120, patientIdPrefix: "Coh");
+            output, patientCount: 1, totalResourcesPerPatient: 120);
         var patientId = patientIds.Single();
         var resources = FlattenResources(bundles);
 
@@ -122,7 +123,7 @@ public class FhirBundleGeneratorTests
         var output = new NullOutputHelper();
 
         var (_, bundles) = FhirBundleGenerator.Generate(
-            output, patientCount: 1, totalResourcesPerPatient: 150, patientIdPrefix: "Spec");
+            output, patientCount: 1, totalResourcesPerPatient: 150);
         var resources = FlattenResources(bundles);
 
         var specimens = resources.Values.OfType<Specimen>().ToList();
@@ -143,7 +144,7 @@ public class FhirBundleGeneratorTests
         var output = new NullOutputHelper();
 
         var (_, bundles) = FhirBundleGenerator.Generate(
-            output, patientCount: 1, totalResourcesPerPatient: 200, patientIdPrefix: "Diag");
+            output, patientCount: 1, totalResourcesPerPatient: 200);
         var resources = FlattenResources(bundles);
 
         var reports = resources.Values.OfType<DiagnosticReport>().ToList();
@@ -163,7 +164,7 @@ public class FhirBundleGeneratorTests
         var output = new NullOutputHelper();
 
         var (_, bundles) = FhirBundleGenerator.Generate(
-            output, patientCount: 1, totalResourcesPerPatient: 220, patientIdPrefix: "Ref");
+            output, patientCount: 1, totalResourcesPerPatient: 220);
         var resources = FlattenResources(bundles);
 
         foreach (var obs in resources.Values.OfType<Observation>())
@@ -199,8 +200,8 @@ public class FhirBundleGeneratorTests
         // expected — but the *shape* of the output must be identical.
         var output = new NullOutputHelper();
 
-        var run1 = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 180, patientIdPrefix: "Det");
-        var run2 = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 180, patientIdPrefix: "Det");
+        var run1 = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 180);
+        var run2 = FhirBundleGenerator.Generate(output, patientCount: 1, totalResourcesPerPatient: 180);
 
         Assert.Equal(run1.PatientIds.Count, run2.PatientIds.Count);
         Assert.Equal(run1.Bundles.Count, run2.Bundles.Count);
@@ -231,7 +232,7 @@ public class FhirBundleGeneratorTests
         var output = new NullOutputHelper();
 
         var (patientIds, bundles) = FhirBundleGenerator.Generate(
-            output, patientCount: 4, totalResourcesPerPatient: 1200, patientIdPrefix: "Rig");
+            output, patientCount: 4, totalResourcesPerPatient: 1200);
 
         Assert.Equal(4, patientIds.Count);
         Assert.True(bundles.Count > 4);
@@ -261,11 +262,11 @@ public class FhirBundleGeneratorTests
         var resources = entries.ToDictionary(e => e.Request.Url!, e => e.Resource!, StringComparer.OrdinalIgnoreCase);
 
         // Shared infrastructure existence (matched by suffix, not by legacy constants).
-        Assert.Single(resources.Keys, k => k.StartsWith("Organization/Rig-") && k.EndsWith("-Org-Hospital"));
-        Assert.Single(resources.Keys, k => k.StartsWith("Location/Rig-") && k.EndsWith("-Loc-Hospital"));
-        Assert.Single(resources.Keys, k => k.StartsWith("Location/Rig-") && k.EndsWith("-Loc-ICU"));
-        Assert.Single(resources.Keys, k => k.StartsWith("Location/Rig-") && k.EndsWith("-Loc-ED"));
-        Assert.Single(resources.Keys, k => k.StartsWith("Location/Rig-") && k.EndsWith("-Loc-StepDown"));
+        Assert.Single(resources.Keys, k => k.StartsWith("Organization/") && k.EndsWith("-Org-Hospital"));
+        Assert.Single(resources.Keys, k => k.StartsWith("Location/") && k.EndsWith("-Loc-Hospital"));
+        Assert.Single(resources.Keys, k => k.StartsWith("Location/") && k.EndsWith("-Loc-ICU"));
+        Assert.Single(resources.Keys, k => k.StartsWith("Location/") && k.EndsWith("-Loc-ED"));
+        Assert.Single(resources.Keys, k => k.StartsWith("Location/") && k.EndsWith("-Loc-StepDown"));
 
         // Per-patient coherence validations
         foreach (var patientId in patientIds)

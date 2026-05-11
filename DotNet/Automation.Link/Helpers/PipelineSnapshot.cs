@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Automation.Link.Helpers;
+﻿namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 /// <summary>
 /// Non-asserting, read-only snapshot of the pipeline's database state.

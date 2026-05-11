@@ -67,7 +67,7 @@ public sealed class BackendE2ETestFixture : IDisposable
         builder.Services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<IAutomationOutput>(), sp.GetRequiredService<AutomationConfig>()));
         builder.Services.AddSingleton(sp => {
             var cfg = sp.GetRequiredService<AutomationConfig>();
-            return new FhirDataLoader(cfg.ExternalFhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
+            return new FhirDataLoader(cfg.FhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
         });
         builder.Services.AddSingleton<PipelineDataReader>();
 
