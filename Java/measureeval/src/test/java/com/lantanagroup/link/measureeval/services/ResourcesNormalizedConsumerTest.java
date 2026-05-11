@@ -56,6 +56,9 @@ class ResourcesNormalizedConsumerTest {
     private RedisResourceService redisResourceService;
 
     @Mock
+    private AbsResourceService absResourceService;
+
+    @Mock
     private MongoOperations mongoOperations;
 
     private AutoCloseable mocks;
@@ -75,7 +78,7 @@ class ResourcesNormalizedConsumerTest {
                 recoverer,
                 measureReportGeneratedProducer,
                 redisResourceService,
-                null,
+                absResourceService,
                 mongoOperations);
     }
 
