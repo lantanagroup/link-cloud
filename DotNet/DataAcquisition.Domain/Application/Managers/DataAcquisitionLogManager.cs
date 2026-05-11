@@ -905,12 +905,18 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             return null;
         }
 
-        var resourceTypes = await _dbContext.DataAcquisitionLogs
-            .Where(l =>
-                l.FacilityId == groupInfo.FacilityId
-                && l.CorrelationId == groupInfo.CorrelationId
-                && l.QueryPhase == groupInfo.QueryPhase)
-            .SelectMany(l => l.FhirQueries.SelectMany(q => q.FhirQueryResourceTypes.Select(r => r.ResourceType)))
+        // Only include cache keys for resource types that had at least one resource actually acquired.
+        // ResourceId rows use the format "TypeName/id" (e.g. "Patient/abc-123"), so the type name
+        // is the substring before the first '/'.
+        var acquiredResourceTypes = await _dbContext.DataAcquisitionLogResourceIds
+            .Join(_dbContext.DataAcquisitionLogs,
+                rid => rid.DataAcquisitionLogId,
+                l => l.Id,
+                (rid, l) => new { rid, l })
+            .Where(x => x.l.FacilityId == groupInfo.FacilityId
+                && x.l.CorrelationId == groupInfo.CorrelationId
+                && x.l.QueryPhase == groupInfo.QueryPhase)
+            .Select(x => x.rid.ResourceId.Substring(0, x.rid.ResourceId.IndexOf('/')))
             .Distinct()
             .ToListAsync(cancellationToken);
 
@@ -928,8 +934,9 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                     ? new List<ScheduledReport> { representative.ScheduledReport }
                     : new List<ScheduledReport>(),
                 CacheType = _resourceCache.GetCacheTypeForCorrelationId(groupInfo.CorrelationId ?? string.Empty),
-                CacheKeys = resourceTypes
+                CacheKeys = acquiredResourceTypes
                     .Select(rt => $"{groupInfo.CorrelationId}:{rt}")
+                    .Distinct()
                     .ToList()
             }
         };
