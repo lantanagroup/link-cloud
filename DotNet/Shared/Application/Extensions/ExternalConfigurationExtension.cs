@@ -64,7 +64,7 @@ public static class ExternalConfigurationExtension
 
                             options.ConfigureRefresh(refresh =>
                             {
-                                refresh.Register($"Telemetry:PatientTags", refreshAll: true);
+                                refresh.Register(patientTagsKey, refreshAll: true);
                             });
 
                             builder.Services.AddSingleton(options.GetRefresher());
