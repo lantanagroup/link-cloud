@@ -3,6 +3,8 @@ using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers
@@ -18,10 +20,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
     {
         private readonly IDatabase _database;
         private readonly IResourceQueries _resourceQueries;
-        public ResourceManager(IDatabase database, IResourceQueries resourceQueries)
+        private readonly ILogger<ResourceManager> _logger;
+        public ResourceManager(IDatabase database, IResourceQueries resourceQueries, ILogger<ResourceManager> logger)
         {
             _database = database;
             _resourceQueries = resourceQueries;
+            _logger = logger;
         }
 
         public async Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false)
@@ -46,17 +50,23 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             if (existing != null)
             {
-                return null;
+                return existing;
             }
 
-            var resource = await _database.ResourceTypes.AddAsync(new Entities.ResourceType()
+            var entity = new Entities.ResourceType() { Name = resourceName };
+            try
             {
-                Name = resourceName,
-            });
+                await _database.ResourceTypes.AddAsync(entity);
+                await _database.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                var sanitizedResourceName = resourceName.Replace("\r", string.Empty).Replace("\n", string.Empty);
+                _logger.LogWarning(ex, "DbUpdateException while creating ResourceType '{ResourceName}'. This may be a duplicate key race condition.", sanitizedResourceName);
+                _database.ResourceTypes.Remove(entity);
+            }
 
-            await _database.SaveChangesAsync();
-
-            return await _resourceQueries.Get(resource.Id);
+            return await _resourceQueries.Get(resourceName);
         }
 
         public async Task DeleteResource(string resource)
