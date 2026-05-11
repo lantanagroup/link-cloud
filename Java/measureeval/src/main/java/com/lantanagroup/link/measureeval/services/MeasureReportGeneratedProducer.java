@@ -33,11 +33,14 @@ public class MeasureReportGeneratedProducer {
             throw new IllegalArgumentException("All parameters are required");
         }
 
-        if (logger.isTraceEnabled()) {
-            logger.trace(
-                    "Producing {} record for report tracking id {}",
-                    Topics.MEASURE_REPORT_GENERATED, report.getReportTrackingId());
-        }
+        logger.info(
+                "PRODUCING MeasureReportGenerated: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] REPORT_TYPE=[{}] REPORT_TRACKING_ID=[{}] REPORTABLE=[{}]",
+                patientStatus.getFacilityId(),
+                patientStatus.getPatientId(),
+                patientStatus.getCorrelationId(),
+                report.getReportType(),
+                report.getReportTrackingId(),
+                report.getReportable());
 
         String reportUri = null;
 

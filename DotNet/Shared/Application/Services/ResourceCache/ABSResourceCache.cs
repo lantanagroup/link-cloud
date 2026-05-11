@@ -59,6 +59,13 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
             BlockBlobClient readBlobClient = _containerClient.GetBlockBlobClient(GetBlobKey(cacheKey));
 
+            if (!readBlobClient.Exists())
+            {
+                _logger.LogWarning("ABS blob not found for Get. CacheKey='{CacheKey}', BlobPath='{BlobPath}', Container='{Container}'",
+                    cacheKey, GetBlobKey(cacheKey), _settings.BlobContainerName);
+                return resources;
+            }
+
             using (Stream read_stream = readBlobClient.OpenRead(true))
             using (StreamReader reader = new StreamReader(read_stream))
             {
@@ -118,6 +125,14 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         public void Skipped(string sourceCache, string destinationCache)
         {
             BlockBlobClient sourceBlobClient = _containerClient.GetBlockBlobClient(GetBlobKey(sourceCache));
+
+            if (!sourceBlobClient.Exists())
+            {
+                _logger.LogWarning("ABS blob not found for Skipped. SourceKey='{SourceKey}', BlobPath='{BlobPath}', Container='{Container}', DestinationKey='{DestinationKey}'",
+                    sourceCache, GetBlobKey(sourceCache), _settings.BlobContainerName, destinationCache);
+                return;
+            }
+
             AppendBlobClient destinationBlobClient = _containerClient.GetAppendBlobClient(GetBlobKey(destinationCache));
             destinationBlobClient.CreateIfNotExists();
 

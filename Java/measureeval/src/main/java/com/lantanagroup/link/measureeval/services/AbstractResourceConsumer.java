@@ -52,6 +52,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private final BlobStorageService blobStorageService;
     private final MeasureReportGeneratedProducer measureReportGeneratedProducer;
     private final RedisResourceService redisResourceService;
+    private final AbsResourceService absResourceService;
     private final MongoOperations mongoOperations;
 
     public AbstractResourceConsumer (
@@ -64,6 +65,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             BlobStorageService blobStorageService,
             ConsumerRecordRecoverer recoverer, MeasureReportGeneratedProducer measureReportGeneratedProducer,
             RedisResourceService redisResourceService,
+            AbsResourceService absResourceService,
             MongoOperations mongoOperations) {
         super(recoverer);
         this.patientStatusRepository = patientStatusRepository;
@@ -76,6 +78,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         this.patientStatusBundler = patientStatusBundler;
         this.blobStorageService = blobStorageService;
         this.redisResourceService = redisResourceService;
+        this.absResourceService = absResourceService;
         this.mongoOperations = mongoOperations;
     }
 
@@ -122,14 +125,15 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
             if (perf) taskStopWatch.stop();
 
-            if (logger.isDebugEnabled()) {
-                logger.debug(
-                        "Consuming {}: FACILITY=[{}] CORRELATION=[{}] CACHE=[{}]",
-                        KafkaUtils.format(record),
-                        facilityId,
-                        correlationId,
-                        value.getCacheType());
-            }
+            logger.info(
+                    "MESSAGE RECEIVED {}: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] CACHE=[{}] QUERY_TYPE=[{}] REPORTS={}",
+                    KafkaUtils.format(record),
+                    facilityId,
+                    patientId,
+                    correlationId,
+                    value.getCacheType(),
+                    value.getQueryType(),
+                    value.getScheduledReports() != null ? value.getScheduledReports().size() : 0);
 
             CacheType cacheType = value.getCacheType();
 
@@ -139,7 +143,12 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             switch (cacheType) {
                 case REDIS -> resources = redisResourceService.readResources(
                         facilityId, correlationId, patientId);
-
+                case ABS -> {
+                    if (absResourceService == null) {
+                        throw new IllegalStateException("ABS cache type requested but cache-blob-storage is not configured");
+                    }
+                    resources = absResourceService.readResources(facilityId, correlationId, patientId, correlationId);
+                }
                 default -> throw new IllegalStateException("Unexpected cache type: " + cacheType);
             }
             long readMs = perf ? (System.nanoTime() - readStart) / 1_000_000 : 0;
@@ -214,6 +223,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 if (perf) taskStopWatch.start("cleanupCache");
                 switch (cacheType) {
                     case REDIS -> redisResourceService.cleanup(correlationId);
+                    case ABS -> {
+                        if (absResourceService != null) {
+                            absResourceService.cleanup(correlationId);
+                        }
+                    }
                 }
                 if (perf) taskStopWatch.stop();
                 logger.debug("Cache cleanup complete for correlationId={}, cacheType={}", correlationId, cacheType);
@@ -355,9 +369,19 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private boolean evaluateMeasures (T value, PatientReportingEvaluationStatus patientStatus, Bundle bundle, long kafkaIngestTimestamp) {
         logger.debug("Evaluating measures");
 
+        logger.info("EVALUATING MEASURES: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] QUERY_TYPE=[{}] REPORT_COUNT=[{}]",
+                patientStatus.getFacilityId(), patientStatus.getPatientId(), patientStatus.getCorrelationId(),
+                value.getQueryType(), patientStatus.getReports().size());
+
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
+            logger.info("EVALUATING REPORT: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] REPORT_TYPE=[{}] TRACKING_ID=[{}] QUERY_TYPE=[{}] REPORTABLE=[{}]",
+                    patientStatus.getFacilityId(), patientStatus.getPatientId(), patientStatus.getCorrelationId(),
+                    report.getReportType(), report.getReportTrackingId(), value.getQueryType(), report.getReportable());
+
             //We only want to evaluate supplemental reports that have been marked as reportable. If they failed initial evaluation, then we should not perform a supplemental evaluation for the report.
             if (value.getQueryType() == QueryType.SUPPLEMENTAL && !Boolean.TRUE.equals(report.getReportable())) {
+                logger.info("SKIPPING SUPPLEMENTAL: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] REPORT_TYPE=[{}] — not reportable",
+                        patientStatus.getFacilityId(), patientStatus.getPatientId(), patientStatus.getCorrelationId(), report.getReportType());
                 continue;
             }
 
