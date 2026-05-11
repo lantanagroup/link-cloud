@@ -1,4 +1,4 @@
-using Azure.Storage.Blobs;
+﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -121,10 +121,17 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             AppendBlobClient destinationBlobClient = _containerClient.GetAppendBlobClient(GetBlobKey(destinationCache));
             destinationBlobClient.CreateIfNotExists();
 
-            using (Stream sourceStream = sourceBlobClient.OpenRead(true))
-            using (Stream destinationStream = destinationBlobClient.OpenWrite(false))
+            try
             {
-                sourceStream.CopyTo(destinationStream);
+                using (Stream sourceStream = sourceBlobClient.OpenRead(true))
+                using (Stream destinationStream = destinationBlobClient.OpenWrite(false))
+                {
+                    sourceStream.CopyTo(destinationStream);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error when reading skipped ABS blob: Source Cache = {source}, Destination Cache = {destination}", sourceCache, destinationCache);
             }
         }
 
