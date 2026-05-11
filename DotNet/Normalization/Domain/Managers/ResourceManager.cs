@@ -50,25 +50,23 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
             if (existing != null)
             {
-                return null;
+                return existing;
             }
 
+            var entity = new Entities.ResourceType() { Name = resourceName };
             try
             {
-                var resource = await _database.ResourceTypes.AddAsync(new Entities.ResourceType()
-                {
-                    Name = resourceName,
-                });
-
+                await _database.ResourceTypes.AddAsync(entity);
                 await _database.SaveChangesAsync();
-
-                return await _resourceQueries.Get(resource.Id);
             }
             catch (DbUpdateException ex)
             {
-                _logger.LogWarning(ex, "DbUpdateException while creating ResourceType '{ResourceName}'. This may be a duplicate key race condition.", resourceName);
-                return null;
+                var sanitizedResourceName = resourceName.Replace("\r", string.Empty).Replace("\n", string.Empty);
+                _logger.LogWarning(ex, "DbUpdateException while creating ResourceType '{ResourceName}'. This may be a duplicate key race condition.", sanitizedResourceName);
+                _database.ResourceTypes.Remove(entity);
             }
+
+            return await _resourceQueries.Get(resourceName);
         }
 
         public async Task DeleteResource(string resource)
