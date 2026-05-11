@@ -1,9 +1,10 @@
-using AngleSharp;
+﻿using AngleSharp;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Query;
 using LantanaGroup.Link.Normalization.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using System.Reflection;
 
 namespace LantanaGroup.Link.Normalization.Domain.Queries
 {
@@ -69,7 +70,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         }
 
         public void ClearCache(OperationSequenceSearchModel model) {
-            _cache.Remove(model.FacilityId + model.ResourceType);
+            _cache.Remove(BuildCacheKey(model));
         }
 
         private List<OperationSequenceModel> Query(OperationSequenceSearchModel model) 
