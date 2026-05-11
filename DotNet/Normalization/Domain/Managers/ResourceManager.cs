@@ -3,6 +3,7 @@ using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.EntityFrameworkCore;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers
@@ -49,14 +50,21 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 return null;
             }
 
-            var resource = await _database.ResourceTypes.AddAsync(new Entities.ResourceType()
+            try
             {
-                Name = resourceName,
-            });
+                var resource = await _database.ResourceTypes.AddAsync(new Entities.ResourceType()
+                {
+                    Name = resourceName,
+                });
 
-            await _database.SaveChangesAsync();
+                await _database.SaveChangesAsync();
 
-            return await _resourceQueries.Get(resource.Id);
+                return await _resourceQueries.Get(resource.Id);
+            }
+            catch (DbUpdateException)
+            {
+                return null;
+            }
         }
 
         public async Task DeleteResource(string resource)
