@@ -4,6 +4,7 @@ using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Domain.Managers
@@ -19,10 +20,12 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
     {
         private readonly IDatabase _database;
         private readonly IResourceQueries _resourceQueries;
-        public ResourceManager(IDatabase database, IResourceQueries resourceQueries)
+        private readonly ILogger<ResourceManager> _logger;
+        public ResourceManager(IDatabase database, IResourceQueries resourceQueries, ILogger<ResourceManager> logger)
         {
             _database = database;
             _resourceQueries = resourceQueries;
+            _logger = logger;
         }
 
         public async Task<ResourceModel> CreateResource(string resourceName, bool bypassTypeCheck = false)
@@ -61,8 +64,9 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
                 return await _resourceQueries.Get(resource.Id);
             }
-            catch (DbUpdateException)
+            catch (DbUpdateException ex)
             {
+                _logger.LogWarning(ex, "DbUpdateException while creating ResourceType '{ResourceName}'. This may be a duplicate key race condition.", resourceName);
                 return null;
             }
         }

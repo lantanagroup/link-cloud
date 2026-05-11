@@ -229,6 +229,11 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                     resource = await _resourceManager.CreateResource(res);
                 }
 
+                if (resource == null)
+                {
+                    resource = await _resourceQueries.Get(res);
+                }
+
                 resources.Add(resource);
             }
 
