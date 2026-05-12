@@ -166,6 +166,7 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                     throw new TransientException("Failed to submit content.");
                 }
+
                 if (uploaded)
                 {
                     _payloadSubmittedProducer.Produce(
