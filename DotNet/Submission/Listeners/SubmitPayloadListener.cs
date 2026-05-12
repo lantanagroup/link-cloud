@@ -149,7 +149,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                         _logger.LogError(ex, "Failed to download from internal blob storage.");
                         await ProduceAuditEventAsync(facilityId, correlationId, $"Failed to download from internal blob storage: {ex}", cancellationToken);
                         
-                        throw new TransientException("Failed to retrieve content for submission.");
+                        throw new TransientException("Failed to download from internal blob storage.");
                     }
                 }
 
@@ -164,7 +164,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                     _logger.LogError(ex, "Failed to upload to external blob storage.");
                     await ProduceAuditEventAsync(facilityId, correlationId, $"Failed to upload to external blob storage: {ex}", cancellationToken);
 
-                    throw new TransientException("Failed to submit content.");
+                    throw new TransientException("Failed to upload to external blob storage.");
                 }
 
                 if (uploaded)
