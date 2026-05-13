@@ -106,7 +106,7 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
                     report.setFrequency(r.getFrequency());
                     report.setStartDate(r.getStartDate());
                     report.setEndDate(r.getEndDate());
-                    report.setReportTrackingId(r.getReportTrackingId());
+                    report.setReportTrackingId(value.getReportTrackingId());
                     return report;
                 })
                 .toList());
