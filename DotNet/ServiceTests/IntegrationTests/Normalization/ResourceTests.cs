@@ -61,18 +61,18 @@ namespace IntegrationTests.Normalization
         }
 
         [Fact]
-        public async Task InitializeResources_AlreadyInitialized_ReturnsEmptyList()
+        public async Task InitializeResources_AlreadyInitialized_ReturnsAllResources()
         {
             //Setup
             using var scope = _fixture.ServiceProvider.CreateScope();
             var manager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
-            await manager.InitializeResources();
+            var first = await manager.InitializeResources();
 
             //Act
-            var result = await manager.InitializeResources();
+            var second = await manager.InitializeResources();
 
             //Assert
-            Assert.Empty(result); //Second call should not create any new resources.
+            Assert.Equal(first.Count, second.Count);
         }
 
         [Fact]
@@ -112,7 +112,7 @@ namespace IntegrationTests.Normalization
         }
 
         [Fact]
-        public async Task CreateResource_ExistingName_ReturnsNull()
+        public async Task CreateResource_ExistingName_ReturnsExisting()
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var resourceManager = scope.ServiceProvider.GetRequiredService<IResourceManager>();
@@ -120,7 +120,8 @@ namespace IntegrationTests.Normalization
             const string existingName = "Patient";
             var result = await resourceManager.CreateResource(existingName);
 
-            Assert.Null(result);
+            Assert.NotNull(result);
+            Assert.Equal(existingName, result.ResourceName);
         }
 
         [Fact]

@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -78,28 +79,36 @@ public static class FacilitySetupHelper
         IAutomationOutput output,
         string facilityId)
     {
-        var response = await normalizationClient.SearchFacilityOperationsAsync(facilityId);
-        if (response?.Records?.Count > 0)
+        try
         {
-            output.WriteLine($"Normalization config for facility '{facilityId}' already exists. Skipping create.");
-            return;
-        }
-
-        await normalizationClient.CreateOperationAsync(new CreateNormalizationOperationRequestApiModel
-        {
-            ResourceTypes = ["Location"],
-            FacilityId = facilityId,
-            Operation = new CreateNormalizationOperationDetailsApiModel
+            var response = await normalizationClient.SearchFacilityOperationsAsync(facilityId);
+            if (response?.Records?.Count > 0)
             {
-                OperationType = "CopyProperty",
-                Name = "Copy Location Identifier to Type",
-                Description = "A Test Operation",
-                SourceFhirPath = "identifier.value",
-                TargetFhirPath = "type[0].coding.code"
-            },
-            Description = "Copy Location Identifier to Code",
-            VendorIds = []
-        });
+                output.WriteLine($"Normalization config for facility '{facilityId}' already exists. Skipping create.");
+                return;
+            }
+
+            await normalizationClient.CreateOperationAsync(new CreateNormalizationOperationRequestApiModel
+            {
+                ResourceTypes = ["Location"],
+                FacilityId = facilityId,
+                Operation = new CreateNormalizationOperationDetailsApiModel
+                {
+                    OperationType = "CopyProperty",
+                    Name = "Copy Location Identifier to Type",
+                    Description = "A Test Operation",
+                    SourceFhirPath = "identifier.value",
+                    TargetFhirPath = "type[0].coding.code"
+                },
+                Description = "Copy Location Identifier to Code",
+                VendorIds = []
+            });
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"CreateOperationAsync failed for facility '{facilityId.SanitizeForLog()}': {ex.GetType().Name}");
+            throw;
+        }
     }
 
     public static async Task EnsureQueryPlansAsync(
