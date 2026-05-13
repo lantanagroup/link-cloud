@@ -1,5 +1,4 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Settings;
@@ -9,7 +8,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 {
     public class AuditableEventOccurredProducer(
         ILogger<AuditableEventOccurredProducer> _logger,
-        IProducer<string, AuditEventMessage> _producer)
+        IProducer<string, AuditEventMessage> _producer,
+        ServiceInformation serviceInformation)
     {
         public async Task ProduceAsync(AuditEventMessage model, CancellationToken cancellationToken = default)
         {
@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 {
                     headers.Add(KafkaConstants.HeaderConstants.CorrelationId, Encoding.ASCII.GetBytes(model.CorrelationId));
                 }
-                model.ServiceName = ReportConstants.ServiceName;
+                model.ServiceName = serviceInformation.ServiceConfigName;
                 await _producer.ProduceAsync(nameof(KafkaTopic.AuditableEventOccurred), new Message<string, AuditEventMessage>
                 {
                     Headers = headers,

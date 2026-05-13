@@ -51,7 +51,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 logger.LogUserCreationException(ex.Message);
                 throw;
             }

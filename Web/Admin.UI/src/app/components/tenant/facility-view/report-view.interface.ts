@@ -5,13 +5,22 @@ export interface IReportListSummary {
   facilityId: string;
   reportStartDate: Date;
   reportEndDate: Date;
-  submitted: boolean
-  submitDate: Date;
+  status: ScheduleStatus
+  submitReportDateTime: Date;
   reportTypes: string[];
   frequency: string;
+  adhocType: string;
   censusCount: number;
   initialPopulationCount: number;
   reportMetrics: IScheduledReportMetrics;
+  createDate: Date;
+}
+
+export enum ScheduleStatus {
+  New = 'New',
+  Scheduled = 'Scheduled',
+  EndOfPeriod = 'EndOfPeriod',
+  Submitted = 'Submitted'
 }
 
 export interface ICensusCount {
@@ -38,7 +47,7 @@ export interface IMeasureReportSummary {
   validationStatus: string;
   resourceCount: number;
   resourceCountSummary: Record<string, number>;
-  reportScheduleId : string;
+  reportScheduleId : string
 }
 
 export class IPagedMeasureReportSummary {

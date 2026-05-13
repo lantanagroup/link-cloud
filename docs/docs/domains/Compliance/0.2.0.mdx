@@ -1,0 +1,48 @@
+---
+id: Compliance
+name: Compliance
+summary: Compliance Domain
+version: 0.2.0
+
+owners:
+  - arch_team
+
+services:
+  - id: AccountService
+  - id: AuditService
+  - id: TerminologyService
+  - id: ValidationService
+
+---
+
+# Compliance Domain
+
+Responsible for ensuring that Link operates within defined policies. This includes both operational compliance (e.g., security controls auditing) and data compliance (e.g., validating data syntax and semantics against prescribed profiles and standards).
+
+## Key Concepts
+
+* Data Governance: Setting policy and assuring compliance
+
+## Requirements
+
+### Stakeholder Requirements
+
+* Clinical data shall meet USCore standard compliance requirements
+* FHIR implementation guides containing profiles shall be loadable for validation purposes
+* Clinical data shall be validated prior to submission
+* Open source validation technologies shall be used for FHIR standard compliance validation
+* Validation results shall be persisted for future reference
+* Validation results shall be categorized to facilitate stakeholder review
+* Validation results and categories shall be visualized with drill-down capability
+* Uncategorized validation results shall be identifiable for category creation
+
+### System Requirements
+
+* The system shall validate all clinical data against USCore profiles
+* The system shall support importing FHIR implementation guides containing validation profiles
+* The system shall execute validation checks on clinical data before allowing submission
+* The system shall use [HAPI FHIR validator](https://hapifhir.io/hapi-fhir/docs/validation/instance_validator.html) for FHIR standard compliance validation
+* The system shall persist validation results in a queryable database
+* The system shall support creation and management of validation result categories
+* The system shall provide visualization of validation results with category-to-detail navigation
+* The system shall maintain an "uncategorized" category for validation results without defined categories

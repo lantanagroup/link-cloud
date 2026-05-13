@@ -42,9 +42,7 @@ public class PatientListsAcquiredListener : BackgroundService
         _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
 
 
-        _transientExceptionHandler.ServiceName = CensusConstants.ServiceName;
         _transientExceptionHandler.Topic = nameof(KafkaTopic.PatientListsAcquired) + "-Retry";
-        _nonTransientExceptionHandler.ServiceName = CensusConstants.ServiceName;
         _nonTransientExceptionHandler.Topic = nameof(KafkaTopic.PatientListsAcquired) + "-Error";
     }
 

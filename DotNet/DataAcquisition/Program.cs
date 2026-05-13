@@ -14,18 +14,21 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();
@@ -39,11 +42,11 @@ static void RegisterServices(WebApplicationBuilder builder)
 {
     var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
+    builder.Services.Configure<AcquisitionJobSettings>(builder.Configuration.GetSection(AcquisitionJobSettings.SectionName));
+
     builder.RegisterAll(DataAcquisitionConstants.ServiceName, true);
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
-
-    builder.RegisterQuartzAcquisitionJob(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
 
     // Add services to the container.
     // Additional configuration is required to successfully run gRPC on macOS.
@@ -62,18 +65,20 @@ static void RegisterServices(WebApplicationBuilder builder)
     }); 
 
     //Add Hosted Services
-    if (!consumerSettings?.DisableConsumer ?? true)
+    builder.Services.AddHostedService<AcquisitionProcessingScheduleService>();
+
+    if (!(consumerSettings?.DisableConsumer ?? false))
     {
         builder.Services.AddHostedService<DataAcquisitionRequestedListener>();
         builder.Services.AddHostedService<PatientCensusScheduledListener>();
     }
 
-    if (!consumerSettings?.DisableRetryConsumer ?? true)
+    if (!(consumerSettings?.DisableRetryConsumer ?? false))
     {
-        // TODO: Retry consumer services temporarily disabled for LNK-4038
-        //builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue()]));
-        //builder.Services.AddHostedService<RetryListener>();
-        //builder.Services.AddHostedService<RetryScheduleService>();
+        builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionConstants.ServiceName, [KafkaTopic.DataAcquisitionRequestedRetry.GetStringValue(), KafkaTopic.PatientCensusScheduledRetry.GetStringValue()]));
+        builder.Services.AddHostedService<RetryListener>();
+        builder.Services.AddHostedService<RetryScheduleService>();
+        builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
     }
 
     // Add Link Security

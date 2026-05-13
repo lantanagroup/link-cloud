@@ -1,4 +1,4 @@
-import { PaginationMetadata } from "src/app/models/pagination-metadata.model";
+import {PaginationMetadata} from "src/app/models/pagination-metadata.model";
 
 export interface AcquisitionLogSummary {
     id: string;
@@ -10,7 +10,10 @@ export interface AcquisitionLogSummary {
     fhirVersion: string;
     queryPhase: string;
     queryType: string;
-    executionDate: Date;    
+    executionDate: Date;
+    createDate: Date;
+    completionDate?: Date;
+    retryAttempts: number;
     status: string;
     reportIds: string[];
 }

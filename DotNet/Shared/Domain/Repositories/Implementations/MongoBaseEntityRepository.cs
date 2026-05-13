@@ -79,6 +79,27 @@ public class MongoBaseEntityRepository<T> : IBaseEntityRepository<T> where T : B
         return entity;
     }
 
+    public async Task<List<T>> AddManyAsync(List<T> entities, CancellationToken cancellationToken = default)
+    {
+        if (cancellationToken.IsCancellationRequested) return null;
+
+        foreach (var entity in entities)
+        {
+            entity.Id ??= Guid.NewGuid().ToString();
+        }
+
+        try
+        {
+            await _collection.InsertManyAsync(entities, cancellationToken: cancellationToken);
+        }
+        catch (Exception)
+        {
+            throw;
+        }
+
+        return entities;
+    }
+
     public virtual void Delete(object id)
     {
         var filter = Builders<T>.Filter.Eq(x => x.Id, id);

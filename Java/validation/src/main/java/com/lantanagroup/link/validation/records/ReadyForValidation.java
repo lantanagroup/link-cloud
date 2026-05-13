@@ -27,5 +27,6 @@ public class ReadyForValidation {
     @Setter
     public static class Key {
         private String facilityId;
+        private String correlationId;
     }
 }

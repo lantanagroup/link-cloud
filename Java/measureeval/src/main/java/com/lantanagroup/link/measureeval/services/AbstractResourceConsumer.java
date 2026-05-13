@@ -1,16 +1,17 @@
 package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
+import com.lantanagroup.link.measureeval.entities.QueryType;
 import com.lantanagroup.link.measureeval.entities.Resource;
+import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
+import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
+import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
-import com.lantanagroup.link.measureeval.entities.QueryType;
-import com.lantanagroup.link.measureeval.records.AbstractResourceRecord;
-import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
-import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
+import com.lantanagroup.link.shared.kafka.records.ResourceKey;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
 
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
-public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AsyncListener<String, T> {
+public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AsyncListener<ResourceKey, T> {
     private static final Logger logger = LoggerFactory.getLogger(AbstractResourceConsumer.class);
     private static final Logger performanceLogger =LoggerFactory.getLogger(
             "com.lantanagroup.link.performance." + AbstractResourceConsumer.class.getSimpleName());
@@ -48,7 +49,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private final KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate;
     private final EvaluateMeasureService evaluateMeasureService;
     private final PatientStatusBundler patientStatusBundler;
-    private final ResourceEvaluatedProducer resourceEvaluatedProducer;
+    private final BlobStorageService blobStorageService;
+    private final MeasureReportGeneratedProducer measureReportGeneratedProducer;
 
     public AbstractResourceConsumer (
             ResourceRepository resourceRepository,
@@ -58,22 +60,23 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             KafkaTemplate<String, DataAcquisitionRequested> dataAcquisitionRequestedTemplate,
             EvaluateMeasureService evaluateMeasureService,
             PatientStatusBundler patientStatusBundler,
-            ResourceEvaluatedProducer resourceEvaluatedProducer,
-            ConsumerRecordRecoverer recoverer) {
+            BlobStorageService blobStorageService,
+            ConsumerRecordRecoverer recoverer, MeasureReportGeneratedProducer measureReportGeneratedProducer) {
         super(recoverer);
         this.resourceRepository = resourceRepository;
         this.patientStatusRepository = patientStatusRepository;
+        this.measureReportGeneratedProducer = measureReportGeneratedProducer;
         patientStatusCache = Collections.synchronizedMap(new PassiveExpiringMap<>(1L, TimeUnit.MINUTES));
         this.reportabilityPredicate = reportabilityPredicate;
         this.measureEvalMetrics = measureEvalMetrics;
         this.dataAcquisitionRequestedTemplate = dataAcquisitionRequestedTemplate;
         this.evaluateMeasureService = evaluateMeasureService;
         this.patientStatusBundler = patientStatusBundler;
-        this.resourceEvaluatedProducer = resourceEvaluatedProducer;
+        this.blobStorageService = blobStorageService;
     }
 
     @Override
-    protected void process(ConsumerRecord<String, T> record) {
+    protected void process(ConsumerRecord<ResourceKey, T> record) {
         String correlationId = Headers.getCorrelationId(record.headers());
 
         StopWatch totalStopWatch = new StopWatch();
@@ -91,10 +94,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             taskStopWatch.stop();
 
             taskStopWatch.start("validateRecord");
-            String facilityId = record.key();
-            if (facilityId == null || facilityId.isEmpty()) {
+            ResourceKey key = record.key();
+            if (key == null || key.getFacilityId() == null || key.getFacilityId().isEmpty()) {
                 throw new ValidationException("Facility ID is null or empty.");
             }
+            String facilityId = key.getFacilityId();
             T value = record.value();
             if (value.getResource() == null && !value.isAcquisitionComplete()) {
                 throw new ValidationException("Record Resource is null and AcquisitionComplete is false.");
@@ -120,7 +124,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
             logger.trace("Beginning patient status update");
 
-            PatientReportingEvaluationStatus patientStatus = patientStatusCache.computeIfAbsent(correlationId, key -> {
+            PatientReportingEvaluationStatus patientStatus = patientStatusCache.computeIfAbsent(correlationId, k -> {
                 taskStopWatch.start("retrieveOrCreatePatientStatus");
                 PatientReportingEvaluationStatus _patientStatus = Objects.requireNonNullElseGet(
                         retrievePatientStatus(facilityId, correlationId),
@@ -141,6 +145,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 patientStatusCache.put(correlationId, patientStatus);
             }
 
+            // If we've acquired/consumed all the resources for the patient, evaluate the patient's data against the measures;
+            // otherwise this instance of ResourceNormalized is intended to just persist the resource defined in the record within the database
             if (value.isAcquisitionComplete()) {
                 logger.trace("Beginning measure evaluation");
 
@@ -151,15 +157,14 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 taskStopWatch.start("evaluateMeasures");
                 evaluateMeasures(value, patientStatus, bundle);
                 taskStopWatch.stop();
+            } else {
+                logger.trace("Beginning resource update");
 
-                return;
+                taskStopWatch.start("upsertResource");
+                upsertResource(facilityId, correlationId, value);
+                taskStopWatch.stop();
             }
 
-            logger.trace("Beginning resource update");
-
-            taskStopWatch.start("upsertResource");
-            upsertResource(facilityId, correlationId, value);
-            taskStopWatch.stop();
         } finally {
             totalStopWatch.stop();
             for (StopWatch.TaskInfo task : taskStopWatch.getTaskInfo()) {
@@ -170,7 +175,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         }
     }
 
-    private Resource upsertResource (String facilityId, String correlationId, T value) {
+    private void upsertResource(String facilityId, String correlationId, T value) {
         logger.trace("Upserting resource in database");
         Resource resource = new Resource();
         resource.setFacilityId(facilityId);
@@ -179,7 +184,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         resource.setResourceType(value.getResourceType());
         resource.setResourceId(value.getResourceId());
         resource.setResource(value.getResource());
-        return resourceRepository.upsert(resource);
+        resourceRepository.upsert(resource);
     }
 
     private PatientReportingEvaluationStatus retrievePatientStatus (String facilityId, String correlationId) {
@@ -211,14 +216,32 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
 
     private void evaluateMeasures (T value, PatientReportingEvaluationStatus patientStatus, Bundle bundle) {
         logger.debug("Evaluating measures");
+
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
-            MeasureReport measureReport = evaluateMeasureService.evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
+            MeasureReport measureReport;
+            if (bundle.hasEntry()) {
+                measureReport = evaluateMeasureService.evaluateMeasure(value.getQueryType().toString(), patientStatus, report, bundle);
+                if (measureReport.getIdPart() == null) {
+                    measureReport.setId(UUID.randomUUID().toString());
+                }
+            } else {
+                if (value.getQueryType() != QueryType.INITIAL) {
+                    throw new IllegalArgumentException("Unexpected empty bundle during non-initial evaluation");
+                }
+                measureReport = null;
+            }
+
             switch (value.getQueryType()) {
                 case INITIAL -> {
-                    updateReportability(patientStatus, report, measureReport);
-                    resourceEvaluatedProducer.produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
+                    boolean reportable = measureReport != null && reportabilityPredicate.test(measureReport);
+                    updateReportability(patientStatus, report, reportable);
+
+                    if (!reportable) {
+                        String measureReportId = measureReport == null ? UUID.randomUUID().toString() : measureReport.getIdPart();
+                        measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(patientStatus, report, measureReportId, null, null);
+                    }
                 }
-                case SUPPLEMENTAL -> resourceEvaluatedProducer.produceResourceEvaluatedRecords(value.getQueryType(), patientStatus, report, measureReport);
+                case SUPPLEMENTAL -> blobStorageService.storePatientInBlobStorage(patientStatus, report, measureReport);
                 default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
             }
         }
@@ -250,8 +273,8 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private void updateReportability (
             PatientReportingEvaluationStatus patientStatus,
             PatientReportingEvaluationStatus.Report report,
-            MeasureReport measureReport) {
-        report.setReportable(reportabilityPredicate.test(measureReport));
+            boolean reportable) {
+        report.setReportable(reportable);
         patientStatusRepository.save(patientStatus);
     }
 

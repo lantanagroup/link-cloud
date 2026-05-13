@@ -1,0 +1,613 @@
+{
+  "$ref": "#/definitions/flows",
+  "definitions": {
+    "flows": {
+      "type": "object",
+      "properties": {
+        "detailsPanel": {
+          "type": "object",
+          "properties": {
+            "owners": {
+              "type": "object",
+              "properties": {
+                "visible": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
+            "versions": {
+              "$ref": "#/definitions/flows/properties/detailsPanel/properties/owners"
+            },
+            "changelog": {
+              "$ref": "#/definitions/flows/properties/detailsPanel/properties/owners"
+            }
+          },
+          "additionalProperties": false
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "node",
+                  "message",
+                  "user",
+                  "actor"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "message": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "string",
+                    "default": "latest"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false
+              },
+              "service": {
+                "$ref": "#/definitions/flows/properties/steps/items/properties/message"
+              },
+              "flow": {
+                "$ref": "#/definitions/flows/properties/steps/items/properties/message"
+              },
+              "actor": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "custom": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "color": {
+                    "type": "string"
+                  },
+                  "properties": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": [
+                        "string",
+                        "number"
+                      ]
+                    }
+                  },
+                  "height": {
+                    "type": "number"
+                  },
+                  "menu": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        }
+                      },
+                      "required": [
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "title"
+                ],
+                "additionalProperties": false
+              },
+              "externalSystem": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              "next_step": {
+                "anyOf": [
+                  {
+                    "type": [
+                      "string",
+                      "number"
+                    ]
+                  },
+                  {
+                    "anyOf": [
+                      {
+                        "not": {}
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": [
+                              "string",
+                              "number"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                ]
+              },
+              "next_steps": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/flows/properties/steps/items/properties/next_step"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "draft": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "badges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string"
+              },
+              "backgroundColor": {
+                "type": "string"
+              },
+              "textColor": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "content",
+              "backgroundColor",
+              "textColor"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "owners": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "collection": {
+                    "type": "string",
+                    "enum": [
+                      "users",
+                      "teams"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "collection"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "schemaPath": {
+          "type": "string"
+        },
+        "sidebar": {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "badge": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string"
+            },
+            "backgroundColor": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "repository": {
+          "type": "object",
+          "properties": {
+            "language": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        "specifications": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "openapiPath": {
+                  "type": "string"
+                },
+                "asyncapiPath": {
+                  "type": "string"
+                },
+                "graphqlPath": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "openapi",
+                      "asyncapi",
+                      "graphql"
+                    ]
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            }
+          ]
+        },
+        "hidden": {
+          "type": "boolean"
+        },
+        "editUrl": {
+          "type": "string"
+        },
+        "resourceGroups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string",
+                      "default": "latest"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "service",
+                        "event",
+                        "command",
+                        "query",
+                        "flow",
+                        "channel",
+                        "domain",
+                        "user",
+                        "team",
+                        "container"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "type"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "limit": {
+                "type": "number",
+                "default": 10
+              },
+              "sidebar": {
+                "type": "boolean",
+                "default": true
+              }
+            },
+            "required": [
+              "items"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "styles": {
+          "type": "object",
+          "properties": {
+            "icon": {
+              "type": "string"
+            },
+            "node": {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "deprecated": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "date": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "string",
+                          "format": "date"
+                        },
+                        {
+                          "type": "integer",
+                          "format": "unix-time"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "anyOf": [
+                {
+                  "not": {}
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            }
+          ]
+        },
+        "visualiser": {
+          "type": "boolean"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "diagrams": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/flows/properties/steps/items/properties/message"
+          }
+        },
+        "versions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "latestVersion": {
+          "type": "string"
+        },
+        "catalog": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "filePath": {
+              "type": "string"
+            },
+            "publicPath": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "filePath",
+            "publicPath",
+            "type"
+          ],
+          "additionalProperties": false
+        },
+        "$schema": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "steps",
+        "id",
+        "name",
+        "version"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

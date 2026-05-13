@@ -2,6 +2,9 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using System.Diagnostics;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -23,7 +26,10 @@ public class FhirQueryConfigurationQueries : IFhirQueryConfigurationQueries
 
     public async Task<AuthenticationConfigurationModel?> GetAuthenticationConfigurationByFacilityId(string facilityId, CancellationToken cancellationToken = default)
     {
-        var result = await (from fl in _database.FhirQueryConfigurations
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryConfigurationQueries.GetAuthenticationConfigurationByFacilityId");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
+        var result = await (from fl in _database.FhirQueryConfigurations.AsNoTracking()
                             where fl.FacilityId == facilityId
                             select AuthenticationConfigurationModel.FromDomain(fl.Authentication)).SingleOrDefaultAsync();
 
@@ -32,7 +38,10 @@ public class FhirQueryConfigurationQueries : IFhirQueryConfigurationQueries
 
     public async Task<FhirQueryConfigurationModel?> GetByFacilityIdAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var result = await (from fl in _database.FhirQueryConfigurations
+        using var activity = ServiceActivitySource.Instance.StartActivity("FhirQueryConfigurationQueries.GetByFacilityIdAsync");
+        activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+
+        var result = await (from fl in _database.FhirQueryConfigurations.AsNoTracking()
                             where fl.FacilityId == facilityId
                             select FhirQueryConfigurationModel.FromDomain(fl)).SingleOrDefaultAsync();
 

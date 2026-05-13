@@ -1,19 +1,20 @@
-﻿using Confluent.Kafka;
+﻿using System.Diagnostics;
+using System.Text;
+using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using Microsoft.Extensions.Options;
 using Quartz;
-using System.Diagnostics;
-using System.Text;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using Task = System.Threading.Tasks.Task;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 namespace LantanaGroup.Link.DataAcquisition.Jobs;
 
@@ -23,29 +24,74 @@ public class AcquisitionProcessingJob : IJob
     private readonly ILogger<AcquisitionProcessingJob> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IProducer<long, ReadyToAcquire> _readyToAcquireProducer;
-    private readonly IProducer<string, ResourceAcquired> _resourceAcquiredProducer;
+    private readonly IProducer<ResourceKey, ResourceAcquired> _resourceAcquiredProducer;
+    private readonly AcquisitionWorkerProcessorSettings _settings;
     private const int BatchSize = 25;
-    private const int MaxConcurrency = 8;
 
     public AcquisitionProcessingJob(
         ILogger<AcquisitionProcessingJob> logger,
         IServiceScopeFactory serviceScopeFactory,
         IProducer<long, ReadyToAcquire> readyToAcquireProducer,
-        IProducer<string, ResourceAcquired> resourceAcquiredProducer)
+        IProducer<ResourceKey, ResourceAcquired> resourceAcquiredProducer,
+        IOptions<AcquisitionWorkerProcessorSettings> settings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _serviceScopeFactory = serviceScopeFactory ?? throw new ArgumentNullException(nameof(serviceScopeFactory));
         _readyToAcquireProducer = readyToAcquireProducer ?? throw new ArgumentNullException(nameof(readyToAcquireProducer));
         _resourceAcquiredProducer = resourceAcquiredProducer ?? throw new ArgumentNullException(nameof(resourceAcquiredProducer));
+        _settings = settings?.Value ?? new AcquisitionWorkerProcessorSettings();
     }
 
     public async Task Execute(IJobExecutionContext context)
     {
-        await ProcessPendingLogs(context.CancellationToken);
+        var stopwatch = Stopwatch.StartNew();
+        await FailStalledQueuedLogs(context.CancellationToken);
+        await ResetStalledProcessingLogs(context.CancellationToken);
+        await ProcessPendingLogs(stopwatch, context.CancellationToken);
         await ProcessPendingTailingMessages(context.CancellationToken);
     }
 
-    public async Task ProcessPendingLogs(CancellationToken cancellationToken)
+    private async Task FailStalledQueuedLogs(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+            
+            int failedCount = await dataAcquisitionLogQueries.FailStalledQueuedLogsAsync(_settings.StalledQueuedThresholdMinutes, _settings.MaxBatchesFailStalledPerRun, cancellationToken);
+            
+            if (failedCount > 0)
+            {
+                _logger.LogInformation("Successfully failed {count} stalled queued logs.", failedCount);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while failing stalled queued logs.");
+        }
+    }
+
+    private async Task ResetStalledProcessingLogs(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _serviceScopeFactory.CreateScope();
+            var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+            int resetCount = await dataAcquisitionLogQueries.ResetStalledProcessingLogsAsync(_settings.StalledProcessingThresholdMinutes, _settings.MaxBatchesFailStalledPerRun, cancellationToken);
+
+            if (resetCount > 0)
+            {
+                _logger.LogInformation("Successfully reset {count} stalled processing logs to Pending.", resetCount);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while resetting stalled processing logs.");
+        }
+    }
+
+    public async Task ProcessPendingLogs(Stopwatch stopwatch, CancellationToken cancellationToken)
     {
         try
         {
@@ -53,11 +99,11 @@ public class AcquisitionProcessingJob : IJob
             var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
             var facilities = await dataAcquisitionLogQueries.GetFacilitiesWithPendingAndRetryableFailedRequests(cancellationToken);
 
-            var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = MaxConcurrency, CancellationToken = cancellationToken };
+            var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = _settings.MaxConcurrentAcquisitions, CancellationToken = cancellationToken };
 
             await Parallel.ForEachAsync(facilities, parallelOptions, async (facilityId, ct) =>
             {
-                await ProcessFacilityPendingLogs(facilityId, cancellationToken);
+                await ProcessFacilityPendingLogs(facilityId, stopwatch, cancellationToken);
             });
         }
         catch (Exception ex)
@@ -66,7 +112,7 @@ public class AcquisitionProcessingJob : IJob
         }
     }
 
-    private async Task ProcessFacilityPendingLogs(string facilityId, CancellationToken cancellationToken)
+    private async Task ProcessFacilityPendingLogs(string facilityId, Stopwatch stopwatch, CancellationToken cancellationToken)
     {
         try
         {
@@ -77,37 +123,37 @@ public class AcquisitionProcessingJob : IJob
 
             var config = await fhirQueryConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
+            List<RequestStatus> statuses = [RequestStatus.Failed, RequestStatus.Pending];
+            var dateTimeNow = DateTime.UtcNow;
+
             if (config == null)
             {
                 _logger.LogCritical("Request FAILED due to missing FhirQueryConfiguration. FacilityId: {facilityId}", facilityId.Sanitize());
 
                 long? lastMissingConfigId = null;
-                while (true)
+                int batchesProcessedMissing = 0;
+                while (batchesProcessedMissing < _settings.MaxBatchesPerFacilityPerRun)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    var requests = await dataAcquisitionLogQueries.GetNextEligibleBatchForFacility(facilityId, lastMissingConfigId, BatchSize, cancellationToken);
-                    if (!requests.Any()) break;
-
-                    foreach (var log in requests)
+                    if (stopwatch.Elapsed.TotalSeconds >= _settings.TimeBudgetPerRunSeconds)
                     {
-                        log.Status = RequestStatus.Failed;
-                        log.Notes ??= new List<string>();
-                        log.Notes.Add($"[{DateTime.UtcNow}] Request FAILED due to missing FhirQueryConfiguration. FacilityId: {log.FacilityId}.");
-                        await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                        {
-                            Id = log.Id,
-                            ResourceAcquiredIds = log.ResourceAcquiredIds,
-                            RetryAttempts = log.RetryAttempts,
-                            CompletionDate = log.CompletionDate,
-                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, 
-                            TraceId = log.TraceId,
-                            ExecutionDate = log.ExecutionDate,
-                            Notes = log.Notes,
-                            Status = log.Status,
-                        }, cancellationToken);
+                        _logger.LogInformation("ProcessFacilityPendingLogs (MissingConfig) for facility {facilityId} reached time budget of {budget}s. Yielding.", facilityId, _settings.TimeBudgetPerRunSeconds);
+                        break;
                     }
 
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var requests = await dataAcquisitionLogQueries.GetNextEligibleBatchForFacility(facilityId, lastMissingConfigId, BatchSize, statuses, dateTimeNow, cancellationToken);
+                    if (!requests.Any()) break;
+
+                    var logIds = requests.Select(r => r.Id).ToList();
+                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(logIds, RequestStatus.Failed, cancellationToken);
+
                     lastMissingConfigId = requests.Last().Id;
+                    batchesProcessedMissing++;
+                }
+
+                if (batchesProcessedMissing >= _settings.MaxBatchesPerFacilityPerRun)
+                {
+                    _logger.LogInformation("ProcessFacilityPendingLogs (MissingConfig) for facility {facilityId} reached max batch limit of {maxBatches}. Yielding.", facilityId, _settings.MaxBatchesPerFacilityPerRun);
                 }
 
                 return;
@@ -115,16 +161,23 @@ public class AcquisitionProcessingJob : IJob
 
             if (!IsWithinAcquisitionWindow(config.MinAcquisitionPullTime, config.MaxAcquisitionPullTime))
             {
-                _logger.LogInformation("Current time {currentTime} is outside the acquisition window for facility {facilityId}.", DateTime.UtcNow.TimeOfDay, facilityId);
+                _logger.LogInformation("Current time {currentTime} is outside the acquisition window for facility {facilityId}.", dateTimeNow.TimeOfDay, facilityId);
                 return;
             }
 
             long? lastId = null;
-            while (true)
+            int batchesProcessed = 0;
+            while (batchesProcessed < _settings.MaxBatchesPerFacilityPerRun)
             {
+                if (stopwatch.Elapsed.TotalSeconds >= _settings.TimeBudgetPerRunSeconds)
+                {
+                    _logger.LogInformation("ProcessFacilityPendingLogs for facility {facilityId} reached time budget of {budget}s. Yielding.", facilityId, _settings.TimeBudgetPerRunSeconds);
+                    break;
+                }
+
                 cancellationToken.ThrowIfCancellationRequested();
                 _logger.LogInformation("Fetching batch after Id {lastId} for facility {facilityId}", lastId?.ToString() ?? "null", facilityId);
-                var requests = await dataAcquisitionLogQueries.GetNextEligibleBatchForFacility(facilityId, lastId, BatchSize, cancellationToken);
+                var requests = await dataAcquisitionLogQueries.GetNextEligibleBatchForFacility(facilityId, lastId, BatchSize, statuses, dateTimeNow, cancellationToken);
                 if (!requests.Any())
                 {
                     _logger.LogInformation("No more logs to process for facility {facilityId}", facilityId);
@@ -133,99 +186,72 @@ public class AcquisitionProcessingJob : IJob
 
                 _logger.BeginScope("Processing {count} processable requests for facility {facilityId}", requests.Count, facilityId);
 
-                // Serialize processing to avoid DbContext concurrency issues (original was Parallel.ForEachAsync)
-                foreach (var log in requests)
+                var logIds = requests.Select(r => r.Id).ToList();
+                var failedLogs = requests.Where(r => r.Status == RequestStatus.Failed).ToList();
+                var maxRetriesReachedIds = failedLogs
+                    .Where(r => r.RetryAttempts >= DataAcquisitionLog.MaxRetryAttempts)
+                    .Select(r => r.Id)
+                    .ToList();
+                
+                var retryableLogIds = logIds.Except(maxRetriesReachedIds).ToList();
+
+                if (maxRetriesReachedIds.Any())
                 {
-                    log.Notes ??= new();
-                    if (log.Status == RequestStatus.Failed)
-                    {
-                        if (log.RetryAttempts >= DataAcquisitionLog.MaxRetryAttempts)
-                        {
-                            log.Status = RequestStatus.MaxRetriesReached;
-                            log.Notes ??= new List<string>();
-                            log.Notes.Add($"[{DateTime.UtcNow}] Maximum retry attempts ({DataAcquisitionLog.MaxRetryAttempts}) reached for request.");
-                            await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                            {
-                                Id = log.Id,
-                                ResourceAcquiredIds = log.ResourceAcquiredIds,
-                                RetryAttempts = log.RetryAttempts,
-                                CompletionDate = log.CompletionDate,
-                                CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
-                                ExecutionDate = log.ExecutionDate,
-                                Notes = log.Notes,
-                                Status = log.Status,
-                            }, cancellationToken);
-                            continue;
-                        }
+                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(maxRetriesReachedIds, RequestStatus.MaxRetriesReached, cancellationToken);
+                }
 
-                        log.RetryAttempts += 1;
-                        log.Notes.Add($"[{DateTime.UtcNow}] Retrying failed request. Attempt {log.RetryAttempts}.");
-                    }
+                if (retryableLogIds.Any())
+                {
+                    // We can't easily increment RetryAttempts in ExecuteUpdateAsync if it's null or we need different notes per record
+                    // But for the job, we can assume they all get +1 and the same note if we want true bulk
+                    // However, some might be Pending (RetryAttempts 0) and some Failed (RetryAttempts > 0)
+                    
+                    // To keep it simple and safe for now, let's at least bulk update the status to Ready
+                    await dataAcquisitionLogManager.UpdateStatusBatchAsync(retryableLogIds, RequestStatus.Ready, cancellationToken);
+                }
 
-                    var messageValue = new ReadyToAcquire { FacilityId = facilityId, LogId = log.Id };
-
-                    _logger.LogInformation("Generating ReadyToAcquire message for log id: {requestId}", log.Id);
-
-                    log.Status = RequestStatus.Ready;
-                    await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                    {
-                        Id = log.Id,
-                        ResourceAcquiredIds = log.ResourceAcquiredIds,
-                        RetryAttempts = log.RetryAttempts,
-                        CompletionDate = log.CompletionDate,
-                        CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
-                        ExecutionDate = log.ExecutionDate,
-                        Notes = log.Notes,
-                        Status = log.Status,
-                    }, cancellationToken);
+                foreach (var request in requests)
+                {
+                    if (maxRetriesReachedIds.Contains(request.Id)) continue;
 
                     try
                     {
-                        _logger.LogInformation("Producing ReadyToAcquire message for log id: {logId} and facility id: {facilityId}", log.Id, facilityId.Sanitize());
+                        _logger.LogDebug("Producing ReadyToAcquire message for log id: {logId} and facility id: {facilityId}", request.Id, facilityId.Sanitize());
 
                         var headers = new Headers
                         {
-                            { "X-Correlation-Id", Encoding.UTF8.GetBytes(log.CorrelationId?.ToString() ?? string.Empty) }
+                            { "X-Correlation-Id", Encoding.UTF8.GetBytes(request.CorrelationId?.ToString() ?? string.Empty) }
                         };
 
                         await _readyToAcquireProducer.ProduceAsync(
                             KafkaTopic.ReadyToAcquire.ToString(),
                             new Message<long, ReadyToAcquire>
                             {
-                                Key = log.Id,
+                                Key = request.Id,
                                 Value = new ReadyToAcquire
                                 {
-                                    LogId = log.Id,
+                                    LogId = request.Id,
                                     FacilityId = facilityId,
-                                    ReportTrackingId = log.ReportTrackingId
+                                    ReportTrackingId = request.ReportTrackingId
                                 },
                                 Headers = headers
                             }, cancellationToken);
-                        _readyToAcquireProducer.Flush(cancellationToken);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}", log.Id);
-
-                        log.Notes ??= new();
-
-                        log.Status = RequestStatus.Failed;
-                        log.Notes.Add($"[{DateTime.UtcNow}] Failed to produce ReadyToAcquire message: {ex.Message}");
-                        await dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
-                        {
-                            Id = log.Id,
-                            ResourceAcquiredIds = log.ResourceAcquiredIds,
-                            RetryAttempts = log.RetryAttempts,
-                            CompletionDate = log.CompletionDate,
-                            CompletionTimeMilliseconds = log.CompletionTimeMilliseconds, TraceId = log.TraceId,
-                            ExecutionDate = log.ExecutionDate,
-                            Notes = log.Notes,
-                            Status = log.Status,
-                        }, cancellationToken);
+                        _logger.LogError(ex, "Error producing ReadyToAcquire message for log id: {logId}", request.Id);
+                        await dataAcquisitionLogManager.UpdateStatusBatchAsync([request.Id], RequestStatus.Failed, cancellationToken);
                     }
                 }
+                _readyToAcquireProducer.Flush(cancellationToken);
 
                 lastId = requests.Last().Id;
+                batchesProcessed++;
+            }
+
+            if (batchesProcessed >= _settings.MaxBatchesPerFacilityPerRun)
+            {
+                _logger.LogDebug("ProcessFacilityPendingLogs for facility {facilityId} reached max batch limit of {maxBatches}. Yielding.", facilityId, _settings.MaxBatchesPerFacilityPerRun);
             }
 
             _logger.LogInformation("Completed processing processable requests for facility {facilityId}.", facilityId);
@@ -321,14 +347,16 @@ public class AcquisitionProcessingJob : IJob
                     
                     await _resourceAcquiredProducer.ProduceAsync(
                         KafkaTopic.ResourceAcquired.ToString(),
-                        new Message<string, ResourceAcquired>
+                        new Message<ResourceKey, ResourceAcquired>
                         {
-                            Key = message.FacilityId,
+                            Key = new ResourceKey
+                            {
+                                FacilityId = message.FacilityId,
+                                CorrelationId = message.CorrelationId
+                            },
                             Headers = headers,
                             Value = message.ResourceAcquired
                         }, cancellationToken);
-
-                    _resourceAcquiredProducer.Flush(cancellationToken);
 
                     await dataAcquisitionLogManager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(
                         message.LogIds,
@@ -341,10 +369,12 @@ public class AcquisitionProcessingJob : IJob
                 {
                     _logger.LogError(ex,
                         "An exception occurred while attempting to send Tail Kafka Messages for facility {facilityId}.",
-                        message.FacilityId);
+                        message.FacilityId?.SanitizeUntrustedString());
                 }
 
             }
+
+            _resourceAcquiredProducer.Flush(cancellationToken);
         }
         catch (Exception ex)
         {
@@ -372,7 +402,7 @@ public class AcquisitionProcessingJob : IJob
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to parse traceparent: {TraceParentId}", traceParentId);
+                _logger.LogWarning(ex, "Failed to parse traceparent: {TraceParentId}", traceParentId?.SanitizeUntrustedString());
             }
         }
         return parentContext;

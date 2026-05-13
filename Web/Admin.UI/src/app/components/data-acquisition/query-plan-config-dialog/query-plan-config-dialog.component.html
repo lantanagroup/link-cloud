@@ -2,12 +2,25 @@
 <div mat-dialog-content>
   <app-query-plan-config-form [item]="config" [formMode]="formMode" [viewOnly]="viewOnly" (formValueChanged)="onFormValueChanged($event)" (submittedConfiguration)="onSubmittedConfiguration($event)"></app-query-plan-config-form>
 </div>
-<div mat-dialog-actions align="end">
-  @if (!viewOnly) {
-    <button mat-raised-button color="primary" [disabled]="formIsInvalid" (click)="submitConfiguration()">
-      <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
-      {{ formMode == FormMode.Create ? 'Create' : 'Update' }}Query Plan Configuration
+<div mat-dialog-actions class="dialog-actions">
+  <div class="dialog-actions-left">
+    <button mat-stroked-button color="primary" [disabled]="viewOnly" (click)="triggerJsonImport()">
+      <mat-icon>file_upload</mat-icon>
+      Import JSON
     </button>
-  }
-  <button mat-raised-button mat-dialog-close>Close</button>
+    <button mat-stroked-button color="primary" (click)="exportJson()">
+      <mat-icon>file_download</mat-icon>
+      Export JSON
+    </button>
+    <input #jsonFileInput type="file" accept="application/json" (change)="onJsonFileSelected($event)" hidden>
+  </div>
+  <div class="dialog-actions-right">
+    @if (!viewOnly) {
+      <button mat-raised-button color="primary" [disabled]="formIsInvalid" (click)="submitConfiguration()">
+        <mat-icon>{{ formMode == FormMode.Create ? 'save' : 'save_as' }}</mat-icon>
+        {{ formMode == FormMode.Create ? 'Create' : 'Update' }} Query Plan
+      </button>
+    }
+    <button mat-raised-button mat-dialog-close>Close</button>
+  </div>
 </div>

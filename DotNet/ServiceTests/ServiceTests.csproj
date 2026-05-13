@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
@@ -8,12 +8,6 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Compile Remove="UnitTests\Normalization\**" />
-    <EmbeddedResource Remove="UnitTests\Normalization\**" />
-    <None Remove="UnitTests\Normalization\**" />
-  </ItemGroup>
 
   <ItemGroup>
     <None Remove="Resources\indMeasureReport.json" />
@@ -34,7 +28,6 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
     <PackageReference Include="Moq" Version="4.*" />
     <PackageReference Include="Moq.AutoMock" Version="*-*" />
-    <PackageReference Include="System.Text.Json" Version="8.*" />
     <PackageReference Include="Testcontainers" Version="4.*" />
     <PackageReference Include="Testcontainers.Azurite" Version="4.*" />
     <PackageReference Include="Testcontainers.MongoDb" Version="4.*" />
@@ -59,6 +52,7 @@
     <ProjectReference Include="..\DataAcquisition\DataAcquisition.csproj" />
     <ProjectReference Include="..\Normalization\Normalization.csproj" />
     <ProjectReference Include="..\Report\Report.csproj" />
+    <ProjectReference Include="..\Shared\Shared.csproj" />
     <ProjectReference Include="..\Tenant\Tenant.csproj" />
   </ItemGroup>
 
@@ -132,3 +126,4 @@
   </ItemGroup>
 
 </Project>
+

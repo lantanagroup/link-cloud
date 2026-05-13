@@ -1,8 +1,8 @@
-﻿using Hl7.Fhir.Model;
-using LantanaGroup.Link.Terminology.Application.Models;
+﻿using Amazon.Runtime.Internal;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Shared.Application.Services.Security;
-using Amazon.Runtime.Internal;
+using LantanaGroup.Link.Terminology.Application.Models;
 
 namespace LantanaGroup.Link.Terminology.Services;
 
@@ -165,7 +165,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
         return codeGroup.Resource as CodeSystem;
     }
 
-    public Bundle GetCodeSystems(string url, SummaryType? summary)
+    public Bundle GetCodeSystems(string? url, SummaryType? summary)
     {
         if (string.IsNullOrEmpty(url) && (summary == null))
         {
@@ -227,6 +227,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
             }
         }
 
+        bundle.Total = bundle.Entry.Count;
         return bundle;
     }
 

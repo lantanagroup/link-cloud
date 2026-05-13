@@ -14,9 +14,16 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
     public interface IFacilityQueries
     {
         Task<FacilityModel?> GetAsync(Guid id, CancellationToken cancellationToken = default);
-        Task<FacilityModel?> GetAsync(string facilityId, string? facilityName = null, CancellationToken cancellationToken = default);
-        Task<List<FacilityModel>> SearchAsync(FacilitySearchModel model, CancellationToken cancellationToken = default);
-        Task<PagedConfigModel<FacilityModel>> PagedSearchAsync(FacilitySearchModel model, string sortBy = "FacilityName", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
+
+        Task<FacilityModel?> GetAsync(string facilityId, string? facilityName = null,
+            CancellationToken cancellationToken = default, bool includeDeleted = false);
+
+        Task<List<FacilityModel>> SearchAsync(FacilitySearchModel model, CancellationToken cancellationToken = default,
+            bool includeDeleted = false);
+
+        Task<PagedConfigModel<FacilityModel>> PagedSearchAsync(FacilitySearchModel model,
+            string sortBy = "FacilityId", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10,
+            int pageNumber = 1, bool includeDeleted = false, CancellationToken cancellationToken = default);
     }
 
     public class FacilityQueries : IFacilityQueries
@@ -32,48 +39,59 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
 
         public async Task<FacilityModel?> GetAsync(Guid id, CancellationToken cancellationToken = default)
         {
-            return (await SearchAsync(new FacilitySearchModel { Id = id }, cancellationToken)).SingleOrDefault();   
+            return (await SearchAsync(new FacilitySearchModel { Id = id }, cancellationToken)).SingleOrDefault();
         }
 
-        public async Task<FacilityModel?> GetAsync(string facilityId, string? facilityName = null, CancellationToken cancellationToken = default)
+        public async Task<FacilityModel?> GetAsync(string facilityId, string? facilityName = null,
+            CancellationToken cancellationToken = default, bool includeDeleted = false)
         {
-            return (await SearchAsync(new FacilitySearchModel {  FacilityId = facilityId, FacilityName = facilityName }, cancellationToken)).SingleOrDefault();
+            return (await SearchAsync(new FacilitySearchModel { FacilityId = facilityId, FacilityName = facilityName },
+                cancellationToken, includeDeleted)).SingleOrDefault();
         }
 
-        public async Task<List<FacilityModel>> SearchAsync(FacilitySearchModel model, CancellationToken cancellationToken = default)
+        public async Task<List<FacilityModel>> SearchAsync(FacilitySearchModel model,
+            CancellationToken cancellationToken = default, bool includeDeleted = false)
         {
-            var result = await PagedSearchAsync(model, pageSize: int.MaxValue, cancellationToken: cancellationToken);
+            var result = await PagedSearchAsync(model, pageSize: int.MaxValue, includeDeleted: includeDeleted, cancellationToken: cancellationToken);
             return result.Records;
         }
 
-        public async Task<PagedConfigModel<FacilityModel>> PagedSearchAsync(FacilitySearchModel model, string sortBy = "FacilityId", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default)
+        public async Task<PagedConfigModel<FacilityModel>> PagedSearchAsync(
+            FacilitySearchModel model,
+            string sortBy = "FacilityId",
+            SortOrder sortOrder = SortOrder.Descending,
+            int pageSize = 10,
+            int pageNumber = 1,
+            bool includeDeleted = false,
+            CancellationToken cancellationToken = default)
         {
-            var query = _context.Facilities.AsNoTracking()
-                .AsQueryable();
+            var query = _context.Facilities.AsNoTracking().AsQueryable();
+
+            query = query.Where(f => includeDeleted || !f.IsDeleted);
 
             if (!string.IsNullOrEmpty(model.FacilityId))
             {
-                query = query.Where(log => log.FacilityId == model.FacilityId);
+                query = query.Where(f => f.FacilityId == model.FacilityId);
             }
 
             if (!string.IsNullOrEmpty(model.FacilityName))
             {
                 if (model.FacilityNameContains == true)
                 {
-                    query = query.Where(log => log.FacilityName.Contains(model.FacilityName));
+                    query = query.Where(f => f.FacilityName.Contains(model.FacilityName));
                 }
                 else
                 {
-                    query = query.Where(log => log.FacilityName == model.FacilityName);
+                    query = query.Where(f => f.FacilityName == model.FacilityName);
                 }
             }
 
             if (model.Id != null)
             {
-                query = query.Where(log => log.Id == model.Id);
+                query = query.Where(f => f.Id == model.Id);
             }
 
-            var totalRecords = await query.CountAsync(cancellationToken);
+            var total = await query.CountAsync(cancellationToken);
 
             query = sortOrder switch
             {
@@ -81,8 +99,6 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                 SortOrder.Descending => query.OrderByDescending(SetSortBy<Facility>(sortBy)),
                 _ => query
             };
-
-            var total = await query.CountAsync();
 
             var facilities = await query
                 .Skip((pageNumber - 1) * pageSize)
@@ -93,6 +109,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                     FacilityId = f.FacilityId,
                     FacilityName = f.FacilityName,
                     TimeZone = f.TimeZone,
+                    IsDeleted = f.IsDeleted,
                     ScheduledReports = new TenantScheduledReportConfig
                     {
                         Daily = f.ScheduledReports.Daily,
@@ -114,6 +131,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
             };
         }
 
+
         private Expression<Func<T, object>> SetSortBy<T>(string? sortBy)
         {
             var type = typeof(T);
@@ -122,7 +140,8 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
 
             if (!string.IsNullOrEmpty(inputSortBy))
             {
-                var prop = type.GetProperty(inputSortBy, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                var prop = type.GetProperty(inputSortBy,
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
                 if (prop != null)
                 {
                     sortKey = prop.Name;

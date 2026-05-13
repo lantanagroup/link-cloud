@@ -1,9 +1,7 @@
 ﻿using Confluent.Kafka;
 using KellermanSoftware.CompareNetObjects;
-using LantanaGroup.Link.QueryDispatch.Application.Interfaces;
 using LantanaGroup.Link.QueryDispatch.Domain.Entities;
 using LantanaGroup.Link.QueryDispatch.Presentation.Services;
-using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;

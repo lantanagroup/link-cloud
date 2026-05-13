@@ -1,0 +1,55 @@
+---
+id: KnowledgeArtifactManagement
+name: Knowledge Artifact Management
+version: 0.2.0
+summary: >-
+  Domain that contains knowledge artifacts that support the function of Link
+  including FHIR IGs, Profiles, dQMs, and Terminology.
+owners:
+  - arch_team
+services:
+  - id: TerminologyService
+---
+## Overview
+
+The Knowledge Artifact Management domain represents the organizational and governance processes that support and surround the technical domains within the Link ecosystem.
+
+This domain includes key artifacts such as:
+
+* FHIR Implementation Guides (IGs), including FHIR Profiles
+* Digital Quality Measures (dQMs)
+* Terminology Resources (CodeSystems, ValueSets, etc.)
+
+These assets serve as foundational specifications that guide behavior, structure, and expectations across domains like Reporting, Data Ingestion, and Evaluation.
+
+Rather than owning executable services, this domain captures the processes, standards alignment, and content lifecycle required to ensure consistency and reusability across the system.
+
+## Requirements
+
+Roles:
+
+* Knowledge Artifact Administrator
+* System Administrator
+* Developer
+* Quality Assurance Tester
+
+### Stakeholder Requirements
+
+| Requirement                                                                                                                                                                                                                      | Category               |
+|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|
+| As a knowledge artifact administrator (specialization of systems admin), I can manage persistence, access, relationship and other characteristics of knowledge artifacts so that dependent functionality operates appropriately. | Process                |
+| As a knowledge artifact administrator, I can see what dependencies are missing for a loaded IG, so that I may find and load them and not have evaluation and/or validation fail at runtime.                                      | Process                |
+| As a system administrator, I want to load FHIR Implementation Guides (IGs) that include Measures, Profiles, and Terminology artifacts, so that the platform can support standards-based evaluation and validation.               | Process                |
+| As a quality assurance tester, I want to manage multiple versions of the same IG, to support testing changes to implementation guides without impacting other tenants and users.                                                 | Version Management     |
+| As a system administrator, I want to manage multiple versions of the same IG, to support incremental release of implementation guide updates across all tenants.                                                                 | Version Management     |
+
+### System Requirements
+
+| Requirement                                                                                                                                                                                          | Category               |
+|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|
+| As the system, I want to register FHIR IG artifacts in a shared repository, so that multiple dependent services can access them.                                                                     | Process                |
+| As the system, I want to retrieve version-specific Measure artifacts from the knowledge artifact repository, so that reporting requirements can be confirmed.                                        | Version Management     |
+| As the system, I want to access profile definitions from the loaded IGs, so that I can validate resource instances accurately.                                                                       | Process                |
+| As the system, I want to load and reference ValueSet and CodeSystem definitions from IGs, so that I can confirm inform other services on the terminology needed to accurately evaluate and validate. | Process                |
+| As the system, I want to store IG version metadata and associate it with report evaluation records, so that report reconstruction uses the correct logic.                                            | Report Reproducibility |
+| As the system, I want to ensure IG updates do not overwrite previously loaded versions, so that all versions remain available for historical processing.                                             | Version Management     |

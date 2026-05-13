@@ -49,8 +49,15 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
 
                 options.AddPolicy(CorsConfig.DefaultCorsPolicyName, cpb.Build());
 
-                //add health check endpoint to cors policy
+                //add health check and api info endpoint to cors policy
                 options.AddPolicy("HealthCheckPolicy", policy =>
+                {
+                    policy.AllowAnyHeader();
+                    policy.AllowAnyMethod();
+                    policy.AllowAnyOrigin();
+                });
+                
+                options.AddPolicy("ApiInfoPolicy", policy =>
                 {
                     policy.AllowAnyHeader();
                     policy.AllowAnyMethod();

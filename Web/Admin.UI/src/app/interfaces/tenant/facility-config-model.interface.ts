@@ -6,6 +6,7 @@ export interface IFacilityConfigModel {
   facilityName: string;
   timeZone: string;
   scheduledReports: IScheduledReportModel;
+  isDeleted?: boolean;
 }
 
 export interface IScheduledReportModel {

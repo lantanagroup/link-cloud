@@ -28,7 +28,7 @@ namespace IntegrationTests.Census
             // Arrange
             var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = _fixture.DbContext;
+            var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
             var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityNoFlag" + Guid.NewGuid().ToString();
@@ -80,7 +80,7 @@ namespace IntegrationTests.Census
             // Arrange
             var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = _fixture.DbContext;
+            var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
             var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityDisabled" + Guid.NewGuid().ToString();
@@ -127,7 +127,7 @@ namespace IntegrationTests.Census
             // Arrange
             var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = _fixture.DbContext;
+            var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
             var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityToggle" + Guid.NewGuid().ToString();
@@ -206,7 +206,7 @@ namespace IntegrationTests.Census
             // Arrange
             var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = _fixture.DbContext;
+            var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
             var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityReEnable" + Guid.NewGuid().ToString();
@@ -290,7 +290,7 @@ namespace IntegrationTests.Census
             // Arrange
             var controller = _fixture.ServiceProvider
                 .GetRequiredService<CensusConfigController>();
-            var db = _fixture.DbContext;
+            var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
             var scheduler = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>().GetScheduler().Result;
 
             var facilityId = "TestFacilityGet" + Guid.NewGuid().ToString();

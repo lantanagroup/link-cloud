@@ -34,9 +34,11 @@
           <ng-container [matColumnDef]="column.key">
             <th mat-header-cell *matHeaderCellDef mat-sort-header> {{column.header}} </th>
             <td mat-cell *matCellDef="let category">
-              @if (column.key === 'rules') {
+              @if (column.key === 'acceptable') {
+                {{category.acceptable ? 'Yes' : 'No'}}
+              } @else if (column.key === 'rules') {
                 <a [routerLink]="['/validation-config/validation-categories', category.id, 'edit']"
-                style="white-space: nowrap;">Show Rules</a>
+                   style="white-space: nowrap;">Edit</a>
               } @else {
                 {{ category[column.key] }}
               }

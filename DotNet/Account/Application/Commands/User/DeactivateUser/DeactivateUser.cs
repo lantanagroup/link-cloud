@@ -92,7 +92,7 @@ namespace LantanaGroup.Link.Account.Application.Commands.User
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 _logger.LogDeactivateUserException(userId.ToString(), ex.Message);
                 throw;
             }                  

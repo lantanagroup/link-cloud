@@ -22,7 +22,13 @@ public class ReportSchedule
     public bool EnableSubmission { get; set; } = true;
     public bool EndOfReportPeriodJobHasRun { get; set; } = false;
     public List<string> ReportTypes { get; set; } = new List<string>();
+    
+    public AdHocType? AdHocType { get; set; }
+    
     public Frequency Frequency { get; set; }
     public string? PayloadRootUri { get; set; }
     public ScheduleStatus Status { get; set; } = ScheduleStatus.New;
+    
+    // New soft-delete flag
+    public bool? IsDeleted { get; set; } = false;
 }

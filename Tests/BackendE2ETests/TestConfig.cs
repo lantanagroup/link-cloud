@@ -7,6 +7,7 @@ public static class TestConfig
     public static string ExternalFhirServerBase => Environment.GetEnvironmentVariable("EXTERNAL_FHIR_SERVER_BASE_URL") ?? "http://localhost:6157/fhir";
     public static string InternalFhirServerBase => Environment.GetEnvironmentVariable("INTERNAL_FHIR_SERVER_BASE_URL") ?? "http://fhir-server:8080/fhir";
     public static string AdminBffBase => Environment.GetEnvironmentVariable("ADMIN_BFF_BASE_URL") ?? "http://localhost:8063/api";
+    public static string LokiBaseUrl => Environment.GetEnvironmentVariable("LOKI_BASE_URL") ?? "http://localhost:3100";
     public static string? SmokeTestDownloadPath =>
     Environment.GetEnvironmentVariable("SMOKE_TEST_DOWNLOAD_PATH");
     public static bool CleanupSmokeTestData => bool.Parse(Environment.GetEnvironmentVariable("CLEANUP_SMOKE_TEST_DATA") ?? "true");
@@ -20,14 +21,41 @@ public static class TestConfig
     public const string MeasureAch = "NHSNAcuteCareHospitalMonthlyInitialPopulation";
     public const string CronValue = "0 0 */4 * * ?";
 
+    public const string singleMeasureAdHocTestPatient_One = "patient-CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3.ndjson";
+    public const string singleMeasureAdHocTestPatient_Two = "patient-6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H.ndjson";
+    public const string singleMeasureAdHocTestPatient_Three = "patient-jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg.ndjson";
+    public const string singleMeasureAdHocTestPatient_Four = "patient-MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM.ndjson";
+    public const string singleMeasureAdHocTestPatient_Five = "patient-VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA.ndjson";
+    public const string singleMeasureAdHocTestPatient_Six = "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson";
+    public const string singleMeasureAdHocTestPatient_Seven = "patient-jbbPDJeGWyEyudcf6EBKTgmeCLxB7jTgu5Ugm27JAO494.ndjson";
+    public const string singleMeasureAdHocTestPatient_Eight = "patient-DJxsHpmWuBezhV9hJNgEHT4szaKW3uP5vUNzXUCkltpXj.ndjson";
+    public const string singleMeasureAdHocTestPatient_Nine = "patient-9i6Xi6uG2WjuGxHTmpbin4ct2ZwevRwTWhIkJkRjVFZ4C.ndjson";
+    public const string singleMeasureAdHocTestPatient_Ten = "patient-5ieWogP3EGV24Kus8QsGh6rpmUaJBP5Hl0nCSJJXmh6TI.ndjson";
 
     public static class FhirQueryConfig
     {
-        public const int MaxConcurrentRequests = 5;
+        public const int MaxConcurrentRequests = 8;
         public static readonly TimeSpan MinAcquisitionPullTime = TimeSpan.FromHours(1);
         public static readonly TimeSpan MaxAcquisitionPullTime = TimeSpan.FromHours(24);
-        public static readonly string TimeZone = "America/New_York"; // Default time zone, can be overridden in tests
+        public static readonly string TimeZone = "America/New_York";
     }
+
+    public static readonly string[] SingleMeasureExpectedFiles =
+    {
+        "manifest.ndjson",
+        "patient-x25sJU80vVa51mxJ6vSDcjbNC3BcdCQujJbXQwqdppFOO.ndjson",
+        "patient-MVLkMLWErl3gQGRCuA2mygtVuix7PMBFBh9WVayaCL7xM.ndjson",
+        "patient-CYUcGIlSrpJxCBMeEml30YSmE0Ea7loNBPVZfhCUkv7A3.ndjson",
+        "patient-VsZkAG8h9vkGcL528ZcJxVXynyj8X39GaDfjHbA9AnvyA.ndjson",
+        "patient-jjMZxCVWUbZgLkPf2LTzvZIBOW76YLJdIGCw8JFaTPiZg.ndjson",
+        "patient-6tZ8Wt8maJdDFLvEsDcKmAaCAcSOxjr0mB8RjEi5Szw7H.ndjson"
+    };
+
+    public static readonly string[] SingleMeasureExpectedPatientIds =
+        SingleMeasureExpectedFiles
+            .Where(f => f.StartsWith("patient-", StringComparison.OrdinalIgnoreCase))
+            .Select(f => f.Substring("patient-".Length, f.Length - "patient-".Length - ".ndjson".Length))
+            .ToArray();
 
     public static string GetEmbeddedResourceContent(string resourceName)
     {
@@ -88,34 +116,79 @@ public static class TestConfig
         /// <summary>
         /// Attempts to run a validation method. Captures and logs, does not stop test. 
         /// </summary>
-        public static void TryRunValidation(Action validationMethod, List<string> failures)
-        {
-            try
-            {
-                validationMethod();
-            }
-            catch (Exception ex)
-            {
-                string methodName = validationMethod.Method.Name;
-                Console.WriteLine($"[FAIL] {methodName} - {ex.Message}");
-                failures.Add($"{methodName}: {ex.Message}");
-            }
-        }
+        //public static void TryRunValidation(Action validationMethod, List<string> failures)
+        //{
+        //    try
+        //    {
+        //        validationMethod();
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        string methodName = validationMethod.Method.Name;
+        //        Console.WriteLine($"[FAIL] {methodName} - {ex.Message}");
+        //        failures.Add($"{methodName}: {ex.Message}");
+        //    }
+        //}
 
         /// <summary>
         /// Async version for use with asynchronous validations.
         /// </summary>
-        public static async Task TryRunValidationAsync(Func<Task> validationMethod, List<string> failures)
+        //public static async Task TryRunValidationAsync(Func<Task> validationMethod, List<string> failures)
+        //{
+        //    try
+        //    {
+        //        await validationMethod();
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        string methodName = validationMethod.Method.Name;
+        //        Console.WriteLine($"[FAIL] {methodName} - {ex.Message}");
+        //        failures.Add($"{methodName}: {ex.Message}");
+        //    }
+        //}
+
+        public enum ValidationSeverity
         {
-            try
+            Info,
+            Warning,
+            Error
+        }
+
+        public enum ValidationIssueType
+        {
+            MissingResourceTypeInBundle,
+            BundleCountMismatch,
+            EvaluatedCountMismatch,
+            UnexpectedEvaluatedType,
+            ExcludedTypeMissingFromBundle,
+            ExcludedTypePresentInEvaluated,
+            OperationOutcomePresentInEvaluated,
+            BundleVsEvaluatedCountMismatch,
+            BundleVsEvaluatedIdMismatch,
+            CrossTypeReference,
+            ObservedResourceTypeCount
+        }
+
+        public sealed class ValidationIssue
+        {
+            public string FileName { get; }
+            public ValidationIssueType IssueType { get; }
+            public ValidationSeverity Severity { get; }
+            public string ResourceType { get; }
+            public string Message { get; }
+
+            public ValidationIssue(
+                string fileName,
+                ValidationIssueType issueType,
+                ValidationSeverity severity,
+                string resourceType,
+                string message)
             {
-                await validationMethod();
-            }
-            catch (Exception ex)
-            {
-                string methodName = validationMethod.Method.Name;
-                Console.WriteLine($"[FAIL] {methodName} - {ex.Message}");
-                failures.Add($"{methodName}: {ex.Message}");
+                FileName = fileName;
+                IssueType = issueType;
+                Severity = severity;
+                ResourceType = resourceType;
+                Message = message;
             }
         }
     }

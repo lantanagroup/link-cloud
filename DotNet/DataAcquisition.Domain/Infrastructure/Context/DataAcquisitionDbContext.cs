@@ -1,4 +1,6 @@
-﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
+using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -6,13 +8,13 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.Configuration;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 using ScheduledReport = LantanaGroup.Link.Shared.Application.Models.ScheduledReport;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -44,15 +46,22 @@ public class DataAcquisitionDbContext : DbContext
             jsonOptions.Converters.Add(new ParameterConverter());
             jsonOptions.Converters.Add(new JsonStringEnumConverter());
 
+            var queryConfigComparer = new ValueComparer<Dictionary<string, IQueryConfig>>(
+                (c1, c2) => JsonSerializer.Serialize(c1, jsonOptions) == JsonSerializer.Serialize(c2, jsonOptions),
+                c => c == null ? 0 : JsonSerializer.Serialize(c, jsonOptions).GetHashCode(),
+                c => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(JsonSerializer.Serialize(c, jsonOptions), jsonOptions));
+
             entity.Property(b => b.InitialQueries)
                 .HasConversion(
                     v => JsonSerializer.Serialize(v, jsonOptions),
-                    v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, jsonOptions));
+                    v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, jsonOptions))
+                .Metadata.SetValueComparer(queryConfigComparer);
 
             entity.Property(b => b.SupplementalQueries)
                     .HasConversion(
                         v => JsonSerializer.Serialize(v, jsonOptions),
-                        v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, jsonOptions));
+                        v => JsonSerializer.Deserialize<Dictionary<string, IQueryConfig>>(v, jsonOptions))
+                    .Metadata.SetValueComparer(queryConfigComparer);
         });
 
         //-------------------FhirQueryConfiguration-------------------
@@ -78,10 +87,16 @@ public class DataAcquisitionDbContext : DbContext
                 v => JsonSerializer.Serialize(v, new JsonSerializerOptions()),
                 v => JsonSerializer.Deserialize<AuthenticationConfiguration>(v, new JsonSerializerOptions()));
 
+            var ehrPatientListComparer = new ValueComparer<List<EhrPatientList>>(
+                (c1, c2) => c1.SequenceEqual(c2),
+                c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                c => c.ToList());
+
             entity.Property(p => p.EHRPatientLists)
             .HasConversion(
-                v => JsonSerializer.Serialize(v, new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }),
-                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } }));
+                v => JsonSerializer.Serialize(v, new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } }),
+                v => JsonSerializer.Deserialize<List<EhrPatientList>>(v, new JsonSerializerOptions { Converters = { new JsonStringEnumConverter() } }))
+            .Metadata.SetValueComparer(ehrPatientListComparer);
         });
 
         //-------------------ReferenceResources-------------------
@@ -115,7 +130,7 @@ public class DataAcquisitionDbContext : DbContext
         {
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
 
-            entity.Property(e => e.ResourceType).HasConversion(new EnumToStringConverter<Hl7.Fhir.Model.ResourceType>());
+            entity.Property(e => e.ResourceType).HasConversion(new EnumToStringConverter<ResourceType>());
 
             entity.HasOne(d => d.FhirQuery).WithMany(p => p.FhirQueryResourceTypes)
                 .OnDelete(DeleteBehavior.ClientSetNull)
@@ -138,17 +153,21 @@ public class DataAcquisitionDbContext : DbContext
                 v => JsonSerializer.Deserialize<ScheduledReport>(v, new JsonSerializerOptions())
             );
 
+            entity.Property(d => d.Status)
+                .HasConversion(new EnumToStringConverter<RequestStatus>())
+                .HasMaxLength(50);
+
             entity.Property(d => d.Priority)
-                .HasConversion(new EnumToStringConverter<AcquisitionPriority>());
+                .HasConversion(new EnumToStringConverter<AcquisitionPriority>())
+                .HasMaxLength(50);
 
             entity.Property(d => d.QueryPhase)
-                .HasConversion(new EnumToStringConverter<QueryPhase>());
-
-            entity.Property(d => d.Status)
-                .HasConversion(new EnumToStringConverter<RequestStatus>());
+                .HasConversion(new EnumToStringConverter<QueryPhase>())
+                .HasMaxLength(50);
 
             entity.Property(d => d.QueryType)
-                .HasConversion(new EnumToStringConverter<FhirQueryType>());
+                .HasConversion(new EnumToStringConverter<FhirQueryType>())
+                .HasMaxLength(50);
 
             entity.HasIndex(e => new { e.ExecutionDate, e.Id })
                 .IsDescending()
@@ -171,6 +190,37 @@ public class DataAcquisitionDbContext : DbContext
                     nameof(DataAcquisitionLog.CompletionDate),
                     nameof(DataAcquisitionLog.CompletionTimeMilliseconds)
                 );
+
+            entity.HasIndex(e => new { e.FacilityId, e.Status, e.ExecutionDate, e.Id })
+                .HasDatabaseName("IX_DataAcquisitionLogs_Facility_Status_ExecutionDate_Id")
+                .IncludeProperties(
+                    nameof(DataAcquisitionLog.Priority),
+                    nameof(DataAcquisitionLog.IsCensus),
+                    nameof(DataAcquisitionLog.PatientId),
+                    nameof(DataAcquisitionLog.ReportableEvent),
+                    nameof(DataAcquisitionLog.ReportTrackingId),
+                    nameof(DataAcquisitionLog.CorrelationId),
+                    nameof(DataAcquisitionLog.FhirVersion),
+                    nameof(DataAcquisitionLog.QueryType),
+                    nameof(DataAcquisitionLog.QueryPhase),
+                    nameof(DataAcquisitionLog.TraceId),
+                    nameof(DataAcquisitionLog.RetryAttempts),
+                    nameof(DataAcquisitionLog.CompletionDate),
+                    nameof(DataAcquisitionLog.CompletionTimeMilliseconds),
+                    nameof(DataAcquisitionLog.ResourceAcquiredIds),
+                    nameof(DataAcquisitionLog.Notes),
+                    nameof(DataAcquisitionLog.ScheduledReport)
+                );
+
+            entity.HasIndex(e => new { e.Status, e.ModifyDate })
+                .HasDatabaseName("IX_DataAcquisitionLogs_Status_ModifyDate");
+
+            entity.HasIndex(e => new { e.Status, e.ExecutionDate })
+                .HasDatabaseName("IX_DataAcquisitionLogs_Status_ExecutionDate");
+
+            entity.HasIndex(e => new { e.TailSent, e.FacilityId, e.ReportTrackingId, e.CorrelationId, e.ReportStartDate, e.ReportEndDate, e.QueryPhase })
+                .HasDatabaseName("IX_DataAcquisitionLogs_Tailing_Optimization")
+                .HasFilter("[TailSent] = 0 AND [ReportTrackingId] IS NOT NULL AND [CorrelationId] IS NOT NULL AND [ReportStartDate] IS NOT NULL AND [ReportEndDate] IS NOT NULL");
         });
 
         //-------------------ResourceReferenceType-------------------

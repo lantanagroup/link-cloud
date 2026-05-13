@@ -71,6 +71,34 @@ namespace LantanaGroup.Link.Tenant.Utils
             return auditEvent;
         }
 
+        public static AuditEventMessage SoftDeleteFacilityAuditEvent(Facility facility)
+        {
+            AuditEventMessage auditEvent = new AuditEventMessage();
+            auditEvent.FacilityId = facility.FacilityId;
+            auditEvent.ServiceName = TenantConstants.ServiceName;
+            auditEvent.EventDate = DateTime.UtcNow;
+            auditEvent.User = "SystemUser";
+            auditEvent.Action = AuditEventType.Delete;
+            auditEvent.Resource = typeof(Facility).Name;
+            auditEvent.Notes = $"Soft deleted facility configuration ({facility.Id}) for '{facility.FacilityId}'";
+            auditEvent.CorrelationId = Guid.NewGuid().ToString();
+            return auditEvent;
+        }
+
+        public static AuditEventMessage RestoreFacilityAuditEvent(Facility facility)
+        {
+            AuditEventMessage auditEvent = new AuditEventMessage();
+            auditEvent.FacilityId = facility.FacilityId;
+            auditEvent.ServiceName = TenantConstants.ServiceName;
+            auditEvent.EventDate = DateTime.UtcNow;
+            auditEvent.User = "SystemUser";
+            auditEvent.Action = AuditEventType.Restore;
+            auditEvent.Resource = typeof(Facility).Name;
+            auditEvent.Notes = $"Restored facility configuration ({facility.Id}) for '{facility.FacilityId}'";
+            auditEvent.CorrelationId = Guid.NewGuid().ToString();
+            return auditEvent;
+        }
+
         public static bool ValidateTopic(string strTopic, List<KafkaTopic> topics)
         {
             KafkaTopic topic;

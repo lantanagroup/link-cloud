@@ -3,6 +3,7 @@ using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Jobs;
 using LantanaGroup.Link.Census.Application.Settings;
 using LantanaGroup.Link.Census.Domain.Managers;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Models;
 using Quartz;
 using Quartz.Impl.Matchers;
@@ -134,7 +135,8 @@ public class ScheduleService : BackgroundService
             return null;
         }
 
-        var facilityId = ((CensusConfigEntity)jobDetail.JobDataMap.Get(CensusConstants.Scheduler.Facility))?.FacilityID;
+        var facilityId = jobDetail.JobDataMap.GetObject<CensusConfigEntity>(CensusConstants.Scheduler.Facility)?.FacilityID;
+
         if (string.IsNullOrEmpty(facilityId))
         {
             _logger.LogWarning("FacilityId not found in job data map for job: {JobKey}.", jobKey.Name);

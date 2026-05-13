@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.lantanagroup.link</groupId>
         <artifactId>main</artifactId>
-        <version>0.1.1-dev</version>
+        <version>0.5.1</version>
     </parent>
 
     <artifactId>measureeval</artifactId>
@@ -77,6 +77,11 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-collections4</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-storage-blob</artifactId>
         </dependency>
 
         <dependency>

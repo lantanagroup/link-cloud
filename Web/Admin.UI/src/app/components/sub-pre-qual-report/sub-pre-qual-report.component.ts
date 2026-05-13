@@ -1,16 +1,21 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import {Component, OnDestroy, OnInit} from '@angular/core';
 
-import { ActivatedRoute, RouterLink, RouterLinkActive } from '@angular/router';
-import { CommonModule } from '@angular/common';
-import { FacilityViewService } from '../tenant/facility-view/facility-view.service';
-import { IValidationIssue, IValidationIssueCategorySummary, IReportListSummary } from '../tenant/facility-view/report-view.interface';
-import { SubPreQualReportCategoriesTableComponent } from './sub-pre-qual-report-categories-table/sub-pre-qual-report-categories-table.component';
-import { SubPreQualReportIssuesTableComponent } from './sub-pre-qual-report-issues-table/sub-pre-qual-report-issues-table.component';
-import { SubPreQualReportMetaComponent } from './sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
-import { SubPreQualReportSummaryComponent } from './sub-pre-qual-report-summary/sub-pre-qual-report-summary.component';
-import { Subscription } from 'rxjs';
-import { MatTabsModule } from '@angular/material/tabs';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import {ActivatedRoute, RouterLink, RouterLinkActive} from '@angular/router';
+
+import {FacilityViewService} from '../tenant/facility-view/facility-view.service';
+import {
+  IReportListSummary,
+  IValidationIssue,
+  IValidationIssueCategorySummary
+} from '../tenant/facility-view/report-view.interface';
+import {
+  SubPreQualReportCategoriesTableComponent
+} from './sub-pre-qual-report-categories-table/sub-pre-qual-report-categories-table.component';
+import {SubPreQualReportMetaComponent} from './sub-pre-qual-report-meta/sub-pre-qual-report-meta.component';
+import {SubPreQualReportSummaryComponent} from './sub-pre-qual-report-summary/sub-pre-qual-report-summary.component';
+import {Subscription} from 'rxjs';
+import {MatTabsModule} from '@angular/material/tabs';
+import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
 
 /**
  * Main component for the sub-pre-qual report view
@@ -19,16 +24,14 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 @Component({
   selector: 'app-sub-pre-qual-report',
   imports: [
-    CommonModule,
     SubPreQualReportMetaComponent,
     SubPreQualReportSummaryComponent,
     SubPreQualReportCategoriesTableComponent,
-    SubPreQualReportIssuesTableComponent,
     MatTabsModule,
     RouterLink,
     RouterLinkActive,
     MatProgressSpinnerModule
-  ],
+],
   templateUrl: './sub-pre-qual-report.component.html',
   styleUrls: ['./sub-pre-qual-report.component.scss'],
   standalone: true

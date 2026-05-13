@@ -12,6 +12,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using Task = System.Threading.Tasks.Task;
@@ -46,7 +47,7 @@ public class ReferenceResourceService : IReferenceResourceService
     private readonly ILogger<ReferenceResourceService> _logger;
     private readonly IReferenceResourcesManager _referenceResourcesManager;
     private readonly IReferenceResourcesQueries _referenceResourcesQueries;
-    private readonly IProducer<string, ResourceAcquired> _kafkaProducer;
+    private readonly IProducer<ResourceKey, ResourceAcquired> _kafkaProducer;
     private readonly IDataAcquisitionServiceMetrics _metrics;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
@@ -57,7 +58,7 @@ public class ReferenceResourceService : IReferenceResourceService
         ILogger<ReferenceResourceService> logger,
         IReferenceResourcesManager referenceResourcesManager,
         IReferenceResourcesQueries referenceResourcesQueries,
-        IProducer<string, ResourceAcquired> kafkaProducer,
+        IProducer<ResourceKey, ResourceAcquired> kafkaProducer,
         IDataAcquisitionServiceMetrics metrics,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
@@ -131,11 +132,12 @@ public class ReferenceResourceService : IReferenceResourceService
             var resourceType = group.Key;
             if (string.IsNullOrEmpty(resourceType))
             {
-                _logger.LogWarning("Skipping reference resources with no type for log with ID: {LodId}", log.Id);
+                _logger.LogWarning("Skipping reference resources with no type for log with ID: {LogId}", log.Id);
                 continue;
             }
 
-            var referenceLog = (await _dataAcquisitionLogQueries.SearchAsync(new SearchDataAcquisitionLogRequest
+            // Get just the IDs we need, not the full entities
+            var referenceLogResult = (await _dataAcquisitionLogQueries.SearchAsync(new SearchDataAcquisitionLogRequest
             {
                 FacilityId = log.FacilityId,
                 ReportTrackingId = log.ReportTrackingId,
@@ -143,26 +145,43 @@ public class ReferenceResourceService : IReferenceResourceService
                 ResourceType = resourceType,
                 PageSize = int.MaxValue
             }, cancellationToken)).Records.FirstOrDefault();
-           
-            if (referenceLog == null)
+
+            if (referenceLogResult == null)
             {
                 throw new InvalidOperationException($"No data acquisition log for reference resource type: {resourceType}");
             }
-            if (referenceLog.FhirQuery == null || referenceLog.FhirQuery.Count == 0)
+            if (referenceLogResult.FhirQuery == null || referenceLogResult.FhirQuery.Count == 0)
             {
                 throw new InvalidOperationException($"No FHIR query for reference resource type: {resourceType}");
             }
-            if (referenceLog.FhirQuery.Count > 1)
+            if (referenceLogResult.FhirQuery.Count > 1)
             {
                 throw new InvalidOperationException($"Multiple FHIR queries for reference resource type: {resourceType}");
             }
-            var fhirQuery = referenceLog.FhirQuery.First();
 
-            fhirQuery.IdQueryParameterValues = fhirQuery.IdQueryParameterValues.ToList()
+            // Get just the FhirQuery ID - don't use the tracked entity
+            var fhirQueryId = referenceLogResult.FhirQuery.First().Id;
+            var facilityId = referenceLogResult.FacilityId;
+
+            // Combine existing IDs with new ones
+            var existingIds = referenceLogResult.FhirQuery.First().IdQueryParameterValues.ToList();
+            var updatedIds = existingIds
                 .Concat(group.Select(i => i.Id))
-                .Distinct().ToList();
+                .Distinct()
+                .ToList();
 
-            await _fhirQueryMananger.UpdateAsync(fhirQuery, cancellationToken);
+            // Create a completely fresh model with ONLY the data we need to update
+            // Don't copy navigation properties from the tracked entity
+            var updateModel = new FhirQueryModel
+            {
+                Id = fhirQueryId,
+                FacilityId = facilityId,
+                IdQueryParameterValues = updatedIds,
+                QueryType = referenceLogResult.FhirQuery.First().QueryType
+            };
+
+            // UpdateAsync will load the full entity fresh and update it
+            await _fhirQueryMananger.UpdateAsync(updateModel, cancellationToken);
         }
     }
 }

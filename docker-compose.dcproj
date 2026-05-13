@@ -22,6 +22,7 @@
     <Content Include=".docker\kafka-client.properties" />
     <Content Include=".docker\prometheus.yml" />
     <Content Include=".docker\tempo.yml" />
+    <Content Include=".env" />
     <Content Include="Azure_Pipelines\azure-pipelines.account.cd.yaml" />
     <Content Include="Azure_Pipelines\azure-pipelines.admin-ui.cd.yaml" />
     <Content Include="Azure_Pipelines\azure-pipelines.admin.cd.yaml" />
@@ -60,5 +61,6 @@
     <Content Include="Azure_Pipelines\_deploy_all_services.yml" />
     <Content Include="Azure_Pipelines\_summarize_delta.yaml" />
     <Content Include="Dockerfile.aspnet8-run" />
+    <Content Include="Dockerfile.hapi" />
   </ItemGroup>
 </Project>

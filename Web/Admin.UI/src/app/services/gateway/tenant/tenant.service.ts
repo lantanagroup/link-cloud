@@ -67,6 +67,26 @@ export class TenantService {
       )
   }
 
+  softDeleteFacilityConfiguration(facilityId: string): Observable<IEntityDeletedResponse> {
+    return this.http.delete<IEntityDeletedResponse>(`${this.appConfigService.config?.baseApiUrl}/facility/softDelete/${facilityId}`)
+      .pipe(
+        tap(_ => console.log(`Delete Facility configuration.`)),
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
+      )
+  }
+
+  restoreFacilityConfiguration(facilityId: string): Observable<void> {
+    return this.http.patch<void>(`${this.appConfigService.config?.baseApiUrl}/facility/restore/${facilityId}`, {})
+      .pipe(
+        tap(_ => console.log(`Restore Facility configuration.`)),
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
+        })
+      )
+  }
+
   getFacilityConfiguration(facilityId: string): Observable<IFacilityConfigModel> {
     return this.http.get<IFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility/${facilityId}`)
       .pipe(
@@ -103,7 +123,7 @@ export class TenantService {
   }
 
 
-  listFacilities(facilityId: string, facilityName: string, sortBy: string, sortOrder: number, pageSize: number, pageNumber: number): Observable<PagedFacilityConfigModel> {
+  listFacilities(facilityId: string, facilityName: string, sortBy: string, sortOrder: number, pageSize: number, pageNumber: number, showDeleted: boolean): Observable<PagedFacilityConfigModel> {
 
     //javascript based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
@@ -114,7 +134,8 @@ export class TenantService {
       .set('sortBy', sortBy)
       .set('sortOrder', sortOrder)
       .set('pageSize', pageSize)
-      .set('pageNumber', pageNumber);
+      .set('pageNumber', pageNumber)
+      .set('includeDeleted', showDeleted.toString());
 
     return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility`, {params})
       .pipe(

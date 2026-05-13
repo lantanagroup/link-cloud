@@ -3,7 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { IValidationIssueCategory, IValidationRule, IValidationRuleSet } from 'src/app/components/tenant/facility-view/report-view.interface';
 
-import { CommonModule } from '@angular/common';
+
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -25,7 +25,6 @@ import { VdIconComponent } from "../../../core/vd-icon/vd-icon.component";
   selector: 'app-edit-validation-category',
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     ReactiveFormsModule,
     MatCardModule,
@@ -59,7 +58,7 @@ export class EditValidationCategoryComponent implements OnInit {
     { header: '', key: 'actions' },
   ];
   ruleColumnKeys = this.ruleColumns.map(col => col.key);
-  
+
   isLoading = false;
   error: string | null = null;
 
@@ -100,7 +99,7 @@ export class EditValidationCategoryComponent implements OnInit {
         this.categorySeverity = this.validationCategory.severity;
         this.categoryAcceptable = this.validationCategory.acceptable;
         this.categoryGuidance = this.validationCategory.guidance;
-        
+
         this.categoryForm.patchValue({
           title: data.title,
           severity: data.severity,
@@ -163,13 +162,15 @@ export class EditValidationCategoryComponent implements OnInit {
       panelClass: ['vd-dialog', 'rule-add-edit-dialog'],
       data: {
         dialogTitle: 'Edit Rule',
-        rule: rule
+        // TODO:
+        // use the actual rule, not a clone of the rule, when implementing onSave functionality for edit rule modal
+        rule: structuredClone(rule)
       }
     });
   }
 
   onDelete(rule?: IValidationRule): void {
-    if (rule) {      
+    if (rule) {
       const dialogRef = this.dialog.open(ValidationRuleDeleteDialogComponent, {
         width: '380px',
         panelClass: ['vd-dialog', 'confirm-delete-dialog'],

@@ -13,7 +13,7 @@
 
     <groupId>com.lantanagroup.link</groupId>
     <artifactId>main</artifactId>
-    <version>0.1.1-dev</version>
+    <version>0.5.1</version>
     <packaging>pom</packaging>
 
     <name>Link Java Modules</name>
@@ -21,15 +21,41 @@
 
     <properties>
         <cqf-fhir.version>3.12.0</cqf-fhir.version>
-        <hapi-fhir.version>7.4.0</hapi-fhir.version>
-        <janino.version>2.6.1</janino.version>
+        <hapi-fhir.version>7.6.1</hapi-fhir.version>
+        <janino.version>2.7.8</janino.version>
+        <jacoco.version>0.8.12</jacoco.version>
     </properties>
 
     <modules>
         <module>shared</module>
         <module>measureeval</module>
         <module>validation</module>
+        <module>hapi</module>
     </modules>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 
     <dependencyManagement>
         <dependencies>
@@ -108,13 +134,13 @@
             <dependency>
                 <groupId>com.github.loki4j</groupId>
                 <artifactId>loki-logback-appender</artifactId>
-                <version>2.0.1</version>
+                <version>2.0.3</version>
             </dependency>
 
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-collections4</artifactId>
-                <version>4.4</version>
+                <version>4.5.0</version>
             </dependency>
 
             <dependency>
@@ -148,7 +174,7 @@
             <dependency>
                 <groupId>com.azure</groupId>
                 <artifactId>azure-storage-blob</artifactId>
-                <version>12.30.0</version>
+                <version>12.32.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

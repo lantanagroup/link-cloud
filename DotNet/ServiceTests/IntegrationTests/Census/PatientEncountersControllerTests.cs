@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Controllers;
+using LantanaGroup.Link.Census.Domain.Context;
 using LantanaGroup.Link.Census.Domain.Entities.POI;
 using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -30,7 +31,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
     {
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var queries = _fixture.ServiceProvider.GetRequiredService<IPatientEncounterQueries>();
 
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
@@ -93,7 +94,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
     {
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
 
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
 
@@ -181,8 +182,9 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
             });
         }
 
-        await _fixture.DbContext.PatientEncounters.AddRangeAsync(encounters);
-        await _fixture.DbContext.SaveChangesAsync();
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
+        await db.PatientEncounters.AddRangeAsync(encounters);
+        await db.SaveChangesAsync();
 
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
 
@@ -213,7 +215,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
     {
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
 
         var facilityId = "TestFacility" + Guid.NewGuid().ToString();
 
@@ -287,7 +289,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
     {
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
 
         var facilityId = "FilterTestFacility";
 
@@ -301,9 +303,8 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
             new PatientEncounter { FacilityId = "OtherFacility", CorrelationId = matchingCorrelationId, AdmitDate = DateTime.UtcNow }
         };
 
-        await _fixture.DbContext.PatientEncounters.AddRangeAsync(encounters);
-        await _fixture.DbContext.SaveChangesAsync();
-
+        await db.PatientEncounters.AddRangeAsync(encounters);
+        await db.SaveChangesAsync();
 
         // Act
         var result = await controller.GetCurrentPatientEncounters(
@@ -334,7 +335,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
     {
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var facilityId = "TestFacility" + Guid.NewGuid();
         var threshold = DateTime.UtcNow;
 
@@ -393,7 +394,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
     {
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var facilityId = "PagingTest" + Guid.NewGuid();
         var threshold = DateTime.UtcNow;
 
@@ -464,7 +465,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
     {
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var facilityId = "SortTest" + Guid.NewGuid();
         var threshold = DateTime.UtcNow;
 
@@ -532,7 +533,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
     {
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var facilityId = "SortTest" + Guid.NewGuid();
         var threshold = DateTime.UtcNow;
 
@@ -600,7 +601,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
     {
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var facilityId = "FilterTest" + Guid.NewGuid();
         var threshold = DateTime.UtcNow;
         var targetCorrelationId = Guid.NewGuid().ToString();
@@ -682,7 +683,7 @@ public class PatientEncountersControllerTests : IClassFixture<CensusIntegrationT
     {
         // Arrange
         var controller = _fixture.ServiceProvider.GetRequiredService<PatientEncountersController>();
-        var db = _fixture.DbContext;
+        var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         var facilityId = "ThresholdTest" + Guid.NewGuid();
         var threshold = DateTime.UtcNow.AddDays(-5);
 
