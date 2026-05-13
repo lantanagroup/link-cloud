@@ -49,15 +49,15 @@ public class ConnectionValidationController : Controller
     [ProducesResponseType(StatusCodes.Status424FailedDependency)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<FacilityConnectionResult>> ValidateFacilityConnection(
-        string facilityId, 
-        [FromQuery] string? patientId = default, 
+        string facilityId,
+        [FromQuery] string? patientId = default,
         [FromQuery] string? patientIdentifier = default,
         [FromQuery] string? measureId = default,
         [FromQuery] DateTime? start = default,
         [FromQuery] DateTime? end = default,
         CancellationToken cancellationToken = default)
     {
-        if(!ConnectionValidationRequestValidator.ValidateRequest(facilityId, patientId, patientIdentifier, measureId, start, end, out var errorMessage))
+        if (!ConnectionValidationRequestValidator.ValidateRequest(facilityId, patientId, patientIdentifier, measureId, start, end, out var errorMessage))
         {
             return Problem(errorMessage, statusCode: StatusCodes.Status400BadRequest);
         }
@@ -74,12 +74,12 @@ public class ConnectionValidationController : Controller
                 End = end.Value
             }, cancellationToken);
 
-            if(!result.IsConnected)
+            if (!result.IsConnected)
             {
                 return Problem(result.ErrorMessage, statusCode: StatusCodes.Status400BadRequest);
             }
 
-            if(result.IsConnected && !result.IsPatientFound)
+            if (result.IsConnected && !result.IsPatientFound)
             {
                 return Problem("Patient not found for provided facilityId." + (string.IsNullOrEmpty(result.ErrorMessage) ? "" : " Error Message: " + result.ErrorMessage), statusCode: StatusCodes.Status404NotFound);
             }
@@ -101,7 +101,7 @@ public class ConnectionValidationController : Controller
         {
             return Problem("No Patient ID or Patient Identifier was provided. One is required to validate.", statusCode: StatusCodes.Status400BadRequest);
         }
-        catch(FhirConnectionFailedException ex)
+        catch (FhirConnectionFailedException ex)
         {
             return Problem($"An error occurred while connecting to the FHIR server. Please review your query connection configuration.\nerrorMessage: {ex.Message}\ninnerException:\n{ex.InnerException}", statusCode: StatusCodes.Status424FailedDependency);
         }

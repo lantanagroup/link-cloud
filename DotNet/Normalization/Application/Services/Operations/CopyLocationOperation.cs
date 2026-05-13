@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
         protected override async Task<OperationResult> ExecuteOperation(CopyLocationOperation operation, DomainResource resource)
         {
-            if (resource is not Location) 
+            if (resource is not Location)
             {
                 return OperationResult.Failure($"Resource must be a Location");
             }
@@ -35,9 +35,9 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 location.Type = new List<CodeableConcept>();
             }
 
-            foreach (var identifier in location.Identifier) 
+            foreach (var identifier in location.Identifier)
             {
-                if (string.IsNullOrWhiteSpace(identifier.System) && string.IsNullOrWhiteSpace(identifier.Value)) 
+                if (string.IsNullOrWhiteSpace(identifier.System) && string.IsNullOrWhiteSpace(identifier.Value))
                 {
                     continue;
                 }
@@ -47,8 +47,8 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 cc.Coding.Any(cd =>
                 string.Equals(cd.System, identifier.System, StringComparison.Ordinal) &&
                 string.Equals(cd.Code, identifier.Value, StringComparison.Ordinal)));
-                
-                if (exists) 
+
+                if (exists)
                     continue;
 
                 CodeableConcept codeableConcept = new(identifier.System, identifier.Value);

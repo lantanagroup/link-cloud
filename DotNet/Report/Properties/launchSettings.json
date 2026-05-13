@@ -13,9 +13,8 @@
       "launchBrowser": false,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Docker",
+        "ConnectionStrings__DatabaseConnection": "Server=tcp:localhost,1433;Initial Catalog=link-report;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;",
         "KafkaConnection__BootstrapServers__0": "localhost:9094",
-        "MongoDB__ConnectionString": "mongodb://localhost:17017",
-        "ConnectionStrings__Redis": "localhost:6379",
         "InternalBlobStorage__ConnectionString": "",
         "Serilog__WriteTo__0__Args__uri": "http://localhost:3100",
         "Telemetry__OtelCollectorEndpoint": "http://localhost:4317",

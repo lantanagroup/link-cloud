@@ -6,7 +6,7 @@ namespace LantanaGroup.Link.QueryDispatch.Application.Factory
 {
     public class QueryDispatchFactory : IQueryDispatchFactory
     {
-        public ScheduledReportEntity CreateScheduledReport(string facilityId, List<string>reportTypes, Frequency frequency, DateTime startDate, DateTime endDate, string reportTrackingId)
+        public ScheduledReportEntity CreateScheduledReport(string facilityId, List<string> reportTypes, Frequency frequency, DateTime startDate, DateTime endDate, string reportTrackingId)
         {
             return new ScheduledReportEntity()
             {

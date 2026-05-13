@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using Confluent.Kafka;
@@ -8,6 +8,8 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.ParameterFa
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services;
+using LantanaGroup.Link.Shared.Application.Services.SecretManager;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
@@ -15,6 +17,10 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Parsers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Processors;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -29,13 +35,13 @@ using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -45,14 +51,13 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
-using Serilog.Sinks.SystemConsole.Themes;
 using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
 {
     public static void RegisterAll(
-        this WebApplicationBuilder builder, 
+        this WebApplicationBuilder builder,
         string serviceName,
         bool? configureRedis = false)
     {
@@ -66,8 +71,8 @@ public static class GeneralStartupExtensions
         //Add Quartz scheduler with SQL persistence
         var connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
         builder.Services.RegisterQuartzDatabase(connectionString);
-        
-        builder.Configuration.RegisterMonitoring(builder.Logging, builder.Services);
+
+        builder.RegisterMonitoring();
         builder.Services.RegisterConfigs(builder.Configuration);
         builder.RegisterEntityFramework();
 
@@ -75,6 +80,8 @@ public static class GeneralStartupExtensions
         {
             builder.RegisterRedis();
         }
+
+        builder.Services.RegisterSecretManager(builder.Configuration);
 
         builder.Services.RegisterInMemoryCache();
         builder.Services.RegisterHittpClient();
@@ -88,38 +95,23 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterProblemDetails((IHostingEnvironment)builder.Environment);
     }
 
-    public static void RegisterMonitoring(this IConfigurationManager configuration, ILoggingBuilder logging, IServiceCollection services)
+    public static void RegisterMonitoring(this WebApplicationBuilder builder)
     {
-        var env = configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") ?? "Production"; // Or inject IHostEnvironment if available
+        // Clear default providers first to avoid duplicate logging
+        builder.Logging.ClearProviders();
 
-        // Logging using Serilog
-        logging.AddSerilog();
         var loggerOptions = new ConfigurationReaderOptions { SectionName = DataAcquisitionConstants.AppSettingsSectionNames.Serilog };
         var serilogConfig = new LoggerConfiguration()
-            .ReadFrom.Configuration(configuration, loggerOptions)
+            .ReadFrom.Configuration(builder.Configuration, loggerOptions)
             .Filter.ByExcluding("RequestPath like '/health%'")
             .Enrich.FromLogContext()
             .Enrich.WithSpan()
             .Enrich.With<ActivityEnricher>();
 
-        // Add rich console only in Development (for local debugging)
-        if (env == "Development")
-        {
-            serilogConfig.WriteTo.Console(
-                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
-                theme: AnsiConsoleTheme.Code  // Colorful output like default console
-            );
-        }
-        else
-        {
-            // In non-Development (e.g., Docker, Prod), no console or minimal
-        }
-
         Log.Logger = serilogConfig.CreateLogger();
 
-        // Clear defaults and use Serilog everywhere
-        logging.ClearProviders();
-        logging.AddSerilog(Log.Logger, dispose: true);
+        // Use Serilog as the logging provider
+        builder.Logging.AddSerilog(Log.Logger, dispose: true);
     }
 
     public static void RegisterConfigs(this IServiceCollection services, IConfigurationManager configuration)
@@ -131,6 +123,9 @@ public static class GeneralStartupExtensions
         services.Configure<CorsSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
         services.Configure<LinkTokenServiceSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
         services.Configure<ApiSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.ApiSettings));
+        services.Configure<SecretManagerSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.SecretManagement));
+        services.Configure<SftpValidationSettings>(configuration.GetSection(SftpValidationSettings.SectionName));
+        services.Configure<SftpAcquisitionSettings>(configuration.GetSection(SftpAcquisitionSettings.SectionName));
 
         IConfigurationSection consumerSettingsSection = configuration.GetRequiredSection(nameof(ConsumerSettings));
         services.Configure<ConsumerSettings>(consumerSettingsSection);
@@ -193,19 +188,16 @@ public static class GeneralStartupExtensions
         //Fhir Authentication Handlers
         services.AddSingleton<EpicAuth>();
         services.AddSingleton<BasicAuth>();
+        services.AddSingleton<CustomHeaderAuth>();
+        services.AddSingleton<OAuth>();
         services.AddSingleton<IAuthenticationRetrievalService, AuthenticationRetrievalService>();
     }
 
     public static void RegisterExceptionHandlers(this IServiceCollection services)
     {
-        services.AddSingleton<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-        services.AddSingleton<IDeadLetterExceptionHandler<string, DataAcquisitionRequested>, DeadLetterExceptionHandler<string, DataAcquisitionRequested>>();
-        services.AddSingleton<IDeadLetterExceptionHandler<string, PatientCensusScheduled>, DeadLetterExceptionHandler<string, PatientCensusScheduled>>();
-        services.AddSingleton<IDeadLetterExceptionHandler<long, ReadyToAcquire>, DeadLetterExceptionHandler<long, ReadyToAcquire>>();
-        services.AddSingleton<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
-        services.AddSingleton<ITransientExceptionHandler<string, DataAcquisitionRequested>, TransientExceptionHandler<string, DataAcquisitionRequested>>();
-        services.AddSingleton<ITransientExceptionHandler<string, PatientCensusScheduled>, TransientExceptionHandler<string, PatientCensusScheduled>>();
-        services.AddSingleton<ITransientExceptionHandler<long, ReadyToAcquire>, TransientExceptionHandler<long, ReadyToAcquire>>();
+        services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+        services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
+        services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
     }
 
     public static void RegisterRepositories(this IServiceCollection services)
@@ -219,6 +211,8 @@ public static class GeneralStartupExtensions
         services.AddTransient<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
         services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<SftpAcquisitionLog>, EntityRepository<SftpAcquisitionLog, DataAcquisitionDbContext>>();
+        services.AddTransient<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
 
         //Database
         services.AddScoped<IDatabase, Database>();
@@ -228,11 +222,14 @@ public static class GeneralStartupExtensions
     {
         //Queries
         services.AddTransient<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
+        services.AddTransient<IDataAcquisitionLogNotesQueries, DataAcquisitionLogNotesQueries>();
+        services.AddTransient<ISftpAcquisitionLogQueries, SftpAcquisitionLogQueries>();
         services.AddTransient<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
         services.AddTransient<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
         services.AddTransient<IFhirQueryQueries, FhirQueryQueries>();
         services.AddTransient<IQueryPlanQueries, QueryPlanQueries>();
         services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
+        services.AddTransient<ISftpConfigurationQueries, SftpConfigurationQueries>();
 
         //Managers
         services.AddTransient<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
@@ -241,6 +238,9 @@ public static class GeneralStartupExtensions
         services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
         services.AddTransient<IFhirQueryManager, FhirQueryManager>();
         services.AddTransient<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
+        services.AddTransient<IScheduledReportManager, ScheduledReportManager>();
+        services.AddTransient<ISftpAcquisitionLogManager, SftpAcquisitionLogManager>();
+        services.AddTransient<ISftpConfigurationManager, SftpConfigurationManager>();
     }
 
     public static void RegisterServices(this IServiceCollection services)
@@ -255,10 +255,45 @@ public static class GeneralStartupExtensions
         services.AddTransient<IQueryListProcessor, QueryListProcessor>();
         services.AddTransient<IBundleEventService<ResourceKey, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>, BundleResourceAcquiredEventService>();
         services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
+        services.AddTransient<IAcquisitionDependencyChecker, AcquisitionDependencyChecker>();
 
         //Data Pull Commands
         services.AddTransient<IReadFhirCommand, ReadFhirCommand>();
         services.AddTransient<ISearchFhirCommand, SearchFhirCommand>();
+
+        //SFTP Services
+        services.AddTransient<ISftpClientService, SftpClientService>();
+        services.AddTransient<IFileParserFactory, FileParserFactory>();
+        services.AddTransient<ISftpAcquisitionProcessorFactory, SftpAcquisitionProcessorFactory>();
+
+        //File Parsers
+        services.AddTransient<IFileParser<CernerEncounters>, CernerCclExtractParser>();
+
+        //SFTP Acquisition Processors
+        services.AddTransient<ISftpAcquisitionProcessor, CernerCclExtractProcessor>();
+    }
+
+    private static void RegisterSecretManager(this IServiceCollection services, IConfiguration configuration)
+    {
+        var manager = configuration.GetValue<string>("SecretManagement:Manager");
+
+        if (string.Equals(manager, "AzureKeyVault", StringComparison.OrdinalIgnoreCase))
+        {
+            Log.Information("Registering Azure Key Vault Secret Manager");
+            services.AddSingleton<ISecretManager, AzureKeyVaultSecretManager>();
+        }
+        else
+        {
+            // LocalSecretManager requires Data Protection for encrypted file storage
+            services.AddDataProtection()
+                .SetApplicationName(configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link");
+
+            Log.Information("Registering Local Secret Manager (file-based with encryption)");
+            services.AddSingleton<ISecretManager, LocalSecretManager>();
+        }
+
+        // Register credential service
+        services.AddScoped<ISftpCredentialService, SftpCredentialService>();
     }
 
     public static void RegisterFactories(this IServiceCollection services, IConfigurationManager configuration)
@@ -276,7 +311,7 @@ public static class GeneralStartupExtensions
         //Factories - Producer
         var kafkaConnection = configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>() ?? throw new Exception("Missing Kafka Connection Settings");
         var producerConfig = new ProducerConfig { CompressionType = CompressionType.Zstd };
-        
+
         services.RegisterKafkaProducer<string, object>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, string>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, DataAcquisitionRequested>(kafkaConnection, producerConfig);
@@ -285,6 +320,7 @@ public static class GeneralStartupExtensions
         services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, producerConfig, null, new IndentedJsonSerializer<PatientListMessage>());
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<long, ReadyToAcquire>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<string, CernerPatientsAcquired>(kafkaConnection, producerConfig);
 
         services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
         services.AddTransient<IKafkaProducerFactory<string, object>, KafkaProducerFactory<string, object>>();
@@ -294,6 +330,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourceAcquired>, KafkaProducerFactory<ResourceKey, ResourceAcquired>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
         services.AddTransient<IKafkaProducerFactory<long, ReadyToAcquire>, KafkaProducerFactory<long, ReadyToAcquire>>();
+        services.AddTransient<IKafkaProducerFactory<string, CernerPatientsAcquired>, KafkaProducerFactory<string, CernerPatientsAcquired>>();
 
         //Factories - Application
         services.AddTransient<IParameterQueryFactory, ParameterQueryFactory>();
@@ -316,7 +353,8 @@ public static class GeneralStartupExtensions
 
     public static void RegisterProblemDetails(this IServiceCollection services, IHostingEnvironment environment)
     {
-        services.AddProblemDetails(options => {
+        services.AddProblemDetails(options =>
+        {
             options.CustomizeProblemDetails = ctx =>
             {
                 if (string.IsNullOrEmpty(ctx.ProblemDetails.Detail))

@@ -21,13 +21,15 @@ using System.Reflection;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
 
+builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, configureRedis: true);
+
 var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
+
+builder.Services.AddTransient<SftpAcquisitionHandler>();
 
 //register worker processor config
 builder.Services.Configure<AcquisitionWorkerProcessorSettings>(
     builder.Configuration.GetSection("AcquisitionWorkerProcessorSettings"));
-
-builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, true);
 
 builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
 builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
@@ -37,7 +39,8 @@ builder.Services.AddSingleton<AcquisitionProcessorBackgroundService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<AcquisitionProcessorBackgroundService>());
 
 //Add CORS
-builder.Services.AddLinkCorsService(options => {
+builder.Services.AddLinkCorsService(options =>
+{
     options.Environment = builder.Environment;
 });
 
@@ -55,6 +58,9 @@ if (!consumerSettings?.DisableConsumer ?? true)
     builder.Services.AddHostedService<ReadyToAcquireListener>();
 }
 
+//Add SFTP Acquisition Service
+builder.Services.AddHostedService<SftpAcquisitionService>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -69,6 +75,9 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+// Ensure schema is up to date even when worker starts before API.
+app.AutoMigrateEF<DataAcquisitionDbContext>();
 
 app.UseRouting();
 app.MapControllers();

@@ -1,9 +1,12 @@
-﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Application.Models;
+using Confluent.Kafka;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using System.Text;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
 {
@@ -22,7 +25,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public class ProduceValidationModel
         {
-            public required string ReportScheduleId { get; set; }
+            public required Guid ReportScheduleId { get; set; }
             public required List<string> ReportTypes { get; set; }
             public required string FacilityId { get; set; }
             public required string PatientId { get; set; }
@@ -37,9 +40,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
         }
 
-        public async Task Produce(string scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId)
+        public async Task Produce(Guid scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId)
         {
-            _logger.LogDebug("Producing ReadyForValidation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, patientId, scheduleId);
+            _logger.LogDebug("Producing ReadyForValidation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId.SanitizeForLog(), patientId.SanitizeForLog(), scheduleId.SanitizeForLog());
 
             _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
                 new Message<ReadyForValidationKey, ReadyForValidationValue>
@@ -53,7 +56,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     {
                         PatientId = patientId,
                         ReportTypes = reportTypes,
-                        ReportTrackingId = scheduleId,
+                        ReportTrackingId = scheduleId.ToString(),
                         PayloadUri = payloadUri
                     },
                     Headers = new Headers
@@ -67,15 +70,15 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
             var entry = await reportEntryManager.GetEntry(scheduleId, patientId);
 
-            if (entry == null) 
+            if (entry == null)
             {
                 throw new Exception($"No report entry record was found (ReportId = {scheduleId}, FacilityId = {facilityId}).");
             }
 
-            entry.ReportingStatus = Domain.Enums.ReportingStatus.PendingValidation;
-            entry.SubmissionStatus = Domain.Enums.SubmissionStatus.PendingValidation;
-            
-            await reportEntryManager.UpdateAsync(entry);
+            entry.ReportingStatus = ReportingStatus.PendingValidation;
+            entry.SubmissionStatus = SubmissionStatus.PendingValidation;
+
+            await reportEntryManager.UpdateAsync(entry, CancellationToken.None);
         }
     }
 }

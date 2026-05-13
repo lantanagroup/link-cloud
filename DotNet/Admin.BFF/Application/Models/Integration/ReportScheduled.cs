@@ -60,7 +60,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Integration
         /// The frequency to generate the report
         /// </summary>
         /// <example>Daily</example>
-        public string Frequency { get; set;}
+        public string Frequency { get; set; }
 
         public string ReportTrackingId { get; set; } = string.Empty;
     }

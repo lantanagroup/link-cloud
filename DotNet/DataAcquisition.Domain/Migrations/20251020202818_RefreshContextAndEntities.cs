@@ -20,7 +20,7 @@ namespace DataAcquisition.Domain.Migrations
                 oldClrType: typeof(string),
                 oldType: "nvarchar(max)",
                 oldNullable: true);
-          
+
             migrationBuilder.DropIndex(
                     name: "IX_ResourceReferenceType_FhirQueryId",
                     table: "ResourceReferenceType");

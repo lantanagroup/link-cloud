@@ -1,10 +1,9 @@
 ﻿using Confluent.Kafka;
-using LantanaGroup.Link.Report.Domain;
-using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Text;
 
 namespace LantanaGroup.Link.Report.KafkaProducers
@@ -23,9 +22,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _logger = logger;
         }
 
-        public async Task<bool> Produce(ReportSchedule schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null)
+        public async Task<bool> Produce(ReportScheduleModel schedule, PayloadType payloadType, string? patientId = null, string? correlationId = null, string? payloadUri = null)
         {
-            _logger.LogDebug("Producing SubmitPayload (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId, patientId, schedule.Id);
+            _logger.LogDebug("Producing SubmitPayload (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), patientId.SanitizeForLog(), schedule.Id.SanitizeForLog());
 
             var corrId = string.IsNullOrWhiteSpace(correlationId)
                       ? Guid.NewGuid().ToString()
@@ -50,8 +49,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                         PatientId = patientId,
                         PayloadUri = payloadUri,
                         ReportTypes = schedule.ReportTypes,
-                        StartDate = schedule.ReportStartDate,
-                        EndDate = schedule.ReportEndDate
+                        StartDate = schedule.ReportStartDate.UtcDateTime,
+                        EndDate = schedule.ReportEndDate.UtcDateTime
                     },
 
                     Headers = new Headers
@@ -60,7 +59,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                     }
                 });
 
-            _submitPayloadProducer.Flush();         
+            _submitPayloadProducer.Flush();
 
             return true;
         }

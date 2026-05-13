@@ -93,9 +93,13 @@
 
 .subnav-item.dropdown:hover .dropdown-menu,
 .subnav-item.dropdown:focus .dropdown-menu,
-.subnav-item.dropdown:focus-within .dropdown-menu,
-.subnav-item.dropdown:focus-visible .dropdown-menu {
+.subnav-item.dropdown:focus-visible .dropdown-menu,
+.subnav-item.dropdown:focus-within .dropdown-menu {
   display: block;
+}
+
+.subnav-item.dropdown.active:not(:hover):not(:focus):not(:focus-within) .dropdown-menu {
+  display: none;
 }
 
 .subnav-icon {

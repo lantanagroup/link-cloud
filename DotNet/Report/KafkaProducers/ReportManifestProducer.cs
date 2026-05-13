@@ -1,9 +1,11 @@
 ﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
-using LantanaGroup.Link.Report.Core;
-using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Application.Core;
+using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Domain.Managers;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -24,6 +26,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
         private readonly BlobStorageService _blobStorageService;
         private readonly SubmitPayloadProducer _payloadSubmittedProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
+        private readonly IReportEntryManager _reportEntryManager;
 
 
         public ReportManifestProducer(
@@ -33,7 +36,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             ITenantApiService tenantApiService,
             BlobStorageService blobStorageService,
             SubmitPayloadProducer payloadSubmittedProducer,
-            AuditableEventOccurredProducer auditableEventOccurredProducer)
+            AuditableEventOccurredProducer auditableEventOccurredProducer,
+            IReportEntryManager reportEntryManager)
         {
             _logger = logger;
             _serviceScopeFactory = serviceScopeFactory;
@@ -42,21 +46,17 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _blobStorageService = blobStorageService;
             _payloadSubmittedProducer = payloadSubmittedProducer;
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
+            _reportEntryManager = reportEntryManager;
         }
 
-        public async Task<List<Resource>> Generate(ReportSchedule schedule)
+        public virtual async Task<List<Resource>> Generate(ReportScheduleModel schedule)
         {
             var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
             var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
-            if (reportEntries == null || reportEntries.Count == 0) 
-            {
-                return null;
-            }
-
             var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
 
-            if (facilityConfig == null) 
+            if (facilityConfig == null)
             {
                 throw new Exception($"Facility config was not found when attempting to generate a report manifest (ReportId = {schedule.Id}, FacilityId = {schedule.FacilityId});");
             }
@@ -67,7 +67,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             [
                 organization,
                 CreateDevice(),
-                CreatePatientList(reportEntries.Select(x => x.PatientId).ToList(), schedule.ReportStartDate, schedule.ReportEndDate),
+                CreatePatientList(reportEntries.Select(x => x.PatientId).ToList(), schedule.ReportStartDate.DateTime, schedule.ReportEndDate.DateTime),
             ];
 
             var reportName = _blobStorageService.GetReportName(schedule);
@@ -96,7 +96,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return manifestResources;
         }
 
-        public async Task<Bundle> GenerateAsBundle(ReportSchedule schedule)
+        public virtual async Task<Bundle> GenerateAsBundle(ReportScheduleModel schedule)
         {
             List<Resource> resources = await Generate(schedule);
             Bundle bundle = new()
@@ -112,23 +112,15 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return bundle;
         }
 
-        public async Task<bool> Produce(ReportSchedule schedule, string correlationId = null)
+        public virtual async Task<bool> Produce(ReportScheduleModel schedule, string correlationId = null)
         {
-            if (!schedule.EndOfReportPeriodJobHasRun) {
+            if (!schedule.EndOfReportPeriodJobHasRun)
+            {
                 return false;
             }
 
-            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
-
-            var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.FacilityId == schedule.FacilityId && x.ReportScheduleId == schedule.Id);
-            
-            foreach (var entry in reportEntries)
+            if (!await _reportEntryManager.AreAllEntriesCompleteAsync(schedule.FacilityId, schedule.Id))
             {
-                if ((entry.ReportingStatus == ReportingStatus.NotReportable || entry.ReportingStatus == ReportingStatus.PassedValidation || entry.ReportingStatus == ReportingStatus.FailedValidation) && (entry.SubmissionStatus == SubmissionStatus.Submitted || entry.SubmissionStatus == SubmissionStatus.NotEligable))
-                {
-                    continue;
-                }
-
                 return false;
             }
 
@@ -142,7 +134,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             catch (Exception ex)
             {
                 payloadUri = null;
-                _logger.LogError(ex, "Failed to upload report manifest to blob storage (ReportId = {ReportId}, FacilityId = {FacilityId}).", schedule.Id.SanitizeUntrustedString(), schedule.FacilityId.SanitizeUntrustedString());
+                _logger.LogError(ex, "Failed to upload report manifest to blob storage (ReportId = {ReportId}, FacilityId = {FacilityId}).", schedule.Id.SanitizeForLog(), schedule.FacilityId.SanitizeForLog());
                 AuditEventMessage auditEvent = new()
                 {
                     FacilityId = schedule.FacilityId,
@@ -156,7 +148,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
                 return false;
             }
 
-            _logger.LogDebug("Manifest generated (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId, schedule.Id);
+            _logger.LogDebug("Manifest generated (Facility = {FacilityId}, ReportScheduleId = {ReportScheduleId})", schedule.FacilityId.SanitizeForLog(), schedule.Id.SanitizeForLog());
 
             await _payloadSubmittedProducer.Produce(schedule, PayloadType.ReportSchedule, payloadUri: payloadUri?.ToString());
 
@@ -209,24 +201,6 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             }
 
             return admittedPatients;
-        }
-
-        private void AddExtensionsToAggregate(MeasureReport measureReport, Dictionary<string, string> patientFileDict)
-        {
-            foreach (var list in measureReport.Contained.OfType<List>())
-            {
-                foreach (var entry in list.Entry)
-                {
-                    string? patRef = entry.Item?.Reference;
-                    if (string.IsNullOrEmpty(patRef)) continue;
-
-                    string patId = patRef.Replace("Patient/", "");
-                    if (patientFileDict.TryGetValue(patId, out var filename))
-                    {
-                        entry.AddExtension("https://measures.nhsnlink.org/StructureDefinition/link-file-reference-extension", new FhirString(filename));
-                    }
-                }
-            }
         }
 
         private OperationOutcome CreateOperationOutcome(List<ReportEntry> failedEntries)

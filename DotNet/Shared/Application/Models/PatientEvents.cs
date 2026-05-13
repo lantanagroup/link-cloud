@@ -2,5 +2,6 @@
 public enum PatientEvents
 {
     Admit,
-    Discharge
+    Discharge,
+    Update
 }

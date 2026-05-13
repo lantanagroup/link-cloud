@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.Shared.Application.Interfaces;
+﻿using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
@@ -24,7 +25,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Tenant;
 
-[Collection("TenantIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
 public class FacilityControllerTests
 {
@@ -76,7 +77,7 @@ public class FacilityControllerTests
         };
         await _fixture.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
 
-        var result = await _controller.GetFacilities(facilityId, facilityName, null, null, 10, 1, false, CancellationToken.None);
+        var result = await _controller.GetFacilities(facilityId, facilityName, null, null, null, null, 10, 1, false, CancellationToken.None);
 
         var okResult = result.Result as OkObjectResult;
         var value = okResult.Value as PagedConfigModel<FacilityModel>;
@@ -112,6 +113,7 @@ public class FacilityControllerTests
             FacilityId = facilityId,
             FacilityName = facilityName,
             TimeZone = "America/Chicago",
+            Vendor = Vendor.Epic,
             ScheduledReports = new TenantScheduledReportConfig { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
 
@@ -138,6 +140,7 @@ public class FacilityControllerTests
             FacilityId = facilityId,
             FacilityName = "Updated Name",
             TimeZone = "America/New_York",
+            Vendor = Vendor.Epic,
             ScheduledReports = new TenantScheduledReportConfig { Daily = new string[] { "NewReport" }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
 
@@ -185,14 +188,14 @@ public class FacilityControllerTests
     }
 
     [Fact]
-    public async Task SoftDeleteFacility_FacilityNotFound_ReturnsBadRequest()
+    public async Task SoftDeleteFacility_FacilityNotFound_ReturnsNotFound()
     {
         var nonExistentFacilityId = Guid.NewGuid().ToString();
 
         var result = await _controller.SoftDeleteFacility(nonExistentFacilityId, CancellationToken.None);
 
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Contains("Not Found", badRequestResult.Value?.ToString());
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Contains("Not Found", notFoundResult.Value?.ToString());
     }
 
     [Fact]
@@ -219,14 +222,14 @@ public class FacilityControllerTests
     }
 
     [Fact]
-    public async Task RestoreFacility_FacilityNotFound_ReturnsBadRequest()
+    public async Task RestoreFacility_FacilityNotFound_ReturnsNotFound()
     {
         var nonExistentFacilityId = Guid.NewGuid().ToString();
 
         var result = await _controller.RestoreFacility(nonExistentFacilityId, CancellationToken.None);
 
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Contains("Not Found", badRequestResult.Value?.ToString());
+        var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Contains("Not Found", notFoundResult.Value?.ToString());
     }
 
     [Fact]
@@ -278,12 +281,13 @@ public class FacilityControllerTests
         var objectResult = Assert.IsType<OkObjectResult>(actionResult);
         Assert.Equal(200, objectResult.StatusCode);
         var response = Assert.IsType<GenerateAdhocReportResponse>(objectResult.Value);
-        Assert.NotEmpty(response.ReportId);
+        Assert.True(response.ReportId != default);
     }
 
     [Fact]
     public async Task RegenerateReport_Success()
     {
+        var reportId = Guid.NewGuid().ToString();
         var facilityId = Guid.NewGuid().ToString();
         var facilityName = $"Regen Test {facilityId}";
         var facility = new Facility
@@ -299,18 +303,18 @@ public class FacilityControllerTests
         var handler = new StubHttpMessageHandler(new HttpResponseMessage
         {
             StatusCode = HttpStatusCode.OK,
-            Content = new StringContent(JsonSerializer.Serialize(new ReportScheduleSummaryModel { FacilityId = facilityId, ReportId = "test-report-id" }))
+            Content = new StringContent(JsonSerializer.Serialize(new ReportScheduleSummaryModel { FacilityId = facilityId, ReportId = reportId }))
         });
         var httpClient = new HttpClient(handler);
 
         var httpClientFactoryStub = new StubHttpClientFactory(httpClient);
 
         // Temporarily set the _httpClient to our stub factory
-        typeof(FacilityController).GetField("_httpClient", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.SetValue(_controller, httpClientFactoryStub);
+        typeof(FacilityController).GetField("_httpClient", BindingFlags.NonPublic | BindingFlags.Instance)?.SetValue(_controller, httpClientFactoryStub);
 
         var request = new RegenerateReportRequest
         {
-            ReportId = "test-report-id",
+            ReportId = reportId,
             BypassSubmission = false
         };
 
@@ -319,6 +323,66 @@ public class FacilityControllerTests
         var actionResult = result.Result as IActionResult;
         var objectResult = Assert.IsType<OkObjectResult>(actionResult);
         Assert.Equal(200, objectResult.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task GenerateAdHocReport_EmptyFacilityId_ReturnsBadRequest(string facilityId)
+    {
+        var request = new AdHocReportRequest
+        {
+            ReportTypes = new List<string> { "TestReport" },
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow,
+            PatientIds = new List<string>(),
+            BypassSubmission = false
+        };
+
+        var result = await _controller.GenerateAdHocReport(facilityId, request);
+        var actionResult = result.Result as IActionResult;
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult);
+        Assert.Contains("FacilityId must be provided", badRequestResult.Value?.ToString());
+    }
+
+    [Fact]
+    public async Task GenerateAdHocReport_FacilityNotFound_ReturnsNotFound()
+    {
+        var request = new AdHocReportRequest
+        {
+            ReportTypes = new List<string> { "TestReport" },
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow,
+            PatientIds = new List<string>(),
+            BypassSubmission = false
+        };
+
+        var result = await _controller.GenerateAdHocReport(Guid.NewGuid().ToString(), request);
+        var actionResult = result.Result as IActionResult;
+        Assert.IsType<NotFoundObjectResult>(actionResult);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task RegenerateReport_EmptyFacilityId_ReturnsBadRequest(string facilityId)
+    {
+        var request = new RegenerateReportRequest { ReportId = "test-report-id", BypassSubmission = false };
+
+        var result = await _controller.RegenerateReport(facilityId, request);
+        var actionResult = result.Result as IActionResult;
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(actionResult);
+        Assert.Contains("FacilityId must be provided", badRequestResult.Value?.ToString());
+    }
+
+    [Fact]
+    public async Task RegenerateReport_FacilityNotFound_ReturnsNotFound()
+    {
+        var request = new RegenerateReportRequest { ReportId = "test-report-id", BypassSubmission = false };
+
+        var result = await _controller.RegenerateReport(Guid.NewGuid().ToString(), request);
+        var actionResult = result.Result as IActionResult;
+        Assert.IsType<NotFoundObjectResult>(actionResult);
     }
 
     private class StubHttpMessageHandler : HttpMessageHandler

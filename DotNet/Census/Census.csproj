@@ -8,7 +8,7 @@
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 	<RootNamespace>LantanaGroup.Link.Census</RootNamespace>
 	<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
-	<Version>0.5.1</Version>
+	<Version>0.6.0</Version>
   </PropertyGroup>
 
 	<PropertyGroup>
@@ -24,26 +24,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-    <PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations" Version="0.*" />
-    <PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer" Version="0.*" />
     <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
     <PackageReference Include="Azure.Identity" Version="1.*" />
     <PackageReference Include="Confluent.Kafka" Version="2.*" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.*" />
     <PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Abstractions" Version="8.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Analyzers" Version="8.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.*">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.*">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
     <PackageReference Include="Quartz" Version="3.*" />
     <PackageReference Include="Quartz.Extensions.DependencyInjection" Version="3.*" />
@@ -54,7 +39,7 @@
     <PackageReference Include="Serilog.Exceptions" Version="8.*" />
     <PackageReference Include="Serilog.Expressions" Version="4.*" />
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />    
     <PackageReference Include="xunit.extensibility.core" Version="2.*" />
   </ItemGroup>
 

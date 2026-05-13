@@ -14,18 +14,18 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
         public GetLinkAccount(ILogger<GetLinkAccount> logger, AccountService accountService)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-           
+
             _accountService = accountService ?? throw new ArgumentNullException(nameof(accountService));
         }
 
         public async Task<Account?> ExecuteAsync(ClaimsPrincipal principal, CancellationToken cancellationToken)
         {
             //check if the principal is a claims identity
-            if(principal.Identity is not ClaimsIdentity identity) { return null; }
-            
+            if (principal.Identity is not ClaimsIdentity identity) { return null; }
+
             //get the account id from the claims
             var accountId = identity.FindFirst(LinkAuthorizationConstants.LinkSystemClaims.Email)?.Value;
-            if (accountId == null) { return null; }          
+            if (accountId == null) { return null; }
 
             var response = await _accountService.GetAccountByEmail(accountId, cancellationToken);
 
@@ -40,7 +40,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Security
 
             return account;
 
-        }            
-        
+        }
+
     }
 }

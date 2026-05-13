@@ -57,7 +57,7 @@ namespace LantanaGroup.Link.Census.Migrations
                 type: "bit",
                 nullable: true,
                 defaultValue: true);
-            
+
             migrationBuilder.Sql("UPDATE CensusConfig SET Enabled = 1");
 
             migrationBuilder.CreateIndex(

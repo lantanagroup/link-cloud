@@ -11,7 +11,8 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census;
 
-[Collection("CensusIntegrationTests")]
+[Collection("IntegrationTests")]
+[Trait("Category", "IntegrationTests")]
 public class QueryTests
 {
     private readonly CensusIntegrationTestFixture _fixture;
@@ -291,7 +292,7 @@ public class QueryTests
         var admitCorrelationId1 = Guid.NewGuid().ToString();
         var patient1AdmitPayload = new FHIRListAdmitPayload(patientId1, DateTime.UtcNow.AddDays(-3));
         var patient1AdmitEvent = patient1AdmitPayload.CreatePatientEvent(facilityId, admitCorrelationId1);
-        var patient1Encounter = new PatientEncounterBuilder(facilityId,null,patient1AdmitEvent.EventDate, null, admitCorrelationId1).AddPatientIdentifier(patientId1, SourceType.FHIR).GetPatientEncounter();
+        var patient1Encounter = new PatientEncounterBuilder(facilityId, null, patient1AdmitEvent.EventDate, null, admitCorrelationId1).AddPatientIdentifier(patientId1, SourceType.FHIR).GetPatientEncounter();
         events.Add(patient1AdmitEvent);
 
         patient1Encounter.PatientIdentifiers.FirstOrDefault().Id = Guid.NewGuid().ToString();

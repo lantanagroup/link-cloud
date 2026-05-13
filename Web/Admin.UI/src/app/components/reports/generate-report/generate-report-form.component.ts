@@ -306,7 +306,7 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy, AfterView
             verticalPosition: 'top'
           });
           this.lastGeneratedReport = {facilityId: this.facilityIdControl.value, reportId: response.reportId};
-          this.router.navigate([`tenant/facility/${this.facilityIdControl.value}/report/${response.reportId}`]);
+          this.router.navigate(['/tenant/facility', this.facilityIdControl.value, 'report', response.reportId]);
         },
         error: (err) => {
           // Display error message
@@ -428,7 +428,7 @@ export class GenerateReportFormComponent implements OnInit, OnDestroy, AfterView
 
   navToReport() {
     if (this.lastGeneratedReport?.reportId) {
-      this.router.navigate([`tenant/facility/${this.lastGeneratedReport.facilityId}/report/${this.lastGeneratedReport.reportId}`]);
+      this.router.navigate(['/tenant/facility', this.lastGeneratedReport.facilityId, 'report', this.lastGeneratedReport.reportId]);
     }
   }
 

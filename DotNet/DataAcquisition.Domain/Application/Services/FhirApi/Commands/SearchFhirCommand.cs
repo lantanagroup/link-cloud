@@ -1,18 +1,20 @@
-﻿using Hl7.Fhir.Model;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -59,6 +61,8 @@ public class SearchFhirCommand : ISearchFhirCommand
         _authenticationRetrievalService = authenticationRetrievalService ?? throw new ArgumentNullException(nameof(authenticationRetrievalService));
     }
 
+    protected virtual HttpMessageHandler CreateInnerHttpMessageHandler() => new HttpClientHandler();
+
     public async IAsyncEnumerable<Bundle> ExecuteAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("SearchFhirCommand.ExecuteAsync");
@@ -82,26 +86,45 @@ public class SearchFhirCommand : ISearchFhirCommand
             yield break;
         }
 
+        // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
+        var innerHandler = CreateInnerHttpMessageHandler();
+        var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
+        var httpClientWithHandler = new HttpClient(headerCapturingHandler);
 
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.GetMaxConcurrentRequestsOrDefault(), _distributedLockSettings.Expiration, cancellationToken))
+        var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, httpClientWithHandler, new FhirClientSettings
         {
-            // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
-            var innerHandler = new HttpClientHandler();
-            var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
-            var httpClientWithHandler = new HttpClient(headerCapturingHandler);
+            PreferredFormat = ResourceFormat.Json
+        });
 
-            var fhirClient = new FhirClient(request.queryConfig.FhirServerBaseUrl, httpClientWithHandler, new FhirClientSettings
-            {
-                PreferredFormat = ResourceFormat.Json
-            });
+        Bundle? resultBundle = null;
+
+        var maxConcurrent = request.queryConfig.GetMaxConcurrentRequestsOrDefault();
+        var semWaitStart = DateTime.UtcNow;
+        _logger.LogDebug(
+            "Semaphore: SearchPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
+            request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), maxConcurrent.SanitizeForLog());
+        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
+        {
+            var semAcquiredAt = DateTime.UtcNow;
+            _logger.LogDebug(
+                "Semaphore: SearchPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
+                request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
 
             var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
-                fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+                if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)
+                {
+                    fhirClient.RequestHeaders.Authorization = authHeaderValue;
+                }
+                else if (authBuilderResults.authHeader is Dictionary<string, string> customHeaders)
+                {
+                    foreach (var header in customHeaders)
+                    {
+                        fhirClient.RequestHeaders.Add(header.Key, header.Value);
+                    }
+                }
             }
-
-            Bundle? resultBundle = null;
 
             try
             {
@@ -125,38 +148,59 @@ public class SearchFhirCommand : ISearchFhirCommand
                 throw;
             }
 
+            _logger.LogDebug(
+                "Semaphore: SearchPaging releasing facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} holdMs={HoldMs}",
+                request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
+        }
+
+        if (resultBundle != null)
+        {
             yield return resultBundle;
+            IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
 
-            Bundle? newResultBundle = resultBundle;
-
-            if (newResultBundle != null)
+            while (resultBundle.Link.Exists(x => x.Relation == "next"))
             {
-                while (resultBundle.Link.Exists(x => x.Relation == "next"))
+                try
                 {
-                    try
+                    _logger.LogDebug(
+                        "Semaphore: SearchPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
+                        request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), maxConcurrent.SanitizeForLog());
+                    using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
                     {
-                        resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
-                    }
-                    catch (FhirOperationException ex) when (ex.Status == HttpStatusCode.TooManyRequests)
-                    {
-                        var retryAfter = FhirCommandUtils.ParseRetryAfter(headerCapturingHandler.LastResponseHeaders);
-                        throw new TooManyRequestsException($"Too many requests during paging for {request.resourceType}", retryAfter);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; SearchParams: {SearchParams},\n\n\t{stack}\n\n\t{innerStack}", request.resourceType, request.searchParams, ex.StackTrace, ex.InnerException?.StackTrace);
-                        throw;
-                    }
+                        var semAcquiredAt = DateTime.UtcNow;
+                        _logger.LogDebug(
+                            "Semaphore: SearchPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
+                            request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
 
-                    if (resultBundle != null && resultBundle.Entry.Any())
-                    {
-                        yield return resultBundle;
-                        IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
+                        resultBundle = await fhirClient.ContinueAsync(resultBundle, ct: cancellationToken);
+
+                        _logger.LogDebug(
+                            "Semaphore: SearchPaging releasing facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} holdMs={HoldMs}",
+                            request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
                     }
+                }
+                catch (FhirOperationException ex) when (ex.Status == HttpStatusCode.TooManyRequests)
+                {
+                    var retryAfter = FhirCommandUtils.ParseRetryAfter(headerCapturingHandler.LastResponseHeaders);
+                    throw new TooManyRequestsException($"Too many requests during paging for {request.resourceType}", retryAfter);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error encountered while searching FHIR resources. ResourceType: {ResourceType}; SearchParams: {SearchParams},\n\n\t{stack}\n\n\t{innerStack}", request.resourceType, request.searchParams, ex.StackTrace, ex.InnerException?.StackTrace);
+                    throw;
+                }
+
+                if (resultBundle != null)
+                {
+                    yield return resultBundle;
+                    IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
+                }
+                else
+                {
+                    yield break;
                 }
             }
         }
-
     }
 
     public async Task<Bundle> ExecuteNonPagingAsync(SearchFhirCommandRequest request, CancellationToken cancellationToken)
@@ -176,10 +220,20 @@ public class SearchFhirCommand : ISearchFhirCommand
                 new KeyValuePair<string, object?>(DiagnosticNames.Resource, request.resourceType)
             ]);
 
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.queryConfig.GetMaxConcurrentRequestsOrDefault(), _distributedLockSettings.Expiration, cancellationToken))
+        var maxConcurrent = request.queryConfig.GetMaxConcurrentRequestsOrDefault();
+        var semWaitStart = DateTime.UtcNow;
+        _logger.LogDebug(
+            "Semaphore: SearchNonPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
+            request.facilityId.SanitizeForLog(), request.resourceType, request.correlationId, maxConcurrent);
+        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
+            var semAcquiredAt = DateTime.UtcNow;
+            _logger.LogDebug(
+                "Semaphore: SearchNonPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
+                request.facilityId.SanitizeForLog(), request.resourceType, request.correlationId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
+
             // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
-            var innerHandler = new HttpClientHandler();
+            var innerHandler = CreateInnerHttpMessageHandler();
             var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
             var httpClientWithHandler = new HttpClient(headerCapturingHandler);
 
@@ -191,7 +245,17 @@ public class SearchFhirCommand : ISearchFhirCommand
             var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
-                fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+                if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)
+                {
+                    fhirClient.RequestHeaders.Authorization = authHeaderValue;
+                }
+                else if (authBuilderResults.authHeader is Dictionary<string, string> customHeaders)
+                {
+                    foreach (var header in customHeaders)
+                    {
+                        fhirClient.RequestHeaders.Add(header.Key, header.Value);
+                    }
+                }
             }
 
             Bundle resultBundle;
@@ -205,6 +269,9 @@ public class SearchFhirCommand : ISearchFhirCommand
                 throw new TooManyRequestsException($"Too many requests for non-paging search on {request.resourceType}", retryAfter);
             }
             IncrementResourceAcquiredMetric(request.correlationId, request.patientId, request.facilityId, request.queryPhase.ToString(), request.resourceType.ToString(), resultBundle.Id);
+            _logger.LogDebug(
+                "Semaphore: SearchNonPaging releasing facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} holdMs={HoldMs}",
+                request.facilityId.SanitizeForLog(), request.resourceType, request.correlationId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
             return resultBundle;
         }
     }

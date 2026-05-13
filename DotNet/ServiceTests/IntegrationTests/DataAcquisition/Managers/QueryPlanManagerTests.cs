@@ -1,5 +1,4 @@
 ﻿using DataAcquisition.Domain.Application.Models;
-using DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -19,9 +18,9 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Managers;
 
-[Collection("DataAcquisitionIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class QueryPlanManagerTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
 
@@ -38,6 +37,8 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         return new QueryPlanManager(database, logger, validator);
     }
 
+    private static string CreateFacilityId() => $"NonExistent_{Guid.NewGuid():N}";
+
     [Fact]
     public async Task AddAsync_ValidModel_ReturnsQueryPlanModel()
     {
@@ -45,11 +46,11 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
-        var model = CreateValidCreateQueryPlanModel();
+        var facilityId = CreateFacilityId();
+        var frequency = Frequency.Daily;
+        var model = CreateValidCreateQueryPlanModel(facilityId, frequency);
 
         // Act
         var result = await manager.AddAsync(model);
@@ -57,18 +58,17 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Assert
         Assert.NotNull(result);
         Assert.Equal("TestPlan", result.PlanName);
-        Assert.Equal("TestFacility", result.FacilityId);
-        Assert.Equal(Frequency.Daily, result.Type);
+        Assert.Equal(facilityId, result.FacilityId);
+        Assert.Equal(frequency, result.Type);
         Assert.Equal("TestEHR", result.EHRDescription);
         Assert.Equal("1d", result.LookBack);
-        Assert.NotNull(result.CreateDate);
         Assert.NotNull(result.ModifyDate);
         Assert.Equal(result.CreateDate, result.ModifyDate);
-        Assert.Equal(1, result.InitialQueries.Count);
-        Assert.Equal(1, result.SupplementalQueries.Count);
+        Assert.Single(result.InitialQueries);
+        Assert.Single(result.SupplementalQueries);
 
         // Verify database
-        var savedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == "TestFacility" && q.Type == Frequency.Daily);
+        var savedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == frequency);
         Assert.NotNull(savedPlan);
         Assert.Equal("TestPlan", savedPlan.PlanName);
     }
@@ -90,7 +90,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
-        var model = CreateInvalidOrderCreateQueryPlanModel(initialInvalid: true, supplementalInvalid: false);
+        var model = CreateInvalidOrderCreateQueryPlanModel(CreateFacilityId(), Frequency.Daily, initialInvalid: true, supplementalInvalid: false);
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.AddAsync(model));
@@ -103,7 +103,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
-        var model = CreateInvalidOrderCreateQueryPlanModel(initialInvalid: false, supplementalInvalid: true);
+        var model = CreateInvalidOrderCreateQueryPlanModel(CreateFacilityId(), Frequency.Daily, initialInvalid: false, supplementalInvalid: true);
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.AddAsync(model));
@@ -116,7 +116,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
-        var model = CreateAllParameterCreateQueryPlanModel();
+        var model = CreateAllParameterCreateQueryPlanModel(CreateFacilityId(), Frequency.Daily);
 
         // Act
         var result = await manager.AddAsync(model);
@@ -133,7 +133,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
-        var model = CreateAllReferenceCreateQueryPlanModel();
+        var model = CreateAllReferenceCreateQueryPlanModel(CreateFacilityId(), Frequency.Daily);
 
         // Act
         var result = await manager.AddAsync(model);
@@ -150,7 +150,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
-        var model = CreateValidCreateQueryPlanModel();
+        var model = CreateValidCreateQueryPlanModel(CreateFacilityId(), Frequency.Daily);
         model.InitialQueries = new Dictionary<string, IQueryConfig>();
         model.SupplementalQueries = new Dictionary<string, IQueryConfig>();
 
@@ -167,7 +167,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
-        var model = CreateValidCreateQueryPlanModel();
+        var model = CreateValidCreateQueryPlanModel(CreateFacilityId(), Frequency.Daily);
         model.InitialQueries = null;
 
         // Act & Assert
@@ -180,7 +180,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
-        var model = CreateValidCreateQueryPlanModel();
+        var model = CreateValidCreateQueryPlanModel(CreateFacilityId(), Frequency.Daily);
         model.SupplementalQueries = null;
 
         // Act & Assert
@@ -194,15 +194,15 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var queries = scope.ServiceProvider.GetRequiredService<IQueryPlanQueries>();
+        var facilityId = CreateFacilityId();
+        var frequency = Frequency.Daily;
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
         {
-            FacilityId = "TestFacility",
-            Type = Frequency.Daily,
+            FacilityId = facilityId,
+            Type = frequency,
             PlanName = "OldPlan",
             EHRDescription = "OldEHR",
             LookBack = "1d",
@@ -214,10 +214,10 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         dbContext.QueryPlans.Add(existing);
         await dbContext.SaveChangesAsync();
 
-        var created = await queries.GetAsync(existing.FacilityId, Frequency.Daily);
+        var created = await queries.GetAsync(existing.FacilityId, frequency);
 
         var manager = CreateManager(scope);
-        var model = CreateValidUpdateQueryPlanModel();
+        var model = CreateValidUpdateQueryPlanModel(facilityId, frequency);
 
         // Act
         var result = await manager.UpdateAsync(model);
@@ -229,11 +229,11 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         Assert.Equal("2d", result.LookBack);
         Assert.Equal(created.CreateDate, result.CreateDate);
         Assert.True(result.ModifyDate > created.ModifyDate);
-        Assert.Equal(1, result.InitialQueries.Count);
-        Assert.Equal(1, result.SupplementalQueries.Count);
+        Assert.Single(result.InitialQueries);
+        Assert.Single(result.SupplementalQueries);
 
         // Verify database
-        var updatedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == "TestFacility" && q.Type == Frequency.Daily);
+        var updatedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == frequency);
         Assert.NotNull(updatedPlan);
         Assert.Equal("UpdatedPlan", updatedPlan.PlanName);
     }
@@ -255,7 +255,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
-        var model = CreateInvalidOrderUpdateQueryPlanModel(initialInvalid: true, supplementalInvalid: false);
+        var model = CreateInvalidOrderUpdateQueryPlanModel(CreateFacilityId(), Frequency.Daily, initialInvalid: true, supplementalInvalid: false);
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.UpdateAsync(model));
@@ -268,7 +268,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
-        var model = CreateInvalidOrderUpdateQueryPlanModel(initialInvalid: false, supplementalInvalid: true);
+        var model = CreateInvalidOrderUpdateQueryPlanModel(CreateFacilityId(), Frequency.Daily, initialInvalid: false, supplementalInvalid: true);
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.UpdateAsync(model));
@@ -282,11 +282,8 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var manager = CreateManager(scope);
-        var model = CreateValidUpdateQueryPlanModel();
+        var model = CreateValidUpdateQueryPlanModel(CreateFacilityId(), Frequency.Daily);
 
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() => manager.UpdateAsync(model));
@@ -298,15 +295,15 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facilityId = CreateFacilityId();
+        var frequency = Frequency.Daily;
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
         {
-            FacilityId = "TestFacility",
-            Type = Frequency.Daily,
+            FacilityId = facilityId,
+            Type = frequency,
             PlanName = "TestPlan",
             EHRDescription = "TestEHR",
             LookBack = "1d",
@@ -317,7 +314,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         await dbContext.SaveChangesAsync();
 
         var manager = CreateManager(scope);
-        var model = CreateAllParameterUpdateQueryPlanModel();
+        var model = CreateAllParameterUpdateQueryPlanModel(facilityId, frequency);
 
         // Act
         var result = await manager.UpdateAsync(model);
@@ -334,15 +331,15 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facilityId = CreateFacilityId();
+        var frequency = Frequency.Daily;
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
         {
-            FacilityId = "TestFacility",
-            Type = Frequency.Daily,
+            FacilityId = facilityId,
+            Type = frequency,
             PlanName = "TestPlan",
             EHRDescription = "TestEHR",
             LookBack = "1d",
@@ -353,7 +350,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         await dbContext.SaveChangesAsync();
 
         var manager = CreateManager(scope);
-        var model = CreateAllReferenceUpdateQueryPlanModel();
+        var model = CreateAllReferenceUpdateQueryPlanModel(facilityId, frequency);
 
         // Act
         var result = await manager.UpdateAsync(model);
@@ -370,15 +367,15 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facilityId = CreateFacilityId();
+        var frequency = Frequency.Daily;
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
         {
-            FacilityId = "TestFacility",
-            Type = Frequency.Daily,
+            FacilityId = facilityId,
+            Type = frequency,
             PlanName = "TestPlan",
             EHRDescription = "TestEHR",
             LookBack = "1d",
@@ -389,7 +386,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         await dbContext.SaveChangesAsync();
 
         var manager = CreateManager(scope);
-        var model = CreateValidUpdateQueryPlanModel();
+        var model = CreateValidUpdateQueryPlanModel(facilityId, frequency);
         model.InitialQueries = new Dictionary<string, IQueryConfig>();
         model.SupplementalQueries = new Dictionary<string, IQueryConfig>();
 
@@ -403,15 +400,15 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facilityId = CreateFacilityId();
+        var frequency = Frequency.Daily;
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
         {
-            FacilityId = "TestFacility",
-            Type = Frequency.Daily,
+            FacilityId = facilityId,
+            Type = frequency,
             PlanName = "TestPlan",
             EHRDescription = "TestEHR",
             LookBack = "1d",
@@ -422,7 +419,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         await dbContext.SaveChangesAsync();
 
         var manager = CreateManager(scope);
-        var model = CreateValidUpdateQueryPlanModel();
+        var model = CreateValidUpdateQueryPlanModel(facilityId, frequency);
         model.InitialQueries = null;
 
         // Act & Assert
@@ -435,15 +432,15 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facilityId = CreateFacilityId();
+        var frequency = Frequency.Daily;
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
         {
-            FacilityId = "TestFacility",
-            Type = Frequency.Daily,
+            FacilityId = facilityId,
+            Type = frequency,
             PlanName = "TestPlan",
             EHRDescription = "TestEHR",
             LookBack = "1d",
@@ -454,7 +451,7 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         await dbContext.SaveChangesAsync();
 
         var manager = CreateManager(scope);
-        var model = CreateValidUpdateQueryPlanModel();
+        var model = CreateValidUpdateQueryPlanModel(facilityId, frequency);
         model.SupplementalQueries = null;
 
         // Act & Assert
@@ -467,15 +464,15 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facilityId = CreateFacilityId();
+        var frequency = Frequency.Daily;
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
         {
-            FacilityId = "TestFacility",
-            Type = Frequency.Daily,
+            FacilityId = facilityId,
+            Type = frequency,
             PlanName = "TestPlan",
             EHRDescription = "TestEHR",
             LookBack = "1d",
@@ -486,12 +483,12 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         await dbContext.SaveChangesAsync();
 
         var manager = CreateManager(scope);
-        var model = CreateValidUpdateQueryPlanModel();
+        var model = CreateValidUpdateQueryPlanModel(facilityId, frequency);
         model.PlanName = null;
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<DbUpdateException>(() => manager.UpdateAsync(model));
-        Assert.Contains("NOT NULL constraint failed: queryPlan.PlanName", ex.InnerException.Message);
+        Assert.Contains("Cannot insert the value NULL into column", ex.InnerException!.Message);
     }
 
     [Fact]
@@ -500,15 +497,15 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facilityId = CreateFacilityId();
+        var frequency = Frequency.Daily;
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
         {
-            FacilityId = "TestFacility",
-            Type = Frequency.Daily,
+            FacilityId = facilityId,
+            Type = frequency,
             PlanName = "TestPlan",
             EHRDescription = "TestEHR",
             LookBack = "1d",
@@ -519,12 +516,12 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         await dbContext.SaveChangesAsync();
 
         var manager = CreateManager(scope);
-        var model = CreateValidUpdateQueryPlanModel();
+        var model = CreateValidUpdateQueryPlanModel(facilityId, frequency);
         model.EHRDescription = null;
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<DbUpdateException>(() => manager.UpdateAsync(model));
-        Assert.Contains("NOT NULL constraint failed: queryPlan.EHRDescription", ex.InnerException.Message);
+        Assert.Contains("Cannot insert the value NULL into column", ex.InnerException!.Message);
     }
 
     [Fact]
@@ -533,15 +530,15 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var facilityId = CreateFacilityId();
+        var frequency = Frequency.Daily;
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         // Seed existing
         var existing = new QueryPlan
         {
-            FacilityId = "TestFacility",
-            Type = Frequency.Daily,
+            FacilityId = facilityId,
+            Type = frequency,
             PlanName = "TestPlan",
             EHRDescription = "TestEHR",
             LookBack = "1d",
@@ -552,12 +549,12 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         await dbContext.SaveChangesAsync();
 
         var manager = CreateManager(scope);
-        var model = CreateValidUpdateQueryPlanModel();
+        var model = CreateValidUpdateQueryPlanModel(facilityId, frequency);
         model.LookBack = null;
 
         // Act & Assert
         var ex = await Assert.ThrowsAsync<DbUpdateException>(() => manager.UpdateAsync(model));
-        Assert.Contains("NOT NULL constraint failed: queryPlan.LookBack", ex.InnerException.Message);
+        Assert.Contains("Cannot insert the value NULL into column", ex.InnerException!.Message);
     }
 
     [Fact]
@@ -567,13 +564,14 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+
+        // Use a unique facility for isolation
+        var facilityId = $"DeleteTest_{Guid.NewGuid():N}";
 
         // Seed query plan
         var queryPlan = new QueryPlan
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Type = Frequency.Daily,
             PlanName = "TestPlan",
             EHRDescription = "TestEHR",
@@ -587,10 +585,10 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         var manager = CreateManager(scope);
 
         // Act
-        await manager.DeleteAsync("TestFacility", Frequency.Daily);
+        await manager.DeleteAsync(facilityId, Frequency.Daily);
 
         // Assert
-        var deletedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == "TestFacility" && q.Type == Frequency.Daily);
+        var deletedPlan = await dbContext.QueryPlans.FirstOrDefaultAsync(q => q.FacilityId == facilityId && q.Type == Frequency.Daily);
         Assert.Null(deletedPlan);
     }
 
@@ -601,8 +599,6 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
 
@@ -610,15 +606,15 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         await Assert.ThrowsAsync<NotFoundException>(() => manager.DeleteAsync("NonExisting", Frequency.Daily));
     }
 
-    private CreateQueryPlanModel CreateValidCreateQueryPlanModel()
+    private CreateQueryPlanModel CreateValidCreateQueryPlanModel(string facilityId, Frequency frequency)
     {
         return new CreateQueryPlanModel
         {
             PlanName = "TestPlan",
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             EHRDescription = "TestEHR",
             LookBack = "1d",
-            Type = Frequency.Daily,
+            Type = frequency,
             InitialQueries = new Dictionary<string, IQueryConfig>
             {
                 { "1", new ParameterQueryConfig { ResourceType = "Patient", Parameters = new List<IParameter> { new LiteralParameter { Name = "id", Literal = "123" } } } }
@@ -630,9 +626,9 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         };
     }
 
-    private CreateQueryPlanModel CreateInvalidOrderCreateQueryPlanModel(bool initialInvalid, bool supplementalInvalid)
+    private CreateQueryPlanModel CreateInvalidOrderCreateQueryPlanModel(string facilityId, Frequency frequency, bool initialInvalid, bool supplementalInvalid)
     {
-        var model = CreateValidCreateQueryPlanModel();
+        var model = CreateValidCreateQueryPlanModel(facilityId, frequency);
         if (initialInvalid)
         {
             model.InitialQueries = new Dictionary<string, IQueryConfig>
@@ -652,49 +648,49 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         return model;
     }
 
-    private CreateQueryPlanModel CreateAllParameterCreateQueryPlanModel()
+    private CreateQueryPlanModel CreateAllParameterCreateQueryPlanModel(string facilityId, Frequency frequency)
     {
-        var model = CreateValidCreateQueryPlanModel();
+        var model = CreateValidCreateQueryPlanModel(facilityId, frequency);
         model.InitialQueries = new Dictionary<string, IQueryConfig>
         {
-            { 
-                "1", 
-                new ParameterQueryConfig 
-                { 
-                    ResourceType = "Patient", 
-                    Parameters = new List<IParameter> 
-                    { 
-                        new LiteralParameter 
-                        { 
-                            Name = "id", 
+            {
+                "1",
+                new ParameterQueryConfig
+                {
+                    ResourceType = "Patient",
+                    Parameters = new List<IParameter>
+                    {
+                        new LiteralParameter
+                        {
+                            Name = "id",
                             Literal = "123"
-                        } 
-                    } 
-                } 
+                        }
+                    }
+                }
             },
-            { 
-                "2", 
-                new ParameterQueryConfig 
-                { 
-                    ResourceType = "Encounter", 
-                    Parameters = new List<IParameter> 
-                    { 
-                        new ResourceIdsParameter 
-                        { 
-                            Name = "patient", 
+            {
+                "2",
+                new ParameterQueryConfig
+                {
+                    ResourceType = "Encounter",
+                    Parameters = new List<IParameter>
+                    {
+                        new ResourceIdsParameter
+                        {
+                            Name = "patient",
                             Resource = "Patient",
                             Paged = "50"
-                        } 
-                    } 
-                } 
+                        }
+                    }
+                }
             }
         };
         return model;
     }
 
-    private CreateQueryPlanModel CreateAllReferenceCreateQueryPlanModel()
+    private CreateQueryPlanModel CreateAllReferenceCreateQueryPlanModel(string facilityId, Frequency frequency)
     {
-        var model = CreateValidCreateQueryPlanModel();
+        var model = CreateValidCreateQueryPlanModel(facilityId, frequency);
         model.InitialQueries = new Dictionary<string, IQueryConfig>
         {
             { "1", new ReferenceQueryConfig { ResourceType = "Patient" } },
@@ -703,12 +699,12 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         return model;
     }
 
-    private UpdateQueryPlanModel CreateValidUpdateQueryPlanModel()
+    private UpdateQueryPlanModel CreateValidUpdateQueryPlanModel(string facilityId, Frequency frequency)
     {
         return new UpdateQueryPlanModel
         {
-            FacilityId = "TestFacility",
-            Type = Frequency.Daily,
+            FacilityId = facilityId,
+            Type = frequency,
             PlanName = "UpdatedPlan",
             EHRDescription = "UpdatedEHR",
             LookBack = "2d",
@@ -723,9 +719,9 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         };
     }
 
-    private UpdateQueryPlanModel CreateInvalidOrderUpdateQueryPlanModel(bool initialInvalid, bool supplementalInvalid)
+    private UpdateQueryPlanModel CreateInvalidOrderUpdateQueryPlanModel(string facilityId, Frequency frequency, bool initialInvalid, bool supplementalInvalid)
     {
-        var model = CreateValidUpdateQueryPlanModel();
+        var model = CreateValidUpdateQueryPlanModel(facilityId, frequency);
         if (initialInvalid)
         {
             model.InitialQueries = new Dictionary<string, IQueryConfig>
@@ -745,9 +741,9 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         return model;
     }
 
-    private UpdateQueryPlanModel CreateAllParameterUpdateQueryPlanModel()
+    private UpdateQueryPlanModel CreateAllParameterUpdateQueryPlanModel(string facilityId, Frequency frequency)
     {
-        var model = CreateValidUpdateQueryPlanModel();
+        var model = CreateValidUpdateQueryPlanModel(facilityId, frequency);
         model.InitialQueries = new Dictionary<string, IQueryConfig>
         {
             { "1", new ParameterQueryConfig { ResourceType = "Patient", Parameters = new List<IParameter> { new LiteralParameter { Name = "id", Literal = "123" } } } },
@@ -756,9 +752,9 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         return model;
     }
 
-    private UpdateQueryPlanModel CreateAllReferenceUpdateQueryPlanModel()
+    private UpdateQueryPlanModel CreateAllReferenceUpdateQueryPlanModel(string facilityId, Frequency frequency)
     {
-        var model = CreateValidUpdateQueryPlanModel();
+        var model = CreateValidUpdateQueryPlanModel(facilityId, frequency);
         model.InitialQueries = new Dictionary<string, IQueryConfig>
         {
             { "1", new ReferenceQueryConfig { ResourceType = "Patient" } },
@@ -767,3 +763,4 @@ public class QueryPlanManagerTests : IClassFixture<DataAcquisitionIntegrationTes
         return model;
     }
 }
+

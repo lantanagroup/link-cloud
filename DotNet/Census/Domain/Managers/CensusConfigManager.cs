@@ -4,6 +4,7 @@ using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Exceptions;
 using LantanaGroup.Link.Census.Domain.Queries;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Quartz;
 
@@ -15,6 +16,8 @@ public interface ICensusConfigManager
     Task DeleteCensusConfigByFacilityId(string facilityId, CancellationToken cancellationToken = default);
     Task<CensusConfigEntity?> GetCensusConfigByFacilityId(string facilityId);
     Task<CensusConfigEntity> AddOrUpdateCensusConfig(CensusConfigModel entity, CancellationToken cancellationToken = default);
+    Task DisableFacility(string facilityId, CancellationToken cancellationToken = default);
+    Task EnableFacility(string facilityId, CancellationToken cancellationToken = default);
 }
 
 public class CensusConfigManager : ICensusConfigManager
@@ -74,9 +77,9 @@ public class CensusConfigManager : ICensusConfigManager
             existingEntity.ScheduledTrigger = entity.ScheduledTrigger;
             existingEntity.ModifyDate = DateTime.UtcNow;
             existingEntity.Enabled = entity.Enabled ?? true; // Default to true if not specified
-            
+
             await using var transaction = await _patienteventQueries.StartTransaction(cancellationToken);
-            
+
             try
             {
                 await _censusConfigRepository.UpdateAsync(existingEntity, cancellationToken);
@@ -123,10 +126,10 @@ public class CensusConfigManager : ICensusConfigManager
                 // Only create jobs if enabled
                 if (existingEntity.Enabled == true)
                 {
-                    await _censusSchedulingRepo.AddJobForFacility(existingEntity, 
+                    await _censusSchedulingRepo.AddJobForFacility(existingEntity,
                         await _schedulerFactory.GetScheduler(cancellationToken));
                 }
-                
+
                 await _patienteventQueries.CommitTransaction(transaction, cancellationToken);
             }
             catch (Exception ex)
@@ -138,5 +141,55 @@ public class CensusConfigManager : ICensusConfigManager
         }
 
         return existingEntity;
+    }
+
+    public async Task DisableFacility(string facilityId, CancellationToken cancellationToken = default)
+    {
+        var existing = await _censusConfigRepository.SingleOrDefaultAsync(c => c.FacilityID == facilityId, cancellationToken);
+        if (existing == null)
+            return;
+
+        existing.Enabled = false;
+        existing.ModifyDate = DateTime.UtcNow;
+
+        await using var transaction = await _patienteventQueries.StartTransaction(cancellationToken);
+        try
+        {
+            await _censusConfigRepository.UpdateAsync(existing, cancellationToken);
+            await _censusSchedulingRepo.DeleteJobsForFacility(facilityId, await _schedulerFactory.GetScheduler(cancellationToken));
+            await _patienteventQueries.CommitTransaction(transaction, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            var sanitizedFacilityId = facilityId.SanitizeAndRemove();
+            _logger.LogError(ex, "Exception in CensusConfigManager.DisableFacility for facility {FacilityId}", sanitizedFacilityId);
+            await _patienteventQueries.RollbackTransaction(transaction, cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task EnableFacility(string facilityId, CancellationToken cancellationToken = default)
+    {
+        var existing = await _censusConfigRepository.SingleOrDefaultAsync(c => c.FacilityID == facilityId, cancellationToken);
+        if (existing == null)
+            return;
+
+        existing.Enabled = true;
+        existing.ModifyDate = DateTime.UtcNow;
+
+        await using var transaction = await _patienteventQueries.StartTransaction(cancellationToken);
+        try
+        {
+            await _censusConfigRepository.UpdateAsync(existing, cancellationToken);
+            await _censusSchedulingRepo.AddJobForFacility(existing, await _schedulerFactory.GetScheduler(cancellationToken));
+            await _patienteventQueries.CommitTransaction(transaction, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            var sanitizedFacilityId = facilityId.SanitizeAndRemove();
+            _logger.LogError(ex, "Exception in CensusConfigManager.EnableFacility for facility {FacilityId}", sanitizedFacilityId);
+            await _patienteventQueries.RollbackTransaction(transaction, cancellationToken);
+            throw;
+        }
     }
 }

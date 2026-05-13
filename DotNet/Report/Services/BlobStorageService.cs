@@ -3,7 +3,7 @@ using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Report.Application.Options;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -26,13 +26,13 @@ namespace LantanaGroup.Link.Report.Services
             }
         }
 
-        public string GetReportName(ReportSchedule reportSchedule)
+        public string GetReportName(ReportScheduleModel reportSchedule)
         {
             return ReportHelpers.GetReportName(
                 reportSchedule.Id,
                 reportSchedule.FacilityId,
                 reportSchedule.ReportTypes,
-                reportSchedule.ReportStartDate);
+                reportSchedule.ReportStartDate.UtcDateTime);
         }
 
         public string GetBlobName(params string[] segments)
@@ -59,13 +59,13 @@ namespace LantanaGroup.Link.Report.Services
         }
 
         public virtual async Task<Uri?> UploadAsync(
-            ReportSchedule reportSchedule,
+            ReportScheduleModel reportSchedule,
             PatientSubmissionModel patientSubmission,
             CancellationToken cancellationToken = default)
         {
             if (_containerClient == null)
             {
-                return null;
+                throw new Exception("ABS Container Client is null when attempting to upload patient submission");
             }
             string reportName = GetReportName(reportSchedule);
             string bundleName = $"patient-{patientSubmission.PatientId}.ndjson";
@@ -88,12 +88,13 @@ namespace LantanaGroup.Link.Report.Services
             return blobClient.Uri;
         }
 
-        public virtual async Task<Uri?> UploadManifestAsync(ReportSchedule reportSchedule, IEnumerable<Resource> resources, CancellationToken cancellationToken = default)
+        public virtual async Task<Uri?> UploadManifestAsync(ReportScheduleModel reportSchedule, IEnumerable<Resource> resources, CancellationToken cancellationToken = default)
         {
             if (_containerClient == null)
             {
-                return null;
+                throw new Exception("ABS Container Client is null when attempting to upload manifest file");
             }
+
             string reportName = GetReportName(reportSchedule);
             string bundleName = "manifest.ndjson";
             string blobName = GetBlobName(reportName, bundleName);

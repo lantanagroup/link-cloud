@@ -1,6 +1,5 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using HealthChecks.UI.Client;
-using Hl7.Fhir.Model.CdsHooks;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
@@ -87,11 +86,9 @@ static void RegisterServices(WebApplicationBuilder builder)
         new ProducerConfig() { CompressionType = CompressionType.Zstd });
     builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection: builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(), new ProducerConfig());
 
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<ResourceKey, string>, DeadLetterExceptionHandler<ResourceKey, string>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage>, DeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage>, TransientExceptionHandler<ResourceKey, ResourceAcquiredMessage>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
+    builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+    builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
+    builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
@@ -139,7 +136,8 @@ static void RegisterServices(WebApplicationBuilder builder)
         builder.Services.RegisterQuartzDatabase(databaseConnectionString);
     }
 
-    builder.Services.AddDbContext<NormalizationDbContext>((sp, options) => {
+    builder.Services.AddDbContext<NormalizationDbContext>((sp, options) =>
+    {
 
         var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
         switch (dbProvider)
@@ -162,7 +160,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
     builder.Services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
 
-    builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();  
+    builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
     // Logging using Serilog
     builder.Logging.AddSerilog();
@@ -181,7 +179,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IOperationManager, OperationManager>();
     builder.Services.AddScoped<IResourceManager, ResourceManager>();
     builder.Services.AddScoped<IVendorManager, VendorManager>();
-    builder.Services.AddScoped<IOperationQueries, OperationQueries>(); 
+    builder.Services.AddScoped<IOperationQueries, OperationQueries>();
     builder.Services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
     builder.Services.AddScoped<IVendorQueries, VendorQueries>();
     builder.Services.AddScoped<IResourceQueries, ResourceQueries>();
@@ -202,7 +200,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     
     if (consumerSettings != null && !consumerSettings.DisableConsumer)
     {
-         builder.Services.AddHostedService<ResourceAcquiredListener>();
+        builder.Services.AddHostedService<ResourceAcquiredListener>();
     }
 
     if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
@@ -263,7 +261,8 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     //Add CORS
-    builder.Services.AddLinkCorsService(options => {
+    builder.Services.AddLinkCorsService(options =>
+    {
         options.Environment = builder.Environment;
     });
 
@@ -307,8 +306,8 @@ static void SetupMiddleware(WebApplication app)
     }
     app.UseAuthorization();
 
-    app.MapControllers();   
-    
+    app.MapControllers();
+
     //map health check middleware and info endpoint
     app.MapHealthChecks("/health", new HealthCheckOptions
     {

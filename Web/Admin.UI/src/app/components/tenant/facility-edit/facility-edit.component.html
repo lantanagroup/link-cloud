@@ -156,6 +156,35 @@
             }
           </mat-action-row>
         </mat-tab>
+        <mat-tab label="SFTP Configuration">
+          @if (showNoSftpConfigAlert) {
+            <app-link-alert [type]="linkNoConfigAlertType" [message]="noSftpConfigAlertMessage"
+            ></app-link-alert>
+          }
+          <app-sftp-config-form [item]="sftpConfig"
+          [viewOnly]="true"></app-sftp-config-form>
+          <mat-action-row>
+            @if (showNoSftpConfigAlert) {
+              <button mat-mini-fab aria-label="Add SFTP configuration" matTooltip="Add SFTP configuration"
+                (click)="showSftpConfigDialog()">
+                <mat-icon>add</mat-icon>
+              </button>
+            }
+            @if (!showNoSftpConfigAlert) {
+              <button mat-mini-fab aria-label="Test SFTP connection" matTooltip="Test SFTP connection"
+                (click)="onTestSftpConnection()">
+                <mat-icon>wifi_tethering</mat-icon>
+              </button>
+              <button mat-mini-fab aria-label="Edit SFTP configuration" matTooltip="Edit SFTP configuration"
+                (click)="showSftpConfigDialog()">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-mini-fab aria-label="Delete SFTP configuration" color="warn" (click)="onDeleteSftpConfig()">
+                <mat-icon>delete</mat-icon>
+              </button>
+            }
+          </mat-action-row>
+        </mat-tab>
         <mat-tab label="Query Plan">
           @if (showNoDataAcqQueryPlanConfigAlert) {
             <app-link-alert [type]="linkNoConfigAlertType" [message]="noDataAcqQueryPlanConfigAlertMessage"

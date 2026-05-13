@@ -78,7 +78,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
                         }
                     }
                 }
-                
+
                 bundle.AddResourceEntry(clone, $"/api/fhir/ValueSet/{codeGroup.Id}");
             }
         }
@@ -112,7 +112,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
             codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, id);
         else if (!string.IsNullOrEmpty(url))
             codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, url);
-        else 
+        else
             throw new ArgumentException("No id or url parameter specified");
 
         if (codeGroup == null)
@@ -205,7 +205,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
                         });
                     }
                 }
-                
+
                 bundle.AddResourceEntry(clone, $"/api/fhir/CodeSystem/{codeGroup.Id}");
             }
         }
@@ -491,7 +491,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
             foreach (var systemKey in codeGroup.Codes.Keys)
             {
                 matchedCode = codeGroup.Codes[systemKey].Any(c => c.Value == code);
-                
+
                 if (matchedCode)
                 {
                     var codeObject = codeGroup.Codes[systemKey].First(c => c.Value == code);

@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
                 };
 
                 // create a list
-                var patientList = new List{};
+                var patientList = new List { };
 
                 // add entries to the patientList for each patient in model.PatientIds  
                 for (int i = 0; i < model.PatientIds.Count; i++)
@@ -47,12 +47,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Commands.Integration
 
 
                 // Output the FHIR List in JSON format
-              //  var json = new Hl7.Fhir.Serialization.FhirJsonSerializer().SerializeToString(patientList);
+                //  var json = new Hl7.Fhir.Serialization.FhirJsonSerializer().SerializeToString(patientList);
 
                 var message = new Message<string, object>
                 {
                     Key = model.FacilityId,
-                    Value = new PatientAcquiredMessage { PatientIds = patientList,  ReportTrackingId = model.ReportTrackingId},
+                    Value = new PatientAcquiredMessage { PatientIds = patientList, ReportTrackingId = model.ReportTrackingId },
                     Headers = headers
                 };
 

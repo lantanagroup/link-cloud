@@ -1,1 +1,0 @@
-import{s as t,a as o}from"./index.OxUN2Axg.js";import{b as i}from"./url-builder.B8NKMLeo.js";import"./index.daetGfa_.js";if(!t.get()){const a=i("/api/sidebar-data.json",!0);fetch(a).then(r=>{if(!r.ok)throw new Error(`Failed to fetch sidebar data: ${r.status}`);return r.json()}).then(r=>{o(r)}).catch(r=>{console.error("Error loading sidebar data:",r)})}

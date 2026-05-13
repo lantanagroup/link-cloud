@@ -1,21 +1,21 @@
-[
+﻿[
   {
-    "id": "Incorrect_display_value_for_code",
-    "title": "Incorrect display value for code",
+    "id": "incorrect_display_value_for_code",
+    "title": "Incorrect Display Value for Code",
     "severity": "WARNING",
     "acceptable": true,
-    "guidance": "Code display values and not usually used, except for human readability. \nAsk NHSN if they care)/validate\nAsk site/EHR about LOE to resolve",
+    "guidance": "External: Code display values are not usually used, except for human readability. Incorrect display values are acceptable for reporting to NHSN",
     "matcher": {
       "field": "MESSAGE",
       "regex": "^Wrong Display Name '.*' for .* should be .*'.*' .*"
     }
   },
   {
-    "id": "Unknown_Code_System",
+    "id": "unknown_code_system",
     "title": "Unknown Code System",
     "severity": "ERROR",
     "acceptable": true,
-    "guidance": "Needs investigation. Needs further profiling. Some may be known CodeSystems, that should not be worried about. Importance may be contextual",
+    "guidance": "Internal: This is an unrecognized code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code')",
     "matcher": {
       "children": [
         {
@@ -29,17 +29,37 @@
         {
           "field": "MESSAGE",
           "regex": "^CodeSystem is unknown and can't be validated"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown code 'https?://fhir\\.cerner\\.com/.*' for in-memory expansion of ValueSet"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown code 'https?://open\\.epic\\.com/FHIR/StructureDefinition/.*' for in-memory expansion of ValueSet"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown code 'urn:oid:1\\.2\\.840\\.114350\\..*' for in-memory expansion of ValueSet"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown code 'urn:oid:1\\.2\\.246\\.537\\.6\\.96.*' for in-memory expansion of ValueSet"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "The Coding provided \\(.*\\) is not in the value set 'V3 Value SetActEncounterCode'"
         }
       ],
       "requiresAllChildren": false
     }
   },
   {
-    "id": "Unresolved_Code_System",
+    "id": "unresolved_code_system",
     "title": "Unresolved Code System",
     "severity": "ERROR",
     "acceptable": true,
-    "guidance": "Needs investigation. Needs further profiling. Some may be known CodeSystems, that should not be worried about. Importance may be contextual",
+    "guidance": "Internal: This is an unrecognized code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code')",
     "matcher": {
       "children": [
         {
@@ -55,11 +75,11 @@
     }
   },
   {
-    "id": "Invalid_Code_in_required_ValueSet",
-    "title": "Invalid Code in required ValueSet",
+    "id": "invalid_code_in_required_valueset",
+    "title": "Invalid Code in Required ValueSet",
     "severity": "ERROR",
-    "acceptable": true,
-    "guidance": "The code is not part of the required ValueSet. This may cause issues with measure calculation.",
+    "acceptable": false,
+    "guidance": "External: The code is not part of the required ValueSet. This may cause issues with measure calculation.",
     "matcher": {
       "children": [
         {
@@ -75,22 +95,22 @@
     }
   },
   {
-    "id": "Can_t_validate_code",
-    "title": "Can't validate code",
+    "id": "unable_to_validate_code",
+    "title": "Unable to Validate Code",
     "severity": "WARNING",
-    "acceptable": true,
-    "guidance": "There is an issue with the way the CodeSystem is set up on the terminology server. The full code set for the system does not appear to be on the server. The terminology server should be updated.",
+    "acceptable": false,
+    "guidance": "Internal: There is an issue with the way the CodeSystem is set up on the terminology server. The full code set for the system does not appear to be on the server. The terminology server should be updated.",
     "matcher": {
       "field": "MESSAGE",
       "regex": "^The system .* was found but did not contain enough information to properly validate the code \\(mode = fragment\\) \\(from Tx-Server\\)"
     }
   },
   {
-    "id": "Unresolved_Epic_Code_System_URI",
+    "id": "unresolved_epic_code_system_uri",
     "title": "Unresolved Epic Code System URI",
     "severity": "INFORMATION",
     "acceptable": true,
-    "guidance": "This is an Epic proprietary Code System and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is handled under another logged issue)",
+    "guidance": "Internal: This is an Epic-defined code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code')",
     "matcher": {
       "children": [
         {
@@ -106,22 +126,22 @@
     }
   },
   {
-    "id": "Unresolved_Medispan_Code_System_URI",
+    "id": "unresolved_medispan_code_system_uri",
     "title": "Unresolved Medispan Code System URI",
     "severity": "INFORMATION",
     "acceptable": true,
-    "guidance": "This is an Medispan proprietary Code System and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is handled under another logged issue)",
+    "guidance": "Internal: This is a Medispan-defined code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code')",
     "matcher": {
       "field": "MESSAGE",
       "regex": "^Code System URI 'urn:oid:2\\.16\\.840\\.1\\.113883\\.6\\.68' is unknown so the code cannot be validated"
     }
   },
   {
-    "id": "Unresolved_and_Unrecognized_Code_System_URI",
+    "id": "unresolved_and_unrecognized_code_system_uri",
     "title": "Unresolved and Unrecognized Code System URI",
     "severity": "INFORMATION",
     "acceptable": true,
-    "guidance": "This is an unrecognized Code System and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is handled under another logged issue)",
+    "guidance": "Internal: This is an unrecognized code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code')",
     "matcher": {
       "children": [
         {
@@ -148,112 +168,175 @@
     }
   },
   {
-    "id": "Invalid_code",
-    "title": "Invalid code",
+    "id": "unknown_local_code",
+    "title": "Unknown Local Code",
     "severity": "ERROR",
     "acceptable": true,
-    "guidance": "The code is not recognized to be part of the ValueSet. This may cause issues with measure calculation",
+    "guidance": "External: The code is not recognized to be part of the ValueSet.",
     "matcher": {
       "children": [
         {
-          "field": "SEVERITY",
-          "regex": "^error$"
-        },
-        {
-          "field": "CODE",
-          "regex": "^code-invalid$"
+          "field": "MESSAGE",
+          "regex": "^Unknown Code '.*' in the system '.*'; The provided code .* is not in the value set '.*'"
         },
         {
           "field": "MESSAGE",
-          "regex": "^Unknown Code '.*' in the system '.*'; The provided code .* is not in the value set '.*'"
+          "regex": "^Unknown code 'https?://open\\.epic\\.com/FHIR/StructureDefinition/.*' for in-memory expansion of ValueSet",
+          "inverted": true
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown code 'urn:oid:1\\.2\\.246\\.537\\.6\\.96.*' for in-memory expansion of ValueSet",
+          "inverted": true
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown code 'urn:oid:1\\.2\\.840\\.114350\\..*' for in-memory expansion of ValueSet",
+          "inverted": true
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown code '.*' for in-memory expansion of ValueSet '.*'"
         }
       ],
-      "requiresAllChildren": true
+      "requiresAllChildren": false
     }
   },
   {
-    "id": "Unknown_Extension",
+    "id": "unknown_extension",
     "title": "Unknown Extension",
     "severity": "INFORMATION",
     "acceptable": true,
-    "guidance": "Systems are allowed to include extensions (additional data). Extensions that do not modify the meaning of the data (modifierExtensions) can be safely ignored. This is not a modifierExtension.",
+    "guidance": "Internal: Systems are allowed to include extensions (additional data). Extensions that do not modify the meaning of the data (modifierExtensions) can be safely ignored. This is not a modifierExtension.",
     "matcher": {
-      "field": "MESSAGE",
-      "regex": "^The extension .* is unknown, and not allowed here$"
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "^The extension .* is unknown, and not allowed here$"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown extension https?://fhir-ehr\\.cerner\\.com/.*"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown extension https?://electronichealth\\.se/.*"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown extension https?://open\\.epic\\.com/.*"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown extension https?://hl7\\.org/fhir/us/core/.*"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Extension url 'https?://hl7\\.org/fhir/5\\.0/StructureDefinition/extension.*' is not valid.*"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown extension https?://hl7\\.org/fhir/5\\.0/StructureDefinition/extension.*"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown extension https?://nictiz\\.nl/.*"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "Unknown extension http://terminology\\.hl7\\.org/CodeSystem/data-absent-reason"
+        }
+      ],
+      "requiresAllChildren": false
     }
   },
   {
-    "id": "Does_not_match_a_slice",
-    "title": "Does not match a slice",
+    "id": "additional_data_beyond_nhsn_specification",
+    "title": "Additional Data Beyond NHSN Specification",
     "severity": "INFORMATION",
     "acceptable": true,
-    "guidance": "This could indicate an underlying issue in the resource (the resource is not validating). FHIR SME may need to review.",
+    "guidance": "External: No impact to normal operation. Recommend reviewing during onboarding and initial testing.",
     "matcher": {
       "field": "MESSAGE",
       "regex": "^This element does not match any known slice defined in the profile"
     }
   },
   {
-    "id": "Unable_to_match_profile",
-    "title": "Unable to match profile",
+    "id": "unable_to_match_profile",
+    "title": "Unable to Match Profile",
     "severity": "ERROR",
     "acceptable": false,
-    "guidance": "This could indicate an underlying issue in the resource (the resource is not validating). FHIR SME may need to review.",
+    "guidance": "Internal: This could indicate an underlying issue in the resource (the resource is not validating). FHIR SME may need to review.",
     "matcher": {
-      "field": "MESSAGE",
-      "regex": "^Unable to find a match for profile .* among choices:"
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "^Unable to find a match for profile .* among choices:"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "^Profile reference '.*' has not been checked because it is unknown"
+        }
+      ],
+      "requiresAllChildren": false
     }
   },
   {
-    "id": "Does_not_match_preferred_ValueSet",
-    "title": "Does not match preferred ValueSet",
+    "id": "does_not_match_preferred_valueset",
+    "title": "Does Not Match Preferred ValueSet",
     "severity": "INFORMATION",
     "acceptable": true,
-    "guidance": "This could be indicative of a problem if the data element is part of the measure and would not enable the resource to be included in the measure calculation appropriately.",
+    "guidance": "External: This could be indicative of a problem if the data element is part of the measure and would not enable the resource to be included in the measure calculation appropriately.",
     "matcher": {
       "field": "MESSAGE",
       "regex": "^None of the codings provided are in the value set '.*' .*, and a coding is recommended to come from this value set"
     }
   },
   {
-    "id": "Does_not_match_extensible_ValueSet",
-    "title": "Does not match extensible ValueSet",
-    "severity": "WARNING",
-    "acceptable": true,
-    "guidance": "This could be indicative of a problem if the data element is part of the measure and would not enable the resource to be included in the measure calculation appropriately.",
-    "matcher": {
-      "field": "MESSAGE",
-      "regex": "^None of the codings provided are in the value set '.*' .*, and a coding should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
-    }
-  },
-  {
-    "id": "Possible_matching_profile",
-    "title": "Possible matching profile",
+    "id": "possible_matching_profile",
+    "title": "Possible Matching Profile",
     "severity": "INFORMATION",
     "acceptable": true,
-    "guidance": "This could indicate an underlying issue in the resource (the resource is not validating). FHIR SME may need to review.",
+    "guidance": "Internal: This could indicate an underlying issue in the resource (the resource is not validating).",
     "matcher": {
       "field": "MESSAGE",
       "regex": "^Details for .* matching against Profile"
     }
   },
   {
-    "id": "Identifier_type_code_not_provided_from_IdentifyType_VS",
-    "title": "Identifier.type code not provided from IdentifyType VS",
+    "id": "fhir_standard_recommendations_and_best_practices",
+    "title": "FHIR Standard Recommendations and Best Practices",
     "severity": "WARNING",
     "acceptable": true,
-    "guidance": "This is only for business identifiers. Not important, unless a business identifier, such as MRN is required to be identified.",
+    "guidance": "External: While it is encouraged to follow FHIR standards and best practices for interoperability, resolutions to these issues are not required for reporting to NHSN.",
     "matcher": {
-      "field": "MESSAGE",
-      "regex": "^No code provided, and a code should be provided from the value set '.*' \\(http:\\/\\/hl7\\.org\\/fhir\\/ValueSet\\/identifier-type\\|4\\.0\\.1\\)"
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "^No code provided, and a code should be provided from the value set '.*' \\(http:\\/\\/hl7\\.org\\/fhir\\/ValueSet\\/identifier-type\\|4\\.0\\.1\\)"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "^No code provided, and a code should be provided from the value set '.*' \\(http:\\/\\/hl7\\.org\\/fhir\\/ValueSet\\/marital-status\\|4\\.0\\.1\\)"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "^No code provided, and a code should be provided from the value set '.*' \\(http:\\/\\/hl7\\.org\\/fhir\\/ValueSet\\/observation-interpretation\\|4\\.0\\.1\\)"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "^No code provided, and a code should be provided from the value set '.*' \\(http:\\/\\/hl7\\.org\\/fhir\\/ValueSet\\/subscriber-relationship\\|4\\.0\\.1\\)"
+        }
+      ],
+      "requiresAllChildren": false
     }
   },
   {
-    "id": "MedicationRequest_requester_does_not_have_a_proper_reference",
-    "title": "MedicationRequest.requester does not have a proper reference",
+    "id": "medicationrequest_requester_does_not_have_a_proper_reference",
+    "title": "MedicationRequest.requester Does Not Have a Proper Reference",
     "severity": "WARNING",
     "acceptable": true,
-    "guidance": "No identity or reference for requester (Provider). Safe to ignore when ordering provider is not needed.",
+    "guidance": "External: No identity or reference for requester (Provider). Safe to ignore when ordering provider is not needed.",
     "matcher": {
       "children": [
         {
@@ -262,18 +345,18 @@
         },
         {
           "field": "EXPRESSION",
-          "regex": "Bundle.entry\\[\\d+\\]\\.resource\\/.*\\*\\/\\.requester"
+          "regex": "Bundle.entry\\[\\d+\\]\\.resource\\.ofType\\(MedicationRequest\\)\\.where\\(id = '.*'\\)\\.requester"
         }
       ],
       "requiresAllChildren": true
     }
   },
   {
-    "id": "Identifier_value_starts_with_whitespace",
-    "title": "Identifier value starts with whitespace",
+    "id": "patient_resource_whitespace",
+    "title": "Patient Resource Whitespace",
     "severity": "WARNING",
-    "acceptable": true,
-    "guidance": "This is a business identifier with whitespace at the front or back. Not important if business identifiers are not used. May want to have the whitespace trimmed.",
+    "acceptable": false,
+    "guidance": "External: Leading and/or trailing whitespaces were identified at the problematic locations. NHSN has deemed that leading/trailing whitespaces found within the Patient resource are unacceptable for reporting data to NHSN.  Please review the problematic Patient(s) record within your EHR and remove any leading/trailing whitespaces found within Patient chart (typically a face sheet) in the following fields: MRN, First/Last name, Home Address, Telephone, Email address. If no whitespace is found, hospital is advised to coordinate with its EHR vendor, as issue resolution may require EHR vendor FHIR data cleanup via API or database (i.e. not accessible via EHR user interface).",
     "matcher": {
       "children": [
         {
@@ -282,29 +365,29 @@
         },
         {
           "field": "EXPRESSION",
-          "regex": "resource.*\\.identifier\\[[0-9]+\\]\\.value"
+          "regex": "resource\\.ofType\\(Patient\\)"
         }
       ],
       "requiresAllChildren": true
     }
   },
   {
-    "id": "No_measure_score_allowed_with_cohort",
-    "title": "No measure score allowed with cohort",
+    "id": "no_measure_score_allowed_with_cohort",
+    "title": "No Measure Score Allowed with Cohort",
     "severity": "ERROR",
-    "acceptable": false,
-    "guidance": "The MeasureReport violates a business rule regarding MeasureScore. This issue needs to be resolved in the source data, the validator, or explicitely deemed an invalid error.",
+    "acceptable": true,
+    "guidance": "Internal: The MeasureReport violates a business rule regarding MeasureScore. This issue does not impact metric calculation or NHSN's data pipeline, and therefore is acceptable for reporting data into NHSN.",
     "matcher": {
       "field": "MESSAGE",
       "regex": "^No measureScore when the scoring of the message is ''cohort''"
     }
   },
   {
-    "id": "Invalid_whitespace_non_identifier",
-    "title": "Invalid whitespace (non-identifier)",
+    "id": "non_patient_resource_whitespace",
+    "title": "Non-Patient Resource Whitespace",
     "severity": "WARNING",
     "acceptable": true,
-    "guidance": "This is a non-identifier string element with whitespace at the front or back. Not generally important. May want to have the whitespace trimmed.",
+    "guidance": "External: Leading or trailing whitespaces were identified at the problematic locations. Whitespaces found in any non-Patient resource are acceptable for data reporting to NHSN.",
     "matcher": {
       "children": [
         {
@@ -313,7 +396,7 @@
         },
         {
           "field": "EXPRESSION",
-          "regex": "resource.*\\.identifier\\[[0-9]+\\]\\.value",
+          "regex": "resource\\.ofType\\(Patient\\)",
           "inverted": true
         }
       ],
@@ -321,46 +404,33 @@
     }
   },
   {
-    "id": "Minimum_slice_occurrence_not_met",
-    "title": "Minimum slice occurrence not met",
+    "id": "bundle_slice_requirements_not_met",
+    "title": "Bundle Slice Requirements Not Met",
     "severity": "ERROR",
     "acceptable": true,
-    "guidance": "This is likely a secondary issue. If the resource can't validate then it can't be counted as meeting the slicing requirements. Likely addressing the underlying issue will make this issue go away. ",
+    "guidance": "External: This is likely a secondary issue. If the resource can't validate then it can't be counted as meeting the slicing requirements. Likely addressing the underlying issue will make this issue go away.",
     "matcher": {
       "field": "MESSAGE",
       "regex": "^Bundle.entry:.*: minimum required = .*, but only found .* \\(.*\\)"
     }
   },
   {
-    "id": "Link_Error_using_old_URL",
-    "title": "Link Error using old URL",
+    "id": "link_error_using_old_url",
+    "title": "Link Error Using Old URL",
     "severity": "WARNING",
     "acceptable": false,
-    "guidance": "This is an issue with NHSNLink (using an old url) and should be reported in Jira.",
+    "guidance": "Internal: This is an issue with NHSNLink (using an old url) and should be reported in Jira.",
     "matcher": {
-      "children": [
-        {
-          "field": "MESSAGE",
-          "regex": "'http:\\/\\/lantanagroup\\.com\\/fhir\\/nhsn-measures.*'"
-        },
-        {
-          "field": "MESSAGE",
-          "regex": "The value provided \\('(?:[A-Za-z]+|)'\\) is not in the value set 'USPS Two Letter Alphabetic Codes' \\(http:\\/\\/hl7\\.org\\/fhir\\/us\\/core\\/ValueSet\\/us-core-usps-state\\|(?:\\d+\\.\\d+\\.\\d+)?\\), and a code should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
-        },
-        {
-          "field": "MESSAGE",
-          "regex": "Could not confirm that the codes provided are in the value set \\'.*\\' \\(http\\:\\/\\/terminology\\.hl7\\.org\\/ValueSet\\/.*\\)\\, and a code should come from this value set unless it has no suitable code .*"
-        }
-      ],
-      "requiresAllChildren": false
+      "field": "MESSAGE",
+      "regex": "https?:\\/\\/lantanagroup\\.com\\/fhir\\/nhsn-measures"
     }
   },
   {
-    "id": "No_codes_from_an_extensible_binding_ValueSet",
-    "title": "No codes from an extensible binding ValueSet",
+    "id": "no_codes_from_an_extensible_binding_valueset",
+    "title": "No Codes From an Extensible Binding ValueSet",
     "severity": "WARNING",
     "acceptable": true,
-    "guidance": "The code provided is not part of the extensible ValueSet, which if it is a concept that is part of the measure, is a problem that needs to be resolved.",
+    "guidance": "External: The code provided is not part of the extensible ValueSet, which if it is a concept that is part of the measure, is a problem that needs to be resolved.",
     "matcher": {
       "children": [
         {
@@ -369,33 +439,35 @@
         },
         {
           "field": "MESSAGE",
-          "regex": "The value provided \\('(?:[A-Za-z]+|)'\\) is not in the value set 'USPS Two Letter Alphabetic Codes' \\(http:\\/\\/hl7\\.org\\/fhir\\/us\\/core\\/ValueSet\\/us-core-usps-state\\|(?:\\d+\\.\\d+\\.\\d+)?\\), and a code should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
+          "regex": "The value provided \\('[^']*'\\) is not in the value set 'USPS Two Letter Alphabetic Codes' \\(http:\\/\\/hl7\\.org\\/fhir\\/us\\/core\\/ValueSet\\/us-core-usps-state\\|(?:\\d+\\.\\d+\\.\\d+)?\\), and a code should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
         },
         {
           "field": "MESSAGE",
           "regex": "Could not confirm that the codes provided are in the value set \\'.*\\' \\(http\\:\\/\\/terminology\\.hl7\\.org\\/ValueSet\\/.*\\)\\, and a code should come from this value set unless it has no suitable code .*"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "The Coding provided \\(.*\\) is not in the value set '.*' \\(.*\\), and a code should come from this value set unless it has no suitable code (note that the validator cannot judge what is suitable).*'http://terminology.hl7.org/ValueSet/v3-ActEncounterCode'"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "^None of the codings provided are in the value set '.*' .*, and a coding should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "^None of the codings provided are in the value set 'LOINC Codes' \\(http://hl7\\.org/fhir/ValueSet/observation-codes\\|[0-9.]+\\), and a coding should come from this value set unless it has no suitable code .*?\\(codes = [^)]*(GLUMT|270)[^)]*\\)$",
+          "inverted": true
         }
       ],
       "requiresAllChildren": false
     }
   },
   {
-    "id": "No_code_provided",
-    "title": "No code provided",
+    "id": "unable_to_validate_measure_measure_not_found",
+    "title": "Unable to Validate Measure (Measure not found)",
     "severity": "WARNING",
     "acceptable": false,
-    "guidance": "No code was provided, which if it is a concept that is part of the measure, is a problem that needs to be resolved.",
-    "matcher": {
-      "field": "MESSAGE",
-      "regex": "No code provided, and a code should be provided from the value set '.*' \\(.*\\)"
-    }
-  },
-  {
-    "id": "Unable_to_validate_measure_Measure_not_found",
-    "title": "Unable to validate measure (Measure not found)",
-    "severity": "WARNING",
-    "acceptable": false,
-    "guidance": "This appears to be an issue in the validation process and should be resolved as it may be hiding other issues.",
+    "guidance": "Internal: This appears to be an issue in the validation process and should be resolved within NHSNLink as it may be hiding other issues.",
     "matcher": {
       "children": [
         {
@@ -411,36 +483,336 @@
     }
   },
   {
-    "id": "Minimum_requirement_not_met_for_profile",
-    "title": "Minimum requirement not met for profile.",
-    "severity": "ERROR",
-    "acceptable": false,
-    "guidance": "Needs investigation, cardinality is not being met based on profile. Reference and review profile to meet profile requirements.",
-    "matcher": {
-      "field": "MESSAGE",
-      "regex": "minimum required = \\d+, but only found \\d+ \\(from http:\\/\\/www\\.cdc\\.gov\\/nhsn\\/fhirportal\\/dqm\\/ig\\/StructureDefinition\\/.+?\\)"
-    }
-  },
-  {
-    "id": "Unresolved_url",
+    "id": "unresolved_url",
     "title": "Unresolved URL",
     "severity": "WARNING",
-    "acceptable": true,
-    "guidance": "The URL in the validation details is not resolvable. Link may not have the profiles/resources loaded that are represented by the canonical URL.",
+    "acceptable": false,
+    "guidance": "Internal: The URL in the validation details is not resolvable. Link may not have the profiles/resources loaded that are represented by the canonical URL.",
     "matcher": {
       "field": "MESSAGE",
       "regex": "Canonical URL '.*' does not resolve"
     }
   },
   {
-    "id": "Invalid_dateTime_format",
-    "title": "Invalid dateTime format.",
+    "id": "invalid_dateTime_format",
+    "title": "Invalid dateTime Format.",
     "severity": "ERROR",
-    "acceptable": false,
-    "guidance": "A date-time format must include the timezone offset for precision. Captured as +/-zzzz.",
+    "acceptable": true,
+    "guidance": "External: A date-time format must include the timezone offset for precision. Captured as +/-zzzz.",
     "matcher": {
       "field": "MESSAGE",
       "regex": "date has a time, it must have a timezone.*"
+    }
+  },
+  {
+    "id": "no_expected_code_found_for_encounter_class",
+    "title": "Expected Encounter Class Code Not Found",
+    "severity": "ERROR",
+    "acceptable": true,
+    "guidance": "External: Encounter class is expected to contain a code from here (https://terminology.hl7.org/5.0.0/ValueSet-v3-ActEncounterCode.html). However, a code outside of this ValueSet is acceptable for reporting into NHSN given a standard Encounter.type and/or Location code exist.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The Coding provided \\(.*\\) is not in the value set 'V3 Value SetActEncounterCode'"
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "Bundle.entry\\[\\d+\\]\\.resource\\.ofType\\(Encounter\\)\\.where\\(id = '.*'\\)\\.class"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "embedded_html",
+    "title": "Embedded HTML Found",
+    "severity": "ERROR",
+    "acceptable": true,
+    "guidance": "External: The text contains content that appears to be an embedded HTML tag(s). If this content is rendered to HTML without appropriate post-processing, it may be a security risk. NHSN has deemed with issue acceptable for reporting into NHSN.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The string value contains text that looks like embedded HTML tags\\. If this content is rendered to HTML without appropriate post-processing, it may be a security risk"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "The markdown contains content that appears to be an embedded HTML tag starting at '.*'"
+        }
+      ],
+      "requiresAllChildren": false
+    }
+  },
+  {
+    "id": "illegal_character_in_coverage_beneficiary",
+    "title": "Illegal Character in Coverage Beneficiary",
+    "severity": "ERROR",
+    "acceptable": true,
+    "guidance": "External: The element contains non-text characters - please check for data integrity.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "This content includes the characters? .+ \\(hex values?\\)\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "Bundle.entry\\[\\d+\\]\\.resource\\.ofType\\(Coverage\\)\\.where\\(id = '.*'\\)\\.beneficiary.display"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "unreasonable_decimal",
+    "title": "Unreasonable Decimal",
+    "severity": "ERROR",
+    "acceptable": true,
+    "guidance": "External: A value was found to be outside the range of reasonable decimals - please check for data accuracy.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "The value '.*' is outside the range of commonly/reasonably supported decimals"
+    }
+  },
+  {
+    "id": "unreasonable_time_unit",
+    "title": "Unreasonable Unit of Time",
+    "severity": "ERROR",
+    "acceptable": true,
+    "guidance": "External: A value was found to be outside the range of reasonable years - please check for data accuracy.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "The value '.*' is outside the range of reasonable years - check for data entry error"
+    }
+  },
+  {
+    "id": "invalid_period_date_range",
+    "title": "Invalid Period Date Range",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: The end dateTime occurs before the start dateTime for specified Period. When a start and end dateTime is present, end must not be earlier than start.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "Rule per-1: '.*' Failed"
+    }
+  },
+  {
+    "id": "invalid_condition_code",
+    "title": "Invalid Condition Code",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: Use of proprietary code systems and codes may lead to misinterpretation issues. A SNOMED or ICD code is required for condition.code.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "Unknown code '.*' for in-memory expansion of ValueSet 'http://hl7\\.org/fhir/us/core/ValueSet/us-core-condition-code'"
+    }
+  },
+  {
+    "id": "no_medication_code",
+    "title": "Missing RxNorm Medication Code",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: For recorded Medication, a valid RxNorm code is required.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "No code provided, and a code should be provided from the value set 'US Core Medication Codes (RxNorm)'\\."
+    }
+  },
+  {
+    "id": "no_procedure_code",
+    "title": "No Procedure Code",
+    "severity": "ERROR",
+    "acceptable": true,
+    "guidance": "External: For recorded Procedures, a valid US Core Procedure code is required. Valid codes are defined by US Core Procedure Code ValueSet",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "No code provided, and a code should be provided from the value set 'US Core Procedure Codes'\\."
+    }
+  },
+  {
+    "id": "missing_coverage_type",
+    "title": "Missing Coverage Type",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "External: Coverage.class.type (when present), is required to exist. However, NHSN has deemed this missing concept acceptable to report to NHSN.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "Coverage\\.class\\.type: minimum required = 1, but only found 0"
+    }
+  },
+  {
+    "id": "missing_medication_route",
+    "title": "Missing Medication Route",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: Medication route is required to be present and to contain at least a valid SNOMED code when sending MedicationRequest and MedicationAdministration data to NHSN.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "MedicationRequest\\.dosageInstruction\\.route: minimum required = 1, but only found 0"
+        },
+        {
+          "field": "MESSAGE",
+          "regex": "MedicationAdministration\\.dosage\\.route: minimum required = 1, but only found 0"
+        }
+      ],
+      "requiresAllChildren": false
+    }
+  },
+  {
+    "id": "missing_location_period",
+    "title": "Missing Location Period",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: NHSN requires Encounter location period to be present and overlapping the measure reporting period. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit the issue in a NHSN ServiceNow ticket",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "Encounter\\.location\\.period: minimum required = 1, but only found 0"
+    }
+  },
+  {
+    "id": "missing_annotation_text",
+    "title": "Missing Annotation Text",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: Annotation.text element was found to be missing, and it is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit the issue in a NHSN ServiceNow ticket.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "Annotation\\.text: minimum required = 1, but only found 0"
+    }
+  },
+  {
+    "id": "missing_specimen_type",
+    "title": "Missing Specimen Type",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: Specimen.type element was found to be missing, and it is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit the issue in a NHSN ServiceNow ticket",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "Specimen\\.type: minimum required = 1, but only found 0"
+    }
+  },
+  {
+    "id": "missing_location_type",
+    "title": "Missing Location Type",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: Location.type element was found to be missing, and it is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit the issue in a NHSN ServiceNow ticket",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "Location\\.type: minimum required = 1, but only found 0"
+    }
+  },
+  {
+    "id": "missing_device_type",
+    "title": "Missing Device Type",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: Device.type element was found to be missing, and it is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit the issue in a NHSN ServiceNow ticket.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "Device\\.type: minimum required = 1, but only found 0"
+    }
+  },
+  {
+    "id": "us_core_2",
+    "title": "Observations must have a results or reference component results (us-core-2).",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: US Core FHIR Implementation Guide requires that all Observations have one of the following: a single result (.value), component results, hasMember, or dataAbsentReason. Observations were found that do not contain any of these elements, and NHSN has deemed these Observations unacceptable for reporting.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "Rule us-core-2: '.*' Failed"
+    }
+  },
+  {
+    "id": "us_core_8",
+    "title": "Missing Patient Name",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: US Core FHIR Implementation Guide requires that Patients contain a name.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "Rule us-core-8: '.*' Failed"
+    }
+  },
+  {
+    "id": "encounter_identifier_system",
+    "title": "Missing Encounter Identifier System",
+    "severity": "ERROR",
+    "acceptable": true,
+    "guidance": "External: Encounter.identifier.system is required and was found to be missing.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "Encounter\\.identifier\\.system: minimum required = 1, but only found 0 \\(from http:\\/\\/hl7\\.org\\/fhir\\/us\\/core\\/StructureDefinition\\/us-core-encounter\\|\\d+\\.\\d+\\.\\d+\\)"
+    }
+  },
+  {
+    "id": "duplicate_id_found",
+    "title": "Duplicate FHIR ID Found",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: A FHIR resource must have a unique id. Update any duplicate resource and references with a unique FHIR id.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "Duplicate id value .*"
+    }
+  },
+  {
+    "id": "invalid_value_positive_integer",
+    "title": "Invalid Value for Positive Integer",
+    "severity": "ERROR",
+    "acceptable": true,
+    "guidance": "External: A value of 0 or negative number is not valid. Please check for data to ensure minimum value requirement.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "value is less than permitted minimum value of .*"
+    }
+  },
+  {
+    "id": "missing_numerator_denominator_ratio",
+    "title": "Missing Numerator or Denominator for Ratio",
+    "severity": "ERROR",
+    "acceptable": true,
+    "guidance": "External: Both a numerator and denominator must be present - please check for data accuracy.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "Rule rat-1: '.*' Failed"
+    }
+  },
+  {
+    "id": "non_loinc_code_glucose_point_of_testing",
+    "title": "Non-LOINC Code for Glucose Point of Testing",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "External: The code provided is not part of the extensible ValueSet, which if it is a concept that is part of the measure, is a problem that needs to be resolved.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "^None of the codings provided are in the value set 'LOINC Codes' \\(http://hl7\\.org/fhir/ValueSet/observation-codes\\|[0-9.]+\\), and a coding should come from this value set unless it has no suitable code .*?\\(codes = [^)]*(GLUMT|270)[^)]*\\)$"
+    }
+  },
+  {
+    "id": "missing_patient_gender",
+    "title": "Missing Patient Gender",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: Patient gender is required to be present and contain a valid HL7 Administrative Gender code.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "^Patient\\.gender\\: minimum required = 1, but only found 0 \\(from http\\://www\\.cdc\\.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/cross-measure-patient\\|[0-9.]+\\)$"
+    }
+  },
+  {
+    "id": "missing_reference_to_linked_patient_resource",
+    "title": "Missing Reference to Linked Patient Resource",
+    "severity": "ERROR",
+    "acceptable": false,
+    "guidance": "External: A resolvable FHIR id is required to be present to link all patient resources to the same patient.",
+    "matcher": {
+      "field": "MESSAGE",
+      "regex": "^Patient\\.link\\.other: minimum required = 1, but only found 0 \\(from http\\://www\\.cdc\\.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/cross-measure-patient\\|[0-9.]+\\)$"
     }
   }
 ]

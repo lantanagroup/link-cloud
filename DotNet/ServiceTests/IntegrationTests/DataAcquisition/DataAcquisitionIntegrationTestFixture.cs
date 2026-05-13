@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -18,26 +18,37 @@ using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
-using Microsoft.Data.Sqlite;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Moq;
 using OpenTelemetry.Trace;
+using Testcontainers.MsSql;
+using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition
 {
-    [CollectionDefinition("DataAcquisitionIntegrationTests", DisableParallelization = true)]
-    public class DatabaseCollection : ICollectionFixture<DataAcquisitionIntegrationTestFixture>
+    public class DataAcquisitionIntegrationTestFixture : IAsyncLifetime
     {
-        // This class is a marker for the collection
-    }
+        // Pinned to a specific tag (rather than :latest) so that the layer
+        // cache in CI is reusable across runs and developer machines pull a
+        // single, reproducible image.
+        private const string SqlServerImage = "mcr.microsoft.com/mssql/server:2022-CU13-ubuntu-22.04";
 
-    public class DataAcquisitionIntegrationTestFixture : IDisposable
-    {
-        public IServiceProvider ServiceProvider { get; private set; }
-        private readonly IHost _host;
-        private readonly string _dbPath;
+        // Setting LINK_TESTS_SQL_CONNECTION_STRING points the fixture at an
+        // existing SQL Server (LocalDB, docker, devcontainer, etc.) instead of
+        // spinning up a Testcontainer. This drops fixture startup from
+        // ~30s to ~2s for the inner-dev loop. Each test class still gets an
+        // isolated database so re-runs remain deterministic.
+        private static string? ExternalConnectionString =>
+            Environment.GetEnvironmentVariable("LINK_TESTS_SQL_CONNECTION_STRING");
+
+        public IServiceProvider ServiceProvider { get; private set; } = default!;
+        private IHost? _host;
+        private readonly MsSqlContainer? _sqlContainer;
+        private string? _testDatabaseName;
+        private string? _serverConnectionString;
 
         public Mock<IProducer<long, ReadyToAcquire>> ReadyToAcquireProducerMock { get; private set; }
         public Mock<IProducer<ResourceKey, ResourceAcquired>> ResourceAcquiredProducerMock { get; private set; }
@@ -47,8 +58,47 @@ namespace IntegrationTests.DataAcquisition
             ReadyToAcquireProducerMock = new Mock<IProducer<long, ReadyToAcquire>>();
             ResourceAcquiredProducerMock = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
 
-            _dbPath = Path.Combine(Path.GetTempPath(), $"testdb_{Guid.NewGuid()}.db");
-            var sqliteConnectionString = $"Data Source={_dbPath};";
+            if (string.IsNullOrWhiteSpace(ExternalConnectionString))
+            {
+                _sqlContainer = new MsSqlBuilder()
+                    .WithImage(SqlServerImage)
+                    .Build();
+            }
+        }
+
+        public async Task InitializeAsync()
+        {
+            if (_sqlContainer is not null)
+            {
+                await _sqlContainer.StartAsync();
+                _serverConnectionString = _sqlContainer.GetConnectionString();
+            }
+            else
+            {
+                _serverConnectionString = ExternalConnectionString!;
+            }
+
+            // The default container connection string targets 'master'. Migrations
+            // that alter database-level settings (e.g. READ_COMMITTED_SNAPSHOT)
+            // cannot run against 'master', so point to a dedicated test database.
+            // The unique name allows running against a shared external server
+            // without colliding with parallel runs.
+            _testDatabaseName = $"DataAcquisitionTest_{Guid.NewGuid():N}";
+            var csBuilder = new SqlConnectionStringBuilder(_serverConnectionString)
+            {
+                InitialCatalog = _testDatabaseName,
+                ConnectTimeout = 60
+            };
+            var connectionString = csBuilder.ConnectionString;
+
+            // Create the test database on the server
+            await using (var masterConn = new SqlConnection(_serverConnectionString))
+            {
+                await masterConn.OpenAsync();
+                await using var cmd = masterConn.CreateCommand();
+                cmd.CommandText = $"CREATE DATABASE [{_testDatabaseName}];";
+                await cmd.ExecuteNonQueryAsync();
+            }
 
             var builder = Host.CreateApplicationBuilder();
 
@@ -58,13 +108,13 @@ namespace IntegrationTests.DataAcquisition
 
             // Setup ServiceInformation with the correct connection string
             builder.SetupServiceInformation(
-                "DataAcquisitionService", // Replace with your actual service name constant if available
+                "DataAcquisitionService",
                 assemblyVersion
             );
 
             builder.Services.AddDbContext<DataAcquisitionDbContext>(options =>
             {
-                options.UseSqlite(sqliteConnectionString);
+                options.UseSqlServer(connectionString);
             });
 
             // Register generic repositories for all required entities
@@ -76,6 +126,8 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
             builder.Services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
             builder.Services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<SftpAcquisitionLog>, EntityRepository<SftpAcquisitionLog, DataAcquisitionDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
 
             // Register IDatabase implementation
             builder.Services.AddScoped<IDatabase, Database>();
@@ -92,6 +144,7 @@ namespace IntegrationTests.DataAcquisition
 
             // Register queries
             builder.Services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
+            builder.Services.AddScoped<IDataAcquisitionLogNotesQueries, DataAcquisitionLogNotesQueries>();
             builder.Services.AddScoped<IFhirQueryQueries, FhirQueryQueries>();
             builder.Services.AddScoped<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
             builder.Services.AddScoped<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
@@ -113,7 +166,6 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
             builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
-
             builder.Services.AddHttpClient();
 
             builder.Services.Configure<AcquisitionWorkerProcessorSettings>(options =>
@@ -134,30 +186,46 @@ namespace IntegrationTests.DataAcquisition
             _host = builder.Build();
 
             // Start the host
-            _host.StartAsync().GetAwaiter().GetResult();
+            await _host.StartAsync();
             ServiceProvider = _host.Services;
 
-            // Ensure database is created and set PRAGMAs
+            // Apply migrations to create the SQL Server schema
             using var scope = ServiceProvider.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-            dbContext.Database.EnsureCreated();
-
-            // Set PRAGMAs
-            dbContext.Database.OpenConnection();
-            using var cmd = dbContext.Database.GetDbConnection().CreateCommand();
-            cmd.CommandText = "PRAGMA journal_mode = WAL;";
-            cmd.ExecuteNonQuery();
-            cmd.CommandText = "PRAGMA busy_timeout = 5000;";
-            cmd.ExecuteNonQuery();
-            dbContext.Database.CloseConnection();
+            await dbContext.Database.MigrateAsync();
         }
 
-        public void Dispose()
+        public async Task DisposeAsync()
         {
-            _host.StopAsync().GetAwaiter().GetResult();
-            _host.Dispose();
-            SqliteConnection.ClearAllPools();
-            if (File.Exists(_dbPath)) File.Delete(_dbPath);
+            if (_host is not null)
+            {
+                await _host.StopAsync();
+                _host.Dispose();
+            }
+
+            if (_sqlContainer is not null)
+            {
+                await _sqlContainer.DisposeAsync();
+            }
+            else if (!string.IsNullOrWhiteSpace(_serverConnectionString) && !string.IsNullOrWhiteSpace(_testDatabaseName))
+            {
+                // Best-effort drop of the per-fixture database when running
+                // against an external server.
+                try
+                {
+                    await using var masterConn = new SqlConnection(_serverConnectionString);
+                    await masterConn.OpenAsync();
+                    await using var cmd = masterConn.CreateCommand();
+                    cmd.CommandText =
+                        $"ALTER DATABASE [{_testDatabaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; " +
+                        $"DROP DATABASE [{_testDatabaseName}];";
+                    await cmd.ExecuteNonQueryAsync();
+                }
+                catch
+                {
+                    // Ignore cleanup failures - the next run uses a new GUID.
+                }
+            }
         }
     }
 }

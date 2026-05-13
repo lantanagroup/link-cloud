@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
             var sources = resource.Select(operation.FhirPath);
 
-            if(sources == null || !sources.Any())
+            if (sources == null || !sources.Any())
             {
                 return OperationResult.NoAction($"Nothing found at {operation.FhirPath}", resource);
             }

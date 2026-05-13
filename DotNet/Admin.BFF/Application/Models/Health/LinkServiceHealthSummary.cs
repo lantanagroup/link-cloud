@@ -34,17 +34,17 @@ public static class LinkServiceHealthReportExtensions
         {
             Service = report.Service,
             Status = report.Status,
-            KafkaConnection = 
+            KafkaConnection =
                 report.Entries.ContainsKey(HealthCheckType.Kafka.ToString()) ?
-                    report.Entries.Any(x => x.Key.Equals(HealthCheckType.Kafka.ToString(), StringComparison.OrdinalIgnoreCase) && x.Value.Status == HealthStatus.Healthy) ? LinkServiceHealthStatus.Healthy: LinkServiceHealthStatus.Unhealthy :
+                    report.Entries.Any(x => x.Key.Equals(HealthCheckType.Kafka.ToString(), StringComparison.OrdinalIgnoreCase) && x.Value.Status == HealthStatus.Healthy) ? LinkServiceHealthStatus.Healthy : LinkServiceHealthStatus.Unhealthy :
                     LinkServiceHealthStatus.NotApplicable,
-            DatabaseConnection = 
+            DatabaseConnection =
                 report.Entries.ContainsKey(HealthCheckType.Database.ToString()) ?
-                    report.Entries.Any(x => x.Key.Equals(HealthCheckType.Database.ToString(), StringComparison.OrdinalIgnoreCase) && x.Value.Status == HealthStatus.Healthy) ? LinkServiceHealthStatus.Healthy: LinkServiceHealthStatus.Unhealthy :
+                    report.Entries.Any(x => x.Key.Equals(HealthCheckType.Database.ToString(), StringComparison.OrdinalIgnoreCase) && x.Value.Status == HealthStatus.Healthy) ? LinkServiceHealthStatus.Healthy : LinkServiceHealthStatus.Unhealthy :
                     LinkServiceHealthStatus.NotApplicable,
-            CacheConnection = 
+            CacheConnection =
                 report.Entries.ContainsKey(HealthCheckType.Cache.ToString()) ?
-                    report.Entries.Any(x => x.Key.Equals(HealthCheckType.Cache.ToString(), StringComparison.OrdinalIgnoreCase) && x.Value.Status == HealthStatus.Healthy) ? LinkServiceHealthStatus.Healthy: LinkServiceHealthStatus.Unhealthy :
+                    report.Entries.Any(x => x.Key.Equals(HealthCheckType.Cache.ToString(), StringComparison.OrdinalIgnoreCase) && x.Value.Status == HealthStatus.Healthy) ? LinkServiceHealthStatus.Healthy : LinkServiceHealthStatus.Unhealthy :
                     LinkServiceHealthStatus.NotApplicable
         };
     }

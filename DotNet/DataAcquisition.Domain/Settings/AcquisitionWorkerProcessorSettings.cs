@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,7 +12,7 @@ public class AcquisitionWorkerProcessorSettings
     public int WorkChannelCapacity { get; set; } = 200;
     public int MaxBatchesPerFacilityPerRun { get; set; } = 40;
     public int MaxBatchesFailStalledPerRun { get; set; } = 20;
-    public int TimeBudgetPerRunSeconds { get; set; } = 20;
+    public int TimeBudgetPerRunSeconds { get; set; } = 60;
     public int StalledQueuedThresholdMinutes { get; set; } = 15;
     public int StalledProcessingThresholdMinutes { get; set; } = 240;
 }

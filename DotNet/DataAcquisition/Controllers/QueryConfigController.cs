@@ -75,7 +75,7 @@ public class QueryConfigController : Controller
 
             var facilityConfig = await _tenantApiService.GetFacilityConfig(facilityId, cancellationToken);
 
-            var timeZone = !string.IsNullOrEmpty(facilityConfig.TimeZone)? facilityConfig.TimeZone : "UTC";
+            var timeZone = !string.IsNullOrEmpty(facilityConfig.TimeZone) ? facilityConfig.TimeZone : "UTC";
 
             if (!string.IsNullOrEmpty(facilityConfig?.TimeZone))
             {
@@ -91,7 +91,8 @@ public class QueryConfigController : Controller
                 MinAcquisitionPullTime = result.MinAcquisitionPullTime,
                 MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
                 FhirServerBaseUrl = result.FhirServerBaseUrl,
-                MaxConcurrentRequests = result.MaxConcurrentRequests
+                MaxConcurrentRequests = result.MaxConcurrentRequests,
+                MaxRetries = result.MaxRetries
             });
         }
         catch (BadRequestException ex)
@@ -156,6 +157,7 @@ public class QueryConfigController : Controller
                 MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
                 FacilityId = facilityId,
                 MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
+                MaxRetries = fhirQueryConfiguration.MaxRetries,
                 FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl
             }, cancellationToken);
 
@@ -176,8 +178,9 @@ public class QueryConfigController : Controller
                     Authentication = result.Authentication,
                     MinAcquisitionPullTime = result.MinAcquisitionPullTime,
                     MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
-                    FhirServerBaseUrl= result.FhirServerBaseUrl,
-                    MaxConcurrentRequests= result.MaxConcurrentRequests
+                    FhirServerBaseUrl = result.FhirServerBaseUrl,
+                    MaxConcurrentRequests = result.MaxConcurrentRequests,
+                    MaxRetries = result.MaxRetries
                 });
         }
         catch (EntityAlreadyExistsException ex)
@@ -256,6 +259,7 @@ public class QueryConfigController : Controller
                 FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl,
                 Authentication = fhirQueryConfiguration.Authentication,
                 MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
+                MaxRetries = fhirQueryConfiguration.MaxRetries,
                 MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
                 MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
             }, cancellationToken);
@@ -269,7 +273,8 @@ public class QueryConfigController : Controller
 
             List<Difference> list = resultChanges.Differences;
             List<PropertyChangeModel> propertyChanges = new List<PropertyChangeModel>();
-            list.ForEach(d => {
+            list.ForEach(d =>
+            {
                 propertyChanges.Add(new PropertyChangeModel
                 {
                     PropertyName = d.PropertyName,
@@ -287,7 +292,8 @@ public class QueryConfigController : Controller
                 MinAcquisitionPullTime = result.MinAcquisitionPullTime,
                 MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
                 FhirServerBaseUrl = result.FhirServerBaseUrl,
-                MaxConcurrentRequests = result.MaxConcurrentRequests
+                MaxConcurrentRequests = result.MaxConcurrentRequests,
+                MaxRetries = result.MaxRetries
             });
         }
         catch (MissingFacilityConfigurationException ex)
@@ -417,7 +423,7 @@ public class QueryConfigController : Controller
             var localTimeOfDay = utcTime.Value + offset;
 
             if (localTimeOfDay < TimeSpan.Zero) localTimeOfDay += TimeSpan.FromDays(1);
-            else if (localTimeOfDay >= TimeSpan.FromDays(1))  localTimeOfDay -= TimeSpan.FromDays(1);
+            else if (localTimeOfDay >= TimeSpan.FromDays(1)) localTimeOfDay -= TimeSpan.FromDays(1);
 
             return localTimeOfDay;
         }

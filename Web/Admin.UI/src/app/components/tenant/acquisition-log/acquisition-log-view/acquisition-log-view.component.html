@@ -12,6 +12,10 @@
           </p>
           <p class="sub-title">
             Report <span class="selectable-value">{{reportIdFilter || 'Any'}}</span>
+            @if (isReportSubmitted) {
+              <span class="status-summary-separator">|</span>
+              Submitted <span class="selectable-value">{{submittedDate | date:'M/d/yy HH:mm'}}</span>
+            }
             @if (patientFilter) {
               <span class="status-summary-separator">|</span>
               Patient <span class="selectable-value">{{patientFilter}}</span>
@@ -204,12 +208,25 @@
           </mat-form-field>
         </div>
 
-        <div class="btn-group" role="group" aria-label="Filtering">
-          <button class="link-button success" (click)="applyFilters()">
-            <fa-icon [icon]="faPlus"></fa-icon>
-            Apply Filters
-          </button>
+        <div class="btn-group" role="group" aria-label="View options">
+          <mat-checkbox [(ngModel)]="includeDeleted" (change)="onIncludeDeletedChange()" style="margin-right: 16px;">
+            Show Deleted
+          </mat-checkbox>
+          <div class="cancel-filter-group">
+            <mat-checkbox [checked]="isStuckLogsFilterActive" (change)="toggleCancellableFilter($event.checked)"
+                          [matTooltip]="'Show only logs eligible for cancellation: non-terminal (Pending, Ready, Queued, Processing, Failed) and created more than ' + cancelMinAgeHours + ' hours ago.'">
+              Show Cancellable Logs
+            </mat-checkbox>
+            <mat-form-field appearance="outline" class="compact-filter cancel-age-field">
+              <mat-label>Min Age (hrs)</mat-label>
+              <input matInput type="number" min="0" [(ngModel)]="cancelMinAgeHours"
+                     (ngModelChange)="onCancelMinAgeChange()"
+                     matTooltip="Minimum age in hours a log must have before it can be cancelled.">
+            </mat-form-field>
+          </div>
+        </div>
 
+        <div class="btn-group" role="group" aria-label="Actions">
           <button class="link-button secondary"
                   aria-label="Clear filters"
                   (click)="clearFilters()"
@@ -222,19 +239,41 @@
             <fa-icon [icon]="faRotate"></fa-icon>
             Refresh
           </button>
-        </div>
 
-        @if (selectedLogIds.size > 0 || isAllSelected) {
-          <div class="btn-group">
-            <button type="button" class="link-button secondary" (click)="clearSelection()">
-              Clear Selection
+          @if (reportIdFromRoute && selectedFacilityFilter !== 'Any') {
+            <button type="button" class="link-button warning" (click)="disableLogsByFacility()"
+                    matTooltip="Soft-delete all acquisition logs for the selected facility">
+              <fa-icon [icon]="faBan"></fa-icon>
+              Disable Logs
             </button>
-            <button type="button" class="link-button success" [disabled]="selectedLogIds.size === 0 && !isAllSelected" (click)="bulkExecute()">
+            <button type="button" class="link-button secondary" (click)="restoreLogsByFacility()"
+                    matTooltip="Restore all soft-deleted acquisition logs for the selected facility">
+              <fa-icon [icon]="faArrowRotateLeft"></fa-icon>
+              Restore Logs
+            </button>
+          }
+
+        @if ((selectedLogIds.size > 0 || isAllSelected) && hasActionEligibleOnPage) {
+          <button type="button" class="link-button secondary" (click)="clearSelection()">
+            Clear Selection
+          </button>
+          @if (canBulkExecute) {
+            <button type="button" class="link-button success" (click)="bulkExecute()">
               <fa-icon [icon]="faPlus" style="margin-right: 5px;"></fa-icon>
               Execute Selected ({{ isAllSelected ? paginationMetadata.totalCount : selectedLogIds.size }})
             </button>
-          </div>
+          }
+          @if (canBulkCancel) {
+            <button type="button" class="link-button error" (click)="bulkCancel()"
+              [matTooltip]="isAllSelected
+                ? 'Cancels every non-terminal log matching the current filters older than ' + cancelMinAgeHours + ' hours.'
+                : 'Only non-terminal logs older than ' + cancelMinAgeHours + ' hours will be cancelled.'">
+              <fa-icon [icon]="faBan" style="margin-right: 5px;"></fa-icon>
+              Cancel Selected ({{ isAllSelected ? 'If Eligible' : eligibleSelectedCount }})
+            </button>
+          }
         }
+        </div>
       </div>
     </div>
     @if (acquisitionLogs.length > 0) {
@@ -259,6 +298,10 @@
             <th scope="col" class="header-column sortable" (click)="onSort('patientId')">
               Patient Id
               <fa-icon [icon]="getSortIcon('patientId')"></fa-icon>
+            </th>
+            <th scope="col" class="header-column sortable" (click)="onSort('reportTrackingId')">
+              Report Id
+              <fa-icon [icon]="getSortIcon('reportTrackingId')"></fa-icon>
             </th>
             <th scope="col" class="header-column sortable" (click)="onSort('facilityId')">
               Facility
@@ -295,6 +338,10 @@
               Status
               <fa-icon [icon]="getSortIcon('status')"></fa-icon>
             </th>
+            <th scope="col" class="header-column sortable" (click)="onSort('isDeleted')">
+              Is Deleted
+              <fa-icon [icon]="getSortIcon('isDeleted')"></fa-icon>
+            </th>
             <th scope="col" class="header-column action-column">
               <span class="sr-only">Edit</span>
             </th>
@@ -302,8 +349,15 @@
         </thead>
         <tbody class="table-body">
           @for (log of acquisitionLogs; track log) {
-            <tr @fadeInSlideUp [ngClass]="{'priority-critical': log.priority === 'Critical', 'priority-high': log.priority === 'High'}">
-              <td class="table-cell" style="position: relative;">
+            <tr @fadeInSlideUp [ngClass]="{
+              'priority-critical': log.priority === 'Critical',
+              'priority-high': log.priority === 'High',
+              'row-deleted': log.isDeleted,
+              'row-status-failed': (log.status === 'Failed' || log.status === 'MaxRetriesReached') && log.priority !== 'Critical' && log.priority !== 'High',
+              'row-cancel-ineligible': !isLogCancelEligible(log)
+            }">
+              <td class="table-cell" style="position: relative;"
+                  [matTooltip]="isReportSubmitted ? 'Not eligible for action as report has been submitted.' : (!isLogCancelEligible(log) ? 'Not eligible for cancellation (terminal status or less than ' + cancelMinAgeHours + ' hours old).' + (isLogExecuteEligible(log) ? ' Can still be executed.' : '') : '')">
                   @if (allowLogSelection)
                   {
                     <mat-checkbox [checked]="isLogSelected(log.id)" (change)="toggleSelection(log.id)" [disabled]="!allowLogSelection"></mat-checkbox>
@@ -335,6 +389,7 @@
                     </fa-icon>
                   }
                 </td>
+                <td class="data-col table-cell selectable-value">{{log.reportTrackingId}}</td>
                 <td class="data-col table-cell selectable-value">
                   {{log.facilityId}}
                   <a [routerLink]="['/tenant/facility', log.facilityId]" matTooltip="View Facility" class="facility-link">
@@ -377,14 +432,22 @@
                     'status-completed': log.status === 'Completed',
                     'status-failed': log.status === 'Failed',
                     'status-maxRetryReached': log.status === 'MaxRetriesReached',
-                    'status-skipped': log.status === 'Skipped'
+                    'status-configurationMissing': log.status === 'ConfigurationMissing',
+                    'status-skipped': log.status === 'Skipped',
+                    'status-cancelled': log.status === 'Cancelled'
                   }">{{log.status}}</span>
                 </td>
+                <td class="data-col table-cell">{{ log.isDeleted ? 'Yes' : 'No' }}</td>
                 <td class="table-cell action-column">
                   <app-table-command
                     [acquisitionLogId]="log.id"
                     [priority]="log.priority"
-                    (queryLogAddedToQueue)="handleLogScheduled($event)">
+                    [status]="log.status"
+                    [createDate]="log.createDate"
+                    [cancelMinAgeHours]="cancelMinAgeHours"
+                    [isReportSubmitted]="isReportSubmitted"
+                    (queryLogAddedToQueue)="handleLogScheduled($event)"
+                    (queryLogCancelled)="handleLogCancelled($event)">
                   </app-table-command>
                 </td>
               </tr>

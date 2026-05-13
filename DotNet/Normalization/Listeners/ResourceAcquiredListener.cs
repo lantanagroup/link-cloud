@@ -31,9 +31,9 @@ public class ResourceAcquiredListener : BackgroundService
     private readonly ILogger<ResourceAcquiredListener> _logger;
     private readonly IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage> _consumerFactory;
     private readonly IProducer<ResourceKey, ResourceNormalizedMessage> _producer;
-    private readonly IDeadLetterExceptionHandler<ResourceKey, string> _consumeExceptionHandler;
-    private readonly IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage> _deadLetterExceptionHandler;
-    private readonly ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage> _transientExceptionHandler;
+    private readonly IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, string> _consumeExceptionHandler;
+    private readonly IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> _deadLetterExceptionHandler;
+    private readonly ITransientExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> _transientExceptionHandler;
     private bool _cancelled = false;
     private readonly INormalizationServiceMetrics _metrics;
     private readonly IServiceScopeFactory _scopeFactory;
@@ -49,9 +49,9 @@ public class ResourceAcquiredListener : BackgroundService
         ServiceInformation serviceInformation,
         IServiceScopeFactory scopeFactory,
         IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage> consumerFactory,
-        IDeadLetterExceptionHandler<ResourceKey, string> consumeExceptionHandler,
-        IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage> deadLetterExceptionHandler,
-        ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage> transientExceptionHandler,
+        IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, string> consumeExceptionHandler,
+        IDeadLetterExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> deadLetterExceptionHandler,
+        ITransientExceptionHandler<ResourceAcquiredListener, ResourceKey, ResourceAcquiredMessage> transientExceptionHandler,
         INormalizationServiceMetrics metrics,
         IProducer<ResourceKey, ResourceNormalizedMessage> producer,
         CopyPropertyOperationService copyPropertyOperationService,
@@ -102,7 +102,7 @@ public class ResourceAcquiredListener : BackgroundService
         {
             ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message = default;
             try
-            {                
+            {
                 await kafkaConsumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
                 {
                     try
@@ -115,9 +115,9 @@ public class ResourceAcquiredListener : BackgroundService
                         }
 
                         if (
-                        message.Message.Value == null 
-                            || ((message.Message.Value.Resource == null 
-                                || string.IsNullOrWhiteSpace(message.Message.Value.QueryType) 
+                        message.Message.Value == null
+                            || ((message.Message.Value.Resource == null
+                                || string.IsNullOrWhiteSpace(message.Message.Value.QueryType)
                                 || message.Message.Value.ScheduledReports == null)
                                && !message.Message.Value.AcquisitionComplete)
                         )
@@ -235,7 +235,7 @@ public class ResourceAcquiredListener : BackgroundService
                     {
                         _logger.LogError(ex, $"Failed to process Patient Event.");
 
-                        _transientExceptionHandler.HandleException(message, new TransientException("Normalization Exception thrown: " + ex.Message), message.Key?.FacilityId ?? string.Empty);
+                        _transientExceptionHandler.HandleException(message, new TransientException("Normalization Exception thrown: " + ex.Message, ex), message.Key?.FacilityId ?? string.Empty);
                     }
                     finally
                     {
@@ -276,12 +276,12 @@ public class ResourceAcquiredListener : BackgroundService
                 }
                 else
                 {
-                    kafkaConsumer.Commit( new List<TopicPartitionOffset> {
+                    kafkaConsumer.Commit(new List<TopicPartitionOffset> {
                         offset
                     });
                 }
                 continue;
-            }            
+            }
         }
     }
 

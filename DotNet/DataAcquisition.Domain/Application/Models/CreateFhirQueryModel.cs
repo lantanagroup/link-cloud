@@ -1,5 +1,6 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 
 namespace DataAcquisition.Domain.Application.Models;
 
@@ -14,7 +15,6 @@ public class CreateFhirQueryModel
     public int? Paged { get; set; }
     public long DataAcquisitionLogId { get; set; }
     public string? MeasureId { get; set; }
-    public List<string> IdQueryParameterValues { get; set; } = new();
     public TimeFrame CensusTimeFrame { get; internal set; }
     public ListType CensusPatientStatus { get; internal set; }
     public string CensusListId { get; internal set; }

@@ -92,7 +92,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
         c.EnableAnnotations();
         //c.SwaggerDoc("v1", new OpenApiInfo { Title = "Link Terminology", Version = "3.1.0" });
-        
+
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
@@ -101,18 +101,19 @@ static void RegisterServices(WebApplicationBuilder builder)
     ConfigureLogging(builder);
 
     //Add CORS
-    builder.Services.AddLinkCorsService(options => { 
+    builder.Services.AddLinkCorsService(options =>
+    {
         options.Environment = builder.Environment;
-    });            
+    });
 
     //Add telemetry if enabled
     builder.Services.AddLinkTelemetry(builder.Configuration, options =>
     {
         options.Environment = builder.Environment;
         options.ServiceName = TerminologyConstants.ServiceName;
-        options.ServiceVersion = serviceInformation?.Version ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString();                
+        options.ServiceVersion = serviceInformation?.Version ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString();
     });
-    
+
     builder.Services.AddMemoryCache();
     builder.Services.AddSingleton<CodeGroupCacheService>();
     builder.Services.AddSingleton<FhirService>();
@@ -140,7 +141,7 @@ static void ConfigureLogging(WebApplicationBuilder builder)
         .Enrich.WithSpan()
         .Enrich.With<ActivityEnricher>()
         .CreateLogger();
-            
+
     Serilog.Debugging.SelfLog.Enable(Console.Error);
 }
 
@@ -154,10 +155,10 @@ static void SetupMiddleware(WebApplication app)
     {
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     });
-    
-    app.UseRouting();            
+
+    app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
-    
+
     var allowAnonymousAccess = app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
     if (!allowAnonymousAccess)
     {
@@ -165,8 +166,8 @@ static void SetupMiddleware(WebApplication app)
         app.UseMiddleware<UserScopeMiddleware>();
     }
     app.UseAuthorization();
-    
+
     app.MapControllers();
-    
+
     app.MapInfo(Assembly.GetExecutingAssembly(), app.Configuration, "terminology");
 }

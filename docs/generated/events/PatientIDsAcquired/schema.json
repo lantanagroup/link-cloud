@@ -1,7 +1,30 @@
 {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PatientIDsAcquired",
   "type": "object",
   "properties": {
-    "patientIds": { "type": "array", "items": { "type": "string" } }
+    "reportTrackingId": { "type": ["string", "null"] },
+    "patientLists": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "listType": {
+            "type": "string",
+            "enum": ["Admit", "Discharge"]
+          },
+          "timeFrame": {
+            "type": "string",
+            "enum": ["LessThan24Hours", "Between24To48Hours", "MoreThan48Hours"]
+          },
+          "patientIds": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["listType", "timeFrame", "patientIds"]
+      }
+    }
   },
-  "required": ["patientIds"]
+  "required": ["patientLists"]
 }

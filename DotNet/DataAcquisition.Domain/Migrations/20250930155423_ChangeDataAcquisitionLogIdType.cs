@@ -35,7 +35,7 @@ namespace DataAcquisition.Domain.Migrations
                 table: "ReferenceResources",
                 type: "bigint",
                 nullable: true);
-            
+
             migrationBuilder.Sql(@"
                 EXEC(N'UPDATE fq
                 SET fq.NewDataAcquisitionLogId = dal.NewId
@@ -49,7 +49,7 @@ namespace DataAcquisition.Domain.Migrations
                 FROM ReferenceResources rr
                 INNER JOIN DataAcquisitionLog dal ON rr.DataAcquisitionLogId = dal.Id');
             ");
-            
+
             migrationBuilder.Sql(@"
                 EXEC(N'DELETE FROM ResourceReferenceType WHERE FhirQueryId IN
                 ( SELECT id FROM FhirQuery WHERE NewDataAcquisitionLogId IS NULL )');
@@ -60,7 +60,7 @@ namespace DataAcquisition.Domain.Migrations
                 WHERE NewDataAcquisitionLogId IS NULL');
             ");
 
-                        migrationBuilder.Sql(@"
+            migrationBuilder.Sql(@"
                 EXEC(N'DELETE FROM ReferenceResources
                 WHERE NewDataAcquisitionLogId IS NULL');
             ");

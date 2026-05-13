@@ -1,27 +1,69 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
+using System.Runtime.Serialization;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 
+[DataContract]
 public record QueryLogSummaryModel
 {
+    [DataMember]
     public long? Id { get; init; }
+
+    [DataMember]
     public AcquisitionPriority Priority { get; init; }
+
+    [DataMember]
     public string FacilityId { get; init; } = null!;
+
+    [DataMember]
     public string? PatientId { get; init; } = null!;
+
+    [DataMember]
     public List<string> ResourceTypes { get; init; } = null!;
+
+    [DataMember]
     public string? ResourceId { get; init; } = null!;
+
+    [DataMember]
     public string FhirVersion { get; init; } = null!;
+
+    [DataMember]
     public FhirQueryType? QueryType { get; init; }
+
+    [DataMember]
     public QueryPhase? QueryPhase { get; init; }
+
+    [DataMember]
     public DateTime? ExecutionDate { get; init; }
+
+    [DataMember]
     public DateTime CreateDate { get; init; }
+
+    [DataMember]
     public DateTime? CompletionDate { get; init; }
+
+    [DataMember]
     public int? RetryAttempts { get; init; }
+
+    [DataMember]
     public RequestStatus? Status { get; init; }
+
+    [DataMember]
+    public bool IsDeleted { get; init; }
+
+    [DataMember]
+    public string? ReportTrackingId { get; init; }
+
+    [DataMember]
+    public bool IsReferenceLog { get; init; }
 
     public static QueryLogSummaryModel FromDomain(DataAcquisitionLogModel log)
     {
@@ -51,7 +93,9 @@ public record QueryLogSummaryModel
             CreateDate = log.CreateDate,
             CompletionDate = log.CompletionDate,
             RetryAttempts = log.RetryAttempts,
-            Status = log.Status
+            Status = log.Status,
+            ReportTrackingId = log.ReportTrackingId,
+            IsReferenceLog = log.FhirQuery?.Any(q => q.IsReference == true) == true
         };
     }
 }

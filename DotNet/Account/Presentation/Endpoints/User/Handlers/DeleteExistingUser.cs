@@ -38,13 +38,13 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
 
                 return Results.NoContent();
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 Activity.Current?.AddException(ex);
                 logger.LogDeleteUserException(id.ToString(), ex.Message);
                 throw;
-            }            
+            }
         }
     }
 }

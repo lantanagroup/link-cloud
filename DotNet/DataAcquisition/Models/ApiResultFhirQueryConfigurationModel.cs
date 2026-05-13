@@ -16,10 +16,12 @@ namespace LantanaGroup.Link.DataAcquisition.Models
 
         public int? MaxConcurrentRequests { get; set; } = 1;
 
+        public int? MaxRetries { get; set; }
+
         [JsonConverter(typeof(TimeSpanConverter))]
         public TimeSpan? MinAcquisitionPullTime { get; set; }
 
         [JsonConverter(typeof(TimeSpanConverter))]
-        public TimeSpan? MaxAcquisitionPullTime { get; set; } 
+        public TimeSpan? MaxAcquisitionPullTime { get; set; }
     }
 }

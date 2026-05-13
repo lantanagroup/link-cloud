@@ -25,19 +25,19 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             _serviceRegistry = serviceRegistry ?? throw new ArgumentNullException(nameof(serviceRegistry));
             _authenticationSchemaConfig = authenticationSchemaConfig ?? throw new ArgumentNullException(nameof(authenticationSchemaConfig));
             _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
-           
+
             InitHttpClient();
-            
+
         }
 
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
-        {           
+        {
             // HTTP GET
             HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
         }
-        
+
         public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
         {
             // HTTP GET
@@ -54,6 +54,29 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 _logger.LogError(ex, "Census service health check failed");
                 return new LinkServiceHealthReport { Service = "Census", Status = HealthStatus.Unhealthy };
             }
+        }
+
+        public async Task<HttpResponseMessage> DeleteCensusJobsAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Delete, $"api/census/config/{Uri.EscapeDataString(facilityId)}/jobs");
+            await SetAuthHeaderAsync(user, request);
+            return await _client.SendAsync(request, cancellationToken);
+        }
+
+        public async Task<HttpResponseMessage> RestoreCensusJobsAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Patch, $"api/census/config/{Uri.EscapeDataString(facilityId)}/jobs/restore");
+            await SetAuthHeaderAsync(user, request);
+            return await _client.SendAsync(request, cancellationToken);
+        }
+
+        private async Task SetAuthHeaderAsync(ClaimsPrincipal user, HttpRequestMessage request)
+        {
+            if (_authenticationSchemaConfig.Value.EnableAnonymousAccess) return;
+            using var scope = _scopeFactory.CreateScope();
+            var createLinkBearerToken = scope.ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+            var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
         private void InitHttpClient()

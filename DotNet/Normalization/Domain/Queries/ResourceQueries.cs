@@ -15,7 +15,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     public class ResourceQueries : IResourceQueries
     {
         private readonly NormalizationDbContext _context;
-        public ResourceQueries(NormalizationDbContext context) 
+        public ResourceQueries(NormalizationDbContext context)
         {
             _context = context;
         }
@@ -47,20 +47,20 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
                         select new ResourceModel()
                         {
                             ResourceTypeId = r.Id,
-                            ResourceName = r.Name,                            
+                            ResourceName = r.Name,
                         };
 
 
-            if(model.Names.Any())
+            if (model.Names.Any())
             {
                 query = query.Where(q => model.Names.Contains(q.ResourceName));
             }
-            else if(!string.IsNullOrWhiteSpace(model.Name))
+            else if (!string.IsNullOrWhiteSpace(model.Name))
             {
                 query = query.Where(q => q.ResourceName == model.Name);
             }
 
-            if(model.ResourceId != null)
+            if (model.ResourceId != null)
             {
                 query = query.Where(q => q.ResourceTypeId == model.ResourceId);
             }

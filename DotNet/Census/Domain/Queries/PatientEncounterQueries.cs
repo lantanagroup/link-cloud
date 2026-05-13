@@ -21,6 +21,7 @@ public interface IPatientEncounterQueries
     Task RebuildPatientEncounterTable(string? facilityId = default, string? correlationId = default, bool useTransaction = true, CancellationToken cancellationToken = default);
     Task<IEnumerable<PatientEncounterModel>> GetAdmittedPatientEncounterModelsByDateRange(string facilityId, DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default);
     Task<IEnumerable<string>> GetCurrentlyAdmittedPatientsForFacility(string facilityId, CancellationToken cancellationToken = default);
+    Task<List<PatientEncounter>> GetAdmittedPatientsByFacility(string facilityId, CancellationToken cancellationToken = default);
 }
 
 public class PatientEncounterQueries : IPatientEncounterQueries
@@ -328,7 +329,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                 {
                     encounter = payload.UpdatePatientEncounter(encounter);
                     encounter.ModifyDate = evt.ModifyDate;
-                    
+
                     // Re-check identifiers after update
                     foreach (var identifier in encounter.PatientIdentifiers)
                     {
@@ -337,14 +338,14 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                             identifier.Id = Guid.NewGuid().ToString();
                         }
                     }
-                    
+
                     foreach (var visitIdentifier in encounter.PatientVisitIdentifiers)
                     {
                         if (string.IsNullOrEmpty(visitIdentifier.Id))
                         {
                             visitIdentifier.Id = Guid.NewGuid().ToString();
                         }
-                    }   
+                    }
                 }
             }
 
@@ -465,7 +466,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
                 await Rebuild(facilityId, correlationId, cancellationToken);
                 await transaction.CommitAsync(cancellationToken);
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 _logger.LogError(ex, "Error rebuilding PatientEncounter table: {message}", ex.Message);
                 await transaction.RollbackAsync(cancellationToken);
@@ -482,7 +483,7 @@ public class PatientEncounterQueries : IPatientEncounterQueries
     {
         if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
-        
+
         var currentDateTime = DateTime.UtcNow;
         return _context.PatientEncounters
             .AsNoTracking()
@@ -493,11 +494,24 @@ public class PatientEncounterQueries : IPatientEncounterQueries
             .Select(x => x.PatientIdentifiers.FirstOrDefault().Identifier);
     }
 
+    public async Task<List<PatientEncounter>> GetAdmittedPatientsByFacility(string facilityId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
+
+        return _context.PatientEncounters
+            .AsNoTracking()
+            .Include(e => e.PatientIdentifiers)
+            .Include(e => e.PatientVisitIdentifiers)
+            .Where(e => e.FacilityId == facilityId
+                && e.DischargeDate == null).ToList();
+    }
+
     public async Task<IEnumerable<PatientEncounterModel>> GetAdmittedPatientEncounterModelsByDateRange(string facilityId, DateTime startDateTime, DateTime endDateTime, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(facilityId))
             throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
-        
+
         return _context.PatientEncounters
             .AsNoTracking()
             .Include(e => e.PatientIdentifiers)

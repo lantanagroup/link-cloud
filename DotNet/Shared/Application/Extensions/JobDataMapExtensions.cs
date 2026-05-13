@@ -6,41 +6,131 @@ namespace LantanaGroup.Link.Shared.Application.Extensions;
 public static class JobDataMapExtensions
 {
     /// <summary>
-    /// Serializes the object to JSON and stores it as a string in the JobDataMap.
+    /// Stores an object in the JobDataMap.
+    /// Complex types are serialized to JSON.
+    /// Strings are stored directly for compatibility with Quartz native storage.
     /// </summary>
-    /// <typeparam name="T">The type of the object to store.</typeparam>
-    /// <param name="map">The JobDataMap instance.</param>
-    /// <param name="key">The key to store under.</param>
-    /// <param name="value">The object to serialize and store.</param>
     public static void PutObject<T>(this JobDataMap map, string key, T value)
+    {
+        map.PutObject(key, (object?)value);
+    }
+
+    public static void PutObject(this JobDataMap map, string key, object? value)
     {
         if (value == null)
         {
-            map.Put(key, (string)null!);  // Store null if value is null
+            map.Put(key, (string)null!);
             return;
         }
 
-        string json = JsonSerializer.Serialize(value);
+        if (value is string s)
+        {
+            map.Put(key, s);
+            return;
+        }
+
+        var json = JsonSerializer.Serialize(value, value.GetType());
         map.Put(key, json);
     }
 
     /// <summary>
-    /// Retrieves a string from the JobDataMap and deserializes it to the specified type.
+    /// Retrieves a value from the JobDataMap.
+    /// Supports both native Quartz storage and JSON-serialized objects.
+    /// Automatically unwraps JSON-quoted strings when retrieving as string.
     /// </summary>
-    /// <typeparam name="T">The type to deserialize to.</typeparam>
-    /// <param name="map">The JobDataMap instance.</param>
-    /// <param name="key">The key to retrieve from.</param>
-    /// <returns>The deserialized object, or default(T) if not found or deserialization fails.</returns>
-    /// <exception cref="JsonException">Thrown if deserialization fails (e.g., invalid JSON).</exception>
-    public static T GetObject<T>(this JobDataMap map, string key)
+    public static T? GetObject<T>(this JobDataMap map, string key)
     {
-        var json = map.GetString(key);
+        if (!map.ContainsKey(key))
+            return default;
 
-        if (string.IsNullOrEmpty(json))
+        var storedValue = map[key];
+        if (storedValue == null)
+            return default;
+
+        var targetType = Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T);
+
+        if (targetType == typeof(string))
         {
-            return default!;
+            if (storedValue is string storedString)
+            {
+                try
+                {
+                    var deserialized = JsonSerializer.Deserialize<string>(storedString);
+                    if (deserialized != null)
+                        return (T)(object)deserialized;
+                }
+                catch
+                {
+                }
+
+                var result = storedString;
+                if (result.Length >= 2 && result[0] == '"' && result[^1] == '"')
+                    result = result[1..^1];
+
+                return (T)(object)result;
+            }
+
+            return (T)(object)storedValue.ToString()!;
         }
 
-        return JsonSerializer.Deserialize<T>(json);
+        if (storedValue is T directValue)
+            return directValue;
+
+        if (storedValue is JsonElement jsonElement)
+        {
+            try
+            {
+                return JsonSerializer.Deserialize<T>(jsonElement.GetRawText());
+            }
+            catch
+            {
+                return default;
+            }
+        }
+
+        if (storedValue is string serializedString)
+        {
+            if (string.IsNullOrWhiteSpace(serializedString))
+                return default;
+
+            try
+            {
+                return JsonSerializer.Deserialize<T>(serializedString);
+            }
+            catch
+            {
+                if (targetType == typeof(Guid) && Guid.TryParse(serializedString.Trim('"'), out var guid))
+                    return (T)(object)guid;
+
+                if (targetType == typeof(DateTimeOffset) && DateTimeOffset.TryParse(serializedString.Trim('"'), out var dto))
+                    return (T)(object)dto;
+
+                if (targetType == typeof(DateTime) && DateTime.TryParse(serializedString.Trim('"'), out var dt))
+                    return (T)(object)dt;
+
+                if (targetType.IsEnum)
+                {
+                    try
+                    {
+                        var enumValue = Enum.Parse(targetType, serializedString.Trim('"'), ignoreCase: true);
+                        return (T)enumValue;
+                    }
+                    catch
+                    {
+                        return default;
+                    }
+                }
+            }
+        }
+
+        try
+        {
+            var converted = Convert.ChangeType(storedValue, targetType);
+            return (T)converted!;
+        }
+        catch
+        {
+            return default;
+        }
     }
 }

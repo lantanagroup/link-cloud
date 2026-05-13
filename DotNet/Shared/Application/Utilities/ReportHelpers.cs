@@ -2,14 +2,14 @@
 {
     public static class ReportHelpers
     {
-        public static string GetReportName(string scheduleID, string facilityId, List<string> reportTypes, DateTime? reportStartDate)
+        public static string GetReportName(Guid scheduleID, string facilityId, List<string> reportTypes, DateTime? reportStartDate)
         {
-            if (string.IsNullOrEmpty(scheduleID)) throw new ArgumentException("Schedule ID cannot be null or empty.", nameof(scheduleID));
+            if (scheduleID == default) throw new ArgumentException("Schedule ID cannot be default or empty.", nameof(scheduleID));
             if (string.IsNullOrEmpty(facilityId)) throw new ArgumentException("Facility ID cannot be null or empty.", nameof(facilityId));
             if (reportTypes == null || reportTypes.Count == 0) throw new ArgumentException("Report types cannot be null or empty.", nameof(reportTypes));
 
             // Sanitize scheduleID to make it URL-safe
-            string sanitizedScheduleID = scheduleID.ToLowerInvariant()
+            string sanitizedScheduleID = scheduleID.ToString().ToLowerInvariant()
                 .Replace("/", "_")   // Replace / with _
                 .Replace("+", "-")   // Replace + with -
                 .Replace("=", string.Empty); // Remove = (trim padding)

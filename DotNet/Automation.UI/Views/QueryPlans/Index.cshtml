@@ -1,0 +1,453 @@
+@model List<Automation.UI.Models.QueryPlanTemplate>
+@{
+    ViewData["Title"] = "Query Plans";
+}
+
+<div class="container mt-4">
+    <h2 class="fw-bold mb-1"><i class="bi bi-diagram-3 me-2"></i>Query Plans</h2>
+    <p class="text-muted mb-3">Manage which FHIR resource types are acquired during data acquisition. The <strong>default</strong> plan is used for new scenarios unless overridden.</p>
+
+    <div class="au-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list-ul me-2"></i>All Query Plans</span>
+            <button type="button" class="btn btn-sm btn-success" id="btnNewQp">
+                <i class="bi bi-plus-lg"></i>
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <table class="table au-table mb-0" id="qpTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Resource Types</th>
+                        <th>EHR</th>
+                        <th>LookBack</th>
+                        <th>Queries</th>
+                        <th>Type</th>
+                        <th>Updated</th>
+                        <th style="width:220px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model)
+                    {
+                        var acquiredTypes = t.GetAcquiredResourceTypes();
+                        <tr data-id="@t.Id">
+                            <td>
+                                <strong>@t.Name</strong>
+                                @if (t.IsDefault)
+                                {
+                                    <span class="badge bg-success ms-1">Default</span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(t.Description))
+                                {
+                                    <br /><small class="text-muted">@t.Description</small>
+                                }
+                            </td>
+                            <td>
+                                <small class="text-muted" title="@string.Join(", ", acquiredTypes.OrderBy(x => x))">
+                                    @acquiredTypes.Count types
+                                </small>
+                            </td>
+                            <td><small>@t.EhrDescription</small></td>
+                            <td><code class="small">@t.LookBack</code></td>
+                            <td>
+                                <small class="text-muted">@t.InitialQueries.Count init, @t.SupplementalQueries.Count supp</small>
+                            </td>
+                            <td>
+                                @if (t.IsSystem)
+                                {
+                                    <span class="badge bg-dark">System</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-light text-dark border">Custom</span>
+                                }
+                            </td>
+                            <td class="small text-muted">@t.UpdatedAt.LocalDateTime.ToString("g")</td>
+                            <td class="text-nowrap">
+                                <div class="d-inline-flex gap-1">
+                                    <button type="button" class="btn btn-sm btn-outline-primary btn-qp-open" data-id="@t.Id" data-mode="@(t.IsSystem ? "view" : "edit")">
+                                        @(t.IsSystem ? "View" : "Edit")
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-qp-clone" data-id="@t.Id">Clone</button>
+                                    @if (!t.IsDefault)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-success btn-qp-default" data-id="@t.Id" title="Set as default">
+                                            <i class="bi bi-star"></i>
+                                        </button>
+                                    }
+                                    @if (!t.IsSystem)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-outline-danger btn-qp-delete" data-id="@t.Id">Delete</button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            @if (Model.Count == 0)
+            {
+                <div class="text-center text-muted py-4">No query plans yet. Click <strong>+</strong> to create one.</div>
+            }
+        </div>
+    </div>
+</div>
+
+@* ========== Query Plan Editor Modal ========== *@
+<div id="qpModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;">
+    <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
+        <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:1060px;display:flex;flex-direction:column;max-height:90vh;">
+            <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;flex-shrink:0;" class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0" id="modalTitle"><i class="bi bi-diagram-3 me-2"></i>Query Plan</h5>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-sm btn-success" id="btnModalSave" style="display:none;">
+                        <i class="bi bi-floppy me-1"></i>Save
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-light" id="btnModalClose">Close</button>
+                </div>
+            </div>
+            <div id="qpFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
+            <div style="flex:1;overflow-y:auto;padding:1.25rem;" id="modalBody">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="QpId" />
+                <input type="hidden" id="QpIsSystem" value="false" />
+
+                <div id="qpConfigArea" class="position-relative">
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <label class="form-label" for="QpName">Name</label>
+                            <input class="form-control" id="QpName" maxlength="120" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="QpEhr">
+                                EHR
+                                <span class="au-info-icon" data-bs-toggle="tooltip" title="EHR vendor identifier sent to DataAcquisition (e.g. Epic, Cerner)."><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <input class="form-control" id="QpEhr" maxlength="60" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label" for="QpLookBack">
+                                LookBack
+                                <span class="au-info-icon" data-bs-toggle="tooltip" title="ISO 8601 duration. How far before the report start date to begin querying. P0D = same day, P30D = 30 days before."><i class="bi bi-info-circle"></i></span>
+                            </label>
+                            <input class="form-control" id="QpLookBack" maxlength="20" placeholder="P0D" />
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <div class="small text-muted" id="qpResourceTypeSummary"></div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="QpDescription">Description</label>
+                            <input class="form-control" id="QpDescription" maxlength="500" />
+                        </div>
+
+                        @* ---- Initial Queries ---- *@
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-semibold">
+                                    <i class="bi bi-search me-1"></i>Initial Queries
+                                    <span class="au-info-icon" data-bs-toggle="tooltip" title="Patient-scoped Parameter queries that fetch core clinical data (Encounter, Condition, etc.) using the patient ID and report date range."><i class="bi bi-info-circle"></i></span>
+                                </span>
+                                <button type="button" class="btn btn-sm btn-outline-success" id="addInitialQuery">+ Add</button>
+                            </div>
+                            <table class="table table-sm table-bordered mb-0" id="initialQueryTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width:30px">#</th>
+                                        <th>Resource Type</th>
+                                        <th style="width:110px">Config Type</th>
+                                        <th>Parameters / Options</th>
+                                        <th style="width:40px"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="initialQueryRows"></tbody>
+                            </table>
+                        </div>
+
+                        @* ---- Supplemental Queries ---- *@
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="fw-semibold">
+                                    <i class="bi bi-link-45deg me-1"></i>Supplemental Queries
+                                    <span class="au-info-icon" data-bs-toggle="tooltip" title="Reference queries that run after initial queries. They follow references from acquired resources to fetch related data (e.g. Location from Encounter.location)."><i class="bi bi-info-circle"></i></span>
+                                </span>
+                                <button type="button" class="btn btn-sm btn-outline-success" id="addSupplementalQuery">+ Add</button>
+                            </div>
+                            <table class="table table-sm table-bordered mb-0" id="supplementalQueryTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width:30px">#</th>
+                                        <th>Resource Type</th>
+                                        <th style="width:110px">Config Type</th>
+                                        <th>Parameters / Options</th>
+                                        <th style="width:40px"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="supplementalQueryRows"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div id="systemOverlay" class="position-absolute top-0 start-0 w-100 h-100 au-system-overlay" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="qpModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
+
+<script>
+(function () {
+    var modal = document.getElementById('qpModal');
+    var backdrop = document.getElementById('qpModalBackdrop');
+    var modalTitle = document.getElementById('modalTitle');
+    var btnSave = document.getElementById('btnModalSave');
+    var overlay = document.getElementById('systemOverlay');
+    var idInput = document.getElementById('QpId');
+    var isSystemInput = document.getElementById('QpIsSystem');
+    var addInitialBtn = document.getElementById('addInitialQuery');
+    var addSupplementalBtn = document.getElementById('addSupplementalQuery');
+
+    var saveUrl = '@Url.Action("SaveInline", "QueryPlans")';
+    var deleteUrl = '@Url.Action("DeleteInline", "QueryPlans")';
+    var cloneUrl = '@Url.Action("CloneInline", "QueryPlans")';
+    var setDefaultUrl = '@Url.Action("SetDefaultInline", "QueryPlans")';
+    var getJsonUrl = '@Url.Action("GetJson", "QueryPlans")';
+    var getDefaultsUrl = '@Url.Action("GetDefaults", "QueryPlans")';
+
+    function af() { var t = document.querySelector('input[name="__RequestVerificationToken"]'); return t ? t.value : ''; }
+    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function openModal() { modal.style.display = ''; backdrop.style.display = ''; }
+    function closeModal() { modal.style.display = 'none'; backdrop.style.display = 'none'; }
+    document.getElementById('btnModalClose').addEventListener('click', closeModal);
+    backdrop.addEventListener('click', closeModal);
+
+    function setEditable(e) {
+        overlay.style.display = e ? 'none' : '';
+        addInitialBtn.style.display = e ? '' : 'none';
+        addSupplementalBtn.style.display = e ? '' : 'none';
+        btnSave.style.display = e ? '' : 'none';
+        document.querySelectorAll('.btn-remove-query').forEach(function (b) { b.style.display = e ? '' : 'none'; });
+    }
+
+    // ---- Query row builders ----
+    function paramSummary(p) {
+        if (p.parameterType === 'Variable') return esc(p.name) + ': var(' + p.variable + ')' + (p.format ? ' fmt=' + esc(p.format) : '');
+        if (p.parameterType === 'Literal') return esc(p.name) + ': &quot;' + esc(p.literal || '') + '&quot;';
+        if (p.parameterType === 'ResourceIds') return esc(p.name) + ': ' + esc(p.resource || '') + '/' + esc(p.pagedValue || '');
+        return esc(p.name || '?');
+    }
+
+    function buildQueryRow(q, tbody) {
+        var idx = tbody.children.length;
+        var tr = document.createElement('tr');
+        var isRef = (q.queryConfigType || '').toLowerCase() === 'reference';
+        var detailHtml = '';
+        if (isRef) {
+            detailHtml =
+                '<span class="small text-muted">OpType=</span><input type="number" class="form-control form-control-sm d-inline-block qe-optype" style="width:55px" value="' + (q.operationType ?? '') + '" title="Operation type (numeric)" />' +
+                '<span class="small text-muted ms-2">Paged=</span><input type="number" class="form-control form-control-sm d-inline-block qe-paged" style="width:55px" value="' + (q.paged ?? '') + '" title="Page size for paginated results" />';
+        } else {
+            detailHtml = (q.parameters || []).map(function (p) {
+                return '<span class="badge bg-light text-dark border me-1" title="' + esc(p.parameterType) + '">' + paramSummary(p) + '</span>';
+            }).join('');
+            if (!detailHtml) detailHtml = '<span class="text-muted small">No parameters</span>';
+        }
+
+        tr.innerHTML =
+            '<td class="text-center align-middle small qe-idx">' + (idx + 1) + '</td>' +
+            '<td><input class="form-control form-control-sm qe-resource" value="' + esc(q.resourceType || '') + '" /></td>' +
+            '<td><select class="form-select form-select-sm qe-configtype"><option value="Parameter"' + (!isRef ? ' selected' : '') + '>Parameter</option><option value="Reference"' + (isRef ? ' selected' : '') + '>Reference</option></select></td>' +
+            '<td class="qe-details">' + detailHtml + '</td>' +
+            '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-query">&times;</button></td>';
+
+        tr._queryData = JSON.parse(JSON.stringify(q));
+        tbody.appendChild(tr);
+
+        tr.querySelector('.btn-remove-query').addEventListener('click', function () { tr.remove(); reindexTable(tbody); updateTypeSummary(); });
+        tr.querySelector('.qe-resource').addEventListener('change', function () { tr._queryData.resourceType = this.value; updateTypeSummary(); });
+        tr.querySelector('.qe-configtype').addEventListener('change', function () { tr._queryData.queryConfigType = this.value; });
+        if (isRef) {
+            var opInput = tr.querySelector('.qe-optype');
+            var pagedInput = tr.querySelector('.qe-paged');
+            if (opInput) opInput.addEventListener('change', function () { tr._queryData.operationType = this.value ? parseInt(this.value) : null; });
+            if (pagedInput) pagedInput.addEventListener('change', function () { tr._queryData.paged = this.value ? parseInt(this.value) : null; });
+        }
+
+        return tr;
+    }
+
+    function reindexTable(tbody) {
+        Array.prototype.forEach.call(tbody.children, function (tr, i) {
+            var cell = tr.querySelector('.qe-idx');
+            if (cell) cell.textContent = i + 1;
+        });
+    }
+
+    function updateTypeSummary() {
+        var types = new Set();
+        document.querySelectorAll('#initialQueryRows .qe-resource, #supplementalQueryRows .qe-resource').forEach(function (inp) {
+            var v = (inp.value || '').trim();
+            if (v) types.add(v);
+        });
+        document.getElementById('qpResourceTypeSummary').textContent = types.size + ' resource type' + (types.size !== 1 ? 's' : '');
+    }
+
+    function readQueries(tbodyId) {
+        var rows = document.getElementById(tbodyId).children;
+        return Array.prototype.map.call(rows, function (tr) {
+            var d = tr._queryData || {};
+            d.resourceType = (tr.querySelector('.qe-resource') || {}).value || d.resourceType || '';
+            d.queryConfigType = (tr.querySelector('.qe-configtype') || {}).value || d.queryConfigType || 'Parameter';
+            var opInput = tr.querySelector('.qe-optype');
+            if (opInput) d.operationType = opInput.value ? parseInt(opInput.value) : null;
+            var pagedInput = tr.querySelector('.qe-paged');
+            if (pagedInput) d.paged = pagedInput.value ? parseInt(pagedInput.value) : null;
+            return d;
+        });
+    }
+
+    // ---- Load / populate ----
+    function populate(data) {
+        idInput.value = data.id || '';
+        isSystemInput.value = data.isSystem ? 'true' : 'false';
+        document.getElementById('QpName').value = data.name || '';
+        document.getElementById('QpEhr').value = data.ehrDescription || 'Epic';
+        document.getElementById('QpLookBack').value = data.lookBack || 'P0D';
+        document.getElementById('QpDescription').value = data.description || '';
+
+        var initTbody = document.getElementById('initialQueryRows');
+        var suppTbody = document.getElementById('supplementalQueryRows');
+        initTbody.innerHTML = '';
+        suppTbody.innerHTML = '';
+
+        (data.initialQueries || []).forEach(function (q) { buildQueryRow(q, initTbody); });
+        (data.supplementalQueries || []).forEach(function (q) { buildQueryRow(q, suppTbody); });
+
+        updateTypeSummary();
+    }
+
+    function collectModel() {
+        return {
+            id: idInput.value,
+            name: document.getElementById('QpName').value,
+            description: document.getElementById('QpDescription').value || null,
+            ehrDescription: document.getElementById('QpEhr').value || 'Epic',
+            lookBack: document.getElementById('QpLookBack').value || 'P0D',
+            isSystem: false,
+            isDefault: false,
+            initialQueries: readQueries('initialQueryRows'),
+            supplementalQueries: readQueries('supplementalQueryRows')
+        };
+    }
+
+    // ---- Add rows ----
+    addInitialBtn.addEventListener('click', function () {
+        buildQueryRow({ resourceType: '', queryConfigType: 'Parameter', parameters: [] }, document.getElementById('initialQueryRows'));
+        updateTypeSummary();
+    });
+    addSupplementalBtn.addEventListener('click', function () {
+        buildQueryRow({ resourceType: '', queryConfigType: 'Reference', operationType: 2, paged: null, parameters: [] }, document.getElementById('supplementalQueryRows'));
+        updateTypeSummary();
+    });
+
+    var qpFormErrors = document.getElementById('qpFormErrors');
+    function showQpError(msg) { qpFormErrors.textContent = msg; qpFormErrors.style.display = ''; }
+    function clearQpErrors() { qpFormErrors.style.display = 'none'; qpFormErrors.textContent = ''; clearQpFieldErrors(); }
+    function markQpFieldError(id, msg) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add('is-invalid');
+        var fb = el.parentElement.querySelector('.invalid-feedback');
+        if (!fb) { fb = document.createElement('div'); fb.className = 'invalid-feedback'; el.parentElement.appendChild(fb); }
+        fb.textContent = msg; fb.style.display = 'block';
+    }
+    function clearQpFieldErrors() {
+        document.querySelectorAll('#qpConfigArea .is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
+        document.querySelectorAll('#qpConfigArea .invalid-feedback').forEach(function (el) { el.style.display = 'none'; });
+    }
+
+    async function qpPostJson(url, body) {
+        var res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': af() },
+            body: JSON.stringify(body)
+        });
+        if (!res.ok) {
+            var errText = '';
+            try { errText = await res.text(); } catch (_) {}
+            throw new Error(errText || ('Server returned ' + res.status));
+        }
+        var ct = res.headers.get('content-type') || '';
+        return ct.indexOf('json') >= 0 ? res.json() : null;
+    }
+
+    // ---- Open modal ----
+    async function openEditor(id, mode) {
+        clearQpErrors();
+        var url = id ? (getJsonUrl + '?id=' + encodeURIComponent(id)) : getDefaultsUrl;
+        try {
+            var res = await fetch(url);
+            if (!res.ok) throw new Error('Server returned ' + res.status);
+            var data = await res.json();
+            populate(data);
+
+            var isSystem = data.isSystem === true;
+            var isView = mode === 'view' || isSystem;
+            modalTitle.innerHTML = '<i class="bi bi-diagram-3 me-2"></i>' + (isView ? 'View Query Plan' : id ? 'Edit Query Plan' : 'New Query Plan');
+            setEditable(!isView);
+            openModal();
+        } catch (err) {
+            showQpError('Failed to load query plan: ' + (err.message || 'Unknown error'));
+            openModal();
+        }
+    }
+
+    // ---- Save ----
+    btnSave.addEventListener('click', async function () {
+        clearQpErrors();
+        var model = collectModel();
+        var valid = true;
+        if (!model.name.trim()) { markQpFieldError('QpName', 'Name is required.'); valid = false; }
+        if (!valid) return;
+        try {
+            await qpPostJson(saveUrl, model);
+            location.reload();
+        } catch (err) {
+            showQpError('Save failed: ' + (err.message || 'Unknown error'));
+        }
+    });
+
+    // ---- Table button handlers ----
+    document.getElementById('btnNewQp').addEventListener('click', function () { openEditor(null, 'edit'); });
+
+    document.querySelectorAll('.btn-qp-open').forEach(function (btn) {
+        btn.addEventListener('click', function () { openEditor(btn.getAttribute('data-id'), btn.getAttribute('data-mode')); });
+    });
+
+    document.querySelectorAll('.btn-qp-clone').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            try { await qpPostJson(cloneUrl, { id: btn.getAttribute('data-id') }); location.reload(); }
+            catch (err) { showQpError('Clone failed: ' + (err.message || 'Unknown error')); openModal(); }
+        });
+    });
+
+    document.querySelectorAll('.btn-qp-delete').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            if (!confirm('Delete this query plan?')) return;
+            try { await qpPostJson(deleteUrl, { id: btn.getAttribute('data-id') }); location.reload(); }
+            catch (err) { showQpError('Delete failed: ' + (err.message || 'Unknown error')); openModal(); }
+        });
+    });
+
+    document.querySelectorAll('.btn-qp-default').forEach(function (btn) {
+        btn.addEventListener('click', async function () {
+            try { await qpPostJson(setDefaultUrl, { id: btn.getAttribute('data-id') }); location.reload(); }
+            catch (err) { showQpError('Set default failed: ' + (err.message || 'Unknown error')); openModal(); }
+        });
+    });
+
+    // Init tooltips
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) { new bootstrap.Tooltip(el); });
+})();
+</script>

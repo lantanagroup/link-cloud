@@ -1,8 +1,7 @@
 {
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PayloadSubmitted",
   "type": "object",
-  "properties": {
-    "payloadType": { "type": "string", "enum": ["MeasureReportSubmissionEntry", "ReportSchedule"] },
-    "patientId": { "type": "string" }
-  },
-  "required": ["payloadType"]
+  "properties": {},
+  "additionalProperties": false
 }

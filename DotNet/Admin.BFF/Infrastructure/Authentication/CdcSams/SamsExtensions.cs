@@ -45,6 +45,6 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication.CdcSams
         /// <returns></returns>
         public static AuthenticationBuilder AddCdcSams(this AuthenticationBuilder builder, string authenticationScheme, string displayName, Action<SamsOptions> configureOptions)
             => builder.AddOAuth<SamsOptions, SamsHandler>(authenticationScheme, displayName, configureOptions);
-      
+
     }
 }

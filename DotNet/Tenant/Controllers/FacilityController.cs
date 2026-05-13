@@ -50,14 +50,14 @@ namespace LantanaGroup.Link.Tenant.Controllers
         private readonly IOptions<LinkBearerServiceOptions> _linkBearerServiceOptions;
 
         public FacilityController(ILogger<FacilityController> logger,
-            IFacilityManager facilityManager, 
-            IFacilityQueries facilityQueries, 
+            IFacilityManager facilityManager,
+            IFacilityQueries facilityQueries,
             ScheduleService scheduleService,
             IKafkaProducerFactory<string, GenerateReportValue> adHocKafkaProducerFactory,
-            IOptions<ServiceRegistry> serviceRegistry, 
-            IHttpClientFactory httpClient, 
-            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig, 
-            ICreateSystemToken createSystemToken, 
+            IOptions<ServiceRegistry> serviceRegistry,
+            IHttpClientFactory httpClient,
+            IOptions<LinkTokenServiceSettings> linkTokenServiceConfig,
+            ICreateSystemToken createSystemToken,
             IOptions<LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _facilityManager = facilityManager;
@@ -105,12 +105,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilities")]
         public async Task<ActionResult<PagedConfigModel<FacilityModel>>> GetFacilities(string? facilityId,
-            string? facilityName, string? sortBy, SortOrder? sortOrder, int pageSize = 10, int pageNumber = 1, 
-            bool includeDeleted = false,
+            string? facilityName, string? timeZone, Vendor? vendor, string? sortBy, SortOrder? sortOrder,
+            int pageSize = 10, int pageNumber = 1, bool includeDeleted = false,
             CancellationToken cancellationToken = default)
         {
             facilityId = facilityId?.Sanitize();
             facilityName = facilityName?.Sanitize();
+            timeZone = timeZone?.Sanitize();
             sortBy = sortBy?.Sanitize();
 
             if (pageNumber < 1)
@@ -127,7 +128,13 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             using Activity? activity = ServiceActivitySource.Instance.StartActivity("Get Facilities");
 
-            var searchModel = new FacilitySearchModel { FacilityId = facilityId, FacilityName = facilityName };
+            var searchModel = new FacilitySearchModel
+            {
+                FacilityId = facilityId,
+                FacilityName = facilityName,
+                TimeZone = timeZone,
+                Vendor = vendor
+            };
             var pagedFacilityConfigModelDto = await _facilityQueries.PagedSearchAsync(searchModel, sortBy, sortOrder.Value, pageSize, pageNumber, includeDeleted, cancellationToken);
 
             if (pagedFacilityConfigModelDto.Records.Count == 0)
@@ -161,7 +168,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     }
                 }
 
-                var facilities = await _facilityQueries.SearchAsync(searchModel, HttpContext.RequestAborted);
+                var facilities = await _facilityQueries.SearchAsync(searchModel, HttpContext.RequestAborted, includeDeleted);
 
                 if ((facilities?.Count ?? 0) == 0)
                 {
@@ -197,12 +204,12 @@ namespace LantanaGroup.Link.Tenant.Controllers
         {
             var facilityEntity = _mapperDtoToModel.Map<FacilityModel, Facility>(newFacility);
 
-            if(facilityEntity == null)
+            if (facilityEntity == null)
             {
                 return BadRequest();
             }
 
-            if(facilityEntity.FacilityName == null)
+            if (facilityEntity.FacilityName == null)
             {
                 return BadRequest();
             }
@@ -210,6 +217,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
             if (facilityEntity.FacilityId == null)
             {
                 return BadRequest();
+            }
+
+            if (newFacility.Vendor == null)
+            {
+                return BadRequest("Vendor must be provided.");
             }
 
             try
@@ -312,6 +324,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return NotFound();
             }
 
+            if (facilityConfig.Vendor == null)
+            {
+                return BadRequest("Vendor must be provided.");
+            }
+
             var oldFacility = _mapperDtoToModel.Map<FacilityModel, Facility>(existingModel);
             var newFacility = _mapperDtoToModel.Map<FacilityModel, Facility>(facilityConfig);
 
@@ -358,7 +375,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             if (existingModel == null)
             {
-                return BadRequest($"Facility with Id: {facilityId} Not Found");
+                return NotFound($"Facility with Id: {facilityId} Not Found");
             }
 
             try
@@ -382,7 +399,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             return NoContent();
         }
-        
+
         [HttpDelete("softDelete/{facilityId}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -392,9 +409,20 @@ namespace LantanaGroup.Link.Tenant.Controllers
         {
             facilityId = facilityId?.Sanitize();
 
-            var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken);
+            var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken, includeDeleted: true);
             if (existingModel == null)
-                return BadRequest($"Facility with Id: {facilityId} Not Found");
+                return NotFound($"Facility with Id: {facilityId} Not Found");
+
+            if (existingModel.IsDeleted == true)
+            {
+                // Always attempt job cleanup to self-heal partial failures from prior attempts
+                // (DeleteJobsForFacility is a no-op when no jobs exist)
+                using (ServiceActivitySource.Instance.StartActivity("Delete Jobs for Facility"))
+                {
+                    await _scheduleService.DeleteJobsForFacility(facilityId, cancellationToken: cancellationToken);
+                }
+                return NoContent();
+            }
 
             try
             {
@@ -437,7 +465,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
 
             var existingModel = await _facilityQueries.GetAsync(facilityId, null, cancellationToken, includeDeleted: true);
             if (existingModel == null)
-                return BadRequest($"Facility with Id: {facilityId} Not Found");
+                return NotFound($"Facility with Id: {facilityId} Not Found");
 
             try
             {
@@ -475,10 +503,14 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpPost("{facilityId}/AdHocReport")]
         public async Task<ActionResult<GenerateAdhocReportResponse>> GenerateAdHocReport(string facilityId, AdHocReportRequest request)
         {
-            if (string.IsNullOrEmpty(facilityId) ||
-                await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
+            if (string.IsNullOrWhiteSpace(facilityId))
             {
-                return BadRequest("Facility does not exist.");
+                return BadRequest("FacilityId must be provided.");
+            }
+
+            if (await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
+            {
+                return NotFound("Facility does not exist.");
             }
 
             if (request.ReportTypes == null || request.ReportTypes.Count == 0)
@@ -501,7 +533,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return BadRequest("EndDate must be after StartDate.");
             }
 
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
 
             try
             {
@@ -569,10 +601,14 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpPost("{facilityId}/RegenerateReport")]
         public async Task<ActionResult<GenerateAdhocReportResponse>> RegenerateReport(string facilityId, RegenerateReportRequest request)
         {
-            if (string.IsNullOrEmpty(facilityId) ||
-                await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
+            if (string.IsNullOrWhiteSpace(facilityId))
             {
-                return BadRequest("Facility does not exist.");
+                return BadRequest("FacilityId must be provided.");
+            }
+
+            if (await _facilityQueries.GetAsync(facilityId, null, CancellationToken.None) == null)
+            {
+                return NotFound("Facility does not exist.");
             }
 
             if (string.IsNullOrEmpty(request.ReportId))
@@ -580,7 +616,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return BadRequest("ReportId must be provided.");
             }
 
-            var reportId = Guid.NewGuid().ToString();
+            var reportId = Guid.NewGuid();
 
             try
             {
@@ -613,7 +649,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     throw new Exception(
                         $"Report Service Call unsuccessful: StatusCode: {response.StatusCode} | Response: {await response.Content.ReadAsStringAsync(CancellationToken.None)} | Query URL: {requestUrl}");
                 }
-                
+
                 var producerConfig = new ProducerConfig();
 
                 using var producer = _adHocKafkaProducerFactory.CreateProducer(producerConfig);
@@ -624,7 +660,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
                     Headers = new Headers(),
                     Value = new GenerateReportValue()
                     {
-                        ReportId = request.ReportId,
+                        ReportId = request.ReportId == null ? null : Guid.Parse(request.ReportId),
                         AdhocReportId = reportId,
                         Regenerate = true,
                         BypassSubmission = request.BypassSubmission ?? false

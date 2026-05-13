@@ -13,7 +13,7 @@ export interface IReportSchedule {
   frequency: string;
   payloadRootUri?: string;
   status: string;
-  IsDeleted?: boolean;
+  isDeleted?: boolean;
   censusCount: number;
   initialPopulationCount: number;
 }

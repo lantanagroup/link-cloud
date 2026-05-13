@@ -26,6 +26,9 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.OpenApi.Models;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.DataProtection;
+
+using Microsoft.AspNetCore.Antiforgery;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -40,11 +43,24 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    builder.RegisterAll(DataAcquisitionConstants.ServiceName, configureRedis: true);
+
     var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-    builder.Services.Configure<AcquisitionJobSettings>(builder.Configuration.GetSection(AcquisitionJobSettings.SectionName));
+    // Add Data Protection
+    builder.Services.AddDataProtection()
+        .SetApplicationName(builder.Configuration.GetValue<string>("DataProtection:KeyRing") ?? "Link");
 
-    builder.RegisterAll(DataAcquisitionConstants.ServiceName, true);
+    // Configure antiforgery for browser-based callers (Admin.UI via YARP).
+    // Bearer-authenticated callers (LinkSdk) bypass validation via ValidateAntiForgeryOrBearerTokenAttribute.
+    builder.Services.AddAntiforgery(options =>
+    {
+        options.HeaderName = "X-Link-AntiForgery";
+    });
+
+    builder.Services.Configure<AcquisitionJobSettings>(builder.Configuration.GetSection(AcquisitionJobSettings.SectionName));
+    builder.Services.Configure<TailMessageRecoveryJobSettings>(builder.Configuration.GetSection(TailMessageRecoveryJobSettings.SectionName));
+
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
 
@@ -62,7 +78,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.Converters.Add(new ParameterConverter());
         options.JsonSerializerOptions.Converters.Add(new TimeSpanConverter());
         options.JsonSerializerOptions.ForFhir(ModelInfo.ModelInspector);
-    }); 
+    });
 
     //Add Hosted Services
     builder.Services.AddHostedService<AcquisitionProcessingScheduleService>();
@@ -130,10 +146,11 @@ static void RegisterServices(WebApplicationBuilder builder)
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         c.IncludeXmlComments(xmlPath);
         c.DocumentFilter<HealthChecksFilter>();
-    });    
+    });
 
     //Add CORS
-    builder.Services.AddLinkCorsService(options => {
+    builder.Services.AddLinkCorsService(options =>
+    {
         options.Environment = builder.Environment;
     });
 
@@ -181,6 +198,14 @@ static void SetupMiddleware(WebApplication app)
     app.UseAuthorization();
 
     app.MapControllers();
+
+    // Antiforgery token endpoint for browser-based callers (Admin.UI via YARP proxy).
+    // Returns the request token in the response body and sets the cookie token automatically.
+    app.MapGet("/api/data/antiforgery-token", (IAntiforgery antiforgery, HttpContext context) =>
+    {
+        var tokens = antiforgery.GetAndStoreTokens(context);
+        return Results.Ok(new { token = tokens.RequestToken, headerName = "X-Link-AntiForgery" });
+    }).RequireAuthorization();
 
     //map health check middleware and info endpoint
     app.MapHealthChecks("/health", new HealthCheckOptions

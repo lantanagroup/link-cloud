@@ -41,6 +41,17 @@ import {
 import {
   DataAcquisitionFhirListConfigFormComponent
 } from '../../data-acquisition/data-acquisition-fhir-list-config-form/data-acquisition-fhir-list-config-form.component';
+import {
+  SftpConfigDialogComponent
+} from '../../data-acquisition/sftp-config-dialog/sftp-config-dialog.component';
+import {
+  SftpConfigFormComponent
+} from '../../data-acquisition/sftp-config-form/sftp-config-form.component';
+import {
+  SftpConnectionTestDialogComponent,
+  SftpConnectionTestDialogData
+} from '../../data-acquisition/sftp-connection-test-dialog/sftp-connection-test-dialog.component';
+import { ISftpConfigurationModel } from '../../../interfaces/data-acquisition/sftp-config-model.interface';
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 import {
   QueryPlanConfigDialogComponent
@@ -87,6 +98,7 @@ import {
     LinkAlertComponent,
     DataAcquisitionFhirQueryConfigFormComponent,
     DataAcquisitionFhirListConfigFormComponent,
+    SftpConfigFormComponent,
     QueryPlanConfigFormComponent,
     MatMenu,
     MatMenuTrigger,
@@ -119,6 +131,10 @@ export class FacilityEditComponent implements OnInit {
   showNoDataAcqFhirQueryConfigAlert: boolean = false;
   noDataAcqFhirListConfigAlertMessage = 'No FHIR List configuration found for this facility.';
   showNoDataAcqFhirListConfigAlert: boolean = false;
+
+  noSftpConfigAlertMessage = 'No SFTP configuration found for this facility.';
+  showNoSftpConfigAlert: boolean = false;
+  sftpConfig!: ISftpConfigurationModel;
 
   noDataAcqQueryPlanConfigAlertMessage = 'No FHIR query plan found for this facility and type';
   showNoDataAcqQueryPlanConfigAlert: boolean = false;
@@ -410,6 +426,7 @@ export class FacilityEditComponent implements OnInit {
   loadDataAcquisitionConfig() {
     this.loadFhirQueryConfig();
     this.loadFhirListConfig();
+    this.loadSftpConfig();
     this.loadQueryPlan("Discharge", "Discharge")
   }
 
@@ -477,6 +494,146 @@ export class FacilityEditComponent implements OnInit {
         }
       });
     }
+  }
+
+  loadSftpConfig() {
+    if (!this.sftpConfig) {
+      this.dataAcquisitionService.getSftpConfiguration(this.facilityId).subscribe((data: ISftpConfigurationModel) => {
+        this.sftpConfig = data;
+        this.showNoSftpConfigAlert = !this.sftpConfig;
+      }, error => {
+        if (error.status == 404) {
+          this.sftpConfig = {
+            organizationId: this.facilityConfig.facilityId,
+            host: '',
+            port: 22,
+            timeout: '00:01:00',
+            removeAfterProcessing: false,
+            authenticationProtocol: 'Basic',
+            enableBenchmarking: false,
+            acquisitionConfigurations: []
+          } as ISftpConfigurationModel;
+          this.showNoSftpConfigAlert = true;
+        } else {
+          this.snackBar.open(`Failed to load SFTP configuration for the facility, see error for details.`, '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+        }
+      });
+    }
+  }
+
+  showSftpConfigDialog(): void {
+    this.dialog.open(SftpConfigDialogComponent,
+      {
+        width: '50vw',
+        maxWidth: '50vw',
+        data: {
+          dialogTitle: 'SFTP Configuration',
+          formMode: this.showNoSftpConfigAlert ? FormMode.Create : FormMode.Edit,
+          viewOnly: false,
+          sftpConfig: this.sftpConfig
+        }
+      }).afterClosed().subscribe(res => {
+      if (res) {
+        this.dataAcquisitionService.getSftpConfiguration(this.facilityId).subscribe((data: ISftpConfigurationModel) => {
+          if (data) {
+            this.showNoSftpConfigAlert = false;
+            this.sftpConfig = data;
+          }
+        });
+        this.snackBar.open(`${res}`, '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
+    });
+  }
+
+  onDeleteSftpConfig(): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this SFTP configuration?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.dataAcquisitionService.deleteSftpConfiguration(this.sftpConfig.organizationId, this.sftpConfig.id!).subscribe({
+          next: () => {
+            this.dataAcquisitionService.getSftpConfiguration(this.facilityId).subscribe({
+              next: (data: ISftpConfigurationModel | null) => {
+                if (data) {
+                  this.showNoSftpConfigAlert = false;
+                  this.sftpConfig = data;
+                } else {
+                  this.showNoSftpConfigAlert = true;
+                  this.sftpConfig = {
+                    organizationId: this.facilityId,
+                    host: '',
+                    port: 22,
+                    timeout: '00:01:00',
+                    removeAfterProcessing: false,
+                    authenticationProtocol: 'Basic',
+                    enableBenchmarking: false,
+                    acquisitionConfigurations: []
+                  };
+                }
+              },
+              error: () => {
+                this.showNoSftpConfigAlert = true;
+                this.sftpConfig = {
+                  organizationId: this.facilityId,
+                  host: '',
+                  port: 22,
+                  timeout: '00:01:00',
+                  removeAfterProcessing: false,
+                  authenticationProtocol: 'Basic',
+                  enableBenchmarking: false,
+                  acquisitionConfigurations: []
+                };
+              }
+            });
+          },
+          error: () => {
+            this.snackBar.open('Error deleting SFTP configuration', 'Close', {
+              duration: 3500,
+              panelClass: 'error-snackbar',
+              horizontalPosition: 'end',
+              verticalPosition: 'top'
+            });
+          }
+        });
+      }
+    });
+  }
+
+  onTestSftpConnection(): void {
+    const dialogData: SftpConnectionTestDialogData = {
+      isLoading: true
+    };
+
+    const dialogRef = this.dialog.open(SftpConnectionTestDialogComponent, {
+      width: '400px',
+      data: dialogData,
+      disableClose: true
+    });
+
+    this.dataAcquisitionService.testSftpConnection(this.facilityId).subscribe({
+      next: (result) => {
+        dialogData.isLoading = false;
+        dialogData.result = result;
+      },
+      error: (error) => {
+        dialogData.isLoading = false;
+        dialogData.error = error?.message || 'An unexpected error occurred while testing the connection.';
+      }
+    });
   }
 
   onPlanSelected(outcome: any) {

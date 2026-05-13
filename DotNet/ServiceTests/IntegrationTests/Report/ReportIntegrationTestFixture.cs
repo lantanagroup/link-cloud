@@ -1,253 +1,234 @@
-﻿using Confluent.Kafka;
-using LantanaGroup.Link.Normalization.Domain.Managers;
-using LantanaGroup.Link.Report.Application.Factory;
+using Azure.Storage.Blobs;
+using Confluent.Kafka;
+using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Application.Interfaces;
-using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Application.Options;
-using LantanaGroup.Link.Report.Core;
-using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
-using LantanaGroup.Link.Report.Jobs;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Listeners;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Services.ResourceMerger.Strategies;
-using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
-using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using MongoDB.Driver;
 using Moq;
 using Quartz;
 using Testcontainers.Azurite;
-using Testcontainers.MongoDb;
+using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
 {
-    [CollectionDefinition("ReportIntegrationTests")]
-    public class DatabaseCollection : ICollectionFixture<ReportIntegrationTestFixture> { }
-
-    public class ReportIntegrationTestFixture : IDisposable
+    public class ReportIntegrationTestFixture : IAsyncLifetime, IDisposable
     {
-        public IServiceProvider ServiceProvider { get; private set; }
-        public IServiceScopeFactory ScopeFactory { get; private set; }
-        private readonly IHost _host;
-        private readonly AzuriteContainer _azuriteContainer;
-        private readonly MongoDbContainer _mongoContainer;
+        private readonly AzuriteContainer _azuriteContainer = new AzuriteBuilder()
+            .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
+            .Build();
 
-        //TODO: To be worked on in LNK-4722
-        //// Public static mocks
-        //public static Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadProducerMock { get; private set; }
-        //public static Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> ReadyForValidationProducerMock { get; private set; }
-        //public static Mock<IProducer<string, DataAcquisitionRequestedValue>> DataAcquisitionRequestedProducerMock { get; private set; }
-        //public static Mock<IProducer<string, AuditEventMessage>> AuditableEventOccurredProducerMock { get; private set; }
-        //public static Mock<IProducer<string, EvaluationRequestedValue>> EvaluationRequestedProducerMock { get; private set; }
-        //public static Mock<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>> ResourceEvaluatedConsumerFactoryMock { get; private set; }
-        //public static Mock<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>> ResourceEvaluatedTransientHandlerMock { get; private set; }
-        //public static Mock<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>> ResourceEvaluatedDeadLetterHandlerMock { get; private set; }
-        //public static Mock<IKafkaConsumerFactory<string, ValidationCompleteValue>> ValidationCompleteConsumerFactoryMock { get; private set; }
-        //public static Mock<ITransientExceptionHandler<string, ValidationCompleteValue>> ValidationCompleteTransientHandlerMock { get; private set; }
-        //public static Mock<IDeadLetterExceptionHandler<string, ValidationCompleteValue>> ValidationCompleteDeadLetterHandlerMock { get; private set; }
-        //public static Mock<BlobStorageService> BlobStorageMock { get; private set; }
-        //public static Mock<ISchedulerFactory> SchedulerFactoryMock { get; private set; }
-        //public static Mock<IReportServiceMetrics> ReportServiceMetricsMock { get; private set; }
-        //public static Mock<ITenantApiService> TenantApiServiceMock { get; private set; }
+        private IHost _host;
+        public IServiceProvider ServiceProvider { get; private set; } = null!;
+        public IServiceScopeFactory ScopeFactory { get; private set; } = null!;
 
-        //public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
-        //public string MongoConnectionString { get; }
+        public Mock<ISchedulerFactory> SchedulerFactoryMock { get; } = new();
 
-        //public ReportIntegrationTestFixture()
-        //{
-        //    // Mocks setup
-        //    SubmitPayloadProducerMock = new Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>>();
-        //    ReadyForValidationProducerMock = new Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>>();
-        //    DataAcquisitionRequestedProducerMock = new Mock<IProducer<string, DataAcquisitionRequestedValue>>();
-        //    AuditableEventOccurredProducerMock = new Mock<IProducer<string, AuditEventMessage>>();
-        //    EvaluationRequestedProducerMock = new Mock<IProducer<string, EvaluationRequestedValue>>();
-        //    ResourceEvaluatedConsumerFactoryMock = new Mock<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-        //    ResourceEvaluatedTransientHandlerMock = new Mock<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-        //    ResourceEvaluatedDeadLetterHandlerMock = new Mock<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>();
-        //    ValidationCompleteConsumerFactoryMock = new Mock<IKafkaConsumerFactory<string, ValidationCompleteValue>>();
-        //    ValidationCompleteTransientHandlerMock = new Mock<ITransientExceptionHandler<string, ValidationCompleteValue>>();
-        //    ValidationCompleteDeadLetterHandlerMock = new Mock<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>();
-        //    SchedulerFactoryMock = new Mock<ISchedulerFactory>();
-        //    ReportServiceMetricsMock = new Mock<IReportServiceMetrics>();
-        //    TenantApiServiceMock = new Mock<ITenantApiService>();
+        public Mock<IProducer<SubmitPayloadKey, SubmitPayloadValue>> SubmitPayloadKafkaProducerMock { get; private set; } = new();
+        public Mock<IProducer<ReadyForValidationKey, ReadyForValidationValue>> ReadyForValidationKafkaProducerMock { get; private set; } = new();
+        public Mock<IProducer<string, DataAcquisitionRequestedValue>> DataAcquisitionRequestedKafkaProducerMock { get; private set; } = new();
+        public Mock<IProducer<string, AuditEventMessage>> AuditableEventKafkaProducerMock { get; private set; } = new();
 
-        //    // Azurite
-        //    _azuriteContainer = new AzuriteBuilder()
-        //        .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
-        //        .Build();
-        //    _azuriteContainer.StartAsync().GetAwaiter().GetResult();
+        public Mock<ITenantApiService> TenantApiServiceMock { get; } = new();
+        public Mock<IHttpClientFactory> HttpClientFactoryMock { get; } = new();
+        public Mock<IQuartzJobHelper> QuartzJobHelperMock { get; } = new();
+        public Mock<IKafkaConsumerFactory<string, ReportScheduledValue>> ReportScheduledConsumerFactoryMock { get; } = new();
 
-        //    // MongoDB
-        //    _mongoContainer = new MongoDbBuilder()
-        //        .WithImage("mongo:7.0")
-        //        .WithName($"mongo-report-{Guid.NewGuid():N}")
-        //        .WithReplicaSet("rs0")
-        //        .Build();
+        public Mock<ITransientExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>> ReportScheduledTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>> ReportScheduledDeadLetterHandlerMock { get; } = new();
 
-        //    _mongoContainer.StartAsync().GetAwaiter().GetResult();
-        //    MongoConnectionString = $"{_mongoContainer.GetConnectionString()}&replicaSet=rs0";
+        public Mock<IKafkaConsumerFactory<string, PatientEventValue>> PatientEventConsumerFactoryMock { get; } = new();
+        public Mock<ITransientExceptionHandler<PatientEventListener, string, PatientEventValue>> PatientEventTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<PatientEventListener, string, PatientEventValue>> PatientEventDeadLetterHandlerMock { get; } = new();
 
-        //    // Blob settings
-        //    var blobSettings = new BlobStorageSettings
-        //    {
-        //        ConnectionString = _azuriteContainer.GetConnectionString(),
-        //        BlobContainerName = "report-test-container",
-        //        BlobRoot = "root"
-        //    };
-        //    var options = Options.Create(blobSettings);
-        //    BlobStorageMock = new Mock<BlobStorageService>(MockBehavior.Default, options);
+        public Mock<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>> MeasureReportGeneratedConsumerFactoryMock { get; } = new();
+        public Mock<ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>> MeasureReportGeneratedTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>> MeasureReportGeneratedDeadLetterHandlerMock { get; } = new();
 
-        //    // Host & DI setup
-        //    var schedulerMock = new Mock<IScheduler>();
-        //    SchedulerFactoryMock
-        //        .Setup(f => f.GetScheduler(It.IsAny<CancellationToken>()))
-        //        .ReturnsAsync(schedulerMock.Object);
+        public Mock<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedConsumerFactoryMock { get; } = new();
+        public Mock<ITransientExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue>> PayloadSubmittedDeadLetterHandlerMock { get; } = new();
 
-        //    var builder = Host.CreateApplicationBuilder();
+        public Mock<IKafkaConsumerFactory<string, ValidationCompleteValue>> ValidationCompleteConsumerFactoryMock { get; } = new();
+        public Mock<ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>> ValidationCompleteTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>> ValidationCompleteDeadLetterHandlerMock { get; } = new();
 
-        //    // Get assembly version for ServiceInformation
-        //    var assemblyVersion = Assembly.GetExecutingAssembly()
-        //        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.0.0-test";
+        public Mock<ICreateSystemToken> CreateSystemTokenMock { get; } = new();
+        public Mock<IProducer<string, EvaluationRequestedValue>> EvaluationRequestedProducerMock { get; } = new();
+        public Mock<IKafkaConsumerFactory<string, GenerateReportValue>> GenerateReportConsumerFactoryMock { get; } = new();
+        public Mock<ITransientExceptionHandler<GenerateReportListener, string, GenerateReportValue>> GenerateReportTransientHandlerMock { get; } = new();
+        public Mock<IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue>> GenerateReportDeadLetterHandlerMock { get; } = new();
 
-        //    // Setup ServiceInformation with the correct Mongo connection string
-        //    var serviceInformation = builder.SetupServiceInformation(
-        //        ReportConstants.ServiceName,
-        //        assemblyVersion,
-        //        MongoConnectionString
-        //    );
+        public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
 
-        //    builder.Services.AddLogging(logging => logging.AddConsole());
-        //    builder.Services.AddTransient<ILogger<ValidationCompleteListener>>(sp => Mock.Of<ILogger<ValidationCompleteListener>>());
-        //    builder.Services.AddTransient<ILogger<ResourceEvaluatedListener>>(sp => Mock.Of<ILogger<ResourceEvaluatedListener>>());
-        //    builder.Services.AddTransient<ILogger<ReportManifestProducer>>(sp => Mock.Of<ILogger<ReportManifestProducer>>());
-        //    builder.Services.AddTransient<ILogger<UseLatestStrategy>>(sp => Mock.Of<ILogger<UseLatestStrategy>>());
-
-        //    // Register IMongoClient as a singleton using the configured connection string
-        //    builder.Services.AddSingleton<IMongoClient>(sp =>
-        //    {
-        //        return new MongoClient(MongoConnectionString);
-        //    });
-
-        //    // Register IMongoDatabase as a singleton using the shared client and database name
-        //    builder.Services.AddSingleton<IMongoDatabase>(sp =>
-        //    {
-        //        var client = sp.GetRequiredService<IMongoClient>();
-        //        return client.GetDatabase("reportTestDb");
-        //    });
-
-        //    // Add the MongoDbContext to the DI container, using the shared client
-        //    builder.Services.AddDbContext<MongoDbContext>((sp, options) =>
-        //    {
-        //        var client = sp.GetRequiredService<IMongoClient>();
-        //        options.UseMongoDB(client, "reportTestDb");
-        //    });
-
-        //    builder.Services.AddTransient<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, MongoDbContext>>();
-        //    builder.Services.AddTransient<IEntityRepository<PatientSubmissionEntry>, EntityRepository<PatientSubmissionEntry, MongoDbContext>>();
-        //    builder.Services.AddTransient<IEntityRepository<ReportModel>, EntityRepository<ReportModel, MongoDbContext>>();
-        //    builder.Services.AddTransient<IEntityRepository<FhirResource>, EntityRepository<FhirResource, MongoDbContext>>();
-        //    builder.Services.AddTransient<IEntityRepository<PatientSubmissionEntryResourceMap>, EntityRepository<PatientSubmissionEntryResourceMap, MongoDbContext>>();
-        //    builder.Services.AddTransient<IDatabase, Database>();
-
-        //    builder.Services.AddTransient<IReportScheduledManager, ReportScheduledManager>();
-        //    builder.Services.AddTransient<ISubmissionEntryManager, SubmissionEntryManager>();
-        //    builder.Services.AddTransient<ISubmissionEntryQueries, SubmissionEntryQueries>();
-        //    builder.Services.AddTransient<IResourceManager, ResourceManager>();
-
-        //    builder.Services.AddTransient<ScheduledReportFactory>();
-        //    builder.Services.AddTransient<MeasureReportSummaryFactory>();
-        //    builder.Services.AddTransient<MeasureReportAggregator>();
-
-        //    builder.Services.AddTransient<SubmitPayloadProducer>(sp =>
-        //        new SubmitPayloadProducer(sp.GetRequiredService<IServiceScopeFactory>(), SubmitPayloadProducerMock.Object));
-        //    builder.Services.AddTransient<DataAcquisitionRequestedProducer>(sp =>
-        //        new DataAcquisitionRequestedProducer(sp.GetRequiredService<IServiceScopeFactory>(), DataAcquisitionRequestedProducerMock.Object));
-        //    builder.Services.AddTransient<ReadyForValidationProducer>(sp =>
-        //        new ReadyForValidationProducer(ReadyForValidationProducerMock.Object, sp.GetRequiredService<IServiceScopeFactory>()));
-        //    builder.Services.AddTransient<AuditableEventOccurredProducer>(sp =>
-        //        new AuditableEventOccurredProducer(sp.GetRequiredService<ILogger<AuditableEventOccurredProducer>>(), AuditableEventOccurredProducerMock.Object, serviceInformation));
-
-        //    builder.Services.AddSingleton(Options.Create(blobSettings));
-        //    builder.Services.AddSingleton<BlobStorageService>(BlobStorageMock.Object);
-
-        //    builder.Services.AddTransient<ReportManifestProducer>(sp =>
-        //        new ReportManifestProducer(
-        //            sp.GetRequiredService<ILogger<ReportManifestProducer>>(),
-        //            sp.GetRequiredService<IServiceScopeFactory>(),
-        //            sp.GetRequiredService<MeasureReportAggregator>(),
-        //            TenantApiServiceMock.Object,
-        //            BlobStorageMock.Object,
-        //            sp.GetRequiredService<SubmitPayloadProducer>(),
-        //            sp.GetRequiredService<AuditableEventOccurredProducer>()
-        //        ));
-
-        //    builder.Services.AddTransient<EndOfReportPeriodJob>();
-        //    builder.Services.AddTransient<PatientReportSubmissionBundler>();
-        //    builder.Services.AddTransient<ValidationCompleteListener>();
-
-        //    builder.Services.AddSingleton<IKafkaConsumerFactory<ResourceEvaluatedKey, ResourceEvaluatedValue>>(ResourceEvaluatedConsumerFactoryMock.Object);
-        //    builder.Services.AddSingleton<ITransientExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(ResourceEvaluatedTransientHandlerMock.Object);
-        //    builder.Services.AddSingleton<IDeadLetterExceptionHandler<ResourceEvaluatedKey, ResourceEvaluatedValue>>(ResourceEvaluatedDeadLetterHandlerMock.Object);
-        //    builder.Services.AddSingleton<IKafkaConsumerFactory<string, ValidationCompleteValue>>(ValidationCompleteConsumerFactoryMock.Object);
-        //    builder.Services.AddSingleton<ITransientExceptionHandler<string, ValidationCompleteValue>>(ValidationCompleteTransientHandlerMock.Object);
-        //    builder.Services.AddSingleton<IDeadLetterExceptionHandler<string, ValidationCompleteValue>>(ValidationCompleteDeadLetterHandlerMock.Object);
-
-        //    builder.Services.AddSingleton<IReportServiceMetrics>(ReportServiceMetricsMock.Object);
-        //    builder.Services.AddSingleton<ITenantApiService>(TenantApiServiceMock.Object);
-
-        //    //Add as a singleton so we can retrieve the instance for tests.
-        //    builder.Services.AddSingleton<ResourceEvaluatedListener>();
-
-        //    builder.Services.AddKeyedSingleton<ISchedulerFactory>("MongoScheduler", (provider, key) =>
-        //    {
-        //        var logger = provider.GetRequiredService<ILogger<ReportMongoSchedulerFactory>>();
-        //        var scopeFactory = provider.GetRequiredService<IServiceScopeFactory>();
-        //        return new ReportMongoSchedulerFactory(scopeFactory, logger);
-        //    });
-
-        //    _host = builder.Build();
-
-        //    ServiceProvider = _host.Services;
-        //    ScopeFactory = ServiceProvider.GetRequiredService<IServiceScopeFactory>();
-        //}
-
-        //public void ResetMocks()
-        //{
-        //    SubmitPayloadProducerMock.Reset();
-        //    ReadyForValidationProducerMock.Reset();
-        //    DataAcquisitionRequestedProducerMock.Reset();
-        //    AuditableEventOccurredProducerMock.Reset();
-        //    EvaluationRequestedProducerMock.Reset();
-        //    ResourceEvaluatedConsumerFactoryMock.Reset();
-        //    ResourceEvaluatedTransientHandlerMock.Reset();
-        //    ResourceEvaluatedDeadLetterHandlerMock.Reset();
-        //    ValidationCompleteConsumerFactoryMock.Reset();
-        //    ValidationCompleteTransientHandlerMock.Reset();
-        //    ValidationCompleteDeadLetterHandlerMock.Reset();
-        //    BlobStorageMock.Reset();
-        //    SchedulerFactoryMock.Reset();
-        //    ReportServiceMetricsMock.Reset();
-        //    TenantApiServiceMock.Reset();
-        //}
-
-        public void Dispose()
+        public async Task InitializeAsync()
         {
-            _azuriteContainer?.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            _mongoContainer?.DisposeAsync().AsTask().GetAwaiter().GetResult();
-            _host?.Dispose();
+            await _azuriteContainer.StartAsync();
+
+            var builder = Host.CreateApplicationBuilder();
+
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["BlobStorage:ConnectionString"] = AzuriteConnectionString,
+                ["BlobStorage:BlobContainerName"] = "report-test-container",
+                ["BlobStorage:BlobRoot"] = "test-root",
+                ["Authentication:EnableAnonymousAccess"] = "true",
+                ["Kafka:BootstrapServers"] = "localhost:9092",
+                ["ServiceRegistry:CensusServiceApiUrl"] = "http://localhost:8080"
+            });
+
+            builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection("BlobStorage"));
+
+            var _dbPath = Path.Combine(Path.GetTempPath(), $"testdb_{Guid.NewGuid()}.db");
+            builder.Services.AddDbContext<ReportDbContext>(options => options.UseSqlite($"Data Source={_dbPath};"));
+
+            builder.Services.AddSingleton<IQuartzJobHelper>(QuartzJobHelperMock.Object);
+
+            builder.Services.AddScoped<IEntityRepository<ReportSchedule>, EntityRepository<ReportSchedule, ReportDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<ReportEntry>, EntityRepository<ReportEntry, ReportDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<ReportPopulation>, EntityRepository<ReportPopulation, ReportDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<ReportResource>, EntityRepository<ReportResource, ReportDbContext>>();
+            builder.Services.AddTransient<IEntityRepository<GroupPopulation>, EntityRepository<GroupPopulation, ReportDbContext>>();
+            builder.Services.AddTransient<IEntityRepository<MeasureReportPopulation>, EntityRepository<MeasureReportPopulation, ReportDbContext>>();
+
+            builder.Services.AddScoped<IDatabase, Database>();
+            builder.Services.AddScoped<IReportScheduledManager, ReportScheduledManager>();
+            builder.Services.AddScoped<IReportEntryManager, ReportEntryManager>();
+            builder.Services.AddScoped<IReportPopulationManager, ReportPopulationManager>();
+            builder.Services.AddScoped<IReportResourceManager, ReportResourceManager>();
+
+            builder.Services.AddTransient<IReportServiceMetrics, ReportServiceMetrics>();
+
+            builder.Services.AddTransient<PatientAggregator>();
+            builder.Services.AddTransient<MeasureReportAggregator>();
+            builder.Services.AddSingleton<BlobStorageService>();
+            builder.Services.AddSingleton<ITenantApiService>(TenantApiServiceMock.Object);
+            builder.Services.AddSingleton<IHttpClientFactory>(HttpClientFactoryMock.Object);
+
+            builder.Services.AddLogging();
+
+            builder.Services.AddSingleton<ISchedulerFactory>(SchedulerFactoryMock.Object);
+
+            var serviceInformation = new ServiceInformation
+            {
+                ServiceName = "ReportIntegrationTest",
+                ServiceConfigName = "ReportIntegrationTest",
+                Version = "1.0.0-test"
+            };
+
+            builder.Services.AddSingleton(serviceInformation);
+
+            builder.Services.AddTransient<SubmitPayloadProducer>(sp =>
+                new SubmitPayloadProducer(sp.GetRequiredService<IServiceScopeFactory>(), SubmitPayloadKafkaProducerMock.Object, new Mock<ILogger<SubmitPayloadProducer>>().Object));
+
+            builder.Services.AddTransient<ReadyForValidationProducer>(sp =>
+                new ReadyForValidationProducer(ReadyForValidationKafkaProducerMock.Object, sp.GetRequiredService<IServiceScopeFactory>(), new Mock<ILogger<ReadyForValidationProducer>>().Object));
+
+            builder.Services.AddTransient<AuditableEventOccurredProducer>(sp =>
+                new AuditableEventOccurredProducer(new Mock<ILogger<AuditableEventOccurredProducer>>().Object, AuditableEventKafkaProducerMock.Object, sp.GetRequiredService<ServiceInformation>()));
+
+            builder.Services.AddTransient<DataAcquisitionRequestedProducer>(sp =>
+                new DataAcquisitionRequestedProducer(sp.GetRequiredService<IServiceScopeFactory>(), DataAcquisitionRequestedKafkaProducerMock.Object));
+
+            builder.Services.AddTransient<ReportManifestProducer>(sp =>
+                new ReportManifestProducer(
+                    new Mock<ILogger<ReportManifestProducer>>().Object,
+                    sp.GetRequiredService<IServiceScopeFactory>(),
+                    new MeasureReportAggregator(new Mock<ILogger<MeasureReportAggregator>>().Object, sp.GetRequiredService<IReportPopulationManager>()),
+                    TenantApiServiceMock.Object,
+                    sp.GetRequiredService<BlobStorageService>(),
+                    sp.GetRequiredService<SubmitPayloadProducer>(),
+                    sp.GetRequiredService<AuditableEventOccurredProducer>(),
+                    sp.GetRequiredService<IReportEntryManager>()));
+
+            builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+            builder.Services.AddSingleton<IKafkaConsumerFactory<string, ReportScheduledValue>>(ReportScheduledConsumerFactoryMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>>(ReportScheduledTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<ReportScheduledListener, string, ReportScheduledValue>>(ReportScheduledDeadLetterHandlerMock.Object);
+
+            builder.Services.AddSingleton<IKafkaConsumerFactory<string, PatientEventValue>>(PatientEventConsumerFactoryMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<PatientEventListener, string, PatientEventValue>>(PatientEventTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<PatientEventListener, string, PatientEventValue>>(PatientEventDeadLetterHandlerMock.Object);
+
+            builder.Services.AddSingleton<IKafkaConsumerFactory<Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedConsumerFactoryMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<MeasureReportGeneratedListener, Null, MeasureReportGeneratedValue>>(MeasureReportGeneratedDeadLetterHandlerMock.Object);
+            builder.Services.AddSingleton<ICreateSystemToken>(CreateSystemTokenMock.Object);
+            builder.Services.AddSingleton<IProducer<string, EvaluationRequestedValue>>(EvaluationRequestedProducerMock.Object);
+
+            builder.Services.AddSingleton<IKafkaConsumerFactory<string, GenerateReportValue>>(GenerateReportConsumerFactoryMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<PayloadSubmittedListener, PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedDeadLetterHandlerMock.Object);
+
+            builder.Services.AddSingleton<IKafkaConsumerFactory<PayloadSubmittedKey, PayloadSubmittedValue>>(PayloadSubmittedConsumerFactoryMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>>(ValidationCompleteTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<ValidationCompleteListener, string, ValidationCompleteValue>>(ValidationCompleteDeadLetterHandlerMock.Object);
+
+            builder.Services.AddSingleton<IKafkaConsumerFactory<string, ValidationCompleteValue>>(ValidationCompleteConsumerFactoryMock.Object);
+            builder.Services.AddSingleton<ITransientExceptionHandler<GenerateReportListener, string, GenerateReportValue>>(GenerateReportTransientHandlerMock.Object);
+            builder.Services.AddSingleton<IDeadLetterExceptionHandler<GenerateReportListener, string, GenerateReportValue>>(GenerateReportDeadLetterHandlerMock.Object);
+
+            builder.Services.AddTransient<PatientEventListener>();
+            builder.Services.AddTransient<ReportScheduledListener>();
+            builder.Services.AddTransient<MeasureReportGeneratedListener>();
+            builder.Services.AddTransient<PayloadSubmittedListener>();
+            builder.Services.AddTransient<ValidationCompleteListener>();
+            builder.Services.AddTransient<GenerateReportListener>();
+
+            builder.Services.Configure<ServiceRegistry>(opts => opts.CensusServiceUrl = "http://localhost:8080");
+            builder.Services.Configure<LinkTokenServiceSettings>(opts => opts.SigningKey = "test-signing-key");
+            builder.Services.Configure<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>(opts => opts.AllowAnonymous = true);
+
+            _host = builder.Build();
+            await _host.StartAsync();
+
+            ServiceProvider = _host.Services;
+            ScopeFactory = ServiceProvider.GetRequiredService<IServiceScopeFactory>();
+
+            var configuration = ServiceProvider.GetRequiredService<IConfiguration>();
+            var blobConnectionString = configuration["BlobStorage:ConnectionString"];
+            var containerName = configuration["BlobStorage:BlobContainerName"] ?? "report-test-container";
+            var blobServiceClient = new BlobServiceClient(blobConnectionString);
+            var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+            await containerClient.CreateIfNotExistsAsync();
+
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+            dbContext.Database.EnsureCreated();
         }
+
+        public async Task DisposeAsync()
+        {
+            if (_host != null)
+            {
+                await _host.StopAsync();
+                _host.Dispose();
+            }
+            await _azuriteContainer.DisposeAsync();
+        }
+
+        public void Dispose() { }
     }
 }

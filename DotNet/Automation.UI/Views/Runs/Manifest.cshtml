@@ -1,0 +1,595 @@
+@model LantanaGroup.Automation.Generation.GenerationManifestSnapshot
+@{
+    ViewData["Title"] = "Generation Manifest";
+    var run = (LantanaGroup.Link.Automation.Link.Models.AutomationRunSummary)ViewBag.Run;
+    var runId = (Guid)ViewBag.RunId;
+    var isComplete = run.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled;
+}
+@using LantanaGroup.Link.Automation.Link.Models
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <div>
+        <h3 class="fw-bold mb-0"><i class="bi bi-card-checklist me-2"></i>Generation Manifest</h3>
+        <div class="small text-muted">
+            Run: <a asp-action="Details" asp-route-id="@runId" class="text-decoration-none">@run.RunName</a>
+            <code class="ms-1">@runId</code>
+        </div>
+    </div>
+    <a asp-action="Details" asp-route-id="@runId" class="btn btn-sm btn-au-action">
+        <i class="bi bi-arrow-left me-1"></i>Back to Run
+    </a>
+</div>
+
+<!-- ── Summary Stat Tiles ── -->
+<div class="row g-3 mb-3" id="statTiles">
+    <div class="col"><div class="au-stat-tile" data-bs-toggle="tooltip" title="Number of generated patients"><div class="au-stat-value" id="statPatients">@Model.PatientCount</div><div class="au-stat-label">Patients</div></div></div>
+    <div class="col"><div class="au-stat-tile" data-bs-toggle="tooltip" title="Total resources across all patient bundles + shared infrastructure"><div class="au-stat-value" id="statTotal">@Model.TotalResourceCount.ToString("N0")</div><div class="au-stat-label">Total Generated</div></div></div>
+    <div class="col"><div class="au-stat-tile" data-bs-toggle="tooltip" title="Resources scoped to individual patients"><div class="au-stat-value" id="statPatientRes">-</div><div class="au-stat-label">Patient Resources</div></div></div>
+    <div class="col"><div class="au-stat-tile" data-bs-toggle="tooltip" title="Shared infrastructure resources (Location, Organization, etc.)"><div class="au-stat-value" id="statSharedRes">-</div><div class="au-stat-label">Shared / Infra</div></div></div>
+    <div class="col"><div class="au-stat-tile" data-bs-toggle="tooltip" title="Distinct FHIR resource types generated"><div class="au-stat-value" id="statTypes">-</div><div class="au-stat-label">Resource Types</div></div></div>
+</div>
+
+<!-- ── Nav Tabs ── -->
+<ul class="nav nav-tabs mb-3" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-overview" type="button">Overview</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-patients" type="button">Patients <span class="badge bg-secondary ms-1" id="patientTabCount">@Model.PatientCount</span></button></li>
+    @if (isComplete)
+    {
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-comparison" type="button" id="comparisonTab">
+            <i class="bi bi-arrow-left-right me-1"></i>Generated vs ABS</button></li>
+    }
+</ul>
+
+<div class="tab-content">
+    <!-- ════════════════════ OVERVIEW TAB ════════════════════ -->
+    <div class="tab-pane fade show active" id="tab-overview">
+        <div class="row g-3">
+            <!-- Left Column -->
+            <div class="col-lg-5">
+                <!-- Measures -->
+                <div class="au-card">
+                    <div class="card-header"><i class="bi bi-speedometer2 me-2"></i>Measures</div>
+                    <div class="card-body" id="measuresSection">
+                        <div class="text-muted small">Loading…</div>
+                    </div>
+                </div>
+                <!-- Query Plan Resource Types -->
+                <div class="au-card">
+                    <div class="card-header"><i class="bi bi-diagram-3 me-2"></i>Query Plan Resource Types</div>
+                    <div class="card-body" id="queryPlanSection">
+                        <div class="text-muted small">Loading…</div>
+                    </div>
+                </div>
+                <!-- Patient Eligibility -->
+                <div class="au-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-person-check me-2"></i>Patient Eligibility</span>
+                        <span class="badge" style="background:var(--au-accent);color:#fff;" id="eligibilityBadge"></span>
+                    </div>
+                    <div class="card-body" id="eligibilitySection">
+                        <div class="text-muted small">Loading…</div>
+                    </div>
+                </div>
+            </div>
+            <!-- Right Column -->
+            <div class="col-lg-7">
+                <!-- Resource Distribution Chart -->
+                <div class="au-card">
+                    <div class="card-header"><i class="bi bi-pie-chart me-2"></i>Resource Distribution</div>
+                    <div class="card-body">
+                        <div style="max-height:320px;display:flex;align-items:center;justify-content:center;">
+                            <canvas id="resourceDistChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <!-- Resource Counts Table -->
+                <div class="au-card">
+                    <div class="card-header"><i class="bi bi-table me-2"></i>Generated Resource Counts</div>
+                    <div class="card-body p-0">
+                        <div id="resourceCountsTable" style="max-height:400px;overflow-y:auto;">
+                            <div class="text-muted small p-3">Loading…</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════ PATIENTS TAB ════════════════════ -->
+    <div class="tab-pane fade" id="tab-patients">
+        <div class="au-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-people me-2"></i>Per-Patient Resource Breakdown</span>
+                <div>
+                    <input type="text" class="form-control form-control-sm" id="patientSearch" placeholder="Search patients…" style="width:220px;display:inline-block;">
+                </div>
+            </div>
+            <div class="card-body">
+                <div style="max-height:320px;display:flex;align-items:center;justify-content:center;" class="mb-3">
+                    <canvas id="patientBarChart"></canvas>
+                </div>
+                <div id="patientBreakdownContainer" style="max-height:600px;overflow-y:auto;">
+                    <div class="text-muted small">Loading…</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════ COMPARISON TAB (only when complete) ════════════════════ -->
+    @if (isComplete)
+    {
+        <div class="tab-pane fade" id="tab-comparison">
+            <div class="au-card">
+                <div class="card-header"><i class="bi bi-arrow-left-right me-2"></i>Generated vs ABS Upload Comparison</div>
+                <div class="card-body" id="comparisonBody">
+                    <div class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span>Loading ABS upload data…</div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    'use strict';
+
+    const runId = '@runId';
+    const manifestDataUrl = '@Url.Action("ManifestData", "Runs")';
+    const absDataUrl = '@Url.Action("AbsUploadData", "Runs")';
+    const isComplete = @(isComplete ? "true" : "false");
+
+    const measureShortNames = {
+        NhsnAcuteCareHospitalMonthlyInitialPopulation: 'ACH Monthly',
+        NhsnAcuteCareHospitalDailyInitialPopulation: 'ACH Daily',
+        NhsnGlycemicControlHypoglycemicInitialPopulation: 'Hypoglycemic'
+    };
+
+    const chartColors = [
+        '#4da3ff','#28a745','#ffc107','#dc3545','#6f42c1','#20c997','#fd7e14',
+        '#17a2b8','#e83e8c','#6610f2','#007bff','#6c757d','#343a40','#adb5bd'
+    ];
+
+    function escapeHtml(s) {
+        if (!s) return '';
+        const d = document.createElement('div');
+        d.appendChild(document.createTextNode(s));
+        return d.innerHTML;
+    }
+
+    function renderBadgeSet(items) {
+        if (!items?.length) return '<span class="text-muted small">None</span>';
+        return '<div class="d-flex flex-wrap gap-1">' +
+            items.map(t => `<span class="badge" style="background:#e8f4ff;color:var(--au-dark);border:1px solid #c5ddf5;font-weight:500;">${escapeHtml(t)}</span>`).join('') +
+            '</div>';
+    }
+
+    // ─── Fetch & Render ────────────────────────────────────────────
+    let manifestData = null;
+
+    fetch(`${manifestDataUrl}?id=${runId}`)
+        .then(r => r.ok && r.status !== 204 ? r.json() : null)
+        .then(m => {
+            if (!m) return;
+            manifestData = m;
+            renderOverview(m);
+            renderPatients(m);
+            initTooltips();
+        })
+        .catch(err => console.error('Failed to load manifest', err));
+
+    if (isComplete) {
+        const compTab = document.getElementById('comparisonTab');
+        if (compTab) {
+            compTab.addEventListener('click', () => {
+                // Lazy-load ABS data on first tab click
+                if (compTab._loaded) return;
+                compTab._loaded = true;
+                loadComparison();
+            });
+        }
+    }
+
+    function initTooltips() {
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+            new bootstrap.Tooltip(el);
+        });
+    }
+
+    // ─── OVERVIEW TAB ──────────────────────────────────────────────
+    function renderOverview(m) {
+        const shared = m.sharedInfrastructureCountsByType || {};
+        const sharedTotal = Object.values(shared).reduce((s, c) => s + c, 0);
+        const patientTotal = Object.values(m.totalCountsByType || {}).reduce((s, c) => s + c, 0);
+        const allTypes = new Set([...Object.keys(m.totalCountsByType || {}), ...Object.keys(shared)]);
+
+        document.getElementById('statPatientRes').textContent = patientTotal.toLocaleString();
+        document.getElementById('statSharedRes').textContent = sharedTotal.toLocaleString();
+        document.getElementById('statTypes').textContent = allTypes.size;
+
+        // Measures
+        const ms = document.getElementById('measuresSection');
+        if (m.measureIds?.length) {
+            ms.innerHTML = m.measureIds.map((id, idx) => {
+                const en = m.selectedMeasures?.[idx] || '';
+                const sn = measureShortNames[en] || '';
+                return `<div class="d-flex align-items-center gap-2 mb-2">
+                    ${sn ? `<span class="badge" style="background:var(--au-dark);color:#fff;">${escapeHtml(sn)}</span>` : ''}
+                    <code class="small text-muted text-break">${escapeHtml(id)}</code>
+                </div>`;
+            }).join('');
+        } else {
+            ms.innerHTML = '<span class="text-muted small">No measures</span>';
+        }
+
+        // Query Plan
+        const qp = document.getElementById('queryPlanSection');
+        qp.innerHTML = `
+            <div class="mb-3"><div class="small text-muted mb-1">Acquired (Parameter + Reference)</div>${renderBadgeSet(m.acquiredResourceTypes)}</div>
+            <div class="mb-3"><div class="small text-muted mb-1">Parameter Queries Only</div>${renderBadgeSet(m.parameterQueryResourceTypes)}</div>
+            <div><div class="small text-muted mb-1">CQL Referenced</div>${renderBadgeSet(m.cqlReferencedResourceTypes)}</div>`;
+
+        // Eligibility
+        const el = document.getElementById('eligibilitySection');
+        const eb = document.getElementById('eligibilityBadge');
+        if (m.patientEligibility && Object.keys(m.patientEligibility).length) {
+            const entries = Object.entries(m.patientEligibility);
+            const q = entries.filter(([, ms]) => ms.length > 0).length;
+            eb.textContent = `${q}/${entries.length} qualifying`;
+            let html = '<div style="max-height:300px;overflow-y:auto;"><table class="au-table table table-sm small mb-0"><thead><tr><th>Patient</th><th>Qualifying Measures</th></tr></thead><tbody>';
+            entries.forEach(([pid, measures]) => {
+                const b = measures.length > 0
+                    ? `<span class="badge au-badge-success">${measures.length} measure(s)</span>`
+                    : `<span class="badge au-badge-muted">None</span>`;
+                html += `<tr><td><code>${escapeHtml(pid)}</code></td><td>${b}</td></tr>`;
+            });
+            html += '</tbody></table></div>';
+            el.innerHTML = html;
+        } else {
+            el.innerHTML = '<span class="text-muted small">No eligibility data</span>';
+        }
+
+        // Resource counts table
+        const allCounts = { ...(m.totalCountsByType || {}) };
+        Object.entries(shared).forEach(([t, c]) => { allCounts[t] = (allCounts[t] || 0) + c; });
+        const sorted = Object.entries(allCounts).sort(([, a], [, b]) => b - a);
+
+        const rc = document.getElementById('resourceCountsTable');
+        if (sorted.length) {
+            let html = '<table class="au-table table table-sm small mb-0"><thead><tr><th>Type</th><th class="text-end">Patient</th><th class="text-end">Shared</th><th class="text-end">Total</th></tr></thead><tbody>';
+            sorted.forEach(([t, total]) => {
+                const pc = (m.totalCountsByType || {})[t] || 0;
+                const sc = shared[t] || 0;
+                html += `<tr>
+                    <td>${escapeHtml(t)}</td>
+                    <td class="text-end">${pc > 0 ? pc.toLocaleString() : '&ndash;'}</td>
+                    <td class="text-end text-muted">${sc > 0 ? sc.toLocaleString() : '&ndash;'}</td>
+                    <td class="text-end fw-semibold">${total.toLocaleString()}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            rc.innerHTML = html;
+        }
+
+        // Resource distribution doughnut
+        if (sorted.length) {
+            const labels = sorted.map(([t]) => t);
+            const data = sorted.map(([, c]) => c);
+            new Chart(document.getElementById('resourceDistChart'), {
+                type: 'doughnut',
+                data: {
+                    labels,
+                    datasets: [{ data, backgroundColor: labels.map((_, i) => chartColors[i % chartColors.length]), borderWidth: 1 }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+                        tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.toLocaleString()} (${((ctx.parsed / data.reduce((a,b)=>a+b,0))*100).toFixed(1)}%)` } }
+                    }
+                }
+            });
+        }
+    }
+
+    // ─── PATIENTS TAB ──────────────────────────────────────────────
+    function renderPatients(m) {
+        const container = document.getElementById('patientBreakdownContainer');
+        const patients = Object.entries(m.resourceCountsByPatient || {});
+        if (!patients.length) {
+            container.innerHTML = '<span class="text-muted small">No per-patient data</span>';
+            return;
+        }
+
+        // Bar chart: total resources per patient (top 50)
+        const patientTotals = patients.map(([pid, counts]) => ({
+            pid,
+            total: Object.values(counts).reduce((s, c) => s + c, 0)
+        })).sort((a, b) => b.total - a.total);
+
+        const chartPatients = patientTotals.slice(0, 50);
+        new Chart(document.getElementById('patientBarChart'), {
+            type: 'bar',
+            data: {
+                labels: chartPatients.map(p => p.pid),
+                datasets: [{
+                    label: 'Total Resources',
+                    data: chartPatients.map(p => p.total),
+                    backgroundColor: 'var(--au-accent)',
+                    borderRadius: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { label: ctx => `${ctx.parsed.y.toLocaleString()} resources` } }
+                },
+                scales: {
+                    x: { ticks: { font: { size: 10 }, maxRotation: 45 } },
+                    y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } }
+                }
+            }
+        });
+
+        // Patient cards
+        renderPatientCards(patients);
+
+        // Search
+        document.getElementById('patientSearch').addEventListener('input', function () {
+            const q = this.value.toLowerCase();
+            const filtered = patients.filter(([pid]) => pid.toLowerCase().includes(q));
+            renderPatientCards(filtered);
+        });
+    }
+
+    function renderPatientCards(patients) {
+        const container = document.getElementById('patientBreakdownContainer');
+        if (!patients.length) {
+            container.innerHTML = '<span class="text-muted small">No matching patients</span>';
+            return;
+        }
+
+        // Compact table view for many patients
+        let html = '<table class="au-table table table-sm small mb-0"><thead><tr><th>Patient</th><th class="text-end">Total</th><th>Resource Types</th></tr></thead><tbody>';
+        patients.forEach(([pid, counts]) => {
+            const total = Object.values(counts).reduce((s, c) => s + c, 0);
+            const types = Object.entries(counts).sort(([,a],[,b]) => b - a)
+                .map(([t, c]) => `<span class="badge me-1 mb-1" style="background:#e8f4ff;color:var(--au-dark);border:1px solid #c5ddf5;font-weight:500;" data-bs-toggle="tooltip" title="${c} ${t}">${escapeHtml(t)}: ${c}</span>`)
+                .join('');
+            html += `<tr>
+                <td><code>${escapeHtml(pid)}</code></td>
+                <td class="text-end fw-semibold">${total.toLocaleString()}</td>
+                <td style="max-width:500px;">${types}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+        // Re-init tooltips for new elements
+        container.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+    }
+
+    // ─── COMPARISON TAB ────────────────────────────────────────────
+    async function loadComparison() {
+        const body = document.getElementById('comparisonBody');
+        try {
+            const resp = await fetch(`${absDataUrl}?id=${runId}`);
+            if (resp.status === 204 || !resp.ok) {
+                body.innerHTML = '<div class="text-muted"><i class="bi bi-info-circle me-1"></i>ABS upload data is not available for this run. It is captured when the run completes and ABS validation executes.</div>';
+                return;
+            }
+            const abs = await resp.json();
+            if (!manifestData) {
+                body.innerHTML = '<div class="text-muted">Manifest data not loaded yet. Please try again.</div>';
+                return;
+            }
+            renderComparison(manifestData, abs);
+        } catch (e) {
+            body.innerHTML = `<div class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>Error: ${escapeHtml(e.message)}</div>`;
+        }
+    }
+
+    function renderComparison(gen, abs) {
+        const body = document.getElementById('comparisonBody');
+
+        const genCounts = gen.totalCountsByType || {};
+        const expectedCounts = gen.expectedAbsTotalCountsByType || {};
+        const absCounts = abs.totalCountsByType || {};
+        const acquiredTypes = new Set((gen.acquiredResourceTypes || []).map(t => t.toLowerCase()));
+        const cqlTypes = new Set((gen.cqlReferencedResourceTypes || []).map(t => t.toLowerCase()));
+        const hasFilters = acquiredTypes.size > 0 || cqlTypes.size > 0;
+
+        const allTypes = [...new Set([...Object.keys(genCounts), ...Object.keys(expectedCounts), ...Object.keys(absCounts)])].sort();
+
+        const genTotal = Object.values(genCounts).reduce((s, c) => s + c, 0);
+        const expectedTotal = Object.values(expectedCounts).reduce((s, c) => s + c, 0);
+        const absTotal = abs.totalResourceCount || Object.values(absCounts).reduce((s, c) => s + c, 0);
+
+        let html = '';
+
+        // ── Pipeline explanation ──
+        html += `<div class="alert alert-light border small mb-3" style="background:#f8fafc;">
+            <strong><i class="bi bi-diagram-3 me-1"></i>Prediction Pipeline</strong><br>
+            A resource is expected in ABS only if it passes <b>all three</b> gates:<br>
+            <span class="badge bg-primary me-1">1</span><strong>Generated</strong> — uploaded to FHIR server
+            <span class="mx-2">→</span>
+            <span class="badge bg-info me-1">2</span><strong>Query Plan Acquires</strong> — DA fetches types matching Parameter + Reference queries
+            <span class="mx-2">→</span>
+            <span class="badge bg-success me-1">3</span><strong>CQL References</strong> — HAPI CQL engine only places resources into <code>MeasureReport.contained</code> when a <code>[ResourceType]</code> retrieve touches them; MeasureEval's <code>normalize()</code> writes only <code>contained</code> resources to the <code>.mr</code> file
+            <span class="mx-2">→</span>
+            <span class="badge bg-dark me-1">4</span><strong>Expected in ABS</strong> — our prediction (= Generated ∩ QP Acquired ∩ CQL Referenced)
+            <span class="mx-2">vs</span>
+            <span class="badge bg-secondary me-1">5</span><strong>Actual ABS</strong> — what PatientAggregator wrote from the <code>.mr</code> files
+        </div>`;
+
+        // ── Summary stat tiles ──
+        const predictionDelta = absTotal - expectedTotal;
+        const predDeltaClass = predictionDelta === 0 ? 'text-success' : predictionDelta > 0 ? 'text-info' : 'text-warning';
+        const predDeltaSign = predictionDelta > 0 ? '+' : '';
+        html += `<div class="row g-3 mb-3">
+            <div class="col"><div class="au-stat-tile" data-bs-toggle="tooltip" title="Total resources generated and uploaded to FHIR"><div class="au-stat-value">${genTotal.toLocaleString()}</div><div class="au-stat-label">Generated</div></div></div>
+            <div class="col"><div class="au-stat-tile" data-bs-toggle="tooltip" title="Resources predicted to reach ABS (Generated ∩ Acquired ∩ CQL-Referenced)"><div class="au-stat-value" style="color:var(--au-accent);">${expectedTotal.toLocaleString()}</div><div class="au-stat-label">Predicted in ABS</div></div></div>
+            <div class="col"><div class="au-stat-tile" data-bs-toggle="tooltip" title="Total resources actually in ABS patient artifacts"><div class="au-stat-value">${absTotal.toLocaleString()}</div><div class="au-stat-label">Actual ABS</div></div></div>
+            <div class="col"><div class="au-stat-tile" data-bs-toggle="tooltip" title="Actual ABS − Predicted. Zero = perfect prediction."><div class="au-stat-value ${predDeltaClass}">${predDeltaSign}${predictionDelta.toLocaleString()}</div><div class="au-stat-label">Prediction Δ</div></div></div>
+            <div class="col"><div class="au-stat-tile" data-bs-toggle="tooltip" title="Resources filtered out between generation and prediction (not acquired or not CQL-referenced)"><div class="au-stat-value text-muted">${(genTotal - expectedTotal).toLocaleString()}</div><div class="au-stat-label">Filtered Out</div></div></div>
+        </div>`;
+
+        // ── Type-by-type pipeline table ──
+        html += `<div class="au-card mb-3"><div class="card-header"><i class="bi bi-funnel me-2"></i>Per-Type Prediction Pipeline</div><div class="card-body p-0">
+        <div style="max-height:500px;overflow-y:auto;">
+        <table class="au-table table table-sm small mb-0"><thead><tr>
+            <th>Resource Type</th>
+            <th class="text-end" data-bs-toggle="tooltip" title="Count generated and uploaded to FHIR">Generated</th>`;
+        if (hasFilters) {
+            html += `<th class="text-center" data-bs-toggle="tooltip" title="Does the query plan acquire this type?">QP Acquires</th>
+                <th class="text-center" data-bs-toggle="tooltip" title="Does the CQL reference this type?">CQL Refs</th>`;
+        }
+        html += `<th class="text-end" data-bs-toggle="tooltip" title="Our prediction: count expected in ABS after all filters">Predicted</th>
+            <th class="text-end" data-bs-toggle="tooltip" title="What actually appeared in ABS">Actual ABS</th>
+            <th class="text-end" data-bs-toggle="tooltip" title="Actual − Predicted">Δ</th>
+            <th>Verdict</th>
+        </tr></thead><tbody>`;
+
+        allTypes.forEach(t => {
+            const g = genCounts[t] || 0;
+            const e = expectedCounts[t] || 0;
+            const a = absCounts[t] || 0;
+            const d = a - e;
+            const tl = t.toLowerCase();
+            const qpAcq = acquiredTypes.size === 0 || acquiredTypes.has(tl) || tl === 'patient';
+            const cqlRef = cqlTypes.size === 0 || cqlTypes.has(tl) || tl === 'patient';
+
+            let verdict, rowClass;
+            if (d === 0 && e === a) {
+                verdict = '<i class="bi bi-check-circle-fill text-success"></i> Match';
+                rowClass = '';
+            } else if (a > e) {
+                verdict = '<i class="bi bi-plus-circle-fill text-info"></i> ABS has more';
+                rowClass = '';
+            } else if (e > 0 && a === 0) {
+                verdict = '<i class="bi bi-x-circle-fill text-danger"></i> Missing from ABS';
+                rowClass = 'table-danger';
+            } else if (a < e) {
+                verdict = '<i class="bi bi-exclamation-triangle-fill text-warning"></i> Partial';
+                rowClass = 'table-warning';
+            } else if (g > 0 && e === 0) {
+                verdict = '<span class="text-muted">Filtered out</span>';
+                rowClass = '';
+            } else {
+                verdict = '&ndash;';
+                rowClass = '';
+            }
+
+            const dSign = d > 0 ? '+' : '';
+            const qpIcon = qpAcq ? '<i class="bi bi-check text-success"></i>' : '<i class="bi bi-x text-danger"></i>';
+            const cqlIcon = cqlRef ? '<i class="bi bi-check text-success"></i>' : '<i class="bi bi-x text-danger"></i>';
+
+            html += `<tr class="${rowClass}">
+                <td><strong>${escapeHtml(t)}</strong></td>
+                <td class="text-end">${g > 0 ? g.toLocaleString() : '<span class="text-muted">&ndash;</span>'}</td>`;
+            if (hasFilters) {
+                html += `<td class="text-center">${qpIcon}</td><td class="text-center">${cqlIcon}</td>`;
+            }
+            html += `<td class="text-end fw-semibold" style="color:var(--au-accent);">${e > 0 ? e.toLocaleString() : '<span class="text-muted">&ndash;</span>'}</td>
+                <td class="text-end">${a > 0 ? a.toLocaleString() : '<span class="text-muted">&ndash;</span>'}</td>
+                <td class="text-end fw-semibold">${d !== 0 ? dSign + d.toLocaleString() : '<span class="text-muted">&ndash;</span>'}</td>
+                <td class="small">${verdict}</td>
+            </tr>`;
+        });
+        html += '</tbody></table></div></div></div>';
+
+        // ── Per-Patient Drill-Down ──
+        const genPatients = gen.resourceCountsByPatient || {};
+        const expectedPatients = gen.expectedAbsCountsByPatient || {};
+        const absPatients = abs.resourceCountsByPatient || {};
+        const allPatientIds = [...new Set([...Object.keys(genPatients), ...Object.keys(expectedPatients), ...Object.keys(absPatients)])].sort();
+
+        if (allPatientIds.length > 0) {
+            html += `<div class="au-card"><div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-people me-2"></i>Per-Patient Prediction vs ABS</span>
+                <input type="text" class="form-control form-control-sm" id="compPatientSearch" placeholder="Search patients…" style="width:200px;">
+            </div><div class="card-body p-0">
+            <div style="max-height:600px;overflow-y:auto;">
+            <table class="au-table table table-sm small mb-0" id="compPatientTable"><thead><tr>
+                <th>Patient</th>
+                <th class="text-end">Generated</th>
+                <th class="text-end" style="color:var(--au-accent);">Predicted</th>
+                <th class="text-end">Actual ABS</th>
+                <th class="text-end">Δ</th>
+                <th>Verdict</th>
+                <th></th>
+            </tr></thead><tbody>`;
+
+            allPatientIds.forEach((pid, idx) => {
+                const gCounts = genPatients[pid] || {};
+                const eCounts = expectedPatients[pid] || {};
+                const aCounts = absPatients[pid] || {};
+                const gTotal = Object.values(gCounts).reduce((s, c) => s + c, 0);
+                const eTotal = Object.values(eCounts).reduce((s, c) => s + c, 0);
+                const aTotal = Object.values(aCounts).reduce((s, c) => s + c, 0);
+                const d = aTotal - eTotal;
+                const dSign = d > 0 ? '+' : '';
+
+                let verdict, rowClass;
+                if (!(pid in absPatients)) { verdict = '<span class="badge au-badge-danger">Missing from ABS</span>'; rowClass = 'table-danger'; }
+                else if (d === 0) { verdict = '<i class="bi bi-check-circle-fill text-success"></i> Match'; rowClass = ''; }
+                else if (d > 0) { verdict = '<i class="bi bi-plus-circle text-info"></i> +' + d; rowClass = ''; }
+                else { verdict = '<i class="bi bi-exclamation-triangle text-warning"></i> ' + d; rowClass = 'table-warning'; }
+
+                // Build per-type detail for expand row
+                const patientTypes = [...new Set([...Object.keys(gCounts), ...Object.keys(eCounts), ...Object.keys(aCounts)])].sort();
+                let detailHtml = '<table class="table table-sm table-borderless small mb-0" style="background:#f8fafc;"><thead><tr><th>Type</th><th class="text-end">Gen</th><th class="text-end" style="color:var(--au-accent);">Pred</th><th class="text-end">ABS</th><th class="text-end">Δ</th><th>Status</th></tr></thead><tbody>';
+                patientTypes.forEach(t => {
+                    const pg = gCounts[t] || 0;
+                    const pe = eCounts[t] || 0;
+                    const pa = aCounts[t] || 0;
+                    const pd = pa - pe;
+                    const pds = pd > 0 ? '+' : '';
+                    let pv;
+                    if (pd === 0 && pe === pa) pv = '<i class="bi bi-check text-success"></i>';
+                    else if (pe > 0 && pa === 0) pv = '<i class="bi bi-x-circle text-danger"></i> Missing';
+                    else if (pa < pe) pv = '<i class="bi bi-exclamation-triangle text-warning"></i> Partial';
+                    else if (pa > pe) pv = '<i class="bi bi-plus-circle text-info"></i> Extra';
+                    else if (pg > 0 && pe === 0) pv = '<span class="text-muted">Filtered</span>';
+                    else pv = '&ndash;';
+                    const prc = pe > 0 && pa === 0 ? 'table-danger' : pa < pe ? 'table-warning' : '';
+                    detailHtml += `<tr class="${prc}"><td>${escapeHtml(t)}</td><td class="text-end">${pg || '&ndash;'}</td><td class="text-end">${pe || '&ndash;'}</td><td class="text-end">${pa || '&ndash;'}</td><td class="text-end">${pd !== 0 ? pds + pd : '&ndash;'}</td><td>${pv}</td></tr>`;
+                });
+                detailHtml += '</tbody></table>';
+
+                html += `<tr class="${rowClass} comp-patient-row" data-pid="${escapeHtml(pid)}">
+                    <td><code>${escapeHtml(pid)}</code></td>
+                    <td class="text-end">${gTotal.toLocaleString()}</td>
+                    <td class="text-end fw-semibold" style="color:var(--au-accent);">${eTotal.toLocaleString()}</td>
+                    <td class="text-end">${aTotal > 0 ? aTotal.toLocaleString() : '<span class="text-muted">&ndash;</span>'}</td>
+                    <td class="text-end fw-semibold">${d !== 0 ? dSign + d.toLocaleString() : '<span class="text-muted">&ndash;</span>'}</td>
+                    <td>${verdict}</td>
+                    <td><button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="this.closest('tr').nextElementSibling.classList.toggle('d-none');this.querySelector('i').classList.toggle('bi-chevron-down');this.querySelector('i').classList.toggle('bi-chevron-up');"><i class="bi bi-chevron-down"></i></button></td>
+                </tr>
+                <tr class="d-none"><td colspan="7" class="p-0">${detailHtml}</td></tr>`;
+            });
+            html += '</tbody></table></div></div></div>';
+        }
+
+        body.innerHTML = html;
+        body.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+
+        // Patient search filter
+        const searchInput = document.getElementById('compPatientSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', function () {
+                const q = this.value.toLowerCase();
+                document.querySelectorAll('.comp-patient-row').forEach(row => {
+                    const pid = row.dataset.pid?.toLowerCase() || '';
+                    const match = pid.includes(q);
+                    row.style.display = match ? '' : 'none';
+                    // Also hide the detail row
+                    if (row.nextElementSibling) row.nextElementSibling.style.display = match ? '' : 'none';
+                });
+            });
+        }
+    }
+})();
+</script>

@@ -33,9 +33,9 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 {
                     return Results.Problem("Failed to update user claims");
                 }
-                
+
                 user.UserClaims = model.Claims;
-                
+
                 logger.LogUpdateUser(user.Id.ToString(), requestor.Claims.FirstOrDefault(c => c.Type == "sub")?.Value ?? "Uknown");
 
                 return Results.Ok(user);
@@ -47,7 +47,7 @@ namespace LantanaGroup.Link.Account.Presentation.Endpoints.User.Handlers
                 logger.LogUpdateUserException(id.ToString(), ex.Message);
                 throw;
             }
-            
+
         }
     }
 }

@@ -40,20 +40,32 @@
 }
 
 .menu-dropdown li {
+  list-style: none;
+}
+
+.menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
   cursor: pointer;
+  text-align: left;
 }
 
-.menu-dropdown li .ng-fa-icon {
-  width: 16px; 
+.menu-item .ng-fa-icon {
+  width: 16px;
   text-align: center;
 }
 
-.menu-dropdown li:hover {
+.menu-item:hover,
+.menu-item:focus-visible {
   background-color: #f0f0f0;
+  outline: none;
 }
 
 .priority-invert {

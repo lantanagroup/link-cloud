@@ -55,7 +55,7 @@ public class CensusConfigController : Controller
 
         try
         {
-            var entity =  CensusConfigModel.FromDomain(await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig));
+            var entity = CensusConfigModel.FromDomain(await _censusConfigManager.AddOrUpdateCensusConfig(censusConfig));
 
             return Created(entity.FacilityId, entity);
         }
@@ -174,6 +174,74 @@ public class CensusConfigController : Controller
             _logger.LogError(ex, "Exception encountered in CensusConfigController.Put");
             return Problem(
                 detail: "An error occurred while processing your request.",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
+        }
+    }
+
+    /// <summary>
+    /// Disables census scheduling for a facility and removes its cron jobs.
+    /// </summary>
+    /// <param name="facilityId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>
+    ///     No Content: 204
+    ///     Bad Request: 400
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [HttpDelete("{facilityId}/jobs")]
+    public async Task<IActionResult> DisableFacilityJobs(string facilityId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            return BadRequest("FacilityID is required.");
+
+        try
+        {
+            await _censusConfigManager.DisableFacility(facilityId, cancellationToken);
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception encountered in CensusConfigController.DisableFacilityJobs");
+            return Problem(
+                detail: "An error occurred while disabling census jobs.",
+                statusCode: StatusCodes.Status500InternalServerError
+            );
+        }
+    }
+
+    /// <summary>
+    /// Enables census scheduling for a facility and recreates its cron jobs.
+    /// </summary>
+    /// <param name="facilityId"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns>
+    ///     No Content: 204
+    ///     Bad Request: 400
+    ///     Server Error: 500
+    /// </returns>
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    [HttpPatch("{facilityId}/jobs/restore")]
+    public async Task<IActionResult> EnableFacilityJobs(string facilityId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            return BadRequest("FacilityID is required.");
+
+        try
+        {
+            await _censusConfigManager.EnableFacility(facilityId, cancellationToken);
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception encountered in CensusConfigController.EnableFacilityJobs");
+            return Problem(
+                detail: "An error occurred while restoring census jobs.",
                 statusCode: StatusCodes.Status500InternalServerError
             );
         }

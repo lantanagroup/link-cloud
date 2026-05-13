@@ -1,10 +1,12 @@
 import { PaginationMetadata } from "../../models/pagination-metadata.model";
+import { Vendor } from "./vendor.enum";
 
 export interface IFacilityConfigModel {
   id?: string;
   facilityId: string;
   facilityName: string;
   timeZone: string;
+  vendor?: Vendor;
   scheduledReports: IScheduledReportModel;
   isDeleted?: boolean;
 }

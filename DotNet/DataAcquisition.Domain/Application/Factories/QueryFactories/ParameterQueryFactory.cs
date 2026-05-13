@@ -51,7 +51,7 @@ public class ParameterQueryFactory : IParameterQueryFactory
                     _logger.LogError("Query plan cannot have multiple paged parameters per resource type: {ResourceType}", config.ResourceType);
                     return null;
                 }
-                
+
                 isPaged = true;
 
                 if (searchParam.values != null)
@@ -71,7 +71,7 @@ public class ParameterQueryFactory : IParameterQueryFactory
                     _logger.LogWarning("Parameter value is null or empty. Parameter Key: {Key} for {ResourceType} on CorrelationId {CorrelationId}", searchParam.key, config.ResourceType, request.CorrelationId);
                     continue;
                 }
-                
+
                 // If another parameter previously made this a paged query, add the search param to all of the pages of the query
                 if (isPaged)
                 {
@@ -81,7 +81,7 @@ public class ParameterQueryFactory : IParameterQueryFactory
                 {
                     searchParams.Add(new KeyValuePair<string, string>(searchParam.key, searchParam.value));
                 }
-            }   
+            }
         }
 
         return isPaged ? new PagedParameterQueryFactoryResult(OperationType.Search, searchParamList)

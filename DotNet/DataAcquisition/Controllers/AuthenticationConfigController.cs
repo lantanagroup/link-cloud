@@ -24,7 +24,7 @@ public class AuthenticationConfigController : Controller
     private readonly IFhirListQueryConfigurationManager _fhirQueryListConfigurationManager;
 
 
-    public AuthenticationConfigController(ILogger<AuthenticationConfigController> logger, IFhirQueryConfigurationManager fhirQueryConfigurationManager, IFhirQueryConfigurationQueries fhirQueryConfigurationQueries, 
+    public AuthenticationConfigController(ILogger<AuthenticationConfigController> logger, IFhirQueryConfigurationManager fhirQueryConfigurationManager, IFhirQueryConfigurationQueries fhirQueryConfigurationQueries,
         IFhirListQueryConfigurationManager fhirQueryListConfigurationManager, IFhirQueryListConfigurationQueries fhirQueryListConfigurationQueries)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -59,7 +59,7 @@ public class AuthenticationConfigController : Controller
         try
         {
             facilityId = Sanitize(facilityId);
-            
+
             if (queryConfigurationTypePathParameter == null)
             {
                 throw new BadRequestException($"QueryConfigurationTypePathParameter is null.");
@@ -229,7 +229,7 @@ public class AuthenticationConfigController : Controller
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> UpdateAuthenticationSettings(
         string facilityId,
-        QueryConfigurationTypePathParameter queryConfigurationTypePathParameter,
+        QueryConfigurationTypePathParameter? queryConfigurationTypePathParameter,
         AuthenticationConfigurationModel? authenticationConfiguration,
         CancellationToken cancellationToken)
     {

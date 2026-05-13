@@ -1,15 +1,16 @@
-﻿using System.ComponentModel.DataAnnotations;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using System.ComponentModel.DataAnnotations;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Models;
 
-public class DataAcquisitionLogModel 
+public class DataAcquisitionLogModel
 {
     public long Id { get; init; }
     public string FacilityId { get; set; }
@@ -18,6 +19,7 @@ public class DataAcquisitionLogModel
     public string? PatientId { get; set; }
     public string? ResourceId { get; set; }
     public string? CorrelationId { get; set; }
+    public string? ReferenceResourceType { get; set; }
     public string? ReportTrackingId { get; set; }
     public string? FhirVersion { get; set; }
     public ReportableEvent? ReportableEvent { get; set; }
@@ -33,9 +35,10 @@ public class DataAcquisitionLogModel
     public DateTime? CompletionDate { get; set; }
     public long? CompletionTimeMilliseconds { get; set; }
     public List<string>? ResourceAcquiredIds { get; set; } = new List<string>();
-    public List<ReferenceResourceModel> ReferenceResources { get; set; } = new();
+    public int ReferenceResourceCount { get; set; }
     public List<string>? Notes { get; set; } = new List<string>();
     public ScheduledReport? ScheduledReport { get; set; }
+    public bool IsDeleted { get; set; }
 
     public static DataAcquisitionLogModel FromDomain(DataAcquisitionLog log)
     {
@@ -52,8 +55,9 @@ public class DataAcquisitionLogModel
             IsCensus = log.IsCensus,
             PatientId = log.PatientId,
             ReportableEvent = log.ReportableEvent,
-            ReportTrackingId = log.ReportTrackingId,
+            ReportTrackingId = log.ReportTrackingId?.ToString().ToLowerInvariant(),
             CorrelationId = log.CorrelationId,
+            ReferenceResourceType = log.ReferenceResourceType,
             FhirVersion = log.FhirVersion,
             QueryType = log.QueryType,
             QueryPhase = log.QueryPhase,
@@ -63,13 +67,15 @@ public class DataAcquisitionLogModel
                 Id = q.Id,
                 FacilityId = q.FacilityId,
                 MeasureId = q.MeasureId,
-                IdQueryParameterValues = q.IdQueryParameterValues.ToList(),
                 IsReference = q.IsReference,
                 QueryType = q.QueryType,
                 ResourceTypes = q.FhirQueryResourceTypes.Select(s => s.ResourceType).ToList(),
                 QueryParameters = q.QueryParameters,
                 Paged = q.Paged,
                 DataAcquisitionLogId = q.DataAcquisitionLogId,
+                CensusTimeFrame = q.CensusTimeFrame,
+                CensusPatientStatus = q.CensusPatientStatus,
+                CensusListId = q.CensusListId,
                 ResourceReferenceTypes = q.ResourceReferenceTypes != null ? q.ResourceReferenceTypes.Select(rt => new ResourceReferenceTypeModel
                 {
                     Id = rt.Id,
@@ -88,19 +94,20 @@ public class DataAcquisitionLogModel
             RetryAttempts = log.RetryAttempts,
             CompletionDate = log.CompletionDate,
             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-            ResourceAcquiredIds = log.ResourceAcquiredIds,
-            ReferenceResources = log.ReferenceResources.Select(r => new ReferenceResourceModel
-            {
-                Id = r.Id,
-                FacilityId = r.FacilityId,
-                ResourceId = r.ResourceId,
-                ResourceType = r.ResourceType,
-                ReferenceResource = r.ReferenceResource,
-                QueryPhase = r.QueryPhase,
-                DataAcquisitionLogId = r.DataAcquisitionLogId
-            }).ToList(),
-            Notes = log.Notes,
-            ScheduledReport = log.ScheduledReport
+            ResourceAcquiredIds = log.ResourceIds?.Select(r => r.ResourceId).ToList() ?? new List<string>(),
+            ReferenceResourceCount = log.ReferenceResources?.Count ?? 0,
+            Notes = null,
+            ScheduledReport = log.ScheduledReportEntity != null
+                ? new ScheduledReport
+                {
+                    ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString().ToLowerInvariant(),
+                    Frequency = log.ScheduledReportEntity.Frequency,
+                    StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
+                    EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
+                    ReportTypes = log.ScheduledReportEntity.ReportTypes?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() ?? new()
+                }
+                : null,
+            IsDeleted = log.IsDeleted
         };
     }
 }

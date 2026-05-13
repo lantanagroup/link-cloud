@@ -7,7 +7,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations
     /// </summary>
     public enum OperationStatus
     {
-        Failure, 
+        Failure,
         Success,
         NoAction
     }

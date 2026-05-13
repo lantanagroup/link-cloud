@@ -39,9 +39,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.Security
                     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
 
                     var response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
-                    response.EnsureSuccessStatusCode();                    
+                    response.EnsureSuccessStatusCode();
 
-                    var user = await response.Content.ReadFromJsonAsync<JsonElement>();                     
+                    var user = await response.Content.ReadFromJsonAsync<JsonElement>();
 
                     context.RunClaimActions(user);
 

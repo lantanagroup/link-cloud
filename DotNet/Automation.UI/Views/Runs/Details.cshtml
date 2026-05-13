@@ -1,0 +1,1632 @@
+@model LantanaGroup.Link.Automation.Link.Models.AutomationRunSummary
+@{
+    ViewData["Title"] = "Run Details";
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <h3 class="fw-bold mb-0" id="runName">@Model.RunName</h3>
+            <code class="text-muted small">@Model.RunId</code>
+        </div>
+        <div class="d-flex gap-2 align-items-center" id="runHeaderActions">
+            @if (Model.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+            {
+                <button type="button" class="btn btn-warning btn-sm" id="btnCancelRun"><i class="bi bi-x-circle me-1"></i>Cancel</button>
+            }
+            @if (Model.Status is AutomationRunStatus.Succeeded or AutomationRunStatus.Failed or AutomationRunStatus.Cancelled)
+            {
+                <button type="button" class="btn btn-danger btn-sm" id="btnDeleteRun"><i class="bi bi-trash me-1"></i>Delete</button>
+                <a asp-action="Export" asp-route-id="@Model.RunId" class="btn btn-sm" style="background:var(--au-accent);color:#fff;font-weight:600;">
+                    <i class="bi bi-download me-1"></i>Export Diagnostics
+                </a>
+            }
+            <a asp-action="Index" class="btn btn-sm btn-au-action"><i class="bi bi-arrow-left me-1"></i>Back</a>
+        </div>
+    </div>
+
+    <div class="au-card">
+        <div class="card-header"><i class="bi bi-clipboard-data me-2"></i>Run Summary</div>
+        <div class="card-body">
+            <div class="row g-3" id="runSummaryGrid">
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Status</span><span class="au-value" id="status">@Model.Status</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Facility</span><code class="au-value" id="facilityId">@(Model.FacilityId ?? "-")</code></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Started</span><span class="au-value" id="started">@(Model.StartedAt?.ToString("u") ?? "-")</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value" id="finished">@(Model.FinishedAt?.ToString("u") ?? "-")</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Pipeline Duration</span><span class="au-value" id="pipelineDuration">@(Model.Duration ?? "-")</span></div></div>
+            </div>
+            <div id="errorRow" class="mt-3" style="display:none;"><div class="alert alert-danger mb-0 py-2 small"><i class="bi bi-exclamation-triangle-fill me-1"></i><span id="error">@(Model.Error ?? "-")</span></div></div>
+            <span id="finalizingBadge" class="badge rounded-pill bg-secondary text-white mt-2" style="display:none;">
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" style="width:.7rem;height:.7rem;"></span>
+                Finalizing…
+            </span>
+        </div>
+    </div>
+
+    <div class="au-card" id="testConfigCard" style="display:none;">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-gear me-2"></i>Test Configuration</span>
+            <a href="#" class="btn btn-sm" id="btnViewManifest" style="display:none; background:var(--au-accent); color:#fff; font-weight:600;">
+                <i class="bi bi-card-checklist me-1"></i>Generation Manifest
+            </a>
+        </div>
+        <div class="card-body">
+            <div class="row g-3" id="runConfigProps"></div>
+            <div id="cohortSummaryCard" class="mt-3" style="display:none;">
+                <div class="fw-semibold small mb-1"><i class="bi bi-people-fill me-1"></i>Cohorts</div>
+                <div id="cohortSummaryBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <ul class="nav nav-tabs mb-3" id="runDetailsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview-pane" type="button" role="tab" aria-controls="overview-pane" aria-selected="true">Overview</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs-pane" type="button" role="tab" aria-controls="logs-pane" aria-selected="false">Logs</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="runDetailsTabContent">
+        <div class="tab-pane fade show active" id="overview-pane" role="tabpanel" aria-labelledby="overview-tab" tabindex="0">
+            <div class="au-card">
+                <div class="card-header"><i class="bi bi-file-earmark-medical me-2"></i>Report</div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="small text-muted mb-1">Milestones</div>
+                        <div id="reportMilestones" class="d-flex flex-wrap justify-content-center gap-2" style="min-height: 42px;"></div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted mb-2">Report Schedule</div>
+                                <div class="row g-2">
+                                    <div class="col-md-12"><strong>Facility ID:</strong> <code id="scheduleFacilityId">@(Model.FacilityId ?? "-")</code></div>
+                                    <div class="col-md-6"><strong>Test:</strong> <span id="scheduleReportName">-</span></div>
+                                    <div class="col-md-6"><strong>Frequency:</strong> <span id="scheduleFrequency">-</span></div>
+                                    <div class="col-md-6"><strong>Start:</strong> <span id="scheduleStart">-</span></div>
+                                    <div class="col-md-6"><strong>End:</strong> <span id="scheduleEnd">-</span></div>
+                                    <div class="col-md-6"><strong>Adhoc Type:</strong> <span id="scheduleAdhoc">-</span></div>
+                                    <div class="col-md-6"><strong>Status:</strong> <span id="scheduleStatusPill" class="badge bg-secondary">-</span></div>
+                                    <div class="col-md-6"><strong>Report Created:</strong> <span id="scheduleCreated">-</span></div>
+                                    <div class="col-md-6"><strong>Submitted:</strong> <span id="scheduleSubmitted">-</span></div>
+                                    <div class="col-md-6"><strong>Duration:</strong> <span id="scheduleDuration" class="fw-semibold">-</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="border rounded p-3 h-100">
+                                <div class="small text-muted mb-2">Report Entries by Submission Status</div>
+                                    <canvas id="entriesDonut" height="150" style="height:150px;max-height:150px;"></canvas>
+                                <div id="entriesLegend" class="small mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border rounded p-3 mt-3">
+                        <div class="small text-muted mb-1">Report Populations</div>
+                        <div id="populationSummary">No population data yet.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="au-card" id="validatorResultsCard" style="display:none;">
+                <div class="card-header"><i class="bi bi-check2-square me-2"></i>Automation Validator Results</div>
+                <div class="card-body">
+                    <div id="validatorResultsSummary" class="small text-muted mb-2"></div>
+                    <div class="row g-2" id="validatorResultsGrid"></div>
+                </div>
+            </div>
+
+            <div class="au-card" id="serviceErrorSummaryCard">
+                <div class="card-header"><i class="bi bi-bug me-2"></i>Service Error Summary</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted mb-1">Data Acquisition</div>
+                                <button type="button" id="serviceErrorBtnDataAcq" class="btn w-100 text-center service-error-btn" data-service="Data Acquisition" disabled>
+                                    <div id="serviceErrorCountDataAcq" class="display-5 fw-semibold text-muted">0</div>
+                                    <div class="small text-muted">exceptions</div>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted mb-1">Normalization</div>
+                                <button type="button" id="serviceErrorBtnNormalization" class="btn w-100 text-center service-error-btn" data-service="Normalization" disabled>
+                                    <div id="serviceErrorCountNormalization" class="display-5 fw-semibold text-muted">0</div>
+                                    <div class="small text-muted">exceptions</div>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted mb-1">Measure Eval</div>
+                                <button type="button" id="serviceErrorBtnMeasureEval" class="btn w-100 text-center service-error-btn" data-service="Measure Eval" disabled>
+                                    <div id="serviceErrorCountMeasureEval" class="display-5 fw-semibold text-muted">0</div>
+                                    <div class="small text-muted">exceptions</div>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted mb-1">Validation</div>
+                                <button type="button" id="serviceErrorBtnValidation" class="btn w-100 text-center service-error-btn" data-service="Validation" disabled>
+                                    <div id="serviceErrorCountValidation" class="display-5 fw-semibold text-muted">0</div>
+                                    <div class="small text-muted">exceptions</div>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="border rounded p-2 h-100">
+                                <div class="small text-muted mb-1">Report</div>
+                                <button type="button" id="serviceErrorBtnReport" class="btn w-100 text-center service-error-btn" data-service="Report" disabled>
+                                    <div id="serviceErrorCountReport" class="display-5 fw-semibold text-muted">0</div>
+                                    <div class="small text-muted">exceptions</div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="au-card">
+                <div class="card-header" role="button" data-bs-toggle="modal" data-bs-target="#dataAcqLogModal" style="cursor:pointer;">
+                    <i class="bi bi-download me-2"></i>Data Acquisition
+                    <span class="badge bg-light text-dark ms-2" id="dataAcqTotalLogs">0</span>
+                    <span class="small ms-1" style="opacity:.7;">logs (click to drill down)</span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Resource Count</div><div class="fs-4 fw-semibold" id="dataAcqResourceCount">0</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Avg Resources/sec</div><div class="fs-4 fw-semibold" id="dataAcqResPerSec">0.00</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Events/sec</div><div class="fs-4 fw-semibold" id="dataAcqRate">0.00</div></div></div>
+                        <div class="col-md-3 d-flex align-items-end justify-content-end">
+                            <button type="button" id="dataAcqErrorsBtn" class="btn btn-sm btn-outline-danger" style="display:none;">Errors Encountered</button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Logs by Status</div>
+                            <canvas id="dataAcqDonut" height="160" style="height:160px;max-height:160px;max-width: 220px;"></canvas>
+                            <div id="dataAcqLegend" class="small mt-2"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Throughput Timeline (10s buckets)</div>
+                            <canvas id="dataAcqTimeline" height="90" style="height:90px;max-height:90px;"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Top Resource Types</div>
+                            <canvas id="dataAcqResourceMixChart" height="170" style="height:170px;max-height:170px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="au-card">
+                <div class="card-header"><i class="bi bi-arrow-repeat me-2"></i>Normalization</div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Resource Count</div><div class="fs-4 fw-semibold" id="normalizationResourceCount">0</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Avg Resources/sec</div><div class="fs-4 fw-semibold" id="normalizationResPerSec">0.00</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Events/sec</div><div class="fs-4 fw-semibold" id="normalizationRate">0.00</div></div></div>
+                        <div class="col-md-3 d-flex align-items-end justify-content-end">
+                            <button type="button" id="normalizationErrorsBtn" class="btn btn-sm btn-outline-danger" style="display:none;">Errors Encountered</button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="small text-muted mb-1">Throughput Timeline (10s buckets)</div>
+                            <canvas id="normalizationTimeline" height="90" style="height:90px;max-height:90px;"></canvas>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted mb-1">Top Resource Types</div>
+                            <canvas id="normalizationResourceMixChart" height="170" style="height:170px;max-height:170px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="au-card">
+                <div class="card-header"><i class="bi bi-bar-chart-line me-2"></i>Measure Eval</div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Resource Count</div><div class="fs-4 fw-semibold" id="measureResourceCount">0</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Avg Resources/sec</div><div class="fs-4 fw-semibold" id="measureResPerSec">0.00</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Events/sec</div><div class="fs-4 fw-semibold" id="measureRate">0.00</div></div></div>
+                        <div class="col-md-3 d-flex align-items-end justify-content-end">
+                            <button type="button" id="measureErrorsBtn" class="btn btn-sm btn-outline-danger" style="display:none;">Errors Encountered</button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Measure Report Patient States</div>
+                            <canvas id="measureStageChart" height="170" style="height:170px;max-height:170px;"></canvas>
+                            <div id="measureStageLegend" class="small mt-2"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Throughput Timeline (10s buckets)</div>
+                            <canvas id="measureTimeline" height="90" style="height:90px;max-height:90px;"></canvas>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="small text-muted mb-1">Top Resource Types</div>
+                            <canvas id="measureResourceMixChart" height="170" style="height:170px;max-height:170px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="au-card">
+                <div class="card-header"><i class="bi bi-shield-check me-2"></i>Validation</div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Patients</div><div class="fs-4 fw-semibold" id="validationPatientCount">0</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Passed</div><div class="fs-4 fw-semibold text-success" id="validationPassedCount">0</div></div></div>
+                        <div class="col-md-3"><div class="border rounded p-2"><div class="small text-muted">Failed</div><div class="fs-4 fw-semibold text-danger" id="validationFailedCount">0</div></div></div>
+                        <div class="col-md-3 d-flex align-items-end justify-content-end">
+                            <button type="button" id="validationErrorsBtn" class="btn btn-sm btn-outline-danger" style="display:none;">Errors Encountered</button>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="small text-muted mb-1">Validation Patient States</div>
+                            <canvas id="validationStageChart" height="170" style="height:170px;max-height:170px;"></canvas>
+                            <div id="validationStageLegend" class="small mt-2"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-muted mb-1">Throughput Timeline (10s buckets)</div>
+                            <canvas id="validationTimeline" height="90" style="height:90px;max-height:90px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="logs-pane" role="tabpanel" aria-labelledby="logs-tab" tabindex="0">
+            <div class="au-card">
+                <div class="card-header"><i class="bi bi-terminal me-2"></i>Console</div>
+                <div class="card-body p-0">
+                    <pre id="logBox" class="au-log-console mb-0">@string.Join("\n", Model.Logs)</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="errorFlyout" style="position:fixed; top:0; right:-480px; width:460px; height:100%; background:#fff; box-shadow:-4px 0 20px rgba(0,0,0,.2); z-index:1055; transition:right .2s ease;">
+    <div class="d-flex justify-content-between align-items-center border-bottom p-3">
+        <h6 class="mb-0" id="errorFlyoutTitle">Errors</h6>
+        <button class="btn btn-sm btn-outline-secondary" id="closeFlyout">Close</button>
+    </div>
+    <div class="p-3" id="errorFlyoutBody" style="overflow:auto; height: calc(100% - 60px);"></div>
+</div>
+
+<div class="modal fade" id="serviceExceptionModal" tabindex="-1" aria-labelledby="serviceExceptionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable" style="max-width:900px;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-0" id="serviceExceptionModalLabel">Service Exceptions</h5>
+                    <small class="text-muted" id="serviceExceptionSubtitle"></small>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="sticky-top bg-white border-bottom px-3 py-2" style="z-index:2;">
+                    <div class="row g-2 align-items-center">
+                        <div class="col">
+                            <input type="text" class="form-control form-control-sm" id="exModalSearch" placeholder="Search exceptions…">
+                        </div>
+                        <div class="col-auto">
+                            <span class="badge bg-secondary" id="exModalVisibleCount">0</span>
+                            <span class="small text-muted">shown</span>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1 mt-2" id="exModalGroupChips"></div>
+                </div>
+                <div id="exModalAccordion" class="accordion accordion-flush" style="min-height:200px;"></div>
+                <div id="exModalEmpty" class="text-center text-muted p-4" style="display:none;">No exceptions match the current filter.</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="dataAcqLogModal" tabindex="-1" aria-labelledby="dataAcqLogModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content au-card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-download me-2"></i><span id="dataAcqLogModalLabel">Data Acquisition Logs</span></span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex justify-content-between align-items-center mb-2 gap-2">
+                    <input type="search"
+                           id="daLogSearch"
+                           class="form-control form-control-sm"
+                           style="max-width:360px;"
+                           placeholder="Filter all logs (Id, patient, status, phase, resource types…)"
+                           autocomplete="off" />
+                    <span class="small text-muted" id="daLogFilterInfo"></span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table au-table mb-0" id="dataAcqLogTable">
+                        <thead>
+                            <tr>
+                                <th role="button" class="user-select-none" data-sortby="Id">Id <span id="sortIconId" class="text-white-50"></span></th>
+                                <th role="button" class="user-select-none" data-sortby="PatientId">Patient <span id="sortIconPatientId" class="text-white-50"></span></th>
+                                <th role="button" class="user-select-none" data-sortby="Status">Status <span id="sortIconStatus" class="text-white-50"></span></th>
+                                <th role="button" class="user-select-none" data-sortby="QueryPhase">Phase <span id="sortIconQueryPhase" class="text-white-50"></span></th>
+                                <th>Reference</th>
+                                <th>Resource Types</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="dataAcqLogTableBody">
+                        </tbody>
+                    </table>
+                </div>
+
+<div id="daLogFlyout" class="au-card" style="position:fixed; top:0; right:-720px; width:700px; max-width:96vw; height:100%; z-index:1060; transition:right .2s ease; border-radius:0; margin-bottom:0;">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+            <div id="daLogFlyoutTitle"><i class="bi bi-file-text me-2"></i>Data Acquisition Log Details</div>
+            <div class="small" id="daLogFlyoutSubtitle" style="opacity:.85;font-weight:400;"></div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" id="closeDaLogFlyout" aria-label="Close"></button>
+    </div>
+    <div class="p-3" id="daLogFlyoutBody" style="overflow:auto; height: calc(100% - 56px); background:#fff;"></div>
+</div>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                    <span class="small text-muted" id="dataAcqLogPaginationInfo"></span>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-au-action" id="dataAcqLogPrev" disabled>Previous</button>
+                        <button class="btn btn-au-action" id="dataAcqLogNext" disabled>Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+<script>
+    (function () {
+        const runId = '@Model.RunId';
+        const runConfigurationJson = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.RunConfigurationJson ?? string.Empty));
+        const snapshotUrl = '@Url.Action("PipelineSnapshot", "Runs")';
+        const manifestUrl = '@Url.Action("ManifestData", "Runs")';
+        const logBox = document.getElementById('logBox');
+        let dataAcqErrors = [];
+        let measureErrors = [];
+        let validationErrors = [];
+        let normalizationErrors = [];
+        let lastDataAcqSnapshot = null;
+        const serviceErrorLines = {
+            'Data Acquisition': [],
+            'Normalization': [],
+            'Measure Eval': [],
+            'Validation': [],
+            'Report': []
+        };
+        const charts = {};
+        let currentRunStatus = '@Model.Status';
+        let currentFinishedAt = '@(Model.FinishedAt?.ToString("O") ?? string.Empty)';
+        let runCompletedAtMs = currentFinishedAt ? (Date.parse(currentFinishedAt) || Date.now()) : null;
+        let snapshotTimer = null;
+
+        function antiforgeryToken() {
+            var token = document.querySelector('input[name="__RequestVerificationToken"]');
+            return token ? token.value : '';
+        }
+
+        function swapCancelToDelete() {
+            var cancelBtn = document.getElementById('btnCancelRun');
+            if (cancelBtn) cancelBtn.remove();
+
+            var actionsDiv = document.getElementById('runHeaderActions');
+            if (!actionsDiv) return;
+
+            var backLink = actionsDiv.querySelector('a.btn-au-action');
+
+            if (!document.getElementById('btnDeleteRun')) {
+                var deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'btn btn-danger btn-sm';
+                deleteBtn.id = 'btnDeleteRun';
+                deleteBtn.innerHTML = '<i class="bi bi-trash me-1"></i>Delete';
+                if (backLink) actionsDiv.insertBefore(deleteBtn, backLink);
+                else actionsDiv.appendChild(deleteBtn);
+            }
+
+            if (!document.getElementById('btnExportRun')) {
+                var exportLink = document.createElement('a');
+                exportLink.id = 'btnExportRun';
+                exportLink.className = 'btn btn-sm';
+                exportLink.style.background = 'var(--au-accent)';
+                exportLink.style.color = '#fff';
+                exportLink.style.fontWeight = '600';
+                exportLink.href = '@Url.Action("Export", "Runs", new { id = Model.RunId })';
+                exportLink.innerHTML = '<i class="bi bi-download me-1"></i>Export Diagnostics';
+                if (backLink) actionsDiv.insertBefore(exportLink, backLink);
+                else actionsDiv.appendChild(exportLink);
+            }
+        }
+
+        function handleDeleteClick(btn) {
+            if (!confirm('Delete this run and all persisted data?')) return;
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i>Deleting…';
+
+            fetch('@Url.Action("DeleteJson", "Runs")', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'RequestVerificationToken': antiforgeryToken()
+                },
+                body: JSON.stringify({ id: runId })
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (result) {
+                if (result.success) {
+                    window.location.href = '@Url.Action("Index", "Runs")';
+                } else {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-trash me-1"></i>Delete';
+                    alert('Unable to delete the run. It may still be active.');
+                }
+            })
+            .catch(function (err) {
+                console.error('Delete failed', err);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-trash me-1"></i>Delete';
+                alert('Unable to delete the run. Please try again.');
+            });
+        }
+
+        // Use event delegation so dynamically-created delete buttons also work
+        document.getElementById('runHeaderActions').addEventListener('click', function (e) {
+            var deleteBtn = e.target.closest('#btnDeleteRun');
+            if (deleteBtn) {
+                handleDeleteClick(deleteBtn);
+                return;
+            }
+        });
+
+        var cancelBtn = document.getElementById('btnCancelRun');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function () {
+                if (!confirm('Cancel this running test and cleanup all related service/FHIR data?')) return;
+
+                cancelBtn.disabled = true;
+                cancelBtn.textContent = 'Cancelling…';
+
+                fetch('@Url.Action("CancelJson", "Runs")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': antiforgeryToken()
+                    },
+                    body: JSON.stringify({ id: runId })
+                })
+                .then(function (r) { return r.json(); })
+                .then(function () {
+                    swapCancelToDelete();
+                })
+                .catch(function (err) {
+                    console.error('Cancel failed', err);
+                    cancelBtn.disabled = false;
+                    cancelBtn.textContent = 'Cancel';
+                    alert('Unable to cancel the run. Please try again.');
+                });
+            });
+        }
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl('/hubs/runs')
+            .withAutomaticReconnect()
+            .build();
+
+        function appendLog(line) {
+            if (!line) return;
+            logBox.textContent += (logBox.textContent ? '\n' : '') + line;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function formatNumber(value) {
+            return Number(value || 0).toFixed(2);
+        }
+
+        function escapeHtml(value) {
+            const s = String(value || '');
+            return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+        }
+
+        function toLabel(key) {
+            if (!key) return '';
+            const spaced = String(key)
+                .replaceAll('_', ' ')
+                .replace(/([a-z])([A-Z])/g, '$1 $2');
+            return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+        }
+
+        const measureShortNames = {
+            NhsnAcuteCareHospitalMonthlyInitialPopulation: 'ACH Monthly',
+            NhsnAcuteCareHospitalDailyInitialPopulation: 'ACH Daily',
+            NhsnGlycemicControlHypoglycemicInitialPopulation: 'Hypoglycemic'
+        };
+
+        function renderConfigProperties(rawJson) {
+            const container = document.getElementById('runConfigProps');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const cohortCard = document.getElementById('cohortSummaryCard');
+            const cohortBody = document.getElementById('cohortSummaryBody');
+            if (cohortCard) cohortCard.style.display = 'none';
+            if (cohortBody) cohortBody.innerHTML = '';
+
+            const errorRow = document.getElementById('errorRow');
+            const errorSpan = document.getElementById('error');
+
+            if (!rawJson) return;
+
+            let parsed;
+            try { parsed = JSON.parse(rawJson); } catch { return; }
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+
+            // Keys rendered elsewhere or otherwise not surfaced as plain key/value pairs.
+            const skip = new Set([
+                'id', 'isSystemScenario',
+                'patientCohorts',
+                'resourcesPerPatientMin', 'resourcesPerPatientMax',
+                'queryPlanTemplateId', 'updatedAt'
+            ]);
+
+            const labels = {
+                name: 'Test Name',
+                description: 'Description',
+                reportMethod: 'Report Method',
+                selectedMeasures: 'Measures',
+                seed: 'Seed',
+                patientCount: 'Patients',
+                queryPlanTemplateName: 'Query Plan',
+                cleanupServiceData: 'Cleanup Service Data',
+                cleanupFhirData: 'Cleanup FHIR Data'
+            };
+
+            Object.entries(parsed).forEach(([k, v]) => {
+                if (skip.has(k)) return;
+                if (v === null || v === undefined || v === '') return;
+
+                let display;
+                if (Array.isArray(v)) {
+                    if (v.length === 0) return;
+                    if (k === 'selectedMeasures') {
+                        display = v.map(m => escapeHtml(measureShortNames[m] || toLabel(m))).join(', ');
+                    } else {
+                        display = v.map(item => escapeHtml(String(item))).join(', ');
+                    }
+                } else if (typeof v === 'boolean') {
+                    display = v ? '<i class="bi bi-check-circle-fill text-success"></i> Yes' : '<i class="bi bi-x-circle text-muted"></i> No';
+                } else if (typeof v === 'object') {
+                    return;
+                } else {
+                    display = escapeHtml(String(v));
+                }
+
+                const label = labels[k] || toLabel(k);
+                const col = document.createElement('div');
+                col.className = 'col-md-3';
+                col.innerHTML = `<div class="au-summary-item"><span class="au-label">${escapeHtml(label)}</span><span class="au-value">${display}</span></div>`;
+                container.appendChild(col);
+            });
+
+            // Show error row only if there is an actual error.
+            if (errorRow && errorSpan) {
+                const hasError = errorSpan.textContent && errorSpan.textContent !== '-';
+                errorRow.style.display = hasError ? '' : 'none';
+            }
+
+            // Show the test config card if any properties were rendered.
+            const testConfigCard = document.getElementById('testConfigCard');
+            if (testConfigCard && container.children.length > 0) {
+                testConfigCard.style.display = '';
+            }
+
+            // Render cohort summary as a compact table.
+            if (cohortCard && cohortBody && Array.isArray(parsed.patientCohorts) && parsed.patientCohorts.length > 0) {
+                const allMeasures = [...new Set(parsed.patientCohorts.flatMap(c => c.measureEligibilities ? Object.keys(c.measureEligibilities) : []))];
+                const measureCols = allMeasures.map(m => `<th>${escapeHtml(measureShortNames[m] || toLabel(m))}</th>`).join('');
+
+                const rows = parsed.patientCohorts.map((c, idx) => {
+                    const eligCells = allMeasures.map(m => {
+                        const v = c.measureEligibilities?.[m];
+                        const isQ = v === 'Qualifying' || v === 0 || v === '0';
+                        return `<td><span class="badge ${isQ ? 'au-badge-success' : 'au-badge-muted'}">${isQ ? 'Q' : 'NQ'}</span></td>`;
+                    }).join('');
+                    const min = c?.resourcesPerPatientMin ?? '-';
+                    const max = c?.resourcesPerPatientMax ?? '-';
+                    return `<tr><td class="fw-semibold">${idx + 1}</td><td>${c?.patientCount ?? '-'}</td><td>${escapeHtml(String(min))}\u2013${escapeHtml(String(max))}</td>${eligCells}</tr>`;
+                }).join('');
+
+                cohortBody.innerHTML =
+                    `<table class="au-cohort-summary-table"><thead><tr><th>#</th><th>Patients</th><th>Resources</th>${measureCols}</tr></thead><tbody>${rows}</tbody></table>`;
+                cohortCard.style.display = '';
+            }
+        }
+
+        function upsertChart(canvasId, config) {
+            if (charts[canvasId]) {
+                charts[canvasId].data = config.data;
+                charts[canvasId].options = config.options;
+                charts[canvasId].update('none');
+                return;
+            }
+
+            charts[canvasId] = new Chart(document.getElementById(canvasId), config);
+        }
+
+        function renderStageChart(canvasId, legendId, counts, colorMap) {
+            renderDoughnut(canvasId, legendId, counts, colorMap);
+        }
+
+        function renderResourceMix(canvasId, counts) {
+            const items = counts || [];
+            if (!items.length) {
+                return;
+            }
+
+            upsertChart(canvasId, {
+                type: 'bar',
+                data: {
+                    labels: items.map(x => x.status || 'Unknown'),
+                    datasets: [{
+                        data: items.map(x => x.count || 0),
+                        backgroundColor: ['#0d6efd', '#198754', '#6f42c1', '#20c997', '#fd7e14', '#6c757d'],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2.2,
+                    animation: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, ticks: { precision: 0 } },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function renderTimeline(canvasId, buckets, color) {
+            const items = buckets || [];
+            if (!items.length) {
+                return;
+            }
+
+            upsertChart(canvasId, {
+                type: 'line',
+                data: {
+                    labels: items.map(x => x.label || ''),
+                    datasets: [{
+                        data: items.map(x => x.count || 0),
+                        borderColor: color,
+                        backgroundColor: `${color}33`,
+                        fill: true,
+                        pointRadius: 2,
+                        tension: 0.25
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2.6,
+                    animation: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { maxTicksLimit: 6 } },
+                        y: { beginAtZero: true, ticks: { precision: 0 } }
+                    }
+                }
+            });
+        }
+
+        function renderDoughnut(canvasId, legendId, items, colorMap, preserveOnEmpty = false) {
+            const total = (items || []).reduce((sum, x) => sum + (x.count || 0), 0);
+            const legend = document.getElementById(legendId);
+
+            if (!items || items.length === 0 || total === 0) {
+                if (preserveOnEmpty && charts[canvasId]) {
+                    return;
+                }
+                if (charts[canvasId]) {
+                    charts[canvasId].destroy();
+                    delete charts[canvasId];
+                }
+                legend.innerHTML = '<span class="text-muted small">No data yet.</span>';
+                return;
+            }
+
+            const labels = [];
+            const values = [];
+            const colors = [];
+            const fallbackPalette = ['#0ea5e9', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#64748b'];
+            let legendHtml = '';
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                const value = item.count || 0;
+                const color = colorMap[(item.status || '').toLowerCase()] || fallbackPalette[i % fallbackPalette.length];
+                labels.push(item.status || 'Unknown');
+                values.push(value);
+                colors.push(color);
+                legendHtml += `<div class="small"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:6px;"></span>${item.status}: ${value}</div>`;
+            }
+
+            upsertChart(canvasId, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 1.2,
+                    animation: false,
+                    cutout: '65%',
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            legend.innerHTML = legendHtml;
+        }
+
+        function getScheduleStatusClass(status) {
+            const s = (status || '').toLowerCase();
+            if (s === 'submitted') return 'bg-success';
+            if (s === 'endofperiod') return 'bg-success-subtle text-success-emphasis';
+            if (s === 'scheduled') return 'bg-warning text-dark';
+            if (s === 'new') return 'bg-secondary';
+            return 'bg-secondary';
+        }
+
+        function isRunComplete(status) {
+            const value = String(status || '').toLowerCase();
+            return value === 'succeeded' || value === 'failed' || value === 'cancelled' || value === '3' || value === '4' || value === '2';
+        }
+
+        function stopSnapshotPolling() {
+            if (snapshotTimer) {
+                clearInterval(snapshotTimer);
+                snapshotTimer = null;
+            }
+        }
+
+        function setFinalizingBadge(visible) {
+            var badge = document.getElementById('finalizingBadge');
+            if (!badge) return;
+            badge.style.display = visible ? '' : 'none';
+        }
+
+        function getMilestone(milestones, name) {
+            return (milestones || []).find(m => String(m.name || m.Name || '').toLowerCase() === String(name).toLowerCase());
+        }
+
+        function isReportSettled(snapshot) {
+            if (!snapshot) return false;
+
+            const scheduleStatus = String(snapshot.report?.schedule?.scheduleStatus || '').toLowerCase();
+            const submittedMilestone = getMilestone(snapshot.report?.milestones || [], 'Submitted');
+            const submittedCompleted = submittedMilestone && (submittedMilestone.completed === true || submittedMilestone.Completed === true);
+
+            // Failed/cancelled runs may not progress report schedule to Submitted.
+            const runStatus = String(currentRunStatus || '').toLowerCase();
+            if (runStatus === 'failed' || runStatus === 'cancelled') {
+                return true;
+            }
+
+            return submittedCompleted
+                || scheduleStatus === 'submitted'
+                || scheduleStatus === 'endofperiod';
+        }
+
+        function renderValidatorResults(results) {
+            const card = document.getElementById('validatorResultsCard');
+            const grid = document.getElementById('validatorResultsGrid');
+            const summary = document.getElementById('validatorResultsSummary');
+
+            if (!isRunComplete(currentRunStatus) && !currentFinishedAt) {
+                card.style.display = 'none';
+                return;
+            }
+
+            card.style.display = '';
+            const items = (results || []).filter(x => !(x.name || '').startsWith('[Snapshot]'));
+            if (!items.length) {
+                summary.textContent = 'No validator output was captured for this run.';
+                grid.innerHTML = '<div class="col-12 text-muted small">No validator results available.</div>';
+                return;
+            }
+
+            const passed = items.filter(x => (x.outcome || '').toLowerCase() === 'passed').length;
+            const advisory = items.filter(x =>
+                (x.outcome || '').toLowerCase() === 'failed'
+                && (x.name || '').toUpperCase() === 'VALIDATION RESULTS (API)').length;
+            const failed = items.length - passed - advisory;
+            summary.textContent = `${passed} passed, ${advisory} advisory, ${failed} failed.`;
+
+            grid.innerHTML = items.map(item => {
+                const outcome = (item.outcome || 'Unknown');
+                const isPass = outcome.toLowerCase() === 'passed';
+                const isAdvisory = !isPass && (item.name || '').toUpperCase() === 'VALIDATION RESULTS (API)';
+                const badge = isPass
+                    ? 'bg-success-subtle text-success-emphasis'
+                    : isAdvisory
+                        ? 'bg-warning-subtle text-warning-emphasis'
+                        : 'bg-danger-subtle text-danger-emphasis';
+                const badgeText = isPass ? 'Passed' : isAdvisory ? 'Advisory' : outcome;
+                const issueText = isPass ? 'No issues' : `${item.issueCount || 0} issue(s)`;
+
+                return `<div class="col-md-4">
+                    <div class="border rounded p-2 h-100">
+                        <div class="fw-semibold small">${escapeHtml(item.name)}</div>
+                        <div class="mt-1"><span class="badge ${badge}">${escapeHtml(badgeText)}</span></div>
+                        <div class="small text-muted mt-1">${issueText}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function getServiceError(summaryItems, serviceName) {
+            return (summaryItems || []).find(x =>
+                String(x.serviceName || x.ServiceName || '').toLowerCase() === serviceName.toLowerCase());
+        }
+
+        function toCountItems(groupItems) {
+            return (groupItems || []).map(x => ({
+                status: x.status || x.Status,
+                count: x.count ?? x.Count ?? 0
+            }));
+        }
+
+        function animateCounter(elementId, targetValue) {
+            const el = document.getElementById(elementId);
+            const startValue = Number(el.dataset.current || 0);
+            const endValue = Number(targetValue || 0);
+
+            if (startValue === endValue) {
+                el.textContent = String(endValue);
+                return;
+            }
+
+            const durationMs = 350;
+            const startTs = performance.now();
+
+            function step(ts) {
+                const progress = Math.min(1, (ts - startTs) / durationMs);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const value = Math.round(startValue + ((endValue - startValue) * eased));
+                el.textContent = String(value);
+                if (progress < 1) {
+                    requestAnimationFrame(step);
+                } else {
+                    el.textContent = String(endValue);
+                    el.dataset.current = String(endValue);
+                }
+            }
+
+            requestAnimationFrame(step);
+        }
+
+        function renderServiceErrorSummary(summaryItems) {
+            if (!serviceErrorLines._summaries) serviceErrorLines._summaries = {};
+
+            const targets = [
+                { name: 'Data Acquisition', countId: 'serviceErrorCountDataAcq', buttonId: 'serviceErrorBtnDataAcq' },
+                { name: 'Normalization', countId: 'serviceErrorCountNormalization', buttonId: 'serviceErrorBtnNormalization' },
+                { name: 'Measure Eval', countId: 'serviceErrorCountMeasureEval', buttonId: 'serviceErrorBtnMeasureEval' },
+                { name: 'Validation', countId: 'serviceErrorCountValidation', buttonId: 'serviceErrorBtnValidation' },
+                { name: 'Report', countId: 'serviceErrorCountReport', buttonId: 'serviceErrorBtnReport' }
+            ];
+
+            for (const target of targets) {
+                const service = getServiceError(summaryItems, target.name);
+                const total = Number(service?.totalErrors ?? service?.TotalErrors ?? 0);
+                const errorLines = service?.errorLines || service?.ErrorLines || [];
+                serviceErrorLines[target.name] = errorLines;
+                serviceErrorLines._summaries[target.name] = service || { errorLines: [], errorGroups: [], totalErrors: 0 };
+
+                animateCounter(target.countId, total);
+
+                const btn = document.getElementById(target.buttonId);
+                btn.disabled = total <= 0;
+                btn.classList.toggle('text-danger', total > 0);
+            }
+        }
+
+        function renderMilestones(milestones) {
+            const host = document.getElementById('reportMilestones');
+            const orderedMilestones = [
+                'Report Scheduled',
+                'Data Acquired',
+                'Measure Evaluated',
+                'Validation',
+                'Submitted',
+                'Test Validation'
+            ];
+            const normalized = new Map();
+            for (const m of (milestones || [])) {
+                const name = m.name || m.Name;
+                if (!name) continue;
+                normalized.set(name, {
+                    name,
+                    completed: m.completed === true || m.Completed === true,
+                    failed: m.failed === true || m.Failed === true
+                });
+            }
+
+            host.innerHTML = '';
+            for (const stepName of orderedMilestones) {
+                const m = normalized.get(stepName) || { name: stepName, completed: false, failed: false };
+                const div = document.createElement('span');
+                const failed = m.failed === true;
+                const completed = m.completed === true;
+                div.className = `rounded-pill d-inline-flex align-items-center justify-content-center ${failed ? 'bg-danger text-white' : completed ? 'bg-success text-white' : 'bg-light border text-dark'}`;
+                div.style.width = '136px';
+                div.style.height = '30px';
+                div.style.fontSize = '0.8rem';
+                div.style.fontWeight = '600';
+                div.style.lineHeight = '1';
+                div.style.whiteSpace = 'nowrap';
+                div.textContent = m.name;
+                host.appendChild(div);
+            }
+        }
+
+        function setFlyout(title, errors) {
+            const flyout = document.getElementById('errorFlyout');
+            document.getElementById('errorFlyoutTitle').textContent = title;
+            const body = document.getElementById('errorFlyoutBody');
+            if (!errors || errors.length === 0) {
+                body.innerHTML = '<div class="text-muted">No errors.</div>';
+            } else {
+                body.innerHTML = errors.map(x => `<div class="border-bottom py-2 small">${x.replaceAll('<', '&lt;').replaceAll('>', '&gt;')}</div>`).join('');
+            }
+            flyout.style.right = '0';
+        }
+
+        // --- Service Exception Modal ---
+        let _exModalAllItems = [];
+        let _exModalGroups = [];
+        let _exModalActiveGroup = null;
+
+        function openServiceExceptionModal(serviceName) {
+            const summary = (serviceErrorLines._summaries || {})[serviceName];
+            if (!summary) return;
+
+            const lines = summary.errorLines || summary.ErrorLines || [];
+            const groups = (summary.errorGroups || summary.ErrorGroups || []).map(g => ({
+                label: g.status || g.Status || 'Unknown',
+                count: g.count ?? g.Count ?? 0
+            })).sort((a, b) => b.count - a.count);
+            const totalErrors = summary.totalErrors ?? summary.TotalErrors ?? lines.length;
+
+            document.getElementById('serviceExceptionModalLabel').textContent = `${serviceName} Exceptions`;
+            document.getElementById('serviceExceptionSubtitle').textContent = `${totalErrors} total exception(s) captured`;
+
+            _exModalAllItems = lines.map((line, i) => {
+                const parsed = parseExceptionLine(line);
+                return { id: i, raw: line, ...parsed };
+            });
+            _exModalGroups = groups;
+            _exModalActiveGroup = null;
+
+            renderExModalGroupChips();
+            applyExModalFilter();
+
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('serviceExceptionModal'));
+            modal.show();
+        }
+
+        function parseExceptionLine(line) {
+            let cleaned = line;
+            const componentMatch = cleaned.match(/^\[([^\]]+)\]\s*/);
+            const component = componentMatch ? componentMatch[1] : '';
+            if (componentMatch) cleaned = cleaned.slice(componentMatch[0].length);
+
+            let level = 'ERROR';
+            const levelMatch = cleaned.match(/^(ERROR|WARN|WARNING|FATAL|INFO)\b\s*\|?\s*/i);
+            if (levelMatch) {
+                level = levelMatch[1].toUpperCase();
+                cleaned = cleaned.slice(levelMatch[0].length);
+            }
+
+            // Split on ||| delimiter — left side is summary, right side is full detail
+            let summary = cleaned;
+            let detail = '';
+            const tripleIdx = cleaned.indexOf('|||');
+            if (tripleIdx >= 0) {
+                summary = cleaned.slice(0, tripleIdx).trim();
+                detail = cleaned.slice(tripleIdx + 3).trim();
+            }
+
+            let headline = summary;
+            if (!detail) {
+                // No triple-pipe detail — try splitting on first pipe for headline/detail
+                const pipeIdx = summary.indexOf(' | ');
+                if (pipeIdx > 0) {
+                    headline = summary.slice(0, pipeIdx).trim();
+                    detail = summary.slice(pipeIdx + 3).trim();
+                } else if (summary.length > 120) {
+                    headline = summary.slice(0, 120).trim() + '…';
+                    detail = summary;
+                }
+            } else {
+                // Shorten the summary for the collapsed header
+                if (summary.length > 160) {
+                    headline = summary.slice(0, 160).trim() + '…';
+                }
+            }
+
+            return { component, level, headline, detail, full: line };
+        }
+
+        function renderExModalGroupChips() {
+            const host = document.getElementById('exModalGroupChips');
+            if (!_exModalGroups.length) { host.innerHTML = ''; return; }
+
+            const allActive = _exModalActiveGroup === null;
+            let html = `<button class="btn btn-sm ${allActive ? 'btn-dark' : 'btn-outline-secondary'} ex-group-chip" data-group="">All</button>`;
+            for (const g of _exModalGroups) {
+                const active = _exModalActiveGroup === g.label;
+                html += `<button class="btn btn-sm ${active ? 'btn-dark' : 'btn-outline-secondary'} ex-group-chip" data-group="${escapeHtml(g.label)}" title="${escapeHtml(g.label)}">${truncate(g.label, 50)} <span class="badge bg-light text-dark ms-1">${g.count}</span></button>`;
+            }
+            host.innerHTML = html;
+
+            for (const btn of host.querySelectorAll('.ex-group-chip')) {
+                btn.addEventListener('click', () => {
+                    _exModalActiveGroup = btn.dataset.group || null;
+                    renderExModalGroupChips();
+                    applyExModalFilter();
+                });
+            }
+        }
+
+        function applyExModalFilter() {
+            const searchTerm = (document.getElementById('exModalSearch').value || '').toLowerCase();
+            const accordion = document.getElementById('exModalAccordion');
+            const emptyMsg = document.getElementById('exModalEmpty');
+
+            let filtered = _exModalAllItems;
+            if (_exModalActiveGroup) {
+                const groupLower = _exModalActiveGroup.toLowerCase();
+                filtered = filtered.filter(item => item.raw.toLowerCase().includes(groupLower));
+            }
+            if (searchTerm) {
+                filtered = filtered.filter(item => item.raw.toLowerCase().includes(searchTerm));
+            }
+
+            document.getElementById('exModalVisibleCount').textContent = String(filtered.length);
+
+            if (!filtered.length) {
+                accordion.innerHTML = '';
+                emptyMsg.style.display = '';
+                return;
+            }
+            emptyMsg.style.display = 'none';
+
+            const maxRender = 200;
+            const items = filtered.slice(0, maxRender);
+
+            accordion.innerHTML = items.map(item => {
+                const levelBadge = item.level === 'FATAL' || item.level === 'ERROR'
+                    ? 'bg-danger' : item.level === 'WARN' || item.level === 'WARNING'
+                    ? 'bg-warning text-dark' : 'bg-secondary';
+                const collapseId = `exCollapse${item.id}`;
+                const headerId = `exHeader${item.id}`;
+                const hasDetail = !!item.detail;
+
+                return `<div class="accordion-item">
+                    <h2 class="accordion-header" id="${headerId}">
+                        <button class="accordion-button collapsed py-2 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}" style="font-size:.82rem;">
+                            <span class="badge ${levelBadge} me-2" style="font-size:.65rem;">${item.level}</span>
+                            <span class="text-muted me-2" style="flex-shrink:0;font-size:.72rem;">${escapeHtml(item.component)}</span>
+                            <span class="text-truncate">${escapeHtml(item.headline)}</span>
+                        </button>
+                    </h2>
+                    <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headerId}">
+                        <div class="accordion-body p-3" style="background:#f8f9fa;">
+                            ${hasDetail
+                                ? `<pre class="mb-0 small" style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow:auto;">${escapeHtml(item.detail)}</pre>`
+                                : `<pre class="mb-0 small" style="white-space:pre-wrap;word-break:break-all;max-height:400px;overflow:auto;">${escapeHtml(item.full)}</pre>`}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('') + (filtered.length > maxRender ? `<div class="text-center text-muted small p-3">${filtered.length - maxRender} more items not shown. Use the search filter to narrow results.</div>` : '');
+        }
+
+        function truncate(str, len) {
+            return str.length > len ? str.slice(0, len) + '…' : str;
+        }
+
+        document.getElementById('exModalSearch').addEventListener('input', applyExModalFilter);
+
+        async function refreshSnapshot() {
+            try {
+                const response = await fetch(`${snapshotUrl}?id=${encodeURIComponent(runId)}`);
+                if (response.status === 204) {
+                    appendLog('[snapshot] no snapshot content yet (204).');
+                    return;
+                }
+                if (response.status === 404) {
+                    appendLog('[snapshot] snapshot endpoint returned 404.');
+                    return;
+                }
+                if (!response.ok) {
+                    appendLog(`[snapshot] HTTP error ${response.status}.`);
+                    throw new Error(`Snapshot HTTP ${response.status}`);
+                }
+                const snapshot = await response.json();
+                if (!snapshot) {
+                    appendLog('[snapshot] empty snapshot payload.');
+                    return;
+                }
+
+                const snapshotIsFinal = snapshot.isFinal === true || snapshot.IsFinal === true;
+
+                probeManifest();
+                renderMilestones(snapshot.report?.milestones || []);
+                renderValidatorResults(snapshot.validatorResults || []);
+
+                const schedule = snapshot.report?.schedule;
+                const effectiveFacilityId = snapshot.facilityId || snapshot.FacilityId || schedule?.reportName || '-';
+                document.getElementById('scheduleFacilityId').textContent = effectiveFacilityId;
+                document.getElementById('scheduleReportName').textContent = schedule?.reportName || '-';
+                document.getElementById('scheduleFrequency').textContent = schedule?.frequency || '-';
+                document.getElementById('scheduleStart').textContent = schedule?.startDate || '-';
+                document.getElementById('scheduleEnd').textContent = schedule?.endDate || '-';
+                document.getElementById('scheduleAdhoc').textContent = schedule?.adHocType || '-';
+                document.getElementById('scheduleCreated').textContent = schedule?.reportCreated || '-';
+                document.getElementById('scheduleSubmitted').textContent = schedule?.submittedAt || '-';
+                document.getElementById('scheduleDuration').textContent = schedule?.duration || '-';
+
+                const statusPill = document.getElementById('scheduleStatusPill');
+                statusPill.className = `badge ${getScheduleStatusClass(schedule?.scheduleStatus)}`;
+                statusPill.textContent = schedule?.scheduleStatus || '-';
+
+                renderDoughnut('entriesDonut', 'entriesLegend', snapshot.report?.entrySubmissionStatuses || [], {
+                    submitted: '#198754',
+                    submitting: '#06b6d4',
+                    noteligable: '#f59e0b',
+                    failedsubmission: '#ef4444',
+                    pendingvalidation: '#94a3b8',
+                    unknown: '#cbd5e1'
+                });
+
+                document.getElementById('populationSummary').textContent = snapshot.report?.populationSummary || 'No population data yet.';
+
+                const dataAcqCandidate = snapshot.dataAcquisition || {};
+                const dataAcqHasData = (dataAcqCandidate.statusCounts || []).length > 0
+                    || (dataAcqCandidate.resourceTypeCounts || []).length > 0
+                    || (dataAcqCandidate.throughputBuckets || []).length > 0
+                    || Number(dataAcqCandidate.resourceCount || 0) > 0;
+
+                if (dataAcqHasData) {
+                    lastDataAcqSnapshot = dataAcqCandidate;
+                }
+
+                const dataAcq = lastDataAcqSnapshot || dataAcqCandidate;
+
+                renderDoughnut('dataAcqDonut', 'dataAcqLegend', dataAcq.statusCounts || [], {
+                    completed: '#198754',
+                    processing: '#06b6d4',
+                    failed: '#ef4444',
+                    pending: '#f59e0b',
+                    unknown: '#94a3b8'
+                }, true);
+
+                document.getElementById('dataAcqRate').textContent = formatNumber(dataAcq.completionRatePerSecond);
+                document.getElementById('dataAcqResourceCount').textContent = dataAcq.resourceCount || 0;
+                document.getElementById('dataAcqResPerSec').textContent = formatNumber(dataAcq.averageResourcesPerSecond);
+                renderTimeline('dataAcqTimeline', dataAcq.throughputBuckets || [], '#06b6d4');
+                renderResourceMix('dataAcqResourceMixChart', dataAcq.resourceTypeCounts || []);
+                dataAcqErrors = dataAcq.errors || [];
+                document.getElementById('dataAcqErrorsBtn').style.display = dataAcqErrors.length > 0 ? '' : 'none';
+
+                const totalLogCount = (dataAcq.statusCounts || []).reduce((sum, x) => sum + (x.count || 0), 0);
+                document.getElementById('dataAcqTotalLogs').textContent = totalLogCount;
+
+                renderServiceErrorSummary(snapshot.serviceErrorSummary || snapshot.ServiceErrorSummary || []);
+
+                document.getElementById('normalizationRate').textContent = formatNumber(snapshot.normalization?.completionRatePerSecond);
+                document.getElementById('normalizationResourceCount').textContent = snapshot.normalization?.resourceCount || 0;
+                document.getElementById('normalizationResPerSec').textContent = formatNumber(snapshot.normalization?.averageResourcesPerSecond);
+                renderResourceMix('normalizationResourceMixChart', snapshot.normalization?.resourceTypeCounts || []);
+                renderTimeline('normalizationTimeline', snapshot.normalization?.throughputBuckets || [], '#6f42c1');
+
+                normalizationErrors = snapshot.normalization?.errors || [];
+                document.getElementById('normalizationErrorsBtn').style.display = normalizationErrors.length > 0 ? '' : 'none';
+
+                document.getElementById('measureRate').textContent = formatNumber(snapshot.measureEval?.completionRatePerSecond);
+                document.getElementById('measureResourceCount').textContent = snapshot.measureEval?.resourceCount || 0;
+                document.getElementById('measureResPerSec').textContent = formatNumber(snapshot.measureEval?.averageResourcesPerSecond);
+                renderStageChart('measureStageChart', 'measureStageLegend', snapshot.measureEval?.funnelCounts || [], {
+                    'no measure report': '#94a3b8',
+                    notreportable: '#f59e0b',
+                    readyforvalidation: '#198754'
+                });
+                renderResourceMix('measureResourceMixChart', snapshot.measureEval?.resourceTypeCounts || []);
+                renderTimeline('measureTimeline', snapshot.measureEval?.throughputBuckets || [], '#0d6efd');
+
+                measureErrors = snapshot.measureEval?.errors || [];
+                document.getElementById('measureErrorsBtn').style.display = measureErrors.length > 0 ? '' : 'none';
+
+                const validationFunnel = snapshot.validation?.funnelCounts || [];
+                const validationTotal = validationFunnel.reduce((acc, item) => acc + (item.count || 0), 0);
+                const validationPassed = (validationFunnel.find(f => (f.status || '').toLowerCase() === 'passedvalidation') || {}).count || 0;
+                const validationFailed = (validationFunnel.find(f => (f.status || '').toLowerCase() === 'failedvalidation') || {}).count || 0;
+
+                document.getElementById('validationPatientCount').textContent = validationTotal;
+                document.getElementById('validationPassedCount').textContent = validationPassed;
+                document.getElementById('validationFailedCount').textContent = validationFailed;
+                renderStageChart('validationStageChart', 'validationStageLegend', validationFunnel, {
+                    notvalidated: '#94a3b8',
+                    failedvalidation: '#ef4444',
+                    passedvalidation: '#198754'
+                });
+                renderTimeline('validationTimeline', snapshot.validation?.throughputBuckets || [], '#198754');
+
+                validationErrors = snapshot.validation?.errors || [];
+                document.getElementById('validationErrorsBtn').style.display = validationErrors.length > 0 ? '' : 'none';
+
+                const runIsComplete = isRunComplete(currentRunStatus) || !!currentFinishedAt;
+                if (runIsComplete && !runCompletedAtMs) {
+                    runCompletedAtMs = Date.now();
+                }
+
+                if (runIsComplete) {
+                    const elapsedMs = runCompletedAtMs ? (Date.now() - runCompletedAtMs) : 0;
+                    const settled = isReportSettled(snapshot);
+
+                    setFinalizingBadge(!settled);
+
+                    // Keep polling briefly after completion so final persisted schedule/milestones
+                    // can catch up in the UI.
+                    if ((snapshotIsFinal && settled && elapsedMs >= 2000) || elapsedMs >= 30000) {
+                        setFinalizingBadge(false);
+                        stopSnapshotPolling();
+                    }
+                } else {
+                    setFinalizingBadge(false);
+                }
+            } catch (err) {
+                const message = err && err.message ? err.message : String(err || 'Unknown snapshot error');
+                appendLog(`[snapshot] ERROR: ${message}`);
+                console.error('refreshSnapshot failed', err);
+            }
+        }
+
+        connection.on('log', appendLog);
+        connection.on('status', (run) => {
+            currentRunStatus = run.status || currentRunStatus;
+            document.getElementById('runName').textContent = run.runName;
+            document.getElementById('facilityId').textContent = run.facilityId || '-';
+            document.getElementById('scheduleFacilityId').textContent = run.facilityId || '-';
+            document.getElementById('status').textContent = run.status;
+            document.getElementById('error').textContent = run.error || '-';
+            document.getElementById('started').textContent = run.startedAt || '-';
+            document.getElementById('finished').textContent = run.finishedAt || '-';
+            document.getElementById('pipelineDuration').textContent = run.duration || '-';
+            currentFinishedAt = run.finishedAt || currentFinishedAt;
+
+            if ((isRunComplete(currentRunStatus) || !!currentFinishedAt) && !runCompletedAtMs) {
+                runCompletedAtMs = Date.now();
+            }
+
+            if (isRunComplete(currentRunStatus)) {
+                swapCancelToDelete();
+            }
+
+            refreshSnapshot();
+        });
+
+        document.getElementById('measureErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Measure Eval'));
+        document.getElementById('validationErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Validation'));
+        document.getElementById('dataAcqErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Data Acquisition'));
+        document.getElementById('normalizationErrorsBtn').addEventListener('click', () => openServiceExceptionModal('Normalization'));
+        for (const btn of document.querySelectorAll('.service-error-btn')) {
+            btn.addEventListener('click', () => {
+                const service = btn.getAttribute('data-service');
+                openServiceExceptionModal(service);
+            });
+        }
+        document.getElementById('closeFlyout').addEventListener('click', () => {
+            document.getElementById('errorFlyout').style.right = '-480px';
+        });
+
+        connection.start()
+            .then(() => connection.invoke('SubscribeRun', runId))
+            .catch(err => appendLog('[signalr] ' + err));
+
+        renderConfigProperties(runConfigurationJson);
+        refreshSnapshot();
+        if (!isRunComplete(currentRunStatus) && !currentFinishedAt)
+            snapshotTimer = setInterval(refreshSnapshot, 2000);
+
+        // Probe for manifest availability (repeated until found).
+        let manifestButtonVisible = false;
+        function probeManifest() {
+            if (manifestButtonVisible) return;
+            fetch(`${manifestUrl}?id=${runId}`).then(r => {
+                if (r.ok && r.status !== 204) {
+                    manifestButtonVisible = true;
+                    tryShowManifestButton();
+                }
+            }).catch(() => {});
+        }
+        probeManifest();
+
+        // --- DA Log Drill-Down Modal ---
+        const dataAcqLogsUrl = '@Url.Action("DataAcquisitionLogs", "Runs")';
+        const dataAcqLogDetailUrl = '@Url.Action("DataAcquisitionLogDetail", "Runs")';
+        let daLogPage = 1;
+        const daLogPageSize = 50;
+        let daSortBy = 'Id';
+        let daSortOrder = 'Ascending';
+        // Current free-text search term, sent to the server on every fetch. Server
+        // applies the filter and returns paged results just like the unfiltered case,
+        // so pagination stays straightforward and works the same in either mode.
+        let daSearchTerm = '';
+
+        function updateDaSortIcons() {
+            const map = {
+                Id: 'sortIconId',
+                PatientId: 'sortIconPatientId',
+                Status: 'sortIconStatus',
+                QueryPhase: 'sortIconQueryPhase'
+            };
+
+            for (const key of Object.keys(map)) {
+                const el = document.getElementById(map[key]);
+                if (!el) continue;
+                if (key !== daSortBy) {
+                    el.textContent = '';
+                    continue;
+                }
+
+                el.textContent = daSortOrder === 'Ascending' ? '\u25B2' : '\u25BC';
+            }
+        }
+
+        async function loadDataAcqLogs(page) {
+            daLogPage = page;
+            const tbody = document.getElementById('dataAcqLogTableBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Loading...</td></tr>';
+
+            try {
+                let url = `${dataAcqLogsUrl}?id=${encodeURIComponent(runId)}&pageNumber=${page}&pageSize=${daLogPageSize}&sortBy=${encodeURIComponent(daSortBy)}&sortOrder=${encodeURIComponent(daSortOrder)}`;
+                if (daSearchTerm) {
+                    url += `&searchTerm=${encodeURIComponent(daSearchTerm)}`;
+                }
+
+                const res = await fetch(url);
+                if (!res.ok) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Failed to load logs.</td></tr>';
+                    return;
+                }
+
+                const data = await res.json();
+                const records = data.records || data.Records || [];
+                const totalCount = data.metadata?.totalCount || data.Metadata?.TotalCount || 0;
+                const totalPages = Math.max(1, Math.ceil(totalCount / daLogPageSize));
+
+                document.getElementById('dataAcqLogPaginationInfo').textContent = daSearchTerm
+                    ? `Page ${page} of ${totalPages} (${totalCount} match(es), filtered)`
+                    : `Page ${page} of ${totalPages} (${totalCount} total)`;
+
+                document.getElementById('dataAcqLogPrev').disabled = page <= 1;
+                document.getElementById('dataAcqLogNext').disabled = page >= totalPages;
+
+                renderDaLogRows(records, daSearchTerm ? 'No matching logs.' : 'No logs found.');
+            } catch {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading logs.</td></tr>';
+            }
+        }
+
+        // Renders the table body for a list of records and (re-)wires the per-row
+        // detail buttons. Hoisted out of loadDataAcqLogs so future server-paged
+        // call sites have a single rendering contract.
+        function renderDaLogRows(records, emptyMessage) {
+            const tbody = document.getElementById('dataAcqLogTableBody');
+            if (!records.length) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">${escapeHtml(emptyMessage || 'No logs found.')}</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = records.map(r => {
+                const status = r.status ?? r.Status ?? '-';
+                const phase = r.queryPhase ?? r.QueryPhase ?? '-';
+                const isReference = r.isReferenceLog === true || r.IsReferenceLog === true;
+                const refCount = r.referenceResourceCount ?? r.ReferenceResourceCount ?? 0;
+                const resourceTypes = r.resourceTypes || r.ResourceTypes || [];
+                const patient = r.patientId ?? r.PatientId ?? '-';
+                const logId = r.id ?? r.Id;
+                const statusKey = String(status).toLowerCase();
+                const statusBadge = statusKey === 'completed' ? 'au-badge-success'
+                    : statusKey === 'failed' ? 'au-badge-danger'
+                    : statusKey === 'processing' ? 'au-badge-muted'
+                    : 'au-badge-muted';
+                return `<tr>
+                    <td class="small">${logId ?? '-'}</td>
+                    <td class="small">${escapeHtml(patient)}</td>
+                    <td><span class="badge ${statusBadge}">${escapeHtml(status)}</span></td>
+                    <td class="small">${escapeHtml(phase)}</td>
+                    <td class="small">${refCount > 0 ? `<span class="badge" style="background:var(--au-accent);color:#fff;">${refCount} ref</span>` : isReference ? '<span class="badge au-badge-muted">Ref</span>' : '<span class="text-muted">-</span>'}</td>
+                    <td class="small" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(resourceTypes.join(', '))}">${escapeHtml(resourceTypes.join(', ') || '-')}</td>
+                    <td class="small text-end">
+                        <button type="button" class="btn btn-sm btn-au-action da-detail-btn" data-logid="${logId}" title="View details"><i class="bi bi-file-text"></i></button>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            for (const btn of tbody.querySelectorAll('.da-detail-btn')) {
+                btn.addEventListener('click', () => openDaLogDetails(btn.getAttribute('data-logid')));
+            }
+        }
+
+        async function openDaLogDetails(logId) {
+            if (!logId) return;
+
+            const flyout = document.getElementById('daLogFlyout');
+            const title = document.getElementById('daLogFlyoutTitle');
+            const subtitle = document.getElementById('daLogFlyoutSubtitle');
+            const body = document.getElementById('daLogFlyoutBody');
+
+            title.innerHTML = `<i class="bi bi-file-text me-2"></i>Data Acquisition Log ${logId}`;
+            subtitle.textContent = 'Loading…';
+            body.innerHTML = '<div class="text-muted">Loading details…</div>';
+            flyout.style.right = '0';
+
+            try {
+                const res = await fetch(`${dataAcqLogDetailUrl}?id=${encodeURIComponent(runId)}&logId=${encodeURIComponent(logId)}`);
+                if (!res.ok) {
+                    subtitle.textContent = '';
+                    body.innerHTML = '<div class="text-danger">Failed to load log details.</div>';
+                    return;
+                }
+
+                const d = await res.json();
+                const notes = d.notes || d.Notes || [];
+                const resources = d.resourceAcquiredIds || d.ResourceAcquiredIds || [];
+                const referenceResources = d.referenceResourceIds || d.ReferenceResourceIds || [];
+                const resourceTypes = d.resourceTypes || d.ResourceTypes || [];
+                const isReference = d.isReferenceLog === true || d.IsReferenceLog === true;
+                const referenceResourceCount = d.referenceResourceCount ?? d.ReferenceResourceCount ?? 0;
+                const status = d.status ?? d.Status ?? '-';
+                const phase = d.queryPhase ?? d.QueryPhase ?? '-';
+                const patient = d.patientId ?? d.PatientId ?? '-';
+                const traceId = d.traceId ?? d.TraceId ?? '';
+                const correlationId = d.correlationId ?? d.CorrelationId ?? '';
+                const queryType = d.queryType ?? d.QueryType ?? '';
+                const queries = d.queries || d.Queries || [];
+                const fhirVersion = d.fhirVersion ?? d.FhirVersion ?? '';
+                const priority = d.priority ?? d.Priority ?? '';
+                const retryAttempts = d.retryAttempts ?? d.RetryAttempts ?? 0;
+
+                const statusKey = String(status).toLowerCase();
+                const statusBadge = statusKey === 'completed' ? 'au-badge-success'
+                    : statusKey === 'failed' ? 'au-badge-danger'
+                    : statusKey === 'processing' ? 'au-badge-muted'
+                    : 'au-badge-muted';
+
+                subtitle.innerHTML = `Patient <code class="text-white">${escapeHtml(patient)}</code> &middot; <span class="badge ${statusBadge}">${escapeHtml(status)}</span> &middot; Phase ${escapeHtml(phase)}`;
+                body.innerHTML = `
+                    <div class="row g-3 mb-3">
+                        <div class="col-12">
+                            <div class="au-summary-item"><span class="au-label">Trace Id</span><code class="au-value text-break">${escapeHtml(traceId || '-')}</code></div>
+                        </div>
+                        <div class="col-12">
+                            <div class="au-summary-item"><span class="au-label">Correlation Id</span><code class="au-value text-break">${escapeHtml(correlationId || '-')}</code></div>
+                        </div>
+                        <div class="col-6"><div class="au-summary-item"><span class="au-label">Query Type</span><span class="au-value">${escapeHtml(queryType || '-')}</span></div></div>
+                        <div class="col-6"><div class="au-summary-item"><span class="au-label">FHIR Version</span><span class="au-value">${escapeHtml(fhirVersion || '-')}</span></div></div>
+                        <div class="col-6"><div class="au-summary-item"><span class="au-label">Priority</span><span class="au-value">${escapeHtml(String(priority) || '-')}</span></div></div>
+                        <div class="col-6"><div class="au-summary-item"><span class="au-label">Retry Attempts</span><span class="au-value">${retryAttempts}</span></div></div>
+                        <div class="col-6"><div class="au-summary-item"><span class="au-label">Reference Workflow</span><span class="au-value">${isReference ? `Yes (${referenceResourceCount})` : 'No'}</span></div></div>
+                        <div class="col-6"><div class="au-summary-item"><span class="au-label">Completion</span><span class="au-value">${escapeHtml(String(d.completionTimeMilliseconds ?? d.CompletionTimeMilliseconds ?? '-'))} ms</span><span class="small text-muted">${escapeHtml(String(d.completionDate ?? d.CompletionDate ?? '-'))}</span></div></div>
+                    </div>
+
+                    <div class="au-summary-item mb-2"><span class="au-label">Queries (${queries.length})</span></div>
+                    <pre class="small" style="max-height:160px;overflow:auto;background:#f5f6f8;border:1px solid #e3e6ea;border-radius:.35rem;padding:.5rem .65rem;">${escapeHtml(queries.join('\n') || '(none)')}</pre>
+
+                    <div class="au-summary-item mb-2"><span class="au-label">Resource Types</span><span class="au-value">${escapeHtml(resourceTypes.join(', ') || '-')}</span></div>
+
+                    <div class="au-summary-item mb-2 mt-3"><span class="au-label">Resources (${resources.length})</span></div>
+                    <pre class="small" style="max-height:200px;overflow:auto;background:#f5f6f8;border:1px solid #e3e6ea;border-radius:.35rem;padding:.5rem .65rem;">${escapeHtml(resources.join('\n') || '(none)')}</pre>
+
+                    ${referenceResources.length > 0 ? `<div class="au-summary-item mb-2 mt-3"><span class="au-label"><span class="badge au-badge-muted me-1">Ref</span>Reference Resources (${referenceResources.length})</span></div>
+                    <pre class="small" style="max-height:200px;overflow:auto;background:#eef5ff;border:1px solid #cfe1fb;border-radius:.35rem;padding:.5rem .65rem;">${escapeHtml(referenceResources.join('\n'))}</pre>` : ''}
+
+                    <div class="au-summary-item mb-2 mt-3"><span class="au-label">Notes (${notes.length})</span></div>
+                    <pre class="small" style="max-height:260px;overflow:auto;background:#f5f6f8;border:1px solid #e3e6ea;border-radius:.35rem;padding:.5rem .65rem;">${escapeHtml(notes.join('\n') || '(none)')}</pre>
+                `;
+            } catch {
+                subtitle.textContent = '';
+                body.innerHTML = '<div class="text-danger">Error loading log details.</div>';
+            }
+        }
+
+        for (const th of document.querySelectorAll('#dataAcqLogTable thead th[data-sortby]')) {
+            th.addEventListener('click', () => {
+                const nextSortBy = th.getAttribute('data-sortby');
+                if (!nextSortBy) return;
+
+                if (daSortBy === nextSortBy) {
+                    daSortOrder = daSortOrder === 'Ascending' ? 'Descending' : 'Ascending';
+                } else {
+                    daSortBy = nextSortBy;
+                    daSortOrder = 'Ascending';
+                }
+
+                updateDaSortIcons();
+                loadDataAcqLogs(1);
+            });
+        }
+
+        updateDaSortIcons();
+
+        document.getElementById('dataAcqLogModal').addEventListener('show.bs.modal', () => loadDataAcqLogs(1));
+        document.getElementById('dataAcqLogPrev').addEventListener('click', () => { if (daLogPage > 1) loadDataAcqLogs(daLogPage - 1); });
+        document.getElementById('dataAcqLogNext').addEventListener('click', () => loadDataAcqLogs(daLogPage + 1));
+
+        // Search input updates the server-side search term. Each fetch passes the term
+        // along; the server applies it as PatientId LIKE %term% (and Id/ResourceType
+        // exact matches when applicable), then returns a normally-paged result. So
+        // pagination behaves identically to the unfiltered case — page 1 is page 1
+        // of the filtered set, no client-side row hiding, no bulk pre-fetch.
+        (function () {
+            const input = document.getElementById('daLogSearch');
+            if (!input) return;
+
+            let timer = null;
+            input.addEventListener('input', () => {
+                clearTimeout(timer);
+                timer = setTimeout(() => {
+                    daSearchTerm = (input.value || '').trim();
+                    loadDataAcqLogs(1);
+                }, 250);
+            });
+        })();
+
+        document.getElementById('closeDaLogFlyout').addEventListener('click', () => {
+            document.getElementById('daLogFlyout').style.right = '-720px';
+        });
+
+        // --- Generation Manifest ---
+        const manifestPageUrl = '@Url.Action("Manifest", "Runs")';
+
+        function tryShowManifestButton() {
+            var btn = document.getElementById('btnViewManifest');
+            if (btn) {
+                btn.style.display = '';
+                btn.href = `${manifestPageUrl}?id=${runId}`;
+            }
+            // Ensure the parent card is visible even if no config properties were rendered.
+            var card = document.getElementById('testConfigCard');
+            if (card) card.style.display = '';
+        }
+    })();
+</script>

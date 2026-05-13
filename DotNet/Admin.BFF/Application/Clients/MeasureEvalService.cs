@@ -25,13 +25,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         }
 
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
-        {         
+        {
             // HTTP GET
             HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
         }
-        
+
         public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
         {
             // HTTP GET
@@ -57,8 +57,9 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                         PropertyNameCaseInsensitive = true
                     });
                 }
-                catch (JsonException ex) { 
-                    _logger.LogError(ex, "Failed to deserialize health response from Measure Evaluation service");  
+                catch (JsonException ex)
+                {
+                    _logger.LogError(ex, "Failed to deserialize health response from Measure Evaluation service");
                     return new LinkServiceHealthReport { Service = "Measure Evaluation", Status = HealthStatus.Unhealthy };
                 }
 
@@ -80,7 +81,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                         report.Entries[ToPascalCase(component.Key)] = new LinkServiceHealthReportEntry
                         {
                             Status = componentStatus,
-                            Duration = TimeSpan.Zero 
+                            Duration = TimeSpan.Zero
                         };
                     }
                 }

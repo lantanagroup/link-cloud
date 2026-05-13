@@ -1,6 +1,7 @@
 ﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Tenant.Services;
 using System.Text;
 
@@ -26,7 +27,7 @@ namespace LantanaGroup.Link.Tenant.Commands
 
                 try
                 {
-                    // send the Audit Event
+                    // send the Audit Event to Auditing Kafka Topic
                     Headers headers = new Headers();
                     headers.Add("X-Correlation-Id", Encoding.ASCII.GetBytes(auditEvent.CorrelationId ?? Guid.NewGuid().ToString()));
 
@@ -40,7 +41,7 @@ namespace LantanaGroup.Link.Tenant.Commands
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to generate an audit event for create of facility configuration {FacilityId}.", facilityId);
+                    _logger.LogError(ex, "Failed to generate an audit event for create of facility configuration {FacilityId}.", facilityId.SanitizeForLog());
                 }
             }
         }

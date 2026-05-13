@@ -33,7 +33,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions.ExternalServices
                 {
                     options.ConfigurationOptions.ConnectTimeout = (int)redisCacheOptions.Timeout;
                 }
-                
+
 
             });
 

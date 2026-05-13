@@ -40,21 +40,21 @@ namespace LantanaGroup.Link.Account.Application.Queries.User
                 {
                     return [];
                 }
-                
+
                 List<GroupedUserModel> facilityUsers = [];
                 foreach (var user in users)
                 {
                     var groupedUser = _groupedUserModelFactory.Create(user);
                     facilityUsers.Add(groupedUser);
                 }
-                
+
                 return facilityUsers;
             }
             catch (Exception)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
                 throw;
-            }            
+            }
         }
     }
 }

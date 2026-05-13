@@ -24,13 +24,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         }
 
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
-        {            
+        {
             // HTTP GET
             HttpResponseMessage response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
         }
-        
+
         public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
         {
             // HTTP GET
@@ -47,7 +47,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 _logger.LogError(ex, "Normalization service health check failed");
                 return new LinkServiceHealthReport { Service = "Normalization", Status = HealthStatus.Unhealthy };
             }
-            
+
         }
 
         private void InitHttpClient()

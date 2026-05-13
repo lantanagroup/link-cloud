@@ -173,7 +173,7 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
                 SortOrder.Descending => query.OrderByDescending(sortExpression),
                 _ => query
             };
-            
+
 
             var results = await query
                 .Skip((pageNumber - 1) * pageSize)
@@ -239,22 +239,16 @@ namespace LantanaGroup.Link.Shared.Domain.Repositories.Implementations
         public async Task<HealthCheckResult> HealthCheck(int eventId, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                bool outcome = await _dbContext.Database.CanConnectAsync(cancellationToken);
 
-                if (outcome)
-                {
-                    return HealthCheckResult.Healthy();
-                }
-                else
-                {
-                    return HealthCheckResult.Unhealthy();
-                }
-            }
-            catch (Exception ex)
+            bool outcome = await _dbContext.Database.CanConnectAsync(cancellationToken);
+
+            if (outcome)
             {
-                return HealthCheckResult.Unhealthy(exception: ex);
+                return HealthCheckResult.Healthy();
+            }
+            else
+            {
+                return HealthCheckResult.Unhealthy();
             }
         }
 

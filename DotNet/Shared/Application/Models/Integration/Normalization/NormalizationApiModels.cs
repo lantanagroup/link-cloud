@@ -1,0 +1,58 @@
+﻿namespace LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+
+public class NormalizationOperationApiModel
+{
+    public Guid Id { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
+    public string OperationJson { get; set; } = string.Empty;
+    public string OperationType { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public bool IsDisabled { get; set; }
+    public List<NormalizationOperationResourceTypeApiModel> OperationResourceTypes { get; set; } = [];
+}
+
+public class CreateNormalizationOperationRequestApiModel
+{
+    public List<string> ResourceTypes { get; set; } = [];
+    public string? FacilityId { get; set; }
+    public CreateNormalizationOperationDetailsApiModel Operation { get; set; } = new();
+    public string? Description { get; set; }
+    public List<string> VendorIds { get; set; } = [];
+}
+
+public class CreateNormalizationOperationDetailsApiModel
+{
+    public string OperationType { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string SourceFhirPath { get; set; } = string.Empty;
+    public string TargetFhirPath { get; set; } = string.Empty;
+}
+
+public class NormalizationOperationResourceTypeApiModel
+{
+    public Guid Id { get; set; }
+    public Guid OperationId { get; set; }
+    public Guid ResourceTypeId { get; set; }
+    public NormalizationResourceApiModel? Resource { get; set; }
+}
+
+public class NormalizationResourceApiModel
+{
+    public Guid ResourceTypeId { get; set; }
+    public string ResourceName { get; set; } = string.Empty;
+}
+
+public class NormalizationOperationSequenceApiModel
+{
+    public Guid Id { get; set; }
+    public int? Sequence { get; set; }
+    public NormalizationOperationResourceTypeSequenceApiModel? OperationResourceType { get; set; }
+}
+
+public class NormalizationOperationResourceTypeSequenceApiModel
+{
+    public NormalizationOperationApiModel? Operation { get; set; }
+    public NormalizationResourceApiModel? ResourceType { get; set; }
+}
