@@ -2,11 +2,9 @@ package com.lantanagroup.link.measureeval.controllers;
 
 import com.lantanagroup.link.shared.config.ServiceInformationConfig;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/measureeval/measure-definition")
 public class ApiInfoController {
     private final ServiceInformationConfig serviceInformationConfig;
 
@@ -14,7 +12,7 @@ public class ApiInfoController {
         this.serviceInformationConfig = serviceInformationConfig;
     }
 
-    @GetMapping("/info")
+    @GetMapping("${link.info-route:/api/info}")
     public ServiceInformationConfig info() {
         return this.serviceInformationConfig;
     }

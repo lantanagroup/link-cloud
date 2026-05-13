@@ -1,14 +1,12 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Report.Application.Models;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Entities;
 using LantanaGroup.Link.Report.KafkaProducers;
 using LantanaGroup.Link.Report.Services;
-using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
@@ -17,6 +15,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Options;
@@ -45,6 +44,7 @@ namespace LantanaGroup.Link.Report.Listeners
         private readonly DataAcquisitionRequestedProducer _dataAcqProducer;
         private readonly IProducer<string, EvaluationRequestedValue> _evaluationProducer;
         private readonly BlobStorageService _blobStorageService;
+        private readonly ServiceInformation _serviceInformation;
 
         private string Name => this.GetType().Name;
 
@@ -60,6 +60,7 @@ namespace LantanaGroup.Link.Report.Listeners
             DataAcquisitionRequestedProducer dataAcqProducer,
             IProducer<string, EvaluationRequestedValue> evaluationProducer,
             BlobStorageService blobStorageService,
+            ServiceInformation serviceInformation,
             IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> linkBearerServiceOptions)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -72,10 +73,8 @@ namespace LantanaGroup.Link.Report.Listeners
             _deadLetterExceptionHandler = deadLetterExceptionHandler ??
                                                throw new ArgumentException(nameof(_deadLetterExceptionHandler));
 
-            _transientExceptionHandler.ServiceName = ReportConstants.ServiceName;
-            _transientExceptionHandler.Topic = nameof(KafkaTopic.GenerateReportRequested) + "-Retry";
 
-            _deadLetterExceptionHandler.ServiceName = ReportConstants.ServiceName;
+            _transientExceptionHandler.Topic = nameof(KafkaTopic.GenerateReportRequested) + "-Retry";
             _deadLetterExceptionHandler.Topic = nameof(KafkaTopic.GenerateReportRequested) + "-Error";
             _httpClientFactory = httpClientFactory;
             _linkTokenServiceConfig = linkTokenService;
@@ -84,6 +83,7 @@ namespace LantanaGroup.Link.Report.Listeners
             _dataAcqProducer = dataAcqProducer;
             _evaluationProducer = evaluationProducer;
             _blobStorageService = blobStorageService;
+            _serviceInformation = serviceInformation;
             _linkBearerServiceOptions = linkBearerServiceOptions;
         }
 
@@ -97,7 +97,7 @@ namespace LantanaGroup.Link.Report.Listeners
         {
             var config = new ConsumerConfig()
             {
-                GroupId = ReportConstants.ServiceName,
+                GroupId = _serviceInformation.ServiceConfigName,
                 EnableAutoCommit = false,
                 AutoOffsetReset = AutoOffsetReset.Earliest,
                 SessionTimeoutMs = 10000,
@@ -123,12 +123,11 @@ namespace LantanaGroup.Link.Report.Listeners
                                 return;
                             }
 
+                            var reportScheduledManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportScheduledManager>();
+                            var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
+
                             try
                             {
-                              using var scope = _serviceScopeFactory.CreateScope();
-                                var measureReportScheduledManager =
-                                    scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
-
                                 var key = result.Message.Key;
                                 var value = result.Message.Value;
                                 var startDate = value.StartDate;
@@ -149,7 +148,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 {
                                     _logger.LogDebug(
                                         "Finding existing report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, value.ReportId, DateTime.UtcNow);
-                                    var existing = await measureReportScheduledManager.SingleOrDefaultAsync(x => x.Id == value.ReportId, consumeCancellationToken);
+                                    var existing = await reportScheduledManager.SingleOrDefaultAsync(x => x.Id == value.ReportId, consumeCancellationToken);
 
                                     if (existing == null)
                                     {
@@ -198,6 +197,8 @@ namespace LantanaGroup.Link.Report.Listeners
                                     DateTimeKind.Utc
                                 );
 
+                                bool isCensus = !value.Regenerate && (value.PatientIds == null || value.PatientIds.Count == 0);
+                                
                                 // Create ReportSchedule for AdHoc Report
                                 var reportSchedule = new ReportSchedule
                                 {
@@ -206,6 +207,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                     ReportStartDate = startDate.Value,
                                     ReportEndDate = endDate.Value,
                                     Frequency = Frequency.Adhoc,
+                                    AdHocType = isCensus ? AdHocType.Census : AdHocType.Manual,
                                     ReportTypes = reportTypes,
                                     EndOfReportPeriodJobHasRun = true,
                                     EnableSubmission = !value.BypassSubmission,
@@ -214,34 +216,38 @@ namespace LantanaGroup.Link.Report.Listeners
                                 var reportName = _blobStorageService.GetReportName(reportSchedule);
                                 reportSchedule.PayloadRootUri = _blobStorageService.GetUri(reportName)?.ToString();
 
-                                await measureReportScheduledManager.AddAsync(reportSchedule, cancellationToken);
-
-                                var submissionEntryManager = scope.ServiceProvider.GetRequiredService<ISubmissionEntryManager>();
+                                await reportScheduledManager.AddAsync(reportSchedule, cancellationToken);
                                 
                                 if (value.Regenerate)
                                 {
                                     _logger.LogInformation("Re-generating report for facility {FacilityId} with ID {ReportId} at {Timestamp}", facilityId, reportId, DateTime.UtcNow);
-                                    
-                                    var scheduledReports = await submissionEntryManager.FindAsync(
-                                            p => p.ReportScheduleId == reportId, cancellationToken);
-                                    var patientMeasureReports = scheduledReports.Select(p => p.PatientId).Distinct();
-                                    
-                                    _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate} with ID {ReportId}", patientMeasureReports.Count(), facilityId, startDate, endDate, reportId);
 
-                                    foreach (var p in patientMeasureReports)
+                                    var scheduledReports = await reportEntryManager.FindAsync(p => p.ReportScheduleId == reportId, cancellationToken);
+                                    var patientEntries = scheduledReports.Select(p => p.PatientId).Distinct();
+
+                                    _logger.LogDebug("Found {PatientCount} patients to re-generate for facility {FacilityId} from {StartDate} to {EndDate} with ID {ReportId}", patientEntries.Count(), facilityId, startDate, endDate, reportId);
+
+                                    foreach (var p in patientEntries)
                                     {
+                                        var newEntry = new ReportEntry()
+                                        {
+                                            PatientId = p,
+                                            ReportingStatus = ReportingStatus.PatientIdentified,
+                                            ReportScheduleId = reportSchedule.Id,
+                                            FacilityId = facilityId,
+                                            CreateDate = DateTime.UtcNow
+                                        };
+
                                         foreach (var reportType in reportTypes)
                                         {
-                                            await submissionEntryManager.AddAsync(new PatientSubmissionEntry()
+                                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
                                             {
-                                                PatientId = p,
-                                                Status = PatientSubmissionStatus.PendingEvaluation,
-                                                ReportScheduleId = reportSchedule.Id,
-                                                FacilityId = facilityId,
-                                                ReportType = reportType,
-                                                CreateDate = DateTime.UtcNow
-                                            }, cancellationToken);
+                                                Status = MeasureReportStatus.EntryCreated,
+                                                ReportType = reportType
+                                            });
                                         }
+
+                                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
 
                                         try
                                         {
@@ -263,7 +269,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                         catch (ProduceException<string, EvaluationRequestedValue> ex)
                                         {
                                             _logger.LogError(ex, "An error was encountered generating an Evaluation Requested event.\n\tFacilityId: {facilityId}\n\tPatientId: {patientId}\n\tReportTrackingId: {reportTrackingId}",
-                                                facilityId.SanitizeAndRemove(), p.SanitizeAndRemove(), reportSchedule.Id.SanitizeAndRemove());
+                                                facilityId?.SanitizeUntrustedString(), p?.SanitizeUntrustedString(), reportSchedule.Id?.SanitizeUntrustedString());
                                         }
                                     }
                                 }
@@ -283,19 +289,26 @@ namespace LantanaGroup.Link.Report.Listeners
 
                                     foreach (var patient in value.PatientIds)
                                     {
+                                        var newEntry = new ReportEntry()
+                                        {
+                                            PatientId = patient,
+                                            ReportingStatus = ReportingStatus.PatientIdentified,
+                                            ReportScheduleId = reportSchedule.Id,
+                                            FacilityId = facilityId,
+                                            CreateDate = DateTime.UtcNow
+                                        };
+
                                         //For each patient and report type, Create Submission Entries for each Patient and Report Type
                                         foreach (var reportType in reportTypes)
                                         {
-                                            await submissionEntryManager.AddAsync(new PatientSubmissionEntry()
+                                            newEntry.MeasureReportList.Add(new EvaluatedMeasureReport()
                                             {
-                                                PatientId = patient,
-                                                Status = PatientSubmissionStatus.PendingEvaluation,
-                                                ReportScheduleId = reportSchedule.Id,
-                                                FacilityId = facilityId,
-                                                ReportType = reportType,
-                                                CreateDate = DateTime.UtcNow
-                                            }, cancellationToken);
+                                                Status = MeasureReportStatus.EntryCreated,
+                                                ReportType = reportType
+                                            });
                                         }
+
+                                        await reportEntryManager.AddAsync(newEntry, cancellationToken);
                                     }
 
                                     try
@@ -393,9 +406,9 @@ namespace LantanaGroup.Link.Report.Listeners
             try
             {
                 admittedPatients =
-                    System.Text.Json.JsonSerializer.Deserialize<List>(
+                    JsonSerializer.Deserialize<List>(
                         censusContent,
-                        new JsonSerializerOptions().ForFhir());
+                        LinkFhirSerializerOptions.ForFhirLenientSerialization);
             }
             catch (Exception ex)
             {

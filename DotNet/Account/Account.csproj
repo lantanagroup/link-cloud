@@ -1,8 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-	<Version>0.1.1-dev</Version>
+	<Version>0.5.1</Version>
 	<IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -36,7 +36,6 @@
     <PackageReference Include="Serilog.Expressions" Version="4.*" />
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
-    <PackageReference Include="System.Text.Json" Version="8.*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -47,3 +46,4 @@
 		<Folder Include="Migrations\" />
 	</ItemGroup>
 </Project>
+

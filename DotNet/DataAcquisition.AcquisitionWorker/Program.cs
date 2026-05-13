@@ -1,13 +1,13 @@
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker;
 using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Listeners;
+using LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
-using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -16,19 +16,25 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.EntityFrameworkCore;
 using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
+//register worker processor config
+builder.Services.Configure<AcquisitionWorkerProcessorSettings>(
+    builder.Configuration.GetSection("AcquisitionWorkerProcessorSettings"));
+
 builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, true);
 
-builder.Services.RegisterQuartzDatabase(builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection));
 builder.Services.AddTransient<IDataAcquisitionServiceMetrics, DataAcquisitionServiceMetrics>();
 builder.Services.AddTransient<ICreateSystemToken, CreateSystemToken>();
 builder.Services.AddSingleton(TimeProvider.System);
+
+builder.Services.AddSingleton<AcquisitionProcessorBackgroundService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<AcquisitionProcessorBackgroundService>());
 
 //Add CORS
 builder.Services.AddLinkCorsService(options => {
@@ -47,15 +53,6 @@ builder.Services.AddHealthChecks()
 if (!consumerSettings?.DisableConsumer ?? true)
 {
     builder.Services.AddHostedService<ReadyToAcquireListener>();
-}
-
-// TODO: Retry consumer services temporarily disabled for LNK-4038
-if (!consumerSettings?.DisableRetryConsumer ?? true)
-{
-
-    //builder.Services.AddSingleton(new RetryListenerSettings(DataAcquisitionWorkerConstants.ServiceName, [KafkaTopic.ReadyToAcquire.GetStringValue()]));
-    //builder.Services.AddHostedService<RetryListener>();     
-    //builder.Services.AddHostedService<RetryScheduleService>();
 }
 
 builder.Services.AddEndpointsApiExplorer();

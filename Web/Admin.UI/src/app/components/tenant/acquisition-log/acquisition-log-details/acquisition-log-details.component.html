@@ -16,6 +16,12 @@
     <div class="link-card-row" style="justify-content: flex-start; margin-bottom: 2em;">
       <div style="flex: 1;">
         <div class="data-label inline-label">
+          Log ID:
+          <span class="data-value selectable-value" style="display: inline;">{{acquisitionLog?.id}}</span>
+        </div>
+      </div>
+      <div style="flex: 1;">
+        <div class="data-label inline-label">
           Report:
           <span class="data-value selectable-value" style="display: inline;">{{acquisitionLog?.reportTrackingId}}</span>
         </div>
@@ -86,13 +92,17 @@
       <div style="flex: 1;">
         <div class="data-label inline-label">
           Scheduled For:
-          <span class="data-value" style="display: inline;">{{acquisitionLog?.executionDate | date:'short'}}</span>
+          <span class="data-value" style="display: inline;" [matTooltip]="acquisitionLog?.executionDate | date:'M/d/yy h:mm:ss a'">
+            {{acquisitionLog?.executionDate | date:'M/d/yy HH:mm'}}
+          </span>
         </div>
       </div>
       <div style="flex: 1;">
         <div class="data-label inline-label">
           Completed On:
-          <span class="data-value" style="display: inline;">{{acquisitionLog?.completionDate | date:'short'}}</span>
+          <span class="data-value" style="display: inline;" [matTooltip]="acquisitionLog?.completionDate | date:'M/d/yy h:mm:ss a'">
+            {{acquisitionLog?.completionDate | date:'M/d/yy HH:mm'}}
+          </span>
         </div>
       </div>
     </div>

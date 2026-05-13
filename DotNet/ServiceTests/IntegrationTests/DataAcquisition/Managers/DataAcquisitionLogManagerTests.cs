@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Managers;
@@ -33,7 +34,9 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
     {
         var logger = new Mock<ILogger<DataAcquisitionLogManager>>().Object;
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-        return new DataAcquisitionLogManager(logger, database);
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+        return new DataAcquisitionLogManager(logger, database, dbContext, queries);
     }
 
     [Fact]
@@ -66,7 +69,7 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
                     Paged = 25,
                     QueryType = FhirQueryType.Read,
                     QueryParameters = new List<string>() { "Test "},
-                    ResourceTypes = new List<Hl7.Fhir.Model.ResourceType>() { Hl7.Fhir.Model.ResourceType.Patient },
+                    ResourceTypes = new List<ResourceType>() { ResourceType.Patient },
                     MeasureId = "TestMeasureId",
                     ResourceReferenceTypes = new List<CreateResourceReferenceTypeModel>() 
                     { 
@@ -297,16 +300,15 @@ public class DataAcquisitionLogManagerTests : IClassFixture<DataAcquisitionInteg
         // Act
         var result = await queries.SearchAsync(new SearchDataAcquisitionLogRequest
         {
-            RequestStatus = RequestStatus.Pending
-        });
-
-        var res2 = await queries.SearchAsync(new SearchDataAcquisitionLogRequest
-        {
             RequestStatuses = [RequestStatus.Pending, RequestStatus.Failed]
         });
 
         // Assert
-        Assert.Single(result.Records);
-        Assert.Equal(RequestStatus.Pending, result.Records[0].Status);
+        Assert.True(result.Records.Any());
+        foreach (var rec in result.Records)
+        {
+            if (rec.Status != RequestStatus.Pending && rec.Status != RequestStatus.Failed)
+                Assert.Fail("Search results should only have Pending and Failed statuses");
+        }
     }
 }

@@ -8,17 +8,21 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
     public class CodeMapOperationService : BaseOperationService<CodeMapOperation>
     {
+        ILogger<CodeMapOperationService> _logger;
+
         public CodeMapOperationService(ILogger<CodeMapOperationService> logger, TimeSpan? operationTimeout = null)
             : base(logger, operationTimeout)
         {
+            _logger = logger;
         }
 
         protected override async Task<OperationResult> ExecuteOperation(CodeMapOperation operation, DomainResource resource)
         {
-            var result = await FhirPathValidator.IsFhirPathValidForResourceType(operation.FhirPath, resource.TypeName);
+            //Daniel - 4/2026: I don't think we need this per execution. We should probably move a check like this in the Rest API and validate that it's a valid path.             
+            //var result = await FhirPathValidator.IsFhirPathValidForResourceType(operation.FhirPath, resource.TypeName);
 
-            if (!result.IsValid)
-                return OperationResult.Failure($"Invalid target FHIRPath expression: {operation.FhirPath}. {result.ErrorMessage}", resource);
+            //if (!result.IsValid)
+            //    return OperationResult.Failure($"Invalid target FHIRPath expression: {operation.FhirPath}. {result.ErrorMessage}", resource);
 
             var sources = resource.Select(operation.FhirPath);
 
@@ -54,8 +58,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 }
             }
 
-            if(anyUpdated)
+            if (anyUpdated)
+            {
+                _logger.LogDebug("Applying Code Map Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
                 return OperationResult.Success(resource);
+            }
             else
                 return OperationResult.NoAction("No code maps applied.", resource);
         }

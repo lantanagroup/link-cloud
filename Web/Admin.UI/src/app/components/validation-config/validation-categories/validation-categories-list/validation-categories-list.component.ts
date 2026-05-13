@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+
 import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { MatTableDataSource, MatTableModule } from '@angular/material/table';
 import { MatSort, MatSortModule } from '@angular/material/sort';
@@ -12,7 +12,6 @@ import { VdIconComponent } from 'src/app/components/core/vd-icon/vd-icon.compone
 @Component({
   selector: 'app-validation-categories-list',
   imports: [
-    CommonModule,
     MatTableModule,
     MatSortModule,
     RouterModule,
@@ -31,7 +30,7 @@ export class ValidationCategoriesComponent implements OnInit, OnDestroy {
   columns = [
     { header: 'Category', key: 'title' },
     { header: 'Severity', key: 'severity' },
-    { header: 'Acceptability', key: 'acceptable' },
+    { header: 'Acceptable', key: 'acceptable' },
     { header: 'Guidance', key: 'guidance' },
     { header: 'Rules', key: 'rules' }
   ];

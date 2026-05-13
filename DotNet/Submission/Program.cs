@@ -1,9 +1,10 @@
-using Azure.Identity;
+using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Health;
@@ -19,6 +20,7 @@ using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Jobs;
 using LantanaGroup.Link.Shared.Settings;
 using LantanaGroup.Link.Submission.Application.Config;
+using LantanaGroup.Link.Submission.Application.HealthChecks;
 using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Middleware;
 using LantanaGroup.Link.Submission.Application.Services;
@@ -27,18 +29,15 @@ using LantanaGroup.Link.Submission.Listeners;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
 using Microsoft.OpenApi.Models;
-using Quartz;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
 using Serilog.Settings.Configuration;
 using Submission.Data;
-using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();
@@ -53,15 +52,12 @@ static void RegisterServices(WebApplicationBuilder builder)
     // load external configuration source (if specified)
     builder.AddExternalConfiguration(SubmissionConstants.ServiceName);
 
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+
+    var serviceInformation = builder.SetupServiceInformation(SubmissionConstants.ServiceName, assemblyVersion);
+
     //Add Data Layer
     builder.Services.AddSubmissionDataServices(builder.Configuration);
-
-    builder.Services.AddQuartz();
-
-    builder.Services.AddQuartzHostedService(options =>
-    {
-        options.WaitForJobsToComplete = true;
-    });
 
     builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
     builder.Services.AddTransient<RetryJob>();
@@ -70,17 +66,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     {
         options.Limits.MaxRequestBodySize = 200 * 1024 * 1024; // Set limit to 200 MB
     });
-
-    // Add service information
-    var serviceInformation = builder.Configuration.GetSection(ConfigurationConstants.AppSettings.ServiceInformation).Get<ServiceInformation>();
-    if (serviceInformation != null)
-    {
-        ServiceActivitySource.Initialize(serviceInformation);
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
-    }
 
     //Add problem details
     builder.Services.AddProblemDetails();
@@ -155,9 +140,13 @@ static void RegisterServices(WebApplicationBuilder builder)
     // Add controllers
     builder.Services.AddControllers();
 
+    //Add Quartz scheduler with SQL persistence
+    string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+    builder.Services.RegisterQuartzDatabase(connectionString);
+
     // Add hosted services
     builder.Services.AddHostedService<SubmitPayloadListener>();
-    builder.Services.AddSingleton(new RetryListenerSettings(SubmissionConstants.ServiceName, [KafkaTopic.SubmitPayloadRetry.GetStringValue()]));
+    builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.SubmitPayloadRetry.GetStringValue()]));
     builder.Services.AddHostedService<RetryListener>();
     builder.Services.AddHostedService<RetryScheduleService>();
     builder.Services.AddSingleton<BlobStorageService>();
@@ -186,6 +175,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     var kafkaHealthOptions = new KafkaHealthCheckConfiguration(kafkaConnection, SubmissionConstants.ServiceName).GetHealthCheckOptions();
 
     builder.Services.AddHealthChecks()
+        .AddCheck<DatabaseHealthCheck>(HealthCheckType.Database.ToString())
         .AddKafka(kafkaHealthOptions, HealthCheckType.Kafka.ToString());
     
     // Producers
@@ -283,3 +273,4 @@ static void SetupMiddleware(WebApplication app)
 }
 
 #endregion
+

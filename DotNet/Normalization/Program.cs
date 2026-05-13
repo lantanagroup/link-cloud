@@ -1,6 +1,6 @@
-using Azure.Identity;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
+using Hl7.Fhir.Model.CdsHooks;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
@@ -14,15 +14,16 @@ using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
@@ -32,10 +33,8 @@ using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.OpenApi.Models;
-using Quartz;
-using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
@@ -43,6 +42,7 @@ using System.Reflection;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();
@@ -57,17 +57,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     // load external configuration source (if specified)
     builder.AddExternalConfiguration(NormalizationConstants.ServiceName);
 
-    IConfigurationSection serviceInformationSection = builder.Configuration.GetRequiredSection(NormalizationConstants.AppSettingsSectionNames.ServiceInformation);
-    builder.Services.Configure<ServiceInformation>(serviceInformationSection);
-    var serviceInformation = serviceInformationSection.Get<ServiceInformation>();
-    if (serviceInformation != null)
-    {
-        ServiceActivitySource.Initialize(serviceInformation);;
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
-    }
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+
+    var serviceInformation = builder.SetupServiceInformation(NormalizationConstants.ServiceName, assemblyVersion);
 
     IConfigurationSection consumerSettingsSection = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings));
     builder.Services.Configure<ConsumerSettings>(consumerSettingsSection);
@@ -82,20 +74,24 @@ static void RegisterServices(WebApplicationBuilder builder)
     // For instructions on how to configure Kestrel and gRPC clients on macOS, visit https://go.microsoft.com/fwlink/?linkid=2099682
 
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
-    builder.Services.AddTransient<IKafkaConsumerFactory<string, ResourceAcquiredMessage>, KafkaConsumerFactory<string, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<IKafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage>, KafkaConsumerFactory<ResourceKey, ResourceAcquiredMessage>>();
 
     builder.Services.AddTransient<IKafkaProducerFactory<string, string>, KafkaProducerFactory<string, string>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, string>, KafkaProducerFactory<ResourceKey, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, ResourceAcquiredMessage>, KafkaProducerFactory<string, ResourceAcquiredMessage>>();
-    builder.Services.AddTransient<IKafkaProducerFactory<string, ResourceNormalizedMessage>, KafkaProducerFactory<string, ResourceNormalizedMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourceAcquiredMessage>, KafkaProducerFactory<ResourceKey, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourceNormalizedMessage>, KafkaProducerFactory<ResourceKey, ResourceNormalizedMessage>>();
 
-    builder.Services.RegisterKafkaProducer<string, ResourceNormalizedMessage>(kafkaConnection: builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
-        config: new ProducerConfig() { CompressionType = CompressionType.Zstd });
+    builder.Services.RegisterKafkaProducer<ResourceKey, ResourceNormalizedMessage>(
+        builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(),
+        new ProducerConfig() { CompressionType = CompressionType.Zstd });
     builder.Services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection: builder.Configuration.GetSection(KafkaConstants.SectionName).Get<KafkaConnection>(), new ProducerConfig());
 
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<ResourceKey, string>, DeadLetterExceptionHandler<ResourceKey, string>>();
     builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-    builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ResourceAcquiredMessage>, DeadLetterExceptionHandler<string, ResourceAcquiredMessage>>();
-    builder.Services.AddTransient<ITransientExceptionHandler<string, ResourceAcquiredMessage>, TransientExceptionHandler<string, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<IDeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage>, DeadLetterExceptionHandler<ResourceKey, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<ResourceKey, ResourceAcquiredMessage>, TransientExceptionHandler<ResourceKey, ResourceAcquiredMessage>>();
+    builder.Services.AddTransient<ITransientExceptionHandler<string, string>, TransientExceptionHandler<string, string>>();
 
     builder.Services.AddTransient<ITenantApiService, TenantApiService>();
 
@@ -107,6 +103,11 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddHttpClient();
     builder.Services.AddProblemDetails();
+
+    builder.Services.AddMemoryCache();
+
+    var provider = builder.Services.BuildServiceProvider();
+    var cache = provider.GetRequiredService<IMemoryCache>();
 
     // Add Link Security
     bool allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
@@ -123,23 +124,30 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
 
+    var dbProvider =
+        builder.Configuration.GetValue<string>(NormalizationConstants.AppSettingsSectionNames.DatabaseProvider);
+    string? databaseConnectionString = null;
+
+    if (dbProvider == ConfigurationConstants.AppSettings.SqlServerDatabaseProvider)
+    {
+        databaseConnectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+
+        if (string.IsNullOrEmpty(databaseConnectionString))
+            throw new InvalidOperationException("Database connection string is null or empty.");
+
+        //Add Quartz scheduler with SQL persistence
+        builder.Services.RegisterQuartzDatabase(databaseConnectionString);
+    }
+
     builder.Services.AddDbContext<NormalizationDbContext>((sp, options) => {
 
         var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
-        var dbProvider =
-            builder.Configuration.GetValue<string>(NormalizationConstants.AppSettingsSectionNames.DatabaseProvider);
         switch (dbProvider)
         {
             case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
-                string? connectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
-
-                if (string.IsNullOrEmpty(connectionString))
-                    throw new InvalidOperationException("Database connection string is null or empty.");
-
                 options
-                    .UseSqlServer(connectionString)
+                    .UseSqlServer(databaseConnectionString)
                     .AddInterceptors(updateBaseEntityInterceptor);
-
                 break;
             default:
                 throw new InvalidOperationException("Database provider not supported.");
@@ -185,25 +193,13 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.JsonSerializerOptions.Converters.Add(new OperationConverter());
     });
 
-
-    builder.Services.AddTransient<IJobFactory, QuartzJobFactory>();
-    builder.Services.AddSingleton<InMemorySchedulerFactory>();
-    builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
-    builder.Services.AddSingleton<ISchedulerFactory>(provider => provider.GetRequiredService<InMemorySchedulerFactory>());
     builder.Services.AddTransient<RetryJob>();
 
     builder.Services.AddSingleton<CopyPropertyOperationService>();
-    builder.Services.AddHostedService(provider => provider.GetRequiredService<CopyPropertyOperationService>());
-
     builder.Services.AddSingleton<CodeMapOperationService>();
-    builder.Services.AddHostedService(provider => provider.GetRequiredService<CodeMapOperationService>());
-
     builder.Services.AddSingleton<ConditionalTransformOperationService>();
-    builder.Services.AddHostedService(provider => provider.GetRequiredService<ConditionalTransformOperationService>());
-
     builder.Services.AddSingleton<CopyLocationOperationService>();
-    builder.Services.AddHostedService(provider => provider.GetRequiredService<CopyLocationOperationService>());
-
+    
     if (consumerSettings != null && !consumerSettings.DisableConsumer)
     {
          builder.Services.AddHostedService<ResourceAcquiredListener>();
@@ -211,7 +207,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
-        builder.Services.AddSingleton(new RetryListenerSettings(NormalizationConstants.ServiceName, [KafkaTopic.ResourceAcquiredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.ResourceAcquiredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }

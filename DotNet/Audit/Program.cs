@@ -1,9 +1,9 @@
-using Azure.Identity;
+using System.Reflection;
+using System.Text;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Audit.Application.Interfaces;
 using LantanaGroup.Link.Audit.Application.Services;
 using LantanaGroup.Link.Audit.Domain.Managers;
-using LantanaGroup.Link.Audit.Infrastructure;
 using LantanaGroup.Link.Audit.Infrastructure.Health;
 using LantanaGroup.Link.Audit.Infrastructure.Logging;
 using LantanaGroup.Link.Audit.Infrastructure.Telemetry;
@@ -15,9 +15,9 @@ using LantanaGroup.Link.Audit.Settings;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Factories;
-using LantanaGroup.Link.Shared.Application.Factory;
 using LantanaGroup.Link.Shared.Application.Health;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
@@ -33,18 +33,12 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Compliance.Classification;
 using Microsoft.Extensions.Compliance.Redaction;
-using Microsoft.Extensions.Configuration.AzureAppConfiguration;
-using Quartz;
-using Quartz.Impl;
-using Quartz.Spi;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
-using System.Collections.Specialized;
-using System.Reflection;
-using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddStandardEnvironmentConfiguration();
 
 RegisterServices(builder);
 var app = builder.Build();
@@ -59,15 +53,9 @@ static void RegisterServices(WebApplicationBuilder builder)
     // load external configuration source (if specified)
     builder.AddExternalConfiguration(AuditConstants.ServiceName);
 
-    var serviceInformation = builder.Configuration.GetRequiredSection(AuditConstants.AppSettingsSectionNames.ServiceInformation).Get<ServiceInformation>();
-    if (serviceInformation != null)
-    {
-        ServiceActivitySource.Initialize(serviceInformation);
-    }
-    else
-    {
-        throw new NullReferenceException("Service Information was null.");
-    }
+    var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+
+    var serviceInformation = builder.SetupServiceInformation(AuditConstants.ServiceName, assemblyVersion);
 
     //Add problem details
     builder.Services.AddProblemDetailsService(options =>
@@ -97,9 +85,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IAuditEventProcessor, AuditEventProcessor>();
 
     //Add factories
-    builder.Services.AddSingleton<InMemorySchedulerFactory>();
-    builder.Services.AddKeyedSingleton<ISchedulerFactory>(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<InMemorySchedulerFactory>());
-    
     builder.Services.AddTransient<IKafkaConsumerFactory<string, AuditEventMessage>, KafkaConsumerFactory<string, AuditEventMessage>>();
     builder.Services.AddTransient<IKafkaConsumerFactory<string, string>, KafkaConsumerFactory<string, string>>();
     builder.Services.AddTransient<IKafkaProducerFactory<string, AuditEventMessage>, KafkaProducerFactory<string, AuditEventMessage>>();
@@ -114,25 +99,31 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
 
+    var dbProvider = builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseProvider);
+    string? databaseConnectionString = null;
+
+    if (dbProvider == ConfigurationConstants.AppSettings.SqlServerDatabaseProvider)
+    {
+        databaseConnectionString = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection);
+
+        if (string.IsNullOrEmpty(databaseConnectionString))
+            throw new InvalidOperationException("Database connection string is null or empty.");
+
+        //Add Quartz scheduler with SQL persistence
+        builder.Services.RegisterQuartzDatabase(databaseConnectionString);
+    }
+
     //Add database context
     builder.Services.AddDbContext<AuditDbContext>((sp, options) => {
 
         var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
 
-        switch(builder.Configuration.GetValue<string>(AuditConstants.AppSettingsSectionNames.DatabaseProvider))
+        switch(dbProvider)
         {          
             case ConfigurationConstants.AppSettings.SqlServerDatabaseProvider:
-                string? connectionString =
-                    builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections
-                        .DatabaseConnection);
-                
-                if (string.IsNullOrEmpty(connectionString))
-                    throw new InvalidOperationException("Database connection string is null or empty.");
-
                 options
-                    .UseSqlServer(connectionString)
+                    .UseSqlServer(databaseConnectionString)
                     .AddInterceptors(updateBaseEntityInterceptor);
-
                 break;
             default:
                 throw new InvalidOperationException("Database provider not supported.");
@@ -148,34 +139,12 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     var consumerSettings = builder.Configuration.GetSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
 
-    var quartzProps = new NameValueCollection
-    {
-        ["quartz.scheduler.instanceName"] = "AuditScheduler",
-        ["quartz.scheduler.instanceId"] = "AUTO",
-        ["quartz.jobStore.clustered"] = "true",
-        ["quartz.jobStore.type"] = "Quartz.Impl.AdoJobStore.JobStoreTX, Quartz",
-        ["quartz.jobStore.driverDelegateType"] = "Quartz.Impl.AdoJobStore.SqlServerDelegate, Quartz",
-        ["quartz.jobStore.tablePrefix"] = "quartz.QRTZ_",
-        ["quartz.jobStore.dataSource"] = "default",
-        ["quartz.dataSource.default.connectionString"] = builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.DatabaseConnection),
-        ["quartz.dataSource.default.provider"] = "SqlServer",
-        ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-        ["quartz.threadPool.threadCount"] = "5",
-        ["quartz.jobStore.useProperties"] = "false",
-        ["quartz.serializer.type"] = "json"
-    };
-
-    // Register main persistent scheduler factory
-    builder.Services.AddSingleton<ISchedulerFactory>(new StdSchedulerFactory(quartzProps));
-    builder.Services.AddKeyedSingleton(ConfigurationConstants.RunTimeConstants.RetrySchedulerKeyedSingleton, (provider, key) => provider.GetRequiredService<ISchedulerFactory>());
-
     if (consumerSettings != null && !consumerSettings.DisableRetryConsumer)
     {
         builder.Services.AddTransient<IRetryModelFactory, RetryModelFactory>();
-        builder.Services.AddTransient<IJobFactory, QuartzJobFactory>();
         builder.Services.AddTransient<RetryJob>();
 
-        builder.Services.AddSingleton(new RetryListenerSettings(AuditConstants.ServiceName, [KafkaTopic.AuditableEventOccurredRetry.GetStringValue()]));
+        builder.Services.AddSingleton(new RetryListenerSettings(serviceInformation.ServiceName, [KafkaTopic.AuditableEventOccurredRetry.GetStringValue()]));
         builder.Services.AddHostedService<RetryListener>();
         builder.Services.AddHostedService<RetryScheduleService>();
     }

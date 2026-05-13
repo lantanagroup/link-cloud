@@ -1,14 +1,6 @@
 import {Component, EventEmitter, Input, Output, SimpleChanges} from '@angular/core';
-import {
-  AbstractControl,
-  FormBuilder,
-  FormControl,
-  FormGroup,
-  FormsModule,
-  ReactiveFormsModule,
-  Validators
-} from "@angular/forms";
-import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
+import {FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators} from "@angular/forms";
+import {IQueryPlanModel, QueryConfigModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 import {FormMode} from "../../../models/FormMode.enum";
 import {IEntityCreatedResponse} from "../../../interfaces/entity-created-response.model";
 
@@ -26,11 +18,17 @@ import {MatTabsModule} from "@angular/material/tabs";
 import {MatExpansionModule} from "@angular/material/expansion";
 import {MatProgressSpinnerModule} from "@angular/material/progress-spinner";
 import {DataAcquisitionService} from "../../../services/gateway/data-acquisition/data-acquisition.service";
+import {CdkDragDrop, DragDropModule, moveItemInArray} from '@angular/cdk/drag-drop';
+import {MatDialog} from '@angular/material/dialog';
+import {QueryConfigEditDialogComponent} from '../query-config-edit/query-config-edit-dialog.component';
+import {MatTableModule} from '@angular/material/table';
+import {CommonModule} from '@angular/common';
 
 @Component({
   selector: 'app-query-plan-config-form',
   standalone: true,
   imports: [
+    CommonModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -42,21 +40,12 @@ import {DataAcquisitionService} from "../../../services/gateway/data-acquisition
     MatSnackBarModule,
     MatToolbarModule,
     FormsModule,
-    ReactiveFormsModule,
-    MatFormFieldModule,
-    MatSnackBarModule,
-    FormsModule,
-    ReactiveFormsModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
-    MatToolbarModule,
     MatCardModule,
     MatTabsModule,
-    MatButtonModule,
-    MatIconModule,
     MatExpansionModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    DragDropModule,
+    MatTableModule
 ],
   templateUrl: './query-plan-config.component.html',
   styleUrl: './query-plan-config.component.scss'
@@ -94,7 +83,11 @@ export class QueryPlanConfigFormComponent {
     { value: 'Monthly', label: 'Monthly' }
   ];
 
-  constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService, private fb: FormBuilder) {
+  initialQueries: QueryConfigModel[] = [];
+  supplementalQueries: QueryConfigModel[] = [];
+  displayedColumns: string[] = ['drag', 'resourceType', 'queryConfigType', 'details', 'actions'];
+
+  constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService, private fb: FormBuilder, private dialog: MatDialog) {
 
     //initialize form with fields based on IDataAcquisitionQueryConfigModel
     this.planForm = new FormGroup({
@@ -102,8 +95,6 @@ export class QueryPlanConfigFormComponent {
       facilityId: new FormControl('', Validators.required),
       ehrDescription: new FormControl('', Validators.required),
       lookBack: new FormControl('', Validators.required),
-      initialQueries: new FormControl('', [Validators.required, this.jsonValidator]),
-      supplementalQueries: new FormControl('', [Validators.required, this.jsonValidator]),
       type: new FormControl('', Validators.required)
     });
   }
@@ -112,29 +103,7 @@ export class QueryPlanConfigFormComponent {
     this.planForm.reset();
 
     if (this.item) {
-      //set form values
-      this.planNameControl.setValue(this.item.planName);
-      this.planNameControl.updateValueAndValidity();
-
-      this.facilityIdControl.setValue(this.item.facilityId);
-      this.facilityIdControl.updateValueAndValidity();
-
-      this.typeControl.setValue(this.item.type);
-      this.typeControl.updateValueAndValidity();
-
-      this.ehrDescriptionControl.setValue(this.item.ehrDescription);
-      this.ehrDescriptionControl.updateValueAndValidity();
-
-      this.lookBackControl.setValue(this.item.lookBack);
-      this.lookBackControl.updateValueAndValidity();
-
-
-      this.initialQueriesControl.setValue(this.item?.initialQueries ? JSON.stringify(this.item.initialQueries, null, 2) : '');
-      this.initialQueriesControl.updateValueAndValidity();
-
-      this.supplementalQueriesControl.setValue(this.item?.supplementalQueries ? JSON.stringify(this.item.supplementalQueries, null, 2) : '')
-      this.supplementalQueriesControl.updateValueAndValidity();
-
+      this.setFormValues();
     } else {
       this.formMode = FormMode.Create;
     }
@@ -145,33 +114,128 @@ export class QueryPlanConfigFormComponent {
   }
 
   ngOnChanges(changes: SimpleChanges) {
-
     if (changes['item'] && changes['item'].currentValue) {
-
-      this.planNameControl.setValue(this.item.planName);
-      this.planNameControl.updateValueAndValidity();
-
-      this.facilityIdControl.setValue(this.item.facilityId);
-      this.facilityIdControl.updateValueAndValidity();
-
-      this.typeControl.setValue(this.item.type);
-      this.typeControl.updateValueAndValidity();
-
-      this.ehrDescriptionControl.setValue(this.item.ehrDescription);
-      this.ehrDescriptionControl.updateValueAndValidity();
-
-      this.lookBackControl.setValue(this.item.lookBack);
-      this.lookBackControl.updateValueAndValidity();
-
-
-      this.initialQueriesControl.setValue(this.item?.initialQueries ? JSON.stringify(this.item.initialQueries, null, 2) : '');
-      this.initialQueriesControl.updateValueAndValidity();
-
-      this.supplementalQueriesControl.setValue(this.item?.supplementalQueries ? JSON.stringify(this.item.supplementalQueries, null, 2) : '')
-      this.supplementalQueriesControl.updateValueAndValidity();
+      this.setFormValues();
     }
     // toggle view
     this.toggleViewOnly(this.viewOnly);
+  }
+
+  setFormValues() {
+    this.planNameControl.setValue(this.item.planName);
+    this.planNameControl.updateValueAndValidity();
+
+    this.facilityIdControl.setValue(this.item.facilityId);
+    this.facilityIdControl.updateValueAndValidity();
+
+    this.typeControl.setValue(this.item.type);
+    this.typeControl.updateValueAndValidity();
+
+    this.ehrDescriptionControl.setValue(this.item.ehrDescription);
+    this.ehrDescriptionControl.updateValueAndValidity();
+
+    this.lookBackControl.setValue(this.item.lookBack);
+    this.lookBackControl.updateValueAndValidity();
+
+    this.initialQueries = this.recordToArray(this.item.initialQueries);
+    this.supplementalQueries = this.recordToArray(this.item.supplementalQueries);
+  }
+
+  recordToArray(record: Record<string, QueryConfigModel> | undefined | string): QueryConfigModel[] {
+    if (!record) return [];
+    if (typeof record === 'string') {
+      try {
+        record = JSON.parse(record);
+      } catch {
+        return [];
+      }
+    }
+    const entries = Object.entries(record as Record<string, QueryConfigModel>);
+    return entries
+      .sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
+      .map(e => this.normalizeQueryConfig(e[1]));
+  }
+
+  arrayToRecord(array: QueryConfigModel[]): Record<string, QueryConfigModel> {
+    const record: Record<string, QueryConfigModel> = {};
+    array.forEach((item, index) => {
+      const normalized = this.normalizeQueryConfig(item);
+      record[index.toString()] = normalized;
+    });
+    return record;
+  }
+
+  dropInitial(event: CdkDragDrop<QueryConfigModel[]>) {
+    if (this.viewOnly) return;
+    moveItemInArray(this.initialQueries, event.previousIndex, event.currentIndex);
+    this.initialQueries = [...this.initialQueries];
+    this.formValueChanged.emit(this.planForm.invalid);
+  }
+
+  dropSupplemental(event: CdkDragDrop<QueryConfigModel[]>) {
+    if (this.viewOnly) return;
+    moveItemInArray(this.supplementalQueries, event.previousIndex, event.currentIndex);
+    this.supplementalQueries = [...this.supplementalQueries];
+    this.formValueChanged.emit(this.planForm.invalid);
+  }
+
+  addInitialQuery() {
+    this.openQueryEditDialog(null, (res) => {
+      this.initialQueries = [...this.initialQueries, res];
+      this.formValueChanged.emit(this.planForm.invalid);
+    });
+  }
+
+  addSupplementalQuery() {
+    this.openQueryEditDialog(null, (res) => {
+      this.supplementalQueries = [...this.supplementalQueries, res];
+      this.formValueChanged.emit(this.planForm.invalid);
+    });
+  }
+
+  editInitialQuery(index: number) {
+    this.openQueryEditDialog(this.initialQueries[index], (res) => {
+      this.initialQueries[index] = res;
+      this.initialQueries = [...this.initialQueries];
+      this.formValueChanged.emit(this.planForm.invalid);
+    });
+  }
+
+  editSupplementalQuery(index: number) {
+    this.openQueryEditDialog(this.supplementalQueries[index], (res) => {
+      this.supplementalQueries[index] = res;
+      this.supplementalQueries = [...this.supplementalQueries];
+      this.formValueChanged.emit(this.planForm.invalid);
+    });
+  }
+
+  deleteInitialQuery(index: number) {
+    this.initialQueries.splice(index, 1);
+    this.initialQueries = [...this.initialQueries];
+    this.formValueChanged.emit(this.planForm.invalid);
+  }
+
+  deleteSupplementalQuery(index: number) {
+    this.supplementalQueries.splice(index, 1);
+    this.supplementalQueries = [...this.supplementalQueries];
+    this.formValueChanged.emit(this.planForm.invalid);
+  }
+
+  openQueryEditDialog(config: QueryConfigModel | null, callback: (res: QueryConfigModel) => void) {
+    const dialogRef = this.dialog.open(QueryConfigEditDialogComponent, {
+      width: '800px',
+      data: {
+        dialogTitle: config ? 'Edit Query' : 'Add Query',
+        config: config ? JSON.parse(JSON.stringify(config)) : { resourceType: '', queryConfigType: 'Parameter', parameters: [] },
+        viewOnly: this.viewOnly
+      }
+    });
+
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        callback(result);
+      }
+    });
   }
 
   // Method to get the label based on the value
@@ -198,12 +262,13 @@ export class QueryPlanConfigFormComponent {
             verticalPosition: 'top'
           });
           this.item = {
+            id: '',
             facilityId: this.facilityIdControl.value,
             planName: '',
             ehrDescription: '',
             lookBack: '',
-            initialQueries: '',
-            supplementalQueries: '',
+            initialQueries: {},
+            supplementalQueries: {},
             type: this.typeControl.value ?? "Discharge"
           } as IQueryPlanModel;
           this.planSelected.emit({"type" : this.typeControl.value, "label": this.getLabelFromValue(this.typeControl.value), "exists" : false});
@@ -235,14 +300,6 @@ export class QueryPlanConfigFormComponent {
     return this.planForm.get('lookBack') as FormControl;
   }
 
-  get initialQueriesControl(): FormControl {
-    return this.planForm.get('initialQueries') as FormControl;
-  }
-
-  get supplementalQueriesControl(): FormControl {
-    return this.planForm.get('supplementalQueries') as FormControl;
-  }
-
   get typeControl(): FormControl {
     return this.planForm.get('type') as FormControl;
   }
@@ -262,30 +319,60 @@ export class QueryPlanConfigFormComponent {
     this.lookBackControl.updateValueAndValidity();
   }
 
-  clearInitialQueries(): void {
-    this.initialQueriesControl.setValue('');
-    this.initialQueriesControl.updateValueAndValidity();
+  private normalizeOperationType(value: unknown): number {
+    if (value === null || value === undefined) return 1; // default Search
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return 1;
+      const numeric = Number(trimmed);
+      if (!Number.isNaN(numeric)) return numeric;
+      const key = trimmed.toLowerCase().replace(/[^a-z]/g, '');
+      const map: Record<string, number> = { read: 0, search: 1, searchpost: 2 };
+      if (key in map) return map[key];
+    }
+    return 1;
   }
 
-  clearSupplementalQueries(): void {
-    this.supplementalQueriesControl.setValue('');
-    this.supplementalQueriesControl.updateValueAndValidity();
+  private normalizeVariableType(value: unknown): number {
+    if (value === null || value === undefined) return 0; // patient
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return 0;
+      const numeric = Number(trimmed);
+      if (!Number.isNaN(numeric)) return numeric;
+      const key = trimmed.toLowerCase().replace(/[^a-z]/g, '');
+      const map: Record<string, number> = {
+        patient: 0,
+        lookbackstart: 1,
+        periodstart: 2,
+        periodend: 3
+      };
+      if (key in map) return map[key];
+    }
+    return 0;
   }
 
+  private normalizeQueryConfig(cfg: QueryConfigModel): QueryConfigModel {
+    if (!cfg) return cfg;
+    const c: any = cfg as any;
 
-  jsonValidator(control: AbstractControl) {
-    if (!control.value) {
-      return null; // Don't validate empty input (handled by 'required')
+    if (c.queryConfigType === 'Reference') {
+      c.operationType = this.normalizeOperationType(c.operationType);
     }
 
-    try {
-      JSON.parse(control.value);
-      return null; // Valid JSON
-    } catch {
-      return {invalidJson: true}; // ❌ Invalid JSON
+    if (c.parameters && Array.isArray(c.parameters)) {
+      c.parameters = c.parameters.map((p: any) => {
+        if (p && p.parameterType === 'Variable') {
+          p.variable = this.normalizeVariableType(p.variable);
+        }
+        return p;
+      });
     }
-  }
 
+    return c as QueryConfigModel;
+  }
 
   toggleViewOnly(viewOnly: boolean) {
     this.facilityIdControl.disable();
@@ -293,19 +380,70 @@ export class QueryPlanConfigFormComponent {
       this.planNameControl.disable();
       this.ehrDescriptionControl.disable();
       this.lookBackControl.disable();
-      this.initialQueriesControl.disable();
-      this.supplementalQueriesControl.disable();
       this.typeControl.enable();
     } else {
       this.planNameControl.enable();
       this.ehrDescriptionControl.enable();
       this.lookBackControl.enable();
-      this.initialQueriesControl.enable();
-      this.supplementalQueriesControl.enable();
       this.typeControl.disable();
     }
   }
 
+
+  get currentPlanJson(): string {
+    const plan: any = {
+      Id: this.item?.id || '',
+      PlanName: this.planNameControl.value,
+      FacilityId: this.facilityIdControl.value,
+      EHRDescription: this.ehrDescriptionControl.value,
+      LookBack: this.lookBackControl.value,
+      InitialQueries: this.arrayToRecord(this.initialQueries),
+      SupplementalQueries: this.arrayToRecord(this.supplementalQueries),
+      Type: this.typeControl.value
+    };
+    return JSON.stringify(plan, null, 2);
+  }
+
+  applyImportedPlan(plan: any, preserveFacilityId: boolean, preserveType: boolean): string | null {
+    if (!plan || typeof plan !== 'object' || Array.isArray(plan)) {
+      return 'Imported JSON must be an object.';
+    }
+
+    const incomingInitialQueries = plan.InitialQueries ?? plan.initialQueries ?? {};
+    const incomingSupplementalQueries = plan.SupplementalQueries ?? plan.supplementalQueries ?? {};
+
+    if (incomingInitialQueries && (typeof incomingInitialQueries !== 'object' || Array.isArray(incomingInitialQueries))) {
+      return 'InitialQueries must be an object.';
+    }
+
+    if (incomingSupplementalQueries && (typeof incomingSupplementalQueries !== 'object' || Array.isArray(incomingSupplementalQueries))) {
+      return 'SupplementalQueries must be an object.';
+    }
+
+    const facilityId = preserveFacilityId
+      ? this.facilityIdControl.value
+      : (plan.FacilityId ?? plan.facilityId ?? this.facilityIdControl.value ?? '');
+
+    const type = preserveType
+      ? this.typeControl.value
+      : (plan.Type ?? plan.type ?? this.typeControl.value ?? 'Discharge');
+
+    this.item = {
+      id: plan.Id ?? plan.id ?? this.item?.id ?? '',
+      planName: plan.PlanName ?? plan.planName ?? '',
+      facilityId: facilityId ?? '',
+      ehrDescription: plan.EHRDescription ?? plan.ehrDescription ?? '',
+      lookBack: plan.LookBack ?? plan.lookBack ?? '',
+      initialQueries: incomingInitialQueries ?? {},
+      supplementalQueries: incomingSupplementalQueries ?? {},
+      type: type ?? 'Discharge'
+    } as IQueryPlanModel;
+
+    this.setFormValues();
+    this.formValueChanged.emit(this.planForm.invalid);
+
+    return null;
+  }
 
   submitConfiguration(): void {
     if (this.planForm.valid) {
@@ -315,8 +453,8 @@ export class QueryPlanConfigFormComponent {
             FacilityId: this.facilityIdControl.value,
             EHRDescription: this.ehrDescriptionControl.value,
             LookBack: this.lookBackControl.value,
-            InitialQueries: JSON.parse(this.initialQueriesControl.value),
-            SupplementalQueries: JSON.parse(this.supplementalQueriesControl.value),
+            InitialQueries: this.arrayToRecord(this.initialQueries),
+            SupplementalQueries: this.arrayToRecord(this.supplementalQueries),
             Type: this.typeControl.value
           } as any).subscribe({
             next: (response) => {
@@ -334,8 +472,8 @@ export class QueryPlanConfigFormComponent {
               FacilityId: this.facilityIdControl.value,
               EHRDescription: this.ehrDescriptionControl.value,
               LookBack: this.lookBackControl.value,
-              InitialQueries: JSON.parse(this.initialQueriesControl.value),
-              SupplementalQueries: JSON.parse(this.supplementalQueriesControl.value),
+              InitialQueries: this.arrayToRecord(this.initialQueries),
+              SupplementalQueries: this.arrayToRecord(this.supplementalQueries),
               Type: this.typeControl.value
             } as any).subscribe({
             next: (response) => {
@@ -356,4 +494,22 @@ export class QueryPlanConfigFormComponent {
     }
   }
 
+  getOperationTypeDisplay(op: number|string) {
+    switch (op) {
+      case 0:
+      case '0':
+      case 'Read':
+        return 'Read';
+      case 1:
+      case '1':
+      case 'Search':
+        return 'Search';
+      case 2:
+      case '2':
+      case 'SearchPost':
+        return 'SearchPost';
+      default:
+        return 'Unknown';
+    }
+  }
 }

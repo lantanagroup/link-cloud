@@ -1,12 +1,13 @@
-﻿using System.Diagnostics;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.Extensions.Logging;
-using System.Text;
 using OpenTelemetry.Trace;
+using System.Diagnostics;
+using System.Text;
 
 namespace LantanaGroup.Link.Shared.Application.Error.Handlers
 {
@@ -16,18 +17,23 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
         protected readonly ILogger<DeadLetterExceptionHandler<K, V>> Logger;
         protected readonly IKafkaProducerFactory<K, V> ProducerFactory;
         protected readonly IKafkaProducerFactory<string, string> NullConsumeResultProducerFactory;
+        protected readonly ServiceInformation ServiceInformation;
 
         public string Topic { get; set; } = string.Empty;
 
-        public string ServiceName { get; set; } = string.Empty;
+        protected string ServiceName { get; set; } = string.Empty;
 
         public DeadLetterExceptionHandler(ILogger<DeadLetterExceptionHandler<K, V>> logger, 
             IKafkaProducerFactory<K, V> producerFactory,
-            IKafkaProducerFactory<string, string> nullConsumeResultProducerFactory)
+            IKafkaProducerFactory<string, string> nullConsumeResultProducerFactory,
+            ServiceInformation serviceInformation)
         {
             Logger = logger;
             ProducerFactory = producerFactory;
             NullConsumeResultProducerFactory = nullConsumeResultProducerFactory;
+            ServiceInformation = serviceInformation;
+
+            ServiceName = ServiceInformation.ServiceConfigName ?? throw new ArgumentNullException("ServiceName must be populated");
         }
 
         public void HandleException(ConsumeResult<K, V> consumeResult, string facilityId,string message = "")
@@ -35,13 +41,13 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             try
             {
                 var ex = new Exception(message);
-                Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
+                Logger.LogError(ex, "{Name}: Failed to process {S} Event. (Partition: {Partition} Offset: {Offset})", GetType().Name, ServiceName, consumeResult.Partition.Value, consumeResult.Offset.Value);
 
-                ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, message);
+                ProduceDeadLetter(consumeResult, message);
             }
             catch (Exception e)
             {
-                Logger.LogError(e, "Error in {name}.HandleException: {message}", GetType().Name, e.Message);
+                Logger.LogError(e, "Error in {name}. HandleException: {message}", GetType().Name, e.Message);
             }
         }
 
@@ -56,11 +62,11 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             try
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
-                
-                Logger.LogError(ex, "{Name}: Failed to process {S} Event.", GetType().Name, ServiceName);
+                Activity.Current?.AddException(ex);
 
-                ProduceDeadLetter(consumeResult.Message.Key, consumeResult.Message.Value, consumeResult.Message.Headers, ex.Message);
+                Logger.LogError(ex, "{Name}: Failed to process {S} Event. (Partition: {Partition} Offset: {Offset})", GetType().Name, ServiceName, consumeResult.Partition.Value, consumeResult.Offset.Value);
+
+                ProduceDeadLetter(consumeResult, ex.Message);
             }
             catch (Exception e)
             {
@@ -68,7 +74,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             }
         }
 
-        public virtual void ProduceDeadLetter(K key, V value, Headers headers, string exceptionMessage)
+        public virtual void ProduceDeadLetter(ConsumeResult<K, V> consumeResult, string exceptionMessage)
         {
             if (string.IsNullOrWhiteSpace(Topic))
             {
@@ -76,19 +82,21 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
                     $"{GetType().Name}.Topic has not been configured. Cannot Produce Dead Letter Event for {ServiceName}");
             }
 
-            if (!headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
+            if (!consumeResult.Message.Headers.TryGetLastBytes(KafkaConstants.HeaderConstants.ExceptionService, out var headerValue))
             {
-                headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
+                consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionService, Encoding.UTF8.GetBytes(ServiceName));
             }
 
-            headers.Add(KafkaConstants.HeaderConstants.ExceptionMessage, Encoding.UTF8.GetBytes(exceptionMessage));
+            consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionPartition, Encoding.UTF8.GetBytes(consumeResult.Partition.Value.ToString()));
+            consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionOffset, Encoding.UTF8.GetBytes(consumeResult.Offset.Value.ToString()));
+            consumeResult.Message.Headers.Add(KafkaConstants.HeaderConstants.ExceptionMessage, Encoding.UTF8.GetBytes(exceptionMessage));
 
             using var producer = ProducerFactory.CreateProducer(new ProducerConfig() { CompressionType = CompressionType.Zstd });
             producer.Produce(Topic, new Message<K, V>
             {
-                Key = key,
-                Value = value,
-                Headers = headers
+                Key = consumeResult.Message.Key,
+                Value = consumeResult.Message.Value,
+                Headers = consumeResult.Message.Headers
             });
 
             producer.Flush();
@@ -99,7 +107,7 @@ namespace LantanaGroup.Link.Shared.Application.Error.Handlers
             try
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
-                Activity.Current?.RecordException(ex);
+                Activity.Current?.AddException(ex);
                 
                 if (ex?.ConsumerRecord?.Message == null)
                 {

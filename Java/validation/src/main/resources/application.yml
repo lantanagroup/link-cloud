@@ -1,3 +1,6 @@
+service-information:
+  service-name: Link Validation Service
+
 loki:
   enabled: true
   url: http://localhost:3100
@@ -101,6 +104,7 @@ authentication:
   authority: 'https://localhost:7004'
 
 link:
+  info-route: /api/validation/info
   terminology-service-url: ''
   report:
     base-url: http://localhost:5110
@@ -111,9 +115,9 @@ link:
           - facilityId={facilityId}
           - patientId={patientId}
           - reportScheduleId={reportId}
-      report-schedule-summary-model:
-        path: /api/Report/schedule
-        query:
-            - facilityId={facilityId}
-            - reportScheduleId={reportId}
+      report-schedules:
+        path: /api/schedules/{reportId}
 
+internal-blob-storage:
+  connection-string: ''
+  blob-container-name: ''

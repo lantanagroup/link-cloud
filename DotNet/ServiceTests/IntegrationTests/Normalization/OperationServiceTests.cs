@@ -6,6 +6,7 @@ using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Domain;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using System.Text.Json;
@@ -70,7 +71,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string locationPath = Path.Combine(assemblyLocation, "Resources", "Location.txt");
             string location_text = File.ReadAllText(locationPath);
@@ -88,7 +89,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, location);
+            var operationResult = await _copyOperationService.ProcessOperationAsync(copyOperation, location);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedLocation = (Location)operationResult.Resource;
@@ -131,7 +132,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string locationPath = Path.Combine(assemblyLocation, "Resources", "LocationWithCodeSection.txt");
             string location_text = File.ReadAllText(locationPath);
@@ -144,7 +145,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, location);
+            var operationResult = await _copyOperationService.ProcessOperationAsync(copyOperation, location);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedLocation = (Location)operationResult.Resource;
@@ -187,7 +188,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Patient.txt");
             string text = File.ReadAllText(resourcePath);
@@ -200,7 +201,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.ProcessOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Patient)operationResult.Resource;
@@ -243,7 +244,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Observation.txt");
             string text = File.ReadAllText(resourcePath);
@@ -256,7 +257,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.ProcessOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Observation)operationResult.Resource;
@@ -305,7 +306,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.NotEqual(default, fetched.Id);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Patient.txt");
             string text = File.ReadAllText(resourcePath);
@@ -318,7 +319,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.ProcessOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Patient)operationResult.Resource;
@@ -367,7 +368,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.NotEqual(default, fetched.Id);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "MedicationRequest.txt");
             string text = File.ReadAllText(resourcePath);
@@ -380,7 +381,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.ProcessOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (MedicationRequest)operationResult.Resource;
@@ -431,7 +432,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.NotEqual(default, fetched.Id);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Condition.txt");
             string text = File.ReadAllText(resourcePath);
@@ -444,7 +445,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.ProcessOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Condition)operationResult.Resource;
@@ -493,7 +494,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "EncounterCopyTest.txt");
             string text = File.ReadAllText(resourcePath);
@@ -509,7 +510,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.ProcessOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Encounter)operationResult.Resource;
@@ -558,7 +559,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "PatientBirthDateTest.txt");
             string text = File.ReadAllText(resourcePath);
@@ -573,7 +574,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.ProcessOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Patient)operationResult.Resource;
@@ -622,7 +623,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "MedicationRequestAuthoredOnToNote.txt");
             string text = File.ReadAllText(resourcePath);
@@ -637,7 +638,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.ProcessOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (MedicationRequest)operationResult.Resource;
@@ -686,7 +687,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "AllergyIntolerance.txt");
             string text = File.ReadAllText(resourcePath);
@@ -703,7 +704,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.ProcessOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (AllergyIntolerance)operationResult.Resource;
@@ -752,7 +753,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "DiagnosticReport.txt");
             string text = File.ReadAllText(resourcePath);
@@ -770,7 +771,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(copyOperation.SourceFhirPath);
             Assert.NotNull(copyOperation.TargetFhirPath);
 
-            var operationResult = await _copyOperationService.EnqueueOperationAsync(copyOperation, resource);
+            var operationResult = await _copyOperationService.ProcessOperationAsync(copyOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (DiagnosticReport)operationResult.Resource;
@@ -790,7 +791,7 @@ namespace IntegrationTests.Normalization
         [Fact]
         public async Task Integration_CopyPropertyOperation_MultipleOperations_Queue()
         {
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Patient.txt");
             string text = File.ReadAllText(resourcePath);
@@ -854,7 +855,7 @@ namespace IntegrationTests.Normalization
                 Assert.NotNull(copyOperation.TargetFhirPath);
 
                 fetchedOperations.Add(copyOperation);
-                tasks.Add(_copyOperationService.EnqueueOperationAsync(copyOperation, resource));
+                tasks.Add(_copyOperationService.ProcessOperationAsync(copyOperation, resource));
             }
 
             var results = await Task.WhenAll(tasks);
@@ -943,7 +944,7 @@ namespace IntegrationTests.Normalization
             Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
 
             // Load Encounter resource
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string encounterPath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string encounterText = File.ReadAllText(encounterPath);
@@ -954,7 +955,7 @@ namespace IntegrationTests.Normalization
                 Assert.Fail("No encounter resource found");
             }
             // Act: Execute the operation
-            var operationResult = await _codeMapOperationService.EnqueueOperationAsync(codeMapOperation, encounter);
+            var operationResult = await _codeMapOperationService.ProcessOperationAsync(codeMapOperation, encounter);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             // Assert: Verify the mapping
@@ -1023,7 +1024,7 @@ namespace IntegrationTests.Normalization
             Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
 
             // Load Encounter resource
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string encounterPath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string encounterText = File.ReadAllText(encounterPath);
@@ -1035,7 +1036,7 @@ namespace IntegrationTests.Normalization
             }
 
             // Act: Execute the operation
-            var operationResult = await _codeMapOperationService.EnqueueOperationAsync(codeMapOperation, encounter);
+            var operationResult = await _codeMapOperationService.ProcessOperationAsync(codeMapOperation, encounter);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             // Assert: Verify the mapping
@@ -1106,7 +1107,7 @@ namespace IntegrationTests.Normalization
             Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
 
             // Load Encounter resource
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string encounterPath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string encounterText = File.ReadAllText(encounterPath);
@@ -1121,7 +1122,7 @@ namespace IntegrationTests.Normalization
             var originalClass = encounter.Class.DeepCopy() as Coding;
 
             // Act: Execute the operation
-            var operationResult = await _codeMapOperationService.EnqueueOperationAsync(codeMapOperation, encounter);
+            var operationResult = await _codeMapOperationService.ProcessOperationAsync(codeMapOperation, encounter);
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
 
             // Assert: Verify no changes were made
@@ -1190,7 +1191,7 @@ namespace IntegrationTests.Normalization
             Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
 
             // Load Observation resource
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string observationPath = Path.Combine(assemblyLocation, "Resources", "BodyTempObservation.txt");
             string observationText = File.ReadAllText(observationPath);
@@ -1202,7 +1203,7 @@ namespace IntegrationTests.Normalization
             }
 
             // Act: Execute the operation
-            var operationResult = await _codeMapOperationService.EnqueueOperationAsync(codeMapOperation, observation);
+            var operationResult = await _codeMapOperationService.ProcessOperationAsync(codeMapOperation, observation);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             // Assert: Verify the mapping
@@ -1274,7 +1275,7 @@ namespace IntegrationTests.Normalization
             Assert.NotEmpty(codeMapOperation.CodeSystemMaps);
 
             // Load Condition resource
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string conditionPath = Path.Combine(assemblyLocation, "Resources", "DiabetesCondition.txt");
             string conditionText = File.ReadAllText(conditionPath);
@@ -1286,7 +1287,7 @@ namespace IntegrationTests.Normalization
             }
 
             // Act: Execute the operation
-            var operationResult = await _codeMapOperationService.EnqueueOperationAsync(codeMapOperation, condition);
+            var operationResult = await _codeMapOperationService.ProcessOperationAsync(codeMapOperation, condition);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             // Assert: Verify the mapping
@@ -1346,13 +1347,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             if (operationResult.SuccessCode != OperationStatus.Success)
             {
                 _output.WriteLine(operationResult.ErrorMessage);
@@ -1410,13 +1411,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
@@ -1472,13 +1473,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Encounter)operationResult.Resource;
@@ -1532,13 +1533,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
@@ -1594,13 +1595,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Encounter)operationResult.Resource;
@@ -1654,13 +1655,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
@@ -1716,13 +1717,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Encounter)operationResult.Resource;
@@ -1776,13 +1777,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
@@ -1838,13 +1839,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Encounter)operationResult.Resource;
@@ -1898,13 +1899,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
@@ -1960,13 +1961,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Encounter)operationResult.Resource;
@@ -2020,13 +2021,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
@@ -2082,13 +2083,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Encounter)operationResult.Resource;
@@ -2142,13 +2143,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
@@ -2204,13 +2205,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Encounter)operationResult.Resource;
@@ -2264,13 +2265,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "Encounter.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Encounter>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
@@ -2326,13 +2327,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "ConditionalObservation.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Observation>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedResource = (Observation)operationResult.Resource;
@@ -2386,13 +2387,13 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(transformOperation.TargetFhirPath);
             Assert.NotEmpty(transformOperation.Conditions);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string resourcePath = Path.Combine(assemblyLocation, "Resources", "ConditionalObservation.txt");
             string text = File.ReadAllText(resourcePath);
             var resource = parser.Parse<Observation>(text);
 
-            var operationResult = await _conditionalTransformService.EnqueueOperationAsync(transformOperation, resource);
+            var operationResult = await _conditionalTransformService.ProcessOperationAsync(transformOperation, resource);
 
             Assert.Equal(OperationStatus.NoAction, operationResult.SuccessCode);
             Assert.Contains("Condition was not met", operationResult.ErrorMessage);
@@ -2436,7 +2437,7 @@ namespace IntegrationTests.Normalization
             Assert.NotNull(fetched);
             Assert.True(fetched.Id != default);
 
-            var parser = new FhirJsonParser();
+            var parser = LinkFhirSerializerOptions.FhirJsonParserPermissive;
             string assemblyLocation = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             string locationPath = Path.Combine(assemblyLocation, "Resources", "Location.txt");
             string location_text = File.ReadAllText(locationPath);
@@ -2452,7 +2453,7 @@ namespace IntegrationTests.Normalization
 
             Assert.NotNull(copyOperation);
 
-            var operationResult = await _copyLocationOperationService.EnqueueOperationAsync(copyOperation, location);
+            var operationResult = await _copyLocationOperationService.ProcessOperationAsync(copyOperation, location);
             Assert.Equal(OperationStatus.Success, operationResult.SuccessCode);
 
             var modifiedLocation = (Location)operationResult.Resource;

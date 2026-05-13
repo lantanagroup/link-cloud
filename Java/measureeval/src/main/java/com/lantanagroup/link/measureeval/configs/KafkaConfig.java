@@ -9,6 +9,7 @@ import com.lantanagroup.link.measureeval.services.ResourceNormalizedConsumer;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Properties;
 import com.lantanagroup.link.shared.kafka.Topics;
+import com.lantanagroup.link.shared.kafka.records.ResourceKey;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingConsumerInterceptor;
 import io.opentelemetry.instrumentation.kafkaclients.v2_6.TracingProducerInterceptor;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -61,10 +62,10 @@ public class KafkaConfig {
     @Bean
     public Deserializer<?> keyDeserializer(ObjectMapper objectMapper) {
         Map<String, Deserializer<?>> deserializers = Map.of(
-                Topics.RESOURCE_ACQUIRED_ERROR, new StringDeserializer(),
-                Topics.RESOURCE_NORMALIZED, new StringDeserializer(),
-                Topics.RESOURCE_NORMALIZED_ERROR, new StringDeserializer(),
-                Topics.RESOURCE_NORMALIZED_RETRY, new StringDeserializer(),
+                Topics.RESOURCE_ACQUIRED_ERROR, new JsonDeserializer<>(ResourceKey.class, objectMapper),
+                Topics.RESOURCE_NORMALIZED, new JsonDeserializer<>(ResourceKey.class, objectMapper),
+                Topics.RESOURCE_NORMALIZED_ERROR, new JsonDeserializer<>(ResourceKey.class, objectMapper),
+                Topics.RESOURCE_NORMALIZED_RETRY, new JsonDeserializer<>(ResourceKey.class, objectMapper),
                 Topics.EVALUATION_REQUESTED, new StringDeserializer(),
                 Topics.EVALUATION_REQUESTED_ERROR, new StringDeserializer(),
                 Topics.EVALUATION_REQUESTED_RETRY, new StringDeserializer());
@@ -87,7 +88,7 @@ public class KafkaConfig {
                         .trustedPackages("*")
                         .ignoreTypeHeaders()
                         .typeResolver(KafkaConfig::resolveType),
-                Topics.RESOURCE_EVALUATED, new JsonDeserializer<>(ResourceEvaluated.class, objectMapper)
+                Topics.MEASURE_REPORT_GENERATED, new JsonDeserializer<>(MeasureReportGenerated.class, objectMapper)
                         .trustedPackages("*")
                         .ignoreTypeHeaders()
                         .typeResolver(KafkaConfig::resolveType),
@@ -117,12 +118,12 @@ public class KafkaConfig {
             case Topics.DATA_ACQUISITION_REQUESTED -> new ObjectMapper().constructType(DataAcquisitionRequested.class);
             case Topics.RESOURCE_ACQUIRED_ERROR -> new ObjectMapper().constructType(ResourceAcquired.class);
             case Topics.RESOURCE_NORMALIZED -> new ObjectMapper().constructType(ResourceNormalized.class);
-            case Topics.RESOURCE_EVALUATED -> new ObjectMapper().constructType(ResourceEvaluated.class);
             case Topics.RESOURCE_NORMALIZED_ERROR -> new ObjectMapper().constructType(ResourceNormalized.class);
             case Topics.RESOURCE_NORMALIZED_RETRY -> new ObjectMapper().constructType(ResourceNormalized.class);
             case Topics.EVALUATION_REQUESTED -> new ObjectMapper().constructType(EvaluationRequested.class);
             case Topics.EVALUATION_REQUESTED_ERROR -> new ObjectMapper().constructType(EvaluationRequested.class);
             case Topics.EVALUATION_REQUESTED_RETRY -> new ObjectMapper().constructType(EvaluationRequested.class);
+            case Topics.MEASURE_REPORT_GENERATED -> new ObjectMapper().constructType(MeasureReportGenerated.class);
             default -> new ObjectMapper().constructType(Object.class);
         };
     }
@@ -147,7 +148,7 @@ public class KafkaConfig {
 
         Map<Class<?>, Serializer<?>> serializers = Map.of(
                 String.class, new StringSerializer(),
-                ResourceEvaluated.Key.class, new JsonSerializer<>(objectMapper.constructType(ResourceEvaluated.Key.class), objectMapper),
+                ResourceKey.class, new JsonSerializer<>(objectMapper.constructType(ResourceKey.class), objectMapper).noTypeInfo(),
                 Object.class, new JsonSerializer<>(),
                 byte[].class, new ByteArraySerializer()
         );
@@ -160,7 +161,7 @@ public class KafkaConfig {
                 ResourceAcquired.class, new JsonSerializer<>(objectMapper.constructType(ResourceAcquired.class), objectMapper).noTypeInfo(),
                 ResourceNormalized.class, new JsonSerializer<>(objectMapper.constructType(ResourceNormalized.class), objectMapper).noTypeInfo(),
                 DataAcquisitionRequested.class, new JsonSerializer<>(objectMapper.constructType(DataAcquisitionRequested.class), objectMapper).noTypeInfo(),
-                ResourceEvaluated.class, new JsonSerializer<>(objectMapper.constructType(ResourceEvaluated.class), objectMapper).noTypeInfo(),
+                MeasureReportGenerated.class, new JsonSerializer<>(objectMapper.constructType(MeasureReportGenerated.class), objectMapper).noTypeInfo(),
                 AbstractResourceRecord.class, new JsonSerializer<>(objectMapper.constructType(AbstractResourceRecord.class), objectMapper).noTypeInfo(),
                 EvaluationRequested.class, new JsonSerializer<>(objectMapper.constructType(EvaluationRequested.class), objectMapper).noTypeInfo(),
                 String.class, new StringSerializer(),

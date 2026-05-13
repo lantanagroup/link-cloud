@@ -1,9 +1,9 @@
-import { IsActiveMatchOptions, Router, RouterLink, RouterLinkActive } from '@angular/router';
-import { NgFor, NgIf } from '@angular/common';
+import {Router, RouterLink, RouterLinkActive} from '@angular/router';
 
-import { Component } from '@angular/core';
-import { VdIconComponent } from "../vd-icon/vd-icon.component";
-import { AppConfigService } from "../../../services/app-config.service";
+
+import {Component} from '@angular/core';
+import {VdIconComponent} from "../vd-icon/vd-icon.component";
+import {AppConfigService} from "../../../services/app-config.service";
 
 export interface SubnavItem {
   label: string;
@@ -16,10 +16,8 @@ export interface SubnavItem {
   imports: [
     RouterLink,
     RouterLinkActive,
-    VdIconComponent,
-    NgFor,
-    NgIf
-  ],
+    VdIconComponent
+],
   templateUrl: './link-nav-bar.component.html',
   styleUrls: ['./link-nav-bar.component.scss'],
   standalone: true,
@@ -30,7 +28,13 @@ export class LinkNavBarComponent {
   subnavItems: SubnavItem[] = [
     { label: 'Home', path: '/dashboard' },
     { label: 'Tenants', path: '/tenant' },
-    { label: 'Reports', path: '/reports' },
+    {
+      label: 'Reports',
+      path: '/reports',
+      children: [
+        { label: 'Generate Ad-Hoc Report', path: '/reports/generate-report' }
+      ]
+    },
     {
       label: 'Configuration',
       children: [
@@ -38,6 +42,7 @@ export class LinkNavBarComponent {
         { label: 'Measure Definitions', path: '/measure-def' },
         { label: 'Normalization Operations', path: '/tenant/operations' },
         { label: 'Query Plans', path: '/query-plans' },
+        { label: 'Terminology', path: '/terminology-config' },
         { label: 'Validation Categories', path: '/validation-config/validation-categories' },
         { label: 'Vendors', path: '/vendor' },
       ]
@@ -71,5 +76,14 @@ export class LinkNavBarComponent {
         matrixParams: 'ignored'
       })
     );
+  }
+
+  isRouteActive(path: string): boolean {
+    return this.router.isActive(path, {
+      paths: 'exact',
+      queryParams: 'ignored',
+      fragment: 'ignored',
+      matrixParams: 'ignored'
+    });
   }
 }

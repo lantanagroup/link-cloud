@@ -47,18 +47,17 @@ public enum KafkaTopic
     PatientEvent,
     [StringValue("PatientEvent-Retry")]
     PatientEventRetry,
-    ResourceEvaluated,
+    MeasureReportGenerated,
     PayloadSubmitted,
     BundleEvalRequested,
-    [StringValue("ResourceEvaluated-Retry")]
-    ResourceEvaluatedRetry,
+    [StringValue("MeasureReportGenerated-Retry")]
+    MeasureReportGeneratedRetry,
     [StringValue("PayloadSubmitted-Retry")]
     PayloadSubmittedRetry,
     [StringValue("BundleEvalRequested-Retry")]
     BundleEvalRequestedRetry,
     [StringValue("ReportScheduled-Retry")]
     ReportScheduledRetry,
-    MeasureEvaluated,
     GenerateReportRequested,
     [StringValue("GenerateReportRequested-Retry")]
     GenerateReportRequestedRetry,

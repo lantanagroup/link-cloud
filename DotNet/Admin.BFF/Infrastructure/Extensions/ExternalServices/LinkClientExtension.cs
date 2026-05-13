@@ -18,6 +18,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServ
             services.AddHttpClient<SubmissionService>();   
             services.AddHttpClient<TenantService>();
             services.AddHttpClient<ValidationService>();
+            services.AddHttpClient<TerminologyService>();
 
             return services;
         }

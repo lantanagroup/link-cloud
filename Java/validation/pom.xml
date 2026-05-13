@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.lantanagroup.link</groupId>
         <artifactId>main</artifactId>
-        <version>0.1.1-dev</version>
+        <version>0.5.1</version>
     </parent>
 
     <artifactId>validation</artifactId>
@@ -148,7 +148,7 @@
         <dependency>
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-sdk-extension-autoconfigure</artifactId>
-            <version>1.38.0</version>
+            <version>1.57.0</version>
         </dependency>
         <dependency>
             <groupId>io.opentelemetry</groupId>

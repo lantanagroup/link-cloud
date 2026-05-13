@@ -120,7 +120,6 @@ $purple: #630075;
 }
 
 .left-pane {
-  flex: 1;
   margin-right: 1em;
 }
 
@@ -143,7 +142,7 @@ $purple: #630075;
 }
 
 .data-label {
-    font-size: 1.2rem; 
+    font-size: 1.2rem;
     font-weight: 400;
 }
 
@@ -152,11 +151,11 @@ $purple: #630075;
 }
 
 .data-value {
-    display: block; 
+    display: block;
     color: #5f6672;
     font-size: 1.1rem;
-    font-weight: 300; 
-    margin-top: .5em; 
+    font-weight: 300;
+    margin-top: .5em;
     margin-bottom: .5em;
 }
 
@@ -164,7 +163,7 @@ $purple: #630075;
 
 .link-button {
   cursor: pointer;
-  padding: 8px 16px; 
+  padding: 8px 16px;
   border-radius: .375em;
   font-size: 12px;
   font-size: 12px;
@@ -173,7 +172,7 @@ $purple: #630075;
 }
 
 .link-button.btn-lg {
-  padding: .75em;  
+  padding: .75em;
   border-radius: .375em;
   font-size: 14px;
   font-size: 14px;
@@ -186,7 +185,7 @@ $purple: #630075;
 }
 
 .link-button.primary:hover {
-  background-color: color.adjust($primary, $lightness: 10%); 
+  background-color: color.adjust($primary, $lightness: 10%);
 }
 
 .link-button.light {

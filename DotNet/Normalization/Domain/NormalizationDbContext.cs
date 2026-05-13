@@ -1,4 +1,6 @@
-﻿using LantanaGroup.Link.Shared.Application.Models;
+﻿using AppAny.Quartz.EntityFrameworkCore.Migrations;
+using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using System.Text.Json;
@@ -80,6 +82,9 @@ public partial class NormalizationDbContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull)
                 .HasConstraintName("FK_VendorOperationPreset_VendorVersion");
         });
+
+        // Adds Quartz.NET SqlServer schema to EntityFrameworkCore
+        modelBuilder.AddQuartz(builder => builder.UseSqlServer());
 
         OnModelCreatingPartial(modelBuilder);
     }

@@ -217,6 +217,204 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     }
 
     [Fact]
+    public async Task GetTailingMessages_WithMixedStatusesIncludingCompletedOpOutcome_ReturnsTailingMessage()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var correlationId = Guid.NewGuid().ToString();
+        var facilityId = "TestFacility";
+        var reportTrackingId = "TestReportId";
+
+        var scheduledReport = new ScheduledReport
+        {
+            ReportTrackingId = reportTrackingId,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        };
+
+        var startDate = DateTime.UtcNow.AddDays(-1);
+        var endDate = DateTime.UtcNow;
+
+        // Log 1: Completed
+        var log1 = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed,
+            TailSent = false,
+            QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123",
+            ReportStartDate = startDate,
+            ReportEndDate = endDate,
+            ScheduledReport = scheduledReport
+        };
+        dbContext.DataAcquisitionLogs.Add(log1);
+
+        // Log 2: Completed (used to be Inoperable)
+        var log2 = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed,
+            TailSent = false,
+            QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123",
+            ReportStartDate = startDate,
+            ReportEndDate = endDate,
+            ScheduledReport = scheduledReport
+        };
+        dbContext.DataAcquisitionLogs.Add(log2);
+
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        var result = await queries.GetTailingMessages();
+
+        // Assert
+        Assert.Single(result);
+        var tailingMessage = result.First();
+        Assert.Equal(facilityId, tailingMessage.FacilityId);
+        Assert.Equal(correlationId, tailingMessage.CorrelationId);
+        Assert.True(tailingMessage.ResourceAcquired.AcquisitionComplete);
+        Assert.Contains(log1.Id, tailingMessage.LogIds);
+        Assert.Contains(log2.Id, tailingMessage.LogIds);
+    }
+
+    [Fact]
+    public async Task GetCountOfNonRefLogsIncompleteAsync_WithCompleted_ReturnsCorrectCount()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var correlationId = Guid.NewGuid().ToString();
+        var facilityId = "TestFacility";
+        var reportTrackingId = "TestReportId";
+
+        // Add log with Completed status (should be considered complete)
+        var log1 = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed,
+            TailSent = false,
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery { FacilityId = facilityId, IsReference = false }
+            }
+        };
+        dbContext.DataAcquisitionLogs.Add(log1);
+
+        // Add a truly incomplete log
+        var incompleteLog = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Pending,
+            TailSent = false,
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery { FacilityId = facilityId, IsReference = false }
+            }
+        };
+        dbContext.DataAcquisitionLogs.Add(incompleteLog);
+
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        var count = await queries.GetCountOfNonRefLogsIncompleteAsync(facilityId, reportTrackingId, correlationId);
+
+        // Assert
+        // Only incompleteLog should be counted
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task GetTailingMessages_WithCompleted_ReturnsEligibleTailingMessages()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var correlationId = Guid.NewGuid().ToString();
+        var facilityId = "TestFacility";
+        var reportTrackingId = "TestReportId";
+
+        var scheduledReport = new ScheduledReport
+        {
+            ReportTrackingId = reportTrackingId,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        };
+
+        var startDate = DateTime.UtcNow.AddDays(-1);
+        var endDate = DateTime.UtcNow;
+
+        // Add log with Completed status
+        var log1 = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Completed,
+            TailSent = false,
+            QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123",
+            ReportStartDate = startDate,
+            ReportEndDate = endDate,
+            ScheduledReport = scheduledReport
+        };
+        dbContext.DataAcquisitionLogs.Add(log1);
+
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        var result = await queries.GetTailingMessages();
+
+        // Assert
+        // The log with Completed should be considered finished
+        Assert.Single(result);
+        var message = result.First();
+        Assert.Equal(facilityId, message.FacilityId);
+        Assert.Equal(correlationId, message.CorrelationId);
+        Assert.Contains(log1.Id, message.LogIds);
+    }
+
+    [Fact]
     public async Task GetCompleteLogAsync_ReturnsLogWithRelatedEntities()
     {
         // Arrange
@@ -337,8 +535,7 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         {
             FacilityId = facilityId,
             ReportTrackingId = reportTrackingId,
-            CorrelationId = correlationId,
-            RequestStatus = RequestStatus.Completed
+            CorrelationId = correlationId
         })).Records.FirstOrDefault();
 
         // Assert
@@ -767,6 +964,71 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
     }
 
     [Fact]
+    public async Task GetDataAcquisitionLogStatisticsByReportAsync_IncludesCompleted()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var reportTrackingId = "StatReportId";
+        var facilityId = "TestFacility";
+
+        var log = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            Status = RequestStatus.Completed,
+            CorrelationId = Guid.NewGuid().ToString(),
+            ReportTrackingId = reportTrackingId,
+            PatientId = "Patient/123",
+            ReportStartDate = DateTime.UtcNow.AddDays(-1),
+            ReportEndDate = DateTime.UtcNow,
+            CompletionTimeMilliseconds = 150,
+            QueryPhase = QueryPhase.Initial,
+            QueryType = FhirQueryType.Read,
+            ScheduledReport = new ScheduledReport
+            {
+                ReportTrackingId = reportTrackingId,
+                StartDate = DateTime.UtcNow.AddDays(-1),
+                EndDate = DateTime.UtcNow
+            },
+            ResourceAcquiredIds = new List<string>(),
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery 
+                {   MeasureId = "test", 
+                    FacilityId = facilityId, 
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType> 
+                    {  
+                        new FhirQueryResourceType() 
+                        { 
+                            ResourceType = Hl7.Fhir.Model.ResourceType.Patient
+                        } 
+                    } 
+                }
+            }
+        };
+        dbContext.DataAcquisitionLogs.Add(log);
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        var statistics = await queries.GetDataAcquisitionLogStatisticsByReportAsync(reportTrackingId);
+
+        // Assert
+        Assert.NotNull(statistics);
+        Assert.Equal(1, statistics.TotalLogs);
+        Assert.True(statistics.RequestStatusCounts.ContainsKey(RequestStatus.Completed));
+        Assert.Equal(1, statistics.RequestStatusCounts[RequestStatus.Completed]);
+    }
+
+    [Fact]
     public async Task CheckIfReferenceResourceHasBeenSent_ReturnsTrueIfSent()
     {
         // Arrange
@@ -954,10 +1216,116 @@ public class DataAcquisitionLogQueriesTests : IClassFixture<DataAcquisitionInteg
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
 
         // Act
-        var batch = await queries.GetNextEligibleBatchForFacility(facilityId, null, 3);
+        var batch = await queries.GetNextEligibleBatchForFacility(facilityId, null, 3, new() { RequestStatus.Pending });
 
         // Assert
         Assert.Equal(3, batch.Count);
         Assert.All(batch, l => Assert.Equal(facilityId, l.FacilityId));
+    }
+
+    [Fact]
+    public async Task FailStalledQueuedLogsAsync_FailsStalledLogs()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var stallMinutes = 15;
+        var stalledDate = DateTime.UtcNow.AddMinutes(-(stallMinutes + 1));
+        var recentDate = DateTime.UtcNow;
+
+        var stalledLog = new DataAcquisitionLog
+        {
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Queued,
+            ModifyDate = stalledDate,
+            Notes = new List<string> { "Initial note" }
+        };
+
+        var recentLog = new DataAcquisitionLog
+        {
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Queued,
+            ModifyDate = recentDate,
+            Notes = new List<string> { "Initial note" }
+        };
+
+        dbContext.DataAcquisitionLogs.AddRange(stalledLog, recentLog);
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        int rowsAffected = await queries.FailStalledQueuedLogsAsync(stallMinutes);
+
+        // Assert
+        Assert.Equal(1, rowsAffected);
+
+        // Refresh stalled log from DB
+        await dbContext.Entry(stalledLog).ReloadAsync();
+        Assert.Equal(RequestStatus.Failed, stalledLog.Status);
+        
+        // Note: The notes check was removed as notes are no longer appended in bulk updates
+        // to maintain high performance and avoid LINQ translation errors.
+
+        // Refresh recent log from DB
+        await dbContext.Entry(recentLog).ReloadAsync();
+        Assert.Equal(RequestStatus.Queued, recentLog.Status);
+        Assert.Single(recentLog.Notes);
+    }
+
+    [Fact]
+    public async Task ResetStalledProcessingLogsAsync_ResetsStalledLogs()
+    {
+        // Arrange
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        // Reset database for this test
+        await dbContext.Database.EnsureDeletedAsync();
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var stallMinutes = 240;
+        var stalledDate = DateTime.UtcNow.AddMinutes(-(stallMinutes + 1));
+        var recentDate = DateTime.UtcNow;
+
+        var stalledLog = new DataAcquisitionLog
+        {
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Processing,
+            ModifyDate = stalledDate,
+            Notes = new List<string> { "Processing started" }
+        };
+
+        var recentLog = new DataAcquisitionLog
+        {
+            FacilityId = "TestFacility",
+            Status = RequestStatus.Processing,
+            ModifyDate = recentDate,
+            Notes = new List<string> { "Processing started" }
+        };
+
+        dbContext.DataAcquisitionLogs.AddRange(stalledLog, recentLog);
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        // Act
+        int rowsAffected = await queries.ResetStalledProcessingLogsAsync(stallMinutes);
+
+        // Assert
+        Assert.Equal(1, rowsAffected);
+
+        // Refresh stalled log from DB
+        await dbContext.Entry(stalledLog).ReloadAsync();
+        Assert.Equal(RequestStatus.Pending, stalledLog.Status);
+
+        // Refresh recent log from DB
+        await dbContext.Entry(recentLog).ReloadAsync();
+        Assert.Equal(RequestStatus.Processing, recentLog.Status);
     }
 }

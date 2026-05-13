@@ -12,136 +12,231 @@
           formControlName="facilityInput"
           [matAutocomplete]="auto"
           (blur)="onFacilityInputBlur()"
-        >
-        <button *ngIf="facilityInputControl.value" matSuffix mat-icon-button matTooltip="Clear" aria-label="Clear"
-                (click)="clearSearchInput()" class="clear-btn">
-          <mat-icon>close</mat-icon>
-        </button>
-        <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onFacilitySelected($event.option.value)">
-          <mat-option *ngFor="let fac of filteredFacilities | async" [value]="fac.facilityId">
-            {{ fac.facilityId }}
-          </mat-option>
-        </mat-autocomplete>
+          >
+          @if (facilityInputControl.value) {
+            <button matSuffix mat-icon-button matTooltip="Clear" aria-label="Clear"
+              (click)="clearSearchInput()" class="clear-btn">
+              <mat-icon>close</mat-icon>
+            </button>
+          }
+          <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onFacilitySelected($event.option.value)">
+            @for (fac of filteredFacilities | async; track fac) {
+              <mat-option [value]="fac.facilityId">
+                {{ fac.facilityId }}
+              </mat-option>
+            }
+          </mat-autocomplete>
 
-      </mat-form-field>
+        </mat-form-field>
 
-      <!-- Facility error messages -->
-      <div class="facility-errors-container">
-        @if (facilityIdControl.touched && facilityIdControl.hasError('required')) {
-          <div class="facility-error">
-            Facility is <strong>required</strong>
-          </div>
-        }
-        @if (facilityIdControl.touched && facilityIdControl.hasError('notFound')) {
-          <div class="facility-error">
-            Facility <strong>not found</strong>
-          </div>
-        }
-      </div>
-    </div>
-  </div>
-
-  <!-- Report Types -->
-  <mat-form-field class="form-select" appearance="outline" class="full-width">
-    <mat-label>Report Types</mat-label>
-    <mat-select matInput formControlName="reportTypes" [compareWith]="compareReportTypes" multiple>
-      @for (reportType of reportTypes; track reportType) {
-        <mat-option [value]="reportType">
-          {{ reportType }}
-        </mat-option>
-      }
-    </mat-select>
-  </mat-form-field>
-
-  <mat-checkbox formControlName="bypassSubmission">Bypass submission?</mat-checkbox>
-
-
-  <!-- Row 2: Dates -->
-  <div class="row">
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>Start Date</mat-label>
-      <input matInput [matDatepicker]="startPicker" formControlName="startDate" required/>
-      <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
-      <mat-datepicker #startPicker></mat-datepicker>
-    </mat-form-field>
-
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>End Date</mat-label>
-      <input matInput [matDatepicker]="endPicker" formControlName="endDate" required/>
-      <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
-      <mat-datepicker #endPicker></mat-datepicker>
-    </mat-form-field>
-  </div>
-
-  <div class="row">
-    <mat-radio-group formControlName="selectedForm">
-      <mat-radio-button value="fileUpload">File Upload</mat-radio-button>
-      <mat-radio-button value="censusPatients">Census Patients</mat-radio-button>
-    </mat-radio-group>
-  </div>
-  <!-- File Upload Form -->
-  <div class="row">
-    @if (selectedFormControl.value === 'fileUpload') {
-      <div>
-        <h3>File Upload</h3>
-        <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
-        @if (errorMessage) {
-          <div class="text-red-600 mt-2">
-            {{ errorMessage }}
-          </div>
-        }
-      </div>
-    }
-
-    <!-- Census Patients Form -->
-    @if (selectedFormControl.value === 'censusPatients') {
-      <div>
-        <h3>Census Patients</h3>
-        <div>
-          <mat-form-field appearance="outline">
-            <input matInput formControlName="patients" placeholder="Enter comma-delimited string of patients"/>
-          </mat-form-field>
-          <button mat-raised-button color="primary" type="button" class="custom-height-button" (click)="addPatient()">
-            Add
-          </button>
+        <!-- Facility error messages -->
+        <div class="facility-errors-container">
+          @if (facilityIdControl.touched && facilityIdControl.hasError('required')) {
+            <div class="facility-error">
+              Facility is <strong>required</strong>
+            </div>
+          }
+          @if (facilityIdControl.touched && facilityIdControl.hasError('notFound')) {
+            <div class="facility-error">
+              Facility <strong>not found</strong>
+            </div>
+          }
         </div>
       </div>
-    }
-    <div class="input-container">
-      <thead>
-        @if (patients.length > 0) {
-          <tr>
-            <th class="header-cell">Patient</th>
-            <th class="header-cell">Delete</th>
-          </tr>
+    </div>
+
+    <!-- Report Types -->
+    <mat-form-field class="form-select" appearance="outline" class="full-width">
+      <mat-label>Report Types</mat-label>
+      <mat-select matInput formControlName="reportTypes" [compareWith]="compareReportTypes" multiple>
+        @for (reportType of reportTypes; track reportType) {
+          <mat-option [value]="reportType">
+            {{ reportType }}
+          </mat-option>
         }
-      </thead>
-      @for (patient of patients; track patient; let i = $index) {
-        <tr>
-          <td class="header-cell">{{ patient }}</td>
-          <td class="header-cell">
-            @if (patients.length > 0) {
-              <button mat-icon-button color="warn" (click)="removePatient(i)">
-                <mat-icon>remove_circle</mat-icon>
-              </button>
-            }
-          </td>
-        </tr>
+      </mat-select>
+      @if (reportTypesControl.hasError('required')) {
+        <mat-error>
+          At least one report type is required
+        </mat-error>
+      }
+    </mat-form-field>
+
+    <mat-checkbox formControlName="bypassSubmission">Bypass submission?</mat-checkbox>
+    <br>
+
+    <div class="row">
+      <div class="cadence-group">
+        <label>Reporting Cadence</label>
+        <mat-radio-group formControlName="reportingCadence">
+          <mat-radio-button value="Daily">Daily</mat-radio-button>
+          <mat-radio-button value="Monthly">Monthly</mat-radio-button>
+          <mat-radio-button value="Custom">Custom</mat-radio-button>
+        </mat-radio-group>
+      </div>
+    </div>
+
+
+    <!-- Row 2: Dates -->
+    <div class="row">
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>{{ reportingCadenceControl.value === 'Monthly' ? 'Month and Year' : 'Start Date' }}</mat-label>
+        <input matInput [matDatepicker]="startPicker" formControlName="startDate" required/>
+        <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+        <mat-datepicker #startPicker
+                        [startView]="reportingCadenceControl.value === 'Monthly' ? 'multi-year' : 'month'"
+                        (monthSelected)="chosenMonthHandler($event, startPicker)">
+        </mat-datepicker>
+        @if (startDateControl.touched && startDateControl.hasError('required')) {
+          <mat-error>
+            Start date is required
+          </mat-error>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="full-width">
+        <mat-label>End Date</mat-label>
+        <input matInput [matDatepicker]="endPicker" formControlName="endDate" required [readonly]="reportingCadenceControl.value !== 'Custom'"/>
+        <mat-datepicker-toggle matSuffix [for]="endPicker" [disabled]="reportingCadenceControl.value !== 'Custom'"></mat-datepicker-toggle>
+        <mat-datepicker #endPicker [startAt]="startDateControl.value"></mat-datepicker>
+        @if (endDateControl.touched && endDateControl.hasError('required')) {
+          <mat-error>
+            End date is required
+          </mat-error>
+        }
+      </mat-form-field>
+    </div>
+
+    <div class="row">
+      <mat-radio-group formControlName="selectedForm">
+        <mat-radio-button value="fileUpload">
+          Upload CSV
+          @if (patients.length > 0) {
+            <span class="patient-badge">{{ patients.length }}</span>
+          }
+        </mat-radio-button>
+        <mat-radio-button value="manualPatients">
+          Enter Patient IDs
+          @if (patients.length > 0) {
+            <span class="patient-badge">{{ patients.length }}</span>
+          }
+        </mat-radio-button>
+        <mat-radio-button value="censusPatients">Use Census</mat-radio-button>
+      </mat-radio-group>
+      @if (patients.length > 0 && selectedFormControl.value !== 'censusPatients') {
+        <div class="patient-list-info">
+          <mat-icon>info</mat-icon>
+          {{ patients.length }} patients loaded — shared between Upload CSV and Enter Patient IDs. Switching to Use Census will not use this list.
+        </div>
       }
     </div>
-  </div>
-  <!-- Button -->
-  <div class="text-center mt-6" style="margin-top: 50px;">
-    <button type="button" mat-raised-button color="primary" [disabled]="generateReportForm.invalid"
-            (click)="generateReport()">Generate Report
-    </button>
-  </div>
-  @if (lastGeneratedReport?.reportId) {
-    <div class="text-center mt-6" style="margin-top: 50px;">
-      <button type="button" mat-raised-button color="secondary"
-              (click)="navToReport()">View Report
+    <!-- File Upload Form -->
+    <div class="row">
+      @if (selectedFormControl.value === 'fileUpload') {
+        <div class="full-width">
+          <h3>Upload CSV</h3>
+          <file-upload (fileChange)="loadFile($event)">Upload</file-upload>
+          @if (isFileLoading) {
+            <div class="file-loading">
+              <mat-spinner diameter="20"></mat-spinner>
+              <span>Loading patients…</span>
+            </div>
+          }
+          @if (errorMessage) {
+            <div class="text-red-600 mt-2">
+              {{ errorMessage }}
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Enter Patients Form -->
+      @if (selectedFormControl.value === 'manualPatients') {
+        <div class="full-width">
+          <h3>Enter Patient IDs</h3>
+          <div class="patient-entry-row">
+            <mat-form-field appearance="outline" class="patient-entry-field">
+              <mat-label>Patient IDs</mat-label>
+              <textarea matInput cdkTextareaAutosize cdkAutosizeMinRows="3"
+                        formControlName="patients"
+                        placeholder="e.g. Patient1, Patient2&#10;or one per line"></textarea>
+              <mat-hint>Comma or newline separated — click Add to add them</mat-hint>
+            </mat-form-field>
+            <button mat-raised-button color="primary" type="button" class="custom-height-button patient-action-btn" (click)="addPatient()">
+              <mat-icon>add</mat-icon> Add
+            </button>
+          </div>
+        </div>
+      }
+      <div class="input-container" [class.hidden]="selectedFormControl.value === 'censusPatients'">
+        <div class="loaded-patients-header">
+          <span class="loaded-patients-title">Loaded Patients</span>
+          @if (patients.length > 0) {
+            @if (searchFilter) {
+              <span class="patient-count">Showing {{ dataSource.filteredData.length }} of {{ patients.length }}</span>
+            } @else {
+              <span class="patient-count">{{ patients.length }} patient IDs</span>
+            }
+          }
+        </div>
+        @if (patients.length > 0) {
+          <div class="patient-search-bar">
+            <mat-form-field appearance="outline" class="search-field">
+              <mat-label>Filter by Patient IDs</mat-label>
+              <input matInput
+                     [value]="searchFilter"
+                     (input)="applyFilter($any($event.target).value)"
+                     placeholder="e.g. Patient1, Patient2" />
+              @if (searchFilter) {
+                <button matSuffix mat-icon-button aria-label="Clear" (click)="clearFilter()">
+                  <mat-icon>close</mat-icon>
+                </button>
+              }
+            </mat-form-field>
+            <button mat-stroked-button color="warn" type="button" class="patient-action-btn" (click)="clearAllPatients()">
+              <mat-icon>delete_sweep</mat-icon> Delete All
+            </button>
+          </div>
+        }
+
+        <!-- Always in DOM so ngAfterViewInit can connect the paginator before data arrives -->
+        <mat-table [dataSource]="dataSource" class="patient-table" [class.hidden]="patients.length === 0">
+          <ng-container matColumnDef="patient">
+            <mat-header-cell *matHeaderCellDef>Patient</mat-header-cell>
+            <mat-cell *matCellDef="let patient">{{ patient }}</mat-cell>
+          </ng-container>
+          <ng-container matColumnDef="delete">
+            <mat-header-cell *matHeaderCellDef>Delete</mat-header-cell>
+            <mat-cell *matCellDef="let patient">
+              <button mat-icon-button color="warn" (click)="removePatient(patient)">
+                <mat-icon>remove_circle</mat-icon>
+              </button>
+            </mat-cell>
+          </ng-container>
+          <mat-header-row *matHeaderRowDef="displayedColumns"></mat-header-row>
+          <mat-row *matRowDef="let row; columns: displayedColumns;"></mat-row>
+        </mat-table>
+
+        <mat-paginator
+          [pageSize]="100"
+          [pageSizeOptions]="[25, 50, 100, 250]"
+          [showFirstLastButtons]="true"
+          [style.display]="patients.length > 0 ? 'block' : 'none'">
+        </mat-paginator>
+      </div>
+    </div>
+    <!-- Button -->
+    <div class="generate-report-actions">
+      <button type="button" mat-raised-button color="primary" [disabled]="!canGenerateReport"
+        (click)="generateReport()">Generate Report
       </button>
     </div>
-  }
+    @if (lastGeneratedReport?.reportId) {
+      <div class="text-center mt-6" style="margin-top: 50px;">
+        <button type="button" mat-raised-button color="secondary"
+          (click)="navToReport()">View Report
+        </button>
+      </div>
+    }
 
-</form>
+  </form>

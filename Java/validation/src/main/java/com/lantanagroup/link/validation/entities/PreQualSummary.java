@@ -1,5 +1,6 @@
 package com.lantanagroup.link.validation.entities;
 
+import com.lantanagroup.link.shared.entities.ReportScheduleModel;
 import lombok.Getter;
 import lombok.Setter;
 import org.hl7.fhir.r4.model.Device;
@@ -17,7 +18,7 @@ public class PreQualSummary {
     private List<Result> results = new ArrayList<>();
     private List<Category> categories = new ArrayList<>();
 
-    public PreQualSummary(ReportScheduleSummaryModel reportSummary) {
+    public PreQualSummary(ReportScheduleModel reportSummary) {
 
         if(reportSummary == null) {
             throw new IllegalArgumentException("ReportSummary cannot be null");
@@ -25,12 +26,10 @@ public class PreQualSummary {
 
         this.facilityId = reportSummary.getFacilityId();
         this.report = new Report();
-        this.report.setId(reportSummary.getReportId());
-        this.report.setMeasures(reportSummary.getMeasures());
-        this.report.setPeriodStart(reportSummary.getStartDate() != null ?
-                reportSummary.getStartDate().toString() : null);
-        this.report.setPeriodEnd(reportSummary.getEndDate() != null ?
-                reportSummary.getEndDate().toString() : null);
+        this.report.setId(reportSummary.getId());
+        this.report.setMeasures(reportSummary.getReportTypes());
+        this.report.setPeriodStart(reportSummary.getReportStartDate() != null ? reportSummary.getReportStartDate().toString() : null);
+        this.report.setPeriodEnd(reportSummary.getReportEndDate() != null ? reportSummary.getReportEndDate().toString() : null);
         this.report.setSubmittedTime(reportSummary.getSubmitReportDateTime());
     }
 }

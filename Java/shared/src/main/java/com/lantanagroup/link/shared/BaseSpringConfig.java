@@ -7,6 +7,7 @@ import com.lantanagroup.link.shared.mongo.FhirConversions;
 import com.lantanagroup.link.shared.security.SecurityHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
@@ -18,6 +19,10 @@ import org.springframework.security.web.SecurityFilterChain;
 @ComponentScan(basePackages = "com.lantanagroup.link.shared.auth")
 public class BaseSpringConfig {
     private static final Logger logger = LoggerFactory.getLogger(BaseSpringConfig.class);
+
+    @Value("${link.info-route:/api/info}")
+    private String infoRoute;
+
     @Bean
     SecurityFilterChain web(
             AuthenticationConfig authenticationConfig,
@@ -31,7 +36,7 @@ public class BaseSpringConfig {
 
         return authenticationConfig.isAnonymous()
                 ? SecurityHelper.buildAnonymous(http)
-                : SecurityHelper.build(http, point, authFilter);
+                : SecurityHelper.build(http, point, authFilter, infoRoute);
     }
 
     @Bean
