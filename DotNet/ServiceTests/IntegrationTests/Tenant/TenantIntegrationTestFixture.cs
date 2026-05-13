@@ -1,6 +1,3 @@
-﻿using System.Collections.Specialized;
-using System.Diagnostics;
-using System.Net;
 using Confluent.Kafka;
 using LantanaGroup.Link.Account.Persistence.Interceptors;
 using LantanaGroup.Link.Shared.Application.Extensions;
@@ -24,29 +21,22 @@ using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Quartz;
-using Quartz.Impl;
 using Quartz.Spi;
+using System.Diagnostics;
+using System.Net;
 using static LantanaGroup.Link.Shared.Application.Extensions.Security.BackendAuthenticationServiceExtension;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Tenant
 {
-    [CollectionDefinition("TenantIntegrationTests")]
-    public class DatabaseCollection : ICollectionFixture<TenantIntegrationTestFixture>
-    {
-        // This class is a marker for the collection
-    }
-
     public class TenantIntegrationTestFixture : IDisposable
     {
         public IServiceProvider ServiceProvider { get; private set; }
         private readonly IHost _host;
-        private readonly string _inMemoryDatabaseName = "TenantDatabase";
 
         public TenantIntegrationTestFixture()
         {
@@ -56,17 +46,23 @@ namespace IntegrationTests.Tenant
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
             // Register ServiceInformation using the extension method
-           var serviceInformation = builder.SetupServiceInformation(TenantConstants.ServiceName, assemblyVersion);
+            var serviceInformation = builder.SetupServiceInformation(TenantConstants.ServiceName, assemblyVersion);
 
-            // Add in-memory database with warning suppression
+            // Register the interceptor and DbContext
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
+            string dbName = $"testdb_{Guid.NewGuid()}.db";
+            var _dbPath = Path.Combine(Path.GetTempPath(), dbName);
+            var sqliteConnectionString = $"Data Source={_dbPath};";
+
             builder.Services.AddDbContext<TenantDbContext>((sp, options) =>
             {
                 var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
-                options.UseInMemoryDatabase(_inMemoryDatabaseName);
-                options.ConfigureWarnings(warnings => warnings.Ignore(InMemoryEventId.TransactionIgnoredWarning));
+                options.UseSqlite(sqliteConnectionString);
                 options.AddInterceptors(updateBaseEntityInterceptor);
             });
+
+            // Configure Quartz
+            builder.Services.RegisterQuartzDatabaseInTest();
 
             // Register repositories
             builder.Services.AddScoped<IEntityRepository<Facility>, FacilityRepository>();
@@ -133,25 +129,6 @@ namespace IntegrationTests.Tenant
             // Add ScheduleService
             builder.Services.AddScoped<ScheduleService>();
 
-            // Add test job factory
-            builder.Services.AddSingleton<IJobFactory, TestJobFactory>();
-
-            // Configure Quartz with RAMJobStore
-            builder.Services.RegisterQuartzDatabase(_inMemoryDatabaseName);
-
-            var quartzProps = new NameValueCollection
-            {
-                ["quartz.scheduler.instanceName"] = "TestScheduler",
-                ["quartz.scheduler.instanceId"] = "AUTO",
-                ["quartz.threadPool.type"] = "Quartz.Simpl.SimpleThreadPool, Quartz",
-                ["quartz.threadPool.threadCount"] = "1",
-                ["quartz.jobStore.type"] = "Quartz.Simpl.RAMJobStore, Quartz",
-                ["quartz.serializer.type"] = "json"
-            };
-
-            var schedulerFactory = new StdSchedulerFactory(quartzProps);
-            builder.Services.AddSingleton<ISchedulerFactory>(schedulerFactory);
-
             builder.Services.AddSingleton<ScheduleService>();
             //builder.Services.AddHostedService(sp => sp.GetRequiredService<ScheduleService>());
 
@@ -175,6 +152,11 @@ namespace IntegrationTests.Tenant
             // Start the host
             _host.StartAsync().GetAwaiter().GetResult();
             ServiceProvider = _host.Services;
+
+            // Ensure database is created and set PRAGMAs
+            using var scope = ServiceProvider.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
+            dbContext.Database.EnsureCreated();
         }
 
         public void Dispose()

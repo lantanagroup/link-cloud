@@ -1,8 +1,10 @@
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
@@ -22,6 +24,9 @@ public class DataAcquisitionLog
 
     public string? CorrelationId { get; set; }
 
+    [MaxLength(128)]
+    public string? ReferenceResourceType { get; set; }
+
     public string? FhirVersion { get; set; }
 
     public FhirQueryType? QueryType { get; set; }
@@ -39,11 +44,8 @@ public class DataAcquisitionLog
 
     public long? CompletionTimeMilliseconds { get; set; }
 
-    public List<string>? ResourceAcquiredIds { get; set; } = new();
-
-    public List<string> Notes { get; set; } = new();
-
-    public ScheduledReport? ScheduledReport { get; set; }
+    [ForeignKey("ReportTrackingId")]
+    public virtual ScheduledReportEntity? ScheduledReportEntity { get; set; }
 
     public bool IsCensus { get; set; } = false;
 
@@ -51,15 +53,20 @@ public class DataAcquisitionLog
 
     public bool TailSent { get; set; } = false;
 
-    [MaxLength(128)]
-    public string? ReportTrackingId { get; set; }
+    public bool IsDeleted { get; set; } = false;
 
-    public DateTime? ReportEndDate { get; set; }
-
-    public DateTime? ReportStartDate { get; set; }
+    public Guid? ReportTrackingId { get; set; }
 
     [StringLength(64)]
     public string? TraceId { get; set; }
+
+    /// <summary>
+    /// The total number of sibling logs created in the same
+    /// (FacilityId, CorrelationId, QueryPhase) group.
+    /// Stamped by the creator after all logs are committed.
+    /// Null means creation is still in progress (or legacy row).
+    /// </summary>
+    public int? SiblingCount { get; set; }
 
     [Key]
     public long Id { get; set; }
@@ -71,5 +78,10 @@ public class DataAcquisitionLog
     public virtual ICollection<FhirQuery> FhirQueries { get; set; } = new List<FhirQuery>();
 
     [InverseProperty("DataAcquisitionLog")]
+    public virtual ICollection<DataAcquisitionLogNote> NoteEntries { get; set; } = new List<DataAcquisitionLogNote>();
+
+    [InverseProperty("DataAcquisitionLog")]
+    public virtual ICollection<DataAcquisitionLogResourceId> ResourceIds { get; set; } = new List<DataAcquisitionLogResourceId>();
+
     public virtual ICollection<ReferenceResources> ReferenceResources { get; set; } = new List<ReferenceResources>();
 }

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
@@ -15,12 +15,15 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.Extensions.Logging;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -39,7 +42,7 @@ public interface IQueryListProcessor
         CancellationToken cancellationToken = default
         );
 
-    Task Process(IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
+    Task<int> Process(IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
         FhirQueryConfigurationModel fhirQueryConfiguration,
         QueryPlanModel queryPlan,
@@ -124,7 +127,7 @@ public class QueryListProcessor : IQueryListProcessor
         return resources;
     }
 
-    public async Task Process(
+    public async Task<int> Process(
         IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> queryList,
         GetPatientDataRequest request,
         FhirQueryConfigurationModel fhirQueryConfiguration,
@@ -138,6 +141,7 @@ public class QueryListProcessor : IQueryListProcessor
         var traceId = Activity.Current?.TraceId.ToHexString();
         var spanId = Activity.Current?.SpanId.ToHexString();
         var traceAndSpanDelimited = traceId + "|" + spanId;
+        int logsCreated = 0;
 
         foreach (var query in queryList)
         {
@@ -180,6 +184,7 @@ public class QueryListProcessor : IQueryListProcessor
                     fhirQuery,
                     traceAndSpanDelimited,
                     cancellationToken);
+                logsCreated++;
             }
             else if (builtQuery is PagedParameterQueryFactoryResult)
             {
@@ -207,30 +212,19 @@ public class QueryListProcessor : IQueryListProcessor
                         pagedFhirQuery,
                         traceAndSpanDelimited,
                         cancellationToken);
+                    logsCreated++;
                 }
             }
             else if (builtQuery is ReferenceQueryFactoryResult)
             {
-                var config = (ReferenceQueryConfig)queryConfig;
-                _logger.LogDebug("Resource: {resourceType}", config.ResourceType);
-
-                var fhirQueryType = FhirQueryTypeUtilities.ToDomain(config.OperationType.ToString());
-                fhirQuery.QueryType = fhirQueryType;
-                fhirQuery.ResourceTypes = [Enum.Parse<ResourceType>(config.ResourceType)];
-                fhirQuery.QueryParameters = ["_id="];
-                fhirQuery.ResourceReferenceTypes = [];
-                fhirQuery.Paged = config.Paged;
-                fhirQuery.IsReference = true;
-
-                await CreateDataAcquisitionLogAsync(
-                    request,
-                    fhirQueryType,
-                    scheduledReport,
-                    fhirQuery,
-                    traceAndSpanDelimited,
-                    cancellationToken);
+                // Reference queries are not scheduled up front. Reference ids are discovered
+                // while primary logs execute and are accumulated into the single durable
+                // same-phase reference log for the correlation/resource type.
+                _logger.LogDebug("Skipping up-front log creation for reference query {ResourceType}; execution is driven by primary-log reference discovery.", ((ReferenceQueryConfig)queryConfig).ResourceType);
             }
         }
+
+        return logsCreated;
     }
 
     private async Task CreateDataAcquisitionLogAsync(
@@ -252,7 +246,7 @@ public class QueryListProcessor : IQueryListProcessor
             FhirVersion = "R4",
             QueryPhase = QueryPhaseUtilities.ToDomain(request.QueryPlanType.ToString()),
             Status = RequestStatus.Pending,
-            ScheduledReport = scheduledReport,
+            ReportTrackingId = scheduledReport.ReportTrackingId,
             ExecutionDate = DateTime.UtcNow,
             FhirQuery = [fhirQuery],
             TraceId = traceAndSpanDelimited ?? string.Empty,

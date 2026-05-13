@@ -1,10 +1,10 @@
-using System.Net;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
-using Xunit;
+using System.Net;
 
 namespace ServiceTests.UnitTests;
 
+[Trait("Category", "UnitTests")]
 public class OpOutcomeExceptionTests
 {
     [Fact]
@@ -21,7 +21,7 @@ public class OpOutcomeExceptionTests
         Assert.Equal(message, exception.Message);
         Assert.Equal(innerException.Status, exception.Status);
         Assert.Equal(innerException.Outcome, exception.Outcome);
-        
+
         Assert.NotNull(exception.InnerException);
         Assert.Same(innerException, exception.InnerException);
         Assert.Contains("Inner message", exception.StackTrace);

@@ -51,6 +51,34 @@
       </mat-form-field>
     </div>
 
+    <div class="form-inputs" style="display: flex; flex-direction: column; gap: 16px;">
+      <mat-form-field appearance="fill">
+        <mat-label>Max Retries</mat-label>
+        <input matInput
+          type="number"
+          min="0"
+          max="10"
+          [formControl]="maxRetriesControl"
+          placeholder="Enter max retries"
+          [disabled]="viewOnly">
+          @if (maxRetriesControl.hasError('required')) {
+            <mat-error>
+              This field is required
+            </mat-error>
+          }
+          @if (maxRetriesControl.hasError('min')) {
+            <mat-error>
+              Minimum value is 0
+            </mat-error>
+          }
+          @if (maxRetriesControl.hasError('max')) {
+            <mat-error>
+              Maximum value is 10
+            </mat-error>
+          }
+        </mat-form-field>
+      </div>
+
     <!-- Min Acquisition Pull -->
     <div class="form-group">
       <label class="form-label">Min Acquisition Pull</label>
@@ -134,121 +162,224 @@
             <mat-label>Auth Type</mat-label>
             <mat-select formControlName="authType" [disabled]="viewOnly">
               @for (authType of authTypes; track authType) {
-                <mat-option [disabled]="viewOnly" [value]="authType">
-                  {{ authType }}
-                </mat-option>
+              <mat-option [disabled]="viewOnly" [value]="authType">
+                {{ authType }}
+              </mat-option>
               }
             </mat-select>
             @if (authTypeControl.hasError('required')) {
-              <mat-error>
-                Auth Type is <strong>required</strong>. Allowed values are Basic, Epic, and None.
-              </mat-error>
+            <mat-error>
+              Auth Type is <strong>required</strong>.
+            </mat-error>
             }
           </mat-form-field>
         </div>
 
-
+        @if (authTypeControl.value === 'Epic') {
         <div class="form-input">
           <mat-form-field appearance="outline" class="subject-input form-input ">
             <mat-label>Key</mat-label>
             <input matInput formControlName="authKey" [readonly]="viewOnly" placeholder="Authentication Key">
             @if (authKeyControl.value && !viewOnly) {
-              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearAuthKey()">
-                <mat-icon>close</mat-icon>
-              </button>
+            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearAuthKey()">
+              <mat-icon>close</mat-icon>
+            </button>
             }
             @if (authTypeControl.value != 'None' && authTypeControl.value != 'Basic') {
-              <mat-error>
-                Auth Key is <strong>required</strong> when AuthType is not None or Basic.
-              </mat-error>
+            <mat-error>
+              Auth Key is <strong>required</strong>.
+            </mat-error>
             }
           </mat-form-field>
         </div>
+        }
 
+        @if (authTypeControl.value === 'OAuth' || authTypeControl.value === 'Epic') {
         <div class="form-input">
           <mat-form-field appearance="outline" class="subject-input form-input">
             <mat-label>Token URL</mat-label>
             <input matInput formControlName="tokenUrl" [readonly]="viewOnly" placeholder="Token URL">
             @if (tokenUrlControl.value && !viewOnly) {
-              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearTokenUrl()">
-                <mat-icon>close</mat-icon>
-              </button>
+            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearTokenUrl()">
+              <mat-icon>close</mat-icon>
+            </button>
             }
             @if (authTypeControl.value != 'None' && authTypeControl.value != 'Basic') {
-              <mat-error>
-                Token URL is <strong>required</strong> when AuthType is not None or Basic.
-              </mat-error>
+            <mat-error>
+              Token URL is <strong>required</strong>.
+            </mat-error>
             }
           </mat-form-field>
         </div>
+        }
 
+        @if (authTypeControl.value === 'Epic') {
         <div class="form-input">
           <mat-form-field appearance="outline" class="subject-input form-input ">
             <mat-label>Audience</mat-label>
             <input matInput formControlName="audience" [readonly]="viewOnly" placeholder="Audience">
             @if (audienceControl.value && !viewOnly) {
-              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearAudience()">
-                <mat-icon>close</mat-icon>
-              </button>
+            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearAudience()">
+              <mat-icon>close</mat-icon>
+            </button>
             }
             @if (authTypeControl.value != 'None' && authTypeControl.value != 'Basic') {
-              <mat-error>
-                Audience is <strong>required</strong> when AuthType is not None or Basic.
-              </mat-error>
+            <mat-error>
+              Audience is <strong>required</strong>.
+            </mat-error>
             }
           </mat-form-field>
         </div>
+        }
 
+        @if (authTypeControl.value === 'OAuth' || authTypeControl.value === 'Epic') {
         <div class="form-input">
           <mat-form-field appearance="outline" class="subject-input form-input ">
-            <mat-label>Client ID</mat-label>
+            <mat-label>Client ID - Secret Name</mat-label>
             <input matInput formControlName="clientId" [readonly]="viewOnly" placeholder="Client ID">
             @if (clientIdControl.value && !viewOnly) {
-              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearClientId()">
-                <mat-icon>close</mat-icon>
-              </button>
+            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearClientId()">
+              <mat-icon>close</mat-icon>
+            </button>
             }
-            @if (authTypeControl.value != 'None' && authTypeControl.value != 'Basic') {
-              <mat-error>
-                Client Id is <strong>required</strong> when AuthType is not None or Basic.
-              </mat-error>
+            @if (clientIdControl.hasError('required')) {
+            <mat-error>
+              Client ID - Secret Name is <strong>required</strong>.
+            </mat-error>
+            }
+          </mat-form-field>
+        </div>
+        }
+
+        @if (authTypeControl.value === 'OAuth') {
+        <div class="form-input">
+          <mat-form-field appearance="outline" class="subject-input form-input ">
+            <mat-label>Client Secret - Secret Name</mat-label>
+            <input matInput formControlName="clientSecret" [readonly]="viewOnly" placeholder="Client Secret">
+            @if (clientSecretControl.value && !viewOnly) {
+            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearClientSecret()">
+              <mat-icon>close</mat-icon>
+            </button>
+            }
+            @if (clientSecretControl.hasError('required')) {
+            <mat-error>
+              Client Secret - Secret Name is <strong>required</strong>.
+            </mat-error>
             }
           </mat-form-field>
         </div>
 
         <div class="form-input">
           <mat-form-field appearance="outline" class="subject-input form-input ">
-            <mat-label>User Name</mat-label>
-            <input matInput formControlName="userName" [readonly]="viewOnly" placeholder="User Name">
+            <mat-label>Scope</mat-label>
+            <input matInput formControlName="scope" [readonly]="viewOnly" placeholder="Scope">
+            @if (scopeControl.value && !viewOnly) {
+            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearScope()">
+              <mat-icon>close</mat-icon>
+            </button>
+            }
+            @if (scopeControl.hasError('required')) {
+            <mat-error>
+              Scope is <strong>required</strong>.
+            </mat-error>
+            }
+          </mat-form-field>
+        </div>
+        }
+
+        @if (authTypeControl.value === 'Basic') {
+        <div class="form-input">
+          <mat-form-field appearance="outline" class="subject-input form-input ">
+            <mat-label>User Name Secret Name</mat-label>
+            <input matInput formControlName="userName" [readonly]="viewOnly" placeholder="User Name Secret Name">
             @if (userNameControl.value && !viewOnly) {
-              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearUserName()">
-                <mat-icon>close</mat-icon>
-              </button>
+            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearUserName()">
+              <mat-icon>close</mat-icon>
+            </button>
             }
             @if (authTypeControl.value == 'Basic') {
-              <mat-error>
-                User Name is <strong>required</strong> when AuthType is Basic.
-              </mat-error>
+            <mat-error>
+              User Name Secret Name is <strong>required</strong>.
+            </mat-error>
             }
           </mat-form-field>
         </div>
+        }
 
+        @if (authTypeControl.value === 'Basic') {
         <div class="form-input">
           <mat-form-field appearance="outline" class="subject-input form-input ">
-            <mat-label>Password</mat-label>
-            <input matInput formControlName="password" type="password" [readonly]="viewOnly" placeholder="Password">
+            <mat-label>Password Secret Name</mat-label>
+            <input matInput formControlName="password" [readonly]="viewOnly" placeholder="Password Secret Name">
             @if (passwordControl.value && !viewOnly) {
-              <button matSuffix mat-icon-button aria-label="Clear" (click)="clearPassword()">
-                <mat-icon>close</mat-icon>
-              </button>
+            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearPassword()">
+              <mat-icon>close</mat-icon>
+            </button>
             }
             @if (authTypeControl.value == 'Basic') {
-              <mat-error>
-                Password is <strong>required</strong> when AuthType is Basic.
-              </mat-error>
+            <mat-error>
+              Password Secret Name is <strong>required</strong>.
+            </mat-error>
             }
           </mat-form-field>
         </div>
+        }
+
+        @if (authTypeControl.value === 'CustomHeaders') {
+        <div class="custom-headers-section" style="margin-top: 16px;">
+          <label class="form-label">Custom Headers</label>
+
+          @if (customHeadersArray.length > 0) {
+          <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+            <thead>
+              <tr>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Key</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd;">Secret Name</th>
+                @if (!viewOnly) {
+                <th style="width: 60px; padding: 8px; border-bottom: 1px solid #ddd;"></th>
+                }
+              </tr>
+            </thead>
+            <tbody formArrayName="customHeaders">
+              @for (header of customHeadersArray.controls; let i = $index; track header) {
+              <tr [formGroupName]="i">
+                <td style="padding: 8px;">
+                  <mat-form-field appearance="outline" style="width: 100%;">
+                    <input matInput formControlName="key" placeholder="Header Key" [readonly]="viewOnly">
+                    @if (header.get('key')?.hasError('required') && header.get('key')?.touched) {
+                    <mat-error>Key is required</mat-error>
+                    }
+                  </mat-form-field>
+                </td>
+                <td style="padding: 8px;">
+                  <mat-form-field appearance="outline" style="width: 100%;">
+                    <input matInput formControlName="value" placeholder="Secret Name" [readonly]="viewOnly">
+                    @if (header.get('value')?.hasError('required') && header.get('value')?.touched) {
+                    <mat-error>Secret Name is required</mat-error>
+                    }
+                  </mat-form-field>
+                </td>
+                @if (!viewOnly) {
+                <td style="padding: 8px; text-align: center;">
+                  <button mat-icon-button color="warn" (click)="removeCustomHeader(i)" type="button">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </td>
+                }
+              </tr>
+              }
+            </tbody>
+          </table>
+          }
+
+          @if (!viewOnly) {
+          <button mat-raised-button color="primary" (click)="addCustomHeader()" type="button" style="margin-top: 8px;">
+            <mat-icon>add</mat-icon>
+            Add Header
+          </button>
+          }
+        </div>
+        }
       </div>
     }
     @if (configForm.errors?.['bothOrNoneHours'] && (minAcqHoursControl.touched || maxAcqHoursControl.touched || configForm.dirty)) {

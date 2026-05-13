@@ -1,6 +1,4 @@
-﻿using MongoDB.Bson.Serialization.Attributes;
-
-namespace LantanaGroup.Link.Shared.Application.Models
+﻿namespace LantanaGroup.Link.Shared.Application.Models
 {
     public class RetryModel
     {
@@ -9,7 +7,7 @@ namespace LantanaGroup.Link.Shared.Application.Models
         public string FacilityId { get; set; }
         public string Topic { get; set; }
         public string Key { get; set; }
-        public string Value { get; set; } 
+        public string Value { get; set; }
         public Dictionary<string, string> Headers { get; set; }
         public DateTime ScheduledTrigger { get; set; }
         public int RetryCount { get; set; }

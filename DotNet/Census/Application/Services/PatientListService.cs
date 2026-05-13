@@ -169,6 +169,18 @@ public class PatientListService : IPatientListService
 
                     var patientEncounter = payload.CreatePatientEncounter(facilityId, sharedCorrelationId);
                     await _patientEncounterManager.AddPatientEncounterAsync(patientEncounter, cancellationToken);
+
+                    messages.Add(new PatientEventResponse
+                    {
+                        CorrelationId = sharedCorrelationId,
+                        FacilityId = facilityId,
+                        TopicName = KafkaTopic.PatientEvent.ToString(),
+                        PatientEvent = new Models.Messages.PatientEvent
+                        {
+                            PatientId = patientId,
+                            EventType = PatientEvents.Admit.ToString()
+                        }
+                    });
                 }
 
                 await _patientEventQueries.CommitTransaction(transaction, cancellationToken);
@@ -270,7 +282,7 @@ public class PatientListService : IPatientListService
 
         if (patientsToDischarge.Any())
         {
-            foreach(var patientId in patientsToDischarge)
+            foreach (var patientId in patientsToDischarge)
             {
                 var dischargeList = new PatientListItem
                 {

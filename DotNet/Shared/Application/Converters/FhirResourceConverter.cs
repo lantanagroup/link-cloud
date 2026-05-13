@@ -9,20 +9,20 @@ namespace LantanaGroup.Link.Shared.Application.Converters
     {
         public override T Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            var converterOptions = LinkFhirSerializerOptions.ForFhirWithoutValidation();            
+            var converterOptions = LinkFhirSerializerOptions.ForFhirWithoutValidation();
 
             if (reader.TokenType == JsonTokenType.StartObject)
             {
                 return JsonSerializer.Deserialize<T>(ref reader, converterOptions);
-            }         
-       
+            }
+
             // This is a string value, so we need to parse it as JSON
             using var jsonDocument = JsonDocument.ParseValue(ref reader);
             var jsonText = jsonDocument.RootElement.ToString().TrimStart('"').TrimEnd('"');
 
             var resource = JsonSerializer.Deserialize<T>(jsonText, converterOptions);
 
-            return resource;            
+            return resource;
         }
 
         public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)

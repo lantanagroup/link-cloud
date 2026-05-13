@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Normalization.Application.Models.Operations;
+﻿using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business;
 using LantanaGroup.Link.Normalization.Application.Models.Operations.Business.Manager;
 using LantanaGroup.Link.Normalization.Application.Operations;
@@ -15,7 +15,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Normalization
 {
-    [Collection("NormalizationIntegrationTests")]
+    [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
     public class OperationServiceTests
     {
@@ -394,7 +394,7 @@ namespace IntegrationTests.Normalization
             _output.WriteLine(await serializer.SerializeToStringAsync(modifiedResource));
 
             Assert.NotEmpty(modifiedResource.Note);
-            Assert.Equal(1, modifiedResource.Note.Count);
+            Assert.Single(modifiedResource.Note);
             var note = modifiedResource.Note[0];
             Assert.NotNull(note.Text);
             Assert.Equal("325", note.Text);

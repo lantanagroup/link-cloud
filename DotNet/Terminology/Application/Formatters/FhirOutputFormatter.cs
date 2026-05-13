@@ -57,9 +57,9 @@ public class FhirOutputFormatter : TextOutputFormatter
     {
         var response = context.HttpContext.Response;
         var resource = context.Object as Resource;
-        
+
         if (resource == null) return;
-        
+
         await System.Text.Json.JsonSerializer.SerializeAsync(response.Body, resource, LinkFhirSerializerOptions.ForFhirLenientSerialization);
 
         await response.Body.FlushAsync();

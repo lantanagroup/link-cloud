@@ -1,0 +1,301 @@
+/* ===================================================================
+   Automation.UI — Design System
+   =================================================================== */
+
+/* --- Tokens --- */
+:root {
+  --au-dark:       #111;
+  --au-dark-soft:  #1a1a1a;
+  --au-accent:     #4da3ff;       /* light-blue actions */
+  --au-success:    #28a745;
+  --au-danger:     #dc3545;
+  --au-warning:    #ffc107;
+  --au-muted:      #6c757d;
+  --au-bg:         #f5f6f8;
+  --au-card-shadow: 0 2px 8px rgba(0,0,0,.10), 0 1px 3px rgba(0,0,0,.06);
+  --au-radius:     .5rem;
+}
+
+/* --- Base --- */
+html { font-size: 14px; position: relative; min-height: 100%; }
+@media (min-width: 768px) { html { font-size: 15px; } }
+
+body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
+
+/* --- Focus ring --- */
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus,
+.form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 .1rem #fff, 0 0 0 .25rem var(--au-accent);
+}
+
+/* --- Footer --- */
+.footer { font-size: .85rem; }
+
+/* ===================================================================
+   Navbar
+   =================================================================== */
+.au-navbar {
+  background: var(--au-dark) !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+}
+.au-navbar .navbar-brand,
+.au-navbar .nav-link { color: #fff !important; font-weight: 500; }
+.au-navbar .nav-link:hover { color: var(--au-accent) !important; }
+.au-navbar .navbar-text { color: rgba(255,255,255,.7); }
+
+/* ===================================================================
+   Cards — the core container
+   =================================================================== */
+.au-card {
+  border: none;
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+  margin-bottom: 1.25rem;
+  overflow: hidden;          /* so header corners clip */
+  background: #fff;
+}
+.au-card .card-header {
+  background: var(--au-dark);
+  color: #fff;
+  font-weight: 600;
+  border-bottom: none;
+  padding: .65rem 1rem;
+  font-size: .95rem;
+}
+.au-card .card-body { padding: 1rem; }
+
+/* ===================================================================
+   Buttons — colour vocabulary
+   =================================================================== */
+.btn-au-action {
+  background: var(--au-accent); color: #fff; border: none;
+}
+.btn-au-action:hover { background: #3991ee; color: #fff; }
+
+.btn-au-run {
+  background: var(--au-dark); color: #fff; border: none;
+  padding: .5rem 2rem; font-weight: 600;
+}
+.btn-au-run:hover { background: #333; color: #fff; }
+.btn-au-run:disabled { opacity: .45; cursor: not-allowed; }
+
+/* overrides for bootstrap btn-success / danger / warning */
+.btn-success, .btn-outline-success:hover { background: var(--au-success); border-color: var(--au-success); }
+.btn-danger  { background: var(--au-danger);  border-color: var(--au-danger); }
+.btn-warning, .btn-outline-warning:hover { background: var(--au-warning); border-color: var(--au-warning); color: #111; }
+
+/* ===================================================================
+   Status badges
+   =================================================================== */
+.au-badge-success  { background: var(--au-success) !important; }
+.au-badge-danger   { background: var(--au-danger)  !important; }
+.au-badge-warning  { background: var(--au-warning) !important; color: #111 !important; }
+.au-badge-muted    { background: var(--au-muted)   !important; }
+
+/* ===================================================================
+   Tables
+   =================================================================== */
+.au-table {
+  font-size: .875rem;
+}
+.au-table thead th {
+  background: var(--au-dark);
+  color: #fff;
+  font-weight: 600;
+  border: none;
+  white-space: nowrap;
+  padding: .55rem .75rem;
+}
+.au-table tbody td {
+  vertical-align: middle;
+  padding: .5rem .75rem;
+}
+.au-table tbody tr:hover { background: rgba(77,163,255,.06); }
+
+/* Sort header anchors inside .au-table thead th. The default user-agent +
+   Bootstrap link color (blue/purple) clashes with the white header text;
+   inheriting color while keeping the underline and arrow indicator preserves
+   the dark/white theme and still signals the link is clickable. */
+.au-sort-header,
+.au-sort-header:visited {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.au-sort-header:hover,
+.au-sort-header:focus {
+  color: #fff;
+  text-decoration: underline;
+  filter: brightness(1.15); /* subtle affordance without changing the palette */
+}
+
+/* Loading overlay used while the recent-runs table is being refreshed via
+   the partial-view fetch path. Sits over the card body without disturbing
+   layout — the card keeps its height so the page doesn't reflow. */
+.au-card-loading {
+  position: relative;
+}
+.au-card-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,.65);
+  z-index: 5;
+}
+.au-card-loading::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2rem;
+  height: 2rem;
+  margin: -1rem 0 0 -1rem;
+  border: 3px solid #ccc;
+  border-top-color: var(--au-dark, #1f2937);
+  border-radius: 50%;
+  animation: au-card-spin .8s linear infinite;
+  z-index: 6;
+}
+@keyframes au-card-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===================================================================
+   Cohort builder
+   =================================================================== */
+.au-cohort-card {
+  border: 1px solid #dee2e6;
+  border-radius: var(--au-radius);
+  background: #fafbfc;
+}
+.au-cohort-card .card-body { padding: .75rem 1rem; }
+
+/* ===================================================================
+   Scenario header bar (inside the form)
+   =================================================================== */
+.au-scenario-header {
+  background: var(--au-dark);
+  color: #fff;
+  border-radius: var(--au-radius);
+  padding: .75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+/* ===================================================================
+   Details — run summary grid
+   =================================================================== */
+.au-summary-item {
+  display: flex;
+  flex-direction: column;
+  font-size: .875rem;
+}
+.au-summary-item .au-label {
+  color: var(--au-muted);
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: .15rem;
+}
+.au-summary-item .au-value { font-weight: 600; }
+.au-summary-item code { font-size: .82rem; }
+
+/* ===================================================================
+   Cohort summary table (Details page)
+   =================================================================== */
+.au-cohort-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .82rem;
+}
+.au-cohort-summary-table th {
+  background: #f0f0f0;
+  font-weight: 600;
+  padding: .35rem .6rem;
+  border-bottom: 2px solid #ddd;
+}
+.au-cohort-summary-table td {
+  padding: .3rem .6rem;
+  border-bottom: 1px solid #eee;
+}
+
+/* ===================================================================
+   Stat tiles (data-acq / norm / measure / validation)
+   =================================================================== */
+.au-stat-tile {
+  border: 1px solid #e3e6ea;
+  border-radius: var(--au-radius);
+  padding: .6rem .8rem;
+  background: #fff;
+  text-align: center;
+}
+.au-stat-tile .au-stat-value { font-size: 1.35rem; font-weight: 700; }
+.au-stat-tile .au-stat-label { font-size: .75rem; color: var(--au-muted); }
+
+/* ===================================================================
+   Log console
+   =================================================================== */
+.au-log-console {
+  height: 500px;
+  overflow: auto;
+  background: var(--au-dark);
+  color: #ddd;
+  padding: 12px;
+  font-size: .82rem;
+  border-radius: 0;
+}
+
+/* ===================================================================
+   System-scenario overlay
+   =================================================================== */
+.au-system-overlay {
+  background: rgba(255,255,255,.38);
+  z-index: 5;
+  cursor: not-allowed;
+}
+
+/* ===================================================================
+   Tooltips — rely on Bootstrap but ensure dark style
+   =================================================================== */
+
+/* Info-icon tooltips: subtle (?) indicators for contextual help */
+.au-info-icon {
+  color: var(--au-muted);
+  font-size: .8em;
+  cursor: help;
+  opacity: .7;
+  transition: opacity .15s;
+}
+.au-info-icon:hover { opacity: 1; color: var(--au-accent); }
+
+/* ===================================================================
+   Responsive helpers
+   =================================================================== */
+@media (max-width: 767.98px) {
+  .au-card .card-body { padding: .75rem; }
+  .au-table { font-size: .8rem; }
+  .au-summary-item { font-size: .8rem; }
+}
+
+/* ===================================================================
+   KPI dashboard cards
+   =================================================================== */
+.au-kpi-card {
+  background: #fff;
+  border-radius: var(--au-radius);
+  box-shadow: var(--au-card-shadow);
+  padding: 1.25rem 1rem;
+  text-align: center;
+}
+.au-kpi-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.au-kpi-label {
+  font-size: .78rem;
+  color: var(--au-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-top: .3rem;
+}

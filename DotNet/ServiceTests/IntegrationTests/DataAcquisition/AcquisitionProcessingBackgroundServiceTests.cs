@@ -8,9 +8,9 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition;
 
-[Collection("DataAcquisitionIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class AcquisitionProcessorBackgroundServiceTests : IClassFixture<DataAcquisitionIntegrationTestFixture>
+public class AcquisitionProcessorBackgroundServiceTests
 {
     private readonly DataAcquisitionIntegrationTestFixture _fixture;
     private readonly Mock<IPatientDataService> _patientDataServiceMock;
@@ -21,7 +21,7 @@ public class AcquisitionProcessorBackgroundServiceTests : IClassFixture<DataAcqu
         _patientDataServiceMock = new Mock<IPatientDataService>();
     }
 
-   
+
 
     [Fact]
     public async Task ProcessWorkItem_LogNotFound_SkipsProcessing()

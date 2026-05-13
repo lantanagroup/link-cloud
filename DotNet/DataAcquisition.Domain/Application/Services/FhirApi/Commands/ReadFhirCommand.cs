@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Medallion.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -68,8 +69,19 @@ public class ReadFhirCommand : IReadFhirCommand
         if (request.fhirQueryConfiguration == null)
             throw new ArgumentNullException(nameof(request.fhirQueryConfiguration), "FhirQueryConfiguration cannot be null.");
 
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, request.fhirQueryConfiguration.GetMaxConcurrentRequestsOrDefault(), _distributedLockSettings.Expiration, cancellationToken))
+        var maxConcurrent = request.fhirQueryConfiguration.GetMaxConcurrentRequestsOrDefault();
+        var semWaitStart = DateTime.UtcNow;
+        var maskedFacilityId = request.facilityId.MaskForLog();
+        var maskedResourceId = request.resourceId.MaskForLog();
+        _logger.LogDebug(
+            "Semaphore: Read acquire attempt facility={FacilityId} resource={ResourceType}/{ResourceId} maxConcurrent={MaxConcurrent}",
+            maskedFacilityId, request.resourceType, maskedResourceId, maxConcurrent);
+        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
+            var semAcquiredAt = DateTime.UtcNow;
+            _logger.LogDebug(
+                "Semaphore: Read acquired facility={FacilityId} resource={ResourceType}/{ResourceId} waitMs={WaitMs}",
+                maskedFacilityId, request.resourceType, maskedResourceId, (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
             // Create a new handler chain using a DelegatingHandler around a base HttpClientHandler
             var innerHandler = new HttpClientHandler();
             var headerCapturingHandler = new HeaderCapturingHandler { InnerHandler = innerHandler };
@@ -83,7 +95,17 @@ public class ReadFhirCommand : IReadFhirCommand
             var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.fhirQueryConfiguration.Authentication);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
-                fhirClient.RequestHeaders.Authorization = (AuthenticationHeaderValue)authBuilderResults.authHeader;
+                if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)
+                {
+                    fhirClient.RequestHeaders.Authorization = authHeaderValue;
+                }
+                else if (authBuilderResults.authHeader is Dictionary<string, string> customHeaders)
+                {
+                    foreach (var header in customHeaders)
+                    {
+                        fhirClient.RequestHeaders.Add(header.Key, header.Value);
+                    }
+                }
             }
 
             string location = request.resourceType switch
@@ -109,6 +131,9 @@ public class ReadFhirCommand : IReadFhirCommand
                 throw new Exception($"Resource not found. ResourceType: {request.resourceType}; ResourceId: {request.resourceId}; Full location: {location}");
             }
 
+            _logger.LogDebug(
+                "Semaphore: Read releasing facility={FacilityId} resource={ResourceType}/{ResourceId} holdMs={HoldMs}",
+                maskedFacilityId, request.resourceType, maskedResourceId, (long)(DateTime.UtcNow - semAcquiredAt).TotalMilliseconds);
             return readResource;
         }
     }

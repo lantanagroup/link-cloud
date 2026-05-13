@@ -7,10 +7,15 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
@@ -20,7 +25,6 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using RequestStatus = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
@@ -40,6 +44,8 @@ public class PatientCensusService : IPatientCensusService
     private readonly IFhirQueryConfigurationQueries _fhirQueryConfigurationQueries;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IProducer<string, PatientListMessage> _kafkaProducer;
+    private readonly ISftpConfigurationQueries _sftpConfigurationQueries;
+    private readonly ISftpAcquisitionLogManager _sftpAcquisitionLogManager;
 
     public PatientCensusService(
         ILogger<PatientCensusService> logger,
@@ -48,7 +54,9 @@ public class PatientCensusService : IPatientCensusService
         IFhirQueryConfigurationQueries fhirQueryConfigurationQueries,
         IReadFhirCommand readFhirCommand,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
-        IProducer<string, PatientListMessage> kafkaProducer)
+        IProducer<string, PatientListMessage> kafkaProducer,
+        ISftpConfigurationQueries sftpConfigurationQueries,
+        ISftpAcquisitionLogManager sftpAcquisitionLogManager)
     {
         _logger = logger;
         _authRetrievalService = authRetrievalService;
@@ -58,13 +66,65 @@ public class PatientCensusService : IPatientCensusService
         _fhirQueryListConfigurationQueries = fhirQueryListConfigurationQueries;
         _fhirQueryConfigurationQueries = fhirQueryConfigurationQueries;
         _kafkaProducer = kafkaProducer;
+        _sftpConfigurationQueries = sftpConfigurationQueries;
+        _sftpAcquisitionLogManager = sftpAcquisitionLogManager;
     }
 
     public async Task CreateLog(string facilityId, CancellationToken cancellationToken)
     {
         using var activity = Activity.Current?.Source.StartActivity();
         activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
-    
+
+        // Check if SFTP configuration exists for this facility
+        var sftpConfig = await _sftpConfigurationQueries.GetByOrganizationIdAsync(facilityId, cancellationToken);
+
+        if (sftpConfig is not null)
+        {
+            // Find all census-related acquisition configurations
+            var censusConfigs = sftpConfig.AcquisitionConfigurations
+                .Where(c => c.AcquisitionType == SftpAcquisitionType.Census)
+                .ToList();
+
+            if (censusConfigs.Count > 0)
+            {
+                foreach (var censusConfig in censusConfigs)
+                {
+                    // Create SftpAcquisitionLog for SFTP-based census
+                    _logger.LogInformation(
+                        "Facility {FacilityId} is configured for SFTP census acquisition (type: {AcquisitionType}, subType: {SubType})",
+                        facilityId, censusConfig.AcquisitionType, censusConfig.SubType);
+
+                    var sftpLog = new SftpAcquisitionLogModel
+                    {
+                        ExternalId = Guid.NewGuid(),
+                        FacilityId = facilityId,
+                        AcquisitionType = censusConfig.AcquisitionType,
+                        SubType = censusConfig.SubType,
+                        ScheduledDate = null,  // null = census should process immediately, can be set later for retry if needed
+                        ProcessDate = null,
+                        Status = RequestStatus.Pending,
+                        OriginatingTraceId = Activity.Current?.TraceId.ToString(),
+                        OriginatingSpanId = Activity.Current?.SpanId.ToString(),
+                        Notes = [$"[{DateTime.UtcNow:O}] SFTP {censusConfig.AcquisitionType}/{censusConfig.SubType} acquisition scheduled"]
+                    };
+
+                    await _sftpAcquisitionLogManager.CreateAsync(sftpLog, cancellationToken);
+
+                    _logger.LogInformation(
+                        "Created SFTP acquisition log ({AcquisitionType}/{SubType}) for facility {FacilityId}",
+                        censusConfig.AcquisitionType, censusConfig.SubType, facilityId);
+                }
+
+                return;
+            }
+
+            // SFTP config exists but no census acquisition configured - fall through to FHIR List
+            _logger.LogDebug(
+                "Facility {FacilityId} has SFTP config but no census acquisition configured, using FHIR List",
+                facilityId);
+        }
+
+        // No SFTP configuration, continue with FHIR List logic
         var facilityConfig = await _fhirQueryListConfigurationQueries.GetByFacilityIdAsync(facilityId, cancellationToken);
 
         if (facilityConfig == null)
@@ -93,7 +153,6 @@ public class PatientCensusService : IPatientCensusService
                 ExecutionDate = DateTime.UtcNow,
                 Priority = AcquisitionPriority.Normal,
                 IsCensus = true,
-                ScheduledReport = new ScheduledReport()
             };
 
             facilityConfig.EHRPatientLists.ForEach(x =>
@@ -102,7 +161,7 @@ public class PatientCensusService : IPatientCensusService
                 {
                     activity?.SetStatus(ActivityStatusCode.Error, "Timeframe is null for list");
                     activity?.AddTag("fhir.list.id", x.FhirId);
-                    activity?.AddTag("fhir.list.internal.id", x.InternalId );
+                    activity?.AddTag("fhir.list.internal.id", x.InternalId);
                     _logger.LogError("TimeFrame is null for list {listId} for facility {facilityId}.", x.FhirId, facilityId);
                 }
 
@@ -110,7 +169,7 @@ public class PatientCensusService : IPatientCensusService
                 {
                     activity?.SetStatus(ActivityStatusCode.Error, "Status is null for list");
                     activity?.AddTag("fhir.list.id", x.FhirId);
-                    activity?.AddTag("fhir.list.internal.id", x.InternalId );
+                    activity?.AddTag("fhir.list.internal.id", x.InternalId);
                     _logger.LogError("Status is null for list {listId} for facility {facilityId}.", x.FhirId, facilityId);
                 }
 
@@ -234,7 +293,7 @@ public class PatientCensusService : IPatientCensusService
                     TimeFrame = ConvertToTimeFrame(query.CensusTimeFrame.Value),
                     PatientIds = fhirList.Entry.Select(x => x.Item?.ReferenceElement.Value.SplitReference().Trim()).ToList() ?? [],
                 });
-                
+
             }
             catch (TimeoutException timeoutEx)
             {
@@ -244,19 +303,15 @@ public class PatientCensusService : IPatientCensusService
             catch (Exception ex)
             {
                 isFailed = true;
-                notes.Add($"Error retrieving patient list for facility {query.FacilityId} with list id {query.CensusListId}: {ex.Message}");
+                _logger.LogError(ex, "Error retrieving patient list for facility {FacilityId} with list id {CensusListId}", query.FacilityId.SanitizeForLog(), query.CensusListId.SanitizeForLog());
+                notes.Add($"[{DateTime.UtcNow}] Error retrieving patient list for facility {query.FacilityId}. See application logs for details.");
             }
         }
 
         if (isFailed)
         {
-            if (log.Notes == null)
-            {
-                log.Notes = new List<string>();
-            }
-            log.Notes.Add($"Failed to retrieve patient list for facility {log.FacilityId}. \n" + string.Join(", ", notes));
+            notes.Add($"[{DateTime.UtcNow}] Failed to retrieve patient list for facility {log.FacilityId}. See application logs for details.");
             log.Status = RequestStatus.Failed;
-            log.Notes.AddRange(notes);
         }
         else
         {
@@ -267,28 +322,20 @@ public class PatientCensusService : IPatientCensusService
 
         log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
         log.CompletionDate = System.DateTime.UtcNow;
-        log.ResourceAcquiredIds = results.SelectMany(x => x.PatientIds).ToList();
+        var acquiredIds = results.SelectMany(x => x.PatientIds).ToList();
 
-        // Ensure that the result of UpdateAsync is not null before assigning it to the log variable
-        var updatedLog = await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+        await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
         {
             Id = log.Id,
-            ResourceAcquiredIds = log.ResourceAcquiredIds,
+            ResourceAcquiredIds = acquiredIds,
             RetryAttempts = log.RetryAttempts,
             CompletionDate = log.CompletionDate,
             CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
             ExecutionDate = log.ExecutionDate,
-            Notes = log.Notes,
+            NewNotes = notes.Count > 0 ? notes : null,
             Status = log.Status,
-            TraceId = log.TraceId,  
+            TraceId = log.TraceId,
         }, cancellationToken);
-
-        if (updatedLog == null)
-        {
-            throw new InvalidOperationException("Failed to update the DataAcquisitionLog. The returned value is null.");
-        }
-
-        log = updatedLog;
 
         if (triggerMessage)
         {
@@ -313,7 +360,7 @@ public class PatientCensusService : IPatientCensusService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An error occurred while producing the message to Kafka for facility {facilityId} and log id {logid}.", log.FacilityId, log.Id);
+                _logger.LogError(ex, "An error occurred while producing the message to Kafka for facility {facilityId} and log id {logid}.", log.FacilityId.SanitizeForLog(), log.Id.SanitizeForLog());
                 throw;
             }
         }

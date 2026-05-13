@@ -17,6 +17,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {IFacilityConfigModel} from 'src/app/interfaces/tenant/facility-config-model.interface';
+import {Vendor} from 'src/app/interfaces/tenant/vendor.enum';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { FormMode } from 'src/app/models/FormMode.enum';
 import { ENTER, COMMA } from '@angular/cdk/keycodes';
@@ -93,6 +94,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
   @Output() submittedConfiguration = new EventEmitter<IEntityCreatedResponse>();
 
   timezones: string[] = moment.tz.names();
+  vendors = Object.values(Vendor);
 
   formMode!: FormMode;
   facilityConfigForm!: FormGroup;
@@ -122,7 +124,8 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       {
         facilityId: new FormControl('', [Validators.required, facilityIdConditionalValidator(this.appConfig?.allowAlphaNumericFacilityId ?? true)]),
         facilityName: new FormControl('', Validators.required),
-        timeZone: new FormControl('', Validators.required), // Add timezone control
+        timeZone: new FormControl('', Validators.required),
+        vendor: new FormControl<Vendor | null>(null, Validators.required),
         monthlyReports: new FormControl([]),
         dailyReports: new FormControl([]),
         weeklyReports: new FormControl([]),
@@ -153,6 +156,9 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.timeZoneControl.setValue(this.item.timeZone);
       this.timeZoneControl.updateValueAndValidity();
 
+      this.vendorControl.setValue(this.item.vendor ?? null);
+      this.vendorControl.updateValueAndValidity();
+
       this.monthlyReportsControl.setValue(this.item.scheduledReports.monthly);
       this.monthlyReportsControl.updateValueAndValidity();
 
@@ -173,9 +179,13 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
     this.facilityConfigForm.valueChanges.subscribe(() => {
       this.formValueChanged.emit(this.facilityConfigForm.invalid);
     });
+
+    this.formValueChanged.emit(this.facilityConfigForm.invalid);
   }
 
   ngOnChanges(changes: SimpleChanges) {
+
+    if (!this.facilityConfigForm) return;
 
     if (changes['item'] && changes['item'].currentValue) {
       this.facilityIdControl.setValue(this.item.facilityId);
@@ -186,6 +196,9 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
       this.timeZoneControl.setValue(this.item.timeZone);
       this.timeZoneControl.updateValueAndValidity();
+
+      this.vendorControl.setValue(this.item.vendor ?? null);
+      this.vendorControl.updateValueAndValidity();
 
       this.monthlyReportsControl.setValue(this.item.scheduledReports.monthly)
       this.monthlyReportsControl.updateValueAndValidity();
@@ -207,6 +220,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.facilityIdControl.disable();
       this.facilityNameControl.disable();
       this.timeZoneControl.disable();
+      this.vendorControl.disable();
       this.monthlyReportsControl.disable();
       this.weeklyReportsControl.disable();
       this.dailyReportsControl.disable();
@@ -214,6 +228,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       this.facilityIdControl.enable();
       this.facilityNameControl.enable();
       this.timeZoneControl.enable();
+      this.vendorControl.enable();
       this.monthlyReportsControl.enable();
       this.weeklyReportsControl.enable();
       this.dailyReportsControl.enable();
@@ -236,6 +251,10 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
 
   get timeZoneControl(): FormControl {
     return this.facilityConfigForm.get('timeZone') as FormControl;
+  }
+
+  get vendorControl(): FormControl {
+    return this.facilityConfigForm.get('vendor') as FormControl;
   }
 
   get monthlyReportsControl(): FormControl {
@@ -277,7 +296,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
       let scheduledReports: { daily: string[], monthly: string[], weekly: string[] } = {"daily": dailyReports, "monthly": monthlyReports, "weekly": weeklyReports};
 
       if(this.formMode == FormMode.Create) {
-        this.tenantService.createFacility(this.facilityIdControl.value, this.facilityNameControl.value, this.timeZoneControl.value, scheduledReports).subscribe({
+        this.tenantService.createFacility(this.facilityIdControl.value, this.facilityNameControl.value, this.timeZoneControl.value, scheduledReports, this.vendorControl.value).subscribe({
           next: (response) => {
             if (response) {
               this.submittedConfiguration.emit({id: response.id, message: "Facility Created"});
@@ -289,7 +308,7 @@ export class FacilityConfigFormComponent implements OnInit, OnChanges {
         });
       }
       else if(this.formMode == FormMode.Edit) {
-        this.tenantService.updateFacility(this.item.id ?? '', this.facilityIdControl.value, this.facilityNameControl.value, this.timeZoneControl.value, scheduledReports).subscribe( {
+        this.tenantService.updateFacility(this.item.id ?? '', this.facilityIdControl.value, this.facilityNameControl.value, this.timeZoneControl.value, scheduledReports, this.vendorControl.value).subscribe( {
           next: (response) => {
             this.submittedConfiguration.emit({id:  this.item.id ?? '', message: "Facility Updated"});
           },

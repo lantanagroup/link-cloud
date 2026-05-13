@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 
             return response;
         }
-        
+
         public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
         {
             // HTTP GET
@@ -62,12 +62,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         }
 
         public async Task<HttpResponseMessage> GetAccountByEmail(string email, CancellationToken cancellationToken)
-        {        
+        {
 
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                
+
                 //create a bearer token for the system account
                 var bearerToken = await createLinkBearerToken.ExecuteAsync(_systemPrincipal, 2);
                 if (string.IsNullOrEmpty(bearerToken))
@@ -82,7 +82,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
 
             // HTTP GET
             HttpResponseMessage response = await _client.GetAsync($"api/account/user/email/{email}", cancellationToken);
-            
+
             return response;
         }
 
@@ -95,7 +95,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 new(LinkAuthorizationConstants.LinkSystemClaims.Role, LinkAuthorizationConstants.LinkUserClaims.LinkAdministartor),
                 new(LinkAuthorizationConstants.LinkSystemClaims.LinkPermissions, nameof(LinkSystemPermissions.IsLinkAdmin))
             };
-           
+
             return new ClaimsPrincipal(new ClaimsIdentity(claims));
         }
 

@@ -1,0 +1,692 @@
+@model Automation.UI.Models.RunDashboardViewModel
+@{
+    ViewData["Title"] = "Automation Runs";
+
+    var stats = Model.Stats;
+    var sortedScenarios = Model.SavedScenarios
+        .OrderBy(s => s.IsSystemScenario ? 1 : 0)
+        .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+    var avgDuration = stats.AvgDurationSeconds > 0
+        ? TimeSpan.FromSeconds(stats.AvgDurationSeconds).ToString(@"mm\:ss")
+        : "—";
+}
+
+<div class="container mt-4">
+    <h2 class="fw-bold mb-1"><i class="bi bi-lightning-charge-fill me-2"></i>Automation Runs</h2>
+    <p class="text-muted mb-3">Dashboard overview, quick-launch tests, and run history.</p>
+
+    @if (TempData["RunStartError"] is string runStartError && !string.IsNullOrWhiteSpace(runStartError))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i> @runStartError
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @* ========== KPI Summary Cards ========== *@
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="au-kpi-card">
+                <div class="au-kpi-value @(stats.Running + stats.Queued > 0 ? "text-primary" : "")" id="kpiActive">@(stats.Running + stats.Queued)</div>
+                <div class="au-kpi-label">Currently Active</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="au-kpi-card">
+                <div class="au-kpi-value" id="kpiTotal">@stats.TotalRuns</div>
+                <div class="au-kpi-label">Total Runs</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="au-kpi-card">
+                <div class="au-kpi-value @(stats.SuccessRate >= 80 ? "text-success" : stats.SuccessRate >= 50 ? "text-warning" : "text-danger")" id="kpiSuccessRate">@stats.SuccessRate%</div>
+                <div class="au-kpi-label">Success Rate</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="au-kpi-card">
+                <div class="au-kpi-value" id="kpiAvgDuration">@avgDuration</div>
+                <div class="au-kpi-label">Avg Duration</div>
+            </div>
+        </div>
+    </div>
+
+    @* ========== Charts Row ========== *@
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="au-card h-100">
+                <div class="card-header"><i class="bi bi-pie-chart-fill me-2"></i>Status Breakdown</div>
+                <div class="card-body d-flex align-items-center justify-content-center" style="min-height:240px;">
+                    <canvas id="statusDoughnut"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="au-card h-100">
+                <div class="card-header"><i class="bi bi-bar-chart-fill me-2"></i>Runs Per Day (Last 14 Days)</div>
+                <div class="card-body" style="min-height:240px;">
+                    <canvas id="runsPerDayChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ========== Active Runs ========== *@
+    <div class="au-card mb-4" id="activeRunsCard" style="@(Model.ActiveRuns.Count == 0 ? "display:none;" : "")">
+        <div class="card-header bg-primary text-white"><i class="bi bi-activity me-2"></i>Active Runs</div>
+        <div class="card-body">
+            <div class="row g-2" id="activeRunsGrid">
+                @foreach (var run in Model.ActiveRuns)
+                {
+                    var elapsed = DateTimeOffset.UtcNow - run.CreatedAt;
+                    <div class="col-md-4">
+                        <div class="border rounded p-3">
+                            <div class="fw-semibold">@run.RunName</div>
+                            <div class="small text-muted">@run.PatientCount patients &middot; seed @run.Seed</div>
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <span class="badge au-badge-muted">@run.Status</span>
+                                <span class="small text-muted js-elapsed" data-created-at="@run.CreatedAt.ToString("o")">@elapsed.ToString(@"mm\:ss") elapsed</span>
+                            </div>
+                            <a href="@Url.Action("Details", "Runs", new { id = run.RunId })" class="btn btn-sm btn-au-action mt-2 w-100">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>View Details
+                            </a>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    @* ========== Quick-Launch ========== *@
+    <div class="au-card mb-4">
+        <div class="card-header"><i class="bi bi-play-circle me-2"></i>Quick Launch</div>
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold" for="quickLaunchSelect">Select a saved scenario to run</label>
+                    <select class="form-select" id="quickLaunchSelect">
+                        <option value="">-- Select a scenario --</option>
+                        @foreach (var s in sortedScenarios)
+                        {
+                            var suffix = s.IsSystemScenario ? " [System]" : "";
+                            <option value="@s.Id">@s.Name@suffix</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <form asp-action="Start" method="post" id="quickLaunchForm">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="Scenario" value="@AutomationScenarioKind.Custom" />
+                        <input type="hidden" name="ScenarioName" id="qlScenarioName" value="" />
+                        <input type="hidden" name="RunConfigurationJson" id="qlRunConfigJson" value="" />
+                        <input type="hidden" name="ReportMethod" id="qlReportMethod" value="Adhoc" />
+                        <input type="hidden" name="Seed" id="qlSeed" value="20260329" />
+                        <input type="hidden" name="PatientCount" id="qlPatientCount" value="10" />
+                        <input type="hidden" name="ResourcesPerPatient" id="qlResourcesPerPatient" value="250" />
+                        <input type="hidden" name="CleanupFhirData" id="qlCleanupFhirData" value="true" />
+                        <input type="hidden" name="CleanupServiceData" id="qlCleanupServiceData" value="false" />
+                        <input type="hidden" name="QueryPlanTemplateId" id="qlQueryPlanTemplateId" value="" />
+                        <input type="hidden" name="ReportPeriodStart" id="qlReportPeriodStart" value="" />
+                        <input type="hidden" name="ReportPeriodEnd" id="qlReportPeriodEnd" value="" />
+                        <button type="submit" class="btn btn-au-run w-100" id="qlRunButton" disabled>
+                            <i class="bi bi-play-fill me-1"></i> Run
+                        </button>
+                    </form>
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-success w-100" id="btnNewScenarioFromRuns">
+                        <i class="bi bi-plus-lg me-1"></i> New Scenario
+                    </button>
+                </div>
+                <div class="col-md-2">
+                    <a asp-controller="Scenarios" asp-action="Index" class="btn btn-outline-secondary w-100">
+                        <i class="bi bi-journal-text me-1"></i> Manage
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* ========== Recent Runs Table (extracted to partial so AJAX sort/page
+       and the initial server render share one template) ========== *@
+    @{
+        var recentRunsTableVm = new Automation.UI.Models.AutomationRunIndexViewModel
+        {
+            Runs = Model.RecentRuns,
+            PageNumber = Model.PageNumber,
+            PageSize = Model.PageSize,
+            TotalCount = Model.TotalCount,
+            SortBy = Model.SortBy,
+            SortDescending = Model.SortDescending,
+        };
+    }
+    <div id="recentRunsHost">
+        @await Html.PartialAsync("_RecentRunsTable", recentRunsTableVm)
+    </div>
+</div>
+
+@section Scripts {
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+<script>
+(function () {
+    var detailsBaseUrl = '@Url.Action("Details", "Runs", new { id = "__ID__" })';
+    var dashboardStatsUrl = '@Url.Action("DashboardStats", "Runs")';
+    var recentRunsPartialUrl = '@Url.Action("RecentRunsPartial", "Runs")';
+    var scenarioJsonUrl = '@Url.Action("GetJson", "Scenarios")';
+    var cancelUrl = '@Url.Action("CancelJson", "Runs")';
+    var deleteUrl = '@Url.Action("DeleteJson", "Runs")';
+
+    // --- KPI elements ---
+    var kpiActive = document.getElementById('kpiActive');
+    var kpiTotal = document.getElementById('kpiTotal');
+    var kpiSuccessRate = document.getElementById('kpiSuccessRate');
+    var kpiAvgDuration = document.getElementById('kpiAvgDuration');
+
+    // --- Chart instances ---
+    var statusChart = null;
+    var barChart = null;
+
+    // --- Chart.js: Status Doughnut ---
+    var statusCtx = document.getElementById('statusDoughnut');
+    if (statusCtx) {
+        statusChart = new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Succeeded', 'Failed', 'Cancelled', 'Running', 'Queued'],
+                datasets: [{
+                    data: [@stats.Succeeded, @stats.Failed, @stats.Cancelled, @stats.Running, @stats.Queued],
+                    backgroundColor: ['#28a745', '#dc3545', '#ffc107', '#4da3ff', '#6c757d'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10, font: { size: 12 } } }
+                },
+                cutout: '55%'
+            }
+        });
+    }
+
+    // --- Chart.js: Runs Per Day (Stacked Bar) ---
+    var initialRunsPerDay = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+        stats.RunsPerDay.OrderBy(kvp => kvp.Key).ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+
+    function dayLabelsFromMap(map) {
+        return Object.keys(map).map(function (d) {
+            var parts = d.split('-');
+            return parts[1] + '/' + parts[2];
+        });
+    }
+
+    var barCtx = document.getElementById('runsPerDayChart');
+    if (barCtx) {
+        barChart = new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels: dayLabelsFromMap(initialRunsPerDay),
+                datasets: [
+                    { label: 'Succeeded', data: Object.values(initialRunsPerDay).map(function (b) { return b.succeeded; }), backgroundColor: '#28a745' },
+                    { label: 'Failed',    data: Object.values(initialRunsPerDay).map(function (b) { return b.failed; }),    backgroundColor: '#dc3545' },
+                    { label: 'Cancelled', data: Object.values(initialRunsPerDay).map(function (b) { return b.cancelled; }), backgroundColor: '#ffc107' },
+                    { label: 'Other',     data: Object.values(initialRunsPerDay).map(function (b) { return b.other; }),     backgroundColor: '#6c757d' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10, font: { size: 12 } } }
+                },
+                scales: {
+                    x: { stacked: true },
+                    y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1, precision: 0 } }
+                }
+            }
+        });
+    }
+
+    // --- Helpers ---
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+
+    function statusBadgeClass(status) {
+        var s = String(status || '').toLowerCase();
+        if (s === 'succeeded' || s === '3') return 'au-badge-success';
+        if (s === 'failed' || s === '4') return 'au-badge-danger';
+        if (s === 'cancelled' || s === '2') return 'au-badge-warning';
+        return 'au-badge-muted';
+    }
+
+    function isTerminal(status) {
+        var s = String(status || '').toLowerCase();
+        return s === 'succeeded' || s === 'failed' || s === 'cancelled' || s === '3' || s === '4' || s === '2';
+    }
+
+    function isActive(status) {
+        var s = String(status || '').toLowerCase();
+        return s === 'running' || s === 'queued' || s === '0' || s === '1';
+    }
+
+    function formatDuration(seconds) {
+        if (!seconds || seconds <= 0) return '—';
+        var m = Math.floor(seconds / 60);
+        var s = Math.round(seconds % 60);
+        return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    function formatLocalDate(isoStr) {
+        if (!isoStr) return '—';
+        try { return new Date(isoStr).toLocaleString(); }
+        catch (e) { return isoStr; }
+    }
+
+    function antiforgeryToken() {
+        var token = document.querySelector('#quickLaunchForm input[name="__RequestVerificationToken"]');
+        return token ? token.value : '';
+    }
+
+    // --- Live update from server data ---
+    function refreshDashboard() {
+        // KPI + charts + active-runs card come from DashboardStats. The Recent
+        // Runs table is now refreshed via a separate partial-view swap so that
+        // sorting, paging, and SignalR updates all go through the same
+        // server-rendered path (see refreshRecentRunsCard below). Previously
+        // this function rebuilt the tbody client-side from JSON, which meant
+        // any sort/pager state the user set via full-page nav would be
+        // clobbered on the next SignalR tick.
+        var card = document.getElementById('recentRunsCard');
+        var qs = '';
+        if (card) {
+            var params = new URLSearchParams({
+                pageNumber: card.getAttribute('data-page-number') || '1',
+                pageSize:   card.getAttribute('data-page-size')   || '20',
+                sortBy:     card.getAttribute('data-sort-by')     || 'createdAt',
+                sortDir:    card.getAttribute('data-sort-dir')    || 'desc',
+            });
+            qs = '?' + params.toString();
+        }
+        fetch(dashboardStatsUrl + qs)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                updateKpis(data.stats);
+                updateCharts(data.stats);
+                updateActiveRuns(data.activeRuns || []);
+            })
+            .catch(function (err) { console.error('Dashboard refresh failed', err); });
+
+        refreshRecentRunsCard();
+    }
+
+    // Replace the Recent Runs card in place by fetching the partial view and
+    // swapping its HTML into the #recentRunsHost container. Keeps the user's
+    // scroll position (no full navigation), keeps sort/page/size state inside
+    // the card's data attributes, and syncs the URL so refresh / back-button
+    // behavior still works. The loading overlay (CSS .au-card-loading) gives
+    // a visible affordance during the fetch without reflowing the page.
+    function refreshRecentRunsCard(overrides) {
+        var host = document.getElementById('recentRunsHost');
+        if (!host) return Promise.resolve();
+
+        var card = document.getElementById('recentRunsCard');
+        var state = {
+            pageNumber: (card && card.getAttribute('data-page-number')) || '1',
+            pageSize:   (card && card.getAttribute('data-page-size'))   || '20',
+            sortBy:     (card && card.getAttribute('data-sort-by'))     || 'createdAt',
+            sortDir:    (card && card.getAttribute('data-sort-dir'))    || 'desc',
+        };
+        var merged = Object.assign({}, state, overrides || {});
+
+        // Mirror the active view into the URL so a page refresh / bookmark
+        // preserves what the user is looking at. replaceState (not pushState)
+        // because every sort/page click creating a history entry would make
+        // the browser Back button feel broken.
+        try {
+            var here = new URL(window.location.href);
+            here.searchParams.set('pageNumber', merged.pageNumber);
+            here.searchParams.set('pageSize',   merged.pageSize);
+            here.searchParams.set('sortBy',     merged.sortBy);
+            here.searchParams.set('sortDir',    merged.sortDir);
+            window.history.replaceState(null, '', here.toString());
+        } catch (_) { /* URL API unavailable: non-fatal, just skip URL sync */ }
+
+        if (card) card.classList.add('au-card-loading');
+
+        var qs = new URLSearchParams(merged).toString();
+        return fetch(recentRunsPartialUrl + '?' + qs)
+            .then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.text();
+            })
+            .then(function (html) { host.innerHTML = html; })
+            .catch(function (err) {
+                console.error('Recent runs refresh failed', err);
+                if (card) card.classList.remove('au-card-loading');
+            });
+    }
+
+    function updateKpis(s) {
+        if (!s) return;
+        var active = (s.running || 0) + (s.queued || 0);
+        kpiActive.textContent = active;
+        kpiActive.className = 'au-kpi-value' + (active > 0 ? ' text-primary' : '');
+        kpiTotal.textContent = s.totalRuns || 0;
+
+        var rate = s.successRate || 0;
+        kpiSuccessRate.textContent = rate + '%';
+        kpiSuccessRate.className = 'au-kpi-value ' + (rate >= 80 ? 'text-success' : rate >= 50 ? 'text-warning' : 'text-danger');
+
+        kpiAvgDuration.textContent = formatDuration(s.avgDurationSeconds);
+    }
+
+    function updateCharts(s) {
+        if (statusChart) {
+            statusChart.data.datasets[0].data = [s.succeeded || 0, s.failed || 0, s.cancelled || 0, s.running || 0, s.queued || 0];
+            statusChart.update();
+        }
+        if (barChart && s.runsPerDay) {
+            var sorted = Object.keys(s.runsPerDay).sort();
+            var values = sorted.map(function (k) { return s.runsPerDay[k]; });
+            barChart.data.labels = sorted.map(function (d) { var p = d.split('-'); return p[1] + '/' + p[2]; });
+            barChart.data.datasets[0].data = values.map(function (b) { return b.succeeded || 0; });
+            barChart.data.datasets[1].data = values.map(function (b) { return b.failed || 0; });
+            barChart.data.datasets[2].data = values.map(function (b) { return b.cancelled || 0; });
+            barChart.data.datasets[3].data = values.map(function (b) { return b.other || 0; });
+            barChart.update();
+        }
+    }
+
+    function updateActiveRuns(runs) {
+        var card = document.getElementById('activeRunsCard');
+        var grid = document.getElementById('activeRunsGrid');
+        if (!runs || runs.length === 0) {
+            card.style.display = 'none';
+            grid.innerHTML = '';
+            return;
+        }
+        card.style.display = '';
+        grid.innerHTML = runs.map(function (run) {
+            var elapsedStr = formatElapsed(run.createdAt);
+            var url = detailsBaseUrl.replace('__ID__', run.runId);
+            return '<div class="col-md-4"><div class="border rounded p-3">' +
+                '<div class="fw-semibold">' + escapeHtml(run.runName) + '</div>' +
+                '<div class="small text-muted">' + (run.patientCount || 0) + ' patients &middot; seed ' + (run.seed || 0) + '</div>' +
+                '<div class="d-flex justify-content-between align-items-center mt-2">' +
+                '<span class="badge au-badge-muted">' + escapeHtml(String(run.status)) + '</span>' +
+                '<span class="small text-muted js-elapsed" data-created-at="' + escapeHtml(String(run.createdAt)) + '">' + elapsedStr + ' elapsed</span>' +
+                '</div>' +
+                '<a href="' + url + '" class="btn btn-sm btn-au-action mt-2 w-100"><i class="bi bi-box-arrow-up-right me-1"></i>View Details</a>' +
+                '</div></div>';
+        }).join('');
+    }
+
+    // Ticks every active-run elapsed span using its data-created-at anchor so the
+    // duration advances without a full dashboard refresh. Spans rendered by either
+    // the server-side Razor pass or updateActiveRuns participate, since both emit
+    // the same .js-elapsed + data-created-at contract.
+    function formatElapsed(createdAtIso) {
+        var created = new Date(createdAtIso);
+        var totalSec = Math.max(0, Math.round((Date.now() - created.getTime()) / 1000));
+        var h = Math.floor(totalSec / 3600);
+        var m = Math.floor((totalSec % 3600) / 60);
+        var s = totalSec % 60;
+        var pad = function (n) { return String(n).padStart(2, '0'); };
+        return h > 0 ? (pad(h) + ':' + pad(m) + ':' + pad(s)) : (pad(m) + ':' + pad(s));
+    }
+
+    function tickActiveRunElapsed() {
+        var spans = document.querySelectorAll('#activeRunsGrid .js-elapsed[data-created-at]');
+        for (var i = 0; i < spans.length; i++) {
+            var iso = spans[i].getAttribute('data-created-at');
+            if (!iso) continue;
+            spans[i].textContent = formatElapsed(iso) + ' elapsed';
+        }
+    }
+    setInterval(tickActiveRunElapsed, 1000);
+
+    function updateRecentRunsTable(_runs) {
+        // Kept as a compatibility shim: earlier code paths (and any extensions
+        // someone writes later) may still call updateRecentRunsTable, so we
+        // just route them into the partial-view refresh. The argument is
+        // ignored because the partial re-renders from the server as the
+        // single source of truth.
+        refreshRecentRunsCard();
+    }
+
+    // --- SignalR connection ---
+    var connection = new signalR.HubConnectionBuilder()
+        .withUrl('/hubs/runs')
+        .withAutomaticReconnect()
+        .build();
+
+    connection.on('dashboardUpdate', function () {
+        refreshDashboard();
+    });
+
+    connection.start()
+        .then(function () { return connection.invoke('SubscribeDashboard'); })
+        .catch(function (err) { console.error('[signalr] Dashboard connection failed', err); });
+
+    // --- Quick Launch ---
+    var selector = document.getElementById('quickLaunchSelect');
+    var runBtn = document.getElementById('qlRunButton');
+
+    selector.addEventListener('change', function () {
+        var id = selector.value;
+        runBtn.disabled = !id;
+        if (!id) return;
+
+        fetch(scenarioJsonUrl + '?id=' + encodeURIComponent(id))
+            .then(function (r) { return r.json(); })
+            .then(function (s) {
+                document.getElementById('qlScenarioName').value = s.name || 'Scenario';
+                document.getElementById('qlReportMethod').value = s.reportMethod || 'Adhoc';
+                document.getElementById('qlSeed').value = s.seed || 20260329;
+                document.getElementById('qlPatientCount').value = (typeof s.patientCount === 'number') ? s.patientCount : 10;
+                document.getElementById('qlResourcesPerPatient').value = s.resourcesPerPatientMax || 250;
+                document.getElementById('qlQueryPlanTemplateId').value = s.queryPlanTemplateId || '';
+                document.getElementById('qlReportPeriodStart').value = s.reportPeriodStart || '';
+                document.getElementById('qlReportPeriodEnd').value = s.reportPeriodEnd || '';
+                // Mirror the scenario's saved cleanup preferences into the form so the
+                // Quick Launch run honours them. Without this, the static defaults
+                // (CleanupFhirData=true, CleanupServiceData=false) silently override
+                // whatever the user saved on the scenario.
+                document.getElementById('qlCleanupFhirData').value = (s.cleanupFhirData === false) ? 'false' : 'true';
+                document.getElementById('qlCleanupServiceData').value = (s.cleanupServiceData === true) ? 'true' : 'false';
+                document.getElementById('qlRunConfigJson').value = JSON.stringify(s);
+            });
+    });
+
+    // --- AJAX Cancel ---
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.btn-cancel-run');
+        if (!btn) return;
+        if (!confirm('Cancel this running test?')) return;
+        var runId = btn.getAttribute('data-run-id');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+
+        fetch(cancelUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': antiforgeryToken() },
+            body: JSON.stringify({ id: runId })
+        })
+        .then(function (r) { return r.json().then(function (body) { return { ok: r.ok, body: body }; }); })
+        .then(function (res) {
+            // Honor the server's success flag. Previously this branch called
+            // refreshDashboard() regardless, so a {success:false} response (e.g.
+            // when the run existed only in Mongo with no in-memory state to
+            // cancel) looked like "nothing happened" to the user.
+            if (res.ok && res.body && res.body.success) {
+                refreshDashboard();
+                return;
+            }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-x-circle"></i>';
+            var reason = (res.body && res.body.error)
+                ? res.body.error
+                : 'The server could not cancel this run. It may have already finished or been cancelled elsewhere.';
+            alert('Unable to cancel: ' + reason);
+        })
+        .catch(function () {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-x-circle"></i>';
+            alert('Unable to cancel.');
+        });
+    });
+
+    // --- AJAX Delete ---
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.btn-delete-run');
+        if (!btn) return;
+        if (!confirm('Delete this run?')) return;
+        var runId = btn.getAttribute('data-run-id');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+
+        fetch(deleteUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': antiforgeryToken() },
+            body: JSON.stringify({ id: runId })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (result) {
+            if (result.success) { refreshDashboard(); }
+            else { btn.disabled = false; btn.innerHTML = '<i class="bi bi-trash"></i>'; alert('Unable to delete.'); }
+        })
+        .catch(function () { btn.disabled = false; btn.innerHTML = '<i class="bi bi-trash"></i>'; alert('Unable to delete.'); });
+    });
+
+    // --- New Scenario (via shared scenario editor modal) ---
+    var btnNewScenarioFromRuns = document.getElementById('btnNewScenarioFromRuns');
+    if (btnNewScenarioFromRuns) {
+        btnNewScenarioFromRuns.addEventListener('click', function () {
+            if (typeof window.openScenarioEditor === 'function') {
+                window.openScenarioEditor(null, 'edit');
+            }
+        });
+    }
+
+    // When the shared editor saves a scenario, add/update its option and select it so
+    // the user can immediately run the newly created scenario.
+    document.addEventListener('scenario-editor:changed', function (e) {
+        var detail = e.detail || {};
+        if (detail.action !== 'saved' || !detail.id) return;
+        var sel = document.getElementById('quickLaunchSelect');
+        if (!sel) return;
+        var label = detail.name || 'Scenario';
+        var opt = sel.querySelector('option[value="' + detail.id + '"]');
+        if (opt) {
+            // Preserve the existing " [System]" suffix (if any) across rename so an
+            // edited system scenario doesn't get demoted into the custom group on
+            // re-sort below. User-created scenarios have no suffix on either branch.
+            var wasSystem = /\s\[System\]$/.test(opt.textContent || '');
+            opt.textContent = label + (wasSystem ? ' [System]' : '');
+        } else {
+            opt = document.createElement('option');
+            opt.value = detail.id;
+            // New scenarios created through this editor are always custom; system
+            // scenarios are read-only and only the seeded set can exist.
+            opt.textContent = label;
+            sel.appendChild(opt);
+        }
+        sortScenarioOptions(sel);
+        sel.value = detail.id;
+        sel.dispatchEvent(new Event('change'));
+    });
+
+    // Re-orders <option>s inside the Quick Launch selector to match the server-side
+    // ordering in RunsController.Index / Views/Runs/Index.cshtml:
+    //   1. The "-- Select a scenario --" placeholder stays pinned at index 0.
+    //   2. Custom scenarios (no " [System]" suffix) come next, alphabetically.
+    //   3. System scenarios come last, alphabetically.
+    // Sorting is case-insensitive so "zNick" / "ZNick" / "znick" cluster together.
+    function sortScenarioOptions(sel) {
+        if (!sel) return;
+        var placeholder = null;
+        var items = [];
+        for (var i = 0; i < sel.options.length; i++) {
+            var o = sel.options[i];
+            // The placeholder is the only option with an empty value.
+            if (placeholder === null && !o.value) {
+                placeholder = o;
+                continue;
+            }
+            items.push(o);
+        }
+
+        items.sort(function (a, b) {
+            var aSys = /\s\[System\]$/.test(a.textContent || '') ? 1 : 0;
+            var bSys = /\s\[System\]$/.test(b.textContent || '') ? 1 : 0;
+            if (aSys !== bSys) return aSys - bSys;
+            return (a.textContent || '').localeCompare((b.textContent || ''), undefined, { sensitivity: 'base' });
+        });
+
+        // Re-append in sorted order. appendChild on an already-parented node moves it,
+        // so we don't need to remove first.
+        if (placeholder) sel.appendChild(placeholder);
+        items.forEach(function (o) { sel.appendChild(o); });
+    }
+
+    // --- Recent Runs table: sort / page / size all go through the partial-view
+    // AJAX path. Handlers are delegated on `document` so they keep working after
+    // refreshRecentRunsCard replaces the #recentRunsHost contents.
+
+    // Sort header click: route to refreshRecentRunsCard instead of navigating.
+    // The anchor's href still points at a valid server-rendered fallback URL,
+    // so no-JS / middle-click / "open in new tab" all continue to work.
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest('a.au-sort-header');
+        if (!link) return;
+        // Allow modifier-key clicks to fall through to a full navigation (new
+        // tab, new window, background tab). Same convention as the rest of the
+        // web; lets power users still deep-link to a sorted view.
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
+        e.preventDefault();
+
+        var col = link.getAttribute('data-sort-col');
+        if (!col) return;
+        var card = document.getElementById('recentRunsCard');
+        var currentSort = card ? card.getAttribute('data-sort-by')  : 'createdAt';
+        var currentDir  = card ? card.getAttribute('data-sort-dir') : 'desc';
+        var nextDir = (currentSort === col && currentDir === 'desc') ? 'asc' : 'desc';
+        refreshRecentRunsCard({ sortBy: col, sortDir: nextDir, pageNumber: '1' });
+    });
+
+    // Pager click: hydrate from data-page on the anchor. Disabled items bail
+    // early so clicking « when you're already on page 1 is a no-op.
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest('.pagination .page-link');
+        if (!link) return;
+        var li = link.closest('li.page-item');
+        if (li && li.classList.contains('disabled')) { e.preventDefault(); return; }
+        var page = link.getAttribute('data-page');
+        if (!page) return;
+        if (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1) return;
+        e.preventDefault();
+        refreshRecentRunsCard({ pageNumber: page });
+    });
+
+    // Page-size select: resets to page 1 because the user's current page
+    // number likely doesn't exist at the new size (e.g. page 6 at 10/page
+    // becomes page 2 at 50/page, and just landing on "2" would be surprising).
+    document.addEventListener('change', function (e) {
+        var sel = e.target.closest('#pageSizeSelect');
+        if (!sel) return;
+        refreshRecentRunsCard({ pageSize: sel.value, pageNumber: '1' });
+    });
+})();
+</script>
+
+@await Html.PartialAsync("_ScenarioEditorModal")
+}

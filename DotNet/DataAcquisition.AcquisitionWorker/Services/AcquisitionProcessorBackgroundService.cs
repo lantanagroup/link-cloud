@@ -1,16 +1,20 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using Confluent.Kafka;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Options;
+using System.Text;
 using System.Threading.Channels;
 
 namespace LantanaGroup.Link.DataAcquisition.AcquisitionWorker.Services;
@@ -49,7 +53,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             });
     }
 
-    public async ValueTask EnqueueAsync(AcquisitionWorkItem item, CancellationToken ct = default)
+    public virtual async ValueTask EnqueueAsync(AcquisitionWorkItem item, CancellationToken ct = default)
     {
         // Wait up to 5 seconds for space to become available
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -108,10 +112,10 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
         var logManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
         var patientDataService = scope.ServiceProvider.GetRequiredService<IPatientDataService>();
         var producerFactory = scope.ServiceProvider.GetRequiredService<IKafkaProducerFactory<long, ReadyToAcquire>>();
+        var dependencyChecker = scope.ServiceProvider.GetRequiredService<IAcquisitionDependencyChecker>();
 
         DataAcquisitionLogModel? log = null;
 
-        //debug line
         _logger.LogInformation("Processing acquisition work for LogId {LogId} at FacilityId {FacilityId}", item.LogId, item.FacilityId);
 
         try
@@ -126,38 +130,72 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             if (log.Status != RequestStatus.Queued)
             {
                 _logger.LogInformation("Log {LogId} no longer in Queued state ({Status}) - skipping",
-                    log.Id.ToString().SanitizeUntrustedString(), log.Status?.ToString()?.SanitizeUntrustedString());
+                    log.Id.ToString().SanitizeForLog(), log.Status?.ToString()?.SanitizeForLog());
+                return;
+            }
+
+            var depResult = await dependencyChecker.CheckDependenciesAsync(log, ct);
+            if (!depResult.AreDependenciesMet)
+            {
+                var blockingList = string.Join(", ", depResult.BlockingResourceTypes);
+                _logger.LogInformation(
+                    "Log {LogId} has unmet dependencies ({BlockingTypes}). Deferring to Pending.",
+                    log.Id.SanitizeForLog(), blockingList.SanitizeForLog());
+
+                await logManager.TrySetLogStatusAsync(
+                    log.Id,
+                    [RequestStatus.Queued],
+                    RequestStatus.Pending,
+                    note: $"[{DateTime.UtcNow:O}] Deferred: waiting for {blockingList} queries to complete.",
+                    cancellationToken: ct);
+
                 return;
             }
         }
+        catch (OperationCanceledException)
+        {
+            throw; // Shutdown must propagate
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to process LogId {LogId} for facility {FacilityId}", item.LogId, item.FacilityId);
+            _logger.LogError(ex, "Failed to fetch/validate LogId {LogId} for facility {FacilityId}. " +
+                "The log will be recovered by the stalled-queue housekeeping job.", item.LogId, item.FacilityId);
 
-            if (log != null)
+            try
             {
-                log.Notes ??= new List<string>();
-                var safeMessage = $"[{DateTime.UtcNow:O}] Processing failed: {ex.GetType().Name} - {ex.Message}";
-                log.Notes.Add(safeMessage);
-                log.Status = RequestStatus.Failed;
-            
-                await logQueries.UpdateAsync(new UpdateDataAcquisitionLogModel
+                if (log != null)
                 {
-                    Id = log.Id,
-                    Status = log.Status,
-                    Notes = log.Notes,
-                    ResourceAcquiredIds = log.ResourceAcquiredIds,
-                    RetryAttempts = log.RetryAttempts,
-                    CompletionDate = log.CompletionDate,
-                    CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
-                    TraceId = log.TraceId,
-                    ExecutionDate = log.ExecutionDate
-                }, ct);
+                    var safeMessage = $"[{DateTime.UtcNow:O}] Processing failed: {ex.GetType().Name} - {ex.Message}";
+                    log.Status = RequestStatus.Failed;
+
+                    await logManager.UpdateAsync(new UpdateDataAcquisitionLogModel
+                    {
+                        Id = log.Id,
+                        Status = log.Status,
+                        NewNotes = [safeMessage],
+                        ResourceAcquiredIds = log.ResourceAcquiredIds,
+                        RetryAttempts = log.RetryAttempts,
+                        CompletionDate = log.CompletionDate,
+                        CompletionTimeMilliseconds = log.CompletionTimeMilliseconds,
+                        TraceId = log.TraceId,
+                        ExecutionDate = log.ExecutionDate
+                    }, ct);
+                }
+            }
+            catch (Exception updateEx)
+            {
+                _logger.LogError(updateEx,
+                    "Additionally failed to update status for LogId {LogId}. " +
+                    "The log will be recovered by the stalled-queue housekeeping job.", item.LogId);
             }
 
-            throw;
+            // Do NOT re-throw a transient DB error for one work item must not
+            // kill the Parallel.ForEachAsync loop and take down the entire
+            // background service. The log stays in Queued state and will be
+            // recovered by FailStalledQueuedLogsAsync on the next job cycle.
+            return;
         }
-            
+
         try
         {
             await patientDataService.ExecuteLogRequest(
@@ -165,10 +203,74 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 ct);
 
             _logger.LogInformation("Successfully completed acquisition for LogId {LogId}", log.Id);
+
+            // Inline tail check if all siblings are terminal, produce AcquisitionComplete.
+            await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, ct);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to process LogId {LogId} for facility {FacilityId}", item.LogId, item.FacilityId);
+
+            // Even on failure the log may now be in a terminal status (MaxRetriesReached),
+            // so attempt the tail check to avoid stalling downstream.
+            try
+            {
+                await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, ct);
+            }
+            catch (Exception tailEx)
+            {
+                _logger.LogWarning(tailEx, "Post-failure tail check also failed for LogId {LogId}. Safety-net poller will recover.", item.LogId);
+            }
+        }
+    }
+
+    private async Task TryProduceTailMessageAsync(IServiceProvider scopeProvider, IDataAcquisitionLogManager logManager, long logId, CancellationToken ct)
+    {
+        try
+        {
+            var tailResult = await logManager.TryCompleteTailAsync(logId, ct);
+            if (tailResult == null)
+            {
+                return; // Group not yet complete.
+            }
+
+            var producer = scopeProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
+
+            var headers = new Headers
+            {
+                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
+                    Encoding.UTF8.GetBytes(tailResult.CorrelationId))
+            };
+
+            if (!string.IsNullOrEmpty(tailResult.TraceParentId))
+            {
+                headers.Add("traceparent", Encoding.UTF8.GetBytes(tailResult.TraceParentId));
+            }
+
+            await producer.ProduceAsync(
+                KafkaTopic.ResourceAcquired.ToString(),
+                new Message<ResourceKey, ResourceAcquired>
+                {
+                    Key = new ResourceKey
+                    {
+                        FacilityId = tailResult.FacilityId,
+                        CorrelationId = tailResult.CorrelationId
+                    },
+                    Headers = headers,
+                    Value = tailResult.ResourceAcquired
+                }, ct);
+
+            _logger.LogInformation(
+                "Produced inline AcquisitionComplete tail for FacilityId={FacilityId}, CorrelationId={CorrelationId}",
+                tailResult.FacilityId.SanitizeForLog(), tailResult.CorrelationId.SanitizeForLog());
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to produce inline tail message for LogId {LogId}. Safety-net poller will recover.", logId);
         }
     }
 }

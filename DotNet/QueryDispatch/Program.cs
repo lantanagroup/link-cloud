@@ -1,6 +1,3 @@
-using System.Diagnostics;
-using System.Reflection;
-using System.Text.Json.Serialization;
 using HealthChecks.UI.Client;
 using LanatanGroup.Link.QueryDispatch.Jobs;
 using LantanaGroup.Link.QueryDispatch.Application.Factory;
@@ -40,6 +37,9 @@ using QueryDispatch.Domain.Managers;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
+using System.Diagnostics;
+using System.Reflection;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -104,10 +104,9 @@ builder.Services.AddTransient<IScheduledReportManager, ScheduledReportManager>()
 
 
 //Excepation Handlers
-builder.Services.AddTransient<IDeadLetterExceptionHandler<string, PatientEventValue>, DeadLetterExceptionHandler<string, PatientEventValue>>();
-builder.Services.AddTransient<IDeadLetterExceptionHandler<string, ReportScheduledValue>, DeadLetterExceptionHandler<string, ReportScheduledValue>>();
-builder.Services.AddTransient<IDeadLetterExceptionHandler<string, string>, DeadLetterExceptionHandler<string, string>>();
-builder.Services.AddTransient<ITransientExceptionHandler<string, PatientEventValue>, TransientExceptionHandler<string, PatientEventValue>>();
+builder.Services.AddSingleton(typeof(IExceptionLogger<>), typeof(ExceptionLogger<>));
+builder.Services.AddSingleton(typeof(ITransientExceptionHandler<,,>), typeof(TransientExceptionHandler<,,>));
+builder.Services.AddSingleton(typeof(IDeadLetterExceptionHandler<,,>), typeof(DeadLetterExceptionHandler<,,>));
 
 //Add Services
 builder.Services.AddTransient<ITenantApiService, TenantApiService>();
@@ -136,7 +135,8 @@ builder.Services.AddSingleton<QueryDispatchJob>();
 
 
 //Add problem details
-builder.Services.AddProblemDetails(options => {
+builder.Services.AddProblemDetails(options =>
+{
     options.CustomizeProblemDetails = ctx =>
     {
         ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
@@ -221,7 +221,8 @@ Log.Logger = new LoggerConfiguration()
                 .CreateLogger();
 
 //Add CORS
-builder.Services.AddLinkCorsService(options => {
+builder.Services.AddLinkCorsService(options =>
+{
     options.Environment = builder.Environment;
 });
 
@@ -279,5 +280,5 @@ static void SetupMiddleware(WebApplication app)
     }
     app.UseAuthorization();
 
-    app.UseEndpoints(endpoints => endpoints.MapControllers());    
+    app.UseEndpoints(endpoints => endpoints.MapControllers());
 }

@@ -13,14 +13,15 @@ def get_changed_lines(base_ref):
     subprocess.run(["git", "fetch", "origin", base_ref], capture_output=True)
     
     cmd = ["git", "diff", "-U0", f"origin/{base_ref}...HEAD"]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True)
     if result.returncode != 0:
-        print(f"Error running git diff: {result.stderr}")
+        print(f"Error running git diff: {result.stderr.decode('utf-8', errors='replace')}")
         return {}
 
+    stdout = result.stdout.decode('utf-8', errors='replace')
     changed_lines = {}
     current_file = None
-    for line in result.stdout.splitlines():
+    for line in stdout.splitlines():
         if line.startswith("+++ b/"):
             current_file = line[6:]
             changed_lines[current_file] = set()

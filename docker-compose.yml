@@ -4,7 +4,7 @@ version: '3.4'
 ## fhir_server: 6157
 ## redis_cache: 6379
 ## mssql: 1433
-## mongo: 17017
+## mongo: 17017 
 ## loki: 3100
 ## grafana: 3000
 ## otel-collector: 4317
@@ -22,6 +22,7 @@ version: '3.4'
 ## dataacq: 8065
 ## dataacq-worker: 8078
 ## admin-ui: 8066
+## automation-ui: 5256
 ## measureeval: 8067
 ## normalization: 8068
 ## querydispatch: 8071
@@ -125,11 +126,33 @@ services:
     environment:
       AZURE_STORAGE_CONNECTION_STRING: ${AZURITE_CONNECTION_STRING}
     command: bash -c 'az storage container create -n ${INTERNAL_BLOB_CONTAINER_NAME}; az storage container create -n ${EXTERNAL_BLOB_CONTAINER_NAME}'
+    restart: "no"
     depends_on:
       azurite:
         condition: service_healthy
     networks:
       - link-nw
+    
+  ###########################################
+  ### SFTP Server
+  ###########################################
+  sftp:
+    image: atmoz/sftp
+    container_name: sftp-server
+    ports:
+      - "2222:22"
+    volumes:
+      - sftp_data:/home/${SFTP_USER}/data
+      - ./Scripts/sftp-setup.sh:/etc/sftp.d/sftp-setup.sh:ro
+    command: ${SFTP_USER}:${SFTP_PASSWORD}:1001:1001:data
+    networks:
+      - link-nw
+    healthcheck:
+      test: ["CMD", "/bin/sh", "-c", "sftp -oBatchMode=no -b - ${SFTP_USER}@localhost -P 22 <<< 'exit' || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   ###########################################
   ### Databases
@@ -169,12 +192,12 @@ services:
     depends_on:
       mssql:
         condition: service_healthy
-        
     networks:
       - link-nw
-      
+
   mongo:
     image: mongo:6-jammy
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     ports:
       - '17017:27017'
     container_name: mongo
@@ -183,12 +206,43 @@ services:
     networks:
       - link-nw
     healthcheck:
-      test: ["CMD","mongosh", "--eval", "db.adminCommand('ping')"]
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 5s
       timeout: 5s
       retries: 3
-      start_period: 5s
+      start_period: 10s
 
+  mongo_init:
+    image: mongo:6-jammy
+    container_name: mongo-init
+    depends_on:
+        mongo:
+            condition: service_healthy
+    command: >
+        bash -c '
+        echo "=== MongoDB Replica Set Setup ===";
+        sleep 6;
+
+        mongosh --host mongo:27017 --quiet --eval "
+            try {
+            if (rs.status().ok) {
+                print(\"? Replica set rs0 already initialized - skipping\");
+                quit(0);
+            }
+            } catch (err) {
+            print(\"?? Initializing replica set rs0...\");
+            rs.initiate({
+                _id: \"rs0\",
+                members: [{ _id: 0, host: \"mongo:27017\" }]
+            });
+            print(\"? Replica set initialized successfully\");
+            }
+        ";
+
+        echo "=== mongo_init completed ===";
+        '
+    networks:
+        - link-nw
       
   ###########################################
   ### Telemetry
@@ -216,7 +270,7 @@ services:
       - "8889:8889"   # Prometheus exporter metrics
       - "13133:13133" # health_check extension
       - "4317:4317"   # OTLP gRPC receiver
-      - "55900:55679" # zpages extension
+      - "55679:55679" # zpages extension
     networks:
       - link-nw
       
@@ -235,7 +289,7 @@ services:
       - otel-collector
 
   tempo:
-    image: grafana/tempo:latest
+    image: grafana/tempo:2.9.1
     command: [ "-config.file=/etc/tempo.yaml" ]
     container_name: tempo
     hostname: tempo
@@ -605,6 +659,30 @@ services:
     depends_on:
       - admin-bff
 
+  automation-ui:
+    image: link-automation-ui
+    container_name: link-automation-ui
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+    volumes:
+      - automation_ui_keys:/keys/dataprotection
+    ports:
+      - "5256:5257"
+    build:
+      context: .
+      dockerfile: DotNet/Automation.UI/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
+    networks:
+      - link-nw
+    depends_on:
+      mongo:
+        condition: service_healthy
+      admin-bff:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5257/"]
+
   measureeval:
     image: link-measureeval
     container_name: link-measureeval
@@ -710,7 +788,7 @@ services:
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
-      Redis__Password: ${REDIS_PASS}
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-report;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
     ports:
       - "8072:8072"
     build:
@@ -723,8 +801,10 @@ services:
     depends_on:
       kafka_init:
         condition: service_completed_successfully
-      mongo:
-        condition: service_healthy
+      mssql_init:
+        condition: service_completed_successfully
+      azurite_init:
+        condition: service_completed_successfully
       otel-collector:
         condition: service_started
       loki:
@@ -762,6 +842,8 @@ services:
       kafka_init:
         condition: service_completed_successfully
       mssql_init:
+        condition: service_completed_successfully
+      azurite_init:
         condition: service_completed_successfully
       otel-collector:
         condition: service_started
@@ -889,4 +971,8 @@ volumes:
   azurite_data:
     driver: local
   terminology_data:
+    driver: local
+  sftp_data:
+    driver: local
+  automation_ui_keys:
     driver: local

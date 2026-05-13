@@ -10,6 +10,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="IntegrationTests\Report\Aggregators\**" />
+    <EmbeddedResource Remove="IntegrationTests\Report\Aggregators\**" />
+    <None Remove="IntegrationTests\Report\Aggregators\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Remove="Resources\indMeasureReport.json" />
   </ItemGroup>
 
@@ -23,14 +29,13 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" Version="2.*" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.*" />
     <PackageReference Include="FluentAssertions" Version="8.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.*" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.*" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.*" />
     <PackageReference Include="Moq" Version="4.*" />
-    <PackageReference Include="Moq.AutoMock" Version="*-*" />
+    <PackageReference Include="Moq.AutoMock" Version="*-*" />    
     <PackageReference Include="Testcontainers" Version="4.*" />
     <PackageReference Include="Testcontainers.Azurite" Version="4.*" />
     <PackageReference Include="Testcontainers.MongoDb" Version="4.*" />
+    <PackageReference Include="Testcontainers.MsSql" Version="4.*" />
     <PackageReference Include="xunit" Version="2.*" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.*">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -45,15 +50,25 @@
   <ItemGroup>
     <ProjectReference Include="..\Account\Account.csproj" />
     <ProjectReference Include="..\Admin.BFF\Admin.BFF.csproj" />
+    <ProjectReference Include="..\Automation.Link\Automation.Link.csproj" />
     <ProjectReference Include="..\Audit\Audit.csproj" />
     <ProjectReference Include="..\Census\Census.csproj" />
     <ProjectReference Include="..\DataAcquisition.AcquisitionWorker\DataAcquisition.AcquisitionWorker.csproj" />
     <ProjectReference Include="..\DataAcquisition.Domain\DataAcquisition.Domain.csproj" />
     <ProjectReference Include="..\DataAcquisition\DataAcquisition.csproj" />
     <ProjectReference Include="..\Normalization\Normalization.csproj" />
+    <ProjectReference Include="..\QueryDispatch\QueryDispatch.csproj" />
     <ProjectReference Include="..\Report\Report.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
     <ProjectReference Include="..\Tenant\Tenant.csproj" />
+    <ProjectReference Include="..\Terminology\Terminology.csproj" />
+    <ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />
+    <ProjectReference Include="..\Automation\Automation.csproj" />
+    <ProjectReference Include="..\Automation.UI\Automation.UI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>
@@ -123,6 +138,10 @@
     <None Update="Resources\TestConceptMap.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="IntegrationTests\DataAcquisition\Controllers\" />
   </ItemGroup>
 
 </Project>

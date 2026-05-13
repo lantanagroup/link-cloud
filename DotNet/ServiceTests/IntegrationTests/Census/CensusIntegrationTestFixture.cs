@@ -27,9 +27,6 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census;
 
-[CollectionDefinition("CensusIntegrationTests")]
-public class DatabaseCollection : ICollectionFixture<CensusIntegrationTestFixture> { }
-
 public sealed class CensusIntegrationTestFixture : IDisposable
 {
     private IHost? _host;
@@ -92,6 +89,7 @@ public sealed class CensusIntegrationTestFixture : IDisposable
         builder.Services.AddScoped<IBaseEntityRepository<PatientVisitIdentifier>, CensusEntityRepository<PatientVisitIdentifier>>();
         builder.Services.AddScoped<ICensusSchedulingRepository, CensusSchedulingRepository>();
         builder.Services.AddScoped<IPatientListService, PatientListService>();
+        builder.Services.AddScoped<ICernerListService, CernerListService>();
 
         builder.Services.AddSingleton<ICensusServiceMetrics, NullCensusServiceMetrics>();
         builder.Services.AddSingleton<ITenantApiService, NullTenantApiService>();

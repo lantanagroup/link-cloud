@@ -1,17 +1,19 @@
-ï»¿using System.Net;
-using LantanaGroup.Link.Report.Domain;
+using LantanaGroup.Link.Report.Data;
+using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Entities;
+using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Settings;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
-using LantanaGroup.Link.Shared.Application.Models.Report;
 
 namespace LantanaGroup.Link.Report.Controllers
 {
@@ -41,24 +43,27 @@ namespace LantanaGroup.Link.Report.Controllers
         /// Defaults to <c>false</c>.
         /// </param>
         [HttpGet("{id}")]
-        public async Task<ActionResult<ReportSchedule>> GetById(
+        public async Task<ActionResult<ReportScheduleApiModel>> GetById(
             string id,
-            [FromQuery] bool includeDeleted = false) 
+            [FromQuery] bool includeDeleted = false)
         {
             if (string.IsNullOrWhiteSpace(id))
                 return BadRequest("Id is required.");
 
+            if (!Guid.TryParse(id, out Guid parsedId))
+                return BadRequest("Invalid ID format");
+
             try
             {
                 var reportSchedule = (await _reportScheduledManager
-                        .FindAsync(x => x.Id == id &&
+                        .FindAsync(x => x.Id == parsedId &&
                                         (includeDeleted || !x.IsDeleted.HasValue || x.IsDeleted == false)))
                     .FirstOrDefault();
 
                 if (reportSchedule == null)
                     return NotFound();
 
-                return Ok(reportSchedule);
+                return Ok(reportSchedule.ToApiModel());
             }
             catch (Exception ex)
             {
@@ -71,33 +76,50 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <summary>
         /// Returns scheduled reports for the given facility Id.
         /// An optional 'active' parameter is available to only return current active reports.
+        /// An optional 'blocking' parameter filters to only reports with statuses that block facility deletion (New, EndOfPeriod).
         /// An optional 'includeDeleted' parameter is available to include soft-deleted reports.
         /// </summary>
         /// <param name="facilityId"></param>
         /// <param name="active"></param>
+        /// <param name="blocking">
+        /// When set to <c>true</c>, returns only report schedules with a status of <c>New</c> or <c>EndOfPeriod</c>
+        /// — the statuses that indicate a report is actively in progress and would block a facility soft-delete.
+        /// Defaults to <c>false</c>.
+        /// </param>
         /// <param name="includeDeleted">
         /// When set to <c>true</c>, includes soft-deleted report schedules.
         /// Defaults to <c>false</c>.
         /// </param>
         [HttpGet("facilities/{facilityId}")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<ReportSchedule>))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<ReportScheduleApiModel>))]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<List<ReportSchedule>>> GetByFacilityId(
+        public async Task<ActionResult<List<ReportScheduleApiModel>>> GetByFacilityId(
             string facilityId,
             [FromQuery] bool? active = null,
-            [FromQuery] bool includeDeleted = false) 
+            [FromQuery] bool blocking = false,
+            [FromQuery] bool includeDeleted = false)
         {
             if (string.IsNullOrWhiteSpace(facilityId))
                 return BadRequest("FacilityId is required.");
 
             try
             {
-                List<ReportSchedule>? reportSchedules;
+                List<ReportScheduleModel>? reportSchedules;
 
-                if (active == true)
+                if (blocking)
                 {
-                    reportSchedules = await _reportScheduledManager.FindAsync(x => 
+                    // Only statuses that cannot be safely cleaned up: New and EndOfPeriod.
+                    // Scheduled reports are handled by deleting their Quartz jobs; Submitted are terminal.
+                    reportSchedules = await _reportScheduledManager.FindAsync(x =>
+                        x.FacilityId == facilityId &&
+                        (x.Status == Shared.Application.Enums.ScheduleStatus.New ||
+                         x.Status == Shared.Application.Enums.ScheduleStatus.EndOfPeriod) &&
+                        (includeDeleted || !x.IsDeleted.HasValue || x.IsDeleted == false));
+                }
+                else if (active == true)
+                {
+                    reportSchedules = await _reportScheduledManager.FindAsync(x =>
                         x.FacilityId == facilityId &&
                         x.Status != Shared.Application.Enums.ScheduleStatus.Submitted &&
                         (includeDeleted || !x.IsDeleted.HasValue || x.IsDeleted == false));
@@ -108,16 +130,88 @@ namespace LantanaGroup.Link.Report.Controllers
                         x.FacilityId == facilityId &&
                         (includeDeleted || !x.IsDeleted.HasValue || x.IsDeleted == false));
                 }
-                
+
                 if (reportSchedules == null)
                     return NotFound();
 
-                return Ok(reportSchedules);
+                return Ok(reportSchedules.Select(s => s.ToApiModel()).ToList());
             }
             catch (Exception ex)
             {
                 _logger.LogError(new EventId(ReportConstants.LoggingIds.GetItem, "GetByFacilityId"), ex, "An exception occurred while attempting to get a Report Schedule record for Facility Id {id}", HtmlInputSanitizer.Sanitize(facilityId));
 
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Soft deletes a single report schedule by its ID.
+        /// </summary>
+        /// <param name="id">The ID of the report schedule to soft delete.</param>
+        [HttpDelete("{id}")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> SoftDelete(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Id is required.");
+
+            if (!Guid.TryParse(id, out Guid parsedId))
+                return BadRequest("Invalid ID format.");
+
+            try
+            {
+                await _reportScheduledManager.SoftDeleteByReportTrackingIdAsync(parsedId, HttpContext.RequestAborted);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+            {
+                return NotFound(ex.Message);
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.UpdateItem, "SoftDelete"), ex, "Failed to soft delete report schedule {Id}", HtmlInputSanitizer.Sanitize(id));
+                return Conflict(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.UpdateItem, "SoftDelete"), ex, "An exception occurred while attempting to soft delete report schedule {Id}", HtmlInputSanitizer.Sanitize(id));
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Restores a single soft-deleted report schedule by its ID.
+        /// </summary>
+        /// <param name="id">The ID of the report schedule to restore.</param>
+        [HttpPatch("{id}/restore")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> Restore(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Id is required.");
+
+            if (!Guid.TryParse(id, out Guid parsedId))
+                return BadRequest("Invalid ID format.");
+
+            try
+            {
+                await _reportScheduledManager.RestoreByReportTrackingIdAsync(parsedId, HttpContext.RequestAborted);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(new EventId(ReportConstants.LoggingIds.UpdateItem, "Restore"), ex, "An exception occurred while attempting to restore report schedule {Id}", HtmlInputSanitizer.Sanitize(id));
                 throw;
             }
         }
@@ -152,7 +246,7 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="reportType">Optional report type filter</param>
         /// <param name="reportStartDate">Optional report start date filter (inclusive)</param>
         /// <param name="reportEndDate">Optional report end date filter (inclusive)</param>
-        /// <param name="status">Optional status filter</param>
+        /// <param name="status">Optional status filter — supports multiple values (e.g. status=New&amp;status=Submitted)</param>
         /// <param name="endOfReportPeriodJobHasRun">Optional end of report period job flag filter</param>
         /// <param name="includeDeleted">Optional include deleted filter</param>
         /// <param name="sortBy">Optional sort field (e.g., "CreateDate", "ReportStartDate")</param>
@@ -160,21 +254,23 @@ namespace LantanaGroup.Link.Report.Controllers
         /// <param name="pageSize">Number of records per page (default: 10)</param>
         /// <param name="pageNumber">Page number (default: 1)</param>
         [HttpGet("search")]
-        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ReportSchedule>))]
+        [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PagedConfigModel<ReportScheduleApiModel>))]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<ReportSchedule>>> Search(
+        public async Task<ActionResult<PagedConfigModel<ReportScheduleApiModel>>> Search(
             string? facilityId = null,
             Frequency? frequency = null,
             string? reportType = null,
             DateTime? reportStartDate = null,
             DateTime? reportEndDate = null,
-            ScheduleStatus? status = null,
+            [FromQuery] List<ScheduleStatus>? status = null,
             bool? endOfReportPeriodJobHasRun = null,
             bool includeDeleted = false,
             string? sortBy = null,
             SortOrder? sortOrder = null,
             int pageSize = 10,
-            int pageNumber = 1)
+            int pageNumber = 1,
+            DateOnly? createDate = null,
+            string? id = null)
         {
             try
             {
@@ -188,23 +284,34 @@ namespace LantanaGroup.Link.Report.Controllers
                     pageNumber = 1;
                 }
 
+                Guid? parsedId = null;
+                if (!string.IsNullOrWhiteSpace(id) && Guid.TryParse(id, out var guidId))
+                    parsedId = guidId;
+
                 var result = await _reportScheduledManager.SearchAsync(
                     facilityId,
                     frequency,
                     reportType,
                     reportStartDate,
                     reportEndDate,
-                    status,
+                    statuses: status?.ToArray(),
                     endOfReportPeriodJobHasRun,
                     includeDeleted,
                     sortBy,
                     sortOrder,
                     pageSize,
-                    pageNumber);
+                    pageNumber,
+                    cancellationToken: HttpContext.RequestAborted,
+                    createDate: createDate,
+                    id: parsedId);
 
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(result.Metadata));
 
-                return Ok(result);
+                var apiResult = new PagedConfigModel<ReportScheduleApiModel>(
+                    result.Records.Select(s => s.ToApiModel()).ToList(),
+                    result.Metadata);
+
+                return Ok(apiResult);
             }
             catch (Exception ex)
             {

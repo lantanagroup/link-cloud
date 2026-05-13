@@ -2,6 +2,7 @@ import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges
 
 import {
   AbstractControlOptions,
+  FormArray,
   FormControl,
   FormGroup,
   FormsModule,
@@ -69,7 +70,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
   addOnBlur = true;
   readonly separatorKeysCodes = [ENTER, COMMA] as const;
 
-  authTypes: string[] = ["Basic", "Epic", "None"];
+  authTypes: string[] = ["Basic", "Epic", "OAuth", "CustomHeaders", "None"];
 
   hoursOptions = [null, ...Array.from({ length: 24 }, (_, i) => i)]; // 0..23    // 0..23
   minutesOptions = [0, ...Array.from({ length: 59 }, (_, i) => i + 1)];
@@ -84,6 +85,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       isAuthEnabled: new FormControl(false),
 
       maxConcurrentRequests: new FormControl(1, [Validators.required, Validators.min(1), Validators.max(16)]),
+      maxRetries: new FormControl<number | null>(null, [Validators.min(0), Validators.max(10)]),
 
       // Min acquisition pull time
       minAcqPull: this.createTimeGroup(),
@@ -96,8 +98,11 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       tokenUrl: new FormControl(''),
       audience: new FormControl(''),
       clientId: new FormControl(''),
+      clientSecret: new FormControl(''),
+      scope: new FormControl(''),
       userName: new FormControl(''),
-      password: new FormControl('')
+      password: new FormControl(''),
+      customHeaders: new FormArray([])
     },  { validators: this.bothOrNoneHoursValidator } as AbstractControlOptions);
   }
 
@@ -111,8 +116,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
   }
 
   ngOnInit(): void {
-    this.configForm.reset();
-
     if (this.item) {
 
       //set form values
@@ -126,6 +129,10 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.setMaxAcqPull(this.item.maxAcquisitionPullTime ?? "");
       if (this.item.maxConcurrentRequests != null) {
         this.maxConcurrentRequestsControl.setValue(this.item.maxConcurrentRequests);
+      }
+
+      if (this.item.maxRetries !== undefined) {
+        this.maxRetriesControl.setValue(this.item.maxRetries);
       }
 
       this.isAuthEnabledControl.setValue(!!this.item.authentication?.authType);
@@ -146,15 +153,41 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.clientIdControl.setValue(this.item.authentication?.clientId);
       this.clientIdControl.updateValueAndValidity();
 
+      this.clientSecretControl.setValue(this.item.authentication?.clientSecret);
+      this.clientSecretControl.updateValueAndValidity();
+
+      this.scopeControl.setValue(this.item.authentication?.scope);
+      this.scopeControl.updateValueAndValidity();
+
       this.userNameControl.setValue(this.item.authentication?.userName);
       this.userNameControl.updateValueAndValidity();
 
       this.passwordControl.setValue(this.item.authentication?.password);
       this.passwordControl.updateValueAndValidity();
+
+      // Always clear custom headers first, then reload if present
+      this.customHeadersArray.clear();
+      if (this.item.authentication?.customHeaders) {
+        Object.entries(this.item.authentication.customHeaders).forEach(([key, value]) => {
+          this.addCustomHeader(key, value);
+        });
+      }
     }
 
     this.authTypeControl?.valueChanges.subscribe((value) => {
       this.updateValidators(value);
+
+      if (value === 'CustomHeaders') {
+        // Enable customHeadersArray and ensure at least one row
+        this.customHeadersArray.enable();
+        if (this.customHeadersArray.length === 0) {
+          this.addCustomHeader();
+        }
+      } else {
+        // Clear and disable customHeadersArray when not using CustomHeaders
+        this.customHeadersArray.clear();
+        this.customHeadersArray.disable();
+      }
     });
 
     if (this.authTypeControl?.value) {
@@ -217,6 +250,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.setMinAcqPull(this.item.minAcquisitionPullTime ?? null);
       this.setMaxAcqPull(this.item.maxAcquisitionPullTime ?? null);
       this.maxConcurrentRequestsControl.setValue(this.item.maxConcurrentRequests);
+      this.maxRetriesControl.setValue(this.item.maxRetries ?? null);
 
       this.isAuthEnabledControl.setValue(!!this.item.authentication?.authType);
       this.isAuthEnabledControl.updateValueAndValidity();
@@ -236,11 +270,26 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.clientIdControl.setValue(this.item.authentication?.clientId);
       this.clientIdControl.updateValueAndValidity();
 
+      this.clientSecretControl.setValue(this.item.authentication?.clientSecret);
+      this.clientSecretControl.updateValueAndValidity();
+
+      this.scopeControl.setValue(this.item.authentication?.scope);
+      this.scopeControl.updateValueAndValidity();
+
       this.userNameControl.setValue(this.item.authentication?.userName);
       this.userNameControl.updateValueAndValidity();
 
       this.passwordControl.setValue(this.item.authentication?.password);
       this.passwordControl.updateValueAndValidity();
+      
+      // Always clear custom headers first, then reload if present
+      this.customHeadersArray.clear();
+      if (this.item.authentication?.customHeaders) {
+        Object.entries(this.item.authentication.customHeaders).forEach(([key, value]) => {
+          this.addCustomHeader(key, value);
+        });
+      }
+      this.customHeadersArray.updateValueAndValidity();
 
       // toggle view
       this.toggleViewOnly(this.viewOnly);
@@ -295,6 +344,10 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     return this.configForm.get('maxConcurrentRequests') as FormControl;
   }
 
+  get maxRetriesControl(): FormControl {
+    return this.configForm.get('maxRetries') as FormControl;
+  }
+
   private parseTime(time: string | null): { hour: number; minute: number; second: number } {
     if (!time) return { hour: 0, minute: 0, second: 0 };
 
@@ -310,18 +363,29 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
   }
 
   private updateValidators(authType: string): void {
-    const isAuthRequired = authType !== 'None' && authType !== 'Basic';
-    const isBasicAuth = authType === 'Basic';
 
     // Manage validators for fields requiring authentication
-    this.toggleValidators('authKey', isAuthRequired);
-    this.toggleValidators('tokenUrl', isAuthRequired);
-    this.toggleValidators('audience', isAuthRequired);
-    this.toggleValidators('clientId', isAuthRequired);
+    this.toggleValidators('authKey', authType === 'Epic');
+    this.toggleValidators('tokenUrl', authType === 'Epic' || authType === 'OAuth');
+    this.toggleValidators('audience', authType === 'Epic');
+    this.toggleValidators('clientId', authType === 'Epic' || authType === 'OAuth');
+    this.toggleValidators('clientSecret', authType === 'OAuth');
+    this.toggleValidators('scope', authType === 'OAuth');
 
     // Manage validators for Basic Auth fields
-    this.toggleValidators('userName', isBasicAuth);
-    this.toggleValidators('password', isBasicAuth);
+    this.toggleValidators('userName', authType === 'Basic');
+    this.toggleValidators('password', authType === 'Basic');
+
+    // Manage customHeadersArray lifecycle based on authType
+    if (authType === 'CustomHeaders') {
+      // Ensure customHeadersArray is enabled and has validators
+      this.customHeadersArray.enable();
+      // Individual header rows have their own validators set in addCustomHeader
+    } else {
+      // Clear and disable customHeadersArray when not using CustomHeaders
+      this.customHeadersArray.clear();
+      this.customHeadersArray.disable();
+    }
   }
 
   private toggleValidators(controlName: string, shouldRequire: boolean): void {
@@ -345,9 +409,12 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.tokenUrlControl.disable();
       this.audienceControl.disable();
       this.clientIdControl.disable();
+      this.clientSecretControl.disable();
+      this.scopeControl.disable();
       this.userNameControl.disable();
       this.passwordControl.disable();
       this.maxConcurrentRequestsControl.disable();
+      this.maxRetriesControl.disable();
       this.minAcqHoursControl.disable();
       this.minAcqMinutesControl.disable();
       this.minAcqSecondsControl.disable();
@@ -355,6 +422,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.maxAcqMinutesControl.disable();
       this.maxAcqSecondsControl.disable();
       this.isAuthEnabledControl.disable();
+      this.customHeadersArray.disable();
     } else {
       this.fhirServerBaseUrlControl.enable();
       this.authTypeControl.enable();
@@ -362,9 +430,12 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.tokenUrlControl.enable();
       this.audienceControl.enable();
       this.clientIdControl.enable();
+      this.clientSecretControl.enable();
+      this.scopeControl.enable();
       this.userNameControl.enable();
       this.passwordControl.enable();
       this.maxConcurrentRequestsControl.enable();
+      this.maxRetriesControl.enable();
       this.minAcqHoursControl.enable();
       const enableMin = this.minAcqHoursControl.value !== null
       this.minAcqMinutesControl[enableMin ? 'enable' : 'disable']();
@@ -375,6 +446,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.maxAcqSecondsControl[enableMax ? 'enable' : 'disable']();
 
       this.isAuthEnabledControl.enable();
+      this.customHeadersArray.enable();
     }
   }
 
@@ -385,8 +457,11 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.configForm.controls['tokenUrl'].reset();
       this.configForm.controls['audience'].reset();
       this.configForm.controls['clientId'].reset();
+      this.configForm.controls['clientSecret'].reset();
+      this.configForm.controls['scope'].reset();
       this.configForm.controls['userName'].reset();
       this.configForm.controls['password'].reset();
+      this.customHeadersArray.clear();
     }
   }
 
@@ -446,12 +521,56 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     return this.configForm.get('clientId') as FormControl;
   }
 
+  get clientSecretControl(): FormControl {
+    return this.configForm.get('clientSecret') as FormControl;
+  }
+
+  get scopeControl(): FormControl {
+    return this.configForm.get('scope') as FormControl;
+  }
+
   get userNameControl(): FormControl {
     return this.configForm.get('userName') as FormControl;
   }
 
   get passwordControl(): FormControl {
     return this.configForm.get('password') as FormControl;
+  }
+
+  get customHeadersArray(): FormArray {
+    return this.configForm.get('customHeaders') as FormArray;
+  }
+
+  addCustomHeader(key: string = '', value: string = ''): void {
+    // Only apply validators when authType is CustomHeaders
+    const validators = this.authTypeControl.value === 'CustomHeaders' ? Validators.required : null;
+    const headerGroup = new FormGroup({
+      key: new FormControl(key, validators),
+      value: new FormControl(value, validators)
+    });
+    this.customHeadersArray.push(headerGroup);
+  }
+
+  removeCustomHeader(index: number): void {
+    this.customHeadersArray.removeAt(index);
+  }
+
+  getCustomHeadersObject(): { [key: string]: string } | null {
+    if (this.authTypeControl.value !== 'CustomHeaders' || this.customHeadersArray.length === 0) {
+      return null;
+    }
+
+    const headers: { [key: string]: string } = {};
+    this.customHeadersArray.controls.forEach((control) => {
+      const group = control as FormGroup;
+      const key = group.get('key')?.value;
+      const value = group.get('value')?.value;
+      if (key && value) {
+        headers[key] = value;
+      }
+    });
+
+    return Object.keys(headers).length > 0 ? headers : null;
   }
 
 
@@ -490,6 +609,16 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     this.clientIdControl.updateValueAndValidity();
   }
 
+  clearClientSecret(): void {
+    this.clientSecretControl.setValue('');
+    this.clientSecretControl.updateValueAndValidity();
+  }
+
+  clearScope(): void {
+    this.scopeControl.setValue('');
+    this.scopeControl.updateValueAndValidity();
+  }
+
   clearUserName(): void {
     this.userNameControl.setValue('');
     this.userNameControl.updateValueAndValidity();
@@ -522,6 +651,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
           facilityId: this.facilityIdControl.value,
           fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
           maxConcurrentRequests: this.maxConcurrentRequestsControl.value,
+          maxRetries: this.maxRetriesControl.value,
           ...(this.getAcqPull("minAcqPull") && { minAcquisitionPullTime: this.getAcqPull("minAcqPull") }),
           ...(this.getAcqPull("maxAcqPull") && { maxAcquisitionPullTime: this.getAcqPull("maxAcqPull") }),
           timeZone: this.item.timeZone,
@@ -532,8 +662,11 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
               tokenUrl: this.tokenUrlControl.value || null,
               audience: this.audienceControl.value || null,
               clientId: this.clientIdControl.value || null,
+              clientSecret: this.clientSecretControl.value || null,
+              scope: this.scopeControl.value || null,
               userName: this.userNameControl.value || null,
-              password: this.passwordControl.value || null
+              password: this.passwordControl.value || null,
+              ...(this.getCustomHeadersObject() && { customHeaders: this.getCustomHeadersObject() })
             }
             : null
         } as IDataAcquisitionQueryConfigModel).subscribe((response: IEntityCreatedResponse) => {
@@ -546,6 +679,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
             facilityId: this.facilityIdControl.value,
             fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
             maxConcurrentRequests: this.maxConcurrentRequestsControl.value,
+            maxRetries: this.maxRetriesControl.value,
             ...(this.getAcqPull("minAcqPull") && { minAcquisitionPullTime: this.getAcqPull("minAcqPull") }),
             ...(this.getAcqPull("maxAcqPull") && { maxAcquisitionPullTime: this.getAcqPull("maxAcqPull") }),
             timeZone: this.item.timeZone,
@@ -556,8 +690,11 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
                 tokenUrl: this.tokenUrlControl.value || null,
                 audience: this.audienceControl.value || null,
                 clientId: this.clientIdControl.value || null,
+                clientSecret: this.clientSecretControl.value || null,
+                scope: this.scopeControl.value || null,
                 userName: this.userNameControl.value || null,
-                password: this.passwordControl.value || null
+                password: this.passwordControl.value || null,
+                ...(this.getCustomHeadersObject() && { customHeaders: this.getCustomHeadersObject() })
               }
               : null
           } as IDataAcquisitionQueryConfigModel).subscribe((response: IEntityCreatedResponse) => {

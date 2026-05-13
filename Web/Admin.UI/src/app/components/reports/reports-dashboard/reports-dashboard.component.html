@@ -14,15 +14,95 @@
         <div class="left-pane">
           <p class="title">All Reports</p>
         </div>
-        <div class="right-pane">
-          <mat-checkbox
-            [(ngModel)]="showDeleted"
-            (change)="onShowDeletedChange()">
-            Show deleted
-          </mat-checkbox>
-        </div>
       </div>
     </div>
+    <div class="filter-bar">
+      <mat-form-field appearance="outline" class="compact-filter">
+        <mat-label>Facility ID</mat-label>
+        <input matInput [formControl]="facilityInputControl" [matAutocomplete]="facilityAuto" (keyup.enter)="applyFilters()" placeholder="Search facilities...">
+        @if (facilityInputControl.value) {
+          <button matSuffix mat-icon-button aria-label="Clear facility" (click)="clearFacilityFilter()">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+        <mat-autocomplete #facilityAuto="matAutocomplete" [displayWith]="displayFacility" (optionSelected)="onFacilitySelected($event.option.value)">
+          @for (fac of filteredFacilities | async; track fac.facilityId) {
+            <mat-option [value]="fac">
+              <span class="facility-option-name">{{ fac.facilityName || fac.facilityId }}</span>
+              <span class="facility-option-id">{{ fac.facilityId }}</span>
+            </mat-option>
+          }
+        </mat-autocomplete>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-filter">
+        <mat-label>Report ID</mat-label>
+        <input matInput [ngModel]="reportIdFilter" (ngModelChange)="onReportIdInput($event)" placeholder="Search by report ID...">
+        @if (reportIdFilter) {
+          <button matSuffix mat-icon-button aria-label="Clear report ID" (click)="reportIdFilter = ''; applyFilters()">
+            <mat-icon>close</mat-icon>
+          </button>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-filter">
+        <mat-label>Status</mat-label>
+        <mat-select multiple [(ngModel)]="statusFilters" (selectionChange)="applyFilters()">
+          @for (s of statusOptions; track s) {
+            <mat-option [value]="s">{{ s === 'EndOfPeriod' ? 'End of Period' : s }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-filter">
+        <mat-label>Frequency</mat-label>
+        <mat-select [(ngModel)]="frequencyFilter" (selectionChange)="applyFilters()">
+          <mat-option value="">Any</mat-option>
+          @for (f of frequencyOptions; track f) {
+            <mat-option [value]="f">{{ f }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="compact-filter">
+        <mat-label>Created Date</mat-label>
+        <input matInput [matDatepicker]="createDatePicker" [(ngModel)]="createDateFilter" (dateChange)="applyFilters()">
+        <mat-datepicker-toggle matSuffix [for]="createDatePicker"></mat-datepicker-toggle>
+        <mat-datepicker #createDatePicker></mat-datepicker>
+      </mat-form-field>
+
+      <div class="date-range-group">
+        <span class="date-range-label">Reporting Period</span>
+        <div class="date-range-fields">
+          <mat-form-field appearance="outline" class="compact-filter">
+            <mat-label>From</mat-label>
+            <input matInput [matDatepicker]="startPicker" [(ngModel)]="reportStartDateFilter" (dateChange)="applyFilters()">
+            <mat-datepicker-toggle matSuffix [for]="startPicker"></mat-datepicker-toggle>
+            <mat-datepicker #startPicker></mat-datepicker>
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="compact-filter">
+            <mat-label>To</mat-label>
+            <input matInput [matDatepicker]="endPicker" [(ngModel)]="reportEndDateFilter" (dateChange)="applyFilters()">
+            <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+            <mat-datepicker #endPicker></mat-datepicker>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <mat-checkbox
+        [(ngModel)]="showDeleted"
+        (change)="onShowDeletedChange()">
+        Show deleted
+      </mat-checkbox>
+
+      <div class="filter-actions">
+        <button mat-stroked-button (click)="clearFilters()" *ngIf="hasActiveFilters()">
+          <mat-icon>filter_list_off</mat-icon> Clear All Filters
+        </button>
+      </div>
+
+    </div>
+
     <div class="table-container no-border">
       <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" style="width: 100%; background-color: transparent">
 
@@ -110,13 +190,13 @@
         <ng-container matColumnDef="status">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Status</th>
           <td mat-cell *matCellDef="let element">
-            <div>
-              <span *ngIf="element.status === 'New'" class="status-new">New</span>
-              <span *ngIf="element.status === 'Scheduled'" class="status-scheduled">Scheduled</span>
-              <span *ngIf="element.status === 'EndOfPeriod'" class="status-endOfPeriod">End of Period</span>
-              <span *ngIf="element.status === 'Submitted'" class="status-submitted">Submitted</span>
+            <span *ngIf="element.status === 'New'" class="status-new">New</span>
+            <span *ngIf="element.status === 'Scheduled'" class="status-scheduled">Scheduled</span>
+            <span *ngIf="element.status === 'EndOfPeriod'" class="status-endOfPeriod">End of Period</span>
+            <div *ngIf="element.status === 'Submitted'">
+              <span class="status-submitted">Submitted</span>
+              <div *ngIf="element.submitReportDateTime" class="status-date">{{element.submitReportDateTime | date:'M/d/yy h:mm a'}}</div>
             </div>
-            <div style="margin-top:5px" *ngIf="element.submitDate">{{element.submitDate | date:'short'}}</div>
           </td>
         </ng-container>
 
@@ -125,6 +205,7 @@
           <th mat-header-cell *matHeaderCellDef>Action</th>
           <td mat-cell *matCellDef="let element">
             <button type="button"
+                    *ngIf="element.status === 'Submitted'"
                     class="link-button secondary"  [disabled]="element.isDeleted"
                     (click)="onResubmit(element.id, element.facilityId)">
               <fa-icon [icon]="faRotate"></fa-icon>
@@ -132,9 +213,28 @@
             </button>
           </td>
         </ng-container>
+        <!-- Delete Column -->
+        <ng-container matColumnDef="delete">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let element">
+            <button mat-icon-button color="warn"
+                    *ngIf="(element.status === 'Submitted' || element.status === 'Scheduled') && !element.isDeleted"
+                    matTooltip="Soft delete this report"
+                    (click)="onSoftDeleteReport(element.id, element.status)">
+              <mat-icon>delete</mat-icon>
+            </button>
+            <button mat-icon-button color="accent"
+                    *ngIf="element.isDeleted"
+                    matTooltip="Restore this report"
+                    (click)="onRestoreReport(element.id)">
+              <mat-icon>restore</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
         <!-- Deleted Column (show only if showDeleted = true) -->
         <ng-container *ngIf="showDeleted" matColumnDef="isDeleted">
-          <th mat-header-cell *matHeaderCellDef>Deleted</th>
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Deleted</th>
           <td mat-cell *matCellDef="let row">{{ row.isDeleted ?? false ? 'Yes' : 'No' }}</td>
         </ng-container>
 

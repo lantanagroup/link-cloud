@@ -9,7 +9,7 @@ namespace LantanaGroup.Link.Account.Application.Models.Responses
         public List<GroupedUserModel> Records { get; set; } = [];
         public PaginationMetadata Metadata { get; set; } = null!;
 
-        public PagedUserModel(): this([], new PaginationMetadata()) { }
+        public PagedUserModel() : this([], new PaginationMetadata()) { }
 
         public PagedUserModel(List<GroupedUserModel> records, PaginationMetadata metadata)
         {

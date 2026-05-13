@@ -24,7 +24,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         private readonly IOptions<ServiceRegistry> _serviceRegistry;
         private readonly IOptions<AuthenticationSchemaConfig> _authenticationSchemaConfig;
         private readonly IServiceScopeFactory _scopeFactory;
-        
+
         public ReportService(ILogger<ReportService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry, IOptions<AuthenticationSchemaConfig> authenticationSchemaConfig, IServiceScopeFactory scopeFactory)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -37,13 +37,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
         }
 
         public async Task<HttpResponseMessage> ServiceHealthCheck(CancellationToken cancellationToken)
-        {            
+        {
             // HTTP GET
             var response = await _client.GetAsync($"health", cancellationToken);
 
             return response;
         }
-        
+
         public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
         {
             // HTTP GET
@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 return new LinkServiceHealthReport { Service = "Report", Status = HealthStatus.Unhealthy };
             }
         }
-        
+
         public async Task<HttpResponseMessage> ReportSummaryList(
             ClaimsPrincipal user,
             CancellationToken cancellationToken,
@@ -70,20 +70,22 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             string? reportType = null,
             DateTime? reportStartDate = null,
             DateTime? reportEndDate = null,
-            ScheduleStatus? status = null,
+            ScheduleStatus[]? statuses = null,
             bool? endOfReportPeriodJobHasRun = null,
             bool includeDeleted = false,
             string? sortBy = null,
             SortOrder? sortOrder = null,
             int pageNumber = 1,
-            int pageSize = 10
+            int pageSize = 10,
+            DateOnly? createDate = null,
+            string? reportScheduleId = null
             )
         {
             // HTTP GET
             if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
             {
                 var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
-                
+
                 //create a bearer token for the system account
                 var token = await createLinkBearerToken.ExecuteAsync(user, 2);
                 _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -124,10 +126,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 queryParams["reportEndDate"] = reportEndDate.Value.ToString("o");
             }
 
-            if (status.HasValue)
-            {
-                queryParams["status"] = status.Value.ToString();
-            }
+            // status handled separately below (supports multiple values)
 
             if (endOfReportPeriodJobHasRun.HasValue)
             {
@@ -149,7 +148,22 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                 queryParams["sortOrder"] = sortOrder.Value.ToString();
             }
 
+            if (createDate.HasValue)
+            {
+                queryParams["createDate"] = createDate.Value.ToString("yyyy-MM-dd");
+            }
+
+            if (!string.IsNullOrWhiteSpace(reportScheduleId))
+            {
+                queryParams["id"] = reportScheduleId;
+            }
+
             var relativeUrl = QueryHelpers.AddQueryString("api/schedules/search", queryParams);
+            if (statuses != null && statuses.Length > 0)
+            {
+                foreach (var s in statuses)
+                    relativeUrl = QueryHelpers.AddQueryString(relativeUrl, "status", s.ToString());
+            }
 
             var response = await _client.GetAsync(relativeUrl, cancellationToken);
 
@@ -220,6 +234,67 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
             var response = await _client.GetAsync(relativeUrl, cancellationToken);
 
             return response;
+        }
+
+        public async Task<HttpResponseMessage> RestoreReportSchedulesAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
+        {
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            return await _client.PatchAsync($"api/schedules/facility/{Uri.EscapeDataString(facilityId)}/status?deleted=false", null, cancellationToken);
+        }
+
+        public async Task<HttpResponseMessage> GetActiveReportSchedulesAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
+        {
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            return await _client.GetAsync($"api/schedules/facilities/{Uri.EscapeDataString(facilityId)}?blocking=true", cancellationToken);
+        }
+
+        public async Task<HttpResponseMessage> SoftDeleteReportScheduleAsync(ClaimsPrincipal user, string reportScheduleId, CancellationToken cancellationToken)
+        {
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            return await _client.DeleteAsync($"api/schedules/{Uri.EscapeDataString(reportScheduleId)}", cancellationToken);
+        }
+
+        public async Task<HttpResponseMessage> RestoreReportScheduleAsync(ClaimsPrincipal user, string reportScheduleId, CancellationToken cancellationToken)
+        {
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            var request = new HttpRequestMessage(HttpMethod.Patch, $"api/schedules/{Uri.EscapeDataString(reportScheduleId)}/restore");
+            return await _client.SendAsync(request, cancellationToken);
+        }
+
+        public async Task<HttpResponseMessage> SoftDeleteReportSchedulesAsync(ClaimsPrincipal user, string facilityId, CancellationToken cancellationToken)
+        {
+            if (!_authenticationSchemaConfig.Value.EnableAnonymousAccess)
+            {
+                var createLinkBearerToken = _scopeFactory.CreateScope().ServiceProvider.GetRequiredService<ICreateLinkBearerToken>();
+                var token = await createLinkBearerToken.ExecuteAsync(user, 2);
+                _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+
+            return await _client.PatchAsync($"api/schedules/facility/{Uri.EscapeDataString(facilityId)}/status?deleted=true", null, cancellationToken);
         }
 
         private void InitHttpClient()

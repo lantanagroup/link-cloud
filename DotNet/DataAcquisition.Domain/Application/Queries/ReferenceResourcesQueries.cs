@@ -4,14 +4,13 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Diagnostics;
-using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 
@@ -75,6 +74,11 @@ public class ReferenceResourcesQueries : IReferenceResourcesQueries
             query = query.Where(r => r.ResourceType == model.ResourceType);
         }
 
+        if (model.ResourceTypes != null && model.ResourceTypes.Any())
+        {
+            query = query.Where(r => model.ResourceTypes.Contains(r.ResourceType));
+        }
+
         if (model.QueryPhase.HasValue)
         {
             query = query.Where(r => r.QueryPhase == model.QueryPhase.Value);
@@ -82,10 +86,8 @@ public class ReferenceResourcesQueries : IReferenceResourcesQueries
 
         if (model.DataAcquisitionLogId.HasValue)
         {
-            query = query.Where(r => r.DataAcquisitionLogId == model.DataAcquisitionLogId.Value);
+            query = query.Where(r => r.DataAcquisitionLogs.Any(l => l.Id == model.DataAcquisitionLogId.Value));
         }
-
-        var total = await query.CountAsync(cancellationToken);
 
         query = model.SortOrder switch
         {
@@ -94,11 +96,51 @@ public class ReferenceResourcesQueries : IReferenceResourcesQueries
             _ => query
         };
 
-        var resources = await query
-            .Skip((model.PageNumber - 1) * model.PageSize)
-            .Take(model.PageSize)
-            .Select(r => ReferenceResourcesModel.FromDomain(r))
-            .ToListAsync(cancellationToken);
+        int total;
+        List<ReferenceResourcesModel> resources;
+
+        // Fast path: when on page 1, skip the separate COUNT round-trip.
+        // When PageSize is int.MaxValue the caller wants every row — skip Take
+        // entirely (adding 1 would overflow). Otherwise fetch one extra row to
+        // cheaply detect whether more pages exist.
+        if (model.PageNumber == 1)
+        {
+            if (model.PageSize == int.MaxValue)
+            {
+                // Unbounded — caller wants all rows; skip Take entirely
+                resources = await query
+                    .Select(r => ReferenceResourcesModel.FromDomain(r))
+                    .ToListAsync(cancellationToken);
+                total = resources.Count;
+            }
+            else
+            {
+                resources = await query
+                    .Take(model.PageSize + 1)
+                    .Select(r => ReferenceResourcesModel.FromDomain(r))
+                    .ToListAsync(cancellationToken);
+
+                if (resources.Count > model.PageSize)
+                {
+                    total = model.PageSize + 1;
+                    resources.RemoveAt(resources.Count - 1);
+                }
+                else
+                {
+                    total = resources.Count;
+                }
+            }
+        }
+        else
+        {
+            total = await query.CountAsync(cancellationToken);
+
+            resources = await query
+                .Skip((model.PageNumber - 1) * model.PageSize)
+                .Take(model.PageSize)
+                .Select(r => ReferenceResourcesModel.FromDomain(r))
+                .ToListAsync(cancellationToken);
+        }
 
         return new PagedConfigModel<ReferenceResourcesModel>
         {
