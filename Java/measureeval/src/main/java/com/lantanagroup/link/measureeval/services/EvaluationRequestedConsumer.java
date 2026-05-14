@@ -115,7 +115,7 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
         for (PatientReportingEvaluationStatus.Report r : newPatientStatus.getReports()) {
             MeasureReport measureReport;
             if (bundle.hasEntry()) {
-                measureReport = evaluateMeasureService.evaluateMeasure(patientStatus, r, bundle);
+                measureReport = evaluateMeasureService.evaluateMeasure(newPatientStatus, r, bundle);
                 if (measureReport.getIdPart() == null) {
                     measureReport.setId(UUID.randomUUID().toString());
                 }
@@ -126,10 +126,10 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
             boolean reportable = measureReport != null && reportabilityPredicate.test(measureReport);
             r.setReportable(reportable);
             if (reportable) {
-                blobStorageService.storePatientInBlobStorage(patientStatus, r, measureReport);
+                blobStorageService.storePatientInBlobStorage(newPatientStatus, r, measureReport);
             } else {
                 String measureReportId = measureReport == null ? UUID.randomUUID().toString() : measureReport.getIdPart();
-                measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(patientStatus, r, measureReportId, null, null);
+                measureReportGeneratedProducer.produceMeasureReportGeneratedRecord(newPatientStatus, r, measureReportId, null, null);
             }
         }
 
