@@ -13,6 +13,7 @@ import org.hl7.fhir.r4.model.Patient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -136,6 +137,8 @@ class EvaluationRequestedConsumerTest {
         assertDoesNotThrow(() -> consumer.process(buildRecord("facility-1", value)));
 
         verifyNoInteractions(evaluateMeasureService);
+        verify(measureReportGeneratedProducer).produceMeasureReportGeneratedRecord(any(), any(), any(), isNull(), isNull());
+        verifyNoInteractions(blobStorageService);
     }
 
     @Test
@@ -163,6 +166,38 @@ class EvaluationRequestedConsumerTest {
 
         assertDoesNotThrow(() -> consumer.process(buildRecord("facility-1", value)));
 
-        verify(evaluateMeasureService).evaluateMeasure(any(), any(), eq(bundle));
+        ArgumentCaptor<PatientReportingEvaluationStatus.Report> reportCaptor =
+                ArgumentCaptor.forClass(PatientReportingEvaluationStatus.Report.class);
+        verify(evaluateMeasureService).evaluateMeasure(any(), reportCaptor.capture(), eq(bundle));
+        assertEquals("tracking-1", reportCaptor.getValue().getReportTrackingId());
+    }
+
+    @Test
+    void process_patientStatusFound_nonEmptyBundle_reportable_callsBlobStorage() {
+        EvaluationRequested value = new EvaluationRequested();
+        value.setPatientId("patient-1");
+        value.setPreviousReportId("report-1");
+        value.setReportTrackingId("tracking-1");
+
+        PatientReportingEvaluationStatus patientStatus = buildPatientStatus("facility-1", "patient-1", "report-1");
+
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(new Patient().setId("patient-1"));
+
+        when(patientStatusRepository.findByFacilityIdAndPatientIdAndReportsReportTrackingId(
+                "facility-1", "patient-1", "report-1"))
+                .thenReturn(Optional.of(patientStatus));
+        when(patientStatusBundler.createBundle("facility-1", "correlation-1"))
+                .thenReturn(bundle);
+
+        MeasureReport measureReport = new MeasureReport();
+        measureReport.setId("measure-report-1");
+        when(evaluateMeasureService.evaluateMeasure(any(), any(), any())).thenReturn(measureReport);
+        when(reportabilityPredicate.test(measureReport)).thenReturn(true);
+
+        assertDoesNotThrow(() -> consumer.process(buildRecord("facility-1", value)));
+
+        verify(blobStorageService).storePatientInBlobStorage(any(), any(), eq(measureReport));
+        verifyNoInteractions(measureReportGeneratedProducer);
     }
 }
