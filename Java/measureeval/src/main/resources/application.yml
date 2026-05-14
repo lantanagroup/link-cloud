@@ -107,3 +107,9 @@ authentication:
 internal-blob-storage:
   connection-string: ''
   blob-container-name: ''
+
+resource-cache:
+  blob-storage:
+    connection-string: ''
+    blob-container-name: ''
+    blob-root: ''
