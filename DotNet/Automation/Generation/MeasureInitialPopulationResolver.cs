@@ -150,6 +150,18 @@ public static class IpWindowExtensions
         return false;
     }
 
+    /// <summary>True when any IP window fully contains the closed interval [start, end].</summary>
+    public static bool AnyContains(this IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> windows, DateTime start, DateTime end)
+    {
+        if (windows == null) return false;
+        for (var i = 0; i < windows.Count; i++)
+        {
+            var w = windows[i];
+            if (start >= w.Start && end <= w.End) return true;
+        }
+        return false;
+    }
+
     /// <summary>True when any IP window's end is strictly after <paramref name="date"/> (i.e. <paramref name="date"/> is before the IP end).</summary>
     public static bool AnyEndStrictlyAfter(this IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> windows, DateTime date)
     {
