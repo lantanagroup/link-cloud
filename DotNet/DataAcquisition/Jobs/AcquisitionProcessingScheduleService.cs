@@ -59,7 +59,7 @@ public class AcquisitionProcessingScheduleService : IHostedService
         //     .WithDescription("Tail Message Recovery Trigger")
         //     .Build();
 
-        //await EnsureJobAndTrigger(scheduler, acquisitionJob, acquisitionTrigger, cancellationToken);
+        await EnsureJobAndTrigger(scheduler, acquisitionJob, acquisitionTrigger, cancellationToken);
         //await EnsureJobAndTrigger(scheduler, tailRecoveryJob, tailRecoveryTrigger, cancellationToken);
 
         await scheduler.Start(cancellationToken);
