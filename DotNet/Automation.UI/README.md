@@ -406,7 +406,24 @@ strict prediction-vs-actual comparison. The Report service's `ReportEntry.Report
 rows feed the `OperationOutcome` count prediction (one OO per patient with
 `FailedValidation`).
 
-See `DotNet/Automation/README.md` section 7 for the full prediction formula.
+The CQL simulator is resource-aware, not just type-aware. In addition to checking that a
+resource type is acquired and referenced by CQL, it applies known SDE `where` predicates per
+resource. For example, `Specimen` prediction now models measure-specific behavior:
+
+- ACH Monthly predicts only specimens whose `subject` is the evaluated patient and whose
+  `collection.collected` overlaps an initial-population encounter.
+- ACH Daily predicts only patient-owned specimens referenced by qualifying respiratory
+  pathogen laboratory observations (COVID-19, influenza, RSV); it does not assume every
+  acquired specimen appears in ABS.
+- Hypoglycemic predicts only patient-owned specimens whose collection interval is fully
+  during an initial-population encounter.
+
+This matters on the `Runs/Manifest` page: a `Specimen` can be shown as generated and even
+DataAcquisition-acquired through a reference query, but still be filtered from the predicted
+ABS set when patient-context CQL retrieval or measure-specific SDE predicates do not include
+it.
+
+See `DotNet/Automation/README.md` section 8 for the full prediction formula and profile table.
 
 ### Generation Manifest page
 
