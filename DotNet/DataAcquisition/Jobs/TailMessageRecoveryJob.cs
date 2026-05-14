@@ -47,6 +47,11 @@ public class TailMessageRecoveryJob : IJob
         var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
 
+        _logger.LogInformation(
+            "TailMessageRecoveryJob started. Looking for orphaned tail logs older than {MinAge}. Time budget: {TimeBudget} seconds.",
+            minAge,
+            _settings.TimeBudgetPerRunSeconds);
+            
         try
         {
             var orphanedLogIds = await dataAcquisitionLogQueries.GetOrphanedTailLogIds(
