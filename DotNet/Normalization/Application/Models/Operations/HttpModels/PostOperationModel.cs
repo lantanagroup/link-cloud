@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
         [Required, DataMember]
         public List<string> ResourceTypes { get; set; } = new List<string>();
         [Required, DataMember]
-        public required IOperation Operation { get; set; }
+        public IOperation Operation { get; set; }
         [DataMember]
         public string? FacilityId { get; set; } = null;
         [DataMember(IsRequired = false)]
