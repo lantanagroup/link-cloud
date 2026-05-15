@@ -25,7 +25,7 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.HttpMode
             FacilityId = facilityId;
             VendorIds = vendorIds;
 
-            if (this.Operation.OperationType == OperationType.CopyLocation)
+            if (this.Operation.OperationType == OperationType.CopyLocation && !this.ResourceTypes.Contains(ResourceType.Location.ToString()))
             {
                 this.ResourceTypes.Add(ResourceType.Location.ToString());
             }
