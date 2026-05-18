@@ -744,7 +744,6 @@ services:
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      ResourceCache__CacheImplementation: ABS
       ResourceCache__Redis__ConnectionString: redis_cache:6379
       ResourceCache__Redis__Password: ${REDIS_PASS}
       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
