@@ -181,7 +181,7 @@
             <mat-label>Key - Secret Name</mat-label>
             <input matInput formControlName="authKey" [readonly]="viewOnly" placeholder="Authentication Key Secret Name">
             @if (authKeyControl.value && !viewOnly) {
-            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearAuthKey()">
+            <button matSuffix mat-icon-button aria-label="Clear" type="button" (click)="clearAuthKey()">
               <mat-icon>close</mat-icon>
             </button>
             }
