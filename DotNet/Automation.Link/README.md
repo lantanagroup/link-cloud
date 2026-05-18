@@ -1,4 +1,4 @@
-# Automation.Link
+﻿# Automation.Link
 
 `Automation.Link` is the Link-specific orchestration and validation layer that turns the
 platform-agnostic `Automation` engine into a full end-to-end Link pipeline runner.
@@ -150,11 +150,25 @@ There is no tolerant `actual >= expected` mode. Pipeline-derived types (`Patient
 `MeasureReport`, `OperationOutcome`) are predicted deterministically from the manifest so the
 strict mode holds.
 
+Prediction is intentionally narrower than "generated and acquired". The manifest also applies
+CQL type reachability and resource-level SDE filtering from `Automation.CqlFilterSimulator`.
+This includes patient-context retrieval checks for referenced resources. For example, an
+acquired `Specimen` is only expected in ABS when the selected measure's SDE logic would return
+it for the evaluated patient: ACH Monthly requires patient-owned specimen collection overlap
+with IP, ACH Daily requires a qualifying respiratory-pathogen lab observation reference, and
+Hypoglycemic requires patient-owned collection fully during IP.
+
 ### 5.2 Validators
 
 - **`ReportAbsManifestValidator`** -- validates internal ABS artifacts (`manifest.ndjson`,
   `patient-*.ndjson`). Reconciles expected vs actual resources using
   `GenerationManifest.GetExpectedAbsCountsForPatient(patientId)`.
+
+  If this validator reports `expected=N, actual=0` for a type such as `Specimen`, inspect the
+  manifest's generated/acquired/predicted split before assuming the pipeline dropped data. The
+  expected set is already filtered through acquisition simulation, CQL type reachability, and
+  per-resource SDE profiles; a mismatch usually means either the simulator is missing a CQL
+  predicate/reference rule or the pipeline omitted a resource the CQL should have returned.
 
   Before running, it reads `ReportEntry.ReportingStatus` rows via `PipelineDataReader` and
   populates `manifest.ExpectedOperationOutcomeCountByPatient[pid] = 1` for every patient whose
