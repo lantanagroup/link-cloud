@@ -5,6 +5,7 @@ using Hl7.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Collections;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
@@ -26,7 +27,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 return OperationResult.Failure($"Resource must be a Location");
             }
 
-            _logger.LogDebug("Applying Copy Location Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
+            _logger.LogDebug("Applying Copy Location Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
 
             Location location = (Location)resource;
 
