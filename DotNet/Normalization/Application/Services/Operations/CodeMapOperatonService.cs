@@ -3,6 +3,7 @@ using Hl7.Fhir.FhirPath;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 {
@@ -37,7 +38,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             {
                 if (source is Coding coding)
                 {
-                    if (UpdateCoding(coding, operation.CodeSystemMaps))
+                    if (UpdateCoding(coding, operation.CodeSystemMaps, operation.Name))
                     {
                         anyUpdated = true;
                     }
@@ -46,7 +47,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 {
                     foreach (var cdng in codeableConcept.Coding)
                     {
-                        if (UpdateCoding(cdng, operation.CodeSystemMaps))
+                        if (UpdateCoding(cdng, operation.CodeSystemMaps, operation.Name))
                         {
                             anyUpdated = true;
                         }
@@ -54,20 +55,19 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 }
                 else
                 {
-                    Logger.LogWarning("Unsupported source type {SourceType} for FHIRPath {FhirPath} in operation {OperationName}.", source.GetType().Name, operation.FhirPath, operation.Name);
+                    Logger.LogWarning("Unsupported source type {SourceType} for FHIRPath {FhirPath} in operation {OperationName}.", source.GetType().Name.SanitizeForLog(), operation.FhirPath.SanitizeForLog(), operation.Name.SanitizeForLog());
                 }
             }
 
             if (anyUpdated)
             {
-                _logger.LogDebug("Applying Code Map Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName, resource.Id);
                 return OperationResult.Success(resource);
             }
             else
                 return OperationResult.NoAction("No code maps applied.", resource);
         }
 
-        private bool UpdateCoding(Coding coding, List<CodeSystemMap> codeSystemMaps)
+        private bool UpdateCoding(Coding coding, List<CodeSystemMap> codeSystemMaps, string operationName)
         {
             var updated = false;
             foreach (var codeSystemMap in codeSystemMaps.Where(x => x.SourceSystem == coding.System))
@@ -81,6 +81,10 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     coding.Code = matchingCodeMap.Code;
                     coding.Display = matchingCodeMap.Display;
                     updated = true;
+                }
+                else
+                {
+                    _logger.LogWarning("No code map found for code {Code}|{System} in mapping {OperationName}", coding.Code.SanitizeForLog(), coding.System.SanitizeForLog(), operationName.SanitizeForLog());
                 }
             }
 

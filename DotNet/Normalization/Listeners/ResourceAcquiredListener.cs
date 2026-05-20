@@ -17,6 +17,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.OpenApi.Writers;
 using OpenTelemetry.Resources;
@@ -142,7 +143,7 @@ public class ResourceAcquiredListener : BackgroundService
 
                         if (message.Message.Value.AcquisitionComplete && message.Message.Value.Resource == null)
                         {
-                            _logger.LogInformation("Acquisition Complete tail message received. Producing message for measure eval.");
+                            _logger.LogInformation("Acquisition Complete tail message received for facility {FacilityId} (correlation {CorrelationId}). Producing message for measure eval.", messageMetaData.facilityId.SanitizeForLog(), messageMetaData.correlationId.SanitizeForLog());
 
                             await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, message.Message.Value.Resource);
                             return;
@@ -188,6 +189,8 @@ public class ResourceAcquiredListener : BackgroundService
                                         throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
                                     }
 
+                                    _logger.LogInformation("Normalizing {ResourceType}/{ResourceId} with {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
+
                                     var operationResult = operation.OperationType switch
                                     {
                                         OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource),
@@ -199,6 +202,15 @@ public class ResourceAcquiredListener : BackgroundService
 
                                     if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
                                     {
+                                        if (operationResult.SuccessCode == OperationStatus.Success)
+                                        {
+                                            _logger.LogInformation("Changed {ResourceType}/{ResourceId} as part of {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
+                                        }
+                                        else if (operationResult.SuccessCode == OperationStatus.NoAction)
+                                        {
+                                            _logger.LogInformation("No changes made to {ResourceType}/{ResourceId} as part of {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
+                                        }
+
                                         resource = operationResult.Resource;
 
                                         _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
@@ -211,7 +223,7 @@ public class ResourceAcquiredListener : BackgroundService
                                     }
                                     else
                                     {
-                                        _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", messageMetaData.facilityId, messageMetaData.correlationId, operation.OperationType, operationResult?.ErrorMessage ?? "No Operation Result Error Message");
+                                        _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", messageMetaData.facilityId.SanitizeForLog(), messageMetaData.correlationId.SanitizeForLog(), operation.OperationType, operationResult?.ErrorMessage?.SanitizeForLog() ?? "No Operation Result Error Message");
                                     }
                                 }
 
@@ -219,6 +231,7 @@ public class ResourceAcquiredListener : BackgroundService
                             }
                             else
                             {
+                                _logger.LogDebug("No operation sequences configured for {FacilityId}/{ResourceType}. Passing resource through without normalization.", messageMetaData.facilityId.SanitizeForLog(), message.Message.Value.ResourceType.SanitizeForLog());
                                 await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, message.Message.Value.Resource);
                             }
                         }
@@ -233,7 +246,7 @@ public class ResourceAcquiredListener : BackgroundService
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, $"Failed to process Patient Event.");
+                        _logger.LogError(ex, "Failed to process ResourceAcquired event for facility {FacilityId}.", message?.Message?.Key?.FacilityId?.SanitizeForLog());
 
                         _transientExceptionHandler.HandleException(message, new TransientException("Normalization Exception thrown: " + ex.Message, ex), message.Key?.FacilityId ?? string.Empty);
                     }
@@ -319,7 +332,7 @@ public class ResourceAcquiredListener : BackgroundService
         }
         catch (ProduceException<ResourceKey, ResourceNormalizedMessage> ex)
         {
-            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, ResourceAcquired Partition: {Partition}, ResourceAcquired Offset: {Offset}", facilityId, correlationId, message.Partition.Value, message.Offset.Value);
+            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, ResourceAcquired Partition: {Partition}, ResourceAcquired Offset: {Offset}", facilityId.SanitizeForLog(), correlationId.SanitizeForLog(), message.Partition.Value, message.Offset.Value);
             throw new TransientException($"Failed to produce ResourceNormalized message: {ex.Message}", ex);
         }
     }
