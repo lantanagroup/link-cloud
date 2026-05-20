@@ -155,8 +155,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
     builder.Services.AddSingleton<PathNamingService>();
 
-    builder.Services.AddSingleton<ReportClient>();
-
     // Add kafka producers
     builder.Services.AddTransient<PayloadSubmittedProducer>();
     builder.Services.AddTransient<AuditableEventOccurredProducer>();

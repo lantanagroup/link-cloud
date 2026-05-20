@@ -178,16 +178,16 @@
         @if (authTypeControl.value === 'Epic') {
         <div class="form-input">
           <mat-form-field appearance="outline" class="subject-input form-input ">
-            <mat-label>Key</mat-label>
-            <input matInput formControlName="authKey" [readonly]="viewOnly" placeholder="Authentication Key">
+            <mat-label>Key - Secret Name</mat-label>
+            <input matInput formControlName="authKey" [readonly]="viewOnly" placeholder="Authentication Key Secret Name">
             @if (authKeyControl.value && !viewOnly) {
-            <button matSuffix mat-icon-button aria-label="Clear" (click)="clearAuthKey()">
+            <button matSuffix mat-icon-button aria-label="Clear" type="button" (click)="clearAuthKey()">
               <mat-icon>close</mat-icon>
             </button>
             }
             @if (authTypeControl.value != 'None' && authTypeControl.value != 'Basic') {
             <mat-error>
-              Auth Key is <strong>required</strong>.
+              Auth Key Secret Name is <strong>required</strong>.
             </mat-error>
             }
           </mat-form-field>
