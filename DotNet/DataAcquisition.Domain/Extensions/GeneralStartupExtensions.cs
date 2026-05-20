@@ -126,6 +126,7 @@ public static class GeneralStartupExtensions
         services.Configure<SecretManagerSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.SecretManagement));
         services.Configure<SftpValidationSettings>(configuration.GetSection(SftpValidationSettings.SectionName));
         services.Configure<SftpAcquisitionSettings>(configuration.GetSection(SftpAcquisitionSettings.SectionName));
+        services.Configure<DataSourceAuthSettings>(configuration.GetSection(DataSourceAuthSettings.SectionName));
 
         IConfigurationSection consumerSettingsSection = configuration.GetRequiredSection(nameof(ConsumerSettings));
         services.Configure<ConsumerSettings>(consumerSettingsSection);
