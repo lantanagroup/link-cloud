@@ -1,8 +1,8 @@
-﻿using System.Net.Http.Json;
+﻿using Microsoft.Extensions.DependencyInjection;
+using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Xunit;
-using Xunit.Abstractions;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
 
@@ -17,8 +17,10 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 ///   dotnet test Tests/BackendE2ETests --filter Category=AutomationUiSmokeTest
 /// </summary>
 [Trait("Category", "AutomationUiSmokeTest")]
-public sealed class AutomationUiApiSmokeTest(ITestOutputHelper output)
+public sealed class AutomationUiApiSmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
+    private readonly IServiceProvider _sp;
+
     // Seeded deterministic id from ScenarioSeedService -- same in every environment.
     private static readonly Guid AdhocReportScenarioId = new("00000000-0000-0000-0000-000000000001");
 
@@ -32,6 +34,17 @@ public sealed class AutomationUiApiSmokeTest(ITestOutputHelper output)
         Converters = { new JsonStringEnumConverter() }
     };
 
+    private ConsoleAutomationOutput Output => _sp.GetRequiredService<ConsoleAutomationOutput>();
+
+    public AutomationUiApiSmokeTest(BackendE2ETestFixture fixture)
+    {
+        _sp = fixture.ServiceProvider;
+    }
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
     /// <summary>
     /// POSTs the seeded AdHoc Report [System] scenario to Automation.UI's
     /// /api/runs/start, polls /api/runs/{id}/status until the run reaches a
@@ -43,7 +56,7 @@ public sealed class AutomationUiApiSmokeTest(ITestOutputHelper output)
         using var http = new HttpClient { BaseAddress = new Uri(TestConfig.AutomationUiBase.TrimEnd('/') + "/") };
 
         // ── POST /api/runs/start ─────────────────────────────────────────
-        output.WriteLine($"Starting AdHoc Report [System] scenario ({AdhocReportScenarioId}) against {TestConfig.AutomationUiBase}");
+        Output.WriteLine($"Starting AdHoc Report [System] scenario ({AdhocReportScenarioId}) against {TestConfig.AutomationUiBase}");
 
         var startPayload = new { scenarioId = AdhocReportScenarioId, source = "AutomationUiApiSmokeTest" };
         using var startResponse = await http.PostAsJsonAsync("api/runs/start", startPayload);
@@ -54,7 +67,7 @@ public sealed class AutomationUiApiSmokeTest(ITestOutputHelper output)
         var startBody = await startResponse.Content.ReadFromJsonAsync<StartRunResponse>(JsonOpts);
         Assert.NotNull(startBody);
         Assert.NotEqual(Guid.Empty, startBody.RunId);
-        output.WriteLine($"Run started: runId={startBody.RunId} scenario={startBody.ScenarioName}");
+        Output.WriteLine($"Run started: runId={startBody.RunId} scenario={startBody.ScenarioName}");
 
         // ── Poll GET /api/runs/{id}/status ───────────────────────────────
         var deadline = DateTime.UtcNow.Add(Timeout);
@@ -71,7 +84,7 @@ public sealed class AutomationUiApiSmokeTest(ITestOutputHelper output)
             statusBody = await statusResponse.Content.ReadFromJsonAsync<RunStatusResponse>(JsonOpts);
             Assert.NotNull(statusBody);
 
-            output.WriteLine($"  status={statusBody.Status} isTerminal={statusBody.IsTerminal}" +
+            Output.WriteLine($"  status={statusBody.Status} isTerminal={statusBody.IsTerminal}" +
                              (statusBody.Duration != null ? $" duration={statusBody.Duration}" : ""));
 
             if (statusBody.IsTerminal)
@@ -84,13 +97,13 @@ public sealed class AutomationUiApiSmokeTest(ITestOutputHelper output)
 
         if (statusBody.Status != "Succeeded")
         {
-            output.WriteLine($"Run failed. Error: {statusBody.Error}");
+            Output.WriteLine($"Run failed. Error: {statusBody.Error}");
         }
 
         Assert.True(statusBody.Status == "Succeeded",
             $"Expected run to succeed but got '{statusBody.Status}'. Error: {statusBody.Error}");
 
-        output.WriteLine($"Run {startBody.RunId} completed successfully in {statusBody.Duration ?? "unknown duration"}.");
+        Output.WriteLine($"Run {startBody.RunId} completed successfully in {statusBody.Duration ?? "unknown duration"}.");
     }
 
     // ── Response shape mirrors AutomationRunsApiController.RunStatusResponse ──

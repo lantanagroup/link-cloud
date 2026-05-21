@@ -88,13 +88,13 @@ services:
     ports:
       - '6379:6379'
     container_name: redis_cache
-    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASS}
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASS:-password}
     volumes: 
       - redis_cache:/data
     networks:
       - link-nw
     healthcheck:
-      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASS}", "ping" ]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASS:-password}", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -474,7 +474,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Docker
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
-      Redis__Password: ${REDIS_PASS}
+      Redis__Password: ${REDIS_PASS:-password}
     ports:
       - "8063:8063"
     build:
@@ -508,7 +508,7 @@ services:
       terminology:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8063/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8063/api/health/live"]
   
   audit:
     image: link-audit
@@ -578,7 +578,7 @@ services:
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      Redis__Password: ${REDIS_PASS}
+      Redis__Password: ${REDIS_PASS:-password}
     ports:
       - "8065:8065"
     build:
@@ -613,7 +613,7 @@ services:
        KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
        KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
        ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-       Redis__Password: ${REDIS_PASS}
+       Redis__Password: ${REDIS_PASS:-password}
      ports:
        - "8078:8078"
      build:
