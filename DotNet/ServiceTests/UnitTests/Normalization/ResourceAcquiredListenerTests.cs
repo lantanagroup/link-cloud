@@ -7,11 +7,9 @@ using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Moq;
 using Task = System.Threading.Tasks.Task;
 
@@ -33,7 +31,6 @@ public class ResourceAcquiredListenerTests
     private readonly Mock<CodeMapOperationService> _codeMapOperationServiceMock;
     private readonly Mock<ConditionalTransformOperationService> _conditionalTransformOperationServiceMock;
     private readonly Mock<CopyLocationOperationService> _copyLocationOperationServiceMock;
-    private readonly Mock<IOptionsMonitor<TelemetrySettings>> _telemetrySettingsMock;
 
     public ResourceAcquiredListenerTests()
     {
@@ -52,11 +49,6 @@ public class ResourceAcquiredListenerTests
         _codeMapOperationServiceMock = new Mock<CodeMapOperationService>(new Mock<ILogger<CodeMapOperationService>>().Object, null);
         _conditionalTransformOperationServiceMock = new Mock<ConditionalTransformOperationService>(new Mock<ILogger<ConditionalTransformOperationService>>().Object, null);
         _copyLocationOperationServiceMock = new Mock<CopyLocationOperationService>(new Mock<ILogger<CopyLocationOperationService>>().Object, null);
-        _telemetrySettingsMock = new Mock<IOptionsMonitor<TelemetrySettings>>();
-
-        _telemetrySettingsMock
-            .SetupGet(x => x.CurrentValue)
-            .Returns(new TelemetrySettings { PatientTags = false });
     }
 
     [Fact]
@@ -76,8 +68,7 @@ public class ResourceAcquiredListenerTests
             _copyPropertyOperationServiceMock.Object,
             _codeMapOperationServiceMock.Object,
             _conditionalTransformOperationServiceMock.Object,
-            _copyLocationOperationServiceMock.Object,
-            _telemetrySettingsMock.Object);
+            _copyLocationOperationServiceMock.Object);
 
         var facilityId = "TestFacility";
         var correlationId = "TestCorrelationId";
@@ -145,8 +136,7 @@ public class ResourceAcquiredListenerTests
             _copyPropertyOperationServiceMock.Object,
             _codeMapOperationServiceMock.Object,
             _conditionalTransformOperationServiceMock.Object,
-            _copyLocationOperationServiceMock.Object,
-            _telemetrySettingsMock.Object);
+            _copyLocationOperationServiceMock.Object);
 
         var facilityId = "TestFacility";
         var correlationId = "TestCorrelationId";
