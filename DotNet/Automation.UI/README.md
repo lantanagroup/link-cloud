@@ -220,6 +220,22 @@ All POST endpoints use `[ValidateAntiForgeryToken]`. The token is rendered via
 `@Html.AntiForgeryToken()` inside the modal and sent as a `RequestVerificationToken` request
 header.
 
+Antiforgery tokens are protected by ASP.NET Core Data Protection. `Automation.UI` persists the
+Data Protection key ring to MongoDB so redeploying the UI does not invalidate current browser
+tokens solely because the container restarted. Keys are stored in the configured Mongo database in
+`DataProtection:KeyCollectionName` (default: `automation_data_protection_keys`).
+
+By default, the Data Protection application name is environment-scoped:
+
+```text
+Link.Automation.UI:{ASPNETCORE_ENVIRONMENT}
+```
+
+This allows environments such as Dev and Test to use the same Mongo collection without sharing a
+decryptable antiforgery/cookie payload boundary. Override `DataProtection:ApplicationName` only if
+the value needs to be pinned to a deployment-specific name; it must remain stable across redeploys
+and across all replicas of the same environment.
+
 ---
 
 ## 5. Scenario configuration model
