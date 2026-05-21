@@ -744,7 +744,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             ).ToListAsync(cancellationToken);
 
             statistics.FastestCompletionTimeMilliseconds = new ResourceCompletionTime(
-                string.Join(",", fastestResourceTypes),
+                string.Join(",", fastestResourceTypes.Select(r => r.ToString()).Distinct().OrderBy(r => r)),
                 fastestLog.CompletionTimeMilliseconds!.Value);
         }
 
@@ -764,7 +764,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             ).ToListAsync(cancellationToken);
 
             statistics.SlowestCompletionTimeMilliseconds = new ResourceCompletionTime(
-                string.Join(",", slowestResourceTypes),
+                string.Join(",", slowestResourceTypes.Select(r => r.ToString()).Distinct().OrderBy(r => r)),
                 slowestLog.CompletionTimeMilliseconds!.Value);
         }
 
@@ -786,7 +786,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
         foreach (var logGroup in completionTimeRows.GroupBy(x => x.Id))
         {
-            var key = string.Join(",", logGroup.Select(x => x.ResourceType));
+            var key = string.Join(",", logGroup.Select(x => x.ResourceType.ToString()).Distinct().OrderBy(r => r));
             statistics.ResourceTypeCompletionTimeMilliseconds.TryGetValue(key, out var existing);
             statistics.ResourceTypeCompletionTimeMilliseconds[key] = existing + logGroup.First().CompletionTimeMilliseconds!.Value;
         }
