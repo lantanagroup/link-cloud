@@ -49,7 +49,6 @@ parameters:
     default: "test"
     values:
       - "test"
-      # - "dev"   # add AUTOMATION_UI_BASE_URL_dev to variables when ready
 
   - name: scenario
     displayName: "Scenario to run"
@@ -89,6 +88,7 @@ variables:
   APP_CONFIG_SLACK_KEY:     "Automation:SlackWebhookUrl"
   APP_CONFIG_SLACK_LABEL:   "Link Automation UI"
 
+  TESTRAIL_RUN_URL: 'https://lantanagroup.testrail.io/index.php?/runs/view/171&group_by=cases:section_id&group_order=asc&display=tree'
 
 stages:
   - stage: TriggerAutomationRun
@@ -327,6 +327,7 @@ stages:
                 if ($duration) { $lines += "*Duration:* $duration" }
                 if ($runId)    { $lines += "*Run:* <$automation/Runs/Details/$runId|Open in Automation.UI>" }
                 $lines += "*Pipeline:* <$adoUrl|View ADO build>"
+                $lines += "*TestRail:* <$(TESTRAIL_RUN_URL)|Open TestRail Run>"
                 if ($err)      { $lines += "*Error:* $err" }
 
                 $payload = @{ text = ($lines -join "`n") } | ConvertTo-Json -Compress
