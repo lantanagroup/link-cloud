@@ -20,13 +20,15 @@ namespace LantanaGroup.Link.Tests.E2ETests;
 public sealed class AutomationUiApiSmokeTest : IAsyncLifetime, IClassFixture<BackendE2ETestFixture>
 {
     private readonly IServiceProvider _sp;
+    private const int DefaultTimeoutMinutes = 20;
+    private const int MinTimeoutMinutes = 1;
+    private const int MaxTimeoutMinutes = 240;
 
     // Seeded deterministic id from ScenarioSeedService -- same in every environment.
     private static readonly Guid AdhocReportScenarioId = new("00000000-0000-0000-0000-000000000001");
 
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(
-        int.Parse(Environment.GetEnvironmentVariable("AUTOMATION_UI_SMOKE_TIMEOUT_MINUTES") ?? "20"));
+    private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(GetTimeoutMinutes());
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
@@ -45,6 +47,17 @@ public sealed class AutomationUiApiSmokeTest : IAsyncLifetime, IClassFixture<Bac
 
     public Task DisposeAsync() => Task.CompletedTask;
 
+    private static int GetTimeoutMinutes()
+    {
+        var configured = Environment.GetEnvironmentVariable("AUTOMATION_UI_SMOKE_TIMEOUT_MINUTES");
+        if (!int.TryParse(configured, out var timeoutMinutes))
+            return DefaultTimeoutMinutes;
+
+        return timeoutMinutes is >= MinTimeoutMinutes and <= MaxTimeoutMinutes
+            ? timeoutMinutes
+            : DefaultTimeoutMinutes;
+    }
+
     /// <summary>
     /// POSTs the seeded AdHoc Report [System] scenario to Automation.UI's
     /// /api/runs/start, polls /api/runs/{id}/status until the run reaches a
@@ -53,18 +66,21 @@ public sealed class AutomationUiApiSmokeTest : IAsyncLifetime, IClassFixture<Bac
     [Fact]
     public async Task AdHocReportScenario_CompletesSuccessfully()
     {
+        using var timeoutCts = new CancellationTokenSource(Timeout);
+        var cancellationToken = timeoutCts.Token;
+
         using var http = new HttpClient { BaseAddress = new Uri(TestConfig.AutomationUiBase.TrimEnd('/') + "/") };
 
         // ── POST /api/runs/start ─────────────────────────────────────────
         Output.WriteLine($"Starting AdHoc Report [System] scenario ({AdhocReportScenarioId}) against {TestConfig.AutomationUiBase}");
 
         var startPayload = new { scenarioId = AdhocReportScenarioId, source = "AutomationUiApiSmokeTest" };
-        using var startResponse = await http.PostAsJsonAsync("api/runs/start", startPayload);
+        using var startResponse = await http.PostAsJsonAsync("api/runs/start", startPayload, cancellationToken);
 
         Assert.True(startResponse.IsSuccessStatusCode,
-            $"POST /api/runs/start returned {(int)startResponse.StatusCode}: {await startResponse.Content.ReadAsStringAsync()}");
+            $"POST /api/runs/start returned {(int)startResponse.StatusCode}: {await startResponse.Content.ReadAsStringAsync(cancellationToken)}");
 
-        var startBody = await startResponse.Content.ReadFromJsonAsync<StartRunResponse>(JsonOpts);
+        var startBody = await startResponse.Content.ReadFromJsonAsync<StartRunResponse>(JsonOpts, cancellationToken);
         Assert.NotNull(startBody);
         Assert.NotEqual(Guid.Empty, startBody.RunId);
         Output.WriteLine($"Run started: runId={startBody.RunId} scenario={startBody.ScenarioName}");
@@ -73,15 +89,15 @@ public sealed class AutomationUiApiSmokeTest : IAsyncLifetime, IClassFixture<Bac
         var deadline = DateTime.UtcNow.Add(Timeout);
         RunStatusResponse? statusBody = null;
 
-        while (DateTime.UtcNow < deadline)
+        while (DateTime.UtcNow < deadline && !cancellationToken.IsCancellationRequested)
         {
-            await Task.Delay(PollInterval);
+            await Task.Delay(PollInterval, cancellationToken);
 
-            using var statusResponse = await http.GetAsync($"api/runs/{startBody.RunId}/status");
+            using var statusResponse = await http.GetAsync($"api/runs/{startBody.RunId}/status", cancellationToken);
             Assert.True(statusResponse.IsSuccessStatusCode,
                 $"GET /api/runs/{startBody.RunId}/status returned {(int)statusResponse.StatusCode}");
 
-            statusBody = await statusResponse.Content.ReadFromJsonAsync<RunStatusResponse>(JsonOpts);
+            statusBody = await statusResponse.Content.ReadFromJsonAsync<RunStatusResponse>(JsonOpts, cancellationToken);
             Assert.NotNull(statusBody);
 
             Output.WriteLine($"  status={statusBody.Status} isTerminal={statusBody.IsTerminal}" +
