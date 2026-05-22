@@ -82,9 +82,6 @@ public static class DistributedLockSettingsExtensions
         {
             EndPoints = { distributedLockSettings.ConnectionString },
             AbortOnConnectFail = false,
-            ConnectRetry = 5,
-            ConnectTimeout = 15000,
-            SyncTimeout = 15000,
         };
 
         if (distributedLockSettings?.Password != null)
