@@ -82,6 +82,32 @@ jobs:
       - name: Start services
         run: docker compose up --no-build -d
 
+      - name: Report logs for services that failed to start
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set +e
+          echo "::group::Docker compose status"
+          docker compose ps --all
+          echo "::endgroup::"
+
+          FAILED_SERVICES=$(docker compose ps --all --format json \
+            | jq -r 'select((.State == "exited") or (.State == "dead") or (.State == "restarting")) | .Service')
+
+          if [[ -z "$FAILED_SERVICES" ]]; then
+            echo "No services are in exited/dead/restarting state immediately after startup."
+            exit 0
+          fi
+
+          echo "Detected services that failed to start:"
+          echo "$FAILED_SERVICES"
+
+          for service in $FAILED_SERVICES; do
+            echo "::group::Logs for failed service: ${service}"
+            docker compose logs --no-color --tail=300 "$service" || true
+            echo "::endgroup::"
+          done
+
       - name: Wait for services to start
         run: sleep 10
 
