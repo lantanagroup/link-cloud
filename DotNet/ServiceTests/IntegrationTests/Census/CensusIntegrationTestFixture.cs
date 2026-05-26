@@ -1,4 +1,4 @@
-using Census.Controllers;
+﻿using Census.Controllers;
 using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Repositories;
@@ -26,9 +26,6 @@ using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census;
-
-[CollectionDefinition("CensusIntegrationTests")]
-public class DatabaseCollection : ICollectionFixture<CensusIntegrationTestFixture> { }
 
 public sealed class CensusIntegrationTestFixture : IDisposable
 {

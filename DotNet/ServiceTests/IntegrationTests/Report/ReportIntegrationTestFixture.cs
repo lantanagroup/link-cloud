@@ -34,9 +34,6 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report
 {
-    [CollectionDefinition("ReportIntegrationTests")]
-    public class DatabaseCollection : ICollectionFixture<ReportIntegrationTestFixture> { }
-
     public class ReportIntegrationTestFixture : IAsyncLifetime, IDisposable
     {
         private readonly AzuriteContainer _azuriteContainer = new AzuriteBuilder()

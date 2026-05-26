@@ -193,5 +193,62 @@ namespace UnitTests.DataAcquisition.Controllers
             Assert.NotNull(objectResult.Value);
             Assert.True(((ProblemDetails)objectResult.Value).Status == (int)HttpStatusCode.BadRequest);
         }
+
+        [Fact]
+        public async System.Threading.Tasks.Task CreateFhirConfigurationNegativeTest_AlreadyExists_ReturnsConflict()
+        {
+            _mocker = new AutoMocker();
+            _mocker.GetMock<IFhirQueryConfigurationManager>()
+                .Setup(x => x.CreateAsync(It.IsAny<CreateFhirQueryConfigurationModel>(), CancellationToken.None))
+                .ThrowsAsync(new EntityAlreadyExistsException("A FhirQueryConfiguration already exists for facilityId."));
+
+            var _controller = _mocker.CreateInstance<QueryConfigController>();
+
+            var result = await _controller.CreateFhirConfiguration(
+                new ApiCreateFhirQueryConfigurationModel { FacilityId = facilityId, FhirServerBaseUrl = "http://example.com" },
+                CancellationToken.None);
+
+            Assert.IsType<ObjectResult>(result.Result);
+            var objectResult = (ObjectResult)result.Result;
+            Assert.Equal((int)HttpStatusCode.Conflict, objectResult.StatusCode);
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task UpdateFhirConfigurationNegativeTest_NotFound()
+        {
+            _mocker = new AutoMocker();
+            _mocker.GetMock<IFhirQueryConfigurationManager>()
+                .Setup(x => x.UpdateAsync(It.IsAny<UpdateFhirQueryConfigurationModel>(), CancellationToken.None))
+                .ThrowsAsync(new NotFoundException("No configuration found for facilityId."));
+
+            var _controller = _mocker.CreateInstance<QueryConfigController>();
+
+            var result = await _controller.UpdateFhirConfiguration(
+                new ApiUpdateFhirQueryConfigurationModel { FacilityId = "NonExisting", FhirServerBaseUrl = "http://example.com" },
+                CancellationToken.None);
+
+            Assert.IsType<ObjectResult>(result);
+            var objectResult = (ObjectResult)result;
+            Assert.Equal((int)HttpStatusCode.NotFound, objectResult.StatusCode);
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task UpdateFhirConfigurationNegativeTest_InvalidFacilityId()
+        {
+            _mocker = new AutoMocker();
+            _mocker.GetMock<IFhirQueryConfigurationManager>()
+                .Setup(x => x.UpdateAsync(It.IsAny<UpdateFhirQueryConfigurationModel>(), CancellationToken.None))
+                .ThrowsAsync(new ArgumentNullException("FacilityId"));
+
+            var _controller = _mocker.CreateInstance<QueryConfigController>();
+
+            var result = await _controller.UpdateFhirConfiguration(
+                new ApiUpdateFhirQueryConfigurationModel(),
+                CancellationToken.None);
+
+            Assert.IsType<ObjectResult>(result);
+            var objectResult = (ObjectResult)result;
+            Assert.Equal((int)HttpStatusCode.BadRequest, objectResult.StatusCode);
+        }
     }
 }

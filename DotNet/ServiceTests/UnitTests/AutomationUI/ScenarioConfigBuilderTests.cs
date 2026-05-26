@@ -1,0 +1,131 @@
+﻿using Automation.UI.Models;
+using Automation.UI.Services;
+using FluentAssertions;
+using LantanaGroup.Automation.Generation;
+using LantanaGroup.Link.Automation.Link.Models;
+
+namespace UnitTests.AutomationUI;
+
+[Trait("Category", "UnitTests")]
+public class ScenarioConfigBuilderTests
+{
+    private static ResolvedRunOptions OptionsWith(
+        List<ProfiledMeasureType>? measures = null,
+        DateTimeOffset? start = null,
+        DateTimeOffset? end = null,
+        bool cleanupServiceData = false,
+        bool cleanupFhirData = true,
+        int polling = 3,
+        int maxPolling = 0,
+        int loki = 30)
+    {
+        return new ResolvedRunOptions(
+            PatientCount: 1,
+            ResourcesPerPatient: 1,
+            Seed: 1,
+            PollingIntervalSeconds: polling,
+            MaxPollingDurationMinutes: maxPolling,
+            LokiScrapeWindowMinutes: loki,
+            CleanupServiceData: cleanupServiceData,
+            CleanupFhirData: cleanupFhirData,
+            SelectedMeasures: measures ?? [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+            PatientProfiles: [],
+            PatientCohorts: [])
+        {
+            ReportPeriodStart = start,
+            ReportPeriodEnd = end,
+        };
+    }
+
+    [Theory]
+    [InlineData(AutomationScenarioKind.AdhocReportTest, "adhoc-report-submission.zip")]
+    [InlineData(AutomationScenarioKind.MultiPatientTest, "multi-patient-submission.zip")]
+    [InlineData(AutomationScenarioKind.MegaPatientTest, "mega-patient-submission.zip")]
+    [InlineData(AutomationScenarioKind.Custom, "custom-submission.zip")]
+    public void Download_filename_is_specific_to_each_scenario_kind(
+        AutomationScenarioKind scenario, string expected)
+    {
+        var config = ScenarioConfigBuilder.Build(scenario, OptionsWith());
+
+        config.DownloadFileName.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Unknown_scenario_kind_throws()
+    {
+        var act = () => ScenarioConfigBuilder.Build((AutomationScenarioKind)int.MaxValue, OptionsWith());
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void Bundle_locations_split_first_and_additional_for_multi_measure()
+    {
+        var measures = new List<ProfiledMeasureType>
+        {
+            ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
+            ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation,
+        };
+
+        var config = ScenarioConfigBuilder.Build(AutomationScenarioKind.Custom, OptionsWith(measures: measures));
+
+        config.MeasureBundleLocation.Should().Be(ProfiledMeasureCatalog.GetBundleLocation(measures[0]));
+        config.AdditionalMeasureBundleLocations.Should().ContainSingle()
+            .Which.Should().Be(ProfiledMeasureCatalog.GetBundleLocation(measures[1]));
+    }
+
+    [Fact]
+    public void Single_measure_produces_no_additional_bundle_locations()
+    {
+        var config = ScenarioConfigBuilder.Build(AutomationScenarioKind.Custom, OptionsWith());
+
+        config.AdditionalMeasureBundleLocations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Empty_measure_list_produces_empty_bundle_location()
+    {
+        var config = ScenarioConfigBuilder.Build(AutomationScenarioKind.Custom, OptionsWith(measures: []));
+
+        config.MeasureBundleLocation.Should().BeEmpty();
+        config.AdditionalMeasureBundleLocations.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Report_period_falls_back_to_2023_window_when_unset()
+    {
+        var config = ScenarioConfigBuilder.Build(AutomationScenarioKind.Custom, OptionsWith());
+
+        config.StartDate.Should().Be("2023-01-01T00:00:00Z");
+        config.EndDate.Should().Be("2023-12-31T23:59:59Z");
+    }
+
+    [Fact]
+    public void Report_period_uses_resolved_options_when_set()
+    {
+        var start = new DateTimeOffset(2024, 03, 01, 0, 0, 0, TimeSpan.Zero);
+        var end = new DateTimeOffset(2024, 03, 31, 23, 59, 59, TimeSpan.Zero);
+
+        var config = ScenarioConfigBuilder.Build(
+            AutomationScenarioKind.Custom,
+            OptionsWith(start: start, end: end));
+
+        config.StartDate.Should().Be("2024-03-01T00:00:00Z");
+        config.EndDate.Should().Be("2024-03-31T23:59:59Z");
+    }
+
+    [Fact]
+    public void Cleanup_polling_and_loki_window_pass_through_unchanged()
+    {
+        var config = ScenarioConfigBuilder.Build(
+            AutomationScenarioKind.Custom,
+            OptionsWith(cleanupServiceData: true, cleanupFhirData: false, polling: 7, maxPolling: 15, loki: 90));
+
+        config.CleanupServiceData.Should().BeTrue();
+        config.CleanupFhirData.Should().BeFalse();
+        config.PollingIntervalSeconds.Should().Be(7);
+        config.MaxPollingDurationMinutes.Should().Be(15);
+        config.LokiScrapeWindowMinutes.Should().Be(90);
+        config.PatientIds.Should().BeEmpty();
+    }
+}

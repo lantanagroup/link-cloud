@@ -31,10 +31,9 @@ public sealed class MultiMeasureTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
     private readonly IServiceProvider _sp;
     private readonly string _facilityId = $"MultiMeasure-{Guid.NewGuid():N}";
-    private List<(string Name, string Json)> _generatedBundles = [];
     private List<string> _expectedSubmittedPatientIds = [];
     private List<ProfiledMeasureType> _measures = [];
-    private List<PatientCohortDefinition> _cohorts = [];
+    private GenerationManifest? _generationManifest;
     private string? _reportId;
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
@@ -90,32 +89,21 @@ public sealed class MultiMeasureTest : IAsyncLifetime, IClassFixture<BackendE2ET
                     [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation] = MeasureEligibility.Qualifying,
                     [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation] = MeasureEligibility.NonQualifying
                 },
+                // Match the UI's MultiMeasureTest scenario (ScenarioSeedService): any ACH-qualifying
+                // scenario is permitted for this cohort. The MeasureEligibilities dict above tells
+                // the generator to suppress Hypo-qualifying resources (insulin, hypoglycemic obs)
+                // even when the chosen scenario could otherwise qualify for Hypo.
                 EligibleClinicalScenarioIds =
                 [
                     ..ClinicalScenarioEligibility.GetEligibleScenarioIds(
-                    [
-                        ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation,
-                        ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation
-                    ], MeasureEligibility.NonQualifying)
+                        [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation],
+                        MeasureEligibility.Qualifying)
                 ],
                 ResourcesPerPatientMin = 250,
                 ResourcesPerPatientMax = 250
             }
         };
-        _cohorts = cohorts;
-
-        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(
-            Output, measures, cohorts, "MultiMeasurePatient", GenerationSeed);
-
-        _generatedBundles = bundles;
-
-        if (Config.PatientIds.Count == 0)
-            Config.PatientIds = patientIds;
-
-        // Patient 1 qualifies for both ACH + Hypo (submitted for both).
-        // Patient 2 qualifies for ACH only (submitted for ACH, not Hypo).
-        // Both appear in the ABS submission because each qualifies for at least one measure.
-        _expectedSubmittedPatientIds = patientIds.ToList();
+        var profiles = PatientCohortDefinition.ExpandProfiles(cohorts, GenerationSeed);
 
         // Populate additional bundle locations for the Hypo measure
         Config.MeasureBundleLocation = ProfiledMeasureCatalog.GetBundleLocation(
@@ -126,10 +114,33 @@ public sealed class MultiMeasureTest : IAsyncLifetime, IClassFixture<BackendE2ET
                 ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation)
         ];
 
-        Output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds)}]");
-
         await FhirDataLoader.WaitForServerAsync(Output);
-        await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(Output, bundles);
+
+        var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
+            Output,
+            FhirDataLoader,
+            measures,
+            profiles,
+            totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
+            generationSeed: GenerationSeed,
+            acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
+            {
+                QueryPlan = QueryPlanBuilder.GetDefaultAsInput(),
+                ClinicalPeriodStart = Config.StartDate,
+                ClinicalPeriodEnd = Config.EndDate
+            });
+
+        _generationManifest = pipelineResult.Manifest;
+
+        if (Config.PatientIds.Count == 0)
+            Config.PatientIds = pipelineResult.PatientIds;
+
+        // Patient 1 qualifies for both ACH + Hypo (submitted for both).
+        // Patient 2 qualifies for ACH only (submitted for ACH, not Hypo).
+        // Both appear in the ABS submission because each qualifies for at least one measure.
+        _expectedSubmittedPatientIds = pipelineResult.PatientIds.ToList();
+
+        Output.WriteLine($"Patient IDs for test: [{string.Join(", ", Config.PatientIds)}]");
 
         var validationApi = _sp.GetRequiredService<ValidationApiHelper>();
         await validationApi.InitializeArtifactsAsync();
@@ -238,20 +249,12 @@ public sealed class MultiMeasureTest : IAsyncLifetime, IClassFixture<BackendE2ET
         // Flush stale cache from diagnostics polling so validators read authoritative data.
         dataReader.InvalidateCache();
 
-        // Build the concrete generation manifest from cohort/profile/bundle data.
-        var profiles = PatientCohortDefinition.ExpandProfiles(_cohorts, GenerationSeed);
-        var generationManifest = GenerationManifest.Build(
-            Config.PatientIds, _generatedBundles, profiles, _measures);
+        var generationManifest = _generationManifest
+            ?? throw new InvalidOperationException("Generation manifest was not produced by the pipeline.");
         generationManifest.MeasureIds = measureIds;
         var queryPlanInput = QueryPlanBuilder.GetDefaultAsInput();
         generationManifest.AcquiredResourceTypes = QueryPlanBuilder.GetAcquiredResourceTypes(queryPlanInput);
         generationManifest.ParameterQueryResourceTypes = QueryPlanBuilder.GetParameterQueryResourceTypes(queryPlanInput);
-        generationManifest.SimulatedAcquiredResourceKeysByPatient = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysByPatient(
-            Config.PatientIds,
-            _generatedBundles,
-            queryPlanInput,
-            Config.StartDate,
-            Config.EndDate);
         generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(_measures);
 
         await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
@@ -262,7 +265,7 @@ public sealed class MultiMeasureTest : IAsyncLifetime, IClassFixture<BackendE2ET
             Config.EndDate,
             _facilityId,
             reportId,
-            _generatedBundles,
+            generatedBundles: null,
             expectedManifestPatientListIds: Config.PatientIds,
             manifest: generationManifest);
 

@@ -15,12 +15,6 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Normalization
 {
-    [CollectionDefinition("NormalizationIntegrationTests")]
-    public class DatabaseCollection : ICollectionFixture<NormalizationIntegrationTestFixture>
-    {
-        // This class is a marker for the collection
-    }
-
     public class NormalizationIntegrationTestFixture : IDisposable
     {
         public IServiceProvider ServiceProvider { get; private set; }

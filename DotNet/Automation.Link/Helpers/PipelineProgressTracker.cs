@@ -98,7 +98,8 @@ public class PipelineProgressTracker
                 }
 
                 if (string.Equals(entry.ReportingStatus, "PassedValidation", StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(entry.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase))
+                    || string.Equals(entry.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(entry.ReportingStatus, "NotReportable", StringComparison.OrdinalIgnoreCase))
                 {
                     patientsValidated++;
                     completedUnits++;

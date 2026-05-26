@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.Census.Application.Models;
 using LantanaGroup.Link.Census.Application.Models.Enums;
-using LantanaGroup.Link.Census.Application.Models.Messages;
 using LantanaGroup.Link.Census.Application.Models.Payloads.Fhir.List;
 using LantanaGroup.Link.Census.Application.Services;
 using LantanaGroup.Link.Census.Domain.Context;
@@ -16,7 +15,9 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census;
 
-public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegrationTestFixture>
+[Collection("IntegrationTests")]
+[Trait("Category", "IntegrationTests")]
+public class PatientListProcessingWorkflowTests
 {
     private readonly CensusIntegrationTestFixture _fixture;
     private PatientListService _patientListService;
@@ -31,6 +32,17 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
     [Fact]
     public async Task LargeScalePatientList_ProcessingWorkflow_CreatesEventsAndEncountersCorrectly()
     {
+        // This is a "large scale" workflow test (10 facilities x 1000 patients).
+        // It now shares CensusIntegrationTestFixture with every other Census test, so
+        // by the time it runs the in-memory CensusContext has accumulated thousands of
+        // PatientEvents / PatientEncounters from earlier tests. EF InMemory has no
+        // indexes (every Where() is an O(N) scan) and the DbContext change tracker is
+        // O(N) per SaveChanges, so running this workflow against a "loaded" DB is
+        // catastrophically slower than running it against a fresh one (4+ minutes vs
+        // sub-minute). Reset the DB to give this test the same empty baseline it
+        // used to get from its old per-class IClassFixture.
+        await _fixture.ResetDatabaseAsync();
+
         var db = _fixture.ServiceProvider.GetRequiredService<CensusContext>();
         // Get required services for creating PatientListService
         var eventManager = _fixture.ServiceProvider.GetRequiredService<IPatientEventManager>();
@@ -73,6 +85,13 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
         int initialPatientEventCount = db.PatientEvents.ToList().Count;
         int initialPatientEncounterCount = db.PatientEncounters.ToList().Count;
 
+        // Snapshot a wall-clock cut-off BEFORE the Act phase. Filtering assertions
+        // against this timestamp scopes them down to rows this test created and is
+        // correct regardless of (a) how long ProcessPatientLists takes and
+        // (b) whatever rows the shared Census fixture's in-memory DB has accumulated
+        // from earlier tests in the same run.
+        var testStartedAt = DateTime.UtcNow;
+
         // Act - process all the lists
         var response =
             await ProcessPatientLists(_patientListService, facilityLists, CancellationToken.None);
@@ -103,13 +122,13 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
         // Verify admit events
         var admitEvents = db.PatientEvents
             .Where(e => e.EventType == EventType.FHIRListAdmit)
-            .Where(e => e.CreateDate > DateTime.UtcNow.AddMinutes(-2)) // Only check recent events
+            .Where(e => e.CreateDate >= testStartedAt) // Only this test's events
             .ToList();
 
         // Verify discharge events
         var dischargeEvents = db.PatientEvents
             .Where(e => e.EventType == EventType.FHIRListDischarge)
-            .Where(e => e.CreateDate > DateTime.UtcNow.AddMinutes(-2)) // Only check recent events
+            .Where(e => e.CreateDate >= testStartedAt) // Only this test's events
             .ToList();
 
         _output.WriteLine(
@@ -121,7 +140,7 @@ public class PatientListProcessingWorkflowTests : IClassFixture<CensusIntegratio
 
         // Verify patient encounters were created properly
         var patientEncounters = db.PatientEncounters
-            .Where(e => e.CreateDate > DateTime.UtcNow.AddMinutes(-2)) // Only check recent encounters
+            .Where(e => e.CreateDate >= testStartedAt) // Only this test's encounters
             .ToList();
 
         _output.WriteLine($"Patient encounters created: {patientEncounters.Count}");

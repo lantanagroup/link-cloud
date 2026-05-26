@@ -187,13 +187,17 @@ public class BackgroundDiagnosticsMonitor : IAsyncDisposable
 
         _milestoneOrchestrator.WriteSummary();
 
-        var kafkaMessage = _kafkaMonitor.HasErrors
-            ? $"{_kafkaMonitor.CapturedErrors.Count} Kafka error/retry message(s) detected during test"
+        // Scope the stop-time Kafka summary to errors keyed to THIS test's facility, so
+        // it lines up with what KafkaErrorProbe was actually counting during the run.
+        // Errors with a different key are noise from sibling tests on the shared stack.
+        var scopedKafkaErrorCount = _kafkaMonitor.GetErrorCountForFacility(_monitor.State.CorrelationId1);
+        var kafkaMessage = scopedKafkaErrorCount > 0
+            ? $"{scopedKafkaErrorCount} Kafka error/retry message(s) detected during test"
             : "No Kafka error messages detected";
 
         await PublishEventAsync(
             AutomationMonitorEventType.LogMessage,
-            _kafkaMonitor.HasErrors ? MonitorIssueSeverity.Warning : MonitorIssueSeverity.Info,
+            scopedKafkaErrorCount > 0 ? MonitorIssueSeverity.Warning : MonitorIssueSeverity.Info,
             "Kafka",
             kafkaMessage);
 

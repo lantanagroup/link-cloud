@@ -41,7 +41,8 @@ public static class ObservationFactory
         double normHigh,
         double critHigh,
         int seed,
-        List<string>? specimenIds = null)
+        List<string>? specimenIds = null,
+        string? organizationId = null)
     {
         var isLab = category == "laboratory";
         var periodEnd = effective.AddHours(1 + seed % 4);
@@ -73,7 +74,7 @@ public static class ObservationFactory
             Code = Loinc(loincCode, display),
             Subject = Ref($"Patient/{patientId}"),
             Encounter = Ref($"Encounter/{encounterId}"),
-            Performer = [Ref($"Organization/{FhirBundleGenerator.HospitalOrgId}", "General Test Hospital")]
+            Performer = [Ref($"Organization/{organizationId ?? FhirBundleGenerator.HospitalOrgId}", "General Test Hospital")]
         };
 
         if (isLab)

@@ -1,4 +1,4 @@
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -170,6 +170,8 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 throw new DeadLetterException($"Received message without correlation ID (ReportId = {reportId}, FacilityId = {facilityId}).");
             }
+
+            _logger.LogDebug("Consuming ValidationComplete (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId, value.PatientId, reportId);
 
             var correlationIdStr = Encoding.UTF8.GetString(headerValue);
             var reportEntry = await reportEntryManager.GetEntry(schedule.Id, value.PatientId, cancellationToken);

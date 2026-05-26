@@ -1,4 +1,4 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
@@ -8,19 +8,18 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
+using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -40,7 +39,7 @@ public interface IDataAcquisitionLogManager
     Task<int> RestoreByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default);
     Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId(List<long> logIds, string facilityId, string correlationId, string reportTrackingId, CancellationToken cancellationToken = default);
     Task ThrottleFacilityAcquisitions(string facilityId, DateTime executionDate, CancellationToken cancellationToken = default);
-    Task<bool> TrySetLogStatusAsync(long logId, List<RequestStatus> validCurrentStatuses, RequestStatus newStatus, CancellationToken cancellationToken = default);
+    Task<bool> TrySetLogStatusAsync(long logId, List<RequestStatus> validCurrentStatuses, RequestStatus newStatus, string? note = null, CancellationToken cancellationToken = default);
     Task<bool> TrySetLogToQueuedAsync(long logId, CancellationToken cancellationToken);
     Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
     Task<int> ResetStalledProcessingLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default);
@@ -68,13 +67,15 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     public readonly IDatabase _database;
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly IDataAcquisitionLogQueries _logQueries;
+    private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
 
-    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext, IDataAcquisitionLogQueries logQueries)
+    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext, IDataAcquisitionLogQueries logQueries, IDistributedSemaphoreProvider distributedSemaphoreProvider)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logQueries = logQueries;
+        _distributedSemaphoreProvider = distributedSemaphoreProvider ?? throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
     }
 
     public async Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel model, CancellationToken cancellationToken = default)
@@ -106,12 +107,12 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             Status = model.Status,
             FacilityId = model.FacilityId,
             QueryPhase = model.QueryPhase,
+            ReferenceResourceType = model.ReferenceResourceType,
             FhirVersion = model.FhirVersion,
             QueryType = model.QueryType,
             FhirQueries = model.FhirQuery.Select(q => new FhirQuery
             {
                 FacilityId = model.FacilityId,
-                IdQueryParameterValues = q.IdQueryParameterValues,
                 IsReference = q.IsReference,
                 MeasureId = q.MeasureId,
                 QueryParameters = q.QueryParameters,
@@ -427,16 +428,19 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.CancelBulkAsync");
 
         var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
-        var minAgeCutoff = DateTime.UtcNow.AddHours(-minAgeHours);
 
         var cancelledCount = 0;
         foreach (var batch in ids.Chunk(DataAcquisitionConstants.DatabaseSettings.MaxBulkIds))
         {
-            cancelledCount += await _dbContext.DataAcquisitionLogs
+            var query = _dbContext.DataAcquisitionLogs
                 .Where(l => batch.Contains(l.Id)
                     && l.Status != null
-                    && !terminalStatuses.Contains(l.Status.Value)
-                    && l.CreateDate <= minAgeCutoff)
+                    && !terminalStatuses.Contains(l.Status.Value));
+
+            if (minAgeHours > 0)
+                query = query.Where(l => l.CreateDate <= DateTime.UtcNow.AddHours(-minAgeHours));
+
+            cancelledCount += await query
                 .ExecuteUpdateAsync(setters => setters
                     .SetProperty(l => l.Status, RequestStatus.Cancelled)
                     .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
@@ -451,7 +455,6 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.CancelByFilterAsync");
 
         var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
-        var minAgeCutoff = DateTime.UtcNow.AddHours(-minAgeHours);
 
         var query = _dbContext.DataAcquisitionLogs.AsQueryable();
 
@@ -504,9 +507,13 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         var requested = await query.CountAsync(cancellationToken);
 
         // Get IDs of logs eligible for cancellation
-        var eligibleIds = await query.Where(l => l.Status != null
-            && !terminalStatuses.Contains(l.Status.Value)
-            && l.CreateDate <= minAgeCutoff)
+        var eligibleQuery = query.Where(l => l.Status != null
+            && !terminalStatuses.Contains(l.Status.Value));
+
+        if (minAgeHours > 0)
+            eligibleQuery = eligibleQuery.Where(l => l.CreateDate <= DateTime.UtcNow.AddHours(-minAgeHours));
+
+        var eligibleIds = await eligibleQuery
             .Select(l => l.Id)
             .ToListAsync(cancellationToken);
 
@@ -591,6 +598,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
     public async Task<bool> TrySetLogStatusAsync(long logId, List<RequestStatus> validCurrentStatuses,
         RequestStatus newStatus,
+        string? note = null,
         CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.TrySetLogStatusAsync");
@@ -603,13 +611,24 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                     .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
                 cancellationToken);
 
+        if (rowsAffected > 0 && !string.IsNullOrWhiteSpace(note))
+        {
+            _dbContext.DataAcquisitionLogNotes.Add(new DataAcquisitionLogNote
+            {
+                DataAcquisitionLogId = logId,
+                Note = note,
+                CreateDate = DateTime.UtcNow
+            });
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
         return rowsAffected > 0;
     }
 
     public async Task<bool> TrySetLogToQueuedAsync(long logId, CancellationToken cancellationToken)
     {
         return await TrySetLogStatusAsync(logId, [RequestStatus.Ready, RequestStatus.Pending], RequestStatus.Queued,
-            cancellationToken);
+            cancellationToken: cancellationToken);
     }
 
     public async Task<int> FailStalledQueuedLogsAsync(int stallMinutes, int maxBatches = 20, CancellationToken cancellationToken = default)
@@ -733,11 +752,25 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
 
-        return await _dbContext.DataAcquisitionLogs
+        // SELECT the target IDs in ascending PK order first, then UPDATE by PK.
+        // A broad WHERE-clause UPDATE acquires row/page locks in query-plan order (non-deterministic),
+        // which can deadlock against any other concurrent UPDATE that touches overlapping pages.
+        // Fetching IDs ordered by PK and then updating by PK ensures every caller acquires
+        // locks in the same ascending order, eliminating the lock-ordering inversion that
+        // causes deadlocks regardless of which other operation is running concurrently.
+        var logIds = await _dbContext.DataAcquisitionLogs
             .Where(l => l.FacilityId == facilityId
                 && l.CorrelationId == correlationId
                 && l.QueryPhase == queryPhase
                 && l.SiblingCount == null)
+            .OrderBy(l => l.Id)
+            .Select(l => l.Id)
+            .ToListAsync(cancellationToken);
+
+        if (logIds.Count == 0) return 0;
+
+        return await _dbContext.DataAcquisitionLogs
+            .Where(l => logIds.Contains(l.Id) && l.SiblingCount == null)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(l => l.SiblingCount, siblingCount)
                 .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
@@ -749,7 +782,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.TryCompleteTailAsync");
         activity?.SetTag(DiagnosticNames.ReportId, completedLogId);
 
-        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.ConfigurationMissing };
+        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled, RequestStatus.ConfigurationMissing };
 
         // Load group identity for the completed log (PK lookup)
         var groupInfo = await _dbContext.DataAcquisitionLogs.AsNoTracking()
@@ -773,7 +806,36 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             return null;
         }
 
-        // Count terminal siblings. 
+        // Acquire a per-group mutex so at most one worker evaluates tail completion
+        // at a time for a given (FacilityId, CorrelationId, QueryPhase) group.
+        // This prevents redundant competing COUNT + UPDATE calls from concurrent workers.
+        var lockKey = $"da:tail:{groupInfo.FacilityId}:{groupInfo.CorrelationId}:{groupInfo.QueryPhase}";
+        var semaphore = _distributedSemaphoreProvider.CreateSemaphore(lockKey, maxCount: 1);
+        await using var handle = await semaphore.TryAcquireAsync(TimeSpan.FromSeconds(30), cancellationToken);
+        if (handle == null)
+        {
+            // Another worker is already evaluating this group's tail.
+            // TailMessageRecoveryJob will cover any missed tail.
+            return null;
+        }
+
+        // Tail threshold is derived from the live count of stamped siblings rather
+        // than the SiblingCount value on any single row. Same-phase reference logs
+        // are added mid-flow and stamp ONLY their own row (single-row UPDATE) to
+        // avoid deadlocking with this method's wide TailSent UPDATE; that means a
+        // single row's SiblingCount can lag behind the true group size, but the
+        // count of stamped rows is always authoritative.
+        var stampedSiblingCount = await _dbContext.DataAcquisitionLogs.AsNoTracking()
+            .CountAsync(l =>
+                l.SiblingCount != null
+                && l.CorrelationId != null
+                && l.QueryPhase != null
+                && l.FacilityId == groupInfo.FacilityId
+                && l.CorrelationId == groupInfo.CorrelationId
+                && l.QueryPhase == groupInfo.QueryPhase,
+                cancellationToken);
+
+        // Count terminal siblings.
         var terminalCount = await _dbContext.DataAcquisitionLogs.AsNoTracking()
             .CountAsync(l =>
                 !l.TailSent
@@ -787,7 +849,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
                 && terminalStatuses.Contains(l.Status.Value),
                 cancellationToken);
 
-        if (terminalCount < groupInfo.SiblingCount)
+        if (terminalCount < stampedSiblingCount)
         {
             return null;
         }
@@ -848,7 +910,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             {
                 AcquisitionComplete = true,
                 PatientId = representative.PatientId ?? string.Empty,
-                QueryType = groupInfo.QueryPhase.ToString()!,
+                QueryType = QueryPhaseUtilities.ToWireQueryType(groupInfo.QueryPhase),
                 ReportableEvent = representative.ReportableEvent ?? default,
                 ScheduledReports = representative.ScheduledReport != null
                     ? new List<ScheduledReport> { representative.ScheduledReport }

@@ -2,15 +2,15 @@
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
-using LantanaGroup.Link.Report.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report.Managers;
 
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class ReportEntryManagerAreAllEntriesCompleteTests : IClassFixture<ReportIntegrationTestFixture>
+public class ReportEntryManagerAreAllEntriesCompleteTests
 {
     private readonly IServiceScopeFactory _scopeFactory;
 

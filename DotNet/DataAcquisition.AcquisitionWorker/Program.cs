@@ -21,12 +21,9 @@ using System.Reflection;
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
 
+builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, configureRedis: true);
+
 var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
-
-// Determine if secret manager should be enabled based on configuration
-var secretManagerEnabled = builder.Configuration.GetValue<bool>("SecretManagement:Enabled");
-
-builder.RegisterAll(DataAcquisitionWorkerConstants.ServiceName, configureRedis: true, configureSecretManager: secretManagerEnabled);
 
 builder.Services.AddTransient<SftpAcquisitionHandler>();
 

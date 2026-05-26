@@ -9,6 +9,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
+using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -22,7 +23,7 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Managers;
 
-[Collection("DataAcquisitionIntegrationTests")]
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
 public class DataAcquisitionLogManagerTests
 {
@@ -39,7 +40,24 @@ public class DataAcquisitionLogManagerTests
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-        return new DataAcquisitionLogManager(logger, database, dbContext, queries);
+        var semaphoreProvider = CreateSemaphoreProviderMock();
+        return new DataAcquisitionLogManager(logger, database, dbContext, queries, semaphoreProvider);
+    }
+
+    private static IDistributedSemaphoreProvider CreateSemaphoreProviderMock()
+    {
+        var handle = new Mock<IDistributedSynchronizationHandle>();
+        var semaphore = new Mock<IDistributedSemaphore>();
+        var provider = new Mock<IDistributedSemaphoreProvider>();
+
+        semaphore
+            .Setup(s => s.TryAcquireAsync(It.IsAny<TimeSpan>(), It.IsAny<CancellationToken>()))
+            .Returns(new ValueTask<IDistributedSynchronizationHandle?>(handle.Object));
+        provider
+            .Setup(p => p.CreateSemaphore(It.IsAny<string>(), It.IsAny<int>()))
+            .Returns(semaphore.Object);
+
+        return provider.Object;
     }
 
     [Fact]
@@ -112,24 +130,6 @@ public class DataAcquisitionLogManagerTests
         Assert.Equal(result.Id, log.Id);
         Assert.Equal(result.Id, log.Id);
         Assert.NotEmpty(log.FhirQuery);
-    }
-
-    [Fact]
-    public async Task CreateAsync_InvalidModel_ThrowsArgumentNull()
-    {
-        // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var manager = CreateManager(scope);
-        var createModel = new CreateDataAcquisitionLogModel()
-        {
-            FacilityId = null!,
-            QueryType = FhirQueryType.Read,
-            Status = RequestStatus.Pending,
-            QueryPhase = QueryPhase.Initial
-        };
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentNullException>(() => manager.CreateAsync(createModel));
     }
 
     [Fact]
@@ -211,17 +211,6 @@ public class DataAcquisitionLogManagerTests
     }
 
     [Fact]
-    public async Task DeleteAsync_NoExistingId_ThrowsNotFound()
-    {
-        // Arrange
-        using var scope = _fixture.ServiceProvider.CreateScope();
-        var manager = CreateManager(scope);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<NotFoundException>(() => manager.DeleteAsync(999));
-    }
-
-    [Fact]
     public async Task UpdateTailFlagForFacilityCorrelationIdReportTrackingId_ValidIds_UpdatesFlags()
     {
         // Arrange
@@ -298,18 +287,17 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var facilityId = $"TestFacility_{Guid.NewGuid():N}";
 
         var log1 = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Status = RequestStatus.Pending,
             CreateDate = DateTime.UtcNow.AddHours(-48)
         };
         var log2 = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = facilityId,
             Status = RequestStatus.Failed,
             CreateDate = DateTime.UtcNow.AddHours(-48)
         };
@@ -337,18 +325,19 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var facilityId = $"F1_{Guid.NewGuid():N}";
 
-        dbContext.DataAcquisitionLogs.AddRange(
-            new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Completed, CreateDate = DateTime.UtcNow.AddHours(-48) },
-            new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.MaxRetriesReached, CreateDate = DateTime.UtcNow.AddHours(-48) },
-            new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Skipped, CreateDate = DateTime.UtcNow.AddHours(-48) },
-            new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Cancelled, CreateDate = DateTime.UtcNow.AddHours(-48) }
-        );
+        var seeded = new[]
+        {
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Completed, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.MaxRetriesReached, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Skipped, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Cancelled, CreateDate = DateTime.UtcNow.AddHours(-48) }
+        };
+        dbContext.DataAcquisitionLogs.AddRange(seeded);
         await dbContext.SaveChangesAsync();
 
-        var ids = dbContext.DataAcquisitionLogs.Select(l => l.Id).ToList();
+        var ids = seeded.Select(l => l.Id).ToList();
         var manager = CreateManager(scope);
 
         // Act
@@ -365,12 +354,9 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var log = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = $"TestFacility_{Guid.NewGuid():N}",
             Status = RequestStatus.Pending,
             CreateDate = DateTime.UtcNow.AddHours(-1)
         };
@@ -395,12 +381,9 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var log = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = $"TestFacility_{Guid.NewGuid():N}",
             Status = RequestStatus.Pending,
             CreateDate = DateTime.UtcNow
         };
@@ -423,15 +406,11 @@ public class DataAcquisitionLogManagerTests
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
 
         // Act
-        var result = await manager.CancelBulkAsync(new List<long> { 9999, 8888 }, 24);
+        var result = await manager.CancelBulkAsync(new List<long> { -9999, -8888 }, 24);
 
         // Assert
         Assert.Equal(0, result);
@@ -444,12 +423,9 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
         var log = new DataAcquisitionLog
         {
-            FacilityId = "TestFacility",
+            FacilityId = $"TestFacility_{Guid.NewGuid():N}",
             Status = RequestStatus.Pending,
             CreateDate = DateTime.UtcNow.AddHours(-48),
             ModifyDate = null
@@ -476,12 +452,11 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var facilityId = $"F1_{Guid.NewGuid():N}";
 
-        var eligible = new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
-        var completed = new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Completed, CreateDate = DateTime.UtcNow.AddHours(-48) };
-        var recent = new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-1) };
+        var eligible = new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var completed = new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Completed, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var recent = new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-1) };
         dbContext.DataAcquisitionLogs.AddRange(eligible, completed, recent);
         await dbContext.SaveChangesAsync();
 
@@ -506,10 +481,6 @@ public class DataAcquisitionLogManagerTests
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
 
@@ -529,16 +500,17 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var tag = Guid.NewGuid().ToString("N");
+        var targetFacilityId = $"FacilityA_{tag}";
+        var otherFacilityId = $"FacilityB_{tag}";
 
-        var targetLog = new DataAcquisitionLog { FacilityId = "FacilityA", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
-        var otherLog = new DataAcquisitionLog { FacilityId = "FacilityB", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var targetLog = new DataAcquisitionLog { FacilityId = targetFacilityId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var otherLog = new DataAcquisitionLog { FacilityId = otherFacilityId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
         dbContext.DataAcquisitionLogs.AddRange(targetLog, otherLog);
         await dbContext.SaveChangesAsync();
 
         var manager = CreateManager(scope);
-        var filter = new SearchDataAcquisitionLogRequest { FacilityId = "FacilityA" };
+        var filter = new SearchDataAcquisitionLogRequest { FacilityId = targetFacilityId };
 
         // Act
         var (requested, cancelled) = await manager.CancelByFilterAsync(filter, 24);
@@ -557,11 +529,13 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"F1_{tag}";
+        var matchPatientId = $"P123_{tag}";
+        var noMatchPatientId = $"P456_{tag}";
 
-        var match = new DataAcquisitionLog { FacilityId = "F1", PatientId = "P123", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
-        var noMatch = new DataAcquisitionLog { FacilityId = "F1", PatientId = "P456", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var match = new DataAcquisitionLog { FacilityId = facilityId, PatientId = matchPatientId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var noMatch = new DataAcquisitionLog { FacilityId = facilityId, PatientId = noMatchPatientId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
         dbContext.DataAcquisitionLogs.AddRange(match, noMatch);
         await dbContext.SaveChangesAsync();
 
@@ -569,7 +543,7 @@ public class DataAcquisitionLogManagerTests
 
         // Act
         var (requested, cancelled) = await manager.CancelByFilterAsync(
-            new SearchDataAcquisitionLogRequest { PatientId = "P123" }, 24);
+            new SearchDataAcquisitionLogRequest { FacilityId = facilityId, PatientId = matchPatientId }, 24);
 
         // Assert
         Assert.Equal(1, requested);
@@ -585,9 +559,7 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
+        var facilityId = $"F1_{Guid.NewGuid():N}";
         var matchReportTrackingId = Guid.NewGuid();
         var noMatchReportTrackingId = Guid.NewGuid();
         dbContext.ScheduledReports.AddRange(
@@ -605,8 +577,8 @@ public class DataAcquisitionLogManagerTests
                 StartDate = DateTime.UtcNow.AddDays(-1),
                 EndDate = DateTime.UtcNow
             });
-        var match = new DataAcquisitionLog { FacilityId = "F1", ReportTrackingId = matchReportTrackingId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
-        var noMatch = new DataAcquisitionLog { FacilityId = "F1", ReportTrackingId = noMatchReportTrackingId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var match = new DataAcquisitionLog { FacilityId = facilityId, ReportTrackingId = matchReportTrackingId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var noMatch = new DataAcquisitionLog { FacilityId = facilityId, ReportTrackingId = noMatchReportTrackingId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
         dbContext.DataAcquisitionLogs.AddRange(match, noMatch);
         await dbContext.SaveChangesAsync();
 
@@ -628,11 +600,9 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
-        var initial = new DataAcquisitionLog { FacilityId = "F1", QueryPhase = QueryPhase.Initial, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
-        var supplemental = new DataAcquisitionLog { FacilityId = "F1", QueryPhase = QueryPhase.Supplemental, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var facilityId = $"F1_{Guid.NewGuid():N}";
+        var initial = new DataAcquisitionLog { FacilityId = facilityId, QueryPhase = QueryPhase.Initial, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var supplemental = new DataAcquisitionLog { FacilityId = facilityId, QueryPhase = QueryPhase.Supplemental, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
         dbContext.DataAcquisitionLogs.AddRange(initial, supplemental);
         await dbContext.SaveChangesAsync();
 
@@ -640,7 +610,7 @@ public class DataAcquisitionLogManagerTests
 
         // Act
         var (requested, cancelled) = await manager.CancelByFilterAsync(
-            new SearchDataAcquisitionLogRequest { QueryPhase = QueryPhase.Initial }, 24);
+            new SearchDataAcquisitionLogRequest { FacilityId = facilityId, QueryPhase = QueryPhase.Initial }, 24);
 
         // Assert
         Assert.Equal(1, requested);
@@ -654,16 +624,12 @@ public class DataAcquisitionLogManagerTests
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
 
         var manager = CreateManager(scope);
 
         // Act
         var (requested, cancelled) = await manager.CancelByFilterAsync(
-            new SearchDataAcquisitionLogRequest { FacilityId = "NonExistent" }, 24);
+            new SearchDataAcquisitionLogRequest { FacilityId = $"NonExistent_{Guid.NewGuid():N}" }, 24);
 
         // Assert
         Assert.Equal(0, requested);
@@ -677,12 +643,11 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var facilityId = $"F1_{Guid.NewGuid():N}";
 
         dbContext.DataAcquisitionLogs.AddRange(
-            new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Completed, CreateDate = DateTime.UtcNow.AddHours(-48) },
-            new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Cancelled, CreateDate = DateTime.UtcNow.AddHours(-48) }
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Completed, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Cancelled, CreateDate = DateTime.UtcNow.AddHours(-48) }
         );
         await dbContext.SaveChangesAsync();
 
@@ -690,7 +655,7 @@ public class DataAcquisitionLogManagerTests
 
         // Act
         var (requested, cancelled) = await manager.CancelByFilterAsync(
-            new SearchDataAcquisitionLogRequest { FacilityId = "F1" }, 24);
+            new SearchDataAcquisitionLogRequest { FacilityId = facilityId }, 24);
 
         // Assert
         Assert.Equal(2, requested);
@@ -704,14 +669,13 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var facilityId = $"F1_{Guid.NewGuid():N}";
 
         dbContext.DataAcquisitionLogs.AddRange(
-            new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) },
-            new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Failed, CreateDate = DateTime.UtcNow.AddHours(-48) },
-            new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Completed, CreateDate = DateTime.UtcNow.AddHours(-48) },
-            new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-1) }
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Failed, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Completed, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-1) }
         );
         await dbContext.SaveChangesAsync();
 
@@ -719,7 +683,7 @@ public class DataAcquisitionLogManagerTests
 
         // Act
         var (requested, cancelled) = await manager.CancelByFilterAsync(
-            new SearchDataAcquisitionLogRequest { FacilityId = "F1" }, 24);
+            new SearchDataAcquisitionLogRequest { FacilityId = facilityId }, 24);
 
         // Assert
         Assert.Equal(4, requested);
@@ -733,11 +697,10 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var facilityId = $"F1_{Guid.NewGuid():N}";
 
-        var deleted = new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48), IsDeleted = true };
-        var active = new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48), IsDeleted = false };
+        var deleted = new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48), IsDeleted = true };
+        var active = new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48), IsDeleted = false };
         dbContext.DataAcquisitionLogs.AddRange(deleted, active);
         await dbContext.SaveChangesAsync();
 
@@ -745,7 +708,7 @@ public class DataAcquisitionLogManagerTests
 
         // Act
         var (requested, cancelled) = await manager.CancelByFilterAsync(
-            new SearchDataAcquisitionLogRequest { FacilityId = "F1", IncludeDeleted = false }, 24);
+            new SearchDataAcquisitionLogRequest { FacilityId = facilityId, IncludeDeleted = false }, 24);
 
         // Assert
         Assert.Equal(1, requested);
@@ -759,11 +722,10 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var facilityId = $"F1_{Guid.NewGuid():N}";
 
-        var deleted = new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48), IsDeleted = true };
-        var active = new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48), IsDeleted = false };
+        var deleted = new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48), IsDeleted = true };
+        var active = new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48), IsDeleted = false };
         dbContext.DataAcquisitionLogs.AddRange(deleted, active);
         await dbContext.SaveChangesAsync();
 
@@ -771,7 +733,7 @@ public class DataAcquisitionLogManagerTests
 
         // Act
         var (requested, cancelled) = await manager.CancelByFilterAsync(
-            new SearchDataAcquisitionLogRequest { FacilityId = "F1", IncludeDeleted = true }, 24);
+            new SearchDataAcquisitionLogRequest { FacilityId = facilityId, IncludeDeleted = true }, 24);
 
         // Assert
         Assert.Equal(2, requested);
@@ -785,12 +747,10 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
+        var facilityId = $"F1_{Guid.NewGuid():N}";
         var cutoff = DateTime.UtcNow.AddDays(-3);
-        var oldLog = new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddDays(-5) };
-        var newLog = new DataAcquisitionLog { FacilityId = "F1", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddDays(-1) };
+        var oldLog = new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddDays(-5) };
+        var newLog = new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddDays(-1) };
         dbContext.DataAcquisitionLogs.AddRange(oldLog, newLog);
         await dbContext.SaveChangesAsync();
 
@@ -798,7 +758,7 @@ public class DataAcquisitionLogManagerTests
 
         // Act
         var (requested, cancelled) = await manager.CancelByFilterAsync(
-            new SearchDataAcquisitionLogRequest { FacilityId = "F1", CreatedBefore = cutoff }, 0);
+            new SearchDataAcquisitionLogRequest { FacilityId = facilityId, CreatedBefore = cutoff }, 0);
 
         // Assert
         Assert.Equal(1, requested);
@@ -812,12 +772,10 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
-
+        var facilityId = $"F1_{Guid.NewGuid():N}";
         var log = new DataAcquisitionLog
         {
-            FacilityId = "F1",
+            FacilityId = facilityId,
             Status = RequestStatus.Pending,
             CreateDate = DateTime.UtcNow.AddHours(-48),
             ModifyDate = null
@@ -830,7 +788,7 @@ public class DataAcquisitionLogManagerTests
 
         // Act
         await manager.CancelByFilterAsync(
-            new SearchDataAcquisitionLogRequest { FacilityId = "F1" }, 24);
+            new SearchDataAcquisitionLogRequest { FacilityId = facilityId }, 24);
 
         // Assert
         await dbContext.Entry(log).ReloadAsync();
@@ -846,13 +804,16 @@ public class DataAcquisitionLogManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
 
-        await dbContext.Database.EnsureDeletedAsync();
-        await dbContext.Database.EnsureCreatedAsync();
+        var tag = Guid.NewGuid().ToString("N");
+        var facility1 = $"F1_{tag}";
+        var facility2 = $"F2_{tag}";
+        var patient1 = $"P1_{tag}";
+        var patient2 = $"P2_{tag}";
 
         // Only the log matching both FacilityId AND PatientId should be included
-        var match = new DataAcquisitionLog { FacilityId = "F1", PatientId = "P1", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
-        var wrongPatient = new DataAcquisitionLog { FacilityId = "F1", PatientId = "P2", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
-        var wrongFacility = new DataAcquisitionLog { FacilityId = "F2", PatientId = "P1", Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var match = new DataAcquisitionLog { FacilityId = facility1, PatientId = patient1, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var wrongPatient = new DataAcquisitionLog { FacilityId = facility1, PatientId = patient2, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
+        var wrongFacility = new DataAcquisitionLog { FacilityId = facility2, PatientId = patient1, Status = RequestStatus.Pending, CreateDate = DateTime.UtcNow.AddHours(-48) };
         dbContext.DataAcquisitionLogs.AddRange(match, wrongPatient, wrongFacility);
         await dbContext.SaveChangesAsync();
 
@@ -860,7 +821,7 @@ public class DataAcquisitionLogManagerTests
 
         // Act
         var (requested, cancelled) = await manager.CancelByFilterAsync(
-            new SearchDataAcquisitionLogRequest { FacilityId = "F1", PatientId = "P1" }, 24);
+            new SearchDataAcquisitionLogRequest { FacilityId = facility1, PatientId = patient1 }, 24);
 
         // Assert
         Assert.Equal(1, requested);

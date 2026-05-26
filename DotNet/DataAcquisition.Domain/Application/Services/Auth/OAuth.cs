@@ -1,7 +1,8 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
@@ -14,15 +15,18 @@ public class OAuth : IAuth
     private readonly HttpClient _httpClient;
     private readonly ILogger<OAuth> _logger;
     private readonly ICacheService _cacheService;
+    private readonly ISecretManager _secretManager;
 
     public OAuth(
         HttpClient httpClient,
         ILogger<OAuth> logger,
-        ICacheService cacheService)
+        ICacheService cacheService,
+        ISecretManager secretManager)
     {
         _httpClient = httpClient;
         _logger = logger;
         _cacheService = cacheService;
+        _secretManager = secretManager;
     }
 
     public async Task<(bool isQueryParam, object authHeaderValue)> SetAuthentication(string facilityId, AuthenticationConfigurationModel authSettings)
@@ -34,11 +38,22 @@ public class OAuth : IAuth
 
         try
         {
-            var credentials = Convert.ToBase64String(
-                System.Text.Encoding.UTF8.GetBytes($"{authSettings.ClientId}:{authSettings.ClientSecret}"));
+            if (string.IsNullOrWhiteSpace(authSettings.ClientId))
+                throw new ArgumentException("A secret name for ClientId must be provided for OAuth authentication.");
+            if (string.IsNullOrWhiteSpace(authSettings.ClientSecret))
+                throw new ArgumentException("A secret name for ClientSecret must be provided for OAuth authentication.");
+
+            var clientId = await _secretManager.GetSecretAsync(authSettings.ClientId, CancellationToken.None);
+            var clientSecret = await _secretManager.GetSecretAsync(authSettings.ClientSecret, CancellationToken.None);
+
+            if (string.IsNullOrWhiteSpace(clientId))
+                throw new InvalidOperationException($"No value found in secret manager for ClientId");
+            if (string.IsNullOrWhiteSpace(clientSecret))
+                throw new InvalidOperationException($"No value found in secret manager for ClientSecret");
 
             var request = new HttpRequestMessage(HttpMethod.Post, authSettings.TokenUrl);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Basic",
+                Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}")));
 
             var parameters = new Dictionary<string, string>
             {
@@ -67,9 +82,9 @@ public class OAuth : IAuth
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException)
         {
-            _logger.LogError(ex, "Error acquiring OAuth access token for facility {FacilityId}", facilityId.SanitizeUntrustedString());
+            _logger.LogError(ex, "Error acquiring OAuth access token for facility {FacilityId}", facilityId.SanitizeForLog());
         }
 
         return (false, null);

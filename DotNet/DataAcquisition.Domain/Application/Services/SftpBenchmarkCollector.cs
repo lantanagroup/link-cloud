@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;

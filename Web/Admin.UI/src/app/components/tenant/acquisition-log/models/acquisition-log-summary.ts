@@ -17,6 +17,7 @@ export interface AcquisitionLogSummary {
     status: string;
     reportTrackingId?: string | null;
     reportIds: string[];
+    traceId?: string;
     isDeleted: boolean;
 }
 

@@ -43,12 +43,9 @@ app.Run();
 
 static void RegisterServices(WebApplicationBuilder builder)
 {
+    builder.RegisterAll(DataAcquisitionConstants.ServiceName, configureRedis: true);
+
     var consumerSettings = builder.Configuration.GetRequiredSection(nameof(ConsumerSettings)).Get<ConsumerSettings>();
-
-    // Determine if secret manager should be enabled based on configuration
-    var secretManagerEnabled = builder.Configuration.GetValue<bool>("SecretManagement:Enabled");
-
-    builder.RegisterAll(DataAcquisitionConstants.ServiceName, configureRedis: true, configureSecretManager: secretManagerEnabled);
 
     // Add Data Protection
     builder.Services.AddDataProtection()

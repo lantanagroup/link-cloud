@@ -1,7 +1,8 @@
-using DataAcquisition.Domain.Application.Models;
+﻿using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Interfaces.Services;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -24,15 +25,20 @@ public class OAuthTests
 
     private readonly Mock<ILogger<OAuth>> _mockLogger;
     private readonly Mock<ICacheService> _mockCacheService;
+    private readonly Mock<ISecretManager> _mockSecretManager;
 
     public OAuthTests()
     {
         _mockLogger = new Mock<ILogger<OAuth>>();
         _mockCacheService = new Mock<ICacheService>();
+        _mockSecretManager = new Mock<ISecretManager>();
+        _mockSecretManager
+            .Setup(x => x.GetSecretAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string name, CancellationToken _) => name);
     }
 
     private OAuth BuildSut(HttpMessageHandler handler) =>
-        new(new HttpClient(handler), _mockLogger.Object, _mockCacheService.Object);
+        new(new HttpClient(handler), _mockLogger.Object, _mockCacheService.Object, _mockSecretManager.Object);
 
     private static AuthenticationConfigurationModel BuildAuthSettings(string? scope = null) => new()
     {

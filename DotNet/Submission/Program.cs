@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Shared.Application.Error.Handlers;
@@ -154,8 +154,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     //Add persistence interceptors
     builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
     builder.Services.AddSingleton<PathNamingService>();
-
-    builder.Services.AddSingleton<ReportClient>();
 
     // Add kafka producers
     builder.Services.AddTransient<PayloadSubmittedProducer>();

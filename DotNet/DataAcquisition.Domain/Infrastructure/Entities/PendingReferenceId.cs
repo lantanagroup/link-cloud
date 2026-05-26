@@ -1,46 +1,62 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using IndexAttribute = Microsoft.EntityFrameworkCore.IndexAttribute;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
 /// <summary>
-/// Staging table for reference resource IDs discovered during concurrent patient processing.
-/// Each row represents a single reference ID found by one patient worker.
-/// This eliminates the write-hot-row contention on the shared FhirQuery.QueryParameters column
-/// that previously caused deadlocks and timeouts under high concurrency.
+/// Durable per-log bag of discovered reference resource IDs.
 ///
-/// When the reference log is ready to execute, all pending IDs for its FhirQuery are
-/// collected in a single read and merged into the FhirQuery.QueryParameters at that point.
+/// A single same-phase reference <see cref="DataAcquisitionLog"/> is created per
+/// <c>(FacilityId, CorrelationId, QueryPhase, ResourceType)</c>. As primary logs
+/// discover references, their ids are appended here against that one log. The normal
+/// pending-log workflow later executes the reference log once all non-reference logs in
+/// the phase are terminal.
 /// </summary>
 [Table("PendingReferenceIds")]
+[Index(nameof(DataAcquisitionLogId), nameof(ResourceId),
+       IsUnique = true, Name = "UX_PendingReferenceIds_Log_ResourceId")]
+[Index(nameof(DataAcquisitionLogId), Name = "IX_PendingReferenceIds_DataAcquisitionLogId")]
 public class PendingReferenceId
 {
     [Key]
     public long Id { get; set; }
 
-    /// <summary>
-    /// The FhirQuery (reference log's query) that these IDs will be merged into.
-    /// </summary>
-    [Required]
-    public Guid FhirQueryId { get; set; }
-
-    [ForeignKey(nameof(FhirQueryId))]
-    public virtual FhirQuery FhirQuery { get; set; } = null!;
+    public long DataAcquisitionLogId { get; set; }
 
     /// <summary>
-    /// The reference resource ID (e.g. "Location/Gen-Location-ICU", "Medication/med-123").
-    /// Stored as the bare ID without the resource type prefix.
+    /// Facility that owns this pending reference.
     /// </summary>
     [Required]
     [MaxLength(256)]
-    public string ResourceId { get; set; } = string.Empty;
+    public string FacilityId { get; set; } = string.Empty;
 
     /// <summary>
-    /// The resource type (e.g. "Location", "Medication") for efficient grouping.
+    /// Correlation id of the report run that owns the reference log.
+    /// </summary>
+    [Required]
+    [MaxLength(64)]
+    public string CorrelationId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The reference resource type (e.g. "Location", "Medication") associated with the
+    /// owning reference log.
     /// </summary>
     [Required]
     [MaxLength(128)]
     public string ResourceType { get; set; } = string.Empty;
 
+    /// <summary>
+    /// The bare reference resource id (e.g. "Gen-Location-ICU", "med-123"), without
+    /// the resource-type prefix.
+    /// </summary>
+    [Required]
+    [MaxLength(256)]
+    public string ResourceId { get; set; } = string.Empty;
+
     public DateTime CreateDate { get; set; } = DateTime.UtcNow;
+
+    [ForeignKey(nameof(DataAcquisitionLogId))]
+    public DataAcquisitionLog DataAcquisitionLog { get; set; } = null!;
 }

@@ -52,7 +52,7 @@ public sealed class StoreBackedServicePoller
                 await PollAllDomainsAsync(scheduleId, ct);
                 if (firstSuccess)
                 {
-                    _logger.LogInformation("[Run {RunId}] First poll success â€” all domains now persisted", _meta.RunId);
+                    _logger.LogInformation("[Run {RunId}] First poll success — all domains now persisted", _meta.RunId);
                     firstSuccess = false;
                 }
             }
@@ -83,8 +83,7 @@ public sealed class StoreBackedServicePoller
             PollDomainAsync("entries", () => PollEntriesAsync(scheduleId, ct)),
             PollDomainAsync("populations", () => PollPopulationsAsync(scheduleId, ct)),
             PollDomainAsync("acquisitionSummary", () => PollAcquisitionAsync(ct)),
-            PollDomainAsync("measureResources", () => PollMeasureEvalResourcesAsync(scheduleId, ct)),
-            PollDomainAsync("validationResources", () => PollValidationResourcesAsync(scheduleId, ct)));
+            PollDomainAsync("measureResources", () => PollMeasureEvalResourcesAsync(scheduleId, ct)));
     }
 
     private async Task PollDomainAsync(string domain, Func<Task> action)
@@ -95,7 +94,7 @@ public sealed class StoreBackedServicePoller
         }
         catch (OperationCanceledException)
         {
-            // Expected during shutdown â€” not an error.
+            // Expected during shutdown — not an error.
         }
         catch (Exception ex)
         {
@@ -162,7 +161,7 @@ public sealed class StoreBackedServicePoller
     {
         var summary = await _reader.GetDataAcquisitionReportSummaryAsync(_meta.ReportId);
 
-        // Always write â€” even when null â€” so stale data from a prior report
+        // Always write — even when null — so stale data from a prior report
         // (e.g., before regeneration cleared snapshots) is overwritten.
         await _store.SetDomainAsync(_meta.RunId, "acquisitionSummary", summary, ct);
     }
@@ -171,11 +170,5 @@ public sealed class StoreBackedServicePoller
     {
         var result = await _reader.GetMeasureEvalResourceCountsByPatientTypeAsync(scheduleId);
         await _store.SetDomainAsync(_meta.RunId, "measureResources", result, ct);
-    }
-
-    private async Task PollValidationResourcesAsync(Guid scheduleId, CancellationToken ct)
-    {
-        var result = await _reader.GetReportResourceCountsByPatientTypeAsync(scheduleId, _meta.FacilityId);
-        await _store.SetDomainAsync(_meta.RunId, "validationResources", result, ct);
     }
 }

@@ -51,6 +51,7 @@ public partial class NormalizationDbContext : DbContext
         modelBuilder.Entity<ResourceType>(entity =>
         {
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.HasIndex(e => e.Name).IsUnique();
         });
 
         modelBuilder.Entity<Vendor>(entity =>

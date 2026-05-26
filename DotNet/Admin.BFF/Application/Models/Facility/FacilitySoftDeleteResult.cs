@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Facility;
+﻿namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Facility;
 
 public class FacilitySoftDeleteResult
 {
@@ -6,4 +6,5 @@ public class FacilitySoftDeleteResult
     public bool TenantDeleted { get; set; }
     public bool ReportSchedulesDeleted { get; set; }
     public bool AcquisitionLogsDeleted { get; set; }
+    public bool CensusJobsDeleted { get; set; }
 }

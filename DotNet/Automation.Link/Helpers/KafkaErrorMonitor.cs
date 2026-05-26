@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Text;
 using Confluent.Kafka;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -12,7 +12,7 @@ namespace LantanaGroup.Link.Automation.Link.Helpers;
 /// processing failures in the pipeline. Uses a background consumer loop identical
 /// to the service listeners (e.g., ReportScheduledListener).
 ///
-/// Topics are discovered directly from the broker � any topic ending in -Error or
+/// Topics are discovered directly from the broker — any topic ending in -Error or
 /// -Retry is automatically monitored.
 /// </summary>
 public class KafkaErrorMonitor : IAsyncDisposable
@@ -29,10 +29,47 @@ public class KafkaErrorMonitor : IAsyncDisposable
     private bool _initialized;
     private bool _disposed;
 
-    private readonly ConcurrentBag<string> _capturedErrors = [];
+    private readonly ConcurrentBag<CapturedKafkaError> _capturedErrors = [];
 
-    public IReadOnlyList<string> CapturedErrors => [.. _capturedErrors];
+    /// <summary>
+    /// Formatted log lines for every error/retry message observed since startup. Includes
+    /// messages keyed to OTHER facilities (e.g. retry traffic from a previous test); use
+    /// <see cref="GetErrorCountForFacility"/> when you need a count scoped to a specific
+    /// run.
+    /// </summary>
+    public IReadOnlyList<string> CapturedErrors => [.. _capturedErrors.Select(e => e.Message)];
     public bool HasErrors => !_capturedErrors.IsEmpty;
+
+    /// <summary>
+    /// Counts captured errors whose Kafka message key matches the supplied facility id
+    /// (or has no key at all, so the error can't be ruled out as foreign). Errors keyed
+    /// to a different facility are noise from a sibling test and are excluded.
+    /// </summary>
+    public int GetErrorCountForFacility(string? facilityId)
+    {
+        if (string.IsNullOrEmpty(facilityId))
+            return _capturedErrors.Count;
+
+        return _capturedErrors.Count(e =>
+            string.IsNullOrEmpty(e.Key) ||
+            string.Equals(e.Key, facilityId, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Captured-error rows scoped to the supplied facility id (same filter rules as
+    /// <see cref="GetErrorCountForFacility"/>). Useful for focused diagnostic dumps.
+    /// </summary>
+    public IReadOnlyList<string> GetErrorsForFacility(string? facilityId)
+    {
+        if (string.IsNullOrEmpty(facilityId))
+            return [.. _capturedErrors.Select(e => e.Message)];
+
+        return [.. _capturedErrors
+            .Where(e => string.IsNullOrEmpty(e.Key) || string.Equals(e.Key, facilityId, StringComparison.Ordinal))
+            .Select(e => e.Message)];
+    }
+
+    private sealed record CapturedKafkaError(string? Key, string Message);
 
     private const int DefaultValuePreviewLength = 500;
     private const int DefaultHeaderPreviewLength = 100;
@@ -163,7 +200,9 @@ public class KafkaErrorMonitor : IAsyncDisposable
                         message += $" | Parsed={resourceSummary}";
 
                     _output.WriteLine(message);
-                    _capturedErrors.Add(message);
+                    _capturedErrors.Add(new CapturedKafkaError(
+                        Key: result.Message.Key,
+                        Message: message));
                 }
                 catch (ConsumeException ex)
                 {

@@ -4,6 +4,7 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.ValidationSupportContext;
 import ca.uhn.fhir.parser.IParser;
 import ca.uhn.fhir.parser.LenientErrorHandler;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.entities.Artifact;
 import com.lantanagroup.link.validation.entities.ArtifactType;
 import org.hl7.fhir.common.hapi.validation.support.PrePopulatedValidationSupport;
@@ -63,7 +64,7 @@ public class ArtifactValidationSupport extends PrePopulatedValidationSupport {
         if (artifact.getType() != ArtifactType.PACKAGE) {
             throw new IllegalArgumentException("Artifact is not a package");
         }
-        logger.debug("Adding package artifact: {}", artifact.getName());
+        logger.debug("Adding package artifact: {}", LogUtils.sanitize(artifact.getName()));
         NpmPackage npmPackage;
         try (InputStream stream = new ByteArrayInputStream(artifact.getContent())) {
             npmPackage = NpmPackage.fromPackage(stream);
@@ -81,7 +82,7 @@ public class ArtifactValidationSupport extends PrePopulatedValidationSupport {
         if (artifact.getType() != ArtifactType.RESOURCE) {
             throw new IllegalArgumentException("Artifact is not a resource");
         }
-        logger.debug("Adding resource artifact: {}", artifact.getName());
+        logger.debug("Adding resource artifact: {}", LogUtils.sanitize(artifact.getName()));
         try (InputStream stream = new ByteArrayInputStream(artifact.getContent())) {
             addResource(stream);
         }

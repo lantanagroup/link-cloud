@@ -78,6 +78,17 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             return model;
         }
 
+        /// <summary>
+        /// Daniel - 04/2026: As of 0.6, writing to the ReportResource table is temporarily disabled for two reasons:
+        ///     1. After a few staging runs, we found that Report generated ~13 million entries into the table which could affect write/read performance. Strategies on how to better store this data will need to be investigated.
+        ///     2. Currently, the data in this table is not being used in the admin UI. 
+        /// </summary>
+        /// <param name="facilityId"></param>
+        /// <param name="reportId"></param>
+        /// <param name="patientId"></param>
+        /// <param name="aggregateResult"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         public async Task AddAsyncWithAggregateResult(string facilityId, Guid reportId, string patientId, AggregateResult aggregateResult, CancellationToken cancellationToken)
         {
             if (aggregateResult?.MeasureReportResults == null || !aggregateResult.MeasureReportResults.Any())
@@ -200,16 +211,24 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             {
                 query = sortBy.ToLower() switch
                 {
-                    "createdate" => sortOrder == SortOrder.Descending ? query.OrderByDescending(r => r.CreateDate) : query.OrderBy(r => r.CreateDate),
-                    "facilityid" => sortOrder == SortOrder.Descending ? query.OrderByDescending(r => r.FacilityId) : query.OrderBy(r => r.FacilityId),
-                    "patientid" => sortOrder == SortOrder.Descending ? query.OrderByDescending(r => r.PatientId) : query.OrderBy(r => r.PatientId),
-                    "resourcetype" => sortOrder == SortOrder.Descending ? query.OrderByDescending(r => r.ResourceType) : query.OrderBy(r => r.ResourceType),
-                    _ => query.OrderByDescending(r => r.CreateDate)
+                    "createdate" => sortOrder == SortOrder.Descending
+                        ? query.OrderByDescending(r => r.CreateDate).ThenByDescending(r => r.Id)
+                        : query.OrderBy(r => r.CreateDate).ThenBy(r => r.Id),
+                    "facilityid" => sortOrder == SortOrder.Descending
+                        ? query.OrderByDescending(r => r.FacilityId).ThenByDescending(r => r.Id)
+                        : query.OrderBy(r => r.FacilityId).ThenBy(r => r.Id),
+                    "patientid" => sortOrder == SortOrder.Descending
+                        ? query.OrderByDescending(r => r.PatientId).ThenByDescending(r => r.Id)
+                        : query.OrderBy(r => r.PatientId).ThenBy(r => r.Id),
+                    "resourcetype" => sortOrder == SortOrder.Descending
+                        ? query.OrderByDescending(r => r.ResourceType).ThenByDescending(r => r.Id)
+                        : query.OrderBy(r => r.ResourceType).ThenBy(r => r.Id),
+                    _ => query.OrderByDescending(r => r.CreateDate).ThenByDescending(r => r.Id)
                 };
             }
             else
             {
-                query = query.OrderByDescending(r => r.CreateDate);
+                query = query.OrderByDescending(r => r.CreateDate).ThenByDescending(r => r.Id);
             }
 
             var totalCount = await query.CountAsync(cancellationToken);

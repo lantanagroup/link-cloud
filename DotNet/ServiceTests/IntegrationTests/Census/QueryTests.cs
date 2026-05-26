@@ -11,7 +11,8 @@ using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Census;
 
-[Collection("CensusIntegrationTests")]
+[Collection("IntegrationTests")]
+[Trait("Category", "IntegrationTests")]
 public class QueryTests
 {
     private readonly CensusIntegrationTestFixture _fixture;

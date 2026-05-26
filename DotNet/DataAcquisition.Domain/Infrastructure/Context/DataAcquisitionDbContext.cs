@@ -44,6 +44,7 @@ public class DataAcquisitionDbContext : DbContext
     public DbSet<DataAcquisitionLogNote> DataAcquisitionLogNotes { get; set; }
     public DbSet<DataAcquisitionLogResourceId> DataAcquisitionLogResourceIds { get; set; }
     public DbSet<ScheduledReportEntity> ScheduledReports { get; set; }
+    public DbSet<PendingReferenceId> PendingReferenceIds { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -183,6 +184,11 @@ public class DataAcquisitionDbContext : DbContext
                 .HasConversion(new EnumToStringConverter<FhirQueryType>())
                 .HasMaxLength(50);
 
+            entity.HasIndex(e => new { e.FacilityId, e.CorrelationId, e.QueryPhase, e.ReferenceResourceType })
+                .IsUnique()
+                .HasDatabaseName("UX_DataAcquisitionLogs_ReferenceLogKey")
+                .HasFilter("[CorrelationId] IS NOT NULL AND [QueryPhase] IS NOT NULL AND [ReferenceResourceType] IS NOT NULL");
+
             entity.HasIndex(e => new { e.ExecutionDate, e.Id })
                 .IsDescending()
                 .HasDatabaseName("IX_DataAcquisitionLogs_Paging_Default")
@@ -282,6 +288,17 @@ public class DataAcquisitionDbContext : DbContext
                 );
 
             });
+
+        modelBuilder.Entity<PendingReferenceId>(entity =>
+        {
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+
+            entity.HasOne(e => e.DataAcquisitionLog)
+                .WithMany()
+                .HasForeignKey(e => e.DataAcquisitionLogId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_PendingReferenceIds_DataAcquisitionLog");
+        });
 
             //-------------------DataAcquisitionLogResourceId-------------------
             modelBuilder.Entity<DataAcquisitionLogResourceId>(entity =>

@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Facility;
+﻿namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Facility;
 
 public class FacilityRestoreResult
 {
@@ -6,4 +6,5 @@ public class FacilityRestoreResult
     public bool TenantRestored { get; set; }
     public bool ReportSchedulesRestored { get; set; }
     public bool AcquisitionLogsRestored { get; set; }
+    public bool CensusJobsRestored { get; set; }
 }

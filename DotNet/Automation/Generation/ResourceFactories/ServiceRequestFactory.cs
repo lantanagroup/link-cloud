@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using static LantanaGroup.Automation.Generation.ResourceFactories.FhirConceptFactory;
 
 namespace LantanaGroup.Automation.Generation.ResourceFactories;
@@ -31,7 +31,8 @@ public static class ServiceRequestFactory
         string display,
         bool isLab,
         string codeSystem,
-        string? reasonConditionId = null)
+        string? reasonConditionId = null,
+        string? organizationId = null)
     {
         var request = new ServiceRequest
         {
@@ -55,7 +56,7 @@ public static class ServiceRequestFactory
             Occurrence = new FhirDateTime(authored.AddHours(1)),
             AuthoredOn = authored.ToString("yyyy-MM-ddTHH:mm:ssZ"),
             Requester = Ref($"Practitioner/{practId}", "Ordering Physician"),
-            Performer = [Ref($"Organization/{FhirBundleGenerator.HospitalOrgId}", "General Test Hospital")]
+            Performer = [Ref($"Organization/{organizationId ?? FhirBundleGenerator.HospitalOrgId}", "General Test Hospital")]
         };
 
         if (reasonConditionId != null)

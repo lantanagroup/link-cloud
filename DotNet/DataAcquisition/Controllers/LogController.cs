@@ -101,6 +101,7 @@ public class LogController : Controller
                 patientId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.PatientId);
                 reportId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ReportId);
                 resourceId = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.ResourceId);
+                var searchTerm = HtmlInputSanitizer.SanitizeAndRemove(queryParameters.SearchTerm);
 
                 var result = await _logQueries.SearchQueryLogSummaryAsync(
                     new SearchDataAcquisitionLogRequest
@@ -119,7 +120,8 @@ public class LogController : Controller
                         SortBy = queryParameters.SortBy,
                         SortOrder = queryParameters.SortOrder,
                         IncludeDeleted = queryParameters.IncludeDeleted,
-                        CreatedBefore = queryParameters.CreatedBefore
+                        CreatedBefore = queryParameters.CreatedBefore,
+                        SearchTerm = string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm
                     }, cancellationToken);
 
                 return Ok(result);
@@ -881,6 +883,11 @@ public class LogController : Controller
         if (queryParameters == null)
         {
             return BadRequest("Query parameters are required.");
+        }
+
+        if (minAgeHours < 0)
+        {
+            return BadRequest("minAgeHours must be zero or greater.");
         }
 
         if (string.IsNullOrWhiteSpace(queryParameters.FacilityId) &&

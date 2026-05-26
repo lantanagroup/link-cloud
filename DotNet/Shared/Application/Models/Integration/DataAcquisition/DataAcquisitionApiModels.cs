@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Shared.Application.Utilities;
+﻿using LantanaGroup.Link.Shared.Application.Utilities;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 
@@ -9,6 +9,10 @@ public class DataAcquisitionLogApiModel
     public string? PatientId { get; set; }
     public string? CorrelationId { get; set; }
     public string? ReportTrackingId { get; set; }
+    public string? TraceId { get; set; }
+    public string? FhirVersion { get; set; }
+    public string? Priority { get; set; }
+    public int? RetryAttempts { get; set; }
     public RequestStatus? Status { get; set; }
     public QueryPhase? QueryPhase { get; set; }
     public DateTime? CompletionDate { get; set; }
@@ -145,6 +149,7 @@ public enum QueryPhase
     Initial,
     [StringValue("Supplemental")]
     Supplemental,
+    [Obsolete("Referential phase is no longer emitted on the primary log or downstream contracts; Use Initial or Supplemental instead. Retaining for backward compatibility.")]
     [StringValue("Referential")]
     Referential,
     [StringValue("Polling")]
@@ -161,7 +166,6 @@ public static class QueryPhaseExtensions
         {
             "initial" => QueryPhase.Initial,
             "supplemental" => QueryPhase.Supplemental,
-            "referential" => QueryPhase.Referential,
             "polling" => QueryPhase.Polling,
             "monitoring" => QueryPhase.Monitoring,
             _ => throw new ArgumentException($"Invalid value: {queryPhaseStr}")
@@ -180,4 +184,20 @@ public static class QueryPhaseUtilities
             _ => throw new ArgumentOutOfRangeException(nameof(queryPlanType), queryPlanType, null)
         };
     }
+
+    /// <summary>
+    /// Translates a <see cref="QueryPhase"/> into the string value safe to put on the
+    /// downstream <c>ResourceAcquired</c> / <c>ResourceNormalized</c> wire contract.
+    /// The Java <c>measureeval</c> service's <c>QueryType</c> enum only declares
+    /// <c>INITIAL</c> and <c>SUPPLEMENTAL</c>; emitting any other value causes a Jackson
+    /// deserialization failure that dead-letters the message. Initial / Supplemental pass
+    /// through; null becomes empty. Other phases (Polling, Monitoring) are not currently
+    /// produced on this contract and fall through to their raw name so a real bug surfaces
+    /// loudly rather than being silently rewritten.
+    /// </summary>
+    public static string ToWireQueryType(QueryPhase? queryPhase) => queryPhase switch
+    {
+        null => string.Empty,
+        _ => queryPhase.Value.ToString(),
+    };
 }

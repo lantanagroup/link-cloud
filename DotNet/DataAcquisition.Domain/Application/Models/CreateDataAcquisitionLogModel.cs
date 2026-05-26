@@ -12,6 +12,7 @@ namespace DataAcquisition.Domain.Application.Models
         public AcquisitionPriority Priority { get; set; }
         public string? PatientId { get; set; }
         public string? CorrelationId { get; set; }
+        public string? ReferenceResourceType { get; set; }
         public string? FhirVersion { get; set; }
         public bool IsCensus { get; set; }
         public ReportableEvent? ReportableEvent { get; set; }

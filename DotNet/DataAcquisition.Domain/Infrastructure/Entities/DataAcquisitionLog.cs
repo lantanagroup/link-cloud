@@ -24,6 +24,9 @@ public class DataAcquisitionLog
 
     public string? CorrelationId { get; set; }
 
+    [MaxLength(128)]
+    public string? ReferenceResourceType { get; set; }
+
     public string? FhirVersion { get; set; }
 
     public FhirQueryType? QueryType { get; set; }

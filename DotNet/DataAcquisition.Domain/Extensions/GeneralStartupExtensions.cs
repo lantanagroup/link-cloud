@@ -59,8 +59,7 @@ public static class GeneralStartupExtensions
     public static void RegisterAll(
         this WebApplicationBuilder builder,
         string serviceName,
-        bool? configureRedis = false,
-        bool? configureSecretManager = false)
+        bool? configureRedis = false)
     {
         var assemblyVersion = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
@@ -82,10 +81,7 @@ public static class GeneralStartupExtensions
             builder.RegisterRedis();
         }
 
-        if (configureSecretManager.GetValueOrDefault())
-        {
-            builder.Services.RegisterSecretManager(builder.Configuration);
-        }
+        builder.Services.RegisterSecretManager(builder.Configuration);
 
         builder.Services.RegisterInMemoryCache();
         builder.Services.RegisterHittpClient();
@@ -130,6 +126,7 @@ public static class GeneralStartupExtensions
         services.Configure<SecretManagerSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.SecretManagement));
         services.Configure<SftpValidationSettings>(configuration.GetSection(SftpValidationSettings.SectionName));
         services.Configure<SftpAcquisitionSettings>(configuration.GetSection(SftpAcquisitionSettings.SectionName));
+        services.Configure<DataSourceAuthSettings>(configuration.GetSection(DataSourceAuthSettings.SectionName));
 
         IConfigurationSection consumerSettingsSection = configuration.GetRequiredSection(nameof(ConsumerSettings));
         services.Configure<ConsumerSettings>(consumerSettingsSection);
@@ -155,7 +152,13 @@ public static class GeneralStartupExtensions
                     if (string.IsNullOrEmpty(connectionString))
                         throw new InvalidOperationException("Database connection string is null or empty.");
 
-                    options.UseSqlServer(connectionString)
+                    options.UseSqlServer(connectionString, sqlOptions =>
+                        {
+                            sqlOptions.EnableRetryOnFailure(
+                                maxRetryCount: 5,
+                                maxRetryDelay: TimeSpan.FromSeconds(10),
+                                errorNumbersToAdd: null);
+                        })
                        .AddInterceptors(updateBaseEntityInterceptor);
 
                     break;
@@ -259,6 +262,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IQueryListProcessor, QueryListProcessor>();
         services.AddTransient<IBundleEventService<ResourceKey, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>, BundleResourceAcquiredEventService>();
         services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
+        services.AddTransient<IAcquisitionDependencyChecker, AcquisitionDependencyChecker>();
 
         //Data Pull Commands
         services.AddTransient<IReadFhirCommand, ReadFhirCommand>();

@@ -1,4 +1,4 @@
-namespace LantanaGroup.Link.Terminology.Application.Settings;
+﻿namespace LantanaGroup.Link.Terminology.Application.Settings;
 
 /// <summary>
 /// Provides constant values related to the Terminology application

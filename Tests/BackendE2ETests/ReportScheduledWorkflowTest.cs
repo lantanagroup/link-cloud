@@ -36,9 +36,8 @@ public sealed class ReportScheduledTest : IAsyncLifetime, IClassFixture<BackendE
 
     private readonly IServiceProvider _sp;
     private readonly string _facilityId = $"ScheduledTest-{Guid.NewGuid():N}";
-    private List<(string Name, string Json)> _generatedBundles = [];
     private List<ProfiledMeasureType> _measures = [];
-    private List<PatientCohortDefinition> _cohorts = [];
+    private GenerationManifest? _generationManifest;
 
     private AutomationConfig AutomationCfg => _sp.GetRequiredService<AutomationConfig>();
     private ConsoleAutomationOutput Output => _sp.GetRequiredService<ConsoleAutomationOutput>();
@@ -61,15 +60,28 @@ public sealed class ReportScheduledTest : IAsyncLifetime, IClassFixture<BackendE
         {
             PatientCohortDefinition.AllQualifying(measures, patientCount: 1, resourcesMin: 1000, resourcesMax: 1000)
         };
-        _cohorts = cohorts;
-        var (patientIds, bundles) = FhirBundleGenerator.GenerateFromCohorts(Output, measures, cohorts, "ScheduledPatient", GenerationSeed);
-        _generatedBundles = bundles;
-
-        if (_config.PatientIds.Count == 0)
-            _config.PatientIds = patientIds;
+        var profiles = PatientCohortDefinition.ExpandProfiles(cohorts, GenerationSeed);
 
         await FhirDataLoader.WaitForServerAsync(Output);
-        await FhirDataLoader.LoadTransactionBundlesFromJsonAsync(Output, bundles);
+
+        var pipelineResult = await FhirGenerationPipeline.GenerateAndUploadAsync(
+            Output,
+            FhirDataLoader,
+            measures,
+            profiles,
+            totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
+            generationSeed: GenerationSeed,
+            acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
+            {
+                QueryPlan = QueryPlanBuilder.GetDefaultAsInput(),
+                ClinicalPeriodStart = _config.StartDate,
+                ClinicalPeriodEnd = _config.EndDate
+            });
+
+        _generationManifest = pipelineResult.Manifest;
+
+        if (_config.PatientIds.Count == 0)
+            _config.PatientIds = pipelineResult.PatientIds;
 
         var validationApi = _sp.GetRequiredService<ValidationApiHelper>();
         await validationApi.InitializeArtifactsAsync();
@@ -181,18 +193,12 @@ public sealed class ReportScheduledTest : IAsyncLifetime, IClassFixture<BackendE
         // Flush stale cache from diagnostics polling so validators read authoritative data.
         dataReader.InvalidateCache();
 
-        var profiles = PatientCohortDefinition.ExpandProfiles(_cohorts, GenerationSeed);
-        var generationManifest = GenerationManifest.Build(_config.PatientIds, _generatedBundles, profiles, _measures);
+        var generationManifest = _generationManifest
+            ?? throw new InvalidOperationException("Generation manifest was not produced by the pipeline.");
         generationManifest.MeasureIds = [measureId];
         var queryPlanInput = QueryPlanBuilder.GetDefaultAsInput();
         generationManifest.AcquiredResourceTypes = QueryPlanBuilder.GetAcquiredResourceTypes(queryPlanInput);
         generationManifest.ParameterQueryResourceTypes = QueryPlanBuilder.GetParameterQueryResourceTypes(queryPlanInput);
-        generationManifest.SimulatedAcquiredResourceKeysByPatient = QueryPlanAcquisitionSimulator.SimulateAcquiredKeysByPatient(
-            _config.PatientIds,
-            _generatedBundles,
-            queryPlanInput,
-            actualStartDate,
-            actualEndDate);
         generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(_measures);
 
         await _sp.GetRequiredService<ReportAbsManifestValidator>().ValidateAllAsync(
@@ -203,7 +209,7 @@ public sealed class ReportScheduledTest : IAsyncLifetime, IClassFixture<BackendE
             actualEndDate,
             _facilityId,
             reportId,
-            _generatedBundles,
+            generatedBundles: null,
             manifest: generationManifest);
 
         await _sp.GetRequiredService<ReportDatabaseValidator>().ValidateAllAsync(

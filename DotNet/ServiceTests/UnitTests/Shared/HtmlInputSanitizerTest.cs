@@ -1,4 +1,4 @@
-using LantanaGroup.Link.Shared.Application.Services.Security;
+﻿using LantanaGroup.Link.Shared.Application.Services.Security;
 
 namespace UnitTests.Shared.HtmlInputSanitzer;
 

@@ -1,19 +1,19 @@
-using LantanaGroup.Link.Report.Data;
+﻿using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
-using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
-using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
-using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
+using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report.Managers;
 
+[Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class ReportEntryManagerTests : IClassFixture<ReportIntegrationTestFixture>
+public class ReportEntryManagerTests
 {
     private readonly IServiceScopeFactory _scopeFactory;
 

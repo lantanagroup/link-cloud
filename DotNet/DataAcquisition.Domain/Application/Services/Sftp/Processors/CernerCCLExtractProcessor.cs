@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text;
 using Confluent.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
@@ -13,6 +13,7 @@ using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.Da
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Sftp.Processors;
@@ -88,7 +89,7 @@ public class CernerCclExtractProcessor(
 
             logger.LogInformation(
                 "No files found for facility {FacilityId}, type {AcquisitionType}, sub-type {SubType}, pattern {Pattern}",
-                log.FacilityId, log.AcquisitionType, log.SubType, acquisitionConfig.FileNamePattern ?? "(all files)");
+                log.FacilityId.SanitizeForLog(), log.AcquisitionType.SanitizeForLog(), log.SubType.SanitizeForLog(), acquisitionConfig.FileNamePattern.SanitizeForLog() ?? "(all files)");
             return processedFiles;
         }
 
@@ -106,14 +107,14 @@ public class CernerCclExtractProcessor(
 
         logger.LogInformation(
             "Found {FileCount} {FileLabel} for facility {FacilityId}, type {AcquisitionType}, sub-type {SubType}, pattern {Pattern}",
-            files.Count, files.Count == 1 ? "file" : "files", log.FacilityId, log.AcquisitionType, log.SubType, acquisitionConfig.FileNamePattern ?? "(all files)");
+            files.Count, files.Count == 1 ? "file" : "files", log.FacilityId.SanitizeForLog(), log.AcquisitionType.SanitizeForLog(), log.SubType.SanitizeForLog(), acquisitionConfig.FileNamePattern.SanitizeForLog() ?? "(all files)");
 
         // Process each file
         foreach (var file in files)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            logger.LogDebug("Processing file {FileName} for facility {FacilityId}", file.Name, log.FacilityId);
+            logger.LogDebug("Processing file {FileName} for facility {FacilityId}", file.Name.SanitizeForLog(), log.FacilityId.SanitizeForLog());
 
             // Get appropriate parser for this file
             var fileExtension = Path.GetExtension(file.Name);
@@ -173,7 +174,7 @@ public class CernerCclExtractProcessor(
             {
                 // Move file to processed directory
                 await session.MoveFileAsync(file.FullName, acquisitionConfig.ProcessedDirectory, cancellationToken);
-                logger.LogDebug("Moved file {FileName} to {ProcessedDirectory}", file.Name, acquisitionConfig.ProcessedDirectory);
+                logger.LogDebug("Moved file {FileName} to {ProcessedDirectory}", file.Name.SanitizeForLog(), acquisitionConfig.ProcessedDirectory.SanitizeForLog());
             }
             else if (sftpConfig.RemoveAfterProcessing)
             {
@@ -198,9 +199,9 @@ public class CernerCclExtractProcessor(
 
         logger.LogInformation(
             "Successfully processed {FileCount} {FileLabel} with {EncounterCount} {EncounterLabel} for facility {FacilityId}",
-            processedFiles.Count, processedFiles.Count == 1 ? "file" : "files",
-            totalEncounterCount, totalEncounterCount == 1 ? "encounter" : "encounters",
-            log.FacilityId);
+            processedFiles.Count.SanitizeForLog(), processedFiles.Count == 1 ? "file" : "files",
+            totalEncounterCount.SanitizeForLog(), totalEncounterCount == 1 ? "encounter" : "encounters",
+            log.FacilityId.SanitizeForLog());
 
         return processedFiles;
     }

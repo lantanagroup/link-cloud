@@ -211,30 +211,48 @@ public static class CqlResourceTypeExtractor
             if (!string.Equals(resourceType, "Measure", StringComparison.Ordinal))
                 continue;
 
-            if (!resource.TryGetProperty("group", out var groups) || groups.ValueKind != JsonValueKind.Array)
-                continue;
-
-            foreach (var group in groups.EnumerateArray())
+            // Population criteria expressions (group[].population[].criteria.expression)
+            if (resource.TryGetProperty("group", out var groups) && groups.ValueKind == JsonValueKind.Array)
             {
-                if (!group.TryGetProperty("population", out var populations) || populations.ValueKind != JsonValueKind.Array)
-                    continue;
-
-                foreach (var pop in populations.EnumerateArray())
+                foreach (var group in groups.EnumerateArray())
                 {
-                    if (!pop.TryGetProperty("criteria", out var criteria) || criteria.ValueKind != JsonValueKind.Object)
+                    if (!group.TryGetProperty("population", out var populations) || populations.ValueKind != JsonValueKind.Array)
                         continue;
 
-                    var expr = criteria.TryGetProperty("expression", out var exprProp) && exprProp.ValueKind == JsonValueKind.String
-                        ? exprProp.GetString()
-                        : null;
+                    foreach (var pop in populations.EnumerateArray())
+                    {
+                        AddCriteriaExpression(pop, expressions);
+                    }
+                }
+            }
 
-                    if (!string.IsNullOrWhiteSpace(expr))
-                        expressions.Add(expr);
+            // Supplemental Data expressions (supplementalData[].criteria.expression)
+            // SDE expressions are critical — most resource types are only retrieved via
+            // SDE defines (e.g., "SDE Condition", "SDE Coverage"), not via the population
+            // criteria. Without these roots, the reachability walk misses nearly all types.
+            if (resource.TryGetProperty("supplementalData", out var sdArray) && sdArray.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var sd in sdArray.EnumerateArray())
+                {
+                    AddCriteriaExpression(sd, expressions);
                 }
             }
         }
 
         return expressions;
+    }
+
+    private static void AddCriteriaExpression(JsonElement element, HashSet<string> expressions)
+    {
+        if (!element.TryGetProperty("criteria", out var criteria) || criteria.ValueKind != JsonValueKind.Object)
+            return;
+
+        var expr = criteria.TryGetProperty("expression", out var exprProp) && exprProp.ValueKind == JsonValueKind.String
+            ? exprProp.GetString()
+            : null;
+
+        if (!string.IsNullOrWhiteSpace(expr))
+            expressions.Add(expr);
     }
 
     private static List<string> ExtractCqlTextsFromBundle(string bundleJson)

@@ -1,6 +1,7 @@
-using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
+﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Facility;
 using LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.Aggregation.Handlers.Facility;
@@ -13,6 +14,7 @@ public static class SoftDeleteFacility
         TenantService tenantService,
         ReportService reportService,
         DataAcquisitionService dataAcquisitionService,
+        CensusService censusService,
         string facilityId)
     {
         var logger = loggerFactory.CreateLogger("SoftDeleteFacility");
@@ -27,7 +29,7 @@ public static class SoftDeleteFacility
                 var schedules = JsonSerializer.Deserialize<JsonElement>(body);
                 if (schedules.ValueKind == JsonValueKind.Array && schedules.GetArrayLength() > 0)
                 {
-                    logger.LogWarning("Soft-delete blocked for facility {FacilityId}: {Count} report(s) currently running", facilityId, schedules.GetArrayLength());
+                    logger.LogWarning("Soft-delete blocked for facility {FacilityId}: {Count} report(s) currently running", facilityId.SanitizeForLog(), schedules.GetArrayLength());
                     return Results.Problem(
                         $"This tenant cannot be soft-deleted because there are {schedules.GetArrayLength()} report(s) currently in progress. Please wait for all reports to complete before trying again.",
                         statusCode: StatusCodes.Status409Conflict);
@@ -36,7 +38,7 @@ public static class SoftDeleteFacility
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Exception checking active report schedules for facility {FacilityId}", facilityId);
+            logger.LogError(ex, "Exception checking active report schedules for facility {FacilityId}", facilityId.SanitizeForLog());
             return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
         }
 
@@ -48,14 +50,14 @@ public static class SoftDeleteFacility
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Exception soft-deleting tenant for facility {FacilityId}", facilityId);
+            logger.LogError(ex, "Exception soft-deleting tenant for facility {FacilityId}", facilityId.SanitizeForLog());
             return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
         }
 
         if (!tenantResponse.IsSuccessStatusCode)
         {
             var tenantDetail = await ReadDetailAsync(tenantResponse);
-            logger.LogWarning("Tenant soft-delete failed for facility {FacilityId} with status {StatusCode}", facilityId, tenantResponse.StatusCode);
+            logger.LogWarning("Tenant soft-delete failed for facility {FacilityId} with status {StatusCode}", facilityId.SanitizeForLog(), tenantResponse.StatusCode);
             return ProblemDetailsExtension.UserFacingProblem(tenantDetail ?? "Failed to soft-delete tenant.", (int)tenantResponse.StatusCode);
         }
 
@@ -67,14 +69,14 @@ public static class SoftDeleteFacility
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Exception soft-deleting report schedules for facility {FacilityId} — rolling back step 1", facilityId);
+            logger.LogError(ex, "Exception soft-deleting report schedules for facility {FacilityId} — rolling back step 1", facilityId.SanitizeForLog());
             await RollbackTenantAsync(tenantService, context, facilityId, logger);
             return ProblemDetailsExtension.UserFacingProblem("Failed to soft-delete report schedules. Tenant soft-delete has been rolled back.", StatusCodes.Status500InternalServerError);
         }
 
         if (!reportResponse.IsSuccessStatusCode)
         {
-            logger.LogWarning("Report schedule soft-delete failed for facility {FacilityId} with status {StatusCode} — rolling back step 1", facilityId, reportResponse.StatusCode);
+            logger.LogWarning("Report schedule soft-delete failed for facility {FacilityId} with status {StatusCode} — rolling back step 1", facilityId.SanitizeForLog(), reportResponse.StatusCode);
             await RollbackTenantAsync(tenantService, context, facilityId, logger);
             return ProblemDetailsExtension.UserFacingProblem("Failed to soft-delete report schedules. Tenant soft-delete has been rolled back.", StatusCodes.Status500InternalServerError);
         }
@@ -87,7 +89,7 @@ public static class SoftDeleteFacility
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Exception soft-deleting acquisition logs for facility {FacilityId} — rolling back steps 1 and 2", facilityId);
+            logger.LogError(ex, "Exception soft-deleting acquisition logs for facility {FacilityId} — rolling back steps 1 and 2", facilityId.SanitizeForLog());
             await RollbackReportSchedulesAsync(reportService, context, facilityId, logger);
             await RollbackTenantAsync(tenantService, context, facilityId, logger);
             return ProblemDetailsExtension.UserFacingProblem("Failed to soft-delete acquisition logs. All previous steps have been rolled back.", StatusCodes.Status500InternalServerError);
@@ -95,10 +97,34 @@ public static class SoftDeleteFacility
 
         if (!daResponse.IsSuccessStatusCode)
         {
-            logger.LogWarning("Acquisition log soft-delete failed for facility {FacilityId} with status {StatusCode} — rolling back steps 1 and 2", facilityId, daResponse.StatusCode);
+            logger.LogWarning("Acquisition log soft-delete failed for facility {FacilityId} with status {StatusCode} — rolling back steps 1 and 2", facilityId.SanitizeForLog(), daResponse.StatusCode);
             await RollbackReportSchedulesAsync(reportService, context, facilityId, logger);
             await RollbackTenantAsync(tenantService, context, facilityId, logger);
             return ProblemDetailsExtension.UserFacingProblem("Failed to soft-delete acquisition logs. All previous steps have been rolled back.", StatusCodes.Status500InternalServerError);
+        }
+
+        // Step 4: Delete Census cron jobs — roll back steps 1, 2 and 3 if this fails
+        HttpResponseMessage censusResponse;
+        try
+        {
+            censusResponse = await censusService.DeleteCensusJobsAsync(context.User, facilityId, context.RequestAborted);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Exception deleting census jobs for facility {FacilityId} — rolling back steps 1, 2 and 3", facilityId.SanitizeForLog());
+            await RollbackAcquisitionLogsAsync(dataAcquisitionService, context, facilityId, logger);
+            await RollbackReportSchedulesAsync(reportService, context, facilityId, logger);
+            await RollbackTenantAsync(tenantService, context, facilityId, logger);
+            return ProblemDetailsExtension.UserFacingProblem("Failed to delete census jobs. All previous steps have been rolled back.", StatusCodes.Status500InternalServerError);
+        }
+
+        if (!censusResponse.IsSuccessStatusCode)
+        {
+            logger.LogWarning("Census job deletion failed for facility {FacilityId} with status {StatusCode} — rolling back steps 1, 2 and 3", facilityId.SanitizeForLog(), censusResponse.StatusCode);
+            await RollbackAcquisitionLogsAsync(dataAcquisitionService, context, facilityId, logger);
+            await RollbackReportSchedulesAsync(reportService, context, facilityId, logger);
+            await RollbackTenantAsync(tenantService, context, facilityId, logger);
+            return ProblemDetailsExtension.UserFacingProblem("Failed to delete census jobs. All previous steps have been rolled back.", StatusCodes.Status500InternalServerError);
         }
 
         return Results.Ok(new FacilitySoftDeleteResult
@@ -106,7 +132,8 @@ public static class SoftDeleteFacility
             FacilityId = facilityId,
             TenantDeleted = true,
             ReportSchedulesDeleted = true,
-            AcquisitionLogsDeleted = true
+            AcquisitionLogsDeleted = true,
+            CensusJobsDeleted = true
         });
     }
 
@@ -130,11 +157,11 @@ public static class SoftDeleteFacility
         {
             var response = await tenantService.RestoreFacilityAsync(context.User, facilityId, context.RequestAborted);
             if (!response.IsSuccessStatusCode)
-                logger.LogError("Rollback failed: could not restore tenant for facility {FacilityId} (status {StatusCode})", facilityId, response.StatusCode);
+                logger.LogError("Rollback failed: could not restore tenant for facility {FacilityId} (status {StatusCode})", facilityId.SanitizeForLog(), response.StatusCode);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Rollback failed: exception restoring tenant for facility {FacilityId}", facilityId);
+            logger.LogError(ex, "Rollback failed: exception restoring tenant for facility {FacilityId}", facilityId.SanitizeForLog());
         }
     }
 
@@ -144,11 +171,25 @@ public static class SoftDeleteFacility
         {
             var response = await reportService.RestoreReportSchedulesAsync(context.User, facilityId, context.RequestAborted);
             if (!response.IsSuccessStatusCode)
-                logger.LogError("Rollback failed: could not restore report schedules for facility {FacilityId} (status {StatusCode})", facilityId, response.StatusCode);
+                logger.LogError("Rollback failed: could not restore report schedules for facility {FacilityId} (status {StatusCode})", facilityId.SanitizeForLog(), response.StatusCode);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Rollback failed: exception restoring report schedules for facility {FacilityId}", facilityId);
+            logger.LogError(ex, "Rollback failed: exception restoring report schedules for facility {FacilityId}", facilityId.SanitizeForLog());
+        }
+    }
+
+    private static async Task RollbackAcquisitionLogsAsync(DataAcquisitionService dataAcquisitionService, HttpContext context, string facilityId, ILogger logger)
+    {
+        try
+        {
+            var response = await dataAcquisitionService.RestoreLogsAsync(context.User, facilityId, context.RequestAborted);
+            if (!response.IsSuccessStatusCode)
+                logger.LogError("Rollback failed: could not restore acquisition logs for facility {FacilityId} (status {StatusCode})", facilityId.SanitizeForLog(), response.StatusCode);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Rollback failed: exception restoring acquisition logs for facility {FacilityId}", facilityId.SanitizeForLog());
         }
     }
 }
