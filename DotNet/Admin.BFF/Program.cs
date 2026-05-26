@@ -439,16 +439,6 @@ static void SetupMiddleware(WebApplication app)
         ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
     }).RequireCors("HealthCheckPolicy");
 
-    // Lightweight liveness probe used by container orchestration (docker-compose
-    // healthcheck). Avoids transient dependency failures (e.g. Redis cold-start
-    // ConnectTimeout) from marking the container unhealthy and blocking
-    // downstream services on startup. Use /api/health for full readiness.
-    app.MapHealthChecks("/api/health/live", new HealthCheckOptions
-    {
-        Predicate = _ => false,
-        ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
-    }).RequireCors("HealthCheckPolicy");
-
     app.MapGet("/api/info", async () =>
     {
         var logger = app.Services.GetRequiredService<ILogger<ServiceInformation>>();

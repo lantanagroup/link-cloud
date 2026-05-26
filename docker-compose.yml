@@ -508,7 +508,7 @@ services:
       terminology:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8063/api/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:8063/api/health"]
   
   audit:
     image: link-audit
