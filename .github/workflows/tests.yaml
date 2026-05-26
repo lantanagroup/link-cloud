@@ -175,35 +175,6 @@ jobs:
 
           exit $FAILED
 
-      # ---- Diagnostics on failure ----
-
-      - name: Capture container status and logs on failure
-        if: failure()
-        shell: bash
-        run: |
-          mkdir -p service-logs
-          {
-            echo "=== docker ps -a ==="
-            docker ps -a
-            echo ""
-            echo "=== docker compose ps ==="
-            docker compose ps -a || true
-          } > service-logs/_container-status.txt 2>&1
-
-          # Dump logs for every container in the project. --tail caps each file
-          # to a manageable size; remove or raise if you need full history.
-          for container in $(docker ps -aq); do
-            name=$(docker inspect --format '{{.Name}}' "$container" | sed 's|^/||')
-            docker logs --tail 500 --timestamps "$container" \
-              > "service-logs/${name}.log" 2>&1 || true
-          done
-
-          # Surface admin-bff inline in the Actions UI for fast triage —
-          # this container has historically been the first to flake.
-          echo "::group::link-admin-bff (last 200 lines)"
-          docker logs --tail 200 link-admin-bff 2>&1 || true
-          echo "::endgroup::"
-
       # ---- Artifact uploads ----
 
       - name: Upload Service Logs on Failure
