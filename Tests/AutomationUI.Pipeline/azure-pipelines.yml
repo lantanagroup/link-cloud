@@ -49,7 +49,6 @@ parameters:
     default: "test"
     values:
       - "test"
-      # - "dev"   # TODO: enable once dev is wired up below
 
   - name: scenario
     displayName: "Scenario to run"

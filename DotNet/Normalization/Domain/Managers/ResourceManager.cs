@@ -18,6 +18,8 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
 
     public class ResourceManager : IResourceManager
     {
+        private static readonly SemaphoreSlim CreateResourceLock = new(1, 1);
+
         private readonly IDatabase _database;
         private readonly IResourceQueries _resourceQueries;
         private readonly ILogger<ResourceManager> _logger;
@@ -46,27 +48,39 @@ namespace LantanaGroup.Link.Normalization.Domain.Managers
                 resourceName = resourceType.ToString();
             }
 
-            var existing = await _resourceQueries.Get(resourceName);
-
-            if (existing != null)
-            {
-                return existing;
-            }
-
-            var entity = new Entities.ResourceType() { Name = resourceName };
+            await CreateResourceLock.WaitAsync();
             try
             {
+                var existing = await _resourceQueries.Get(resourceName);
+
+                if (existing != null)
+                {
+                    return existing;
+                }
+
+                var entity = new Entities.ResourceType() { Name = resourceName };
                 await _database.ResourceTypes.AddAsync(entity);
                 await _database.SaveChangesAsync();
+
+                return await _resourceQueries.Get(resourceName);
             }
             catch (DbUpdateException ex)
             {
                 var sanitizedResourceName = resourceName.Replace("\r", string.Empty).Replace("\n", string.Empty);
                 _logger.LogWarning(ex, "DbUpdateException while creating ResourceType '{ResourceName}'. This may be a duplicate key race condition.", sanitizedResourceName);
-                _database.ResourceTypes.Remove(entity);
-            }
 
-            return await _resourceQueries.Get(resourceName);
+                var existing = await _resourceQueries.Get(resourceName);
+                if (existing != null)
+                {
+                    return existing;
+                }
+
+                throw;
+            }
+            finally
+            {
+                CreateResourceLock.Release();
+            }
         }
 
         public async Task DeleteResource(string resource)
