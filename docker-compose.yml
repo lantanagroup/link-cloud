@@ -466,12 +466,7 @@ services:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8060/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
-
-
+      
   admin-bff:
     image: link-admin-bff
     container_name: link-admin-bff
@@ -514,12 +509,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8063/api/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
-
-
+  
   audit:
     image: link-audit
     container_name: link-audit
@@ -548,10 +538,6 @@ services:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8062/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
 
   census:
     image: link-census
@@ -582,11 +568,7 @@ services:
       tenant:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8064/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
+      test: [ "CMD", "curl", "-f", "http://localhost:8064/health" ]
 
   dataacq:
     image: link-dataacquisition
@@ -619,10 +601,9 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8065/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
+      start_period: 5s
+      interval: 5s
+      retries: 10
 
   dataacq-worker:
      image: link-dataacquisitionworker
@@ -657,10 +638,9 @@ services:
          condition: service_healthy
      healthcheck:
        test: ["CMD", "curl", "-f", "http://localhost:8078/health"]
-       interval: 10s
-       timeout: 5s
-       retries: 5
-       start_period: 90s
+       start_period: 3s
+       interval: 3s
+       retries: 10
   
   admin-ui:
     image: link-admin-ui
@@ -702,10 +682,6 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5257/"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
 
   measureeval:
     image: link-measureeval
@@ -767,10 +743,9 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8068/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
+      start_period: 3s
+      interval: 3s
+      retries: 10
       
   querydispatch:
     image: link-querydispatch
@@ -800,10 +775,9 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8071/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
+      start_period: 3s
+      interval: 3s
+      retries: 10
 
   report:
     image: link-report
@@ -837,10 +811,9 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8072/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
+      start_period: 5s
+      interval: 5s
+      retries: 10
 
   submission:
     image: link-submission
@@ -878,10 +851,9 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8073/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
+      start_period: 30s
+      interval: 5s
+      retries: 10
 
   tenant:
     image: link-tenant
@@ -911,10 +883,9 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8074/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
+      start_period: 5s
+      interval: 5s
+      retries: 10
 
   validation:
     image: link-validation
@@ -980,10 +951,6 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8076/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
 
 networks:
   link-nw:
