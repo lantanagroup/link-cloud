@@ -86,26 +86,9 @@ public class ValidationService {
                         .map(Result::fromMessage)
                         .toList();
             } catch (Exception ex) {
-                if (isHapi2509(ex)) {
-                    // Workaround for HAPI FHIR bug https://github.com/hapifhir/hapi-fhir/issues/7200
-                    // MeasureValidator.validateMeasureReport() calls fetchResourcesByUrl() which is
-                    // unimplemented in WorkerContextValidationSupportAdapter (HAPI-2509).
-                    // With concurrent validation, this may be wrapped in ExecutionException.
-                    throw new ValidationSkippedException(
-                            "Validation skipped due to known HAPI bug (HAPI-2509): " + ex.getMessage(), ex);
-                }
                 logger.error("Validation failed", ex);
                 throw ex;
             }
         }
-    }
-
-    private static boolean isHapi2509(Throwable ex) {
-        for (Throwable t = ex; t != null; t = t.getCause()) {
-            if (t.getMessage() != null && t.getMessage().contains("HAPI-2509")) {
-                return true;
-            }
-        }
-        return false;
     }
 }

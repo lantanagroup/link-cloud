@@ -21,7 +21,7 @@
 
     <properties>
         <cqf-fhir.version>4.5.1</cqf-fhir.version>
-        <hapi-fhir.version>8.6.0</hapi-fhir.version>
+        <hapi-fhir.version>8.10.0</hapi-fhir.version>
         <kotlin.version>2.1.20</kotlin.version>
         <janino.version>2.7.8</janino.version>
         <jacoco.version>0.8.12</jacoco.version>

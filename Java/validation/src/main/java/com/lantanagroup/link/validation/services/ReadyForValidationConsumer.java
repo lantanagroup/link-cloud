@@ -76,18 +76,7 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             bundle = getBundleViaRest(facilityId, patientId, reportId);
         }
         Instant start = Instant.now();
-        List<Result> results;
-        try {
-            results = validate(facilityId, patientId, reportId, bundle);
-        } catch (ValidationSkippedException ex) {
-            // TODO: Remove this workaround once HAPI FHIR fixes https://github.com/hapifhir/hapi-fhir/issues/7200
-            // MeasureReport validation crashes with HAPI-2509 because fetchResourcesByUrl() is unimplemented.
-            // We skip categorization/persistence and send ValidationComplete(valid=true) to unblock the pipeline.
-            _logger.warn("Validation skipped for patient {} in report {} (facility {}): {}",
-                    patientId, reportId, facilityId, ex.getMessage());
-            produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, List.of());
-            return;
-        }
+        List<Result> results = validate(facilityId, patientId, reportId, bundle);
         Instant end = Instant.now();
         Duration duration = Duration.between(start, end);
         produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
