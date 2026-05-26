@@ -40,6 +40,10 @@ public static class TestConfig
     // AdminBFF — only for operations that have no direct service endpoint
     public static string AdminBffBase => Environment.GetEnvironmentVariable("ADMIN_BFF_BASE_URL") ?? "http://localhost:8063/api";
 
+    // Automation.UI — used by AutomationUiApiSmokeTest to exercise the /api/runs endpoints.
+    // Host port 5256 matches the docker-compose mapping (5256:5257).
+    public static string AutomationUiBase => Environment.GetEnvironmentVariable("AUTOMATION_UI_BASE_URL") ?? "http://localhost:5256";
+
     // Infrastructure
     public static string LokiBaseUrl => Environment.GetEnvironmentVariable("LOKI_BASE_URL") ?? "http://localhost:3100";
     public static string? AdhocReportTestDownloadPath =>

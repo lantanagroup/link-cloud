@@ -105,4 +105,7 @@
     <Content Include="Dockerfile.aspnet8-run" />
     <Content Include="Dockerfile.hapi" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Tests\AutomationUI.Pipeline\" />
+  </ItemGroup>
 </Project>
