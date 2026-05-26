@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using System.Net;
 using System.Net.Http.Json;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Xunit;
@@ -69,7 +71,28 @@ public sealed class AutomationUiApiSmokeTest : IAsyncLifetime, IClassFixture<Bac
         using var timeoutCts = new CancellationTokenSource(Timeout);
         var cancellationToken = timeoutCts.Token;
 
-        using var http = new HttpClient { BaseAddress = new Uri(TestConfig.AutomationUiBase.TrimEnd('/') + "/") };
+        var cookies = new CookieContainer();
+        using var handler = new HttpClientHandler
+        {
+            UseCookies = true,
+            CookieContainer = cookies
+        };
+        using var http = new HttpClient(handler) { BaseAddress = new Uri(TestConfig.AutomationUiBase.TrimEnd('/') + "/") };
+
+        // Acquire antiforgery cookie + request token from the Runs page so
+        // service-to-service smoke calls can POST to endpoints protected by
+        // [ValidateAntiForgeryToken].
+        using var runsPageResponse = await http.GetAsync("Runs", cancellationToken);
+        Assert.True(runsPageResponse.IsSuccessStatusCode,
+            $"GET /Runs returned {(int)runsPageResponse.StatusCode}");
+
+        var runsPageHtml = await runsPageResponse.Content.ReadAsStringAsync(cancellationToken);
+        var requestVerificationToken = ExtractRequestVerificationToken(runsPageHtml);
+        Assert.False(string.IsNullOrWhiteSpace(requestVerificationToken),
+            "Could not extract __RequestVerificationToken from /Runs page.");
+
+        http.DefaultRequestHeaders.Remove("RequestVerificationToken");
+        http.DefaultRequestHeaders.Add("RequestVerificationToken", requestVerificationToken);
 
         // ── POST /api/runs/start ─────────────────────────────────────────
         Output.WriteLine($"Starting AdHoc Report [System] scenario ({AdhocReportScenarioId}) against {TestConfig.AutomationUiBase}");
@@ -120,6 +143,19 @@ public sealed class AutomationUiApiSmokeTest : IAsyncLifetime, IClassFixture<Bac
             $"Expected run to succeed but got '{statusBody.Status}'. Error: {statusBody.Error}");
 
         Output.WriteLine($"Run {startBody.RunId} completed successfully in {statusBody.Duration ?? "unknown duration"}.");
+    }
+
+    private static string? ExtractRequestVerificationToken(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+            return null;
+
+        var match = Regex.Match(
+            html,
+            "name=\"__RequestVerificationToken\"[^>]*value=\"(?<token>[^\"]+)\"",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        return match.Success ? WebUtility.HtmlDecode(match.Groups["token"].Value) : null;
     }
 
     // ── Response shape mirrors AutomationRunsApiController.RunStatusResponse ──
