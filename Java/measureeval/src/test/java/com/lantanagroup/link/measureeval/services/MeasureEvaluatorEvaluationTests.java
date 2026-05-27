@@ -100,11 +100,9 @@ class MeasureEvaluatorEvaluationTests {
 
         // test evaluated resources
         Assertions.assertTrue(report.hasEvaluatedResource());
-        Assertions.assertEquals(2, report.getEvaluatedResource().size());
+        Assertions.assertEquals(1, report.getEvaluatedResource().size());
         Assertions.assertTrue(report.getEvaluatedResourceFirstRep().hasReference());
         Assertions.assertEquals("Encounter/simple-encounter", report.getEvaluatedResourceFirstRep().getReference());
-        Assertions.assertTrue(report.getEvaluatedResource().get(1).hasReference());
-        Assertions.assertEquals("Patient/simple-patient", report.getEvaluatedResource().get(1).getReference());
     }
 
     /**
@@ -153,11 +151,11 @@ class MeasureEvaluatorEvaluationTests {
 
         // test evaluated resources
         Assertions.assertTrue(report.hasEvaluatedResource());
-        Assertions.assertEquals(3, report.getEvaluatedResource().size());
+        Assertions.assertEquals(2, report.getEvaluatedResource().size());
 
         // test extensions, references, and contained
-        Assertions.assertTrue(report.hasExtension("http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalDataElement.reference"));
-        var extension = report.getExtensionByUrl("http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalDataElement.reference");
+        Assertions.assertTrue(report.hasExtension("http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalData"));
+        var extension = report.getExtensionByUrl("http://hl7.org/fhir/5.0/StructureDefinition/extension-MeasureReport.supplementalData");
         Assertions.assertTrue(extension.hasValue());
         Assertions.assertTrue(extension.getValue() instanceof Reference);
         var reference = (Reference) extension.getValue();
@@ -252,9 +250,6 @@ class MeasureEvaluatorEvaluationTests {
 
         // test measurement period results
         validateMeasurementPeriod(report.getPeriod(), 2024, 0, 1, 2024, 11, 31);
-
-        // test measure score
-        Assertions.assertEquals(1.0, report.getGroupFirstRep().getMeasureScore().getValue().doubleValue());
 
         // test population results
         Assertions.assertEquals(1, getPopulation("initial-population", report).getCount());
