@@ -2,6 +2,7 @@ package com.lantanagroup.link.measureeval.configs;
 
 import com.lantanagroup.link.shared.config.TelemetryConfig;
 import io.opentelemetry.api.OpenTelemetry;
+import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.propagation.ContextPropagators;
 import io.opentelemetry.context.propagation.TextMapPropagator;
@@ -14,7 +15,6 @@ import io.opentelemetry.sdk.metrics.export.PeriodicMetricReader;
 import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
-import io.opentelemetry.semconv.ResourceAttributes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,7 +36,7 @@ public class OpenTelemetryConfig {
 
   @Bean
   public OpenTelemetry openTelemetry () {
-    Resource resource = Resource.getDefault().toBuilder().put(ResourceAttributes.SERVICE_NAME, serviceName).build();
+    Resource resource = Resource.getDefault().toBuilder().put(AttributeKey.stringKey("service.name"), serviceName).build();
 
     if (this.telemetryConfig == null || this.telemetryConfig.getExporterEndpoint() == null) {
       logger.warn("Telemetry configuration is not set. OpenTelemetry will not be initialized.");
