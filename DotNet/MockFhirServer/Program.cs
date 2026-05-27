@@ -117,13 +117,8 @@ app.MapGet("/fhir/{resourceType}", async (
     PatientDataStore store,
     CancellationToken ct) =>
 {
-    var sanitizedSubject = HtmlInputSanitizer.SanitizeAndRemove(subject);
-    var sanitizedPatient = HtmlInputSanitizer.SanitizeAndRemove(patient);
-    var sanitizedIdParam = HtmlInputSanitizer.SanitizeAndRemove(idParam);
-
-    var patientId = ExtractPatientId(sanitizedSubject ?? sanitizedPatient);
-    return await ExecuteFhirSearch(resourceType, patientId, sanitizedIdParam, store, ct);
-})
+    var patientId = ExtractPatientId(subject ?? patient);
+    return await ExecuteFhirSearch(resourceType, patientId, idParam, store, ct);
 })
 .WithName("FhirSearch")
 .WithSummary("FHIR R4 GET search — returns a Bundle of matching resources.")
