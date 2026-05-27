@@ -171,18 +171,18 @@ public class PatientDataStore
 
     private async Task RegisterPatientAsync(string patientId, CancellationToken ct)
     {
-        if (_knownPatientIds.Contains(patientId))
-            return;
-
         await _lock.WaitAsync(ct);
         try
         {
+            if (_knownPatientIds.Contains(patientId))
+                return;
             _knownPatientIds.Add(patientId);
         }
         finally
         {
             _lock.Release();
         }
+    }
     }
 
     private void RegisterPreGeneratedPatientIds()
