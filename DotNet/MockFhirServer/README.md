@@ -1,4 +1,4 @@
-# MockFhirServer
+﻿# MockFhirServer
 
 `MockFhirServer` is a lightweight .NET 8 Minimal API that acts as a drop-in replacement for
 a real FHIR R4 server (e.g. HAPI) during local development and integration testing. Instead
@@ -16,7 +16,7 @@ environments you can point DataAcquisition at `MockFhirServer` instead:
 
 ```
 FhirQueryConfiguration.FhirServerBaseUrl = "http://mock-fhir-server:8080/fhir"   # Docker
-FhirQueryConfiguration.FhirServerBaseUrl = "http://localhost:6158/fhir"           # local
+FhirQueryConfiguration.FhirServerBaseUrl = "http://localhost:58354/fhir"           # local
 ```
 
 The server responds to every read and search request with realistic, internally consistent
@@ -124,12 +124,12 @@ the reporting period used in the census/facility configuration:
 docker compose up -d mock-fhir-server
 ```
 
-The server listens on port **6158** externally (`8080` inside the container).
+The server listens on port **58354** externally (`8080` inside the container).
 
 ### Step 2 — Get pre-registered patient IDs
 
 ```bash
-curl http://localhost:6158/api/mock-fhir/patients
+curl http://localhost:58354/api/mock-fhir/patients
 # mock-patient-0001
 # mock-patient-0002
 # ...
@@ -148,7 +148,7 @@ In the facility's `FhirQueryConfiguration`, set:
 }
 ```
 
-(or `http://localhost:6158/fhir` when running DataAcquisition outside Docker).
+(or `http://localhost:58354/fhir` when running DataAcquisition outside Docker).
 
 ### Step 4 — Run a report
 
@@ -157,7 +157,7 @@ patient on demand.
 
 ### Step 5 — Browse the Swagger UI
 
-While the server is running, navigate to [http://localhost:6158/swagger](http://localhost:6158/swagger)
+While the server is running, navigate to [http://localhost:58354/swagger](http://localhost:58354/swagger)
 to inspect and manually invoke all endpoints.
 
 ---

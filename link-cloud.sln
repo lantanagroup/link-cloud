@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.0.32901.226
+# Visual Studio Version 18
+VisualStudioVersion = 18.6.11806.211 stable
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Tenant", "DotNet\Tenant\Tenant.csproj", "{3CCEE0E2-48DA-4661-A338-8F8FB5B276E8}"
 EndProject
@@ -66,8 +66,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automation.Link", "DotNet\Automation.Link\Automation.Link.csproj", "{9BFE8460-51DB-3B42-6360-FC5905DEE77F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Automation.UI", "DotNet\Automation.UI\Automation.UI.csproj", "{845854CA-3971-3FB1-0092-F86B344EF1EF}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DotNet", "DotNet", "{71E6E750-85FD-B5BC-4321-E01377EC6231}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MockFhirServer", "DotNet\MockFhirServer\MockFhirServer.csproj", "{21B0D029-7435-4010-A40F-8D09DC902542}"
 EndProject
@@ -534,7 +532,6 @@ Global
 		{472A561B-EF7F-467E-96ED-1FB130E43292} = {C98B4989-1078-4632-BC7D-9CE52A40B360}
 		{F25C619A-50DC-4A67-9406-F8A2DB07AA22} = {554985B2-5CA6-49D3-8F07-08080C4EACEA}
 		{E34B41C5-3093-05C2-C945-BCB49AC34E7F} = {554985B2-5CA6-49D3-8F07-08080C4EACEA}
-		{21B0D029-7435-4010-A40F-8D09DC902542} = {71E6E750-85FD-B5BC-4321-E01377EC6231}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E56BCCFA-9A01-455E-ABCF-6C044786FF55}
