@@ -9,17 +9,19 @@ import com.lantanagroup.link.measureeval.utils.StreamUtils;
 import lombok.Getter;
 import org.cqframework.cql.cql2elm.LibraryBuilder;
 import org.hl7.fhir.r4.model.*;
-import org.opencds.cqf.fhir.api.Repository;
+import ca.uhn.fhir.repository.IRepository;
 import org.opencds.cqf.fhir.cql.EvaluationSettings;
 import org.opencds.cqf.fhir.cql.engine.retrieve.RetrieveSettings;
 import org.opencds.cqf.fhir.cql.engine.terminology.TerminologySettings;
 import org.opencds.cqf.fhir.cr.measure.MeasureEvaluationOptions;
-import org.opencds.cqf.fhir.cr.measure.r4.R4MeasureService;
+import org.opencds.cqf.fhir.cr.measure.common.MeasurePeriodValidator;
+import org.opencds.cqf.fhir.cr.measure.r4.R4MultiMeasureService;
 import org.opencds.cqf.fhir.utility.monad.Eithers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.Date;
 import java.util.List;
 import java.util.TimeZone;
@@ -106,12 +108,16 @@ public class MeasureEvaluator {
             DateTimeType periodEnd,
             StringType subject,
             Bundle additionalData) {
-        Repository repository = new LinkInMemoryFhirRepository(fhirContext, bundle);
-        R4MeasureService measureService = new R4MeasureService(repository, options);
+        IRepository repository = new LinkInMemoryFhirRepository(fhirContext, bundle);
+        R4MultiMeasureService measureService = new R4MultiMeasureService(repository, options, null, new MeasurePeriodValidator());
+        ZonedDateTime start = periodStart != null && periodStart.getValue() != null
+                ? periodStart.getValue().toInstant().atZone(ZoneOffset.UTC) : null;
+        ZonedDateTime end = periodEnd != null && periodEnd.getValue() != null
+                ? periodEnd.getValue().toInstant().atZone(ZoneOffset.UTC) : null;
         return measureService.evaluate(
                 Eithers.forRight3(measure),
-                periodStart == null ? null : periodStart.asStringValue(),
-                periodEnd == null ? null : periodEnd.asStringValue(),
+                start,
+                end,
                 null,
                 subject.asStringValue(),
                 null,

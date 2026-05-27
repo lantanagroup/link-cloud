@@ -1,7 +1,9 @@
 package com.lantanagroup.link.measureeval.services;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
+import org.cqframework.cql.cql2elm.CqlIncludeException;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Library;
 import org.hl7.fhir.r4.model.Measure;
@@ -52,7 +54,7 @@ class MeasureEvaluatorInstantiationTests {
     void newInstanceMeasureWithoutPrimaryLibraryReference() {
         Bundle bundle = new Bundle();
         bundle.addEntry().setResource(createMeasure(false));
-        Assertions.assertThrows(IllegalArgumentException.class, () -> MeasureEvaluator.compile(fhirContext, bundle, false),
+        Assertions.assertThrows(InvalidRequestException.class, () -> MeasureEvaluator.compile(fhirContext, bundle, false),
                 "Measure null does not have a primary library specified");
     }
 
@@ -77,7 +79,7 @@ class MeasureEvaluatorInstantiationTests {
         Bundle bundle = new Bundle();
         bundle.addEntry().setResource(createMeasure(true));
         bundle.addEntry().setResource(createLibrary(false));
-        Assertions.assertThrows(IllegalStateException.class, () -> MeasureEvaluator.compile(fhirContext, bundle, false),
+        Assertions.assertThrows(CqlIncludeException.class, () -> MeasureEvaluator.compile(fhirContext, bundle, false),
                 "Unable to load CQL/ELM for library: Nonexistent. Verify that the Library resource is available in your environment and has CQL/ELM content embedded.");
     }
 
