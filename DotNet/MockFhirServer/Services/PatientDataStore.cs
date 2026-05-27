@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.MockFhirServer.Settings;
 using Microsoft.Extensions.Options;
@@ -182,7 +182,6 @@ public class PatientDataStore
         {
             _lock.Release();
         }
-    }
     }
 
     private void RegisterPreGeneratedPatientIds()

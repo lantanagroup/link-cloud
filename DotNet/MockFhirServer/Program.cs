@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.MockFhirServer.Services;
 using LantanaGroup.Link.MockFhirServer.Settings;
