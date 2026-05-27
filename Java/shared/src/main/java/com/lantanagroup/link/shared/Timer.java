@@ -15,6 +15,10 @@ public class Timer implements AutoCloseable {
         return (System.currentTimeMillis() - start) / 1000.0;
     }
 
+    public double getMilliseconds() {
+        return System.currentTimeMillis() - start;
+    }
+
     @Override
     public void close() {
         // Optional: Add any cleanup if needed
