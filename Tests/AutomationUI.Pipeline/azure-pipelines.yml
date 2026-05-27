@@ -1,0 +1,357 @@
+# =========================================
+#  Azure DevOps - Automation.UI Smoke Pipeline (TEST)
+#
+#  Replaces the old API_Integration / VSTest pipeline.
+#  Triggers a saved Automation.UI scenario by ID via HTTP, polls /status
+#  until terminal, and posts the result to Slack.
+#
+#  Currently only the Test environment is wired up. The targetEnvironment
+#  parameter is kept so other envs (e.g. dev) can be added later without
+#  restructuring the pipeline -- just fill in their base URL below.
+# =========================================
+
+trigger:
+  branches:
+    include:
+      - main
+      - feature/*
+
+pr:
+  branches:
+    include:
+      - main
+      - feature/*
+
+schedules:
+  - cron: "0 11 * * 1-5"   # 6AM CT
+    displayName: "Weekday 6AM CT Build"
+    branches:
+      include:
+        - main
+    always: "true"
+    batch: "false"
+
+# Watch the Deploy All Services pipeline (definitionId=226 in project nhsnlink)
+resources:
+  pipelines:
+    - pipeline: DeployAll
+      source: 'Deploy All Services'
+      project: nhsnlink
+      trigger:
+        branches:
+          include:
+            - dev
+
+parameters:
+  - name: targetEnvironment
+    displayName: "Target environment"
+    type: string
+    default: "test"
+    values:
+      - "test"
+
+  - name: scenario
+    displayName: "Scenario to run"
+    type: string
+    default: "AdHocReport"
+    values:
+      - "AdHocReport"
+
+  - name: pollIntervalSeconds
+    displayName: "Status poll interval (seconds)"
+    type: number
+    default: 15
+
+  - name: completionTimeoutMinutes
+    displayName: "Max minutes to wait for the run to finish"
+    type: number
+    default: 45
+
+variables:
+  # Per-environment Automation.UI base URL.
+  # Only test is configured for now; add other envs as they come online.
+  AUTOMATION_UI_BASE_URL_test: "https://test-automation.nhsnlink.org"
+  # AUTOMATION_UI_BASE_URL_dev: "https://dev-automation.nhsnlink.org"
+
+  # System scenario IDs are deterministic and seeded by Automation.UI's
+  # ScenarioSeedService -- same value in every environment.
+  SCENARIO_ID_AdHocReport: "00000000-0000-0000-0000-000000000001"
+
+  # Slack webhook is fetched at runtime from Azure App Configuration so the
+  # value never lives in source. Key 'Automation:SlackWebhookUrl' (label
+  # 'Link Automation UI') in the 'nhnslink-ac-test' App Config resource.
+  # The fetch step uses the ADO service connection below; update it to
+  # whatever connection has at least 'App Configuration Data Reader' on
+  # that resource.
+  AZURE_SERVICE_CONNECTION: "NHSNLink-RG ARM"
+  APP_CONFIG_NAME:          "nhnslink-ac-test"
+  APP_CONFIG_SLACK_KEY:     "Automation:SlackWebhookUrl"
+  APP_CONFIG_SLACK_LABEL:   "Link Automation UI"
+
+  TESTRAIL_RUN_URL: 'https://lantanagroup.testrail.io/index.php?/runs/view/171&group_by=cases:section_id&group_order=asc&display=tree'
+
+stages:
+  - stage: TriggerAutomationRun
+    displayName: "Trigger Automation.UI scenario"
+    jobs:
+      - job: Trigger
+        displayName: "Start scenario, poll for completion, notify Slack"
+        pool:
+          vmImage: "windows-latest"
+        steps:
+
+          # -------------------------------------------------------------
+          # Resolve per-environment base URL & scenario id, gate on
+          # Deploy_All_Services for the same environment.
+          # -------------------------------------------------------------
+          - task: PowerShell@2
+            displayName: "Resolve target & gate on Deploy_All_Services"
+            env:
+              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+            inputs:
+              targetType: "inline"
+              script: |
+                $envName  = "${{ parameters.targetEnvironment }}"
+                $scenName = "${{ parameters.scenario }}"
+
+                # Per-env base URL lookup (avoid macro expansion against undefined names)
+                $baseVar     = "AUTOMATION_UI_BASE_URL_$envName"
+                $scenarioVar = "SCENARIO_ID_$scenName"
+                $base        = (Get-Item -Path "env:$baseVar"     -ErrorAction SilentlyContinue).Value
+                $scenarioId  = (Get-Item -Path "env:$scenarioVar" -ErrorAction SilentlyContinue).Value
+
+                if (-not $base)       { Write-Error "Variable '$baseVar' is not defined.";     exit 1 }
+                if (-not $scenarioId) { Write-Error "Variable '$scenarioVar' is not defined."; exit 1 }
+
+                Write-Host "Target base URL : $base"
+                Write-Host "Scenario id     : $scenarioId"
+
+                Write-Host "##vso[task.setvariable variable=AUTOMATION_UI_BASE_URL]$base"
+                Write-Host "##vso[task.setvariable variable=SCENARIO_ID]$scenarioId"
+
+                # ----- Gate on latest succeeded Deploy_All_Services for this env -----
+                $org          = "$(System.CollectionUri)"
+                $project      = "nhsnlink"
+                $definitionId = 226
+                $shouldRun    = $false
+                $commitSha    = ""
+
+                function Get-EnvFromBuild($Build) {
+                  if (-not $Build.templateParameters) { return $null }
+                  $tp = $Build.templateParameters
+                  if ($tp.PSObject.Properties.Name -contains "environment") {
+                    return ([string]$tp.environment).Trim()
+                  }
+                  $envProp = $tp.PSObject.Properties | Where-Object { $_.Name -match "env" } | Select-Object -First 1
+                  if ($envProp) { return ([string]$tp.($envProp.Name)).Trim() }
+                  return $null
+                }
+
+                try {
+                  $u = "$org$project/_apis/build/builds?definitions=$definitionId&resultFilter=succeeded&`$top=50&api-version=7.1-preview.7"
+                  $h = @{ Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN" }
+                  $resp = Invoke-RestMethod -Uri $u -Headers $h -Method Get
+                  $sorted = $resp.value | Sort-Object -Property finishTime -Descending
+                  foreach ($b in $sorted) {
+                    $envVal = Get-EnvFromBuild $b
+                    if ($envVal -ieq $envName) {
+                      $commitSha = $b.sourceVersion
+                      $shouldRun = $true
+                      Write-Host "Matched Deploy_All_Services build $($b.id) for env '$envName' commit $commitSha."
+                      break
+                    }
+                  }
+                } catch {
+                  Write-Host "Failed to query Deploy_All_Services: $_"
+                }
+
+                if (-not $commitSha) { $commitSha = "$(Build.SourceVersion)" }
+                $commitShort = if ($commitSha.Length -ge 7) { $commitSha.Substring(0,7) } else { $commitSha }
+
+                if (-not $shouldRun) {
+                  Write-Host "No succeeded Deploy_All_Services for env '$envName'. Skipping."
+                  Write-Host "##vso[task.setvariable variable=SKIP_RUN]true"
+                }
+
+                Write-Host "##vso[task.setvariable variable=COMMIT]$commitSha"
+                Write-Host "##vso[task.setvariable variable=COMMIT_SHORT]$commitShort"
+
+          # -------------------------------------------------------------
+          # POST /api/runs/start - returns 202 with { runId }.
+          # No Authorization header is sent; Automation.UI does not require
+          # auth on /api/runs/* in this environment.
+          # -------------------------------------------------------------
+          - task: PowerShell@2
+            displayName: "Start Automation.UI run"
+            condition: and(succeeded(), ne(variables.SKIP_RUN, 'true'))
+            inputs:
+              targetType: "inline"
+              script: |
+                $base = "$(AUTOMATION_UI_BASE_URL)".TrimEnd('/')
+                $url  = "$base/api/runs/start"
+
+                $body = @{
+                  scenarioId = "$(SCENARIO_ID)"
+                  source     = "ADO pipeline ${{ parameters.targetEnvironment }} (commit $(COMMIT_SHORT))"
+                } | ConvertTo-Json -Compress
+
+                Write-Host "POST $url"
+                Write-Host "Body: $body"
+                $response = Invoke-RestMethod -Uri $url -Method Post -ContentType "application/json" -Body $body
+                $runId = $response.runId
+                if (-not $runId) { Write-Error "Start did not return a runId."; exit 1 }
+                Write-Host "Started runId=$runId"
+                Write-Host "##vso[task.setvariable variable=RUN_ID]$runId"
+
+          # -------------------------------------------------------------
+          # Poll GET /api/runs/{id}/status until terminal or timeout.
+          # -------------------------------------------------------------
+          - task: PowerShell@2
+            displayName: "Wait for Automation.UI run to finish"
+            condition: and(succeeded(), ne(variables.SKIP_RUN, 'true'))
+            inputs:
+              targetType: "inline"
+              script: |
+                $base = "$(AUTOMATION_UI_BASE_URL)".TrimEnd('/')
+                $url  = "$base/api/runs/$(RUN_ID)/status"
+
+                $deadline = (Get-Date).AddMinutes(${{ parameters.completionTimeoutMinutes }})
+                $finalStatus = "Unknown"
+                $finalError  = ""
+                $duration    = ""
+                $finishedAt  = ""
+
+                while ((Get-Date) -lt $deadline) {
+                  try {
+                    $r = Invoke-RestMethod -Uri $url -Method Get
+                    Write-Host ("status={0} isTerminal={1}" -f $r.status, $r.isTerminal)
+                    if ($r.isTerminal) {
+                      $finalStatus = "$($r.status)"
+                      $finalError  = "$($r.error)"
+                      $duration    = "$($r.duration)"
+                      $finishedAt  = "$($r.finishedAt)"
+                      break
+                    }
+                  } catch {
+                    Write-Host "Status check failed (will retry): $_"
+                  }
+                  Start-Sleep -Seconds ${{ parameters.pollIntervalSeconds }}
+                }
+
+                if ($finalStatus -eq "Unknown") {
+                  $finalStatus = "TimedOut"
+                  $finalError  = "Pipeline timed out after ${{ parameters.completionTimeoutMinutes }} minutes waiting for run $(RUN_ID)."
+                }
+
+                Write-Host "Final status: $finalStatus"
+                Write-Host "##vso[task.setvariable variable=RUN_STATUS]$finalStatus"
+                Write-Host "##vso[task.setvariable variable=RUN_ERROR]$finalError"
+                Write-Host "##vso[task.setvariable variable=RUN_DURATION]$duration"
+                Write-Host "##vso[task.setvariable variable=RUN_FINISHED_AT]$finishedAt"
+
+                if ($finalStatus -ne "Succeeded") {
+                  Write-Host "##vso[task.complete result=Failed;]Run finished with status '$finalStatus'."
+                }
+
+          # -------------------------------------------------------------
+          # Fetch Slack webhook from Azure App Configuration. Replaces the
+          # file-based webhook lookup the old pipeline used; the value
+          # never lives in source. Marked as a secret so it is masked in logs.
+          # -------------------------------------------------------------
+          - task: AzureCLI@2
+            displayName: "Fetch Slack webhook from Azure App Configuration"
+            condition: always()
+            inputs:
+              azureSubscription: "$(AZURE_SERVICE_CONNECTION)"
+              scriptType: "pscore"
+              scriptLocation: "inlineScript"
+              inlineScript: |
+                $value = az appconfig kv show `
+                  --name  "$(APP_CONFIG_NAME)" `
+                  --key   "$(APP_CONFIG_SLACK_KEY)" `
+                  --label "$(APP_CONFIG_SLACK_LABEL)" `
+                  --query value -o tsv
+
+                if (-not $value) {
+                  Write-Host "Slack webhook key '$(APP_CONFIG_SLACK_KEY)' (label '$(APP_CONFIG_SLACK_LABEL)') not found in App Config '$(APP_CONFIG_NAME)'."
+                  Write-Host "##vso[task.setvariable variable=SLACK_WEBHOOK_URL]"
+                  exit 0
+                }
+
+                Write-Host "Fetched Slack webhook from App Config."
+                Write-Host "##vso[task.setvariable variable=SLACK_WEBHOOK_URL;issecret=true]$value"
+
+          # -------------------------------------------------------------
+          # Slack notification - posts to the webhook fetched above.
+          # -------------------------------------------------------------
+          - task: PowerShell@2
+            displayName: "Send result to Slack"
+            condition: always()
+            inputs:
+              targetType: "inline"
+              script: |
+                $webhook = "$(SLACK_WEBHOOK_URL)"
+                if (-not $webhook) {
+                  Write-Host "SLACK_WEBHOOK_URL not set; skipping Slack notification."
+                  exit 0
+                }
+
+                $envName    = "${{ parameters.targetEnvironment }}"
+                $scenName   = "${{ parameters.scenario }}"
+                $status     = "$(RUN_STATUS)"
+                $err        = "$(RUN_ERROR)"
+                $duration   = "$(RUN_DURATION)"
+                $runId      = "$(RUN_ID)"
+                $commit     = "$(COMMIT_SHORT)"
+                $skipped    = "$(SKIP_RUN)"
+                $adoUrl     = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+                $automation = "$(AUTOMATION_UI_BASE_URL)"
+
+                if (-not $status) { $status = "NotStarted" }
+                if ($skipped -eq "true") { $status = "Skipped (no Deploy_All_Services build)" }
+
+                $icon = switch ($status) {
+                  "Succeeded" { ":white_check_mark:" }
+                  "Failed"    { ":x:" }
+                  "Cancelled" { ":warning:" }
+                  "TimedOut"  { ":hourglass:" }
+                  default     { ":grey_question:" }
+                }
+
+                $lines = @()
+                $lines += "*Title: Automated Test Report :robot_face:*"
+                $lines += "*Environment:* $envName"
+                $lines += "*Scenario:* $scenName"
+                $lines += "*Status:* $icon $status"
+                if ($commit)   { $lines += "*Commit:* $commit" }
+                if ($duration) { $lines += "*Duration:* $duration" }
+                if ($runId)    { $lines += "*Run:* <$automation/Runs/Details/$runId|Open in Automation.UI>" }
+                $lines += "*Pipeline:* <$adoUrl|View ADO build>"
+                $lines += "*TestRail:* <$(TESTRAIL_RUN_URL)|Open TestRail Run>"
+                if ($err)      { $lines += "*Error:* $err" }
+
+                $payload = @{ text = ($lines -join "`n") } | ConvertTo-Json -Compress
+                try {
+                  Invoke-RestMethod -Uri $webhook -Method Post -ContentType "application/json" -Body $payload | Out-Null
+                  Write-Host "Slack notification sent."
+                } catch {
+                  Write-Host "Failed to post to Slack: $_"
+                }
+
+          # -------------------------------------------------------------
+          # Pipeline summary
+          # -------------------------------------------------------------
+          - task: PowerShell@2
+            displayName: "Pipeline summary"
+            condition: always()
+            inputs:
+              targetType: "inline"
+              script: |
+                Write-Host "##[section]Automation.UI run summary"
+                Write-Host "Environment : ${{ parameters.targetEnvironment }}"
+                Write-Host "Scenario    : ${{ parameters.scenario }} ($(SCENARIO_ID))"
+                Write-Host "Run id      : $(RUN_ID)"
+                Write-Host "Status      : $(RUN_STATUS)"
+                Write-Host "Duration    : $(RUN_DURATION)"
+                Write-Host "Commit      : $(COMMIT_SHORT)"
+                Write-Host "Skipped     : $(SKIP_RUN)"
