@@ -2,16 +2,9 @@
 {
     public interface ISubmissionServiceMetrics
     {
-        void IncrementReportSubmittedCounter(int count, List<KeyValuePair<string, object?>> tags);
-        void IncrementResourcesSubmittedCounter(int count, List<KeyValuePair<string, object?>> tags);
-        void IncrementResourceTypeCounter(int count, List<KeyValuePair<string, object?>> tags);
-        void IncrementMedicationCounter(int count, List<KeyValuePair<string, object?>> tags);
-        void IncrementEncounterCounter(int count, List<KeyValuePair<string, object?>> tags);
-        void IncrementLocationCounter(int count, List<KeyValuePair<string, object?>> tags);
-        void IncrementDiagnosticCounter(int count, List<KeyValuePair<string, object?>> tags);
-        void IncrementObservationCounter(int count, List<KeyValuePair<string, object?>> tags);
-        void IncrementMedicationRequestCounter(int count, List<KeyValuePair<string, object?>> tags);
-        void IncrementSpecimenCounter(int count, List<KeyValuePair<string, object?>> tags);
-        void IncrementServiceRequestCounter(int count, List<KeyValuePair<string, object?>> tags);
+        List<KeyValuePair<string, object?>> BuildTags(string? correlationId, Guid reportScheduleId, string? patientId, string facilityId, string destinationType);
+        void IncrementResourceCount(List<KeyValuePair<string, object?>> tags);
+        void RecordUploadDuration(double durationMilliseconds, List<KeyValuePair<string, object?>> tags);
+        void RecordUploadSize(long sizeBytes, List<KeyValuePair<string, object?>> tags);
     }
 }

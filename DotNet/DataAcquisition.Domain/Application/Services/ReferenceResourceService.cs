@@ -1,4 +1,5 @@
-﻿using Confluent.Kafka;
+﻿using System.Text;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
@@ -24,9 +25,8 @@ using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
-using System.Data;
-using System.Text;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using IsolationLevel = System.Data.IsolationLevel;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
@@ -139,7 +139,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
         activity?.SetTag(DiagnosticNames.FacilityId, primaryLog.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, primaryLog.CorrelationId);
-        activity?.SetTag(DiagnosticNames.ReportId, primaryLog.Id);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, primaryLog.Id);
 
         // Resolve the facility's query plan once. The plan's per-type ReferenceQueryConfig
         // tells us OperationType (Search vs SearchPost) and Paged batch size.
@@ -344,7 +344,7 @@ public class ReferenceResourceService : IReferenceResourceService
             _dbContext.ChangeTracker.Clear();
             created = false;
 
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(System.Data.IsolationLevel.ReadCommitted, ct);
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
             await AcquireLockAsync(primaryLog, resourceType, ct);
 
             try
