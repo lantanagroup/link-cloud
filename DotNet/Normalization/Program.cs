@@ -1,4 +1,5 @@
-﻿using Confluent.Kafka;
+﻿using System.Reflection;
+using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Services;
@@ -37,7 +38,6 @@ using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
-using System.Reflection;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -274,6 +274,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
     });
 
+    builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<INormalizationServiceMetrics, NormalizationServiceMetrics>();
 }
 

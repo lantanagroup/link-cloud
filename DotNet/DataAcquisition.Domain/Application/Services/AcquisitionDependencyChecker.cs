@@ -1,5 +1,4 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
@@ -10,7 +9,6 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.Extensions.Logging;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
@@ -45,7 +43,7 @@ public class AcquisitionDependencyChecker : IAcquisitionDependencyChecker
         ArgumentNullException.ThrowIfNull(log);
 
         using var activity = ServiceActivitySource.Instance.StartActivity("AcquisitionDependencyChecker.CheckDependenciesAsync");
-        activity?.SetTag(DiagnosticNames.ReportId, log.Id);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, log.Id);
         activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, log.CorrelationId);
 

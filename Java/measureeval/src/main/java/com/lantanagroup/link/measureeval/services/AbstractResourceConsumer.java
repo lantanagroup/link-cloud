@@ -236,9 +236,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 measureReport = null;
             }
 
+            boolean reportable = false;
+
             switch (value.getQueryType()) {
                 case INITIAL -> {
-                    boolean reportable = measureReport != null && reportabilityPredicate.test(measureReport);
+                    reportable = measureReport != null && reportabilityPredicate.test(measureReport);
                     updateReportability(patientStatus, report, reportable);
 
                     if (!reportable) {
@@ -249,29 +251,17 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 case SUPPLEMENTAL -> blobStorageService.storePatientInBlobStorage(patientStatus, report, measureReport);
                 default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
             }
+
+            // if at least one reportable measure, increment the reportable patient counter otherwise increment the non-reportable patient counter
+            Attributes attributes = MeasureEvalMetrics.buildAttributes(value.getQueryType().toString(), patientStatus, report.getReportTrackingId(), null);
+            measureEvalMetrics.IncrementPatientReportableCounter(attributes, reportable);
         }
 
         boolean reportablePatient = patientStatus.getReports().stream().anyMatch(PatientReportingEvaluationStatus.Report::getReportable);
-        // if at least one reportable measure, increment the reportable patient counter otherwise increment the non-reportable patient counter
-        updatePatientMetrics(value, patientStatus, reportablePatient);
 
         // if the query type is INITIAL and at least one measure is reportable, produce the DataAcquisitionRequested record
         if (value.getQueryType() == QueryType.INITIAL && reportablePatient) {
             produceDataAcquisitionRequestedRecord(value, patientStatus);
-        }
-    }
-
-    private void updatePatientMetrics (T value, PatientReportingEvaluationStatus patientStatus, boolean reportablePatient) {
-
-        if (value.getQueryType() == QueryType.INITIAL) {
-            Attributes attributes = Attributes.builder().put(stringKey(DiagnosticNames.FACILITY_ID), patientStatus.getFacilityId()).
-                    put(stringKey(DiagnosticNames.PATIENT_ID), patientStatus.getPatientId()).
-                    put(stringKey(DiagnosticNames.CORRELATION_ID), patientStatus.getCorrelationId()).build();
-            if (reportablePatient) {
-                measureEvalMetrics.IncrementPatientReportableCounter(attributes);
-            } else {
-                measureEvalMetrics.IncrementPatientNonReportableCounter(attributes);
-            }
         }
     }
 
@@ -282,8 +272,6 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
         report.setReportable(reportable);
         patientStatusRepository.save(patientStatus);
     }
-
-
 
     private void produceDataAcquisitionRequestedRecord (T value, PatientReportingEvaluationStatus patientStatus) {
         logger.debug("Producing {}", Topics.DATA_ACQUISITION_REQUESTED);

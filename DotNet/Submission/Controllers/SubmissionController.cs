@@ -1,9 +1,12 @@
-﻿using System.Net.Http.Headers;
+﻿using System.IO.Compression;
+using System.Net.Http.Headers;
+using System.Text.Json;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Submission.Application.Config;
+using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Services;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -24,7 +27,7 @@ public class SubmissionController(
     ICreateSystemToken createSystemToken,
     IHttpClientFactory httpClientFactory,
     IOptions<ServiceRegistry> serviceRegistry,
-    BlobStorageService blobStorageService) : Controller
+    IStorageService blobStorageService) : Controller
 {
     /**
      * Downloads the specified report's data as a ZIP archive
@@ -80,7 +83,7 @@ public class SubmissionController(
             return StatusCode((int)reportResponse.StatusCode, "Unable to retrieve report metadata.");
         }
 
-        var jsonResponse = System.Text.Json.JsonDocument.Parse(
+        var jsonResponse = JsonDocument.Parse(
             await reportResponse.Content.ReadAsStringAsync());
 
         if (!jsonResponse.RootElement.TryGetProperty("payloadRootUri", out var payloadRootUri) ||
@@ -107,13 +110,13 @@ public class SubmissionController(
     {
         using var memoryStream = new MemoryStream();
         using (var zipArchive =
-               new System.IO.Compression.ZipArchive(memoryStream, System.IO.Compression.ZipArchiveMode.Create,
+               new ZipArchive(memoryStream, ZipArchiveMode.Create,
                    true))
         {
             foreach (var file in files)
             {
                 // Add each file to the zip archive
-                var zipEntry = zipArchive.CreateEntry(file.Key, System.IO.Compression.CompressionLevel.Optimal);
+                var zipEntry = zipArchive.CreateEntry(file.Key, CompressionLevel.Optimal);
                 using var zipEntryStream = zipEntry.Open();
                 new MemoryStream(file.Value).CopyTo(zipEntryStream);
             }
