@@ -181,116 +181,206 @@
 
                 </div>
             </nav>
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content"><!-- Section 1: Navigation Cards (Domains, Services, Messages) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-primary"><i class="bi bi-diagram-3"></i></div>
-                <h5 class="card-title">Domains <a id="domains" href="#domains" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Domains"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Explore high-level business domains like Compliance, Data Access, and Report. Each domain groups related services and events.</p>
-                <a href="domains.html" class="btn btn-outline-primary btn-sm stretched-link">View Domains</a>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Admin UI (front-end)</h1>
+<div class="row">
+    <div class="col-md-8">
+        <div class="mb-3"><strong>Produces:</strong> None</div><div class="mb-3"><strong>Consumes:</strong> None</div>
+        <h2 id="overview">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Admin UI is an Angular-based front-end application that provides a comprehensive interface for managing the Link platform, configuring tenants, and monitoring report generation and submission workflows.</p>
+<h3 id="system-wide-functionality">System-wide Functionality <a id="system-wide-functionality" href="#system-wide-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: System-wide Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>User Management</strong>: Allows administrators to manage user accounts, including creation, editing, and deletion. Currently, the system supports a single &quot;admin&quot; role for platform-wide access.</li>
+<li><strong>Measure Management</strong>: Upload and manage FHIR-based measure definitions. Administrators can upload measure bundles in JSON format and explore related artifacts.</li>
+<li><strong>Validation Profile (IG) Management</strong>: Supports the management of FHIR Implementation Guides (IGs). Administrators can upload IGs as <code>.tgz</code> packages and view their terminology dependencies and package details.</li>
+<li><strong>Terminology Management</strong>: Allows for viewing and filtering terminology resources, such as CodeSystems and ValueSets, that are utilized by the platform's terminology service.</li>
+<li><strong>Integration Testing Support</strong>: Offers tools to initiate and track integration tests, enabling administrators to validate service connectivity and workflow correctness within the environment.</li>
+</ul>
+<h3 id="tenant-configuration">Tenant Configuration <a id="tenant-configuration" href="#tenant-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Basic Configuration</strong>: Administrators can define tenant-specific settings, including Facility IDs, names, and timezones.</li>
+<li><strong>Census Scheduling and Acquisition Methods</strong>: Supports configuring how patient census data is acquired, including defining schedules and enabling/disabling automated census retrieval.</li>
+<li><strong>Measure Association &amp; Scheduling</strong>: Enables associating specific measures with a tenant and configuring automated reporting schedules (Daily, Weekly, or Monthly cadences).</li>
+<li><strong>Data Sources &amp; Acquisition</strong>:
+<ul>
+<li><strong>FHIR Query Config</strong>: Configuration of FHIR-based data acquisition parameters.</li>
+<li><strong>FHIR List Config</strong>: Management of patient list-based acquisition settings.</li>
+<li><strong>Query Plans</strong>: Definition and management of query plans used to retrieve clinical data from data sources.</li>
+</ul>
+</li>
+<li><strong>Normalization Operations</strong>: Configuration of transformation rules and operations applied to data during the normalization phase.</li>
+</ul>
+<h3 id="tenant-report-viewing">Tenant &amp; Report Viewing <a id="tenant-amp-report-viewing" href="#tenant-amp-report-viewing" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant &amp;amp; Report Viewing"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Tenant Dashboard</strong>: Provides a high-level view of a tenant's configuration and a list of all reports generated for that tenant.</li>
+<li><strong>Report Details</strong>:
+<ul>
+<li><strong>Report Summary</strong>: Visual representation of report status using donut charts for Measure IP counts, Reporting Status, and Submission Status.</li>
+<li><strong>Patient List</strong>: A detailed table of all patients included in a report, showing individual reporting and submission statuses.</li>
+<li><strong>Pre-qualification (Validation)</strong>: Detailed access to validation results, categorized by issue type (e.g., missing profiles or terminology warnings), allowing for quick identification of data quality issues.</li>
+</ul>
+</li>
+<li><strong>Report Downloading</strong>: Enables download of generated report packages for manual delivery, archival, or verification once a report has been submitted.</li>
+</ul>
+<h3 id="data-acquisition-log-analysis">Data Acquisition Log Analysis <a id="data-acquisition-log-analysis" href="#data-acquisition-log-analysis" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Log Analysis"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>Log Access</strong>: Integration with data acquisition logs allows administrators to analyze acquisition statistics and troubleshoot data retrieval issues directly from the report view.</li>
+<li><strong>Analysis Tools</strong>: Provides insights into the success and failure rates of data acquisition steps for a given report.</li>
+</ul>
+<h3 id="generating-adhoc-reports">Generating Adhoc Reports <a id="generating-adhoc-reports" href="#generating-adhoc-reports" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Generating Adhoc Reports"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li><strong>On-demand Generation</strong>: Allows administrators to manually trigger report generation for a specific facility, reporting period, and set of measures.</li>
+<li><strong>Patient Scoping</strong>: Supports restricting adhoc reports to a specific cohort by manually entering patient IDs or uploading a CSV file of patient identifiers.</li>
+<li><strong>Submission Control</strong>: Includes an option to bypass automatic submission, enabling administrators to generate and review reports before they are sent to external entities.</li>
+</ul>
+<h2 id="volumes">Volumes <a id="volumes" href="#volumes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Volumes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<table>
+<thead>
+<tr>
+<th>Volume</th>
+<th>Mount Path</th>
+<th>Sub-path</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Azure Storage Account</td>
+<td><code>/usr/share/nginx/html/assets/app.config.local.json</code></td>
+<td><code>app.config.local.json</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="configuration">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>An <code>app.config.local.json</code> file is used to configure the Admin UI service at deployment time, overriding the defaults in <code>app.config.json</code>.</p>
+<pre><code class="language-json">{
+  &quot;baseApiUrl&quot;: &quot;&lt;ADMIN-BFF-BASE-URL&gt;/api&quot;,
+  &quot;authRequired&quot;: true,
+  &quot;oauth2&quot;: {
+    &quot;enabled&quot;: true,
+    &quot;issuer&quot;: &quot;...&quot;,
+    &quot;clientId&quot;: &quot;...&quot;,
+    &quot;scope&quot;: &quot;openid profile email&quot;,
+    &quot;responseType&quot;: &quot;code&quot;
+  }
+}
+</code></pre>
+<p>This configuration file can be customized at deployment time and mounted in the <code>/assets</code> folder, or it can be overridden by ENV variables in a docker deployment.</p>
+<h3 id="authentication">Authentication <a id="authentication" href="#authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The Admin UI supports authentication using:</p>
+<ul>
+<li>OAuth2 via an identity provider (e.g., Azure AD, Keycloak), enabling secure login with centralized identity and access management.</li>
+<li>Token Generation via AdminBFF /api/login, which provides session tokens for downstream API access when deployed in a simplified or standalone context.</li>
+</ul>
+<h2 id="environment-variables">Environment Variables <a id="environment-variables" href="#environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<table>
+<thead>
+<tr>
+<th><strong>ENV variable</strong></th>
+<th><strong>JSON Property</strong></th>
+<th><strong>Description</strong></th>
+<th><strong>Default Value</strong></th>
+<th><strong>Required</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LINK_BASE_API_URL</td>
+<td><code>baseApiUrl</code></td>
+<td>The base URL for the Admin BFF API.</td>
+<td><code>http://localhost</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>LINK_AUTH_REQUIRED</td>
+<td><code>authRequired</code></td>
+<td>Indicates whether authentication is required for the Admin UI.</td>
+<td><code>true</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>LINK_OAUTH2_ENABLED</td>
+<td><code>oauth2.enabled</code></td>
+<td>Indicates whether OAuth2 authentication is enabled.</td>
+<td><code>false</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>LINK_OAUTH2_ISSUER</td>
+<td><code>oauth2.issuer</code></td>
+<td>The issuer URL for the OAuth2 provider.</td>
+<td><code>null</code></td>
+<td>If oauth2 enabled</td>
+</tr>
+<tr>
+<td>LINK_OAUTH2_CLIENT_ID</td>
+<td><code>oauth2.clientId</code></td>
+<td>The client ID for the OAuth2 application.</td>
+<td><code>null</code></td>
+<td>If oauth2 enabled</td>
+</tr>
+<tr>
+<td>LINK_OAUTH2_SCOPE</td>
+<td><code>oauth2.scope</code></td>
+<td>The scope for the OAuth2 application.</td>
+<td><code>openid profile email</code></td>
+<td>If oauth2 enabled</td>
+</tr>
+<tr>
+<td>LINK_OAUTH2_RESPONSE_TYPE</td>
+<td><code>oauth2.responseType</code></td>
+<td>The response type for the OAuth2 application.</td>
+<td><code>code</code></td>
+<td>If oauth2 enabled</td>
+</tr>
+<tr>
+<td>GRAFANA_URL</td>
+<td><code>grafanaUrl</code></td>
+<td>URL for the Grafana UI.</td>
+<td><code>http://localhost:3000</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td>KAFKA_URL</td>
+<td><code>kafkaUrl</code></td>
+<td>URL for the Kafka UI.</td>
+<td><code>http://localhost:9095</code></td>
+<td>If Kafka UI is available</td>
+</tr>
+</tbody>
+</table>
+<h2 id="local-development-with-proxy-configuration">Local Development with Proxy Configuration <a id="local-development-with-proxy-configuration" href="#local-development-with-proxy-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Local Development with Proxy Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>To facilitate local development and testing, the Admin UI can be configured to proxy API requests to a local or remote instance of the Admin BFF service. This is achieved by setting up a proxy configuration file.</p>
+<pre><code class="language-json">{
+    &quot;/api&quot;: {
+      &quot;target&quot;: &quot;http://localhost:5218&quot;,
+      &quot;secure&quot;: false,
+      &quot;changeOrigin&quot;: true,
+      &quot;logLevel&quot;: &quot;debug&quot;
+    }
+}
+</code></pre>
+<p>To use the proxy configuration, start the Angular development server with the following command:</p>
+<pre><code class="language-bash">ng serve --proxy-config proxy.conf.json --configuration=development
+</code></pre>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+nAdminUI_245AD6E3["Service: Admin UI (front-end)"]</pre>
+            <div class="mermaid-actions no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
             </div>
         </div>
     </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-success"><i class="bi bi-gear-wide-connected"></i></div>
-                <h5 class="card-title">Services <a id="services" href="#services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Discover the services that power the Link platform, their APIs, and the messages they produce and consume.</p>
-                <a href="services.html" class="btn btn-outline-success btn-sm stretched-link">View Services</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-info"><i class="bi bi-envelope-paper"></i></div>
-                <h5 class="card-title">Messages <a id="messages" href="#messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Review the events, commands, and queries that flow through the system, including their JSON schemas and version history.</p>
-                <a href="events.html" class="btn btn-outline-info btn-sm stretched-link">View Messages</a>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- Section 2: Core Services Overview -->
-<div class="mb-5">
-    <h2 class="border-bottom pb-2 mb-3">Core Services <a id="core-services" href="#core-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-    <p class="lead">The Link platform is built on a suite of core services that work together to automate reporting workflows, from data acquisition through to submission.</p>
-    <ul class="list-group list-group-flush">
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Platform agnostic:</strong> using interfaces for specific implementations such as Azure.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Micro services:</strong> for scalability in cloud environments.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Event driven:</strong> service interaction (where appropriate) using Kafka.</li>
-    </ul>
-</div>
-<!-- Section 3: Service Cards (3 Column Grid) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Data Acquisition Service <a id="data-acquisition-service" href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Responsible for retrieving raw data from external facility systems and initiating the processing pipeline.</p>
-                <a href="service-dataacquisitionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Census Service <a id="census-service" href="#census-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Manages patient population data and scoping for reporting periods and facilities.</p>
-                <a href="service-censusservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Normalization Service <a id="normalization-service" href="#normalization-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Normalization Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Transforms varied facility data formats into a standardized, internal format suitable for evaluation.</p>
-                <a href="service-normalizationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Measure Evaluation Service <a id="measure-evaluation-service" href="#measure-evaluation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Executes business logic and clinical quality measures against normalized data to calculate metrics.</p>
-                <a href="service-measureevalservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Validation Service <a id="validation-service" href="#validation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Ensures that generated reports and data packages comply with NHSN standards and internal policies.</p>
-                <a href="service-validationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Submission Service <a id="submission-service" href="#submission-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Submission Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Handles the secure transmission of validated data and reports to external stakeholders and agencies.</p>
-                <a href="service-submissionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Admin UI (front-end) <a id="admin-ui-front-end" href="#admin-ui-front-end" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Admin UI (front-end)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Web-based user interface for managing users, measures, validation profiles, terminology, tenants and reports.</p>
-                <a href="service-adminui.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-</div>
-            </main>
+</div>            </main>
         </div>
     </div>
 </body>

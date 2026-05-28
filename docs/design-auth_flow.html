@@ -181,116 +181,174 @@
 
                 </div>
             </nav>
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content"><!-- Section 1: Navigation Cards (Domains, Services, Messages) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-primary"><i class="bi bi-diagram-3"></i></div>
-                <h5 class="card-title">Domains <a id="domains" href="#domains" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Domains"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Explore high-level business domains like Compliance, Data Access, and Report. Each domain groups related services and events.</p>
-                <a href="domains.html" class="btn btn-outline-primary btn-sm stretched-link">View Domains</a>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Auth Flow</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <p>The Link Admin BFF (Backend for Frontend) implements a secure authentication flow using OAuth 2.0 with cookie-based session management. This provides a robust security model where the BFF acts as the OAuth client and manages user sessions through secure HTTP-only cookies.</p>
+<h1 id="authentication-flow">Authentication Flow <a id="authentication-flow" href="#authentication-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Authentication Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<ol>
+<li><strong>Initial Login Request</strong></li>
+</ol>
+<ul>
+<li>The UI redirects users to <code>/api/login</code> on the BFF</li>
+<li>The BFF initiates the authorization by redirecting to the configured Identity Provider (IdP) or Authorization Server</li>
+<li>The OAuth provider authenticates the user and returns an authorization code</li>
+</ul>
+<ol start="2">
+<li><strong>Token Exchange &amp; Session Creation</strong></li>
+</ol>
+<ul>
+<li>The BFF exchanges the authorization code for access/refresh tokens</li>
+<li>The BFF creates a session and issues a secure HTTP-only cookie named &quot;link_cookie&quot;</li>
+<li>The cookie contains session information but not the actual OAuth tokens</li>
+<li>OAuth tokens are securely stored server-side and managed by the BFF</li>
+</ul>
+<ol start="3">
+<li><strong>Subsequent Requests</strong></li>
+</ol>
+<ul>
+<li>The UI includes the session cookie automatically with each request</li>
+<li>The BFF validates the cookie and retrieves the associated session</li>
+<li>The BFF uses the OAuth tokens to make authenticated requests to backend services</li>
+<li>Token refresh is handled transparently by the BFF when needed</li>
+<li>The BFF generates a short lived JWT token and adds it to the Authorization header when making requests to backend services</li>
+</ul>
+<h1 id="cookie-security">Cookie Security <a id="cookie-security" href="#cookie-security" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Cookie Security"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<ul>
+<li>Cookies are HTTP-only to prevent XSS attacks</li>
+<li>Secure flag ensures cookies only sent over HTTPS</li>
+<li>Anti-forgery protection enabled</li>
+<li>Session cookies with server-side storage</li>
+</ul>
+<h1 id="token-security">Token Security <a id="token-security" href="#token-security" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Token Security"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<ul>
+<li>OAuth tokens never exposed to the frontend</li>
+<li>Tokens stored securely server-side</li>
+<li>Token refresh handled by BFF</li>
+<li>Short-lived access tokens with automatic refresh</li>
+</ul>
+<h1 id="cors-protection">CORS Protection <a id="cors-protection" href="#cors-protection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CORS Protection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<ul>
+<li>Strict CORS policy configured</li>
+<li>Credentials mode enabled for cookie transmission</li>
+<li>Only trusted origins allowed</li>
+</ul>
+<h1 id="pkce-proof-key-for-code-exchange">PKCE (Proof Key for Code Exchange) <a id="pkce-proof-key-for-code-exchange" href="#pkce-proof-key-for-code-exchange" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: PKCE (Proof Key for Code Exchange)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>PKCE is implemented to secure the OAuth authorization code flow and prevent authorization code interception attacks:</p>
+<p><strong>Code Verifier Generation</strong></p>
+<ul>
+<li>A cryptographically random code verifier is generated for each authentication request</li>
+<li>The verifier is stored securely server-side in the BFF</li>
+<li>Length and character requirements follow OAuth PKCE specifications</li>
+</ul>
+<p><strong>Code Challenge</strong></p>
+<ul>
+<li>The code challenge is derived from the verifier using SHA-256</li>
+<li>Challenge is included in the initial authorization request</li>
+<li>The challenge method is set to &quot;S256&quot; (SHA-256)</li>
+</ul>
+<p><strong>Code Exchange</strong></p>
+<ul>
+<li>Original code verifier is included when exchanging the authorization code</li>
+<li>OAuth provider validates the code challenge/verifier pair</li>
+<li>Prevents malicious actors from using intercepted auth codes</li>
+</ul>
+<h1 id="state-parameter-protection">State Parameter Protection <a id="state-parameter-protection" href="#state-parameter-protection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: State Parameter Protection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>The state parameter provides CSRF protection during the OAuth flow:</p>
+<p><strong>State Generation</strong></p>
+<ul>
+<li>Cryptographically secure random state value generated per request</li>
+<li>State is bound to the user's session</li>
+<li>Stored server-side in the BFF</li>
+</ul>
+<p><strong>State Validation</strong></p>
+<ul>
+<li>State parameter included in authorization request</li>
+<li>Returned state must match the original stored value</li>
+<li>Requests with invalid/missing state are rejected</li>
+<li>Protects against CSRF and replay attacks</li>
+</ul>
+<h1 id="scope-restrictions">Scope Restrictions <a id="scope-restrictions" href="#scope-restrictions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scope Restrictions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>OAuth scopes are strictly controlled to limit access:</p>
+<p><strong>Required Scopes</strong></p>
+<p>openid profile email</p>
+<p><strong>Scope Validation</strong></p>
+<ul>
+<li>Only pre-configured scopes are allowed</li>
+<li>Scope requests are validated against allowed list</li>
+<li>Additional scopes require explicit configuration</li>
+<li>Prevents scope elevation attacks</li>
+</ul>
+<p><strong>Scope Usage</strong></p>
+<ul>
+<li>Scopes map to specific API permissions</li>
+<li>Access tokens only receive approved scopes</li>
+<li>Resource access is restricted by granted scopes</li>
+</ul>
+<h1 id="configuration">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>The BFF's OAuth and cookie settings are configured in <code>appsettings.json</code>:</p>
+<pre><code class="language-json">&quot;Authentication&quot;: {
+  &quot;DefaultScheme&quot;: &quot;link_cookie&quot;,
+  &quot;DefaultChallengeScheme&quot;: &quot;link_oauth2&quot;,
+  &quot;Schemas&quot;: {
+    &quot;Cookie&quot;: {
+      &quot;HttpOnly&quot;: true,
+      &quot;Domain&quot;: &quot;&quot;,
+      &quot;Path&quot;: &quot;/&quot;
+    },
+    &quot;Oauth2&quot;: {
+      &quot;Enabled&quot;: true,
+      &quot;ClientId&quot;: &quot;&quot;,
+      &quot;ClientSecret&quot;: &quot;&quot;,
+      &quot;Endpoints&quot;: {
+        &quot;Authorization&quot;: &quot;&quot;,
+        &quot;Token&quot;: &quot;&quot;,
+        &quot;UserInformation&quot;: &quot;&quot;
+      },
+      &quot;CallbackPath&quot;: &quot;/api/signin-oauth2&quot;
+    }
+  }
+}
+</code></pre>
+<h1 id="ui-integration">UI Integration <a id="ui-integration" href="#ui-integration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: UI Integration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>The UI application interacts with the BFF's authentication system through:</p>
+<h2 id="login">Login <a id="login" href="#login" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Login"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<pre><code class="language-javascript">// Redirect to BFF login endpoint
+window.location.href = '/api/login';
+</code></pre>
+<h2 id="session-status">Session Status <a id="session-status" href="#session-status" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Session Status"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<pre><code class="language-javascript">// Check if user is authenticated
+fetch('/api/user', {
+credentials: 'include' // Important for cookie transmission
+});
+</code></pre>
+<h2 id="logout">Logout <a id="logout" href="#logout" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Logout"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<pre><code class="language-javascript">// Redirect to BFF logout endpoint
+    window.location.href = '/api/logout';
+</code></pre>
+<hr />
+<p>The UI never directly handles OAuth tokens or credentials - all authentication is delegated to and managed by the BFF or a designated identity provider such as Azure or Keycloak.</p>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+nauth_flow_7387BC20["Design: Auth Flow"]</pre>
+            <div class="mermaid-actions no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
             </div>
         </div>
     </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-success"><i class="bi bi-gear-wide-connected"></i></div>
-                <h5 class="card-title">Services <a id="services" href="#services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Discover the services that power the Link platform, their APIs, and the messages they produce and consume.</p>
-                <a href="services.html" class="btn btn-outline-success btn-sm stretched-link">View Services</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-info"><i class="bi bi-envelope-paper"></i></div>
-                <h5 class="card-title">Messages <a id="messages" href="#messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Review the events, commands, and queries that flow through the system, including their JSON schemas and version history.</p>
-                <a href="events.html" class="btn btn-outline-info btn-sm stretched-link">View Messages</a>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- Section 2: Core Services Overview -->
-<div class="mb-5">
-    <h2 class="border-bottom pb-2 mb-3">Core Services <a id="core-services" href="#core-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-    <p class="lead">The Link platform is built on a suite of core services that work together to automate reporting workflows, from data acquisition through to submission.</p>
-    <ul class="list-group list-group-flush">
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Platform agnostic:</strong> using interfaces for specific implementations such as Azure.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Micro services:</strong> for scalability in cloud environments.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Event driven:</strong> service interaction (where appropriate) using Kafka.</li>
-    </ul>
-</div>
-<!-- Section 3: Service Cards (3 Column Grid) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Data Acquisition Service <a id="data-acquisition-service" href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Responsible for retrieving raw data from external facility systems and initiating the processing pipeline.</p>
-                <a href="service-dataacquisitionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Census Service <a id="census-service" href="#census-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Manages patient population data and scoping for reporting periods and facilities.</p>
-                <a href="service-censusservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Normalization Service <a id="normalization-service" href="#normalization-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Normalization Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Transforms varied facility data formats into a standardized, internal format suitable for evaluation.</p>
-                <a href="service-normalizationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Measure Evaluation Service <a id="measure-evaluation-service" href="#measure-evaluation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Executes business logic and clinical quality measures against normalized data to calculate metrics.</p>
-                <a href="service-measureevalservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Validation Service <a id="validation-service" href="#validation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Ensures that generated reports and data packages comply with NHSN standards and internal policies.</p>
-                <a href="service-validationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Submission Service <a id="submission-service" href="#submission-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Submission Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Handles the secure transmission of validated data and reports to external stakeholders and agencies.</p>
-                <a href="service-submissionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Admin UI (front-end) <a id="admin-ui-front-end" href="#admin-ui-front-end" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Admin UI (front-end)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Web-based user interface for managing users, measures, validation profiles, terminology, tenants and reports.</p>
-                <a href="service-adminui.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-</div>
-            </main>
+</div>            </main>
         </div>
     </div>
 </body>

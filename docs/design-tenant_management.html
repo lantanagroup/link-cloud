@@ -181,116 +181,128 @@
 
                 </div>
             </nav>
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content"><!-- Section 1: Navigation Cards (Domains, Services, Messages) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-primary"><i class="bi bi-diagram-3"></i></div>
-                <h5 class="card-title">Domains <a id="domains" href="#domains" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Domains"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Explore high-level business domains like Compliance, Data Access, and Report. Each domain groups related services and events.</p>
-                <a href="domains.html" class="btn btn-outline-primary btn-sm stretched-link">View Domains</a>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Tenant Management</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <p>In Link Cloud, the terms &quot;tenant&quot; and &quot;facility&quot; are used interchangeably to refer to healthcare organizations configured within the system. Each tenant/facility is identified by a unique <code>facilityId</code> that must be consistent across all services to ensure proper functionality.</p>
+<h1 id="tenant-service">Tenant Service <a id="tenant-service" href="#tenant-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>The Tenant service acts as the primary entry point for configuring organizations within Link Cloud. It maintains core facility configurations and generates events for scheduled measure reporting periods.</p>
+<h2 id="core-tenant-configuration-elements">Core Tenant Configuration Elements <a id="core-tenant-configuration-elements" href="#core-tenant-configuration-elements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Tenant Configuration Elements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<ul>
+<li>Facility ID (unique identifier used across all services; two modes: NHSN ORG ID (5 digits) or Custom ID (alphanumeric plus hyphens))</li>
+<li>Facility Name</li>
+<li>Creation and Modification dates</li>
+<li>Scheduled Tasks</li>
+<li>Monthly Reporting Plans
+<ul>
+<li>Report Types</li>
+<li>Reporting Periods</li>
+<li>Submission Schedules</li>
+</ul>
+</li>
+</ul>
+<h1 id="cross-service-tenant-configuration">Cross-Service Tenant Configuration <a id="cross-service-tenant-configuration" href="#cross-service-tenant-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Cross-Service Tenant Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>A fully functional tenant requires configuration across multiple services. Each service maintains its own tenant-specific configurations using the <code>facilityId</code> as the linking identifier.</p>
+<h2 id="service-specific-configurations">Service-Specific Configurations <a id="service-specific-configurations" href="#service-specific-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service-Specific Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="tenant-service-1">Tenant Service <a id="tenant-service-1" href="#tenant-service-1" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li>Basic facility information</li>
+<li>Reporting schedules</li>
+<li>Monthly reporting plans</li>
+<li>Multi-measure reporting configurations</li>
+<li>NHSN ORG ID enforcement flag</li>
+<li>Soft delete support (<code>isDeleted</code> flag)</li>
+</ul>
+<h3 id="data-acquisition-service">Data Acquisition Service <a id="data-acquisition-service" href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li>Data source configurations</li>
+<li>Query parameters</li>
+<li>Resource type settings</li>
+<li>Data collection schedules</li>
+</ul>
+<h3 id="measure-evaluation-service">Measure Evaluation Service <a id="measure-evaluation-service" href="#measure-evaluation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li>Measure specifications</li>
+<li>Evaluation schedules</li>
+<li>Performance settings</li>
+<li>Output configurations</li>
+</ul>
+<h3 id="report-generation-service">Report Generation Service <a id="report-generation-service" href="#report-generation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Generation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li>Report templates</li>
+<li>Output format preferences</li>
+<li>Delivery settings</li>
+<li>Generation schedules</li>
+</ul>
+<h3 id="notification-service">Notification Service <a id="notification-service" href="#notification-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Notification Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li>Email notification settings</li>
+<li>Recipient lists</li>
+<li>Alert preferences</li>
+<li>Communication channels</li>
+</ul>
+<h3 id="census-services">Census Services <a id="census-services" href="#census-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li>Facility identification</li>
+<li>Facility ID linking</li>
+<li>Tenant API endpoint configuration</li>
+<li>Base service URLs</li>
+<li>Patient Census Management</li>
+<li>FHIR List query frequency settings</li>
+<li>Admission tracking parameters</li>
+<li>Discharge monitoring configurations</li>
+<li>Patient information retention policies</li>
+</ul>
+<h3 id="query-dispatch-service">Query Dispatch Service <a id="query-dispatch-service" href="#query-dispatch-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Query Dispatch Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li>Facility Configuration</li>
+<li>Facility ID mapping</li>
+<li>FHIR endpoint connections</li>
+<li>Resource query parameters</li>
+<li>Query Timing Management</li>
+<li>Discharge lag period settings</li>
+<li>Resource query scheduling</li>
+<li>Data settlement wait times</li>
+<li>Query retry parameters</li>
+<li>Resource Query Settings</li>
+<li>FHIR resource type configurations</li>
+<li>Query batch sizes</li>
+<li>Performance optimization parameters</li>
+<li>Resource filtering rules</li>
+</ul>
+<h1 id="important-notes">Important Notes <a id="important-notes" href="#important-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Important Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<ol>
+<li>Creating a tenant configuration in the Tenant service alone does not create a fully functional tenant. Additional configuration in other services is required.</li>
+<li>The <code>facilityId</code> must be consistent across all services to ensure proper system integration and functionality.</li>
+<li>Each service captures and manages different aspects of a tenant's configuration, working together to provide complete functionality.</li>
+</ol>
+<h1 id="best-practices">Best Practices <a id="best-practices" href="#best-practices" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Best Practices"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="configuration-management">Configuration Management <a id="configuration-management" href="#configuration-management" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration Management"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<ul>
+<li>Ensure all required services are properly configured for each tenant</li>
+<li>Maintain consistent <code>facilityId</code> usage across services</li>
+</ul>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+ntenant_management_F115EC8["Design: Tenant Management"]</pre>
+            <div class="mermaid-actions no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
             </div>
         </div>
     </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-success"><i class="bi bi-gear-wide-connected"></i></div>
-                <h5 class="card-title">Services <a id="services" href="#services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Discover the services that power the Link platform, their APIs, and the messages they produce and consume.</p>
-                <a href="services.html" class="btn btn-outline-success btn-sm stretched-link">View Services</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-info"><i class="bi bi-envelope-paper"></i></div>
-                <h5 class="card-title">Messages <a id="messages" href="#messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Review the events, commands, and queries that flow through the system, including their JSON schemas and version history.</p>
-                <a href="events.html" class="btn btn-outline-info btn-sm stretched-link">View Messages</a>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- Section 2: Core Services Overview -->
-<div class="mb-5">
-    <h2 class="border-bottom pb-2 mb-3">Core Services <a id="core-services" href="#core-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-    <p class="lead">The Link platform is built on a suite of core services that work together to automate reporting workflows, from data acquisition through to submission.</p>
-    <ul class="list-group list-group-flush">
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Platform agnostic:</strong> using interfaces for specific implementations such as Azure.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Micro services:</strong> for scalability in cloud environments.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Event driven:</strong> service interaction (where appropriate) using Kafka.</li>
-    </ul>
-</div>
-<!-- Section 3: Service Cards (3 Column Grid) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Data Acquisition Service <a id="data-acquisition-service" href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Responsible for retrieving raw data from external facility systems and initiating the processing pipeline.</p>
-                <a href="service-dataacquisitionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Census Service <a id="census-service" href="#census-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Manages patient population data and scoping for reporting periods and facilities.</p>
-                <a href="service-censusservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Normalization Service <a id="normalization-service" href="#normalization-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Normalization Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Transforms varied facility data formats into a standardized, internal format suitable for evaluation.</p>
-                <a href="service-normalizationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Measure Evaluation Service <a id="measure-evaluation-service" href="#measure-evaluation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Executes business logic and clinical quality measures against normalized data to calculate metrics.</p>
-                <a href="service-measureevalservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Validation Service <a id="validation-service" href="#validation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Ensures that generated reports and data packages comply with NHSN standards and internal policies.</p>
-                <a href="service-validationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Submission Service <a id="submission-service" href="#submission-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Submission Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Handles the secure transmission of validated data and reports to external stakeholders and agencies.</p>
-                <a href="service-submissionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Admin UI (front-end) <a id="admin-ui-front-end" href="#admin-ui-front-end" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Admin UI (front-end)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Web-based user interface for managing users, measures, validation profiles, terminology, tenants and reports.</p>
-                <a href="service-adminui.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-</div>
-            </main>
+</div>            </main>
         </div>
     </div>
 </body>

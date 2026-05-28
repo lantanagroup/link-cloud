@@ -181,116 +181,165 @@
 
                 </div>
             </nav>
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content"><!-- Section 1: Navigation Cards (Domains, Services, Messages) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-primary"><i class="bi bi-diagram-3"></i></div>
-                <h5 class="card-title">Domains <a id="domains" href="#domains" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Domains"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Explore high-level business domains like Compliance, Data Access, and Report. Each domain groups related services and events.</p>
-                <a href="domains.html" class="btn btn-outline-primary btn-sm stretched-link">View Domains</a>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Data Persistence</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <p>This page provides a comprehensive overview of the data persistence strategy across the Link platform. Persistence is categorized into three main types, each serving specific architectural needs.</p>
+<h2 id="persistence-strategy-overview">Persistence Strategy Overview <a id="persistence-strategy-overview" href="#persistence-strategy-overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Persistence Strategy Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Link platform utilizes a polyglot persistence approach to optimize for different data characteristics:</p>
+<pre class="mermaid">graph TD
+    %% Databases
+    SQL[(SQL Server)]
+    Mongo[(MongoDB)]
+    ABS[(Azure Blob Storage)]
+
+    %% Services
+    AccountService[[Account Service]]
+    AuditService[[Audit Service]]
+    CensusService[[Census Service]]
+    DAService[[Data Acquisition Service]]
+    NormService[[Normalization Service]]
+    NotifService[[Notification Service]]
+    TenantService[[Tenant Service]]
+    MEService[[Measure Evaluation Service]]
+    ReportService[[Report Service]]
+    SubService[[Submission Service]]
+    ValService[[Validation Service]]
+
+    %% Connections to SQL
+    AccountService --- SQL
+    AuditService --- SQL
+    CensusService --- SQL
+    DAService --- SQL
+    NormService --- SQL
+    NotifService --- SQL
+    ReportService --- SQL
+    TenantService --- SQL
+    ValService --- SQL
+    SubService --- SQL
+
+    %% Connections to MongoDB
+    MEService --- Mongo
+
+    %% Connections to ABS
+    MEService --- ABS
+    SubService --- ABS
+    ValService --- ABS
+
+    classDef database fill:#f9f,stroke:#333,stroke-width:2px;
+    class SQL,Mongo,ABS database;
+</pre>
+<ul>
+<li><strong>SQL Server</strong>: The primary store for <strong>configuration and metadata</strong>. Most services use SQL Server to maintain state, tenant settings, and operational logs.</li>
+<li><strong>MongoDB (Azure Cosmos DB)</strong>: Deployed as Azure Cosmos for MongoDB, this layer is used for <strong>clinical and evaluation artifacts</strong>. It handles the high-volume, semi-structured nature of FHIR resources and evaluation results.</li>
+<li><strong>Azure Blob Storage</strong>: Used for <strong>large file persistence</strong> (e.g., patient bundles, submission NDJSON files).
+<ul>
+<li><em>Platform Agnosticism</em>: Blob storage access is abstracted into interface patterns (e.g., <code>IBlobStorageService</code>) to ensure the platform remains agnostic of the underlying cloud provider.</li>
+<li><em>Usage</em>: Used for internal submissions within the reporting pipeline and external submissions to public health agencies.</li>
+</ul>
+</li>
+</ul>
+<hr />
+<h2 id="service-specific-persistence">Service-Specific Persistence <a id="service-specific-persistence" href="#service-specific-persistence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service-Specific Persistence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Detailed persistence schemas for each service are available directly on their respective documentation pages under the &quot;Database Schema&quot; section. These schemas are maintained as JSON Schema files (<code>db.schema.json</code>) within each service's directory.</p>
+<h3 id="sql-server-relational">SQL Server (Relational) <a id="sql-server-relational" href="#sql-server-relational" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SQL Server (Relational)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>The following services utilize SQL Server for structured configuration and metadata:</p>
+<ul>
+<li><a href="service-accountservice.html">Account Service</a></li>
+<li><a href="service-auditservice.html">Audit Service</a></li>
+<li><a href="service-censusservice.html">Census Service</a></li>
+<li><a href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
+<li><a href="service-normalizationservice.html">Normalization Service</a></li>
+<li><a href="service-notificationservice.html">service:NotificationService</a></li>
+<li><a href="service-reportservice.html">Report Service</a></li>
+<li><a href="service-submissionservice.html">Submission Service</a></li>
+<li><a href="service-tenantservice.html">Tenant Service</a></li>
+<li><a href="service-validationservice.html">Validation Service</a></li>
+</ul>
+<h3 id="mongodb-document-based">MongoDB (Document-based) <a id="mongodb-document-based" href="#mongodb-document-based" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: MongoDB (Document-based)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Used for high-volume clinical and evaluation data:</p>
+<ul>
+<li><a href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+</ul>
+<h3 id="azure-blob-storage-object-storage">Azure Blob Storage (Object Storage) <a id="azure-blob-storage-object-storage" href="#azure-blob-storage-object-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Azure Blob Storage (Object Storage)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Used for large artifacts and submission bundles:</p>
+<ul>
+<li><a href="service-measureevalservice.html">Measure Evaluation Service</a> (evaluated reports)</li>
+<li><a href="service-submissionservice.html">Submission Service</a> (internal and external bundles)</li>
+<li><a href="service-validationservice.html">Validation Service</a> (validation results)</li>
+</ul>
+<hr />
+<h2 id="reporting-pipeline-data-flow">Reporting Pipeline Data Flow <a id="reporting-pipeline-data-flow" href="#reporting-pipeline-data-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Reporting Pipeline Data Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The following diagram illustrates the flow of data through the reporting pipeline and the specific points where it is persisted to the various database layers:</p>
+<pre class="mermaid">graph TD
+    subgraph Pipeline ["Reporting Pipeline Flow"]
+        DAService[[Data Acquisition Service]] -->|Acquires| NormService[[Normalization Service]]
+        NormService -->|Normalizes| MEService[[Measure Evaluation Service]]
+        MEService -->|Evaluates| ReportService[[Report Service]]
+        ReportService -->|Validates| ValService[[Validation Service]]
+        ValService -->|Submits| SubService[[Submission Service]]
+    end
+
+    %% Persistence
+    Mongo[(MongoDB)]
+    IntABS[(Internal ABS)]
+    ExtABS[(External ABS)]
+
+    %% Connections
+    MEService -.->|Persist Normalized Data| Mongo
+    ReportService -.->|Persist Evaluated Reports| IntABS
+    SubService -.->|Persist Final Submissions| ExtABS
+
+    classDef service fill:#fff,stroke:#333,stroke-width:2px;
+    classDef storage fill:#f9f,stroke:#333,stroke-width:2px;
+    class DAService,NormService,MEService,ReportService,ValService,SubService service;
+    class Mongo,IntABS,ExtABS storage;
+</pre>
+<h3 id="data-persistence-lifecycle">Data Persistence Lifecycle <a id="data-persistence-lifecycle" href="#data-persistence-lifecycle" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Persistence Lifecycle"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ol>
+<li><strong>Acquisition &amp; Normalization</strong>: Data is retrieved from EHRs and normalized to ensure FHIR compliance.</li>
+<li><strong>Measure Evaluation</strong>: The normalized data is passed to the <a href="service-measureevalservice.html">Measure Evaluation Service</a>, where it is <strong>persisted in MongoDB</strong> for evaluation processing.</li>
+<li><strong>Evaluation &amp; Reporting</strong>: After the CQL engine evaluates the data, the resulting MeasureReports are processed by the <a href="service-reportservice.html">Report Service</a> and <strong>persisted in Internal Blob Storage</strong>.</li>
+<li><strong>Validation &amp; Submission</strong>: The evaluation results are validated against FHIR profiles and quality measures. Once validated, the <a href="service-submissionservice.html">Submission Service</a> packages the content and <strong>persists the final bundles in External Blob Storage</strong> for delivery to public health agencies.</li>
+</ol>
+<AccordionGroup>
+    <Accordion title="Prompt: Initial">
+        Use the GH-link-cloud tool to identify the persistence points across all of the services and to create an AVRO schema for each service that shows each of the tables/collections and their columns. Then create a "Data Persistence" custom page that describes the persistence layers (including blob storage in Measure Eval and Submission) across the platform as a whole. I'd like each service to have a good level of detail (the AVRO schema) for the database of each service, and a good summary of data persistence across the platform in the custom doc.
+        There are three types of persistence:
+        * SQL Server (most services use this at least for configuration)
+        * MongoDB (deployed as Azure Cosmos for MongoDB) used by MeasurEval service
+        * Azure Blob Storage (which needs to be abstracted out into interface patterns so that we can stay platform agnostic) used for internal submissions and eventually external submissions after patient data has completed moving through the reporting pipeline
+    </Accordion>
+    <Accordion title="Prompt: Schema Corrections Prompt">
+        Instead of putting json blocks in the data-persistence.mdx file, put each .avsc avro file in its associated service directory (i.e. domains/Compliance/AccountService/db.avsc) and add `&lt;Schema file="db.avsc" title="Database Schema" /&gt;` to each of the service's index.mdx files
+        Instead of &lt;Schema&gt; use &lt;SchemaViewer&gt; on all pages. Narrative description of the service should show before the schema viewer. Rename all of the .avsc files to .avro
+    </Accordion>
+    <Accordion title="Prompt: Covert AVRO to JSON Schema">
+        The AVRO schemas are displaying in the viewer, but they're only showing the first level of properties. I can't expand each property to see the sub-properties.
+        I don't want to rely on custom changes to files in `.eventcatalog-core` to view the schema successfully. Switch from using AVRO for the schema definitions to regular JSON schema. Rename the .avro files to db.schema.json and change the content to JSON schema format.
+    </Accordion>
+</AccordionGroup>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+ndata_persistence_41C781B1["Design: Data Persistence"]</pre>
+            <div class="mermaid-actions no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
             </div>
         </div>
     </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-success"><i class="bi bi-gear-wide-connected"></i></div>
-                <h5 class="card-title">Services <a id="services" href="#services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Discover the services that power the Link platform, their APIs, and the messages they produce and consume.</p>
-                <a href="services.html" class="btn btn-outline-success btn-sm stretched-link">View Services</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-info"><i class="bi bi-envelope-paper"></i></div>
-                <h5 class="card-title">Messages <a id="messages" href="#messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Review the events, commands, and queries that flow through the system, including their JSON schemas and version history.</p>
-                <a href="events.html" class="btn btn-outline-info btn-sm stretched-link">View Messages</a>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- Section 2: Core Services Overview -->
-<div class="mb-5">
-    <h2 class="border-bottom pb-2 mb-3">Core Services <a id="core-services" href="#core-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-    <p class="lead">The Link platform is built on a suite of core services that work together to automate reporting workflows, from data acquisition through to submission.</p>
-    <ul class="list-group list-group-flush">
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Platform agnostic:</strong> using interfaces for specific implementations such as Azure.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Micro services:</strong> for scalability in cloud environments.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Event driven:</strong> service interaction (where appropriate) using Kafka.</li>
-    </ul>
-</div>
-<!-- Section 3: Service Cards (3 Column Grid) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Data Acquisition Service <a id="data-acquisition-service" href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Responsible for retrieving raw data from external facility systems and initiating the processing pipeline.</p>
-                <a href="service-dataacquisitionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Census Service <a id="census-service" href="#census-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Manages patient population data and scoping for reporting periods and facilities.</p>
-                <a href="service-censusservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Normalization Service <a id="normalization-service" href="#normalization-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Normalization Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Transforms varied facility data formats into a standardized, internal format suitable for evaluation.</p>
-                <a href="service-normalizationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Measure Evaluation Service <a id="measure-evaluation-service" href="#measure-evaluation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Executes business logic and clinical quality measures against normalized data to calculate metrics.</p>
-                <a href="service-measureevalservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Validation Service <a id="validation-service" href="#validation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Ensures that generated reports and data packages comply with NHSN standards and internal policies.</p>
-                <a href="service-validationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Submission Service <a id="submission-service" href="#submission-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Submission Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Handles the secure transmission of validated data and reports to external stakeholders and agencies.</p>
-                <a href="service-submissionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Admin UI (front-end) <a id="admin-ui-front-end" href="#admin-ui-front-end" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Admin UI (front-end)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Web-based user interface for managing users, measures, validation profiles, terminology, tenants and reports.</p>
-                <a href="service-adminui.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-</div>
-            </main>
+</div>            </main>
         </div>
     </div>
 </body>

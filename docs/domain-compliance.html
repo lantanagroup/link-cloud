@@ -181,116 +181,71 @@
 
                 </div>
             </nav>
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content"><!-- Section 1: Navigation Cards (Domains, Services, Messages) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-primary"><i class="bi bi-diagram-3"></i></div>
-                <h5 class="card-title">Domains <a id="domains" href="#domains" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Domains"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Explore high-level business domains like Compliance, Data Access, and Report. Each domain groups related services and events.</p>
-                <a href="domains.html" class="btn btn-outline-primary btn-sm stretched-link">View Domains</a>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Compliance</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <h1 id="compliance-domain">Compliance Domain <a id="compliance-domain" href="#compliance-domain" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Compliance Domain"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>Responsible for ensuring that Link operates within defined policies. This includes both operational compliance (e.g., security controls auditing) and data compliance (e.g., validating data syntax and semantics against prescribed profiles and standards).</p>
+<h2 id="key-concepts">Key Concepts <a id="key-concepts" href="#key-concepts" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Concepts"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<ul>
+<li>Data Governance: Setting policy and assuring compliance</li>
+</ul>
+<h2 id="requirements">Requirements <a id="requirements" href="#requirements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Requirements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="stakeholder-requirements">Stakeholder Requirements <a id="stakeholder-requirements" href="#stakeholder-requirements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Stakeholder Requirements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li>Clinical data shall meet USCore standard compliance requirements</li>
+<li>FHIR implementation guides containing profiles shall be loadable for validation purposes</li>
+<li>Clinical data shall be validated prior to submission</li>
+<li>Open source validation technologies shall be used for FHIR standard compliance validation</li>
+<li>Validation results shall be persisted for future reference</li>
+<li>Validation results shall be categorized to facilitate stakeholder review</li>
+<li>Validation results and categories shall be visualized with drill-down capability</li>
+<li>Uncategorized validation results shall be identifiable for category creation</li>
+</ul>
+<h3 id="system-requirements">System Requirements <a id="system-requirements" href="#system-requirements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: System Requirements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<ul>
+<li>The system shall validate all clinical data against USCore profiles</li>
+<li>The system shall support importing FHIR implementation guides containing validation profiles</li>
+<li>The system shall execute validation checks on clinical data before allowing submission</li>
+<li>The system shall use <a href="https://hapifhir.io/hapi-fhir/docs/validation/instance_validator.html">HAPI FHIR validator</a> for FHIR standard compliance validation</li>
+<li>The system shall persist validation results in a queryable database</li>
+<li>The system shall support creation and management of validation result categories</li>
+<li>The system shall provide visualization of validation results with category-to-detail navigation</li>
+<li>The system shall maintain an &quot;uncategorized&quot; category for validation results without defined categories</li>
+</ul>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+subgraph nCompliance_1DB932AE_domain["Domain: Compliance"]
+    nAccountService_774C0D03["Service: Account Service"]
+    nAuditService_5EA65BFB["Service: Audit Service"]
+    nValidationService_BB320DE["Service: Validation Service"]
+    nAuditableEventOccurred_4EC576E8["Event: Auditable Event Occurred"]
+    nValidationComplete_1D443CBA["Event: Validation Complete"]
+    nReadyForValidation_130DB389["Event: Ready for Validation"]
+    nMeasureReportGenerated_33EF82D6["Event: Measure Report Generated"]
+    nResourceNormalized_4C6EF8DE["Event: Resource Normalized"]
+    nValidateValueSetCode_C85CD9C["Command: Validate ValueSet Code"]
+    nValidateCodeSystemCode_56A926B6["Command: Validate CodeSystem Code"]
+    nEvaluationRequested_37810EC7["Command: Evaluation Requested"]
+  end</pre>
+            <div class="mermaid-actions no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
             </div>
         </div>
     </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-success"><i class="bi bi-gear-wide-connected"></i></div>
-                <h5 class="card-title">Services <a id="services" href="#services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Discover the services that power the Link platform, their APIs, and the messages they produce and consume.</p>
-                <a href="services.html" class="btn btn-outline-success btn-sm stretched-link">View Services</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-info"><i class="bi bi-envelope-paper"></i></div>
-                <h5 class="card-title">Messages <a id="messages" href="#messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Review the events, commands, and queries that flow through the system, including their JSON schemas and version history.</p>
-                <a href="events.html" class="btn btn-outline-info btn-sm stretched-link">View Messages</a>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- Section 2: Core Services Overview -->
-<div class="mb-5">
-    <h2 class="border-bottom pb-2 mb-3">Core Services <a id="core-services" href="#core-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-    <p class="lead">The Link platform is built on a suite of core services that work together to automate reporting workflows, from data acquisition through to submission.</p>
-    <ul class="list-group list-group-flush">
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Platform agnostic:</strong> using interfaces for specific implementations such as Azure.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Micro services:</strong> for scalability in cloud environments.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Event driven:</strong> service interaction (where appropriate) using Kafka.</li>
-    </ul>
-</div>
-<!-- Section 3: Service Cards (3 Column Grid) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Data Acquisition Service <a id="data-acquisition-service" href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Responsible for retrieving raw data from external facility systems and initiating the processing pipeline.</p>
-                <a href="service-dataacquisitionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Census Service <a id="census-service" href="#census-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Manages patient population data and scoping for reporting periods and facilities.</p>
-                <a href="service-censusservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Normalization Service <a id="normalization-service" href="#normalization-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Normalization Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Transforms varied facility data formats into a standardized, internal format suitable for evaluation.</p>
-                <a href="service-normalizationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Measure Evaluation Service <a id="measure-evaluation-service" href="#measure-evaluation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Executes business logic and clinical quality measures against normalized data to calculate metrics.</p>
-                <a href="service-measureevalservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Validation Service <a id="validation-service" href="#validation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Ensures that generated reports and data packages comply with NHSN standards and internal policies.</p>
-                <a href="service-validationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Submission Service <a id="submission-service" href="#submission-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Submission Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Handles the secure transmission of validated data and reports to external stakeholders and agencies.</p>
-                <a href="service-submissionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Admin UI (front-end) <a id="admin-ui-front-end" href="#admin-ui-front-end" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Admin UI (front-end)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Web-based user interface for managing users, measures, validation profiles, terminology, tenants and reports.</p>
-                <a href="service-adminui.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-</div>
-            </main>
+</div>            </main>
         </div>
     </div>
 </body>

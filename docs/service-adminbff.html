@@ -181,116 +181,177 @@
 
                 </div>
             </nav>
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content"><!-- Section 1: Navigation Cards (Domains, Services, Messages) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-primary"><i class="bi bi-diagram-3"></i></div>
-                <h5 class="card-title">Domains <a id="domains" href="#domains" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Domains"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Explore high-level business domains like Compliance, Data Access, and Report. Each domain groups related services and events.</p>
-                <a href="domains.html" class="btn btn-outline-primary btn-sm stretched-link">View Domains</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-success"><i class="bi bi-gear-wide-connected"></i></div>
-                <h5 class="card-title">Services <a id="services" href="#services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Discover the services that power the Link platform, their APIs, and the messages they produce and consume.</p>
-                <a href="services.html" class="btn btn-outline-success btn-sm stretched-link">View Services</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-info"><i class="bi bi-envelope-paper"></i></div>
-                <h5 class="card-title">Messages <a id="messages" href="#messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Review the events, commands, and queries that flow through the system, including their JSON schemas and version history.</p>
-                <a href="events.html" class="btn btn-outline-info btn-sm stretched-link">View Messages</a>
-            </div>
-        </div>
-    </div>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Admin Backend-for-Frontend</h1>
+<div class="row">
+    <div class="col-md-8">
+        <div class="mb-3"><strong>Produces:</strong> <a href="query-getfacilitieslist.html">Get Facilities List [query]</a>, <a href="query-getfacilityconfig.html">Get Facility Configuration [query]</a>, <a href="query-getserviceinfo.html">Get Service Info [query]</a></div><div class="mb-3"><strong>Consumes:</strong> None</div>
+        <h2 id="overview">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The AdminBFF (Backend-for-Frontend) service is the administrative gateway that bridges the Angular-based front-end application with the internal service ecosystem. It serves as the single public-facing backend entry point for all administrative operations, providing a tightly controlled interface that enforces security, authorization, and request routing policies.</p>
+<ul>
+<li><strong>API Gateway for Front-End</strong>: Acts as the dedicated backend interface for the admin UI, simplifying and consolidating access to internal services.</li>
+<li><strong>Reverse Proxy via YARP</strong>: Uses YARP (Yet Another Reverse Proxy) to intelligently route and proxy requests to internal backend services. This enables seamless service composition, service path rewriting, and centralized traffic control.</li>
+<li><strong>Authorization Enforcement</strong>: Validates that all incoming requests are made by authenticated users with the proper roles and scopes. It serves as the first and last line of defense before internal services are reached, ensuring that only authorized actions are executed.</li>
+<li><strong>Facade for Backend Complexity</strong>: Exposes a front-end-optimized API layer, reducing the need for the UI to manage low-level backend details or coordinate multiple service calls directly.</li>
+<li><strong>Config File Serving for Admin UI</strong>: AdminBFF also serves a runtime configuration file used by the Angular-based Admin UI service. This allows environment-specific values (e.g. API base URLs, feature flags) to be injected at deployment time.</li>
+</ul>
+<Admonition type="warning">
+  The "Config File Serving for Admin UI" is only applicable when AdminBFF and AdminUI are deployed together as a single instance, such as in containerized deployments or bundled cloud environments.
+</Admonition>
+<h2 id="configuration">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Redis:Enabled</code></td>
+<td>boolean</td>
+<td>If enabled, Redis will be used to cache account information associated with authenticated users.</td>
+</tr>
+</tbody>
+</table>
+
+        
+<h3 class="mt-4">OpenAPI Operations</h3>
+
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-adminbff-get-api-info" aria-expanded="false"><strong>GET</strong> <code>/api/info</code></a></div>
+  <div id="openapi-card-adminbff-get-api-info" class="card-body export-collapsible">
+    
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
 </div>
-<!-- Section 2: Core Services Overview -->
-<div class="mb-5">
-    <h2 class="border-bottom pb-2 mb-3">Core Services <a id="core-services" href="#core-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-    <p class="lead">The Link platform is built on a suite of core services that work together to automate reporting workflows, from data acquisition through to submission.</p>
-    <ul class="list-group list-group-flush">
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Platform agnostic:</strong> using interfaces for specific implementations such as Azure.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Micro services:</strong> for scalability in cloud environments.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Event driven:</strong> service interaction (where appropriate) using Kafka.</li>
-    </ul>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-adminbff-get-api-aggregate-reports-summaries" aria-expanded="false"><strong>GET</strong> <code>/api/aggregate/reports/summaries</code></a></div>
+  <div id="openapi-card-adminbff-get-api-aggregate-reports-summaries" class="card-body export-collapsible">
+    <p class="text-muted">Get Report Summaries</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    
+<div class="table-responsive">
+  <table class="table table-sm table-striped align-middle">
+    <thead>
+      <tr><th>Name</th><th>Type</th><th>Required?</th><th>Description</th></tr>
+    </thead>
+    <tbody><tr><td>facilityId</td><td>string</td><td>No</td><td></td></tr><tr><td>pageNumber</td><td>integer (int32)</td><td>No</td><td></td></tr><tr><td>pageSize</td><td>integer (int32)</td><td>No</td><td></td></tr></tbody>
+  </table>
 </div>
-<!-- Section 3: Service Cards (3 Column Grid) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Data Acquisition Service <a id="data-acquisition-service" href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Responsible for retrieving raw data from external facility systems and initiating the processing pipeline.</p>
-                <a href="service-dataacquisitionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Census Service <a id="census-service" href="#census-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Manages patient population data and scoping for reporting periods and facilities.</p>
-                <a href="service-censusservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Normalization Service <a id="normalization-service" href="#normalization-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Normalization Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Transforms varied facility data formats into a standardized, internal format suitable for evaluation.</p>
-                <a href="service-normalizationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Measure Evaluation Service <a id="measure-evaluation-service" href="#measure-evaluation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Executes business logic and clinical quality measures against normalized data to calculate metrics.</p>
-                <a href="service-measureevalservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Validation Service <a id="validation-service" href="#validation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Ensures that generated reports and data packages comply with NHSN standards and internal policies.</p>
-                <a href="service-validationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Submission Service <a id="submission-service" href="#submission-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Submission Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Handles the secure transmission of validated data and reports to external stakeholders and agencies.</p>
-                <a href="service-submissionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Admin UI (front-end) <a id="admin-ui-front-end" href="#admin-ui-front-end" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Admin UI (front-end)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Web-based user interface for managing users, measures, validation profiles, terminology, tenants and reports.</p>
-                <a href="service-adminui.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
+  </div>
 </div>
-            </main>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-adminbff-get-api-monitor-health" aria-expanded="false"><strong>GET</strong> <code>/api/monitor/health</code></a></div>
+  <div id="openapi-card-adminbff-get-api-monitor-health" class="card-body export-collapsible">
+    <p class="text-muted">System Health Check</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-adminbff-post-api-integration-patient-event" aria-expanded="false"><strong>POST</strong> <code>/api/integration/patient-event</code></a></div>
+  <div id="openapi-card-adminbff-post-api-integration-patient-event" class="card-body export-collapsible">
+    <p class="text-muted">Integration Testing - Produce Patient Event</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-adminbff-post-api-integration-report-scheduled" aria-expanded="false"><strong>POST</strong> <code>/api/integration/report-scheduled</code></a></div>
+  <div id="openapi-card-adminbff-post-api-integration-report-scheduled" class="card-body export-collapsible">
+    <p class="text-muted">Integration Testing - Produce Report Scheduled Event</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-adminbff-post-api-integration-data-acquisition-requested" aria-expanded="false"><strong>POST</strong> <code>/api/integration/data-acquisition-requested</code></a></div>
+  <div id="openapi-card-adminbff-post-api-integration-data-acquisition-requested" class="card-body export-collapsible">
+    <p class="text-muted">Integration Testing - Produce Data Acquisition Requested Event</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-adminbff-post-api-integration-patient-acquired" aria-expanded="false"><strong>POST</strong> <code>/api/integration/patient-acquired</code></a></div>
+  <div id="openapi-card-adminbff-post-api-integration-patient-acquired" class="card-body export-collapsible">
+    <p class="text-muted">Integration Testing - Produce Data Acquisition Requested Event</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-adminbff-post-api-integration-start-consumers" aria-expanded="false"><strong>POST</strong> <code>/api/integration/start-consumers</code></a></div>
+  <div id="openapi-card-adminbff-post-api-integration-start-consumers" class="card-body export-collapsible">
+    <p class="text-muted">Integration Testing - Start Consumers</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-adminbff-post-api-integration-read-consumers" aria-expanded="false"><strong>POST</strong> <code>/api/integration/read-consumers</code></a></div>
+  <div id="openapi-card-adminbff-post-api-integration-read-consumers" class="card-body export-collapsible">
+    <p class="text-muted">Integration Testing - Read Consumers</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+<div class="card mb-3">
+  <div class="card-header d-flex justify-content-between align-items-center"><a href="#" class="text-decoration-none export-toggle-link" data-export-toggle="openapi-card-adminbff-post-api-integration-stop-consumers" aria-expanded="false"><strong>POST</strong> <code>/api/integration/stop-consumers</code></a></div>
+  <div id="openapi-card-adminbff-post-api-integration-stop-consumers" class="card-body export-collapsible">
+    <p class="text-muted">Integration Testing - Stop Consumers.</p>
+    <h6>Route Parameters</h6>
+    <p class="text-muted">None</p>
+    <h6 class="mt-3">Query Parameters</h6>
+    <p class="text-muted">None</p>
+  </div>
+</div>
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+nAdminBFF_3798181E["Service: Admin Backend-for-Frontend"]
+  nAdminBFF_3798181E -->|provides| nGetFacilitiesList_52F11E7B["Query: GetFacilitiesList"]
+  nAdminBFF_3798181E -->|provides| nGetFacilityConfig_487F50A0["Query: GetFacilityConfig"]
+  nAdminBFF_3798181E -->|provides| nGetServiceInfo_77B82099["Query: GetServiceInfo"]
+  subgraph nTenant_1ABB3779_domain["Domain: Tenant"]
+    nGetFacilitiesList_52F11E7B
+    nGetFacilityConfig_487F50A0
+    nGetServiceInfo_77B82099
+  end</pre>
+            <div class="mermaid-actions no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>            </main>
         </div>
     </div>
 </body>

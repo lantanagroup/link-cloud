@@ -181,116 +181,117 @@
 
                 </div>
             </nav>
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content"><!-- Section 1: Navigation Cards (Domains, Services, Messages) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-primary"><i class="bi bi-diagram-3"></i></div>
-                <h5 class="card-title">Domains <a id="domains" href="#domains" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Domains"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Explore high-level business domains like Compliance, Data Access, and Report. Each domain groups related services and events.</p>
-                <a href="domains.html" class="btn btn-outline-primary btn-sm stretched-link">View Domains</a>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Report</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <h2 id="overview">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Report domain encompasses the full lifecycle of data extraction, transformation, evaluation, and delivery for
+reporting workflows. It orchestrates the flow of raw clinical data into structured, validated, and submitted quality
+reports. Each service plays a specialized role in enabling modularity, traceability, and performance at scale.</p>
+<h2 id="definitions">Definitions <a id="definitions" href="#definitions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Definitions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>Description</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Report</td>
+<td>The output of Link's evaluation of data. A report can be submitted to NHSN, it can be evaluated in Power BI, it can be visualized in a custom UI.</td>
+<td></td>
+</tr>
+<tr>
+<td>Evaluation</td>
+<td>The process of doing something with data within Link (i.e. acquire, normalize, check criteria, submit).</td>
+<td></td>
+</tr>
+<tr>
+<td>Reporting Requirement</td>
+<td>A description of the need for data in a report. (i.e. &quot;Bed capacity reporting during a pandemic&quot; or &quot;Hypoglycemic patients&quot;)</td>
+<td></td>
+</tr>
+<tr>
+<td>Reporting Orchestration</td>
+<td>Indicates the steps to take within the Link system to produce reportable data.</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="stakeholder-requirements">Stakeholder Requirements <a id="stakeholder-requirements" href="#stakeholder-requirements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Stakeholder Requirements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<ul>
+<li>Reporting functionality SHALL be modular so that it can be used for multiple use cases</li>
+<li>Link acquires (either via PUSH or PULL) and evaluates the data in a reporting pipeline.</li>
+<li>Reporting pipelines SHALL be orchestrated via configuration of services</li>
+<li>As a reporting organization and reporting consumer, I want the system to retain version history of IGs used during reporting in a reporting period, so that deleted reports can be accurately regenerated using their original definitions.</li>
+</ul>
+<h2 id="functional-requirements">Functional Requirements <a id="functional-requirements" href="#functional-requirements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Functional Requirements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>TODO</p>
+<h2 id="diagrams">Diagrams <a id="diagrams" href="#diagrams" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Diagrams"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="state">State <a id="state" href="#state" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: State"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<pre class="mermaid">stateDiagram-v2
+state "Report Scheduled" as ReportScheduled
+state "Data Acquisition Requested" as DataAcquisitionRequested
+state "Patient Lists Acquired" as PatientListsAcquired
+state "Resource Evaluated" as ResourceEvaluated
+state "Validation Complete" as ValidationComplete
+state "Report Submitted" as ReportSubmitted
+state "Report Generation Failed" as ReportGenerationFailed
+state "Submission Failed" as SubmissionFailed
+
+ReportScheduled --> DataAcquisitionRequested : GenerateReportValue
+DataAcquisitionRequested --> PatientListsAcquired : PatientListsAcquiredValue
+PatientListsAcquired --> ResourceEvaluated : ResourceEvaluatedValue (for each patient)
+ResourceEvaluated --> ValidationComplete : ReadyForValidationValue
+ValidationComplete --> ReportSubmitted : ReportSubmittedValue
+
+DataAcquisitionRequested --> ReportGenerationFailed : Error
+PatientListsAcquired --> ReportGenerationFailed : Error
+ResourceEvaluated --> ReportGenerationFailed : Error
+ValidationComplete --> ReportGenerationFailed : Error
+ReportSubmitted --> SubmissionFailed : Error
+
+ReportGenerationFailed --> ReportScheduled : Retry (GenerateReport)
+SubmissionFailed --> ReportSubmitted : Retry (SubmitReport)
+
+state "Initial" as Initial
+Initial --> ReportScheduled : Report Scheduled
+</pre>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+subgraph nReport_623174B2_domain["Domain: Report"]
+    nMeasureEvalService_1EEC2B83["Service: Measure Evaluation Service"]
+    nNormalizationService_48113579["Service: Normalization Service"]
+    nQueryDispatchService_754DC411["Service: Query Dispatch Service"]
+    nReportService_249E8A94["Service: Report Service"]
+    nSubmissionService_1C035A38["Service: Submission Service"]
+    nPatientCensusScheduled_29F77A9B["Event: Patient Census Scheduled"]
+    nPatientEvent_41557E59["Event: Patient Event"]
+    nReportScheduled_2D4765D4["Event: Report Scheduled"]
+    nSubmitPayload_3C7A5BA5["Event: Submit Payload"]
+    nPayloadSubmitted_32B09A26["Event: Payload Submitted"]
+    nGenerateReportRequested_36C076BA["Command: Generate Report Requested"]
+  end</pre>
+            <div class="mermaid-actions no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
             </div>
         </div>
     </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-success"><i class="bi bi-gear-wide-connected"></i></div>
-                <h5 class="card-title">Services <a id="services" href="#services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Discover the services that power the Link platform, their APIs, and the messages they produce and consume.</p>
-                <a href="services.html" class="btn btn-outline-success btn-sm stretched-link">View Services</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-info"><i class="bi bi-envelope-paper"></i></div>
-                <h5 class="card-title">Messages <a id="messages" href="#messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Review the events, commands, and queries that flow through the system, including their JSON schemas and version history.</p>
-                <a href="events.html" class="btn btn-outline-info btn-sm stretched-link">View Messages</a>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- Section 2: Core Services Overview -->
-<div class="mb-5">
-    <h2 class="border-bottom pb-2 mb-3">Core Services <a id="core-services" href="#core-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-    <p class="lead">The Link platform is built on a suite of core services that work together to automate reporting workflows, from data acquisition through to submission.</p>
-    <ul class="list-group list-group-flush">
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Platform agnostic:</strong> using interfaces for specific implementations such as Azure.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Micro services:</strong> for scalability in cloud environments.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Event driven:</strong> service interaction (where appropriate) using Kafka.</li>
-    </ul>
-</div>
-<!-- Section 3: Service Cards (3 Column Grid) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Data Acquisition Service <a id="data-acquisition-service" href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Responsible for retrieving raw data from external facility systems and initiating the processing pipeline.</p>
-                <a href="service-dataacquisitionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Census Service <a id="census-service" href="#census-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Manages patient population data and scoping for reporting periods and facilities.</p>
-                <a href="service-censusservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Normalization Service <a id="normalization-service" href="#normalization-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Normalization Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Transforms varied facility data formats into a standardized, internal format suitable for evaluation.</p>
-                <a href="service-normalizationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Measure Evaluation Service <a id="measure-evaluation-service" href="#measure-evaluation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Executes business logic and clinical quality measures against normalized data to calculate metrics.</p>
-                <a href="service-measureevalservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Validation Service <a id="validation-service" href="#validation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Ensures that generated reports and data packages comply with NHSN standards and internal policies.</p>
-                <a href="service-validationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Submission Service <a id="submission-service" href="#submission-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Submission Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Handles the secure transmission of validated data and reports to external stakeholders and agencies.</p>
-                <a href="service-submissionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Admin UI (front-end) <a id="admin-ui-front-end" href="#admin-ui-front-end" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Admin UI (front-end)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Web-based user interface for managing users, measures, validation profiles, terminology, tenants and reports.</p>
-                <a href="service-adminui.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-</div>
-            </main>
+</div>            </main>
         </div>
     </div>
 </body>

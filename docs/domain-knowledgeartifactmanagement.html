@@ -181,116 +181,116 @@
 
                 </div>
             </nav>
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content"><!-- Section 1: Navigation Cards (Domains, Services, Messages) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-primary"><i class="bi bi-diagram-3"></i></div>
-                <h5 class="card-title">Domains <a id="domains" href="#domains" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Domains"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Explore high-level business domains like Compliance, Data Access, and Report. Each domain groups related services and events.</p>
-                <a href="domains.html" class="btn btn-outline-primary btn-sm stretched-link">View Domains</a>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Knowledge Artifact Management</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <h2 id="overview">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The Knowledge Artifact Management domain represents the organizational and governance processes that support and surround the technical domains within the Link ecosystem.</p>
+<p>This domain includes key artifacts such as:</p>
+<ul>
+<li>FHIR Implementation Guides (IGs), including FHIR Profiles</li>
+<li>Digital Quality Measures (dQMs)</li>
+<li>Terminology Resources (CodeSystems, ValueSets, etc.)</li>
+</ul>
+<p>These assets serve as foundational specifications that guide behavior, structure, and expectations across domains like Reporting, Data Ingestion, and Evaluation.</p>
+<p>Rather than owning executable services, this domain captures the processes, standards alignment, and content lifecycle required to ensure consistency and reusability across the system.</p>
+<h2 id="requirements">Requirements <a id="requirements" href="#requirements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Requirements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Roles:</p>
+<ul>
+<li>Knowledge Artifact Administrator</li>
+<li>System Administrator</li>
+<li>Developer</li>
+<li>Quality Assurance Tester</li>
+</ul>
+<h3 id="stakeholder-requirements">Stakeholder Requirements <a id="stakeholder-requirements" href="#stakeholder-requirements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Stakeholder Requirements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Category</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>As a knowledge artifact administrator (specialization of systems admin), I can manage persistence, access, relationship and other characteristics of knowledge artifacts so that dependent functionality operates appropriately.</td>
+<td>Process</td>
+</tr>
+<tr>
+<td>As a knowledge artifact administrator, I can see what dependencies are missing for a loaded IG, so that I may find and load them and not have evaluation and/or validation fail at runtime.</td>
+<td>Process</td>
+</tr>
+<tr>
+<td>As a system administrator, I want to load FHIR Implementation Guides (IGs) that include Measures, Profiles, and Terminology artifacts, so that the platform can support standards-based evaluation and validation.</td>
+<td>Process</td>
+</tr>
+<tr>
+<td>As a quality assurance tester, I want to manage multiple versions of the same IG, to support testing changes to implementation guides without impacting other tenants and users.</td>
+<td>Version Management</td>
+</tr>
+<tr>
+<td>As a system administrator, I want to manage multiple versions of the same IG, to support incremental release of implementation guide updates across all tenants.</td>
+<td>Version Management</td>
+</tr>
+</tbody>
+</table>
+<h3 id="system-requirements">System Requirements <a id="system-requirements" href="#system-requirements" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: System Requirements"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<table>
+<thead>
+<tr>
+<th>Requirement</th>
+<th>Category</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>As the system, I want to register FHIR IG artifacts in a shared repository, so that multiple dependent services can access them.</td>
+<td>Process</td>
+</tr>
+<tr>
+<td>As the system, I want to retrieve version-specific Measure artifacts from the knowledge artifact repository, so that reporting requirements can be confirmed.</td>
+<td>Version Management</td>
+</tr>
+<tr>
+<td>As the system, I want to access profile definitions from the loaded IGs, so that I can validate resource instances accurately.</td>
+<td>Process</td>
+</tr>
+<tr>
+<td>As the system, I want to load and reference ValueSet and CodeSystem definitions from IGs, so that I can confirm inform other services on the terminology needed to accurately evaluate and validate.</td>
+<td>Process</td>
+</tr>
+<tr>
+<td>As the system, I want to store IG version metadata and associate it with report evaluation records, so that report reconstruction uses the correct logic.</td>
+<td>Report Reproducibility</td>
+</tr>
+<tr>
+<td>As the system, I want to ensure IG updates do not overwrite previously loaded versions, so that all versions remain available for historical processing.</td>
+<td>Version Management</td>
+</tr>
+</tbody>
+</table>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+subgraph nKnowledgeArtifactManagement_6831865E_domain["Domain: Knowledge Artifact Management"]
+    nTerminologyService_FC8BF98["Service: Terminology Service"]
+  end</pre>
+            <div class="mermaid-actions no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
             </div>
         </div>
     </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-success"><i class="bi bi-gear-wide-connected"></i></div>
-                <h5 class="card-title">Services <a id="services" href="#services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Discover the services that power the Link platform, their APIs, and the messages they produce and consume.</p>
-                <a href="services.html" class="btn btn-outline-success btn-sm stretched-link">View Services</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-info"><i class="bi bi-envelope-paper"></i></div>
-                <h5 class="card-title">Messages <a id="messages" href="#messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Review the events, commands, and queries that flow through the system, including their JSON schemas and version history.</p>
-                <a href="events.html" class="btn btn-outline-info btn-sm stretched-link">View Messages</a>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- Section 2: Core Services Overview -->
-<div class="mb-5">
-    <h2 class="border-bottom pb-2 mb-3">Core Services <a id="core-services" href="#core-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-    <p class="lead">The Link platform is built on a suite of core services that work together to automate reporting workflows, from data acquisition through to submission.</p>
-    <ul class="list-group list-group-flush">
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Platform agnostic:</strong> using interfaces for specific implementations such as Azure.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Micro services:</strong> for scalability in cloud environments.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Event driven:</strong> service interaction (where appropriate) using Kafka.</li>
-    </ul>
-</div>
-<!-- Section 3: Service Cards (3 Column Grid) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Data Acquisition Service <a id="data-acquisition-service" href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Responsible for retrieving raw data from external facility systems and initiating the processing pipeline.</p>
-                <a href="service-dataacquisitionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Census Service <a id="census-service" href="#census-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Manages patient population data and scoping for reporting periods and facilities.</p>
-                <a href="service-censusservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Normalization Service <a id="normalization-service" href="#normalization-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Normalization Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Transforms varied facility data formats into a standardized, internal format suitable for evaluation.</p>
-                <a href="service-normalizationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Measure Evaluation Service <a id="measure-evaluation-service" href="#measure-evaluation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Executes business logic and clinical quality measures against normalized data to calculate metrics.</p>
-                <a href="service-measureevalservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Validation Service <a id="validation-service" href="#validation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Ensures that generated reports and data packages comply with NHSN standards and internal policies.</p>
-                <a href="service-validationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Submission Service <a id="submission-service" href="#submission-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Submission Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Handles the secure transmission of validated data and reports to external stakeholders and agencies.</p>
-                <a href="service-submissionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Admin UI (front-end) <a id="admin-ui-front-end" href="#admin-ui-front-end" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Admin UI (front-end)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Web-based user interface for managing users, measures, validation profiles, terminology, tenants and reports.</p>
-                <a href="service-adminui.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-</div>
-            </main>
+</div>            </main>
         </div>
     </div>
 </body>

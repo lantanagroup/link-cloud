@@ -181,116 +181,141 @@
 
                 </div>
             </nav>
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content"><!-- Section 1: Navigation Cards (Domains, Services, Messages) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-primary"><i class="bi bi-diagram-3"></i></div>
-                <h5 class="card-title">Domains <a id="domains" href="#domains" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Domains"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Explore high-level business domains like Compliance, Data Access, and Report. Each domain groups related services and events.</p>
-                <a href="domains.html" class="btn btn-outline-primary btn-sm stretched-link">View Domains</a>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Authorization Policies</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <p>Link will enforce developer constructed authorization policies to ensure that users have the proper access required before performing any requests. This will help prevent users from having the ability to perform CRUD operations on service data or configurations without having the necessary permissions set by the facility administrators to do so. Authorization policies will be enforced both at the API Gateway and at each individual service.</p>
+<h1 id="request-authorization-sequence">Request Authorization Sequence <a id="request-authorization-sequence" href="#request-authorization-sequence" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Request Authorization Sequence"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<pre class="mermaid">sequenceDiagram
+    participant User
+    participant APIGateway as API Gateway
+    participant LinkAuth as Link Authorization
+    participant Account
+    participant Service as Requested Service (Ex: Tenant)
+
+    %% Step 1
+    User->>APIGateway: [1] Sams Authenticated Request()
+
+    %% Step 2
+    APIGateway->>LinkAuth: [2] Request Attribute(s): Authorize Policy: bool
+
+    %% Step 3
+    LinkAuth->>Account: [3] UserHasAccess(email, facilityId, group, role): bool
+    Account-->>LinkAuth: bool
+
+    %% Step 4
+    LinkAuth-->>APIGateway: [4] Not authorized: Return error()
+
+    %% Optional authorization passes:
+    LinkAuth-->>APIGateway: Authorized
+
+    %% Step 5
+    APIGateway->>Service: [5] Authorized: Perform service request()
+
+    %% Step 6
+    Service->>LinkAuth: [6] Request Attribute: PolicyAuthorize(): bool
+    LinkAuth->>Account: UserHasAccess(email, facilityId, group, role): bool
+    Account-->>LinkAuth: bool
+    LinkAuth-->>Service: Authorized
+
+    %% Step 7
+    Service-->>APIGateway: [7] Service Response()
+
+    %% Step 8
+    APIGateway-->>User: [8] Request Response()
+</pre>
+<ol>
+<li>User performs initial request. Authentication will have been completed at this point and the request will contain a JWT Token. The API Gateway has an endpoint for the request that contains authorization policies.</li>
+<li>The policy extracts the email address of the user from the JWT Token and performs a request to the Account services' UserHasAccess endpoint. This Account endpoint requires that <strong>all</strong> policies pass the following parameters to determine if they have the proper permissions for the request:
+<ol>
+<li>Email</li>
+<li>Facility Id</li>
+<li>Account Group</li>
+<li>Account Role</li>
+</ol>
+</li>
+<li>The Account service returns a bool value on whether the user is authorized for the request.</li>
+<li>If the response returns a false, the API Gateway should return an error code (Potentially 401 Unauthorized).</li>
+<li>If the response returns a true, the API Gateway will make the request to the service.</li>
+<li>As a safety precaution, the service will perform the same authorization policy checks that the API Gateway endpoint did (Step 3).</li>
+<li>The service will then send a response based on the request of the service.</li>
+<li>The API Gateway will return the response back to the user.</li>
+</ol>
+<h1 id="authorization-library">Authorization Library <a id="authorization-library" href="#authorization-library" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Authorization Library"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>All authorization policies will be located under the Link.Authorization project in the .NET solution (AuthorizationPolicy.cs):</p>
+<pre><code class="language-csharp">using Microsoft.AspNetCore.Authorization;
+
+namespace Link.Authorization
+{
+  public static class AuthorizationPolicies
+  {
+    public static AuthorizationPolicy CanViewAuditLogs()
+    {
+      //TODO: Add Account Authorization Requirement functionality to support Account UserHasAccess()
+      return new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .RequireRole(&quot;LinkAdministrator&quot;)
+        .Build();
+    }
+
+    public static AuthorizationPolicy CanCreateNotifiactionConfigurations()
+    {
+      return new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .RequireRole(&quot;LinkAdministrator&quot;)
+        .Build();
+    }
+  }
+}
+</code></pre>
+<p>A policy must be registered by the service in Program.cs in order to be used.Below is an example of policies that have been registered
+for use in the API Gateway project:</p>
+<pre><code class="language-csharp">  builder.Services.AddAuthorization(authorizationOptions =&gt; {
+    authorizationOptions.AddPolicy(&quot;UserCanViewAuditLogs&quot;, AuthorizationPolicies.CanViewAuditLogs());
+    authorizationOptions.AddPolicy(&quot;CanCreateNotifiactionConfigurations&quot;, AuthorizationPolicies.CanCreateNotifiactionConfigurations());
+    authorizationOptions.AddPolicy(&quot;CanUpdateNotifiactionConfigurations&quot;, AuthorizationPolicies.CanUpdateNotifiactionConfigurations());
+    authorizationOptions.AddPolicy(&quot;CanDeleteNotifiactionConfigurations&quot;, AuthorizationPolicies.CanDeleteNotifiactionConfigurations());
+    authorizationOptions.AddPolicy(&quot;ClientApplicationCanRead&quot;, policyBuilder =&gt; {
+      policyBuilder.RequireScope(&quot;demogatewayapi.read&quot;);
+    });
+    authorizationOptions.AddPolicy(&quot;ClientApplicationCanCreate&quot;, policyBuilder =&gt; {
+      policyBuilder.RequireScope(&quot;demogatewayapi.write&quot;);
+    });
+    authorizationOptions.AddPolicy(&quot;ClientApplicationCanDelete&quot;, policyBuilder =&gt; {
+      policyBuilder.RequireScope(&quot;demogatewayapi.delete&quot;);
+    });
+</code></pre>
+<p>Once a Policy has been registered to the service, it can then be enforced by adding the following attribute to the request endpoint:</p>
+<pre><code class="language-csharp">[HttpGet]
+[Authorize(Policy = &quot;UserCanViewAuditLogs&quot;)]
+[Authorize(Policy = &quot;ClientApplicationCanRead&quot;)]
+public async Task &lt;ActionResult&lt;PagedAuditModel&gt;&gt; ListAuditEvents()
+{
+  //code
+}
+</code></pre>
+<p>As shown in the example, multiple Policies can be applied to a single request.</p>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+nauth_policies_34F0A8EC["Design: Authorization Policies"]</pre>
+            <div class="mermaid-actions no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
             </div>
         </div>
     </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-success"><i class="bi bi-gear-wide-connected"></i></div>
-                <h5 class="card-title">Services <a id="services" href="#services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Discover the services that power the Link platform, their APIs, and the messages they produce and consume.</p>
-                <a href="services.html" class="btn btn-outline-success btn-sm stretched-link">View Services</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm border-0 bg-light">
-            <div class="card-body text-center">
-                <div class="display-6 mb-3 text-info"><i class="bi bi-envelope-paper"></i></div>
-                <h5 class="card-title">Messages <a id="messages" href="#messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text text-muted">Review the events, commands, and queries that flow through the system, including their JSON schemas and version history.</p>
-                <a href="events.html" class="btn btn-outline-info btn-sm stretched-link">View Messages</a>
-            </div>
-        </div>
-    </div>
-</div>
-<!-- Section 2: Core Services Overview -->
-<div class="mb-5">
-    <h2 class="border-bottom pb-2 mb-3">Core Services <a id="core-services" href="#core-services" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Core Services"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-    <p class="lead">The Link platform is built on a suite of core services that work together to automate reporting workflows, from data acquisition through to submission.</p>
-    <ul class="list-group list-group-flush">
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Platform agnostic:</strong> using interfaces for specific implementations such as Azure.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Micro services:</strong> for scalability in cloud environments.</li>
-        <li class="list-group-item bg-transparent border-0 ps-0"><i class="bi bi-check2-circle text-primary me-2"></i><strong>Event driven:</strong> service interaction (where appropriate) using Kafka.</li>
-    </ul>
-</div>
-<!-- Section 3: Service Cards (3 Column Grid) -->
-<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Data Acquisition Service <a id="data-acquisition-service" href="#data-acquisition-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Responsible for retrieving raw data from external facility systems and initiating the processing pipeline.</p>
-                <a href="service-dataacquisitionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Census Service <a id="census-service" href="#census-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Census Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Manages patient population data and scoping for reporting periods and facilities.</p>
-                <a href="service-censusservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Normalization Service <a id="normalization-service" href="#normalization-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Normalization Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Transforms varied facility data formats into a standardized, internal format suitable for evaluation.</p>
-                <a href="service-normalizationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Measure Evaluation Service <a id="measure-evaluation-service" href="#measure-evaluation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Executes business logic and clinical quality measures against normalized data to calculate metrics.</p>
-                <a href="service-measureevalservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Validation Service <a id="validation-service" href="#validation-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Ensures that generated reports and data packages comply with NHSN standards and internal policies.</p>
-                <a href="service-validationservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Submission Service <a id="submission-service" href="#submission-service" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Submission Service"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Handles the secure transmission of validated data and reports to external stakeholders and agencies.</p>
-                <a href="service-submissionservice.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-    <div class="col">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Admin UI (front-end) <a id="admin-ui-front-end" href="#admin-ui-front-end" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Admin UI (front-end)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h5>
-                <p class="card-text small text-muted">Web-based user interface for managing users, measures, validation profiles, terminology, tenants and reports.</p>
-                <a href="service-adminui.html" class="btn btn-link p-0 stretched-link">View Details</a>
-            </div>
-        </div>
-    </div>
-</div>
-            </main>
+</div>            </main>
         </div>
     </div>
 </body>
