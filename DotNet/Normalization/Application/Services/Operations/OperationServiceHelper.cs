@@ -41,6 +41,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 OperationType.CodeMap => (object)(CodeMapOperation)operation,
                 OperationType.ConditionalTransform => (object)(ConditionalTransformOperation)operation,
                 OperationType.CopyLocation => (object)(CopyLocationOperation)operation,
+                OperationType.RemoveExtensions => (object)(RemoveExtensionsOperation)operation,
                 _ => null
             };
         }
@@ -826,6 +827,21 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 else if (operation is CopyLocationOperation)
                 {
                     //No validation needed for CopyLocationOperation
+                }
+                else if (operation is RemoveExtensionsOperation)
+                {
+                    var op = (RemoveExtensionsOperation)operation;
+
+                    if (op.ExtensionUrls == null || !op.ExtensionUrls.Any())
+                    {
+                        return (false, "RemoveExtensionsOperation.ExtensionUrls must contain at least one URL.");
+                    }
+
+                    var emptyUrls = op.ExtensionUrls.Where(string.IsNullOrWhiteSpace).ToList();
+                    if (emptyUrls.Any())
+                    {
+                        return (false, "RemoveExtensionsOperation.ExtensionUrls must not contain null or empty entries.");
+                    }
                 }
                 else
                 {
