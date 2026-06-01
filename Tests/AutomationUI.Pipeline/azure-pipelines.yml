@@ -135,6 +135,14 @@ stages:
                 $definitionId = 226
                 $shouldRun    = $false
                 $commitSha    = ""
+                $buildReason  = "$(Build.Reason)"
+
+                # Manual runs are explicit operator intent; do not gate them on
+                # Deploy_All_Services discovery.
+                if ($buildReason -ieq "Manual") {
+                  $shouldRun = $true
+                  Write-Host "Manual run detected. Bypassing Deploy_All_Services gate."
+                }
 
                 function Get-EnvFromBuild($Build) {
                   if (-not $Build.templateParameters) { return $null }
@@ -147,22 +155,24 @@ stages:
                   return $null
                 }
 
-                try {
-                  $u = "$org$project/_apis/build/builds?definitions=$definitionId&resultFilter=succeeded&`$top=50&api-version=7.1-preview.7"
-                  $h = @{ Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN" }
-                  $resp = Invoke-RestMethod -Uri $u -Headers $h -Method Get
-                  $sorted = $resp.value | Sort-Object -Property finishTime -Descending
-                  foreach ($b in $sorted) {
-                    $envVal = Get-EnvFromBuild $b
-                    if ($envVal -ieq $envName) {
-                      $commitSha = $b.sourceVersion
-                      $shouldRun = $true
-                      Write-Host "Matched Deploy_All_Services build $($b.id) for env '$envName' commit $commitSha."
-                      break
+                if (-not $shouldRun) {
+                  try {
+                    $u = "$org$project/_apis/build/builds?definitions=$definitionId&resultFilter=succeeded&`$top=50&api-version=7.1-preview.7"
+                    $h = @{ Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN" }
+                    $resp = Invoke-RestMethod -Uri $u -Headers $h -Method Get
+                    $sorted = $resp.value | Sort-Object -Property finishTime -Descending
+                    foreach ($b in $sorted) {
+                      $envVal = Get-EnvFromBuild $b
+                      if ($envVal -ieq $envName) {
+                        $commitSha = $b.sourceVersion
+                        $shouldRun = $true
+                        Write-Host "Matched Deploy_All_Services build $($b.id) for env '$envName' commit $commitSha."
+                        break
+                      }
                     }
+                  } catch {
+                    Write-Host "Failed to query Deploy_All_Services: $_"
                   }
-                } catch {
-                  Write-Host "Failed to query Deploy_All_Services: $_"
                 }
 
                 if (-not $commitSha) { $commitSha = "$(Build.SourceVersion)" }
@@ -287,6 +297,14 @@ stages:
           - task: PowerShell@2
             displayName: "Send result to Slack"
             condition: always()
+            env:
+              RUN_STATUS: $(RUN_STATUS)
+              RUN_ERROR: $(RUN_ERROR)
+              RUN_DURATION: $(RUN_DURATION)
+              RUN_ID: $(RUN_ID)
+              COMMIT_SHORT: $(COMMIT_SHORT)
+              SKIP_RUN: $(SKIP_RUN)
+              AUTOMATION_UI_BASE_URL: $(AUTOMATION_UI_BASE_URL)
             inputs:
               targetType: "inline"
               script: |
@@ -298,14 +316,14 @@ stages:
 
                 $envName    = "${{ parameters.targetEnvironment }}"
                 $scenName   = "${{ parameters.scenario }}"
-                $status     = "$(RUN_STATUS)"
-                $err        = "$(RUN_ERROR)"
-                $duration   = "$(RUN_DURATION)"
-                $runId      = "$(RUN_ID)"
-                $commit     = "$(COMMIT_SHORT)"
-                $skipped    = "$(SKIP_RUN)"
+                $status     = "$env:RUN_STATUS"
+                $err        = "$env:RUN_ERROR"
+                $duration   = "$env:RUN_DURATION"
+                $runId      = "$env:RUN_ID"
+                $commit     = "$env:COMMIT_SHORT"
+                $skipped    = "$env:SKIP_RUN"
                 $adoUrl     = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
-                $automation = "$(AUTOMATION_UI_BASE_URL)"
+                $automation = "$env:AUTOMATION_UI_BASE_URL"
 
                 if (-not $status) { $status = "NotStarted" }
                 if ($skipped -eq "true") { $status = "Skipped (no Deploy_All_Services build)" }
