@@ -154,9 +154,14 @@ public class MeasureDefinitionController {
             currentSpan.setAttribute("user", user.getEmailAddress());
         }
 
+        // Ensure that a measure evaluator is cached (so that CQL logging can use it)
+        MeasureEvaluator evaluator = evaluatorCache.get(id);
+
+        if (evaluator == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Measure definition not found");
+        }
+
         try {
-            // Ensure that a measure evaluator is cached (so that CQL logging can use it)
-            MeasureEvaluator evaluator = evaluatorCache.get(id);
             // But recompile the bundle every time because the debug flag may not match what's in the cache
             return MeasureEvaluator.compileAndEvaluate(FhirContext.forR4(), evaluator.getBundle(), parameters, debug);
         } catch (Exception e) {

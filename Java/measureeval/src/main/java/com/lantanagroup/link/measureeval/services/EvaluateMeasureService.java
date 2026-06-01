@@ -3,6 +3,7 @@ package com.lantanagroup.link.measureeval.services;
 import com.lantanagroup.link.measureeval.entities.PatientReportingEvaluationStatus;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import com.lantanagroup.link.shared.utils.LogUtils;
+import com.lantanagroup.link.shared.utils.StringUtils;
 import io.opentelemetry.api.common.Attributes;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.MeasureReport;
@@ -50,24 +51,18 @@ public class EvaluateMeasureService {
 
             long timeElapsed = System.currentTimeMillis() - start;
 
-            Attributes attributes = buildAttributes(queryType, patientStatus, report);
-
-            if (logger.isInfoEnabled()) {
-                logger.info("Measure evaluation duration for Patient {}{}: {} ms",
-                        safe(patientStatus.getPatientId()),
-                        queryType != null ? " on " + queryType + " query" : "",
-                        timeElapsed);
+            if (queryType != null) {
+                Attributes attributes = MeasureEvalMetrics.buildAttributes(queryType, patientStatus, report.getReportTrackingId(), bundle.getEntry().size());
+                measureEvalMetrics.MeasureEvalDuration(timeElapsed, attributes);
             }
-
-            measureEvalMetrics.MeasureEvalDuration(timeElapsed, attributes);
             return measureReport;
 
         } catch (Exception ex) {
             logger.error("Measure evaluation failed [measure={}, patient={}, facility={}, correlationId={}]: {}",
                     report.getReportType(),
-                    safe(patientStatus.getPatientId()),
-                    safe(patientStatus.getFacilityId()),
-                    safe(patientStatus.getCorrelationId()),
+                    StringUtils.safe(patientStatus.getPatientId()),
+                    StringUtils.safe(patientStatus.getFacilityId()),
+                    StringUtils.safe(patientStatus.getCorrelationId()),
                     ex.getMessage(),
                     ex);
             throw ex;
@@ -92,23 +87,6 @@ public class EvaluateMeasureService {
                 bundle);
     }
 
-    private Attributes buildAttributes(String queryType,
-                                       PatientReportingEvaluationStatus patientStatus,
-                                       PatientReportingEvaluationStatus.Report report) {
-        Attributes attributes = Attributes.builder()
-                .put(stringKey(DiagnosticNames.FACILITY_ID), safe(patientStatus.getFacilityId()))
-                .put(stringKey(DiagnosticNames.PATIENT_ID), safe(patientStatus.getPatientId()))
-                .put(stringKey(DiagnosticNames.REPORT_TYPE), safe(report.getReportType()))
-                .put(stringKey(DiagnosticNames.FREQUENCY), safe(report.getFrequency()))
-                .put(stringKey(DiagnosticNames.PERIOD_START), safeDate(report.getStartDate()))
-                .put(stringKey(DiagnosticNames.PERIOD_END), safeDate(report.getEndDate()))
-                .put(stringKey(DiagnosticNames.CORRELATION_ID), safe(patientStatus.getCorrelationId())).build();
-        if (queryType != null) {
-            attributes = attributes.toBuilder().put(stringKey(DiagnosticNames.QUERY_TYPE), queryType).build();
-        }
-        return attributes;
-    }
-
     private void logPopulationCounts(MeasureReport measureReport) {
         if (logger.isDebugEnabled()) {
             String counts = measureReport.getGroup().stream()
@@ -119,15 +97,6 @@ public class EvaluateMeasureService {
                     .collect(Collectors.joining(" "));
             logger.debug("Population counts: {}", counts);
         }
-    }
-
-    private static String safe(String v) {
-        String s = LogUtils.sanitize(v);
-        return (s == null) ? "" : s;
-    }
-
-    private static String safeDate(Object date) {
-        return (date == null) ? "" : date.toString();
     }
 }
 

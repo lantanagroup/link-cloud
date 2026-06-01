@@ -101,9 +101,14 @@
         </dependency>
 
         <dependency>
-            <groupId>info.cqframework</groupId>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.cqframework</groupId>
             <artifactId>engine</artifactId>
-            <version>3.15.0</version>
+            <version>4.6.0</version>
         </dependency>
 
         <dependency>
@@ -111,12 +116,6 @@
             <artifactId>cqf-fhir-cr</artifactId>
         </dependency>
 
-
-        <dependency>
-            <groupId>org.opencds.cqf.fhir</groupId>
-            <artifactId>cqf-fhir-jackson</artifactId>
-            <type>pom</type>
-        </dependency>
 
         <!-- for logback to use conditional expressions -->
         <dependency>

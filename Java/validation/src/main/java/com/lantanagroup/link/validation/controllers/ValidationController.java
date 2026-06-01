@@ -8,7 +8,6 @@ import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.entities.*;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import com.lantanagroup.link.validation.services.CategorizationService;
-import com.lantanagroup.link.validation.services.MetricService;
 import com.lantanagroup.link.validation.services.PreQualService;
 import com.lantanagroup.link.validation.services.ValidationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,7 +42,6 @@ public class ValidationController {
     private final ResultRepository resultRepository;
 
     private final PreQualService preQualService;
-    private final MetricService metricService;
     private final ReportClient reportClient;
 
     private final Logger _logger = LoggerFactory.getLogger(ValidationController.class);
@@ -59,14 +57,12 @@ public class ValidationController {
             FhirContext fhirContext,
             ValidationService validationService,
             CategorizationService categorizationService,
-            MetricService metricService,
             ResultRepository resultRepository,
             PreQualService preQualService) {
         this.reportClient = reportClient;
         this.fhirContext = fhirContext;
         this.validationService = validationService;
         this.categorizationService = categorizationService;
-        this.metricService = metricService;
         this.resultRepository = resultRepository;
         this.preQualService = preQualService;
     }
