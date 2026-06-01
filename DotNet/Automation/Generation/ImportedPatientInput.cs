@@ -1,0 +1,62 @@
+﻿namespace LantanaGroup.Automation.Generation;
+
+using Hl7.Fhir.Model;
+using System.Text.Json.Serialization;
+
+/// <summary>
+/// Source of an imported patient.
+/// </summary>
+public enum ImportedPatientSource
+{
+    /// <summary>Patient already exists on the FHIR server; data is fetched at run time.</summary>
+    ExistingId,
+
+    /// <summary>Patient data is supplied as a transaction bundle and uploaded to the FHIR server during the run.</summary>
+    Bundle
+}
+
+/// <summary>
+/// Describes a single imported patient as configured on a scenario.
+/// One of <see cref="PatientId"/> (for <see cref="ImportedPatientSource.ExistingId"/>)
+/// or <see cref="BundleJson"/> (for <see cref="ImportedPatientSource.Bundle"/>) is required.
+/// </summary>
+public sealed class ImportedPatientInput
+{
+    /// <summary>How this patient's data is sourced.</summary>
+    public ImportedPatientSource Source { get; set; } = ImportedPatientSource.ExistingId;
+
+    /// <summary>FHIR Patient.id. Required for both source kinds.</summary>
+    public string PatientId { get; set; } = string.Empty;
+
+    /// <summary>For <see cref="ImportedPatientSource.Bundle"/>: the original file name (display only).</summary>
+    public string? FileName { get; set; }
+
+    /// <summary>For <see cref="ImportedPatientSource.Bundle"/>: the raw FHIR Bundle JSON.</summary>
+    public string? BundleJson { get; set; }
+
+    /// <summary>
+    /// When true, run the classifier on the patient's resources to seed <see cref="MeasureEligibilities"/>.
+    /// When false, <see cref="MeasureEligibilities"/> is taken as-is (manual override).
+    /// </summary>
+    public bool AutoDetect { get; set; } = true;
+
+    /// <summary>
+    /// Per-measure eligibility for this patient. Populated by the classifier when <see cref="AutoDetect"/>
+    /// is true and may be overridden by the user. Drives Q/NQ classification in the manifest.
+    /// </summary>
+    public Dictionary<ProfiledMeasureType, MeasureEligibility> MeasureEligibilities { get; set; } = [];
+
+    /// <summary>
+    /// Optional clinical scenario ID detected from the patient's data. Informational only.
+    /// </summary>
+    public string? DetectedClinicalScenarioId { get; set; }
+
+    /// <summary>
+    /// Transient: FHIR bundle entries loaded by <see cref="ImportedPatientLoader"/>
+    /// during run pre-flight (so the pipeline can reuse them and the runner can compute
+    /// a clinical period that encompasses the patient's actual encounter dates).
+    /// Excluded from JSON / Mongo serialization.
+    /// </summary>
+    [JsonIgnore]
+    public List<Bundle.EntryComponent>? PreLoadedEntries { get; set; }
+}

@@ -371,9 +371,39 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         {
             var scheduleId = Guid.Parse(consumerValue.ReportTrackingId);
             var model = await GetEntry(scheduleId, consumerValue.PatientId);
-            if (model == null) throw new InvalidOperationException("Entry not found");
 
-            var measureEntry = model.MeasureReports.First(x => x.ReportType == consumerValue.ReportType);
+            // It's possible to receive a MeasureReportGenerated event for a
+            // (schedule, patient) combination that does not yet have a
+            // ReportEntry record — for example when a patient only has a
+            // Discharge event (handled by QueryDispatch) without an Admit event
+            // ever being processed by the Report service's PatientEventListener.
+            // In that case create a new entry rather than failing the message.
+            if (model == null)
+            {
+                model = new ReportEntryModel
+                {
+                    PatientId = consumerValue.PatientId,
+                    FacilityId = consumerValue.FacilityId,
+                    ReportScheduleId = scheduleId,
+                    ReportingStatus = ReportingStatus.PatientIdentified,
+                    CreateDate = DateTime.UtcNow,
+                    MeasureReports = new List<EntryMeasureReportModel>()
+                };
+
+                await AddAsync(model, CancellationToken.None);
+            }
+
+            var measureEntry = model.MeasureReports.FirstOrDefault(x => x.ReportType == consumerValue.ReportType);
+            if (measureEntry == null)
+            {
+                measureEntry = new EntryMeasureReportModel
+                {
+                    ReportType = consumerValue.ReportType,
+                    ResourceCount = new Dictionary<string, int>()
+                };
+                model.MeasureReports.Add(measureEntry);
+            }
+
             measureEntry.MeasureReportId = consumerValue.MeasureReportId;
             measureEntry.MeasureReportFileName = consumerValue.MeasureReportBlobName;
             measureEntry.MeasureReportUri = consumerValue.MeasureReportURI;

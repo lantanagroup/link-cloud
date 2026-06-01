@@ -1,4 +1,4 @@
-using Census.Controllers;
+﻿using Census.Controllers;
 using Census.Domain.Entities;
 using LantanaGroup.Link.Census.Application.Interfaces;
 using LantanaGroup.Link.Census.Application.Repositories;

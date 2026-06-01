@@ -47,6 +47,11 @@ jobs:
         run: echo "run_job=${{ steps.should.outputs.run_job }}"
 
   backend-e2e-tests:
+    # All test categories run in parallel against a SINGLE shared
+    # docker compose stack (one build, one up). Each `dotnet test`
+    # invocation writes to its own log file and is then rendered as its own
+    # collapsible ::group:: in the Actions UI so logs are segmented per
+    # category instead of interleaved.
     name: Backend E2E Tests with Docker Compose
     runs-on: [docker-16core-64gb]
     timeout-minutes: 60
@@ -77,6 +82,62 @@ jobs:
       - name: Start services
         run: docker compose up --no-build -d
 
+      - name: Report logs for services that failed to start
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set +e
+          echo "::group::Docker compose status"
+          docker compose ps --all
+          echo "::endgroup::"
+
+          FAILED_SERVICES=""
+
+          # Evaluate each compose container using inspect data so we can:
+          # - ignore successful one-shot init containers (exited with code 0)
+          # - detect unhealthy running services (like link-admin-bff)
+          for container_id in $(docker compose ps -q); do
+            service=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$container_id" 2>/dev/null)
+            state=$(docker inspect --format '{{ .State.Status }}' "$container_id" 2>/dev/null)
+            exit_code=$(docker inspect --format '{{ .State.ExitCode }}' "$container_id" 2>/dev/null)
+            health=$(docker inspect --format '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}none{{ end }}' "$container_id" 2>/dev/null)
+
+            echo "service=${service} state=${state} exitCode=${exit_code} health=${health}"
+
+            should_report=false
+
+            # Failed container states (ignore exited=0 which is valid for init jobs)
+            if [[ "$state" != "running" ]]; then
+              if [[ "$exit_code" != "0" ]]; then
+                should_report=true
+              fi
+            fi
+
+            # Unhealthy running service
+            if [[ "$state" == "running" && "$health" == "unhealthy" ]]; then
+              should_report=true
+            fi
+
+            if [[ "$should_report" == "true" ]]; then
+              FAILED_SERVICES+="${service} "
+            fi
+          done
+
+          # De-duplicate service names
+          FAILED_SERVICES=$(echo "$FAILED_SERVICES" | xargs -n1 | sort -u | xargs)
+
+          if [[ -z "$FAILED_SERVICES" ]]; then
+            echo "No unhealthy/failed services detected immediately after startup."
+            exit 0
+          fi
+
+          echo "Detected unhealthy/failed services: $FAILED_SERVICES"
+          for service in $FAILED_SERVICES; do
+            echo "::group::Logs for unhealthy/failed service: ${service}"
+            docker compose logs --no-color --tail=300 "$service" || true
+            echo "::endgroup::"
+          done
+
       - name: Wait for services to start
         run: sleep 10
 
@@ -85,30 +146,93 @@ jobs:
           chmod +x Scripts/check_health.sh
           Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
 
-      # ---- Test categories run sequentially against the SAME compose stack. ----
-      # `if: ${{ !cancelled() }}` lets later categories run even if an earlier one fails,
-      # while still letting a failure mark the overall job as failed.
+      # Build the test project ONCE up front. The parallel `dotnet test`
+      # invocations below all target the same assembly and transitively
+      # reference the same service projects; if each one runs MSBuild they
+      # race on shared bin/*.deps.json / appsettings output files and crash
+      # with "The process cannot access the file ... being used by another
+      # process" (MSB4018). Building once and passing --no-build/--no-restore
+      # to each parallel run avoids the contention.
+      - name: Restore & build BackendE2ETests
+        run: |
+          dotnet restore ./Tests/BackendE2ETests/BackendE2ETests.csproj
+          dotnet build ./Tests/BackendE2ETests/BackendE2ETests.csproj \
+            --configuration Debug \
+            --no-restore
 
-      - name: Adhoc Report Tests
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=AdhocReportTest" --logger "trx;LogFileName=adhoc-report-test-results.trx" --logger "console;verbosity=detailed"
+      # ---- All test categories run CONCURRENTLY against the SAME stack. ----
+      # Each `dotnet test` is launched in the background with its stdout/stderr
+      # redirected to a dedicated log file. After they all finish we emit each
+      # log wrapped in ::group::/::endgroup:: markers so the GitHub Actions UI
+      # renders a separate, collapsible section per test category instead of
+      # interleaving everything into one wall of text.
+      - name: Backend E2E Tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p ./Tests/BackendE2ETests/TestResults
+          mkdir -p ./test-logs
 
-      - name: API Stability Test
-        if: ${{ !cancelled() }}
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=ApiStabilityTest" --logger "trx;LogFileName=api-stability-test-results.trx" --logger "console;verbosity=detailed"
+          # name|category|trx-file
+          TESTS=(
+            "Adhoc Report|AdhocReportTest|adhoc-report-test-results.trx"
+            "API Stability|ApiStabilityTest|api-stability-test-results.trx"
+            "Automation UI API Smoke|AutomationUiSmokeTest|automation-ui-api-smoke-test-results.trx"
+            "Report Scheduled|ReportScheduledTest|report-scheduled-test-results.trx"
+            "Regenerate Report|RegenerateReportTest|regenerate-report-test-results.trx"
+            "Multi-Measure|MultiMeasureTest|multi-measure-test-results.trx"
+          )
 
-      - name: Report Scheduled E2E Test
-        if: ${{ !cancelled() }}
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=ReportScheduledTest" --logger "trx;LogFileName=report-scheduled-test-results.trx" --logger "console;verbosity=detailed"
+          declare -a PIDS
+          declare -a NAMES
+          declare -a LOGS
 
-      - name: Regenerate Report E2E Test
-        if: ${{ !cancelled() }}
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=RegenerateReportTest" --logger "trx;LogFileName=regenerate-report-test-results.trx" --logger "console;verbosity=detailed"
+          for entry in "${TESTS[@]}"; do
+            IFS='|' read -r NAME CATEGORY TRX <<< "$entry"
+            SLUG=$(echo "$CATEGORY" | tr '[:upper:]' '[:lower:]')
+            LOG="./test-logs/${SLUG}.log"
+            echo "Starting: $NAME (Category=$CATEGORY) -> $LOG"
+            (
+              dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj \
+                --no-build \
+                --no-restore \
+                --filter "Category=${CATEGORY}" \
+                --logger "trx;LogFileName=${TRX}" \
+                --logger "console;verbosity=detailed" \
+                --results-directory ./Tests/BackendE2ETests/TestResults
+            ) > "$LOG" 2>&1 &
+            PIDS+=("$!")
+            NAMES+=("$NAME")
+            LOGS+=("$LOG")
+          done
 
-      - name: Multi-Measure E2E Test
-        if: ${{ !cancelled() }}
-        run: dotnet test ./Tests/BackendE2ETests/BackendE2ETests.csproj --filter "Category=MultiMeasureTest" --logger "trx;LogFileName=multi-measure-test-results.trx" --logger "console;verbosity=detailed"
+          # Wait for every test run, capture individual exit codes.
+          FAILED=0
+          declare -a EXITS
+          for i in "${!PIDS[@]}"; do
+            if wait "${PIDS[$i]}"; then
+              EXITS+=("0")
+            else
+              EXITS+=("$?")
+              FAILED=1
+            fi
+          done
 
-      # ---- Always-on artifact uploads (preserve per-category artifact names) ----
+          # Render each run's output in its own collapsible group in the UI.
+          for i in "${!NAMES[@]}"; do
+            if [[ "${EXITS[$i]}" != "0" ]]; then
+              STATUS="❌ FAILED (exit ${EXITS[$i]})"
+            else
+              STATUS="✅ PASSED"
+            fi
+            echo "::group::${NAMES[$i]} — ${STATUS}"
+            cat "${LOGS[$i]}" || true
+            echo "::endgroup::"
+          done
+
+          exit $FAILED
+
+      # ---- Artifact uploads ----
 
       - name: Upload Service Logs on Failure
         if: failure()
@@ -117,12 +241,20 @@ jobs:
           name: backend-e2e-service-logs
           path: service-logs/
 
-      - name: Upload Adhoc Report test results
+      - name: Upload Backend E2E per-category console logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: adhoc-report-test-results
-          path: ./Tests/BackendE2ETests/TestResults/adhoc-report-test-results.trx
+          name: backend-e2e-console-logs
+          path: ./test-logs/
+          if-no-files-found: ignore
+
+      - name: Upload Backend E2E test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-e2e-test-results
+          path: ./Tests/BackendE2ETests/TestResults/*.trx
           if-no-files-found: ignore
 
       - name: Upload Adhoc Report submission ZIP
@@ -131,38 +263,6 @@ jobs:
         with:
           name: adhoc-report-submission-zip
           path: ./Tests/BackendE2ETests/TestResults/adhoc-report-test-submission.zip
-          if-no-files-found: ignore
-
-      - name: Upload API Stability test results
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-stability-test-results
-          path: ./Tests/BackendE2ETests/TestResults/api-stability-test-results.trx
-          if-no-files-found: ignore
-
-      - name: Upload Report Scheduled test results
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: report-scheduled-test-results
-          path: ./Tests/BackendE2ETests/TestResults/report-scheduled-test-results.trx
-          if-no-files-found: ignore
-
-      - name: Upload Regenerate Report test results
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: regenerate-report-test-results
-          path: ./Tests/BackendE2ETests/TestResults/regenerate-report-test-results.trx
-          if-no-files-found: ignore
-
-      - name: Upload Multi-Measure test results
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: multi-measure-test-results
-          path: ./Tests/BackendE2ETests/TestResults/multi-measure-test-results.trx
           if-no-files-found: ignore
 
       - name: Tear down services

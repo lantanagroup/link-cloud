@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using System.Globalization;
 using System.Text.Json;
 
@@ -24,16 +24,22 @@ public static class CqlFilterInputExtractor
         string patientId,
         IEnumerable<Bundle.EntryComponent> entries)
     {
-        Encounter? encounter = null;
+        var encounters = new List<Encounter>();
         var conditions = new List<Condition>();
         var observations = new List<Observation>();
+        var procedures = new List<Procedure>();
+        var medicationRequests = new List<MedicationRequest>();
+        var medicationAdministrations = new List<MedicationAdministration>();
+        var coverages = new List<Coverage>();
+        var serviceRequests = new List<ServiceRequest>();
+        var specimens = new List<Specimen>();
 
         foreach (var entry in entries)
         {
             switch (entry.Resource)
             {
-                case Encounter enc when encounter == null:
-                    encounter = enc;
+                case Encounter enc:
+                    encounters.Add(enc);
                     break;
                 case Condition cond:
                     conditions.Add(cond);
@@ -41,35 +47,73 @@ public static class CqlFilterInputExtractor
                 case Observation obs:
                     observations.Add(obs);
                     break;
+                case Procedure proc:
+                    procedures.Add(proc);
+                    break;
+                case MedicationRequest mr:
+                    medicationRequests.Add(mr);
+                    break;
+                case MedicationAdministration ma:
+                    medicationAdministrations.Add(ma);
+                    break;
+                case Coverage cov:
+                    coverages.Add(cov);
+                    break;
+                case ServiceRequest sr:
+                    serviceRequests.Add(sr);
+                    break;
+                case Specimen specimen:
+                    specimens.Add(specimen);
+                    break;
             }
         }
 
-        if (encounter == null || encounter.Period == null)
+        if (encounters.Count == 0)
             return null;
 
-        var encStart = ParseFhirDateTime(encounter.Period.Start) ?? DateTime.MinValue;
-        var encEnd = ParseFhirDateTime(encounter.Period.End) ?? DateTime.MaxValue;
-        var encounterId = encounter.Id;
+        // Use the first encounter with a populated Period as the legacy "primary" anchor
+        // for the EncounterId/Start/End triple. The full encounter list (in the order they
+        // were extracted) is what the IP resolver actually consumes; the legacy fields are
+        // kept for back-compat with pre-Landing-3 tests and consumers.
+        var primaryEncounter = encounters.FirstOrDefault(e => e.Period != null) ?? encounters[0];
+        var primaryStart = ParseFhirDateTime(primaryEncounter.Period?.Start) ?? DateTime.MinValue;
+        var primaryEnd = ParseFhirDateTime(primaryEncounter.Period?.End) ?? DateTime.MaxValue;
 
-        var conditionContexts = new List<CqlFilterSimulator.ConditionContext>(conditions.Count);
-        foreach (var cond in conditions)
-        {
-            conditionContexts.Add(BuildConditionContext(cond));
-        }
-
-        var observationContexts = new List<CqlFilterSimulator.ObservationContext>(observations.Count);
-        foreach (var obs in observations)
-        {
-            observationContexts.Add(BuildObservationContext(obs));
-        }
+        var encounterContexts = encounters.Select(BuildEncounterContext).ToList();
+        var conditionContexts = conditions.Select(BuildConditionContext).ToList();
+        var observationContexts = observations.Select(BuildObservationContext).ToList();
+        var procedureContexts = procedures.Select(BuildProcedureContext).ToList();
+        var medicationRequestContexts = medicationRequests.Select(BuildMedicationRequestContext).ToList();
+        var medicationAdministrationContexts = medicationAdministrations.Select(BuildMedicationAdministrationContext).ToList();
+        var coverageContexts = coverages.Select(BuildCoverageContext).ToList();
+        var serviceRequestContexts = serviceRequests.Select(BuildServiceRequestContext).ToList();
+        var specimenContexts = specimens.Select(BuildSpecimenContext).ToList();
 
         return new CqlFilterSimulator.PatientCqlInput(
             patientId,
-            encounterId,
-            encStart,
-            encEnd,
+            primaryEncounter.Id,
+            primaryStart,
+            primaryEnd,
             conditionContexts,
-            observationContexts);
+            observationContexts)
+        {
+            Encounters = encounterContexts,
+            Procedures = procedureContexts,
+            MedicationRequests = medicationRequestContexts,
+            MedicationAdministrations = medicationAdministrationContexts,
+            Coverages = coverageContexts,
+            ServiceRequests = serviceRequestContexts,
+            Specimens = specimenContexts
+        };
+    }
+
+    private static CqlFilterSimulator.EncounterContext BuildEncounterContext(Encounter enc)
+    {
+        var start = ParseFhirDateTime(enc.Period?.Start) ?? DateTime.MinValue;
+        var end = ParseFhirDateTime(enc.Period?.End) ?? DateTime.MaxValue;
+        var classCode = enc.Class?.Code ?? string.Empty;
+        var status = enc.Status?.ToString() ?? string.Empty;
+        return new CqlFilterSimulator.EncounterContext(enc.Id ?? string.Empty, start, end, classCode, status);
     }
 
     private static CqlFilterSimulator.ConditionContext BuildConditionContext(Condition cond)
@@ -141,6 +185,123 @@ public static class CqlFilterInputExtractor
             loinc,
             categories,
             effectiveStart,
-            effectiveEnd);
+            effectiveEnd)
+        {
+            Status = obs.Status?.ToString() ?? string.Empty,
+            SpecimenReference = obs.Specimen?.Reference ?? string.Empty
+        };
+    }
+
+    // ---------- Procedure / MedicationRequest / MedicationAdministration / Coverage / ServiceRequest ----------
+
+    private static CqlFilterSimulator.ProcedureContext BuildProcedureContext(Procedure proc)
+    {
+        DateTime performedStart;
+        DateTime performedEnd;
+        switch (proc.Performed)
+        {
+            case Period p:
+                performedStart = ParseFhirDateTime(p.Start) ?? DateTime.MinValue;
+                performedEnd = ParseFhirDateTime(p.End) ?? performedStart;
+                break;
+            case FhirDateTime dt:
+                performedStart = ParseFhirDateTime(dt.Value) ?? DateTime.MinValue;
+                performedEnd = performedStart;
+                break;
+            default:
+                performedStart = DateTime.MinValue;
+                performedEnd = DateTime.MaxValue;
+                break;
+        }
+
+        return new CqlFilterSimulator.ProcedureContext(
+            proc.Id,
+            performedStart,
+            performedEnd,
+            proc.Encounter?.Reference ?? string.Empty);
+    }
+
+    private static CqlFilterSimulator.MedicationRequestContext BuildMedicationRequestContext(MedicationRequest mr)
+    {
+        var authoredOn = ParseFhirDateTime(mr.AuthoredOn) ?? DateTime.MinValue;
+        return new CqlFilterSimulator.MedicationRequestContext(
+            mr.Id,
+            authoredOn,
+            mr.Encounter?.Reference ?? string.Empty);
+    }
+
+    private static CqlFilterSimulator.MedicationAdministrationContext BuildMedicationAdministrationContext(MedicationAdministration ma)
+    {
+        DateTime effectiveStart;
+        DateTime effectiveEnd;
+        switch (ma.Effective)
+        {
+            case Period p:
+                effectiveStart = ParseFhirDateTime(p.Start) ?? DateTime.MinValue;
+                effectiveEnd = ParseFhirDateTime(p.End) ?? effectiveStart;
+                break;
+            case FhirDateTime dt:
+                effectiveStart = ParseFhirDateTime(dt.Value) ?? DateTime.MinValue;
+                effectiveEnd = effectiveStart;
+                break;
+            default:
+                effectiveStart = DateTime.MinValue;
+                effectiveEnd = DateTime.MaxValue;
+                break;
+        }
+
+        return new CqlFilterSimulator.MedicationAdministrationContext(
+            ma.Id,
+            effectiveStart,
+            effectiveEnd,
+            ma.Context?.Reference ?? string.Empty);
+    }
+
+    private static CqlFilterSimulator.CoverageContext BuildCoverageContext(Coverage cov)
+    {
+        // Coverage.period is optional; missing start defaults to MinValue, missing end to
+        // MaxValue (open-ended coverage). This matches FHIR overlap semantics where an
+        // unbounded end means the coverage is still active.
+        var periodStart = ParseFhirDateTime(cov.Period?.Start) ?? DateTime.MinValue;
+        var periodEnd = ParseFhirDateTime(cov.Period?.End) ?? DateTime.MaxValue;
+        return new CqlFilterSimulator.CoverageContext(cov.Id, periodStart, periodEnd);
+    }
+
+    private static CqlFilterSimulator.ServiceRequestContext BuildServiceRequestContext(ServiceRequest sr)
+    {
+        var authoredOn = ParseFhirDateTime(sr.AuthoredOn) ?? DateTime.MinValue;
+        return new CqlFilterSimulator.ServiceRequestContext(
+            sr.Id,
+            authoredOn,
+            sr.Encounter?.Reference ?? string.Empty);
+    }
+
+    private static CqlFilterSimulator.SpecimenContext BuildSpecimenContext(Specimen specimen)
+    {
+        DateTime collectionStart;
+        DateTime collectionEnd;
+        switch (specimen.Collection?.Collected)
+        {
+            case Period p:
+                collectionStart = ParseFhirDateTime(p.Start) ?? DateTime.MinValue;
+                collectionEnd = ParseFhirDateTime(p.End) ?? collectionStart;
+                break;
+            case FhirDateTime dt:
+                collectionStart = ParseFhirDateTime(dt.Value) ?? DateTime.MinValue;
+                collectionEnd = collectionStart;
+                break;
+            default:
+                collectionStart = DateTime.MinValue;
+                collectionEnd = DateTime.MaxValue;
+                break;
+        }
+
+        return new CqlFilterSimulator.SpecimenContext(
+            specimen.Id,
+            collectionStart,
+            collectionEnd)
+        {
+            SubjectReference = specimen.Subject?.Reference ?? string.Empty
+        };
     }
 }

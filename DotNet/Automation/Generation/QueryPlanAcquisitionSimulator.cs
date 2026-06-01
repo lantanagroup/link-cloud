@@ -1,3 +1,4 @@
+﻿using LantanaGroup.Automation.Helpers;
 using System.Globalization;
 using System.Text.Json;
 
@@ -25,18 +26,30 @@ public static class QueryPlanAcquisitionSimulator
     /// referenced by the patient's resources.
     /// </param>
     /// <param name="queryPlan">The query plan to simulate.</param>
-    /// <param name="reportStart">Optional report period start date.</param>
-    /// <param name="reportEnd">Optional report period end date.</param>
+    /// <param name="clinicalPeriodStart">Optional clinical period start date (ISO-8601). When provided, parameter queries with a <c>date=ge…</c> filter exclude resources whose date range falls entirely before this value (FHIR overlap semantics).</param>
+    /// <param name="clinicalPeriodEnd">Optional clinical period end date (ISO-8601). When provided, parameter queries with a <c>date=le…</c> filter exclude resources whose date range falls entirely after this value (FHIR overlap semantics).</param>
+    /// <param name="output">
+    /// Optional diagnostic sink. When non-null, the simulator emits a single warning per
+    /// (resource-key) when a Parameter query has a <c>date</c> filter but the resource's
+    /// shape does not carry a recognized date field. Such resources are <b>excluded</b> from
+    /// the predicted-acquired set (fail-closed) so that prediction stays honest in the face
+    /// of unfamiliar imported FHIR shapes.
+    /// </param>
     public static HashSet<string> SimulateAcquiredKeysForPatient(
         string patientId,
         IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)> patientResourceEntries,
         IReadOnlyList<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedResourceEntries,
         QueryPlanInput queryPlan,
-        string? reportStart = null,
-        string? reportEnd = null)
+        string? clinicalPeriodStart = null,
+        string? clinicalPeriodEnd = null,
+        IAutomationOutput? output = null)
     {
-        var hasStart = DateTimeOffset.TryParse(reportStart, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var start);
-        var hasEnd = DateTimeOffset.TryParse(reportEnd, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var end);
+        var hasStart = DateTimeOffset.TryParse(clinicalPeriodStart, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var start);
+        var hasEnd = DateTimeOffset.TryParse(clinicalPeriodEnd, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var end);
+
+        // Track resource keys we've already emitted a "no recognized date" warning for, so
+        // a single missing-date resource doesn't spam the log once per date-parameter iteration.
+        var warnedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Build per-type index for this patient (patient resources + shared)
         var typeMap = new Dictionary<string, List<GeneratedResource>>(StringComparer.OrdinalIgnoreCase);
@@ -84,7 +97,7 @@ public static class QueryPlanAcquisitionSimulator
 
                 foreach (var resource in candidates)
                 {
-                    if (!MatchesParameterQuery(resource, query, hasStart ? start : null, hasEnd ? end : null, acquiredByType))
+                    if (!MatchesParameterQuery(resource, query, hasStart ? start : null, hasEnd ? end : null, acquiredByType, warnedKeys, output))
                         continue;
 
                     acquired.Add(resource.Key);
@@ -119,7 +132,9 @@ public static class QueryPlanAcquisitionSimulator
         QueryPlanQueryEntry query,
         DateTimeOffset? periodStart,
         DateTimeOffset? periodEnd,
-        Dictionary<string, HashSet<string>> acquiredByType)
+        Dictionary<string, HashSet<string>> acquiredByType,
+        HashSet<string> warnedKeys,
+        IAutomationOutput? output)
     {
         foreach (var p in query.Parameters)
         {
@@ -144,22 +159,44 @@ public static class QueryPlanAcquisitionSimulator
             }
 
             if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(p.ParameterType, "Variable", StringComparison.OrdinalIgnoreCase)
-                && TryGetResourceDate(resource.ResourceType, resource.Resource, out var resourceDate))
+                && string.Equals(p.ParameterType, "Variable", StringComparison.OrdinalIgnoreCase))
             {
-                if (p.Format?.StartsWith("ge", StringComparison.OrdinalIgnoreCase) == true
-                    && periodStart.HasValue
-                    && resourceDate < periodStart.Value)
+                var isGe = p.Format?.StartsWith("ge", StringComparison.OrdinalIgnoreCase) == true;
+                var isLe = p.Format?.StartsWith("le", StringComparison.OrdinalIgnoreCase) == true;
+
+                // Pick the bound this specific parameter enforces. When it's null the filter
+                // is vacuous (e.g. caller didn't supply a clinical period) — skip silently
+                // so unrecognized date shapes don't get penalized for a non-existent rule.
+                var bound = isGe ? periodStart : isLe ? periodEnd : null;
+                if (bound == null)
+                    continue;
+
+                // Only one bound is being checked per parameter. We need both ends of the
+                // resource's date range so we can compute correct FHIR overlap semantics:
+                //   ge{S}:  resource.End   >= S   (resource extends into [S, +inf))
+                //   le{E}:  resource.Start <= E   (resource extends into (-inf, E])
+                // For instant types (e.g. authoredOn) start == end.
+                if (!TryGetResourceDateRange(resource.ResourceType, resource.Resource,
+                        out var resourceStart, out var resourceEnd))
                 {
+                    // Fail closed: the query has a date filter and we don't recognize the
+                    // resource's date shape, so we can't honestly say it falls in-period.
+                    // Drop it and warn once per resource key so unfamiliar shapes surface.
+                    if (output != null && warnedKeys.Add(resource.Key))
+                    {
+                        output.WriteLine(
+                            $"  [simulator] WARNING: {resource.Key} has no recognized date field for the " +
+                            $"'{resource.ResourceType}' Parameter query 'date' filter; excluding from " +
+                            "predicted-acquired set (fail-closed). Extend TryGetResourceDateRange to model this shape.");
+                    }
                     return false;
                 }
 
-                if (p.Format?.StartsWith("le", StringComparison.OrdinalIgnoreCase) == true
-                    && periodEnd.HasValue
-                    && resourceDate > periodEnd.Value)
-                {
+                if (isGe && resourceEnd < bound.Value)
                     return false;
-                }
+
+                if (isLe && resourceStart > bound.Value)
+                    return false;
             }
         }
 
@@ -276,48 +313,112 @@ public static class QueryPlanAcquisitionSimulator
         return false;
     }
 
-    private static bool TryGetResourceDate(string resourceType, JsonElement resource, out DateTimeOffset date)
+    /// <summary>
+    /// Returns the resource's date range (start, end) for FHIR <c>date</c> search-param
+    /// matching with overlap semantics. For instant-style fields the start and end are
+    /// equal. Returns <c>false</c> when the resource shape carries no recognized date —
+    /// callers fail-closed and warn so unfamiliar imported shapes get caught early.
+    ///
+    /// Mappings track the FHIR R4 <c>date</c> search parameter for each resource type:
+    /// <list type="bullet">
+    ///   <item>Encounter — <c>period</c> (overlap)</item>
+    ///   <item>Observation — <c>effectiveDateTime</c> | <c>effectivePeriod</c> | <c>effectiveInstant</c>, fall back to <c>issued</c></item>
+    ///   <item>DiagnosticReport — <c>effectiveDateTime</c> | <c>effectivePeriod</c>, fall back to <c>issued</c></item>
+    ///   <item>Procedure — <c>performedDateTime</c> | <c>performedPeriod</c></item>
+    ///   <item>Condition — <c>recordedDate</c> | <c>onsetDateTime</c> | <c>onsetPeriod</c></item>
+    ///   <item>ServiceRequest / MedicationRequest — <c>authoredOn</c> (instant)</item>
+    /// </list>
+    /// </summary>
+    private static bool TryGetResourceDateRange(string resourceType, JsonElement resource,
+        out DateTimeOffset start, out DateTimeOffset end)
     {
-        static bool TryParseStringProperty(JsonElement element, string propertyName, out DateTimeOffset parsed)
-        {
-            if (element.TryGetProperty(propertyName, out var prop)
-                && prop.ValueKind == JsonValueKind.String
-                && DateTimeOffset.TryParse(prop.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out parsed))
-            {
-                return true;
-            }
+        start = default;
+        end = default;
 
-            parsed = default;
-            return false;
+        switch (resourceType)
+        {
+            case "Encounter":
+                return TryGetPeriod(resource, "period", out start, out end);
+
+            case "Observation":
+                return TryGetEffective(resource, out start, out end)
+                    || TryGetInstant(resource, "issued", out start, out end);
+
+            case "DiagnosticReport":
+                return TryGetEffective(resource, out start, out end)
+                    || TryGetInstant(resource, "issued", out start, out end);
+
+            case "Procedure":
+                return TryGetInstant(resource, "performedDateTime", out start, out end)
+                    || TryGetPeriod(resource, "performedPeriod", out start, out end);
+
+            case "Condition":
+                return TryGetInstant(resource, "recordedDate", out start, out end)
+                    || TryGetInstant(resource, "onsetDateTime", out start, out end)
+                    || TryGetPeriod(resource, "onsetPeriod", out start, out end);
+
+            case "ServiceRequest":
+            case "MedicationRequest":
+                return TryGetInstant(resource, "authoredOn", out start, out end);
+
+            default:
+                // Unknown resource type carrying a date filter — fail closed.
+                return false;
+        }
+    }
+
+    /// <summary>Reads an instant-shaped date property as a (date, date) range.</summary>
+    private static bool TryGetInstant(JsonElement element, string propertyName,
+        out DateTimeOffset start, out DateTimeOffset end)
+    {
+        if (element.TryGetProperty(propertyName, out var prop)
+            && prop.ValueKind == JsonValueKind.String
+            && DateTimeOffset.TryParse(prop.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed))
+        {
+            start = parsed;
+            end = parsed;
+            return true;
         }
 
-        static bool TryParseNestedStringProperty(JsonElement element, string parent, string child, out DateTimeOffset parsed)
-        {
-            if (element.TryGetProperty(parent, out var parentProp)
-                && parentProp.ValueKind == JsonValueKind.Object
-                && TryParseStringProperty(parentProp, child, out parsed))
-            {
-                return true;
-            }
+        start = default;
+        end = default;
+        return false;
+    }
 
-            parsed = default;
+    /// <summary>Reads a Period-shaped property as (start, end). Missing start defaults to <see cref="DateTimeOffset.MinValue"/>; missing end defaults to <see cref="DateTimeOffset.MaxValue"/> (FHIR open-ended period).</summary>
+    private static bool TryGetPeriod(JsonElement element, string propertyName,
+        out DateTimeOffset start, out DateTimeOffset end)
+    {
+        start = default;
+        end = default;
+
+        if (!element.TryGetProperty(propertyName, out var period) || period.ValueKind != JsonValueKind.Object)
             return false;
-        }
 
-        return resourceType switch
-        {
-            "Encounter" => TryParseNestedStringProperty(resource, "period", "start", out date),
-            "Condition" => TryParseStringProperty(resource, "recordedDate", out date) || TryParseStringProperty(resource, "onsetDateTime", out date),
-            "Procedure" => TryParseStringProperty(resource, "performedDateTime", out date) || TryParseNestedStringProperty(resource, "performedPeriod", "start", out date),
-            "Observation" => TryParseStringProperty(resource, "effectiveDateTime", out date) || TryParseStringProperty(resource, "issued", out date),
-            "DiagnosticReport" => TryParseStringProperty(resource, "effectiveDateTime", out date) || TryParseStringProperty(resource, "issued", out date),
-            "ServiceRequest" => TryParseStringProperty(resource, "authoredOn", out date),
-            "MedicationRequest" => TryParseStringProperty(resource, "authoredOn", out date),
-            _ => TryParseStringProperty(resource, "authoredOn", out date)
-                 || TryParseStringProperty(resource, "issued", out date)
-                 || TryParseStringProperty(resource, "effectiveDateTime", out date)
-                 || TryParseStringProperty(resource, "recordedDate", out date)
-        };
+        var hasStart = period.TryGetProperty("start", out var startProp)
+            && startProp.ValueKind == JsonValueKind.String
+            && DateTimeOffset.TryParse(startProp.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out start);
+
+        var hasEnd = period.TryGetProperty("end", out var endProp)
+            && endProp.ValueKind == JsonValueKind.String
+            && DateTimeOffset.TryParse(endProp.GetString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out end);
+
+        if (!hasStart && !hasEnd)
+            return false;
+
+        // Open-ended periods: clamp to extremes so overlap math works without conditionals at call sites.
+        if (!hasStart) start = DateTimeOffset.MinValue;
+        if (!hasEnd) end = DateTimeOffset.MaxValue;
+
+        return true;
+    }
+
+    /// <summary>Reads Observation/DiagnosticReport <c>effective[x]</c> in any FHIR-permitted shape.</summary>
+    private static bool TryGetEffective(JsonElement resource, out DateTimeOffset start, out DateTimeOffset end)
+    {
+        return TryGetInstant(resource, "effectiveDateTime", out start, out end)
+            || TryGetInstant(resource, "effectiveInstant", out start, out end)
+            || TryGetPeriod(resource, "effectivePeriod", out start, out end);
     }
 
     private static void AddByType(Dictionary<string, HashSet<string>> acquiredByType, string resourceType, string resourceId)

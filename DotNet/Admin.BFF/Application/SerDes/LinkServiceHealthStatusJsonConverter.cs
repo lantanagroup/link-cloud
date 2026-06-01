@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Serialization;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 

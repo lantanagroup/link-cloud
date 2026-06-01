@@ -1,4 +1,4 @@
-using Automation.UI.Services;
+﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -8,6 +8,8 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.HttpOverrides;
 using MongoDB.Driver;
 
@@ -103,6 +105,26 @@ var mongoClientSettings = MongoClientSettings.FromUrl(mongoUrl);
 
 builder.Services.AddSingleton<IMongoClient>(_ => new MongoClient(mongoClientSettings));
 builder.Services.AddSingleton(sp => sp.GetRequiredService<IMongoClient>().GetDatabase(mongoDatabaseName));
+
+var dataProtectionApplicationName = builder.Configuration.GetValue<string>("DataProtection:ApplicationName")
+    ?? $"Link.Automation.UI:{builder.Environment.EnvironmentName}";
+var dataProtectionKeyCollectionName = builder.Configuration.GetValue<string>("DataProtection:KeyCollectionName")
+    ?? "automation_data_protection_keys";
+
+builder.Services.AddSingleton(new MongoDataProtectionOptions
+{
+    ApplicationName = dataProtectionApplicationName,
+    KeyCollectionName = dataProtectionKeyCollectionName
+});
+builder.Services.AddSingleton<MongoDataProtectionXmlRepository>();
+builder.Services.AddDataProtection()
+    .SetApplicationName(dataProtectionApplicationName);
+builder.Services.AddOptions<KeyManagementOptions>()
+    .Configure<MongoDataProtectionXmlRepository>((options, repository) =>
+    {
+        options.XmlRepository = repository;
+    });
+
 builder.Services.AddSingleton<MongoIndexManager>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
@@ -126,6 +148,13 @@ builder.Services.AddScoped<PipelineDataReader>();
 builder.Services.AddHostedService<ScenarioSeedService>();
 builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
 
+// -- Seed synthetic runs for dashboard verification.
+//    Gated on config (Dashboard:SeedFakeRuns). Used for Debugging Dashbhoard.
+if (builder.Configuration.GetValue<bool?>("Dashboard:SeedFakeRuns") ?? false)
+{
+    builder.Services.AddHostedService<DashboardSeedService>();
+}
+
 // -- MVC + SignalR --
 builder.Services.AddControllersWithViews()
     .AddJsonOptions(opts =>
@@ -136,6 +165,7 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<RunSnapshotOrchestrator>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RunSnapshotOrchestrator>());
 builder.Services.AddSingleton<IAutomationRunManager, AutomationRunManager>();
+builder.Services.AddSingleton<IRunExportService, RunExportService>();
 
 var app = builder.Build();
 

@@ -179,7 +179,7 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         var queryConfigRequest = new CreateFhirQueryConfigurationRequestApiModel
         {
             FacilityId = _facilityId,
-            FhirServerBaseUrl = AutomationCfg.InternalFhirServerBase,
+            FhirServerBaseUrl = AutomationCfg.FacilityFhirServerBase,
             MaxConcurrentRequests = Math.Max(2, AutomationCfg.FhirQuery.MaxConcurrentRequests),
             MaxRetries = 3
         };

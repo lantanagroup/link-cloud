@@ -82,12 +82,7 @@ public static class GeneralStartupExtensions
             builder.RegisterRedis();
         }
 
-        // Determine if secret manager should be enabled based on configuration
-        var configureSecretManager = builder.Configuration.GetValue<bool>("SecretManagement:Enabled");
-        if (configureSecretManager)
-        {
-            builder.Services.RegisterSecretManager(builder.Configuration);
-        }
+        builder.Services.RegisterSecretManager(builder.Configuration);
 
         builder.Services.RegisterInMemoryCache();
         builder.Services.RegisterHittpClient();
@@ -132,6 +127,7 @@ public static class GeneralStartupExtensions
         services.Configure<SecretManagerSettings>(configuration.GetSection(ConfigurationConstants.AppSettings.SecretManagement));
         services.Configure<SftpValidationSettings>(configuration.GetSection(SftpValidationSettings.SectionName));
         services.Configure<SftpAcquisitionSettings>(configuration.GetSection(SftpAcquisitionSettings.SectionName));
+        services.Configure<DataSourceAuthSettings>(configuration.GetSection(DataSourceAuthSettings.SectionName));
 
         IConfigurationSection consumerSettingsSection = configuration.GetRequiredSection(nameof(ConsumerSettings));
         services.Configure<ConsumerSettings>(consumerSettingsSection);
@@ -157,7 +153,13 @@ public static class GeneralStartupExtensions
                     if (string.IsNullOrEmpty(connectionString))
                         throw new InvalidOperationException("Database connection string is null or empty.");
 
-                    options.UseSqlServer(connectionString)
+                    options.UseSqlServer(connectionString, sqlOptions =>
+                        {
+                            sqlOptions.EnableRetryOnFailure(
+                                maxRetryCount: 5,
+                                maxRetryDelay: TimeSpan.FromSeconds(10),
+                                errorNumbersToAdd: null);
+                        })
                        .AddInterceptors(updateBaseEntityInterceptor);
 
                     break;

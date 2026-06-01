@@ -1,4 +1,4 @@
-# Automation.UI
+﻿# Automation.UI
 
 `Automation.UI` is the interactive web host for Link automation runs. It lets users create and
 manage test scenarios, configure FHIR query plans, start runs, watch progress in real time,
@@ -99,13 +99,20 @@ APIs.
 | `Cancel` / `CancelJson` | POST | Cancel a running automation run. |
 | `Delete` / `DeleteJson` | POST | Delete a run and its artifacts. |
 | `PipelineSnapshot` | GET | Full diagnostic pipeline snapshot for a run. |
-| `DataAcquisitionLogs` | GET | Paginated, sortable DA query logs for a run. |
+| `DataAcquisitionLogs` | GET | Paginated, sortable, **free-text searchable** DA query logs for a run. The optional `searchTerm` query parameter is trimmed and forwarded to the DataAcquisition service, which applies it as `PatientId LIKE %term%` (case-insensitive) OR exact `Id` match (when the term parses as a `long`) OR exact `ResourceType` match (when the term parses as a known FHIR ResourceType). The Run Details page debounces the search input and re-pages from the server on every change, so pagination behaves identically to the unfiltered case (page 1 of the filtered set, no client-side row hiding, no bulk pre-fetch). |
 | `DataAcquisitionLogDetail` | GET | Individual DA log entry detail. |
 
-The dashboard's **quick-launch** dropdown is populated from saved scenarios. Clicking the
-**+ New Scenario** button on the Runs page opens the shared scenario editor modal inline -- a
-saved scenario is automatically appended to the dropdown and selected, so the user can run the
-newly authored scenario without navigating away.
+The dashboard's **quick-launch** dropdown is populated from saved scenarios. Selecting a
+scenario mirrors that scenario's saved values into the quick-launch form so the run
+honours them: `ReportMethod`, `Seed`, `PatientCount`, `ResourcesPerPatientMax`,
+`QueryPlanTemplateId`, `ReportPeriodStart` / `ReportPeriodEnd`, `CleanupFhirData`, and
+`CleanupServiceData`. Without this mirroring, the static defaults
+(`CleanupFhirData=true`, `CleanupServiceData=false`, no period) would silently override
+whatever the user saved on the scenario.
+
+Clicking the **+ New Scenario** button on the Runs page opens the shared scenario editor
+modal inline -- a saved scenario is automatically appended to the dropdown and selected,
+so the user can run the newly authored scenario without navigating away.
 
 ### 3.2 `ScenariosController`
 
@@ -116,12 +123,27 @@ no separate Create/Edit/Details pages.
 |---|---|---|
 | `Index` | GET | Scenario list page (uses shared editor modal). |
 | `GetJson` | GET | Return a single scenario as JSON. |
-| `SaveInline` | POST | Create or update a scenario (JSON body). |
-| `CloneInline` | POST | Clone an existing scenario. |
+| `SaveInline` | POST | Create or update a scenario (JSON body). Validates report period bounds and imported-patient inputs (see below). |
+| `CloneInline` | POST | Clone an existing scenario (deep-copies cohorts and imported patient lists; resets `IsSystemScenario` to `false`). |
 | `DeleteInline` | POST | Delete a non-system scenario. |
+| `ClassifyImported` | POST | Classify an imported patient (by ID or supplied bundle JSON) and return per-measure Q/NQ eligibility, detected clinical scenario, and encounter date range. Drives the editor's auto-detect and Report-Period auto-suggest UX. |
 
 System scenarios (seeded at startup by `ScenarioSeedService`) cannot be modified or deleted,
 only cloned. Attempting to modify a system scenario returns `403 Forbidden`.
+
+`SaveInline` also performs server-side validation that the editor cannot fully enforce on
+the client side:
+
+- Report Period end must be on or after Report Period start (when both are set).
+- Each ID-based imported patient must have a non-empty `PatientId`. `BundleJson` is
+  cleared so it is never persisted on ID rows.
+- Each bundle-based imported patient must contain parseable FHIR with at least one
+  `Patient` whose `id` matches the configured `PatientId` (if a `PatientId` was supplied;
+  otherwise the bundle's Patient id is used). `Source` is forced to `Bundle` to keep the
+  document self-consistent.
+- Imported encounter dates are NOT required to sit inside the configured Report Period.
+  A scenario with a date mismatch is a legitimate test case (proper disqualification by
+  measure-eval); the editor surfaces the mismatch as a warning instead of blocking save.
 
 ### 3.3 `QueryPlansController`
 
@@ -198,6 +220,22 @@ All POST endpoints use `[ValidateAntiForgeryToken]`. The token is rendered via
 `@Html.AntiForgeryToken()` inside the modal and sent as a `RequestVerificationToken` request
 header.
 
+Antiforgery tokens are protected by ASP.NET Core Data Protection. `Automation.UI` persists the
+Data Protection key ring to MongoDB so redeploying the UI does not invalidate current browser
+tokens solely because the container restarted. Keys are stored in the configured Mongo database in
+`DataProtection:KeyCollectionName` (default: `automation_data_protection_keys`).
+
+By default, the Data Protection application name is environment-scoped:
+
+```text
+Link.Automation.UI:{ASPNETCORE_ENVIRONMENT}
+```
+
+This allows environments such as Dev and Test to use the same Mongo collection without sharing a
+decryptable antiforgery/cookie payload boundary. Override `DataProtection:ApplicationName` only if
+the value needs to be pinned to a deployment-specific name; it must remain stable across redeploys
+and across all replicas of the same environment.
+
 ---
 
 ## 5. Scenario configuration model
@@ -211,19 +249,54 @@ A `TestScenarioDefinition` captures everything needed to run a test:
 | `ReportMethod` | `Adhoc`, `ScheduledReport`, or `RegenerateReport`. |
 | `SelectedMeasures` | Which profiled measures to test. |
 | `Seed` | Deterministic generation seed. |
-| `PatientCount` | Computed from cohorts. |
+| `PatientCount` | Computed from cohorts plus imported patients (read-only on the editor). |
 | `ResourcesPerPatientMin/Max` | Resource count range per patient. |
-| `PatientPrefix` | FHIR Patient ID prefix. |
 | `PatientCohorts` | List of cohort definitions (count, eligibility, clinical profiles, resource range). |
 | `QueryPlanTemplateId` | Optional override for the FHIR query plan (null = system default). |
 | `CleanupServiceData` | Remove facility config and run artifacts after completion. |
 | `CleanupFhirData` | Expunge FHIR server data after completion. |
+| `ReportPeriodStart` / `ReportPeriodEnd` | Optional reporting period (UTC). When null, the system defaults (`2023-01-01T00:00:00Z` / `2023-12-31T23:59:59Z`) are used. The runtime uses these to bound generated encounter windows and to drive the report's clinical period; the editor auto-suggests a value that encompasses any imported-patient encounter dates. |
+| `ImportedPatientIds` | Patients fetched from the FHIR server by ID at run time. Their resources are not uploaded and not expunged on cleanup. |
+| `ImportedPatientBundles` | Patients supplied as FHIR transaction bundles. The bundle is uploaded to the FHIR server during the run and expunged on cleanup like any generated patient. |
+
+### Patient ID generation
+
+There is no caller-configurable patient ID prefix. The underlying generator scopes every
+generated resource ID to a per-run `RunTag` (a short hex GUID), which guarantees that
+concurrent runs against the same FHIR server cannot collide. Generated patient IDs follow
+`Patient-{RunTag}-{ordinal:D3}`; shared infrastructure follows
+`{RunTag}-Loc-Hospital`, `{RunTag}-Org-Hospital`, etc. This applies to the system
+scenarios, the Custom scenario kind, and any saved scenario.
+
+### Imported patients
+
+Imported patients are fully integrated into the run and into the Generation Manifest, so
+prediction-vs-actual reconciliation works for them too. They come from one of two
+sources:
+
+| Source | Where the data comes from | Uploaded during the run? | Expunged on cleanup? |
+|---|---|---|---|
+| `ExistingId` | Pre-fetched via `Patient/{id}/$everything` (paginated) | No -- the data is assumed to already exist on the server. | No -- recorded in `GenerationManifest.PreExistingPatientIds` so cleanup skips them. |
+| `Bundle` | Caller-supplied transaction bundle JSON | Yes -- treated like any uploaded patient. | Yes -- standard cleanup applies. |
+
+The editor lets the user mix imported patients with cohort-generated patients freely. For
+each imported patient the editor calls `ScenariosController.ClassifyImported` to:
+
+- Run `ImportedPatientClassifier` against the patient's resources and seed the per-measure
+  Q/NQ checkboxes (the user can override; their choice always wins on save).
+- Best-effort match the patient's primary diagnosis to one of the 16 clinical scenarios
+  for an informational scenario badge.
+- Sniff the encounter `Period` values so the editor can auto-suggest a Report Period
+  that encloses them (only fills empty fields; never overwrites user-set dates).
+
+When an imported encounter falls outside the configured Report Period, the editor shows
+a warning so the user knows to expect non-qualification. The save proceeds either way.
 
 ### System scenarios
 
 `ScenarioSeedService` seeds a set of canonical system scenarios at startup. Each one mirrors a
-corresponding backend E2E test (same seed, patient count, resource range, prefix), so running
-the UI scenario and the backend test produces bit-for-bit identical FHIR input:
+corresponding backend E2E test (same seed, patient count, resource range), so running the
+UI scenario and the backend test produces equivalent FHIR input:
 
 | System scenario | Seed | Patients | Resources |
 |---|---:|---:|---:|
@@ -254,7 +327,6 @@ The editor enforces measure eligibility constraints in the UI:
   the generation layer).
 - The Hypoglycemic measure requires ACH Monthly to also be qualifying (dependency
   enforcement).
-
 ---
 
 ## 6. Dashboard and real-time updates
@@ -290,10 +362,20 @@ streaming on the run details page and real-time dashboard KPI updates without po
    - Scenario defaults + custom overrides.
    - Selected measures.
    - Patient cohorts/profiles expansion via `PatientCohortDefinition.ExpandProfiles()`.
+   - Imported-patient lists merged in from the request and (when present) any saved
+     scenario JSON via `ExtractImportedFromJson`.
+   - Reporting period resolved via `ResolveReportPeriod` -- explicit request values win;
+     otherwise the value falls back to the system default for the selected report method.
 2. **Generate FHIR input**
-   - `FhirGenerationPipeline.GenerateAndUploadAsync()` for streaming generation.
-   - `GenerationManifest` is built incrementally during generation.
-   - `QueryPlanAcquisitionSimulator` runs per-patient.
+   - `ImportedPatientLoader.LoadAllAsync` pre-fetches `Patient/{id}/$everything` and
+     parses any supplied bundles, then `ComputeEncounterDateRange` widens the run's
+     clinical period to enclose imported encounter dates so they are not silently
+     disqualified by measure-eval.
+   - `FhirGenerationPipeline.GenerateAndUploadAsync()` for streaming generation
+     (generated cohort first, imported patients appended).
+   - `GenerationManifest` is built incrementally during generation; ID-imported patients
+     are recorded via `MarkPreExistingPatient` so cleanup skips them.
+   - `QueryPlanAcquisitionSimulator` runs per-patient with the resolved clinical period.
    - `CqlFilterSimulator` runs per-patient over the patient's qualifying measures only.
 3. **Initialize validation dependencies** -- validation artifacts and categories.
 4. **Load measure bundles** -- `MeasureLoader.LoadAllAsync()` (supports multi-measure).
@@ -340,7 +422,24 @@ strict prediction-vs-actual comparison. The Report service's `ReportEntry.Report
 rows feed the `OperationOutcome` count prediction (one OO per patient with
 `FailedValidation`).
 
-See `DotNet/Automation/README.md` section 7 for the full prediction formula.
+The CQL simulator is resource-aware, not just type-aware. In addition to checking that a
+resource type is acquired and referenced by CQL, it applies known SDE `where` predicates per
+resource. For example, `Specimen` prediction now models measure-specific behavior:
+
+- ACH Monthly predicts only specimens whose `subject` is the evaluated patient and whose
+  `collection.collected` overlaps an initial-population encounter.
+- ACH Daily predicts only patient-owned specimens referenced by qualifying respiratory
+  pathogen laboratory observations (COVID-19, influenza, RSV); it does not assume every
+  acquired specimen appears in ABS.
+- Hypoglycemic predicts only patient-owned specimens whose collection interval is fully
+  during an initial-population encounter.
+
+This matters on the `Runs/Manifest` page: a `Specimen` can be shown as generated and even
+DataAcquisition-acquired through a reference query, but still be filtered from the predicted
+ABS set when patient-context CQL retrieval or measure-specific SDE predicates do not include
+it.
+
+See `DotNet/Automation/README.md` section 8 for the full prediction formula and profile table.
 
 ### Generation Manifest page
 
@@ -514,3 +613,15 @@ Port mapping: host `5256` -- container `5257`.
   cloned.
 - System scenarios are kept in sync with `Tests/BackendE2ETests` so that UI and test
   executions are reproducible from either host.
+- There is no caller-supplied patient ID prefix anywhere in the UI. Patient IDs are
+  scoped per run by the underlying generator's `RunTag`. The legacy `PatientPrefix`
+  hidden form field has been removed from the dashboard quick-launch form and from
+  `StartScenarioRequest`.
+- Imported patients (by ID and by uploaded bundle) are first-class scenario inputs.
+  Bundles are validated server-side on save; ID-only patients are pre-fetched at run
+  start so the run's reporting period can widen to enclose their encounter dates.
+- The Report Period (`ReportPeriodStart` / `ReportPeriodEnd`) is exposed in the editor
+  and on the dashboard quick-launch row. When omitted, the system default for the chosen
+  report method is used.
+- Data-Acquisition log search is server-side. The Run Details DA-logs panel debounces
+  the search input and re-issues a paged request with `searchTerm` on every change.

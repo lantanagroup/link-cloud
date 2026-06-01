@@ -1,5 +1,4 @@
-using LantanaGroup.Automation.Generation;
-using LantanaGroup.Automation.Generation;
+﻿using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -59,13 +58,12 @@ public sealed class AdhocReportTest : IAsyncLifetime, IClassFixture<BackendE2ETe
             measures,
             profiles,
             totalResourcesPerPatient: profiles[0].ResourcesPerPatient ?? 100,
-            patientIdPrefix: "AdhocPatient",
             generationSeed: GenerationSeed,
             acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
             {
                 QueryPlan = QueryPlanBuilder.GetDefaultAsInput(),
-                ReportStart = Config.StartDate,
-                ReportEnd = Config.EndDate
+                ClinicalPeriodStart = Config.StartDate,
+                ClinicalPeriodEnd = Config.EndDate
             });
 
         _generationManifest = pipelineResult.Manifest;

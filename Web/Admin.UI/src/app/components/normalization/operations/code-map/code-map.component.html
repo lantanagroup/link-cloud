@@ -217,6 +217,16 @@
                     <button type="button" mat-raised-button color="primary" (click)="addCodeMap(i)">
                       Add Code Map
                     </button>
+                    @if (!viewOnly) {
+                      <button type="button" mat-raised-button (click)="pasteFromExcel(i)">
+                        <mat-icon>content_paste</mat-icon>
+                        Paste from Excel
+                      </button>
+                      <button type="button" mat-raised-button (click)="pasteFromCsv(i)">
+                        <mat-icon>content_paste</mat-icon>
+                        Paste CSV
+                      </button>
+                    }
                   </div>
                 </mat-card-content>
               </mat-card>

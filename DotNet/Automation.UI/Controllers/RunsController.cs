@@ -1,7 +1,8 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automation.UI.Controllers;
@@ -11,16 +12,36 @@ public class RunsController(
     IScenarioStore scenarioStore,
     IQueryPlanTemplateStore queryPlanTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
+    IRunExportService runExportService,
     ILogger<RunsController> logger) : Controller
 {
     [HttpGet]
-    public async Task<IActionResult> Index(CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(
+        int pageNumber = 1,
+        int pageSize = 20,
+        string sortBy = "createdAt",
+        string sortDir = "desc",
+        CancellationToken cancellationToken = default)
     {
-        var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
-        var recentPage = await runManager.GetRunsPageAsync(1, 10, cancellationToken);
-        var scenarios = await scenarioStore.GetAllAsync(cancellationToken);
+        // Normalize: accept "asc"/"desc" only, default to descending. Server-side
+        // store-level whitelisting also clamps unknown sortBy values, so this is
+        // belt-and-suspenders against URL tampering.
+        var descending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
 
-        var activeRuns = recentPage.Runs
+        var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
+        var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
+        var scenarios = (await scenarioStore.GetAllAsync(cancellationToken))
+            .OrderBy(s => s.IsSystemScenario)
+            .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        // Active runs are surfaced by status, not by what page the user is on,
+        // so they always come from a default-sorted first page slice. Otherwise
+        // a user paged deep into history would lose the Active Runs card.
+        var activeRunsSource = recentPage.PageNumber == 1
+            ? recentPage.Runs
+            : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
+        var activeRuns = activeRunsSource
             .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
             .ToList();
 
@@ -33,18 +54,54 @@ public class RunsController(
             RecentRuns = recentPage.Runs,
             ActiveRuns = activeRuns,
             SavedScenarios = scenarios,
+            // Echo paging/sort state to the view so headers + pager render
+            // current state and click-to-toggle URLs are correct.
+            PageNumber = recentPage.PageNumber,
+            PageSize = recentPage.PageSize,
+            TotalCount = recentPage.TotalCount,
+            TotalPages = recentPage.TotalPages,
+            SortBy = recentPage.SortBy,
+            SortDescending = recentPage.SortDescending,
         };
 
         return View(vm);
     }
 
     [HttpGet]
-    public async Task<IActionResult> DashboardStats(CancellationToken cancellationToken)
+    public async Task<IActionResult> RecentRunsPartial(
+        int pageNumber = 1,
+        int pageSize = 20,
+        string sortBy = "createdAt",
+        string sortDir = "desc",
+        CancellationToken cancellationToken = default)
     {
-        var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
-        var recentPage = await runManager.GetRunsPageAsync(1, 10, cancellationToken);
+        // Returns just the Recent Runs card markup so the dashboard can refresh
+        // the table in place (sort / paginate / SignalR update) without a full
+        // page navigation. The view model matches the partial's @model so the
+        // partial is reused by both this action and the initial server render
+        // in Index.cshtml — there's no divergence between the two templates.
+        var descending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+        var page = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
+        return PartialView("_RecentRunsTable", page);
+    }
 
-        var activeRuns = recentPage.Runs
+    [HttpGet]
+    public async Task<IActionResult> DashboardStats(
+        int pageNumber = 1,
+        int pageSize = 20,
+        string sortBy = "createdAt",
+        string sortDir = "desc",
+        CancellationToken cancellationToken = default)
+    {
+        var descending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+
+        var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
+        var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
+
+        var activeRunsSource = recentPage.PageNumber == 1
+            ? recentPage.Runs
+            : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
+        var activeRuns = activeRunsSource
             .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
             .ToList();
 
@@ -52,7 +109,16 @@ public class RunsController(
         {
             stats,
             recentRuns = recentPage.Runs,
-            activeRuns
+            activeRuns,
+            paging = new
+            {
+                pageNumber = recentPage.PageNumber,
+                pageSize = recentPage.PageSize,
+                totalCount = recentPage.TotalCount,
+                totalPages = recentPage.TotalPages,
+                sortBy = recentPage.SortBy,
+                sortDir = recentPage.SortDir,
+            }
         });
     }
 
@@ -130,6 +196,30 @@ public class RunsController(
         return Json(run);
     }
 
+    [HttpGet]
+    public async Task<IActionResult> Export(Guid id, CancellationToken cancellationToken)
+    {
+        var run = await runManager.GetRunAsync(id, cancellationToken);
+        if (run == null)
+            return NotFound();
+
+        // Export is only meaningful once the run has stopped collecting data;
+        // exporting an in-flight run would race the polling loop and yield
+        // half-populated domain snapshots.
+        if (run.Status is not AutomationRunStatus.Succeeded
+                       and not AutomationRunStatus.Failed
+                       and not AutomationRunStatus.Cancelled)
+        {
+            return Conflict(new { error = "Run must be completed (Succeeded, Failed, or Cancelled) before it can be exported." });
+        }
+
+        var package = await runExportService.BuildAsync(id, cancellationToken);
+        if (package == null)
+            return NotFound();
+
+        return File(package.Content, "application/zip", package.FileName);
+    }
+
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Delete(Guid id, int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
@@ -194,6 +284,7 @@ public class RunsController(
         int pageSize = 50,
         string sortBy = "Id",
         string sortOrder = "Ascending",
+        string? searchTerm = null,
         CancellationToken cancellationToken = default)
     {
         var run = await runManager.GetRunAsync(id, cancellationToken);
@@ -216,6 +307,10 @@ public class RunsController(
             ? "Descending"
             : "Ascending";
 
+        // Trim to keep server-side LIKE %term% predictable; whitespace-only terms collapse
+        // to no-search.
+        var normalizedSearchTerm = string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm.Trim();
+
         if (string.IsNullOrWhiteSpace(facilityId) || string.IsNullOrWhiteSpace(reportId))
             return Json(new { records = Array.Empty<object>(), metadata = new { totalCount = 0 } });
 
@@ -228,6 +323,7 @@ public class RunsController(
                 pageNumber,
                 sortBy,
                 sortOrder,
+                normalizedSearchTerm,
                 cancellationToken);
 
             if ((result?.Records?.Count ?? 0) == 0)
@@ -239,6 +335,7 @@ public class RunsController(
                     pageNumber,
                     sortBy,
                     sortOrder,
+                    normalizedSearchTerm,
                     cancellationToken);
             }
 
@@ -330,6 +427,31 @@ public class RunsController(
                 logger.LogWarning(refEx, "Failed to load reference resources for log {LogId}", logId);
             }
 
+            // Build the human-readable "Resource?param=value&..." form per FhirQuery.
+            // Mirrors the FhirQueryModel.Query getter so the UI shows what was actually
+            // sent to the FHIR server.
+            var queries = (detailed.FhirQuery ?? [])
+                .Select(q =>
+                {
+                    var firstResource = q.ResourceTypes?.FirstOrDefault();
+                    var paramJoin = string.Join("&", q.QueryParameters ?? []);
+                    return q.QueryType switch
+                    {
+                        FhirQueryType.Search       => string.IsNullOrEmpty(firstResource) ? string.Empty : $"{firstResource}?{paramJoin}",
+                        FhirQueryType.SearchPost   => string.IsNullOrEmpty(firstResource) ? string.Empty : $"{firstResource}/_search [{string.Join(",", q.QueryParameters ?? [])}]",
+                        FhirQueryType.Read         => string.IsNullOrEmpty(firstResource) ? string.Empty : $"{firstResource}/{paramJoin}",
+                        FhirQueryType.BulkDataPoll => paramJoin,
+                        FhirQueryType.BulkDataRequest => "BulkDataRequest",
+                        _ => string.Empty
+                    };
+                })
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .ToList();
+
+            var queryType = (detailed.FhirQuery ?? [])
+                .Select(q => q.QueryType.ToString())
+                .FirstOrDefault();
+
             return Json(new
             {
                 detailed.Id,
@@ -342,6 +464,12 @@ public class RunsController(
                 ReferenceResourceCount = detailed.ReferenceResourceCount,
                 detailed.ReportTrackingId,
                 detailed.CorrelationId,
+                detailed.TraceId,
+                detailed.FhirVersion,
+                detailed.Priority,
+                detailed.RetryAttempts,
+                QueryType = queryType,
+                Queries = queries,
                 detailed.CompletionDate,
                 detailed.CompletionTimeMilliseconds,
                 ResourceTypes = (detailed.ResourceTypes ?? [])
