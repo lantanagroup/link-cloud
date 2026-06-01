@@ -31,6 +31,7 @@ public class ResourceAcquiredListenerTests
     private readonly Mock<CodeMapOperationService> _codeMapOperationServiceMock;
     private readonly Mock<ConditionalTransformOperationService> _conditionalTransformOperationServiceMock;
     private readonly Mock<CopyLocationOperationService> _copyLocationOperationServiceMock;
+    private readonly Mock<RemoveExtensionsOperationService> _removeExtensionsOperationServiceMock;
 
     public ResourceAcquiredListenerTests()
     {
@@ -49,6 +50,7 @@ public class ResourceAcquiredListenerTests
         _codeMapOperationServiceMock = new Mock<CodeMapOperationService>(new Mock<ILogger<CodeMapOperationService>>().Object, null);
         _conditionalTransformOperationServiceMock = new Mock<ConditionalTransformOperationService>(new Mock<ILogger<ConditionalTransformOperationService>>().Object, null);
         _copyLocationOperationServiceMock = new Mock<CopyLocationOperationService>(new Mock<ILogger<CopyLocationOperationService>>().Object, null);
+        _removeExtensionsOperationServiceMock = new Mock<RemoveExtensionsOperationService>(new Mock<ILogger<RemoveExtensionsOperationService>>().Object, null);
     }
 
     [Fact]
@@ -68,7 +70,8 @@ public class ResourceAcquiredListenerTests
             _copyPropertyOperationServiceMock.Object,
             _codeMapOperationServiceMock.Object,
             _conditionalTransformOperationServiceMock.Object,
-            _copyLocationOperationServiceMock.Object);
+            _copyLocationOperationServiceMock.Object,
+            _removeExtensionsOperationServiceMock.Object);
 
         var facilityId = "TestFacility";
         var correlationId = "TestCorrelationId";
@@ -136,7 +139,8 @@ public class ResourceAcquiredListenerTests
             _copyPropertyOperationServiceMock.Object,
             _codeMapOperationServiceMock.Object,
             _conditionalTransformOperationServiceMock.Object,
-            _copyLocationOperationServiceMock.Object);
+            _copyLocationOperationServiceMock.Object,
+            _removeExtensionsOperationServiceMock.Object);
 
         var facilityId = "TestFacility";
         var correlationId = "TestCorrelationId";
