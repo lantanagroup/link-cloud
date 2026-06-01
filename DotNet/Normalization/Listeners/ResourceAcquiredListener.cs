@@ -1,4 +1,6 @@
-﻿using Confluent.Kafka;
+﻿using System.Text;
+using System.Text.Json;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
@@ -19,10 +21,6 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
-using Microsoft.OpenApi.Writers;
-using OpenTelemetry.Resources;
-using System.Text;
-using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Normalization.Listeners;
@@ -213,13 +211,13 @@ public class ResourceAcquiredListener : BackgroundService
 
                                         resource = operationResult.Resource;
 
-                                        _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
+                                        _metrics.IncrementResourceChangedCounter(new List<KeyValuePair<string, object?>>() {
                                         new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, messageMetaData.facilityId),
                                         new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, messageMetaData.correlationId),
                                         new KeyValuePair<string, object?>(DiagnosticNames.PatientId, message.Message.Value.PatientId),
-                                        new KeyValuePair<string, object?>(DiagnosticNames.Resource, resource.TypeName),
-                                        new KeyValuePair<string, object?>(DiagnosticNames.QueryType, message.Message.Value.QueryType),
-                                        new KeyValuePair<string, object?>(DiagnosticNames.NormalizationOperation, operation.OperationType.ToString())});
+                                        new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resource.TypeName),
+                                        new KeyValuePair<string, object?>(DiagnosticNames.OperationType, operation.OperationType.ToString())},
+                                        operationResult.SuccessCode == OperationStatus.Success);
                                     }
                                     else
                                     {

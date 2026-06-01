@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -15,9 +16,9 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -220,7 +221,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetAsync");
-        activity?.SetTag(DiagnosticNames.ReportId, id);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, id);
 
         return await ProjectLogById(id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -636,7 +637,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetDataAcquisitionLogStatisticsByReportAsync");
-        activity?.SetTag(DiagnosticNames.ReportId, reportId);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, reportId);
 
         if (!Guid.TryParse(reportId, out var reportTrackingIdGuid))
         {
@@ -966,10 +967,10 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     }
 
     private static IQueryable<DataAcquisitionLog> ApplySort(IQueryable<DataAcquisitionLog> query, string? sortBy,
-        LantanaGroup.Link.Shared.Application.Enums.SortOrder sortOrder)
+        SortOrder sortOrder)
     {
         var normalizedSortBy = sortBy?.Trim().ToLowerInvariant();
-        var descending = sortOrder == LantanaGroup.Link.Shared.Application.Enums.SortOrder.Descending;
+        var descending = sortOrder == SortOrder.Descending;
 
         return normalizedSortBy switch
         {

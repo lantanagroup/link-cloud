@@ -5,17 +5,20 @@ using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Submission.Application.Config;
+using LantanaGroup.Link.Submission.Application.Interfaces;
 using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Submission.Application.Services
 {
-    public class BlobStorageService
+    public class BlobStorageService : IStorageService
     {
         private readonly ILogger<BlobStorageService> _logger;
         private readonly InternalBlobStorageSettings _internalSettings;
         private readonly ExternalBlobStorageSettings _externalSettings;
         private readonly BlobContainerClient? _internalContainerClient;
         private readonly BlobContainerClient? _externalContainerClient;
+
+        public string DestinationType => "azure_blob_storage";
 
         private static BlobContainerClient? GetContainerClient(BlobStorageSettings settings)
         {

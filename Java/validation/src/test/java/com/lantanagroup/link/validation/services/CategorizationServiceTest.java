@@ -7,7 +7,6 @@ import com.lantanagroup.link.validation.entities.ResultField;
 import com.lantanagroup.link.validation.matchers.CompositeMatcher;
 import com.lantanagroup.link.validation.matchers.RegexMatcher;
 import com.lantanagroup.link.validation.repositories.CategoryRepository;
-import io.opentelemetry.api.metrics.LongUpDownCounter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -25,18 +24,12 @@ public class CategorizationServiceTest {
     @Mock
     private CategoryRepository categoryRepository;
 
-    @Mock
-    private MetricService metricService;
-
     @InjectMocks
     private CategorizationService categorizationService;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-
-        LongUpDownCounter counter = mock(LongUpDownCounter.class);
-        when(metricService.getCategorizationDurationUpDown()).thenReturn(counter);
     }
 
     @Test
