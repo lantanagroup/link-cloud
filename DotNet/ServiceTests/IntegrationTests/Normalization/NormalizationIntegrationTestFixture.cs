@@ -37,6 +37,7 @@ namespace IntegrationTests.Normalization
                     services.AddSingleton<CopyLocationOperationService>();
                     services.AddSingleton<CodeMapOperationService>();
                     services.AddSingleton<ConditionalTransformOperationService>();
+                    services.AddSingleton<RemoveExtensionsOperationService>();
 
                     // Register other services
                     services.AddScoped<IEntityRepository<Operation>, OperationRepository>();
