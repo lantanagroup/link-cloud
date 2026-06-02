@@ -240,6 +240,10 @@
             <mat-icon>content_copy</mat-icon>
             <span>Add Copy Location</span>
           </button>
+          <button mat-menu-item (click)="showOperationDialog(OperationType.RemoveExtensions)">
+            <mat-icon>filter_list_off</mat-icon>
+            <span>Add Remove Extensions</span>
+          </button>
         </mat-menu>
         <button mat-fab color="primary" [matMenuTriggerFor]="addMenu" matTooltip="Add Operation">
           <mat-icon>add</mat-icon>
