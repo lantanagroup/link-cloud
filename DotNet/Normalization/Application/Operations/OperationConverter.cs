@@ -24,6 +24,7 @@ public class OperationConverter : JsonConverter<IOperation>
                 "CodeMap" => JsonSerializer.Deserialize<CodeMapOperation>(doc.RootElement.GetRawText(), options),
                 "ConditionalTransform" => JsonSerializer.Deserialize<ConditionalTransformOperation>(doc.RootElement.GetRawText(), options),
                 "CopyLocation" => JsonSerializer.Deserialize<CopyLocationOperation>(doc.RootElement.GetRawText(), options),
+                "RemoveExtensions" => JsonSerializer.Deserialize<RemoveExtensionsOperation>(doc.RootElement.GetRawText(), options),
                 _ => throw new JsonException($"Unknown operationType: {operationType}")
             };
         }
