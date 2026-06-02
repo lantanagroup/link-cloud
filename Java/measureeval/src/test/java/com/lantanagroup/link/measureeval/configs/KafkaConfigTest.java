@@ -24,7 +24,7 @@ class KafkaConfigTest {
         
         ResourceKey key = ResourceKey.builder()
                 .facilityId("test-facility")
-                .correlationId("test-correlation")
+                .patientId("test-correlation")
                 .build();
         
         byte[] serialized = ((Serializer<Object>) serializer).serialize("test-topic", key);
@@ -36,7 +36,7 @@ class KafkaConfigTest {
         try {
             ResourceKey deserialized = objectMapper.readValue(serialized, ResourceKey.class);
             assertEquals(key.getFacilityId(), deserialized.getFacilityId());
-            assertEquals(key.getCorrelationId(), deserialized.getCorrelationId());
+            assertEquals(key.getPatientId(), deserialized.getPatientId());
         } catch (Exception e) {
             fail("Failed to deserialize serialized ResourceKey: " + e.getMessage());
         }
