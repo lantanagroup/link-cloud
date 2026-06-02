@@ -116,15 +116,19 @@ class AbstractResourceConsumerTest {
         patientStatus.setReports(Collections.singletonList(report));
 
         Bundle bundle = new Bundle();
-        bundle.addEntry().setResource(new org.hl7.fhir.r4.model.Patient());
+        bundle.addEntry().setResource(nonEmptyPatient());
 
         MeasureReport measureReport = new MeasureReport();
         measureReport.setId("mr-1");
         when(evaluateMeasureService.evaluateMeasure(anyString(), any(), any(), any())).thenReturn(measureReport);
         when(patientStatusRepository.save(any())).thenReturn(patientStatus);
 
+        ReflectionTestUtils.invokeMethod(
+                consumer, "evaluateMeasures", value, patientStatus, bundle, System.currentTimeMillis());
+
         verify(blobStorageService).storePatientInBlobStorage(eq(patientStatus), eq(report), eq(measureReport));
     }
+
 
     @Test
     void evaluateMeasures_supplementalNotReportable_skipsEvaluation() {
@@ -141,15 +145,22 @@ class AbstractResourceConsumerTest {
         patientStatus.setPatientId("patient-1");
         patientStatus.setReports(Collections.singletonList(report));
 
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(nonEmptyPatient());
+
+        ReflectionTestUtils.invokeMethod(
+                consumer, "evaluateMeasures", value, patientStatus, bundle, System.currentTimeMillis());
+
         verifyNoInteractions(evaluateMeasureService);
         verifyNoInteractions(blobStorageService);
     }
+
 
     @Test
     void evaluateMeasures_initialReportable_producesDataAcquisitionRequested() {
         ResourcesNormalized value = new ResourcesNormalized();
         value.setQueryType(QueryType.INITIAL);
-        value.setReportableEvent(ReportableEvent.valueOf("Adhoc"));
+        value.setReportableEvent(ReportableEvent.ADHOC);
 
         TestScheduledReport sr = new TestScheduledReport();
         sr.reportTypes = new String[]{"TestMeasure"};
@@ -171,7 +182,7 @@ class AbstractResourceConsumerTest {
         patientStatus.setReports(Collections.singletonList(report));
 
         Bundle bundle = new Bundle();
-        bundle.addEntry().setResource(new org.hl7.fhir.r4.model.Patient());
+        bundle.addEntry().setResource(nonEmptyPatient());
 
         MeasureReport measureReport = new MeasureReport();
         measureReport.setId("mr-1");
@@ -203,7 +214,7 @@ class AbstractResourceConsumerTest {
         patientStatus.setReports(Collections.singletonList(report));
 
         Bundle bundle = new Bundle();
-        bundle.addEntry().setResource(new org.hl7.fhir.r4.model.Patient());
+        bundle.addEntry().setResource(nonEmptyPatient());
 
         MeasureReport measureReport = new MeasureReport();
         measureReport.setId("mr-1");
@@ -252,7 +263,7 @@ class AbstractResourceConsumerTest {
                 .thenReturn(Optional.of(patientStatus));
 
         Bundle bundle = new Bundle();
-        bundle.addEntry().setResource(new org.hl7.fhir.r4.model.Patient());
+        bundle.addEntry().setResource(nonEmptyPatient());
         when(patientStatusBundler.createBundleFromResources(anyList())).thenReturn(bundle);
 
         MeasureReport measureReport = new MeasureReport();
@@ -340,7 +351,7 @@ class AbstractResourceConsumerTest {
                 .thenReturn(Optional.of(patientStatus));
 
         Bundle bundle = new Bundle();
-        bundle.addEntry().setResource(new org.hl7.fhir.r4.model.Patient());
+        bundle.addEntry().setResource(nonEmptyPatient());
         when(patientStatusBundler.createBundleFromResources(anyList())).thenReturn(bundle);
 
         MeasureReport measureReport = new MeasureReport();
@@ -360,6 +371,12 @@ class AbstractResourceConsumerTest {
         consumerWithAbs.process(record);
 
         verify(redisResourceService, never()).cleanup(anyString());
+    }
+
+    private static org.hl7.fhir.r4.model.Patient nonEmptyPatient() {
+        org.hl7.fhir.r4.model.Patient patient = new org.hl7.fhir.r4.model.Patient();
+        patient.setId("patient-1");
+        return patient;
     }
 
     private ResourcesNormalized buildAbsValue(String cacheKey) {
