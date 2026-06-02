@@ -406,6 +406,16 @@ Ensures that the precision of <code>Period.start</code> matches the precision of
 Modifies <code>Period.start</code> to match the precision of <code>Period.end</code>.
 Prevents errors in the CQL (measure evaluation) engine caused by inconsistent precision in Period types.
 </Accordion>
+<Accordion title="Remove Extensions">
+Removes top-level FHIR extensions from a resource based on a configurable list of extension URLs.</p>
+<p><strong>Use Case</strong>: Stripping vendor-specific or implementation-specific extensions that are not required for measure evaluation or that may cause downstream processing errors.</p>
+<p><strong>Details</strong>:
+Accepts a required, non-empty list of extension URLs (<code>ExtensionUrls</code>).
+Removes any top-level extension on the resource whose URL exactly matches an entry in the list.
+Extensions not in the list are left intact.
+Returns <code>NoAction</code> if the resource has no extensions or if none of the resource's extensions match the configured URLs.
+At least one URL must be configured; an empty URL list is rejected at creation time.
+</Accordion>
 </AccordionGroup></p>
 <h3 id="tail-messages">Tail Messages <a id="tail-messages" href="#tail-messages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tail Messages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Normalization propagates the end-of-stream signal by forwarding a tail <a href="event-resourcenormalized.html">Resource Normalized</a> event with <code>acquisitionComplete = true</code> for the same <code>(patientId, reportTrackingId, queryType)</code> tuple it received from acquisition. Measure Evaluation uses this tail to start evaluation for the current phase. See:</p>

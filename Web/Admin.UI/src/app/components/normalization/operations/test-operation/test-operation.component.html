@@ -177,7 +177,20 @@
             </div>
           }
 
-          @if (operation.operationType !== OperationType.CopyProperty && operation.operationType !== OperationType.ConditionalTransform && operation.operationType !== OperationType.CodeMap && operation.operationType !== OperationType.CopyLocation) {
+          @if (operation.operationType === OperationType.RemoveExtensions) {
+            <div class="operations-details-row">
+              <div class="data-label">Name</div>
+              <div class="data-value selectable-value">{{ operation.parsedOperationJson.Name }}</div>
+            </div>
+            <div class="sub-header">Extension URLs to Remove</div>
+            @for (url of operation.parsedOperationJson.ExtensionUrls; track url) {
+              <div class="operations-details-row">
+                <div class="data-value selectable-value">{{ url }}</div>
+              </div>
+            }
+          }
+
+          @if (operation.operationType !== OperationType.CopyProperty && operation.operationType !== OperationType.ConditionalTransform && operation.operationType !== OperationType.CodeMap && operation.operationType !== OperationType.CopyLocation && operation.operationType !== OperationType.RemoveExtensions) {
             <p class="no-results-subtext">
               Unknown operation type: {{ operation.operationType }}. No additional details available.
             </p>

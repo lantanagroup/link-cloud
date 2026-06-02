@@ -842,6 +842,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     {
                         return (false, "RemoveExtensionsOperation.ExtensionUrls must not contain null or empty entries.");
                     }
+
+                    var paddedUrls = op.ExtensionUrls.Where(u => u != u.Trim()).ToList();
+                    if (paddedUrls.Any())
+                    {
+                        return (false, "RemoveExtensionsOperation.ExtensionUrls must not contain entries with leading or trailing whitespace.");
+                    }
                 }
                 else
                 {

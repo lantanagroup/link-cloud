@@ -17,6 +17,7 @@ import {IVendor} from "../../../interfaces/normalization/vendor-interface";
 import {IOperationSequenceModel} from "../../../interfaces/normalization/operation-sequence-get-model.interface";
 import {IOperationSequenceSaveModel} from "../../../interfaces/normalization/operation-sequence-save-model.interface";
 import {IOperation} from "../../../interfaces/normalization/operation.interface";
+import {RemoveExtensionsOperation} from "../../../interfaces/normalization/remove-extensions-operation-interface";
 
 
 @Injectable({
@@ -276,6 +277,9 @@ export class OperationService {
                         break;
                     case OperationType.CopyLocation:
                         record.parsedOperationJson = parsedJson as IOperation;
+                        break;
+                    case OperationType.RemoveExtensions:
+                        record.parsedOperationJson = parsedJson as RemoveExtensionsOperation;
                         break;
                     default:
                         console.warn(`Unsupported operation type: ${record.operationType} for record with id ${record.id}`);

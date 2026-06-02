@@ -13,11 +13,12 @@ import {OperationType} from "../../../../interfaces/normalization/operation-type
 import {ConditionalTransformationComponent} from "../conditional-transformation/conditional-transformation.component";
 import {CodeMapComponent} from "../code-map/code-map.component";
 import {CopyLocationComponent} from "../copy-location/copy-location.component";
+import {RemoveExtensionsComponent} from "../remove-extensions/remove-extensions.component";
 
 @Component({
   selector: 'app-normalization-dialog',
   standalone: true,
-  imports: [MatDialogModule, MatButtonModule, MatIconModule, CopyPropertyComponent, ConditionalTransformationComponent, CodeMapComponent, CopyLocationComponent],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule, CopyPropertyComponent, ConditionalTransformationComponent, CodeMapComponent, CopyLocationComponent, RemoveExtensionsComponent],
   templateUrl: './operation-dialog.component.html',
   styleUrl: './operation-dialog.component.scss'
 })
@@ -27,6 +28,7 @@ export class OperationDialogComponent implements OnInit {
   @ViewChild(ConditionalTransformationComponent) conditionalTransformForm!: ConditionalTransformationComponent;
   @ViewChild(CodeMapComponent) codeMapForm!: CodeMapComponent;
   @ViewChild(CopyLocationComponent) copyLocationForm!: CopyLocationComponent;
+  @ViewChild(RemoveExtensionsComponent) removeExtensionsForm!: RemoveExtensionsComponent;
 
   dialogTitle: string = '';
   viewOnly: boolean = false;
@@ -90,6 +92,9 @@ export class OperationDialogComponent implements OnInit {
         break;
       case OperationType.CopyLocation:
         this.copyLocationForm?.submitConfiguration();
+        break;
+      case OperationType.RemoveExtensions:
+        this.removeExtensionsForm?.submitConfiguration();
         break;
       default:
         console.warn('Unknown operation type:', this.operationType);
