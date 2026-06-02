@@ -2,6 +2,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Filters;
 using LantanaGroup.Link.DataAcquisition.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -35,6 +36,7 @@ public class EncounterMappingController : Controller
     /// GET /api/data/encounter-mappings/{id}
     /// </summary>
     [HttpGet("{id:int}")]
+    [ActionName(nameof(GetByIdAsync))]
     [ProducesResponseType(typeof(EncounterMappingModel), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -304,6 +306,7 @@ public class EncounterMappingController : Controller
     /// POST /api/data/encounter-mappings
     /// </summary>
     [HttpPost]
+    [ValidateAntiForgeryOrBearerToken]
     [ProducesResponseType(typeof(EncounterMappingModel), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
