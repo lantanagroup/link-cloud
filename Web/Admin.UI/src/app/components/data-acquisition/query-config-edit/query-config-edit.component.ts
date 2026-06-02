@@ -43,8 +43,10 @@ export class QueryConfigEditComponent implements OnInit {
 
   queryForm!: FormGroup;
   resourceTypes = [
-    'Encounter', 'Location', 'Condition', 'Coverage', 'Observation', 'Procedure',
-    'ServiceRequest', 'Medication', 'DiagnosticReport', 'MedicationRequest', 'Specimen', 'Device', 'Patient', 'MedicationStatement', 'AllergyIntolerance'
+    'AllergyIntolerance', 'Condition', 'Coverage', 'Device', 'DiagnosticReport',
+    'Encounter', 'Location', 'Medication', 'MedicationAdministration',
+    'MedicationRequest', 'MedicationStatement', 'Observation', 'Patient',
+    'Procedure', 'ServiceRequest', 'Specimen'
   ].sort();
 
   queryConfigTypes = ['Parameter', 'Reference'];
