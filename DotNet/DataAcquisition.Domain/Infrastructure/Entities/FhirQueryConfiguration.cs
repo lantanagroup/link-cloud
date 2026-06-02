@@ -24,6 +24,7 @@ public partial class FhirQueryConfiguration
 
     public TimeSpan? MinAcquisitionPullTime { get; set; }
     public int? MaxRetries { get; set; }
+    public bool EnableLocationResolutionMapping { get; set; } = false;
     public DateTime CreateDate { get; set; } = DateTime.UtcNow;
 
     public DateTime? ModifyDate { get; set; }
