@@ -6,6 +6,7 @@
         CopyProperty = 1,
         ConditionalTransform = 2,
         CodeMap = 3,
-        CopyLocation = 4
+        CopyLocation = 4,
+        RemoveExtensions = 5
     }
 }
