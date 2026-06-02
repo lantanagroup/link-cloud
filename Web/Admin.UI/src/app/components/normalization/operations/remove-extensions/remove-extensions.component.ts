@@ -37,6 +37,11 @@ import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorR
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 import {RemoveExtensionsOperation} from "../../../../interfaces/normalization/remove-extensions-operation-interface";
 
+function noLeadingTrailingWhitespace(control: AbstractControl): {[key: string]: boolean} | null {
+  const v = control.value as string;
+  return v && v !== v.trim() ? {whitespace: true} : null;
+}
+
 @Component({
   selector: 'app-remove-extensions',
   templateUrl: './remove-extensions.component.html',
@@ -171,7 +176,7 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
       );
 
       (op?.ExtensionUrls ?? []).forEach(url => {
-        this.extensionUrlsArray.push(this.fb.control(url, Validators.required));
+        this.extensionUrlsArray.push(this.fb.control(url, [Validators.required, noLeadingTrailingWhitespace]));
       });
     }
   }
@@ -181,7 +186,7 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
   }
 
   addExtensionUrl(): void {
-    this.extensionUrlsArray.push(this.fb.control('', Validators.required));
+    this.extensionUrlsArray.push(this.fb.control('', [Validators.required, noLeadingTrailingWhitespace]));
   }
 
   removeExtensionUrl(index: number): void {
