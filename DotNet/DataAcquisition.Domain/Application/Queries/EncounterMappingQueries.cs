@@ -12,6 +12,8 @@ public interface IEncounterMappingQueries
     Task<List<EncounterMappingModel>> GetByFacilityIdAsync(string facilityId);
     Task<List<EncounterMappingModel>> GetByPatientIdAsync(string patientId);
     Task<EncounterMappingModel?> GetByEncounterIdAsync(string encounterId);
+    Task<EncounterMappingModel?> GetByFacilityIdAndEncounterIdAsync(string facilityId, string encounterId);
+    Task<List<EncounterMappingModel>> GetByFacilityIdAndPatientIdAsync(string facilityId, string patientId);
     Task<PagedConfigModel<EncounterMappingModel>> SearchAsync(EncounterMappingSearchModel search, int pageNumber, int pageSize);
 }
 
@@ -46,6 +48,20 @@ public class EncounterMappingQueries : IEncounterMappingQueries
     {
         var entity = await _database.EncounterMappingRepository.FirstOrDefaultAsync(m => m.EncounterId == encounterId);
         return entity != null ? ProjectToModel(entity) : null;
+    }
+
+    public async Task<EncounterMappingModel?> GetByFacilityIdAndEncounterIdAsync(string facilityId, string encounterId)
+    {
+        var entity = await _database.EncounterMappingRepository
+            .FirstOrDefaultAsync(m => m.FacilityId == facilityId && m.EncounterId == encounterId);
+        return entity != null ? ProjectToModel(entity) : null;
+    }
+
+    public async Task<List<EncounterMappingModel>> GetByFacilityIdAndPatientIdAsync(string facilityId, string patientId)
+    {
+        var entities = await _database.EncounterMappingRepository
+            .FindAsync(m => m.FacilityId == facilityId && m.PatientId == patientId);
+        return entities.Select(ProjectToModel).ToList();
     }
 
     public async Task<PagedConfigModel<EncounterMappingModel>> SearchAsync(EncounterMappingSearchModel search, int pageNumber, int pageSize)
