@@ -220,6 +220,13 @@ public class QueryPlanValidator : IQueryPlanValidator
             }
         }
 
+        // Validate OperationType
+        if (!Enum.IsDefined(typeof(OperationType), config.OperationType))
+        {
+            result.IsValid = false;
+            result.Errors.Add($"{prefix}: OperationType value '{config.OperationType}' is not a valid OperationType enum value.");
+        }
+
         // Validate Parameters
         if (config.Parameters == null || !config.Parameters.Any())
         {
