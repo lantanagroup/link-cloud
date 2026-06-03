@@ -42,6 +42,7 @@ public class ResourceAcquiredListener : BackgroundService
     private readonly CodeMapOperationService _codeMapOperationService;
     private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
     private readonly CopyLocationOperationService _copyLocationOperationService;
+    private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
 
     public ResourceAcquiredListener(
         ILogger<ResourceAcquiredListener> logger,
@@ -56,7 +57,8 @@ public class ResourceAcquiredListener : BackgroundService
         CopyPropertyOperationService copyPropertyOperationService,
         CodeMapOperationService codeMapOperationService,
         ConditionalTransformOperationService conditionalTransformOperationService,
-        CopyLocationOperationService copyLocationOperationService)
+        CopyLocationOperationService copyLocationOperationService,
+        RemoveExtensionsOperationService removeExtensionsOperationService)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _consumerFactory = consumerFactory ?? throw new ArgumentNullException(nameof(consumerFactory));
@@ -80,6 +82,7 @@ public class ResourceAcquiredListener : BackgroundService
         _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
         _conditionalTransformOperationService = conditionalTransformOperationService ?? throw new ArgumentNullException(nameof(conditionalTransformOperationService));
         _copyLocationOperationService = copyLocationOperationService ?? throw new ArgumentNullException(nameof(copyLocationOperationService));
+        _removeExtensionsOperationService = removeExtensionsOperationService ?? throw new ArgumentNullException(nameof(removeExtensionsOperationService));
     }
 
     protected override async Task ExecuteAsync(CancellationToken cancellationToken)
@@ -195,6 +198,7 @@ public class ResourceAcquiredListener : BackgroundService
                                         OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource),
                                         OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource),
                                         OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource),
+                                        OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, resource),
                                         _ => null
                                     };
 
