@@ -141,6 +141,12 @@ export class QueryConfigEditComponent implements OnInit {
       pagedCtrl?.setValidators([Validators.required, Validators.min(1)]);
     } else {
       pagedCtrl?.clearValidators();
+
+      // Since parameter doesn't use read, reset read to search
+      // which is the default for parameter
+      if (operationTypeCtrl?.value === ReferenceQueryOperationType.read) {
+        operationTypeCtrl.setValue(ReferenceQueryOperationType.search);
+      }      
     }
     operationTypeCtrl?.updateValueAndValidity();
     pagedCtrl?.updateValueAndValidity();
