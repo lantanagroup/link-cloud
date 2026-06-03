@@ -107,7 +107,7 @@ export class QueryConfigEditComponent implements OnInit {
       resourceType: [this.config?.resourceType || '', Validators.required],
       queryConfigType: [this.config?.queryConfigType || 'Parameter', Validators.required],
       // Reference specific
-      operationType: [this.config?.queryConfigType === 'Reference' ? this.normalizeOperationType((this.config as IReferenceQueryConfigModel).operationType as unknown) : ReferenceQueryOperationType.search],
+      operationType: [this.normalizeOperationType((this.config as any)?.operationType)],
       paged: [this.config?.queryConfigType === 'Reference' ? (this.config as IReferenceQueryConfigModel).paged : 100],
       // Parameter specific
       parameters: this.fb.array([])
@@ -133,12 +133,11 @@ export class QueryConfigEditComponent implements OnInit {
   updateValidators(type: string): void {
     const operationTypeCtrl = this.queryForm.get('operationType');
     const pagedCtrl = this.queryForm.get('paged');
+    operationTypeCtrl?.setValidators(Validators.required);
 
     if (type === 'Reference') {
-      operationTypeCtrl?.setValidators(Validators.required);
       pagedCtrl?.setValidators([Validators.required, Validators.min(1)]);
     } else {
-      operationTypeCtrl?.clearValidators();
       pagedCtrl?.clearValidators();
     }
     operationTypeCtrl?.updateValueAndValidity();
@@ -251,6 +250,7 @@ export class QueryConfigEditComponent implements OnInit {
       result = {
         resourceType: formValue.resourceType,
         queryConfigType: 'Parameter',
+        operationType: formValue.operationType,
         parameters: params
       } as IParameterQueryConfigModel;
     }
