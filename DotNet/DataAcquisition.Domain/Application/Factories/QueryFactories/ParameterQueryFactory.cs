@@ -6,6 +6,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
 using LantanaGroup.Link.Shared.Application.Models;
 using Microsoft.Extensions.Logging;
+using StackExchange.Redis;
 using OperationType = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.OperationType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Factories.QueryFactories;
@@ -84,7 +85,13 @@ public class ParameterQueryFactory : IParameterQueryFactory
             }
         }
 
-        return isPaged ? new PagedParameterQueryFactoryResult(OperationType.Search, searchParamList)
-            : new SingularParameterQueryFactoryResult(OperationType.Search, searchParams);
+        // Read is not a valid operation type for a parameter query, 
+        // but if it is set to that, treat it as a search to avoid errors and still return results
+        var operationType = config.OperationType == OperationType.SearchPost
+         ? OperationType.SearchPost 
+         : OperationType.Search;
+
+        return isPaged ? new PagedParameterQueryFactoryResult(operationType, searchParamList)
+            : new SingularParameterQueryFactoryResult(operationType, searchParams);
     }
 }
