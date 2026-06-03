@@ -90,6 +90,14 @@ variables:
 
   TESTRAIL_RUN_URL: 'https://lantanagroup.testrail.io/index.php?/runs/view/171&group_by=cases:section_id&group_order=asc&display=tree'
 
+  # Optional token acquisition settings for Automation.UI API.
+  # Use either resource (v1) OR scope (v2) based on how Entra app auth is configured.
+  # Examples:
+  #   AUTOMATION_UI_API_TOKEN_RESOURCE: "api://<app-id-guid>"
+  #   AUTOMATION_UI_API_TOKEN_SCOPE:    "api://<app-id-guid>/.default"
+  AUTOMATION_UI_API_TOKEN_RESOURCE: ""
+  AUTOMATION_UI_API_TOKEN_SCOPE: ""
+
 stages:
   - stage: TriggerAutomationRun
     displayName: "Trigger Automation.UI scenario"
@@ -187,13 +195,69 @@ stages:
                 Write-Host "##vso[task.setvariable variable=COMMIT_SHORT]$commitShort"
 
           # -------------------------------------------------------------
+          # Acquire bearer token for Automation.UI API calls (if configured).
+          # Keeps working with a manually supplied secret token as fallback.
+          # -------------------------------------------------------------
+          - task: AzureCLI@2
+            displayName: "Acquire Automation.UI API bearer token"
+            condition: and(succeeded(), ne(variables.SKIP_RUN, 'true'))
+            env:
+              AUTOMATION_UI_API_BEARER_TOKEN: $(AUTOMATION_UI_API_BEARER_TOKEN)
+              AUTOMATION_UI_API_TOKEN_RESOURCE: $(AUTOMATION_UI_API_TOKEN_RESOURCE)
+              AUTOMATION_UI_API_TOKEN_SCOPE: $(AUTOMATION_UI_API_TOKEN_SCOPE)
+            inputs:
+              azureSubscription: "$(AZURE_SERVICE_CONNECTION)"
+              scriptType: "pscore"
+              scriptLocation: "inlineScript"
+              inlineScript: |
+                $ErrorActionPreference = 'Stop'
+
+                $existing = "$env:AUTOMATION_UI_API_BEARER_TOKEN"
+                if (-not [string]::IsNullOrWhiteSpace($existing)) {
+                  Write-Host "AUTOMATION_UI_API_BEARER_TOKEN already provided; skipping token acquisition."
+                  exit 0
+                }
+
+                $resource = "$env:AUTOMATION_UI_API_TOKEN_RESOURCE".Trim()
+                $scope = "$env:AUTOMATION_UI_API_TOKEN_SCOPE".Trim()
+
+                if (-not [string]::IsNullOrWhiteSpace($resource) -and -not [string]::IsNullOrWhiteSpace($scope)) {
+                  Write-Error "Configure only one of AUTOMATION_UI_API_TOKEN_RESOURCE or AUTOMATION_UI_API_TOKEN_SCOPE, not both."
+                  exit 1
+                }
+
+                if ([string]::IsNullOrWhiteSpace($resource) -and [string]::IsNullOrWhiteSpace($scope)) {
+                  Write-Host "No token audience configured (AUTOMATION_UI_API_TOKEN_RESOURCE / _SCOPE). Continuing without bearer token."
+                  exit 0
+                }
+
+                if (-not [string]::IsNullOrWhiteSpace($scope)) {
+                  Write-Host "Requesting token via scope..."
+                  $token = az account get-access-token --scope "$scope" --query accessToken -o tsv
+                } else {
+                  Write-Host "Requesting token via resource..."
+                  $token = az account get-access-token --resource "$resource" --query accessToken -o tsv
+                }
+
+                if ([string]::IsNullOrWhiteSpace($token)) {
+                  Write-Error "Token acquisition returned an empty access token."
+                  exit 1
+                }
+
+                Write-Host "Successfully acquired Automation.UI API token."
+                Write-Host "##vso[task.setvariable variable=AUTOMATION_UI_API_BEARER_TOKEN;issecret=true]$token"
+
+          # -------------------------------------------------------------
           # POST /api/runs/start - returns 202 with { runId }.
-          # No Authorization header is sent; Automation.UI does not require
-          # auth on /api/runs/* in this environment.
+          # Uses bearer token from AUTOMATION_UI_API_BEARER_TOKEN when available.
+          # If auth redirects to login HTML, fail with a clear diagnostic
+          # instead of "missing runId".
           # -------------------------------------------------------------
           - task: PowerShell@2
             displayName: "Start Automation.UI run"
             condition: and(succeeded(), ne(variables.SKIP_RUN, 'true'))
+            env:
+              AUTOMATION_UI_API_BEARER_TOKEN: $(AUTOMATION_UI_API_BEARER_TOKEN)
             inputs:
               targetType: "inline"
               script: |
@@ -205,10 +269,37 @@ stages:
                   source     = "ADO pipeline ${{ parameters.targetEnvironment }} (commit $(COMMIT_SHORT))"
                 } | ConvertTo-Json -Compress
 
+                $headers = @{ Accept = "application/json" }
+                $bearer = "$env:AUTOMATION_UI_API_BEARER_TOKEN"
+                if (-not [string]::IsNullOrWhiteSpace($bearer)) {
+                  $headers["Authorization"] = "Bearer $bearer"
+                  Write-Host "Using bearer token for Automation.UI API call."
+                } else {
+                  Write-Host "No bearer token configured (AUTOMATION_UI_API_BEARER_TOKEN)."
+                }
+
                 Write-Host "POST $url"
                 Write-Host "Body: $body"
-                $response = Invoke-RestMethod -Uri $url -Method Post -ContentType "application/json" -Body $body
-                $runId = $response.runId
+
+                $response = Invoke-WebRequest -Uri $url -Method Post -ContentType "application/json" -Body $body -Headers $headers -UseBasicParsing
+                $content = $response.Content
+                $isLoginHtml = ($response.Content -match "Sign in to your account") -or
+                               ($response.Content -match "login.microsoftonline.com") -or
+                               (($response.Headers["Content-Type"] -as [string]) -like "text/html*")
+                if ($isLoginHtml) {
+                  Write-Error "Automation.UI returned login HTML instead of JSON. Configure trusted non-interactive auth (e.g., bearer token) for pipeline access."
+                  exit 1
+                }
+
+                try {
+                  $parsed = $content | ConvertFrom-Json
+                } catch {
+                  $preview = if ($content.Length -gt 500) { $content.Substring(0,500) + "..." } else { $content }
+                  Write-Error "Start endpoint did not return JSON. HTTP $($response.StatusCode). Preview: $preview"
+                  exit 1
+                }
+
+                $runId = $parsed.runId
                 if (-not $runId) { Write-Error "Start did not return a runId."; exit 1 }
                 Write-Host "Started runId=$runId"
                 Write-Host "##vso[task.setvariable variable=RUN_ID]$runId"
@@ -219,11 +310,19 @@ stages:
           - task: PowerShell@2
             displayName: "Wait for Automation.UI run to finish"
             condition: and(succeeded(), ne(variables.SKIP_RUN, 'true'))
+            env:
+              AUTOMATION_UI_API_BEARER_TOKEN: $(AUTOMATION_UI_API_BEARER_TOKEN)
             inputs:
               targetType: "inline"
               script: |
                 $base = "$(AUTOMATION_UI_BASE_URL)".TrimEnd('/')
                 $url  = "$base/api/runs/$(RUN_ID)/status"
+
+                $headers = @{ Accept = "application/json" }
+                $bearer = "$env:AUTOMATION_UI_API_BEARER_TOKEN"
+                if (-not [string]::IsNullOrWhiteSpace($bearer)) {
+                  $headers["Authorization"] = "Bearer $bearer"
+                }
 
                 $deadline = (Get-Date).AddMinutes(${{ parameters.completionTimeoutMinutes }})
                 $finalStatus = "Unknown"
@@ -233,7 +332,16 @@ stages:
 
                 while ((Get-Date) -lt $deadline) {
                   try {
-                    $r = Invoke-RestMethod -Uri $url -Method Get
+                    $resp = Invoke-WebRequest -Uri $url -Method Get -Headers $headers -UseBasicParsing
+                    $content = $resp.Content
+                    $isLoginHtml = ($content -match "Sign in to your account") -or
+                                   ($content -match "login.microsoftonline.com") -or
+                                   (($resp.Headers["Content-Type"] -as [string]) -like "text/html*")
+                    if ($isLoginHtml) {
+                      throw "Status endpoint returned login HTML (not JSON)."
+                    }
+
+                    $r = $content | ConvertFrom-Json
                     Write-Host ("status={0} isTerminal={1}" -f $r.status, $r.isTerminal)
                     if ($r.isTerminal) {
                       $finalStatus = "$($r.status)"
