@@ -1,4 +1,5 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+﻿using Hl7.FhirPath;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
@@ -60,30 +61,27 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
     public async Task<OrganizationLocationConfigurationModel> UpdateByIdAsync(int configId, UpdateOrganizationLocationConfigurationModel model)
     {
-        try
+        OrganizationLocationConfigurationModel result = null;
+
+        await _database.ExecuteInTransactionAsync(async () =>
         {
-            await _database.BeginTransactionAsync();
             var entity = await _database.LocationConfigurationRepository.GetAsync(configId);
 
             if (entity == null)
                 throw new NotFoundException($"OrganizationLocationConfiguration with ConfigId {configId} not found.");
 
-            entity.LocationConditions = await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
+            entity.LocationConditions =
+                await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
 
             await ApplyUpdateToEntity(entity, model);
             _database.LocationConfigurationRepository.Update(entity);
 
             await _database.SaveChangesAsync();
 
-            await _database.CommitTransactionAsync();
+            result = ProjectToModel(entity);
+        });
 
-            return ProjectToModel(entity);
-        }
-        catch
-        {
-            await _database.RollbackTransactionAsync();
-            throw;
-        }
+        return result;
     }
 
     public async Task<List<OrganizationLocationConfigurationModel>> UpdateByFacilityIdAsync(string facilityId, UpdateOrganizationLocationConfigurationModel model)
@@ -107,13 +105,12 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
     public async Task DeleteByIdAsync(int configId)
     {
-        try
+        await _database.ExecuteInTransactionAsync(async () =>
         {
-            await _database.BeginTransactionAsync();
-
             var entity = await _database.LocationConfigurationRepository.GetAsync(configId);
 
-            entity.LocationConditions = await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
+            entity.LocationConditions =
+                await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
 
             foreach (var condition in entity.LocationConditions)
             {
@@ -122,13 +119,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
             _database.LocationConfigurationRepository.Remove(entity);
             await _database.SaveChangesAsync();
-            
-            await _database.CommitTransactionAsync();
-        }
-        catch
-        {
-            await _database.RollbackTransactionAsync();
-        }
+        });
     }
 
     public async Task DeleteByFacilityIdAsync(string facilityId)
@@ -136,7 +127,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
         var entities = await _database.LocationConfigurationRepository
             .FindAsync(c => c.FacilityId == facilityId);
 
-        foreach(var entity in entities)
+        foreach (var entity in entities)
         {
             await DeleteByIdAsync(entity.ConfigId);
         }

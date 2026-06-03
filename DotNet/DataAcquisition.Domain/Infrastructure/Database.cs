@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
 {
@@ -23,9 +24,14 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         IEntityRepository<EncounterLocation> EncounterLocationRepository { get; set; }
 
 
-        Task BeginTransactionAsync(CancellationToken cancellationToken = default);
-        Task CommitTransactionAsync(CancellationToken cancellationToken = default);
-        Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
+        /// <summary>
+        /// Runs <paramref name="operation"/> inside a database transaction using the context's
+        /// configured execution strategy, so it is safe to use with connection-resiliency
+        /// (EnableRetryOnFailure). The whole unit is retried atomically on transient failure;
+        /// any exception rolls the transaction back and is rethrown.
+        /// </summary>
+        Task ExecuteInTransactionAsync(Func<Task> operation, CancellationToken cancellationToken = default);
+
         Task SaveChangesAsync();
     }
     public class Database : IDatabase
@@ -46,7 +52,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
         public IEntityRepository<OrganizationLocationMapping> LocationMappingRepository { get; set; }
         public IEntityRepository<EncounterMapping> EncounterMappingRepository { get; set; }
         public IEntityRepository<EncounterLocation> EncounterLocationRepository { get; set; }
-
+        
         public Database(
             DataAcquisitionDbContext context,
             IEntityRepository<FhirQueryConfiguration> queryConfigurationRepository,
@@ -88,19 +94,27 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure
             await _context.SaveChangesAsync();
         }
 
-        public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
+        public async Task ExecuteInTransactionAsync(Func<Task> operation, CancellationToken cancellationToken = default)
         {
-            await _context.Database.BeginTransactionAsync(cancellationToken);
-        }
+            var strategy = _context.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
+            {
+                // Each attempt starts from a clean slate so a retry re-reads state instead of
+                // reusing entities mutated by a prior failed attempt.
+                _context.ChangeTracker.Clear();
 
-        public async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
-        {
-            await _context.Database.CommitTransactionAsync(cancellationToken);
-        }
-
-        public async Task RollbackTransactionAsync(CancellationToken cancellationToken = default)
-        {
-            await _context.Database.RollbackTransactionAsync(cancellationToken);
+                await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+                try
+                {
+                    await operation();
+                    await transaction.CommitAsync(cancellationToken);
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    throw;
+                }
+            });
         }
     }
 }
