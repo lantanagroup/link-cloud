@@ -48,8 +48,7 @@ public class ValidateQueryPlanConfigDictionaryAttributeTests
         var result = Validate(dictionary);
 
         // Assert
-        Assert.True(result == ValidationResult.Success || !result!.ErrorMessage!.Contains(InvalidOperationTypeError));
-        Assert.True(result == ValidationResult.Success || !result!.ErrorMessage!.Contains(ReadNotValidError));
+        Assert.Equal(ValidationResult.Success, result);
     }
 
     [Fact]
