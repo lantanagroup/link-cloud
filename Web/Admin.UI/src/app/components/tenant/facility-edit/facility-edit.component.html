@@ -210,6 +210,35 @@
             }
           </mat-action-row>
         </mat-tab>
+        <mat-tab label="Reporting Organization">
+          @if (facilityConfig?.vendor) {
+            @if (showNoReportingOrgConfigAlert) {
+              <app-link-alert [type]="linkNoConfigAlertType" [message]="noReportingOrgConfigAlertMessage"
+              ></app-link-alert>
+            }
+            <app-reporting-organization-config-form [item]="reportingOrgConfig" [vendor]="facilityConfig.vendor!"
+            [viewOnly]="true"></app-reporting-organization-config-form>
+            <mat-action-row>
+              @if (showNoReportingOrgConfigAlert) {
+                <button mat-mini-fab aria-label="Add reporting organization configuration" matTooltip="Add reporting organization configuration"
+                  (click)="showReportingOrgDialog()">
+                  <mat-icon>add</mat-icon>
+                </button>
+              }
+              @if (!showNoReportingOrgConfigAlert) {
+                <button mat-mini-fab aria-label="Edit reporting organization configuration" matTooltip="Edit reporting organization configuration"
+                  (click)="showReportingOrgDialog()">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-mini-fab aria-label="Delete reporting organization configuration" color="warn" (click)="onDeleteReportingOrgConfig()">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
+            </mat-action-row>
+          } @else {
+            <app-link-alert [type]="linkNoConfigAlertType" [message]="'Select an EHR vendor for this facility to configure its reporting organization.'"></app-link-alert>
+          }
+        </mat-tab>
       </mat-tab-group>
     </mat-expansion-panel>
 
