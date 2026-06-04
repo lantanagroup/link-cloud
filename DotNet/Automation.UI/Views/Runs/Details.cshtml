@@ -586,7 +586,11 @@
 
             const importedIdCount = Array.isArray(parsed.importedPatientIds) ? parsed.importedPatientIds.length : 0;
             const importedBundleCount = Array.isArray(parsed.importedPatientBundles) ? parsed.importedPatientBundles.length : 0;
-            const basePatientCount = Number(parsed.patientCount || 0);
+            const rawPatientCount = parsed.patientCount;
+            const parsedPatientCount = typeof rawPatientCount === 'number'
+                ? rawPatientCount
+                : Number.parseFloat(String(rawPatientCount ?? '0'));
+            const basePatientCount = Number.isFinite(parsedPatientCount) ? parsedPatientCount : 0;
             const effectivePatientCount = basePatientCount + importedIdCount + importedBundleCount;
 
             function formatArrayItem(item, key, index) {
