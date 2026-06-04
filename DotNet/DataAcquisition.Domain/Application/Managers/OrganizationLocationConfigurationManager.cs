@@ -14,6 +14,7 @@ public interface IOrganizationLocationConfigurationManager
     Task<OrganizationLocationConfigurationModel> UpdateByIdAsync(int configId, UpdateOrganizationLocationConfigurationModel model);
 
     Task<List<OrganizationLocationConfigurationModel>> UpdateByFacilityIdAsync(string facilityId, UpdateOrganizationLocationConfigurationModel model);
+    
 
     Task DeleteByIdAsync(int configId);
 
@@ -33,6 +34,8 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
     public async Task<OrganizationLocationConfigurationModel> CreateAsync(CreateOrganizationLocationConfigurationModel model)
     {
+        ValidateConditions(model.Conditions.Select(c => c.FhirPath));
+
         var entity = new OrganizationLocationConfiguration
         {
             FacilityId = model.FacilityId,
@@ -70,8 +73,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
             if (entity == null)
                 throw new NotFoundException($"OrganizationLocationConfiguration with ConfigId {configId} not found.");
 
-            entity.LocationConditions =
-                await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
+            entity.LocationConditions = await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
 
             await ApplyUpdateToEntity(entity, model);
             _database.LocationConfigurationRepository.Update(entity);
@@ -109,8 +111,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
         {
             var entity = await _database.LocationConfigurationRepository.GetAsync(configId);
 
-            entity.LocationConditions =
-                await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
+            entity.LocationConditions = await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
 
             foreach (var condition in entity.LocationConditions)
             {
@@ -127,7 +128,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
         var entities = await _database.LocationConfigurationRepository
             .FindAsync(c => c.FacilityId == facilityId);
 
-        foreach (var entity in entities)
+        foreach(var entity in entities)
         {
             await DeleteByIdAsync(entity.ConfigId);
         }
@@ -145,6 +146,8 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
         if (model.Conditions != null && model.Conditions.Any())
         {
+            ValidateConditions(model.Conditions.Select(c => c.FhirPath));
+
             //Rebuild conditions
             foreach (var condition in entity.LocationConditions)
             {
@@ -165,6 +168,36 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
                     ModifiedOn = DateTime.UtcNow
                 });
             }
+        }
+    }
+
+    private static void ValidateConditions(IEnumerable<string> fhirPaths)
+    {
+        foreach (var fhirPath in fhirPaths)
+        {
+            if (string.IsNullOrWhiteSpace(fhirPath))
+                continue;
+
+            var error = TryGetFhirPathError(fhirPath);
+            if (error != null)
+                throw new BadRequestException($"Invalid FHIRPath syntax: {error}");
+        }
+    }
+
+    /// <summary>
+    /// Compiles the expression with Firely's FhirPathCompiler; returns null when it
+    /// compiles, otherwise the compiler's error message.
+    /// </summary>
+    private static string? TryGetFhirPathError(string fhirPath)
+    {
+        try
+        {
+            new FhirPathCompiler().Compile(fhirPath);
+            return null;
+        }
+        catch (Exception ex) when (ex is FormatException || ex is ArgumentException)
+        {
+            return ex.Message;
         }
     }
 
