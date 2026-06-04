@@ -87,9 +87,22 @@ public class ParameterQueryFactory : IParameterQueryFactory
 
         // Read is not a valid operation type for a parameter query, 
         // but if it is set to that, treat it as a search to avoid errors and still return results
-        var operationType = config.OperationType == OperationType.SearchPost
-         ? OperationType.SearchPost 
-         : OperationType.Search;
+        OperationType operationType;
+        if (config.OperationType == OperationType.Read)
+        {
+            _logger.LogWarning(
+                "Read is not a valid operation type for ParameterQueryConfig. Treating as Search for" +
+                " ResourceType {ResourceType} on CorrelationId {CorrelationId}",
+                config.ResourceType,
+                request.CorrelationId);
+            operationType = OperationType.Search;
+        }
+        else
+        {
+            operationType = config.OperationType == OperationType.SearchPost
+                ? OperationType.SearchPost
+                : OperationType.Search;
+        }
 
         return isPaged ? new PagedParameterQueryFactoryResult(operationType, searchParamList)
             : new SingularParameterQueryFactoryResult(operationType, searchParams);
