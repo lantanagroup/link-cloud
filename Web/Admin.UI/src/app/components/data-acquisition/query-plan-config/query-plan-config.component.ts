@@ -358,9 +358,7 @@ export class QueryPlanConfigFormComponent {
     if (!cfg) return cfg;
     const c: any = cfg as any;
 
-    if (c.queryConfigType === 'Reference') {
-      c.operationType = this.normalizeOperationType(c.operationType);
-    }
+    c.operationType = this.normalizeOperationType(c.operationType);
 
     if (c.parameters && Array.isArray(c.parameters)) {
       c.parameters = c.parameters.map((p: any) => {

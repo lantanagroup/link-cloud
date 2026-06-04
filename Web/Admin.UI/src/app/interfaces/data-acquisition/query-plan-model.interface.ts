@@ -13,6 +13,7 @@ export type QueryConfigModel = IParameterQueryConfigModel | IReferenceQueryConfi
 
 export interface IQueryConfigModel {
     resourceType: string;
+    operationType?: ReferenceQueryOperationType;
     queryConfigType: string;
 }
 
@@ -23,7 +24,6 @@ export interface IParameterQueryConfigModel extends IQueryConfigModel {
 
 export interface IReferenceQueryConfigModel extends IQueryConfigModel {
     queryConfigType: 'Reference';
-    operationType: ReferenceQueryOperationType;
     paged: number;
 }
 
