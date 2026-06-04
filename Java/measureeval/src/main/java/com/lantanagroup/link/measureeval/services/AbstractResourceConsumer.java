@@ -161,8 +161,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             }
 
             if (resources.isEmpty()) {
-                logger.info("Skipping: cache empty for correlationId={}", correlationId);
-                return;
+                logger.info("Cache empty for correlationId={}; evaluating with empty bundle to produce a not-reportable report", correlationId);
             }
 
             logger.trace("Beginning patient status update");

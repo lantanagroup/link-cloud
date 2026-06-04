@@ -301,25 +301,6 @@ class AbstractResourceConsumerTest {
     }
 
     @Test
-    void process_absCacheType_emptyResources_skipsEvaluation() throws Exception {
-        String facilityId = "facility-1";
-        String patientId = "patient-1";
-        String cacheKey = "cache-key-2";
-
-        ResourcesNormalized value = buildAbsValue(cacheKey);
-
-        when(absResourceService.readResources(facilityId, cacheKey, patientId, cacheKey))
-                .thenReturn(Collections.emptyList());
-
-        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
-        consumerWithAbs.process(record);
-
-        verify(absResourceService).readResources(facilityId, cacheKey, patientId, cacheKey);
-        verifyNoInteractions(evaluateMeasureService);
-        verifyNoInteractions(patientStatusBundler);
-    }
-
-    @Test
     void process_absCacheType_doesNotCleanupRedis() throws Exception {
         String facilityId = "facility-1";
         String patientId = "patient-1";
