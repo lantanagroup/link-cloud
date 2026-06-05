@@ -135,7 +135,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                         }
 
                                         //asynchrounously send the email
-                                        _ = Task.Run(() => _sendNotificationCommand.Execute(sendModel));
+                                        _ = Task.Run(() => _sendNotificationCommand.Execute(sendModel), cancellationToken);
                                     }                                    
 
                                     //consume the result and offset

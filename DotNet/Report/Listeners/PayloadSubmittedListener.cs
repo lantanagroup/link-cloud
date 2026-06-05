@@ -125,7 +125,7 @@ public class PayloadSubmittedListener(
                 reportEntry.SubmitReportDateTime = DateTime.UtcNow;
                 reportEntry.ModifyDate = DateTime.UtcNow;
                 database.ReportEntryRepository.Update(reportEntry);
-                await database.SaveChangesAsync();
+                await database.SaveChangesAsync(cancellationToken);
 
                 await reportManifestProducer.Produce(reportSchedule, correlationId);
             }

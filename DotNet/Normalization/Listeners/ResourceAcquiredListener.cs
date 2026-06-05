@@ -146,7 +146,7 @@ public class ResourceAcquiredListener : BackgroundService
                         {
                             _logger.LogInformation("Acquisition Complete tail message received for facility {FacilityId} (correlation {CorrelationId}). Producing message for measure eval.", messageMetaData.facilityId.SanitizeForLog(), messageMetaData.correlationId.SanitizeForLog());
 
-                            await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, message.Message.Value.Resource);
+                            await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, message.Message.Value.Resource, consumeCancellationToken);
                             return;
                         }
 
@@ -229,12 +229,12 @@ public class ResourceAcquiredListener : BackgroundService
                                     }
                                 }
 
-                                await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, resource);
+                                await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, resource, consumeCancellationToken);
                             }
                             else
                             {
                                 _logger.LogDebug("No operation sequences configured for {FacilityId}/{ResourceType}. Passing resource through without normalization.", messageMetaData.facilityId.SanitizeForLog(), message.Message.Value.ResourceType.SanitizeForLog());
-                                await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, message.Message.Value.Resource);
+                                await ProduceResourceNormalizedMessage(message, messageMetaData.facilityId, messageMetaData.correlationId, message.Message.Value.Resource, consumeCancellationToken);
                             }
                         }
                     }
@@ -301,7 +301,7 @@ public class ResourceAcquiredListener : BackgroundService
     }
 
 
-    private async Task ProduceResourceNormalizedMessage(ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message, string facilityId, string correlationId, object? resource)
+    private async Task ProduceResourceNormalizedMessage(ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message, string facilityId, string correlationId, object? resource, CancellationToken cancellationToken = default)
     {
         var headers = new Headers
         {
@@ -330,7 +330,7 @@ public class ResourceAcquiredListener : BackgroundService
 
         try
         {
-            await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage);
+            await _producer.ProduceAsync(KafkaTopic.ResourceNormalized.ToString(), produceMessage, cancellationToken);
         }
         catch (ProduceException<ResourceKey, ResourceNormalizedMessage> ex)
         {
