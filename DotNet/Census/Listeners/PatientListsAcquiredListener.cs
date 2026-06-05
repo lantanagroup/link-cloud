@@ -77,7 +77,7 @@ public class PatientListsAcquiredListener : BackgroundService
             {
                 try
                 {
-                    await kafkaConsumer.ConsumeWithInstrumentation((Func<ConsumeResult<string, PatientListMessage>?, CancellationToken, Task>)(async (result, CancellationToken) =>
+                    await kafkaConsumer.ConsumeWithInstrumentation((Func<ConsumeResult<string, PatientListMessage>?, CancellationToken, Task>)(async (result, consumeCancellationToken) =>
                     {
                         rawmessage = result;
 
@@ -108,7 +108,7 @@ public class PatientListsAcquiredListener : BackgroundService
                                 try
                                 {
                                     var patientListService = scope.ServiceProvider.GetRequiredService<IPatientListService>();
-                                    responseMessages = await patientListService.ProcessLists(facilityId, rawmessage.Message.Value.PatientLists, cancellationToken);
+                                    responseMessages = await patientListService.ProcessLists(facilityId, rawmessage.Message.Value.PatientLists, consumeCancellationToken);
 
                                     // Inject reportTrackingId into each PatientEvent
                                     responseMessages = responseMessages.Select(resp =>
@@ -129,7 +129,7 @@ public class PatientListsAcquiredListener : BackgroundService
                                         _logger.LogWarning("No response messages returned for facility {FacilityId}.", facilityId);
                                     }
                                     else
-                                        await _eventProducerService.ProduceEventsAsync(facilityId, responseMessages, cancellationToken);
+                                        await _eventProducerService.ProduceEventsAsync(facilityId, responseMessages, consumeCancellationToken);
                                 }
                                 catch (SqlException ex)
                                 {

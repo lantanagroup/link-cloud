@@ -67,7 +67,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
             {
                 try
                 {
-                    await consumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
+                    await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                     {
                         consumeResult = result;
 
@@ -75,7 +75,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         {
                             if (consumeResult != null)
                             {
-                                await ExecuteListenerAsync(consumeResult, cancellationToken);
+                                await ExecuteListenerAsync(consumeResult, consumeCancellationToken);
                             }
                         }
                         catch (DeadLetterException ex)

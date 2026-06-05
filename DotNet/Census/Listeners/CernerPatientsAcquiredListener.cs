@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Census.Listeners
                         {
                             try
                             {
-                                await ProcessMessageAsync(result, cancellationToken);
+                                await ProcessMessageAsync(result, consumeCancellationToken);
                             }
                             catch (DeadLetterException ex)
                             {

@@ -89,7 +89,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             try
                             {
                                 facilityId = result.Message.Value.FacilityId;
-                                await ProcessMessageAsync(result, facilityId, cancellationToken);
+                                await ProcessMessageAsync(result, facilityId, consumeCancellationToken);
                             }
                             catch (DeadLetterException ex)
                             {

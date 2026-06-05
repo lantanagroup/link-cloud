@@ -105,7 +105,7 @@ public class ResourceAcquiredListener : BackgroundService
             ConsumeResult<ResourceKey, ResourceAcquiredMessage>? message = default;
             try
             {
-                await kafkaConsumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
+                await kafkaConsumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                 {
                     try
                     {
