@@ -114,6 +114,14 @@ internal sealed class RunExecutor
 
             await fhirDataLoader.WaitForServerAsync(output);
 
+            // Resolve the query plan template early so the acquisition simulator uses the
+            // same plan the scenario is configured with (not always the built-in default).
+            var queryPlanResolution = await _queryPlanResolver.ResolveAsync(state.Options.QueryPlanTemplateId, cancellationToken);
+            var queryPlanInput = queryPlanResolution.Input;
+            var effectiveQueryPlan = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
+            if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
+                output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
+
             if (state.Options.PatientProfiles is { Count: > 0 }
                 || state.Options.ImportedPatientIds.Count > 0
                 || state.Options.ImportedPatientBundles.Count > 0)
@@ -178,7 +186,7 @@ internal sealed class RunExecutor
                     generationConfig,
                     acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
                     {
-                        QueryPlan = QueryPlanDefaults.GetDefaultAsInput(),
+                        QueryPlan = effectiveQueryPlan,
                         ClinicalPeriodStart = scenarioConfig.StartDate,
                         ClinicalPeriodEnd = scenarioConfig.EndDate
                     },
@@ -224,19 +232,12 @@ internal sealed class RunExecutor
             var facilityId = state.RunId.ToString();
             state.FacilityId = facilityId;
 
-            // Resolve the query plan template (null = use built-in defaults).
-            var queryPlanResolution = await _queryPlanResolver.ResolveAsync(state.Options.QueryPlanTemplateId, cancellationToken);
-            var queryPlanInput = queryPlanResolution.Input;
-            if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
-                output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
-
             // Finalize manifest metadata now that we have measure IDs and query plan.
             if (generationManifest != null)
             {
                 generationManifest.MeasureIds = measureIds;
-                var effectiveQueryPlanInput = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
-                generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlanInput);
-                generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlanInput);
+                generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlan);
+                generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlan);
                 generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
 
                 // Persist a lightweight manifest snapshot for the UI.
