@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Http;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
 using Microsoft.AspNetCore.Authorization;
@@ -53,23 +54,19 @@ public class QueryPlanConfigController : Controller
         [FromQuery] GetQueryPlanParameters queryParameters,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(facilityId))
+        {
+            ModelState.AddModelError(nameof(facilityId), "parameter facilityId is required.");
+        }
+
         if (!ModelState.IsValid)
         {
-            return BadRequest(ModelState);
+            _logger.LogError("Request parameters failed validation.");
+            return this.InvalidParametersProblem();
         }
 
         try
         {
-            if (string.IsNullOrWhiteSpace(facilityId))
-            {
-                throw new BadRequestException("parameter facilityId is required.");
-            }
-
-            if (queryParameters == null || queryParameters.Type == null)
-            {
-                throw new BadRequestException("type query parameter must be defined.");
-            }
-
             var result = await _queryPlanQueries.GetAsync(facilityId, queryParameters.Type.Value, cancellationToken);
 
             if (result == null)
@@ -80,15 +77,10 @@ public class QueryPlanConfigController : Controller
 
             return Ok(result);
         }
-        catch (BadRequestException ex)
-        {
-            _logger.LogError(ex, "BadRequestException occurred.");
-            return Problem(title: "Bad Request", detail: ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
-        }
         catch (NotFoundException ex)
         {
             _logger.LogError(ex, "BadRequestException occurred.");
-            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
+            return ValidationProblem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (Exception ex)
         {
@@ -172,7 +164,7 @@ public class QueryPlanConfigController : Controller
             }
             else
             {
-                return BadRequest(ModelState);
+                return this.InvalidParametersProblem();
             }
         }
         catch (IncorrectQueryPlanOrderException ex)
@@ -276,7 +268,7 @@ public class QueryPlanConfigController : Controller
             }
             else
             {
-                return BadRequest(ModelState);
+                return this.InvalidParametersProblem();
             }
         }
         catch (IncorrectQueryPlanOrderException ex)
@@ -336,7 +328,7 @@ public class QueryPlanConfigController : Controller
     {
         if (!ModelState.IsValid)
         {
-            return BadRequest(ModelState);
+            return this.InvalidParametersProblem();
         }
 
         try

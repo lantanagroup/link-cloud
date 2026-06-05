@@ -197,14 +197,59 @@ namespace UnitTests.DataAcquisition.Controllers
         [Fact]
         public async Task GetQueryPlan_MissingType_ReturnsBadRequest()
         {
-            var _mocker = new AutoMocker();
-            var _controller = _mocker.CreateInstance<QueryPlanConfigController>();
+            var mocker = new AutoMocker();
+            var controller = mocker.CreateInstance<QueryPlanConfigController>();
+            controller.ModelState.AddModelError("Type", "The Type field is required.");
 
-            var result = await _controller.GetQueryPlan("test-facility-id", new GetQueryPlanParameters(), CancellationToken.None);
+            var result = await controller.GetQueryPlan("test-facility-id", new GetQueryPlanParameters(), CancellationToken.None);
 
-            var objectResult = Assert.IsType<ObjectResult>(result);
+            var objectResult = Assert.IsAssignableFrom<ObjectResult>(result);
             Assert.Equal((int)HttpStatusCode.BadRequest, objectResult.StatusCode);
-            Assert.Contains("type query parameter must be defined", ((ProblemDetails)objectResult.Value!).Detail!, StringComparison.OrdinalIgnoreCase);
+        }
+
+        [Fact]
+        public async Task GetQueryPlan_MissingType_ReturnsInvalidParametersWithTypeError()
+        {
+            var mocker = new AutoMocker();
+            var controller = mocker.CreateInstance<QueryPlanConfigController>();
+            controller.ModelState.AddModelError("Type", "Type query parameter must be defined");
+
+            var result = await controller.GetQueryPlan("test-facility-id", new GetQueryPlanParameters(), CancellationToken.None);
+
+
+            var objectResult = Assert.IsAssignableFrom<ObjectResult>(result);
+            var problemDetailsResult = Assert.IsAssignableFrom<ProblemDetails>(objectResult.Value);
+            Assert.Equal("https://datatracker.ietf.org/doc/html/rfc7807#section-3", problemDetailsResult.Type);
+            Assert.Equal("Your request parameters didn't validate.", problemDetailsResult.Title);
+
+            var invalidParams =
+                Assert.IsAssignableFrom<IEnumerable<(string name, string reason)>>(problemDetailsResult.Extensions["invalid-params"]);
+
+            Assert.Contains(invalidParams, p =>
+                p.name == "Type" &&
+                p.reason.Contains("type query parameter must be defined", StringComparison.OrdinalIgnoreCase));
+        }
+
+        [Fact]
+        public async Task GetQueryPlan_EmptyFacilityId_ReturnsInvalidParametersWithFacilityIdError()
+        {
+            var mocker = new AutoMocker();
+            var controller = mocker.CreateInstance<QueryPlanConfigController>();
+
+            var result = await controller.GetQueryPlan(" ", new GetQueryPlanParameters(), CancellationToken.None);
+
+            var objectResult = Assert.IsAssignableFrom<ObjectResult>(result);
+            var problemDetailsResult = Assert.IsAssignableFrom<ProblemDetails>(objectResult.Value);
+    
+            Assert.Equal("https://datatracker.ietf.org/doc/html/rfc7807#section-3", problemDetailsResult.Type);
+            Assert.Equal("Your request parameters didn't validate.", problemDetailsResult.Title);
+
+            var invalidParams =
+                Assert.IsAssignableFrom<IEnumerable<(string name, string reason)>>(problemDetailsResult.Extensions["invalid-params"]);
+
+            Assert.Contains(invalidParams, p =>
+                p.name == "facilityId" &&
+                p.reason.Contains("parameter facilityId is required", StringComparison.OrdinalIgnoreCase));
         }
 
         [Fact]
