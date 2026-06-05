@@ -61,7 +61,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
 
-        private async void StartConsumerLoop(CancellationToken cancellationToken)
+        private async Task StartConsumerLoop(CancellationToken cancellationToken)
         {
             var config = new ConsumerConfig()
             {
