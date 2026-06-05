@@ -42,9 +42,9 @@
 		<PackageReference Include="Microsoft.Extensions.Telemetry" Version="10.1.0" />
 		<PackageReference Include="MongoDB.Driver" Version="3.*" />
 		<PackageReference Include="OpenTelemetry" Version="1.15.0" />
-		<PackageReference Include="OpenTelemetry.Api" Version="1.15.0" />
+		<PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
 		<PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.15.0" />
-		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.0" />
+		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
 		<PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.15.0-beta.1" />
 		<PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="1.15.0-beta.1" />
 		<PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
