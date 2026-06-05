@@ -92,7 +92,8 @@ public class QueryConfigController : Controller
                 MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
                 FhirServerBaseUrl = result.FhirServerBaseUrl,
                 MaxConcurrentRequests = result.MaxConcurrentRequests,
-                MaxRetries = result.MaxRetries
+                MaxRetries = result.MaxRetries,
+                EnableLocationResolutionMapping = result.EnableLocationResolutionMapping
             });
         }
         catch (BadRequestException ex)
@@ -158,7 +159,8 @@ public class QueryConfigController : Controller
                 FacilityId = facilityId,
                 MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
                 MaxRetries = fhirQueryConfiguration.MaxRetries,
-                FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl
+                FhirServerBaseUrl = fhirQueryConfiguration.FhirServerBaseUrl,
+                EnableLocationResolutionMapping = fhirQueryConfiguration.EnableLocationResolutionMapping
             }, cancellationToken);
 
             if (result == null)
@@ -180,7 +182,8 @@ public class QueryConfigController : Controller
                     MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
                     FhirServerBaseUrl = result.FhirServerBaseUrl,
                     MaxConcurrentRequests = result.MaxConcurrentRequests,
-                    MaxRetries = result.MaxRetries
+                    MaxRetries = result.MaxRetries,
+                    EnableLocationResolutionMapping = result.EnableLocationResolutionMapping
                 });
         }
         catch (EntityAlreadyExistsException ex)
@@ -262,6 +265,7 @@ public class QueryConfigController : Controller
                 MaxRetries = fhirQueryConfiguration.MaxRetries,
                 MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
                 MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+                EnableLocationResolutionMapping = fhirQueryConfiguration.EnableLocationResolutionMapping
             }, cancellationToken);
 
             if (result == null)
@@ -293,7 +297,8 @@ public class QueryConfigController : Controller
                 MaxAcquisitionPullTime = result.MaxAcquisitionPullTime,
                 FhirServerBaseUrl = result.FhirServerBaseUrl,
                 MaxConcurrentRequests = result.MaxConcurrentRequests,
-                MaxRetries = result.MaxRetries
+                MaxRetries = result.MaxRetries,
+                EnableLocationResolutionMapping = result.EnableLocationResolutionMapping
             });
         }
         catch (MissingFacilityConfigurationException ex)

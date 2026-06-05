@@ -12,6 +12,7 @@ public class CreateFhirQueryConfigurationModel
     public TimeSpan? MaxAcquisitionPullTime { get; set; }
     public int? MaxRetries { get; set; }
     public string? TimeZone { get; set; } = null;
+    public bool EnableLocationResolutionMapping { get; set; } = false;
     public DateTime? CreateDate { get; set; }
     public DateTime? ModifyDate { get; set; }
 }

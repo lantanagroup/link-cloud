@@ -73,7 +73,8 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
             if (entity == null)
                 throw new NotFoundException($"OrganizationLocationConfiguration with ConfigId {configId} not found.");
 
-            entity.LocationConditions = await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
+            entity.LocationConditions =
+                await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
 
             await ApplyUpdateToEntity(entity, model);
             _database.LocationConfigurationRepository.Update(entity);
@@ -111,7 +112,8 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
         {
             var entity = await _database.LocationConfigurationRepository.GetAsync(configId);
 
-            entity.LocationConditions = await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
+            entity.LocationConditions =
+                await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);
 
             foreach (var condition in entity.LocationConditions)
             {
@@ -128,7 +130,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
         var entities = await _database.LocationConfigurationRepository
             .FindAsync(c => c.FacilityId == facilityId);
 
-        foreach(var entity in entities)
+        foreach (var entity in entities)
         {
             await DeleteByIdAsync(entity.ConfigId);
         }
