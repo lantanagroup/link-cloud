@@ -158,11 +158,10 @@ public class QueryPlanConfigController : Controller
                 return Problem("QueryPlan not created.", statusCode: (int)HttpStatusCode.InternalServerError);
             }
 
-            return CreatedAtAction(nameof(CreateQueryPlan),
+            return CreatedAtAction(nameof(GetQueryPlan),
                 new
                 {
-                    FacilityId = facilityId,
-                    QueryPlan = result
+                    FacilityId = facilityId
                 }, result);
         }
         catch (IncorrectQueryPlanOrderException ex)
