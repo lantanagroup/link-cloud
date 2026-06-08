@@ -19,6 +19,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Text;
 using System.Text.Json;
@@ -43,6 +44,7 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly CodeMapOperationService _codeMapOperationService;
     private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
     private readonly CopyLocationOperationService _copyLocationOperationService;
+    private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
     private readonly IResourceCache _resourceCache;
 
     public ResourcesAcquiredListener(
@@ -59,6 +61,7 @@ public class ResourcesAcquiredListener : BackgroundService
         CodeMapOperationService codeMapOperationService,
         ConditionalTransformOperationService conditionalTransformOperationService,
         CopyLocationOperationService copyLocationOperationService,
+        RemoveExtensionsOperationService removeExtensionsOperationService,
         IResourceCache resourceCache)
     {
         this._logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -83,6 +86,7 @@ public class ResourcesAcquiredListener : BackgroundService
         _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
         _conditionalTransformOperationService = conditionalTransformOperationService ?? throw new ArgumentNullException(nameof(conditionalTransformOperationService));
         _copyLocationOperationService = copyLocationOperationService ?? throw new ArgumentNullException(nameof(copyLocationOperationService));
+        _removeExtensionsOperationService = removeExtensionsOperationService ?? throw new ArgumentNullException(nameof(removeExtensionsOperationService));
         _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
     }
 
@@ -121,7 +125,7 @@ public class ResourcesAcquiredListener : BackgroundService
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, $"Failed to process Patient Event.");
+                        _logger.LogError(ex, "Failed to process ResourceAcquired event for facility {FacilityId}.", result?.Message.Key?.FacilityId?.SanitizeForLog());
 
                         _transientExceptionHandler.HandleException(result, new TransientException("Normalization Exception thrown: " + ex.Message, ex), result.Message.Key?.FacilityId ?? string.Empty);
                     }
@@ -195,6 +199,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
                 if (sequences == null || sequences.Count == 0)
                 {
+                    _logger.LogDebug("No operation sequences configured for {FacilityId}/{ResourceType}. Passing resource through without normalization.", result.Message.Key.FacilityId.SanitizeForLog(), resourceType.ToString().SanitizeForLog());
                     resourceCache.Skipped(cacheKey, correlationId);
                     continue;
                 }
@@ -216,28 +221,40 @@ public class ResourcesAcquiredListener : BackgroundService
                             throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
                         }
 
+                        _logger.LogInformation("Normalizing {ResourceType}/{ResourceId} with {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
+
                         var operationResult = operation.OperationType switch
                         {
                             OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource),
                             OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource),
                             OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource),
                             OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource),
+                            OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, resource),
                             _ => null
                         };
 
                         if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
                         {
-                            _metrics.IncrementResourceNormalizedCounter(new List<KeyValuePair<string, object?>>() {
+                            if (operationResult.SuccessCode == OperationStatus.Success)
+                            {
+                                _logger.LogInformation("Changed {ResourceType}/{ResourceId} as part of {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
+                            }
+                            else if (operationResult.SuccessCode == OperationStatus.NoAction)
+                            {
+                                _logger.LogInformation("No changes made to {ResourceType}/{ResourceId} as part of {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
+                            }
+
+                            _metrics.IncrementResourceChangedCounter(new List<KeyValuePair<string, object?>>() {
                                                 new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, result.Message.Key.FacilityId),
                                                 new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
                                                 new KeyValuePair<string, object?>(DiagnosticNames.PatientId, result.Message.Key.PatientId),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.Resource, resource.TypeName),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.QueryType, result.Message.Value.QueryType),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.NormalizationOperation, operation.OperationType.ToString())});
+                                                new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resource.TypeName),
+                                                new KeyValuePair<string, object?>(DiagnosticNames.OperationType, operation.OperationType.ToString())},
+                                                operationResult.SuccessCode == OperationStatus.Success);
                         }
                         else
                         {
-                            _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", result.Message.Key.FacilityId, correlationId, operation.OperationType, operationResult?.ErrorMessage ?? "No Operation Result Error result");
+                            _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", result.Message.Key.FacilityId.SanitizeForLog(), correlationId.SanitizeForLog(), operation.OperationType, operationResult?.ErrorMessage?.SanitizeForLog() ?? "No Operation Result Error result");
                         }
                     }
                 }
@@ -315,7 +332,7 @@ public class ResourcesAcquiredListener : BackgroundService
         }
         catch (ProduceException<ResourceKey, ResourcesNormalizedValue> ex)
         {
-            _logger.LogError(ex, "Failed to produce ResourcesNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, ResourceAcquired Partition: {Partition}, ResourceAcquired Offset: {Offset}", facilityId, correlationId, message.Partition.Value, message.Offset.Value);
+            _logger.LogError(ex, "Failed to produce ResourceNormalized message. FacilityId: {FacilityId}, CorrelationId: {CorrelationId}, ResourceAcquired Partition: {Partition}, ResourceAcquired Offset: {Offset}", facilityId.SanitizeForLog(), correlationId.SanitizeForLog(), message.Partition.Value, message.Offset.Value);
             throw new TransientException($"Failed to produce ResourcesNormalized message: {ex.Message}", ex);
         }
     }
