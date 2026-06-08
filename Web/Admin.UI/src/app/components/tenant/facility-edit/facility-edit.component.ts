@@ -200,6 +200,7 @@ export class FacilityEditComponent implements OnInit {
     this.dialog.open(FacilityConfigDialogComponent,
       {
         width: '75%',
+        disableClose: true,
         data: {dialogTitle: 'Edit facility', viewOnly: false, facilityConfig: this.facilityConfig}
       }).afterClosed().subscribe(res => {
       console.log(res)
@@ -219,6 +220,7 @@ export class FacilityEditComponent implements OnInit {
     this.dialog.open(CensusConfigDialogComponent,
       {
         width: '75%',
+        disableClose: true,
         data: {
           dialogTitle: 'Census Configuration',
           formMode: this.showNoCensusConfigAlert ? FormMode.Create : FormMode.Edit,
@@ -248,6 +250,7 @@ export class FacilityEditComponent implements OnInit {
     this.dialog.open(QueryDispatchConfigDialogComponent,
       {
         width: '75%',
+        disableClose: true,
         data: {
           dialogTitle: 'Query Dispatch Configuration',
           formMode: this.showNoQueryDispatchConfigAlert ? FormMode.Create : FormMode.Edit,
@@ -354,6 +357,7 @@ export class FacilityEditComponent implements OnInit {
     this.dialog.open(DataAcquisitionFhirQueryConfigDialogComponent,
       {
         width: '75%',
+        disableClose: true,
         data: {
           dialogTitle: 'Fhir Query Configuration',
           formMode: this.showNoDataAcqFhirQueryConfigAlert ? FormMode.Create : FormMode.Edit,
@@ -385,6 +389,7 @@ export class FacilityEditComponent implements OnInit {
       {
         width: '50vw',
         maxWidth: '50vw',
+        disableClose: true,
         data: {
           dialogTitle: 'Fhir Query List Configuration',
           formMode: this.showNoDataAcqFhirListConfigAlert ? FormMode.Create : FormMode.Edit,
@@ -416,6 +421,7 @@ export class FacilityEditComponent implements OnInit {
       {
         width: '90%',
         maxWidth: '1200px',
+        disableClose: true,
         data: {
           dialogTitle: 'Query Plan',
           formMode: this.showNoDataAcqQueryPlanConfigAlert ? FormMode.Create : FormMode.Edit,
@@ -551,6 +557,7 @@ export class FacilityEditComponent implements OnInit {
       {
         width: '50vw',
         maxWidth: '50vw',
+        disableClose: true,
         data: {
           dialogTitle: 'SFTP Configuration',
           formMode: this.showNoSftpConfigAlert ? FormMode.Create : FormMode.Edit,
@@ -672,6 +679,7 @@ export class FacilityEditComponent implements OnInit {
       {
         width: '90%',
         maxWidth: '1400px',
+        disableClose: true,
         data: {
           dialogTitle: 'Reporting Organization Configuration',
           formMode: this.showNoReportingOrgConfigAlert ? FormMode.Create : FormMode.Edit,

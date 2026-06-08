@@ -82,6 +82,16 @@
   margin-bottom: 1rem;
 }
 
+.vendor-mismatch-warning {
+  margin-bottom: 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  background-color: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.4);
+  color: #8a5300;
+  font-size: 0.825rem;
+}
+
 .builder-fields {
   display: flex;
   flex-direction: column;

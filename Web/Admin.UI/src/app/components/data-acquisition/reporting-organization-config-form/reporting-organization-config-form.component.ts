@@ -78,6 +78,10 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
   fhirPathWarnings: string[] = [];
   validatingFhirPath = false;
 
+  // True when the saved rules were built for the other EHR vendor (e.g. an Epic rule on a
+  // Cerner facility). Advisory only — nothing is deleted.
+  vendorMismatch = false;
+
   // Every generated/typed expression for this form is applying at the Location resource.
   private static readonly FhirPathResourceType = 'Location';
 
@@ -265,6 +269,9 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
     this.setupMethodControl.setValue(method, { emitEvent: false });
     this.previousMethod = method;
 
+    // Flag (advisory) when the saved rules were built for a different vendor.
+    this.vendorMismatch = this.detectVendorMismatch(this.item?.conditions);
+
     if (this.item) {
       this.facilityIdControl.setValue(this.item.facilityId);
       this.facilityIdControl.updateValueAndValidity();
@@ -331,6 +338,21 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
       return parsed !== null && parsed.setupMethod === candidate;
     });
     return allMatch ? candidate : 'manual';
+  }
+
+  /** Flags a saved config whose rules reverse-parse to the other vendor's builder method.
+   *  Custom/unparseable expressions aren't treated as a mismatch. */
+  private detectVendorMismatch(conditions?: { fhirPath: string }[]): boolean {
+    const operands = (conditions ?? [])
+      .flatMap(cond => ReportingOrganizationConfigFormComponent.splitTopLevelOr(cond.fhirPath));
+    return operands.some(expr => {
+      const parsed = this.parseFhirPath(expr);
+      if (!parsed) return false;
+      const belongsToCurrentVendor =
+        (this.isEpic && parsed.setupMethod === 'identifier') ||
+        (this.isCerner && (parsed.setupMethod === 'managingOrg' || parsed.setupMethod === 'locationType'));
+      return !belongsToCurrentVendor;
+    });
   }
 
   /** Joins stored condition rows into a single expression (for the Custom FHIRPath field). */
