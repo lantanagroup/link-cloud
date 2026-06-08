@@ -226,10 +226,21 @@ public class QueryPlanConfigController : Controller
     {
         try
         {
+            if (!string.IsNullOrWhiteSpace(queryPlan?.FacilityId) &&
+                !string.Equals(facilityId, queryPlan.FacilityId, StringComparison.Ordinal))
+            {
+                ModelState.AddModelError(nameof(queryPlan.FacilityId),
+                    "facilityId in body must match route facilityId.");
+            }
+
             facilityId = facilityId.SanitizeAndRemove();
             if (string.IsNullOrWhiteSpace(facilityId))
             {
                 ModelState.AddModelError(nameof(facilityId), "parameter facilityId is required.");
+            }
+
+            if (!ModelState.IsValid)
+            {
                 return ValidationProblem(
                     title: "Bad Request",
                     type: "https://datatracker.ietf.org/doc/html/rfc9457#section-3",
