@@ -123,6 +123,18 @@ public class QueryPlanConfigController : Controller
     {
         try
         {
+            facilityId = facilityId.SanitizeAndRemove();
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                ModelState.AddModelError(nameof(facilityId), "parameter facilityId is required.");
+                return ValidationProblem(
+                    title: "Bad Request",
+                    type: "https://datatracker.ietf.org/doc/html/rfc9457#section-3",
+                    detail: "One or more parameters were invalid.",
+                    statusCode: (int)HttpStatusCode.BadRequest,
+                    modelStateDictionary: ModelState);
+            }
+
             var exists = await _queryPlanQueries.ExistsAsync(facilityId, queryPlan.Type.Value, cancellationToken);
 
             if (exists)
@@ -215,6 +227,18 @@ public class QueryPlanConfigController : Controller
     {
         try
         {
+            facilityId = facilityId.SanitizeAndRemove();
+            if (string.IsNullOrWhiteSpace(facilityId))
+            {
+                ModelState.AddModelError(nameof(facilityId), "parameter facilityId is required.");
+                return ValidationProblem(
+                    title: "Bad Request",
+                    type: "https://datatracker.ietf.org/doc/html/rfc9457#section-3",
+                    detail: "One or more parameters were invalid.",
+                    statusCode: (int)HttpStatusCode.BadRequest,
+                    modelStateDictionary: ModelState);
+            }
+
             var exists = await _queryPlanQueries.ExistsAsync(facilityId, queryPlan.Type.Value, cancellationToken);
 
             if (!exists)
