@@ -186,4 +186,36 @@ public class QueryPlanApiModelValidationTests
             r.MemberNames.Contains(nameof(QueryPlanApiModel.InitialQueries)) &&
             r.ErrorMessage!.Contains("duplicate ResourceType", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public void SupplementalQueries_NonNumericKeys_FailsObjectValidation()
+    {
+        var model = CreateValidModel();
+        model.SupplementalQueries = new Dictionary<string, IQueryConfig> { ["abc"] = ValidConfig("Patient") };
+
+        var (isValid, results) = Validate(model);
+
+        Assert.False(isValid);
+        Assert.Contains(results, r =>
+            r.MemberNames.Contains(nameof(QueryPlanApiModel.SupplementalQueries)) &&
+            r.ErrorMessage!.Contains("non-numeric keys", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void InitialQueries_NumericEquivalentKeys_FailsObjectValidation()
+    {
+        var model = CreateValidModel();
+        model.InitialQueries = new Dictionary<string, IQueryConfig>
+        {
+            ["1"] = ValidConfig("Patient"),
+            ["01"] = ValidConfig("Observation") // "01" parses to the same numeric key as "1"
+        };
+
+        var (isValid, results) = Validate(model);
+
+        Assert.False(isValid);
+        Assert.Contains(results, r =>
+            r.MemberNames.Contains(nameof(QueryPlanApiModel.InitialQueries)) &&
+            r.ErrorMessage!.Contains("duplicate numeric key", StringComparison.OrdinalIgnoreCase));
+    }
 }
