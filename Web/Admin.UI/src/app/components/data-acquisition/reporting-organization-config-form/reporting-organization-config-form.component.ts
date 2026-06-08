@@ -565,7 +565,9 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
    * Escapes a value for safe embedding inside a single-quoted FHIRPath string.
    */
   private static escape(value: string): string {
-    return (value ?? '').replace(/'/g, "\\'");
+    return (value ?? '')
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'");
   }
 
   /**
