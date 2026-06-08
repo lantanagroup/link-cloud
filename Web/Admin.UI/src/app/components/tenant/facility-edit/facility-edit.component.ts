@@ -52,6 +52,16 @@ import {
   SftpConnectionTestDialogData
 } from '../../data-acquisition/sftp-connection-test-dialog/sftp-connection-test-dialog.component';
 import { ISftpConfigurationModel } from '../../../interfaces/data-acquisition/sftp-config-model.interface';
+import {
+  ReportingOrganizationConfigDialogComponent
+} from '../../data-acquisition/reporting-organization-config-dialog/reporting-organization-config-dialog.component';
+import {
+  ReportingOrganizationConfigFormComponent
+} from '../../data-acquisition/reporting-organization-config-form/reporting-organization-config-form.component';
+import {
+  IOrganizationLocationConfigurationModel
+} from '../../../interfaces/data-acquisition/organization-location-config-model.interface';
+import { Vendor } from '../../../interfaces/tenant/vendor.enum';
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 import {
   QueryPlanConfigDialogComponent
@@ -99,6 +109,7 @@ import {
     DataAcquisitionFhirQueryConfigFormComponent,
     DataAcquisitionFhirListConfigFormComponent,
     SftpConfigFormComponent,
+    ReportingOrganizationConfigFormComponent,
     QueryPlanConfigFormComponent,
     MatMenu,
     MatMenuTrigger,
@@ -136,6 +147,10 @@ export class FacilityEditComponent implements OnInit {
   showNoSftpConfigAlert: boolean = false;
   sftpConfig!: ISftpConfigurationModel;
 
+  reportingOrgConfig!: IOrganizationLocationConfigurationModel;
+  showNoReportingOrgConfigAlert: boolean = false;
+  noReportingOrgConfigAlertMessage = 'No reporting organization configuration found for this facility.';
+
   noDataAcqQueryPlanConfigAlertMessage = 'No FHIR query plan found for this facility and type';
   showNoDataAcqQueryPlanConfigAlert: boolean = false;
 
@@ -156,6 +171,10 @@ export class FacilityEditComponent implements OnInit {
 
   get displayReportDashboard() {
     return this._displayReportDashboard;
+  }
+
+  get facilityVendor(): Vendor | undefined {
+    return this.facilityConfig?.vendor;
   }
 
   constructor(
@@ -427,6 +446,7 @@ export class FacilityEditComponent implements OnInit {
     this.loadFhirQueryConfig();
     this.loadFhirListConfig();
     this.loadSftpConfig();
+    this.loadReportingOrgConfig();
     this.loadQueryPlan("Discharge", "Discharge")
   }
 
@@ -602,6 +622,118 @@ export class FacilityEditComponent implements OnInit {
           },
           error: () => {
             this.snackBar.open('Error deleting SFTP configuration', 'Close', {
+              duration: 3500,
+              panelClass: 'error-snackbar',
+              horizontalPosition: 'end',
+              verticalPosition: 'top'
+            });
+          }
+        });
+      }
+    });
+  }
+
+  loadReportingOrgConfig() {
+    if (!this.reportingOrgConfig) {
+      this.dataAcquisitionService.getLocationConfigurations(this.facilityId).subscribe((data: IOrganizationLocationConfigurationModel[]) => {
+        if (data && data.length > 0) {
+          this.reportingOrgConfig = data[0];
+          this.showNoReportingOrgConfigAlert = false;
+        } else {
+          this.reportingOrgConfig = {
+            facilityId: this.facilityId,
+            isActive: true,
+            conditions: []
+          } as IOrganizationLocationConfigurationModel;
+          this.showNoReportingOrgConfigAlert = true;
+        }
+      }, error => {
+        if (error.status == 404) {
+          this.reportingOrgConfig = {
+            facilityId: this.facilityId,
+            isActive: true,
+            conditions: []
+          } as IOrganizationLocationConfigurationModel;
+          this.showNoReportingOrgConfigAlert = true;
+        } else {
+          this.snackBar.open(`Failed to load reporting organization configuration for the facility, see error for details.`, '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+        }
+      });
+    }
+  }
+
+  showReportingOrgDialog(): void {
+    this.dialog.open(ReportingOrganizationConfigDialogComponent,
+      {
+        width: '90%',
+        maxWidth: '1400px',
+        data: {
+          dialogTitle: 'Reporting Organization Configuration',
+          formMode: this.showNoReportingOrgConfigAlert ? FormMode.Create : FormMode.Edit,
+          viewOnly: false,
+          vendor: this.facilityVendor,
+          reportingOrgConfig: this.reportingOrgConfig
+        }
+      }).afterClosed().subscribe(res => {
+      if (res) {
+        this.dataAcquisitionService.getLocationConfigurations(this.facilityId).subscribe((data: IOrganizationLocationConfigurationModel[]) => {
+          if (data && data.length > 0) {
+            this.showNoReportingOrgConfigAlert = false;
+            this.reportingOrgConfig = data[0];
+          }
+        });
+        this.snackBar.open(`${res}`, '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
+    });
+  }
+
+  onDeleteReportingOrgConfig(): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this reporting organization configuration?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.dataAcquisitionService.deleteLocationConfiguration(this.reportingOrgConfig.configId!).subscribe({
+          next: () => {
+            this.dataAcquisitionService.getLocationConfigurations(this.facilityId).subscribe({
+              next: (data: IOrganizationLocationConfigurationModel[] | null) => {
+                if (data && data.length > 0) {
+                  this.showNoReportingOrgConfigAlert = false;
+                  this.reportingOrgConfig = data[0];
+                } else {
+                  this.showNoReportingOrgConfigAlert = true;
+                  this.reportingOrgConfig = {
+                    facilityId: this.facilityId,
+                    isActive: true,
+                    conditions: []
+                  } as IOrganizationLocationConfigurationModel;
+                }
+              },
+              error: () => {
+                this.showNoReportingOrgConfigAlert = true;
+                this.reportingOrgConfig = {
+                  facilityId: this.facilityId,
+                  isActive: true,
+                  conditions: []
+                } as IOrganizationLocationConfigurationModel;
+              }
+            });
+          },
+          error: () => {
+            this.snackBar.open('Error deleting reporting organization configuration', 'Close', {
               duration: 3500,
               panelClass: 'error-snackbar',
               horizontalPosition: 'end',
