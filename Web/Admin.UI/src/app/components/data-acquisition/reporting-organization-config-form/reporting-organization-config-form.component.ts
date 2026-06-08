@@ -1,10 +1,12 @@
 import { Component, EventEmitter, Input, OnChanges, OnDestroy, OnInit, Output, SimpleChanges } from '@angular/core';
 import {
+  AbstractControl,
   FormArray,
   FormBuilder,
   FormControl,
   FormGroup,
   ReactiveFormsModule,
+  ValidationErrors,
   Validators
 } from '@angular/forms';
 import { Subject, Subscription, merge, of, catchError, debounceTime, distinctUntilChanged, map, switchMap } from 'rxjs';
@@ -70,16 +72,39 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
   // Save error shown inline at the bottom of the dialog (no snackbar / global toast).
   saveError: string | null = null;
 
-  // Live FHIRPath validation findings from the MeasureEval service, shown inline under the
-  // expression. Errors block save; warnings are advisory.
+  // FHIRPath validation findings shown inline under the expression.
+  // Errors block save; warnings are advisory. (Validation is currently stubbed — see the service.)
   fhirPathErrors: string[] = [];
   fhirPathWarnings: string[] = [];
   validatingFhirPath = false;
 
-  // Every generated/typed expression for this form is rooted at the Location resource.
+  // Every generated/typed expression for this form is applying at the Location resource.
   private static readonly FhirPathResourceType = 'Location';
 
-  // Debounced channel that runs the current combined expression through server-side validation.
+  // All builder fields a match group can hold (across every method).
+  private static readonly BuilderFields = [
+    'identifierSystem',
+    'identifierCode',
+    'organizationId',
+    'locationTypeCode',
+    'locationAlias'
+  ];
+
+  // Which builder fields are mandatory per method. Only the fields actually rendered for
+  // the active method are required; everything else is cleared so hidden fields never
+  // block Save. Location Alias is intentionally absent — it stays optional by design.
+  private static readonly RequiredFieldsByMethod: Record<string, string[]> = {
+    identifier: ['identifierSystem', 'identifierCode'],
+    managingOrg: ['organizationId'],
+    locationType: ['locationTypeCode']
+  };
+
+  /** Required validator that also rejects whitespace-only values (which produce empty FHIRPath operands). */
+  private static requiredNonBlank(control: AbstractControl): ValidationErrors | null {
+    return (control.value ?? '').toString().trim().length > 0 ? null : { required: true };
+  }
+
+  // Debounced channel that runs the current expression through FHIRPath validation.
   private fhirPathValidation$ = new Subject<string>();
 
   // Lifetime subscriptions (validation pipeline, manual-edit watcher, form-status watcher).
@@ -107,8 +132,8 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
       // custom FHIRPath directly.
       setupMethod: this.fb.control('identifier', Validators.required),
       // The single combined FHIRPath that is saved. A read-only preview generated from
-      // the match entries in builder mode; directly editable in manual. FHIRPath
-      // validation happens server-side on Save; `required` only prevents an empty save.
+      // the match entries in builder mode; directly editable in manual.
+      // `required` only prevents an empty save.
       fhirPath: this.fb.control('', Validators.required),
       conditions: this.fb.array([])
     });
@@ -124,11 +149,28 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
     // e.g. it stays disabled when the required Custom FHIRPath hasn't been entered.
     this.subscriptions.add(
       merge(this.configForm.valueChanges, this.configForm.statusChanges).subscribe(() => {
-        this.formValueChanged.emit(this.configForm.invalid);
+        this.emitValidity();
         // Clear a stale save error once the user starts changing the form.
         this.saveError = null;
       })
     );
+  }
+
+  /**
+   * Whether Save should be blocked: when the form is invalid, or — in Custom FHIRPath mode —
+   * while validation is running or has returned errors. Builder methods depend only on form validity.
+   */
+  private get isSaveDisabled(): boolean {
+    if (this.configForm.invalid) return true;
+    if (this.setupMethodControl.value === 'manual') {
+      return this.validatingFhirPath || this.fhirPathErrors.length > 0;
+    }
+    return false;
+  }
+
+  /** Pushes the current save-disabled state out so the dialog's Save button stays in sync. */
+  private emitValidity(): void {
+    this.formValueChanged.emit(this.isSaveDisabled);
   }
 
   ngOnDestroy(): void {
@@ -138,10 +180,8 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
   }
 
   /**
-   * Sets up the debounced server-side FHIRPath validation pipeline and the manual-edit watcher.
-   * Builder-mode preview updates push through {@link recomputeCombined}; typing in Custom mode
-   * pushes through the control's valueChanges here. A transport error degrades to "no findings"
-   * rather than tearing down the stream — the authoritative check still runs on Save.
+   * Sets up the debounced FHIRPath validation pipeline and the manual-edit watcher.
+   * Typing in Custom mode pushes through the control's valueChanges here.
    */
   private setupFhirPathValidation(): void {
     this.subscriptions.add(
@@ -155,9 +195,12 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
             this.fhirPathWarnings = [];
             if (!expr) {
               this.validatingFhirPath = false;
+              this.emitValidity();
               return of(null);
             }
             this.validatingFhirPath = true;
+            // Disable Save while the check is in flight so an unvalidated expression can't be saved.
+            this.emitValidity();
             return this.dataAcquisitionService
               .validateFhirPath(ReportingOrganizationConfigFormComponent.FhirPathResourceType, expr)
               .pipe(catchError(() => of(null)));
@@ -171,9 +214,12 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
             this.clearFhirPathFindings();
             return;
           }
-          if (!result) return;
-          this.fhirPathErrors = result.errors ?? [];
-          this.fhirPathWarnings = result.warnings ?? [];
+          if (result) {
+            this.fhirPathErrors = result.errors ?? [];
+            this.fhirPathWarnings = result.warnings ?? [];
+          }
+          // Findings settled — refresh the Save button (enable if clean, keep disabled on errors).
+          this.emitValidity();
         })
     );
 
@@ -184,9 +230,8 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
   }
 
   /**
-   * Queues the expression for server-side validation. Only Custom (manual) FHIRPath is checked —
-   * builder methods generate fixed, well-formed templates from escaped field values, so a
-   * round-trip has nothing to find. No-op in view-only mode.
+   * Queues the expression for validation. Only Custom (manual) FHIRPath is checked —
+   * builder methods generate fixed templates. No-op in view-only mode.
    */
   private queueFhirPathValidation(expr: string | null | undefined): void {
     if (this.viewOnly || this.setupMethodControl.value !== 'manual') return;
@@ -198,6 +243,7 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
     this.fhirPathErrors = [];
     this.fhirPathWarnings = [];
     this.validatingFhirPath = false;
+    this.emitValidity();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -355,8 +401,11 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
     } else {
       this.conditionsArray.enable({ emitEvent: false });
       this.fhirPathControl.disable({ emitEvent: false });
+      this.applyAllConditionValidators(method);
       this.recomputeCombined();
     }
+    // Recompute validity and emit so the Save button reflects the new method's required fields.
+    this.configForm.updateValueAndValidity();
   }
 
   // ---- Getters ----
@@ -424,8 +473,35 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
       });
     }
 
+    this.applyConditionValidators(group, this.setupMethodControl.value);
     this.wireConditionGroup(group);
     return group;
+  }
+
+  /**
+   * Sets `required` on exactly the builder fields rendered for the given method and clears
+   * it from the rest, so a match can't be saved with any of its displayed fields empty
+   * while hidden fields never block Save.
+   */
+  private applyConditionValidators(group: FormGroup, method: string): void {
+    const required = ReportingOrganizationConfigFormComponent.RequiredFieldsByMethod[method] ?? [];
+    ReportingOrganizationConfigFormComponent.BuilderFields.forEach(field => {
+      const control = group.get(field);
+      if (!control) return;
+      if (required.includes(field)) {
+        control.setValidators(ReportingOrganizationConfigFormComponent.requiredNonBlank);
+      } else {
+        control.clearValidators();
+      }
+      control.updateValueAndValidity({ emitEvent: false });
+    });
+  }
+
+  /** Re-applies the active method's required-field rules to every existing match. */
+  private applyAllConditionValidators(method: string): void {
+    this.conditionsArray.controls.forEach(ctrl =>
+      this.applyConditionValidators(ctrl as FormGroup, method)
+    );
   }
 
   private defaultSetupMethod(): string {

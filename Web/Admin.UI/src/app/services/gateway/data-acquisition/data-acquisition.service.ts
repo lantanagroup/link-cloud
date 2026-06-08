@@ -1,11 +1,15 @@
-import { HttpClient } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { ErrorHandlingService } from '../../error-handling.service';
-import {Observable, tap, map, catchError, throwError} from 'rxjs';
-import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
-import { IEntityDeletedResponse } from 'src/app/interfaces/entity-deleted-response.interface';
-import { IDataAcquisitionQueryConfigModel } from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-query-config-model.interface';
-import { IDataAcquisitionFhirListConfigModel } from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
+import {HttpClient} from '@angular/common/http';
+import {Injectable} from '@angular/core';
+import {ErrorHandlingService} from '../../error-handling.service';
+import {Observable, tap, map, catchError, throwError, of} from 'rxjs';
+import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
+import {IEntityDeletedResponse} from 'src/app/interfaces/entity-deleted-response.interface';
+import {
+  IDataAcquisitionQueryConfigModel
+} from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-query-config-model.interface';
+import {
+  IDataAcquisitionFhirListConfigModel
+} from 'src/app/interfaces/data-acquisition/data-acquisition-fhir-list-config-model.interface';
 import {
   ICreateSftpConfigurationModel,
   ISftpConfigurationModel,
@@ -13,15 +17,24 @@ import {
   ISftpCredentialStatusModel,
   ISftpConnectionTestResult
 } from 'src/app/interfaces/data-acquisition/sftp-config-model.interface';
-import { IDataAcquisitionAuthenticationConfigModel } from '../../../interfaces/data-acquisition/data-acquisition-auth-config-model.interface';
-import { AppConfigService } from '../../app-config.service';
+import {
+  IDataAcquisitionAuthenticationConfigModel
+} from '../../../interfaces/data-acquisition/data-acquisition-auth-config-model.interface';
+import {AppConfigService} from '../../app-config.service';
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
+import {
+  IOrganizationLocationConfigurationModel,
+  ICreateOrganizationLocationConfigurationModel,
+  IUpdateOrganizationLocationConfigurationModel
+} from 'src/app/interfaces/data-acquisition/organization-location-config-model.interface';
+import {IFhirPathValidationResponse} from 'src/app/interfaces/data-acquisition/fhir-path-validation-response.interface';
 
 @Injectable({
   providedIn: 'root'
 })
 export class DataAcquisitionService {
-  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) { }
+  constructor(private http: HttpClient, private errorHandler: ErrorHandlingService, public appConfigService: AppConfigService) {
+  }
 
   getFhirQueryConfiguration(facilityId: string): Observable<IDataAcquisitionQueryConfigModel> {
     return this.http.get<IDataAcquisitionQueryConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/fhirQueryConfiguration`)
@@ -74,7 +87,7 @@ export class DataAcquisitionService {
       .pipe(
         tap(_ => console.log(`Fetched FHIR list configuration.`)),
         catchError((error) => {
-          return this.errorHandler.handleError(error,false);
+          return this.errorHandler.handleError(error, false);
         })
       )
   }
@@ -178,10 +191,10 @@ export class DataAcquisitionService {
 
   getAuthenticationConfig(facilityId: string, queryConfigType: string) {
     return this.http.get<IDataAcquisitionAuthenticationConfigModel>(`${this.appConfigService.config?.baseApiUrl}/data/${facilityId}/${queryConfigType}/authentication`)
-    .pipe(
+      .pipe(
         tap(_ => console.log(`Fetched authentication configuration.`)),
-      catchError((error) => {
-        return this.errorHandler.handleError(error);
+        catchError((error) => {
+          return this.errorHandler.handleError(error);
         })
       )
   }
@@ -300,6 +313,61 @@ export class DataAcquisitionService {
           return this.errorHandler.handleError(error);
         })
       )
+  }
+
+  // Reporting Organization (Location Config) Methods
+
+  getLocationConfigurations(facilityId: string): Observable<IOrganizationLocationConfigurationModel[]> {
+    return this.http.get<IOrganizationLocationConfigurationModel[]>(`${this.appConfigService.config?.baseApiUrl}/data/location-config/facility/${facilityId}`)
+      .pipe(
+        tap(_ => console.log(`Fetched location configurations.`)),
+        catchError((error) => {
+          return this.errorHandler.handleError(error, false);
+        })
+      )
+  }
+
+  createLocationConfiguration(facilityId: string, config: ICreateOrganizationLocationConfigurationModel): Observable<IOrganizationLocationConfigurationModel> {
+    return this.http.post<IOrganizationLocationConfigurationModel>(`${this.appConfigService.config?.baseApiUrl}/data/location-config/facility/${facilityId}`, config)
+      .pipe(
+        tap(_ => console.log(`Request for location configuration creation was sent.`)),
+        map((response: IOrganizationLocationConfigurationModel) => {
+          return response;
+        }),
+        catchError((error) => {
+          // Suppress the global bottom toast; the dialog shows the error inline.
+          return this.errorHandler.handleError(error, false);
+        })
+      )
+  }
+
+  updateLocationConfiguration(configId: number, config: IUpdateOrganizationLocationConfigurationModel): Observable<IOrganizationLocationConfigurationModel> {
+    return this.http.put<IOrganizationLocationConfigurationModel>(`${this.appConfigService.config?.baseApiUrl}/data/location-config/${configId}`, config)
+      .pipe(
+        tap(_ => console.log(`Request for location configuration update was sent.`)),
+        map((response: IOrganizationLocationConfigurationModel) => {
+          return response;
+        }),
+        catchError((error) => {
+          // Suppress the global bottom toast; the dialog shows the error inline.
+          return this.errorHandler.handleError(error, false);
+        })
+      )
+  }
+
+  deleteLocationConfiguration(configId: number): Observable<any> {
+    return this.http.delete<any>(`${this.appConfigService.config?.baseApiUrl}/data/location-config/${configId}`)
+      .pipe(
+        tap(_ => console.log(`Request for location configuration deletion was sent.`)),
+        catchError((error) => {
+          throw error;
+        })
+      )
+  }
+
+  // TEMP: stubbed to always pass until the MeasureEval validation endpoint is wired up.
+  validateFhirPath(resourceType: string, fhirPath: string): Observable<IFhirPathValidationResponse> {
+    return of<IFhirPathValidationResponse>({valid: true, errors: [], warnings: []});
   }
 
 }

@@ -67,14 +67,22 @@
               <mat-label>Identifier System</mat-label>
               <input matInput formControlName="identifierSystem" [readonly]="viewOnly"
                      placeholder="https://example.org/location-ids">
-              <mat-hint>The FHIR Location.identifier.system value</mat-hint>
+              @if (!viewOnly && $any(condition).get('identifierSystem')?.hasError('required')) {
+                <mat-error>Identifier System is <strong>required</strong></mat-error>
+              } @else {
+                <mat-hint>The FHIR Location.identifier.system value</mat-hint>
+              }
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="form-input">
               <mat-label>Identifier Code</mat-label>
               <input matInput formControlName="identifierCode" [readonly]="viewOnly"
                      placeholder="Location code/value">
-              <mat-hint>The FHIR Location.identifier.value value</mat-hint>
+              @if (!viewOnly && $any(condition).get('identifierCode')?.hasError('required')) {
+                <mat-error>Identifier Code is <strong>required</strong></mat-error>
+              } @else {
+                <mat-hint>The FHIR Location.identifier.value value</mat-hint>
+              }
             </mat-form-field>
           </div>
         }
@@ -86,7 +94,11 @@
               <mat-label>Organization Id</mat-label>
               <input matInput formControlName="organizationId" [readonly]="viewOnly"
                      placeholder="Managing organization id">
-              <mat-hint>Matches Location.managingOrganization.reference = Organization/&lt;id&gt;</mat-hint>
+              @if (!viewOnly && $any(condition).get('organizationId')?.hasError('required')) {
+                <mat-error>Organization Id is <strong>required</strong></mat-error>
+              } @else {
+                <mat-hint>Matches Location.managingOrganization.reference = Organization/&lt;id&gt;</mat-hint>
+              }
             </mat-form-field>
           </div>
         }
@@ -98,7 +110,11 @@
               <mat-label>Location Type Code</mat-label>
               <input matInput formControlName="locationTypeCode" [readonly]="viewOnly"
                      placeholder="783">
-              <mat-hint>The Location.type.coding.code value (default 783)</mat-hint>
+              @if (!viewOnly && $any(condition).get('locationTypeCode')?.hasError('required')) {
+                <mat-error>Location Type Code is <strong>required</strong></mat-error>
+              } @else {
+                <mat-hint>The Location.type.coding.code value (default 783)</mat-hint>
+              }
             </mat-form-field>
 
             <mat-form-field appearance="outline" class="form-input">
