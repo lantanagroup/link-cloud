@@ -102,6 +102,25 @@ export class ViewReportComponent implements OnInit {
   reportStatusData: Record<string, number> = {};
   submissionStatusData: Record<string, number> = {};
 
+  // Fixed donut-chart colors keyed by the labels produced by
+  // getReportingStatusText / getSubmissionStatusText. Labels not listed
+  // fall back to the chart's default palette.
+  reportStatusColors: Record<string, string> = {
+    'Patient Identified': '#1f77b4', // blue - in pipeline
+    'Pending Validation': '#ff9800', // amber - in progress
+    'Passed Validation': '#2ca02c',  // green - good
+    'Failed Validation': '#d62728',  // red - bad
+    'Not Reportable': '#9e9e9e',     // grey - neutral
+  };
+  submissionStatusColors: Record<string, string> = {
+    'Pending Validation': '#ff9800', // amber - in progress
+    'Submitting': '#1f77b4',         // blue - in progress
+    'Submitted': '#2ca02c',          // green - good
+    'Failed Submission': '#d62728',  // red - bad
+    'Not Eligible': '#9e9e9e',       // grey - neutral
+    'Pending': '#bdbdbd',            // light grey - neutral
+  };
+
   defaultPageNumber: number = 0
   defaultPageSize: number = 10;
   sortBy: string | null = null;

@@ -117,12 +117,14 @@
       <div class="report-chart-cell">
         <app-donut-chart
           [data]="reportStatusData"
+          [colorMap]="reportStatusColors"
           [enableSelection]="true"
           (sliceSelected)="onReportStatusSliceSelected($event)"></app-donut-chart>
       </div>
       <div class="report-chart-cell">
         <app-donut-chart
           [data]="submissionStatusData"
+          [colorMap]="submissionStatusColors"
           [enableSelection]="true"
           (sliceSelected)="onSubmissionStatusSliceSelected($event)"></app-donut-chart>
       </div>

@@ -22,6 +22,8 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   @Input() data: Record<string, number> = {};
   @Input() enableSelection: boolean = false;
+  /** Optional label → color (hex/CSS) map. Labels not present fall back to the default palette. */
+  @Input() colorMap?: Record<string, string>;
   @Output() sliceSelected = new EventEmitter<string>();
   @ViewChild('container', { static: true }) container!: ElementRef;
   @ViewChild('chart', { static: true }) chart!: ElementRef<SVGSVGElement>;
@@ -61,7 +63,8 @@ export class DonutChartComponent implements AfterViewInit, OnChanges, OnDestroy 
       .attr('transform', `translate(${width / 2}, ${height / 2})`);
 
     const dataEntries = Object.entries(this.data);
-    const color = d3.scaleOrdinal(d3.schemeTableau10);
+    const fallbackColor = d3.scaleOrdinal(d3.schemeTableau10);
+    const color = (label: string): string => this.colorMap?.[label] ?? fallbackColor(label);
 
     const pie = d3.pie<any>().value(d => d[1]);
     const arc = d3.arc<d3.PieArcDatum<[string, number]>>()
