@@ -34,6 +34,7 @@ import {
   faXmark
 } from '@fortawesome/free-solid-svg-icons';
 import {LoadingService} from 'src/app/services/loading.service';
+import {ChartColorService} from 'src/app/services/chart-color.service';
 import {DonutChartComponent} from 'src/app/components/core/donut-chart/donut-chart.component';
 import {ViewReportTableCommandComponent} from './table-command/view-report-table-command.component';
 import {AcquisitionLogService} from '../../acquisition-log/acquisition-log.service';
@@ -99,6 +100,8 @@ export class ViewReportComponent implements OnInit {
   // Add summary data for donut charts
   reportEntrySummary: IReportEntrySummary | undefined;
   measureIpCountsData: Record<string, number> = {};
+  // Stable colors per report type, persisted across refreshes via ChartColorService.
+  measureIpColors: Record<string, string> = {};
   reportStatusData: Record<string, number> = {};
   submissionStatusData: Record<string, number> = {};
 
@@ -161,7 +164,8 @@ export class ViewReportComponent implements OnInit {
     private facilityViewService: FacilityViewService,
     private acquisitionLogService: AcquisitionLogService,
     private loadingService: LoadingService,
-    private reportService: ReportService) { }
+    private reportService: ReportService,
+    private chartColorService: ChartColorService) { }
 
   ngOnInit(): void {
     const savedPageSize = localStorage.getItem(this.PAGE_SIZE_KEY);
@@ -254,6 +258,10 @@ export class ViewReportComponent implements OnInit {
         next: (data) => {
           this.reportEntrySummary = data;
           this.measureIpCountsData = data.reportTypeCounts;
+          this.measureIpColors = this.chartColorService.getColorMap(
+            'measure-report-type',
+            Object.keys(data.reportTypeCounts)
+          );
           this.reportStatusData = Object.entries(data.reportingStatusCounts).reduce((acc, [statusKey, count]) => {
             const statusValue = this.toReportingStatus(statusKey);
             const label = statusValue !== null ? this.getReportingStatusText(statusValue) : statusKey;
