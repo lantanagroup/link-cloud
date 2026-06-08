@@ -397,9 +397,11 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 measureReport = null;
             }
 
+            boolean reportable = false;
+
             switch (value.getQueryType()) {
                 case INITIAL -> {
-                    boolean reportable = measureReport != null && reportabilityPredicate.test(measureReport);
+                    reportable = measureReport != null && reportabilityPredicate.test(measureReport);
                     report.setReportable(reportable);
 
                     if (!reportable) {
@@ -414,6 +416,10 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
                 }
                 default -> throw new IllegalStateException(String.format("Unexpected query type: %s", value.getQueryType()));
             }
+
+            // if at least one reportable measure, increment the reportable patient counter otherwise increment the non-reportable patient counter
+            Attributes attributes = MeasureEvalMetrics.buildAttributes(value.getQueryType().toString(), patientStatus, report.getReportTrackingId(), null);
+            measureEvalMetrics.IncrementPatientReportableCounter(attributes, reportable);
         }
 
         if (value.getQueryType() == QueryType.INITIAL) {

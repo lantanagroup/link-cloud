@@ -318,5 +318,57 @@ public static class FhirBundleGenerator
         return (encStart, encEnd);
     }
 
+    /// <summary>
+    /// Builds the run-scoped shared FHIR infrastructure (Organization, Locations, Devices,
+    /// Practitioners, Medications) that all per-patient resources reference.
+    /// Call once per server lifetime and reuse the returned values in every
+    /// <see cref="GeneratePatientEntries"/> call.
+    /// </summary>
+    public static (SharedIds Ids, List<Bundle.EntryComponent> SharedEntries, List<string> PractitionerIds, List<string> MedicationIds)
+        BuildSharedResources()
+    {
+        var ids = new SharedIds();
+        var (sharedEntries, practitionerIds, medicationIds) = ScenarioResourceGeneration.BuildSharedInfrastructure(ids);
+        return (ids, sharedEntries, practitionerIds, medicationIds);
+    }
+
+    /// <summary>
+    /// Generates all FHIR bundle entries for a single patient using the caller-supplied patient ID.
+    /// The <paramref name="seed"/> drives clinical scenario selection and resource values
+    /// deterministically: the same seed + patient ID always produces identical data.
+    /// When <paramref name="seed"/> is <c>null</c> a stable FNV-1a hash of the patient ID is used,
+    /// so any arbitrary incoming patient ID yields consistent data across service restarts.
+    /// </summary>
+    public static List<Bundle.EntryComponent> GeneratePatientEntries(
+        string patientId,
+        SharedIds ids,
+        List<string> sharedPractitionerIds,
+        List<string> sharedMedicationIds,
+        int totalResourcesPerPatient = DefaultResourcesPerPatient,
+        int? seed = null,
+        FhirGenerationConfig? config = null,
+        DateTime? clinicalPeriodStart = null,
+        DateTime? clinicalPeriodEnd = null)
+    {
+        var patientSeed = seed ?? (int)(patientId.GetStableHash32() & 0x7FFFFFFFu);
+        var scenario = FhirGenerationCodes.GetScenarioBySeed(patientSeed);
+        var anchors = ScenarioResourceGeneration.ComputePatientAnchors(patientId, patientSeed, sharedPractitionerIds);
+        var (encStart, encEnd) = DeriveInpatientEncounterWindow(patientSeed, clinicalPeriodStart, clinicalPeriodEnd);
+
+        var encounter = EncounterFactory.Generate(
+            anchors.EncounterId, patientId, encStart, encEnd,
+            anchors.AttendingPractId, anchors.AdmittingPractId,
+            ids.EdLocation, ids.IcuLocation, ids.StepDownLocation, ids.Organization,
+            anchors.PrimaryDxId, scenario);
+
+        var entries = new List<Bundle.EntryComponent>();
+        ScenarioResourceGeneration.AddPatientCoreAndScenarioResources(
+            entries, patientId, patientSeed, 0, patientSeed, totalResourcesPerPatient,
+            encStart, encEnd, scenario, anchors, encounter,
+            sharedPractitionerIds, sharedMedicationIds, config, ids);
+
+        return entries;
+    }
+
     internal static int Mod(int value, int modulus) => ((value % modulus) + modulus) % modulus;
 }

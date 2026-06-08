@@ -1,3 +1,4 @@
+using System.Reflection;
 using Confluent.Kafka;
 using HealthChecks.UI.Client;
 using Hl7.Fhir.Model.CdsHooks;
@@ -25,7 +26,6 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Listeners;
 using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Application.Utilities;
@@ -41,10 +41,7 @@ using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Exceptions;
-using StackExchange.Redis;
-using System.Reflection;
 using AuditEventMessage = LantanaGroup.Link.Shared.Application.Models.Kafka.AuditEventMessage;
-using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddStandardEnvironmentConfiguration();
@@ -205,6 +202,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<CodeMapOperationService>();
     builder.Services.AddSingleton<ConditionalTransformOperationService>();
     builder.Services.AddSingleton<CopyLocationOperationService>();
+    builder.Services.AddSingleton<RemoveExtensionsOperationService>();
     
     if (consumerSettings != null && !consumerSettings.DisableConsumer)
     {
@@ -282,6 +280,7 @@ static void RegisterServices(WebApplicationBuilder builder)
         options.ServiceVersion = serviceInformation.Version; //TODO: Get version from assembly?                
     });
 
+    builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<INormalizationServiceMetrics, NormalizationServiceMetrics>();
 }
 

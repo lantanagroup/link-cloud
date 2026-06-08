@@ -127,6 +127,9 @@
     <None Update="Resources\PatientJohnDoe.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Resources\PatientWithExtensions.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Resources\RawEncounter.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

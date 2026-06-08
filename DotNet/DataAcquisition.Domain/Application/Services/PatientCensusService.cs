@@ -1,32 +1,28 @@
-﻿using Confluent.Kafka;
+﻿using System.Diagnostics;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Utility;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
-using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
-using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
-using LantanaGroup.Link.Shared.Application.Models.Telemetry;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
+using ListType = LantanaGroup.Link.Shared.Application.Models.DataAcq.ListType;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using TimeFrame = LantanaGroup.Link.Shared.Application.Models.DataAcq.TimeFrame;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 public interface IPatientCensusService
@@ -277,7 +273,8 @@ public class PatientCensusService : IPatientCensusService
                         ResourceType.List,
                         query.CensusListId,
                         facilityConfig.FhirBaseServerUrl,
-                        fhirQueryConfig),
+                        fhirQueryConfig,
+                        log.ReportTrackingId),
                     cancellationToken);
 
                 //check if the resultList is null or OperationOutcome
@@ -321,7 +318,7 @@ public class PatientCensusService : IPatientCensusService
         stopwatch.Stop();
 
         log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
-        log.CompletionDate = System.DateTime.UtcNow;
+        log.CompletionDate = DateTime.UtcNow;
         var acquiredIds = results.SelectMany(x => x.PatientIds).ToList();
 
         await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
@@ -382,23 +379,23 @@ public class PatientCensusService : IPatientCensusService
         return authHeader;
     }
 
-    private Shared.Application.Models.DataAcq.ListType ConvertToListType(Infrastructure.Models.Enums.ListType listType)
+    private ListType ConvertToListType(Infrastructure.Models.Enums.ListType listType)
     {
         return listType switch
         {
-            Infrastructure.Models.Enums.ListType.Admit => Shared.Application.Models.DataAcq.ListType.Admit,
-            Infrastructure.Models.Enums.ListType.Discharge => Shared.Application.Models.DataAcq.ListType.Discharge,
+            Infrastructure.Models.Enums.ListType.Admit => ListType.Admit,
+            Infrastructure.Models.Enums.ListType.Discharge => ListType.Discharge,
             _ => throw new ArgumentOutOfRangeException(nameof(listType), $"Unsupported ListType value: {listType}"),
         };
     }
 
-    private Shared.Application.Models.DataAcq.TimeFrame ConvertToTimeFrame(Infrastructure.Models.Enums.TimeFrame timeFrame)
+    private TimeFrame ConvertToTimeFrame(Infrastructure.Models.Enums.TimeFrame timeFrame)
     {
         return timeFrame switch
         {
-            Infrastructure.Models.Enums.TimeFrame.LessThan24Hours => Shared.Application.Models.DataAcq.TimeFrame.LessThan24Hours,
-            Infrastructure.Models.Enums.TimeFrame.Between24To48Hours => Shared.Application.Models.DataAcq.TimeFrame.Between24To48Hours,
-            Infrastructure.Models.Enums.TimeFrame.MoreThan48Hours => Shared.Application.Models.DataAcq.TimeFrame.MoreThan48Hours,
+            Infrastructure.Models.Enums.TimeFrame.LessThan24Hours => TimeFrame.LessThan24Hours,
+            Infrastructure.Models.Enums.TimeFrame.Between24To48Hours => TimeFrame.Between24To48Hours,
+            Infrastructure.Models.Enums.TimeFrame.MoreThan48Hours => TimeFrame.MoreThan48Hours,
             _ => throw new ArgumentOutOfRangeException(nameof(timeFrame), $"Unsupported TimeFrame value: {timeFrame}"),
         };
     }

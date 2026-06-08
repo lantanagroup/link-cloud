@@ -1,4 +1,8 @@
-﻿using Confluent.Kafka;
+﻿using System.Diagnostics;
+using System.Net;
+using System.Text;
+using System.Text.Json;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
@@ -18,10 +22,6 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
-using System.Net;
-using System.Text;
-using System.Text.Json;
 using DateTime = System.DateTime;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
@@ -69,7 +69,8 @@ public class FhirApiService : IFhirApiService
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirApiService.ExecuteRead");
         activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, log.CorrelationId);
-        activity?.SetTag(DiagnosticNames.ReportId, log.ReportTrackingId);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, log.Id);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, log.ReportTrackingId);
         activity?.SetTag(DiagnosticNames.ResourceType, resourceType.ToString());
 
         var resourceIds = new List<string>();
@@ -90,7 +91,8 @@ public class FhirApiService : IFhirApiService
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirApiService.ExecuteReadInternal");
         activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, log.CorrelationId);
-        activity?.SetTag(DiagnosticNames.ReportId, log.Id);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, log.Id);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, log.ReportTrackingId);
         activity?.SetTag(DiagnosticNames.ResourceType, resourceType.ToString());
         activity?.SetTag(DiagnosticNames.ResourceId, resourceIdToAcquire);
 
@@ -104,7 +106,8 @@ public class FhirApiService : IFhirApiService
                                                 resourceType,
                                                 resourceIdToAcquire,
                                                 fhirQueryConfiguration.FhirServerBaseUrl,
-                                                fhirQueryConfiguration),
+                                                fhirQueryConfiguration,
+                                                log.ReportTrackingId),
                                             cancellationToken);
 
             resourceIds.Add($"{resourceType}/{resource.Id}");
@@ -168,7 +171,8 @@ public class FhirApiService : IFhirApiService
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirApiService.ExecuteSearch");
         activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, log.CorrelationId);
-        activity?.SetTag(DiagnosticNames.ReportId, log.Id);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, log.Id);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, log.ReportTrackingId);
         activity?.SetTag(DiagnosticNames.ResourceType, resourceType.ToString());
 
         if (log == null) throw new ArgumentNullException(nameof(log));
@@ -208,7 +212,8 @@ public class FhirApiService : IFhirApiService
         using var activity = ServiceActivitySource.Instance.StartActivity("FhirApiService.ExecutePagingSearch");
         activity?.SetTag(DiagnosticNames.FacilityId, log.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, log.CorrelationId);
-        activity?.SetTag(DiagnosticNames.ReportId, log.Id);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, log.Id);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, log.ReportTrackingId);
         activity?.SetTag(DiagnosticNames.ResourceType, resourceType.ToString());
 
         var isReferenceLog = fhirQuery.IsReference.GetValueOrDefault();
@@ -224,7 +229,8 @@ public class FhirApiService : IFhirApiService
                             log.PatientId,
                             log.CorrelationId,
                             log.QueryPhase,
-                            fhirQuery.QueryType),
+                            fhirQuery.QueryType,
+                            log.ReportTrackingId),
                             cancellationToken))
             {
                 // Reference discovery: collect ref ids from this bundle into the per-

@@ -1,4 +1,5 @@
-﻿using DataAcquisition.Domain.Application.Models;
+﻿using System.Diagnostics;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryLog;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Domain;
@@ -8,16 +9,15 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
-using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Enums;
@@ -167,7 +167,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     public async Task DeleteAsync(long id, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.DeleteAsync");
-        activity?.SetTag(DiagnosticNames.ReportId, id);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, id);
 
         if (id == default)
         {
@@ -321,7 +321,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     public async Task UpdateAsync(UpdateDataAcquisitionLogModel updateLog, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.UpdateAsync");
-        activity?.SetTag(DiagnosticNames.ReportId, updateLog.Id);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, updateLog.Id);
 
         if (updateLog.Id is null or 0)
         {
@@ -606,7 +606,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.TrySetLogStatusAsync");
-        activity?.SetTag(DiagnosticNames.ReportId, logId);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, logId);
 
         int rowsAffected = await _dbContext.DataAcquisitionLogs
             .Where(l => l.Id == logId && l.Status != null && validCurrentStatuses.Contains(l.Status.Value))
@@ -784,7 +784,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     public async Task<TailCompletionResult?> TryCompleteTailAsync(long completedLogId, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.TryCompleteTailAsync");
-        activity?.SetTag(DiagnosticNames.ReportId, completedLogId);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, completedLogId);
 
         var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled, RequestStatus.ConfigurationMissing };
 

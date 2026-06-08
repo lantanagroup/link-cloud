@@ -97,7 +97,7 @@ namespace IntegrationTests.Normalization
             builder.Services.AddSingleton<CopyLocationOperationService>();
             builder.Services.AddSingleton<CodeMapOperationService>();
             builder.Services.AddSingleton<ConditionalTransformOperationService>();
-
+            builder.Services.AddSingleton<RemoveExtensionsOperationService>();
 
             // Register other services
             var serviceInformation = new ServiceInformation

@@ -29,12 +29,9 @@ import java.util.concurrent.ForkJoinPool;
 public class ValidationService {
     private static final Logger logger = LoggerFactory.getLogger(ValidationService.class);
     private final FhirValidator fhirValidator;
-    private final MetricService metricService;
 
 
-    public ValidationService(FhirContext fhirContext, ArtifactService artifactService, LinkConfig linkConfig, ValidationCacheService validationCacheService, MetricService metricService) throws IOException {
-        this.metricService = metricService;
-
+    public ValidationService(FhirContext fhirContext, ArtifactService artifactService, LinkConfig linkConfig, ValidationCacheService validationCacheService) throws IOException {
         ValidationSupportChain validationSupportChain = new ValidationSupportChain(
                 new DefaultProfileValidationSupport(fhirContext),
                 artifactService.getValidationSupport(),
@@ -73,22 +70,14 @@ public class ValidationService {
     }
 
     public List<Result> validate(IBaseResource resource) {
-        try (Timer timer = Timer.start()) {
-            try {
-                ValidationResult validationResult = fhirValidator.validateWithResult(resource);
-
-                this.metricService.getValidationDurationUpDown().add((long) timer.getSeconds());
-                this.metricService.getValidationResultsCounter().add(validationResult.getMessages().size());
-
-                logger.debug("Validation completed with {} results in {} seconds", validationResult.getMessages().size(), String.format("%.2f", timer.getSeconds()));
-
-                return validationResult.getMessages().stream()
-                        .map(Result::fromMessage)
-                        .toList();
-            } catch (Exception ex) {
-                logger.error("Validation failed", ex);
-                throw ex;
-            }
+        try {
+            ValidationResult validationResult = fhirValidator.validateWithResult(resource);
+            return validationResult.getMessages().stream()
+                    .map(Result::fromMessage)
+                    .toList();
+        } catch (Exception ex) {
+            logger.error("Validation failed", ex);
+            throw ex;
         }
     }
 }

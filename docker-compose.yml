@@ -2,6 +2,7 @@ version: '3.4'
 
 #### services and ports
 ## fhir_server: 6157
+## mock-fhir-server: 6158
 ## redis_cache: 6379
 ## mssql: 1433
 ## mongo: 17017 
@@ -946,6 +947,30 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8075/health"]
+      start_period: 15s
+      interval: 5s
+      retries: 10
+
+  mock-fhir-server:
+    image: mock-fhir-server
+    container_name: mock-fhir-server
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      MockFhirServer__PreGeneratedPatientCount: 10
+      MockFhirServer__ResourcesPerPatient: 10
+      MockFhirServer__ClinicalPeriodStart: "2026-01-01"
+      MockFhirServer__ClinicalPeriodEnd: "2026-01-31"
+    ports:
+      - "6158:8080"
+    build:
+      context: .
+      dockerfile: DotNet/MockFhirServer/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
+    networks:
+      - link-nw
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       start_period: 15s
       interval: 5s
       retries: 10

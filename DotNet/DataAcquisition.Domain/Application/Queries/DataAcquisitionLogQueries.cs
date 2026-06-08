@@ -17,9 +17,9 @@ using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using IDatabase = LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.IDatabase;
-using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -224,7 +224,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<DataAcquisitionLogModel?> GetAsync(long id, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetAsync");
-        activity?.SetTag(DiagnosticNames.ReportId, id);
+        activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, id);
 
         return await ProjectLogById(id)
             .FirstOrDefaultAsync(cancellationToken);
@@ -657,7 +657,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetDataAcquisitionLogStatisticsByReportAsync");
-        activity?.SetTag(DiagnosticNames.ReportId, reportId);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, reportId);
 
         if (!Guid.TryParse(reportId, out var reportTrackingIdGuid))
         {
@@ -717,25 +717,25 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         foreach (var qp in queryPhaseCounts)
             statistics.QueryPhaseCounts[qp.Phase] = qp.Count;
 
-        // Resource type counts + total. Reference logs are first-class
-        // log rows in the same QueryPhase as their primary; their fetched ids are
-        // recorded in DataAcquisitionLogResourceIds just like any primary log, so
-        // walking ResourceIds across all completed logs counts every resource —
-        // primary and reference — exactly once.
-        var completedResourceIds = await baseQuery
-            .Where(l => l.Status == RequestStatus.Completed)
-            .SelectMany(l => l.ResourceIds.Select(r => r.ResourceId))
+        // Resource type counts + total.
+        var resourceTypeCounts = await _dbContext.DataAcquisitionLogResourceIds
+            .AsNoTracking()
+            .Where(r =>
+                r.DataAcquisitionLog.ReportTrackingId == reportTrackingIdGuid
+                && !r.DataAcquisitionLog.IsDeleted
+                && r.DataAcquisitionLog.Status == RequestStatus.Completed
+                && r.ResourceId != null
+                && r.ResourceId != "")
+            .GroupBy(r => r.ResourceId.IndexOf("/") > 0
+                ? r.ResourceId.Substring(0, r.ResourceId.IndexOf("/"))
+                : r.ResourceId)
+            .Select(g => new { ResourceType = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
 
-        foreach (var resource in completedResourceIds)
+        foreach (var rt in resourceTypeCounts)
         {
-            if (string.IsNullOrWhiteSpace(resource)) continue;
-            var slashIdx = resource.IndexOf('/');
-            var resourceType = slashIdx > 0 ? resource[..slashIdx] : resource;
-            if (string.IsNullOrEmpty(resourceType)) continue;
-
-            statistics.ResourceTypeCounts.TryGetValue(resourceType, out var val);
-            statistics.ResourceTypeCounts[resourceType] = val + 1;
+            if (!string.IsNullOrEmpty(rt.ResourceType))
+                statistics.ResourceTypeCounts[rt.ResourceType] = rt.Count;
         }
 
         statistics.TotalResourcesAcquired = statistics.ResourceTypeCounts.Values.Sum();
@@ -745,59 +745,71 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         statistics.TotalCompletedPatients = await baseQuery
             .Where(l => l.PatientId != null)
             .GroupBy(l => l.PatientId)
-            .Where(g => g.All(l => l.Status != null && terminalStatuses.Contains(l.Status.Value)))
+            .Where(g => g.Count(l => l.Status == null || !terminalStatuses.Contains(l.Status.Value)) == 0)
             .CountAsync(cancellationToken);
 
         // Fastest / slowest completion times
-        var fastest = await baseQuery
+        var fastestLog = await baseQuery
             .Where(l => l.CompletionTimeMilliseconds != null)
             .OrderBy(l => l.CompletionTimeMilliseconds)
-            .Select(l => new
-            {
-                l.CompletionTimeMilliseconds,
-                ResourceTypes = l.FhirQueries.SelectMany(q => q.FhirQueryResourceTypes.Select(r => r.ResourceType)).ToList()
-            })
+            .Select(l => new { l.Id, l.CompletionTimeMilliseconds })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (fastest != null)
+        if (fastestLog != null)
         {
+            var fastestResourceTypes = await (
+                from fq in _dbContext.FhirQueries.AsNoTracking()
+                join fqrt in _dbContext.FhirQueryResourceTypes on fq.Id equals fqrt.FhirQueryId
+                where fq.DataAcquisitionLogId == fastestLog.Id
+                select fqrt.ResourceType
+            ).ToListAsync(cancellationToken);
+
             statistics.FastestCompletionTimeMilliseconds = new ResourceCompletionTime(
-                string.Join(",", fastest.ResourceTypes),
-                fastest.CompletionTimeMilliseconds!.Value);
+                string.Join(",", fastestResourceTypes.Select(r => r.ToString()).Distinct().OrderBy(r => r)),
+                fastestLog.CompletionTimeMilliseconds!.Value);
         }
 
-        var slowest = await baseQuery
+        var slowestLog = await baseQuery
             .Where(l => l.CompletionTimeMilliseconds != null)
             .OrderByDescending(l => l.CompletionTimeMilliseconds)
-            .Select(l => new
-            {
-                l.CompletionTimeMilliseconds,
-                ResourceTypes = l.FhirQueries.SelectMany(q => q.FhirQueryResourceTypes.Select(r => r.ResourceType)).ToList()
-            })
+            .Select(l => new { l.Id, l.CompletionTimeMilliseconds })
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (slowest != null)
+        if (slowestLog != null)
         {
+            var slowestResourceTypes = await (
+                from fq in _dbContext.FhirQueries.AsNoTracking()
+                join fqrt in _dbContext.FhirQueryResourceTypes on fq.Id equals fqrt.FhirQueryId
+                where fq.DataAcquisitionLogId == slowestLog.Id
+                select fqrt.ResourceType
+            ).ToListAsync(cancellationToken);
+
             statistics.SlowestCompletionTimeMilliseconds = new ResourceCompletionTime(
-                string.Join(",", slowest.ResourceTypes),
-                slowest.CompletionTimeMilliseconds!.Value);
+                string.Join(",", slowestResourceTypes.Select(r => r.ToString()).Distinct().OrderBy(r => r)),
+                slowestLog.CompletionTimeMilliseconds!.Value);
         }
 
-        // Per-resource-type completion time aggregation lightweight projection
-        var completionTimes = await baseQuery
-            .Where(l => l.CompletionTimeMilliseconds != null)
-            .Select(l => new
+        // Per-resource-type completion time aggregation.
+        var completionTimeRows = await (
+            from log in _dbContext.DataAcquisitionLogs.AsNoTracking()
+            join fq in _dbContext.FhirQueries on log.Id equals fq.DataAcquisitionLogId
+            join fqrt in _dbContext.FhirQueryResourceTypes on fq.Id equals fqrt.FhirQueryId
+            where log.ReportTrackingId == reportTrackingIdGuid
+                  && !log.IsDeleted
+                  && log.CompletionTimeMilliseconds != null
+            select new
             {
-                l.CompletionTimeMilliseconds,
-                ResourceTypes = l.FhirQueries.SelectMany(q => q.FhirQueryResourceTypes.Select(r => r.ResourceType)).ToList()
-            })
-            .ToListAsync(cancellationToken);
+                log.Id,
+                log.CompletionTimeMilliseconds,
+                fqrt.ResourceType
+            }
+        ).ToListAsync(cancellationToken);
 
-        foreach (var ct in completionTimes)
+        foreach (var logGroup in completionTimeRows.GroupBy(x => x.Id))
         {
-            var key = string.Join(",", ct.ResourceTypes);
+            var key = string.Join(",", logGroup.Select(x => x.ResourceType.ToString()).Distinct().OrderBy(r => r));
             statistics.ResourceTypeCompletionTimeMilliseconds.TryGetValue(key, out var existing);
-            statistics.ResourceTypeCompletionTimeMilliseconds[key] = existing + ct.CompletionTimeMilliseconds!.Value;
+            statistics.ResourceTypeCompletionTimeMilliseconds[key] = existing + logGroup.First().CompletionTimeMilliseconds!.Value;
         }
 
         return statistics;
@@ -975,10 +987,10 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     }
 
     private static IQueryable<DataAcquisitionLog> ApplySort(IQueryable<DataAcquisitionLog> query, string? sortBy,
-        LantanaGroup.Link.Shared.Application.Enums.SortOrder sortOrder)
+        SortOrder sortOrder)
     {
         var normalizedSortBy = sortBy?.Trim().ToLowerInvariant();
-        var descending = sortOrder == LantanaGroup.Link.Shared.Application.Enums.SortOrder.Descending;
+        var descending = sortOrder == SortOrder.Descending;
 
         return normalizedSortBy switch
         {
