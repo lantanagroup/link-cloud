@@ -177,7 +177,7 @@ public class QueryPlanConfigController : Controller
         catch (BadRequestException ex)
         {
             _logger.LogError(ex, "BadRequestException occurred.");
-            return Problem("Bad Request", ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
+            return Problem(title:"Bad Request", detail:ex.Message, statusCode: (int)HttpStatusCode.BadRequest);
         }
         catch (NotFoundException ex)
         {
