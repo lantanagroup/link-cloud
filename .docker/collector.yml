@@ -2,7 +2,6 @@ receivers:
   otlp:
     protocols:
       grpc:
-        max_recv_msg_size_mib: 16
 
 exporters:
   otlp/tempo:
