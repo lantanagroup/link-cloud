@@ -45,6 +45,16 @@
       <mat-radio-button value="manual">Custom FHIRPath</mat-radio-button>
     </mat-radio-group>
 
+    @if (vendorMismatch) {
+      <div class="vendor-mismatch-warning" role="alert">
+        This configuration's matching rules were built for a different EHR vendor than this
+        facility's current vendor ({{ vendor }}). They are shown as Custom FHIRPath and still
+        apply as written — update them here to fit {{ vendor }}, or close this dialog and use
+        the Delete button on the Reporting Organization tab to remove the configuration.
+        (Clearing the rules won't save — a configuration must have a matching expression.)
+      </div>
+    }
+
     @if (setupMethodControl.value !== 'manual') {
     <p class="section-hint">A location is included if it matches <strong>any</strong> of the following.</p>
 

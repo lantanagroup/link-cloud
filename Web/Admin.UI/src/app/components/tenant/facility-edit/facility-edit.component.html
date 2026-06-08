@@ -210,7 +210,14 @@
             }
           </mat-action-row>
         </mat-tab>
-        <mat-tab label="Reporting Organization">
+        <mat-tab [disabled]="!facilityConfig?.vendor">
+          <ng-template mat-tab-label>
+            <span matTooltip="Select an EHR vendor for this facility to enable reporting organization configuration."
+              [matTooltipDisabled]="!!facilityConfig?.vendor"
+              style="pointer-events: auto;">
+              Reporting Organization
+            </span>
+          </ng-template>
           @if (facilityConfig?.vendor) {
             @if (showNoReportingOrgConfigAlert) {
               <app-link-alert [type]="linkNoConfigAlertType" [message]="noReportingOrgConfigAlertMessage"
