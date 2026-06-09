@@ -27,7 +27,6 @@ public sealed class AutomationRunsApiController(
     /// <see cref="GetStatus"/> until the run reaches a terminal state.
     /// </summary>
     [HttpPost("start")]
-    [ValidateAntiForgeryToken]
     public async Task<IActionResult> Start([FromBody] StartScenarioApiRequest request, CancellationToken cancellationToken)
     {
         if (request == null || request.ScenarioId == Guid.Empty)

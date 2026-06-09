@@ -9,6 +9,7 @@
     <UserSecretsId>0c1c76b4-6914-4e62-8eb3-c645c905e64b</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     <RootNamespace>LantanaGroup.Link.Account</RootNamespace>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
 	<PropertyGroup>

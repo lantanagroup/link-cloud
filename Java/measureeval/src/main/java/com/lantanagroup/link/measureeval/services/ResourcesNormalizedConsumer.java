@@ -1,10 +1,10 @@
 package com.lantanagroup.link.measureeval.services;
 
 import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
-import com.lantanagroup.link.measureeval.records.ResourceNormalized;
+import com.lantanagroup.link.measureeval.records.ResourcesNormalized;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
-import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
 import org.hl7.fhir.r4.model.MeasureReport;
+import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.stereotype.Service;
@@ -12,9 +12,8 @@ import org.springframework.stereotype.Service;
 import java.util.function.Predicate;
 
 @Service
-public class ResourceNormalizedConsumer extends AbstractResourceConsumer<ResourceNormalized> {
-  public ResourceNormalizedConsumer (
-          ResourceRepository resourceRepository,
+public class ResourcesNormalizedConsumer extends AbstractResourceConsumer<ResourcesNormalized> {
+  public ResourcesNormalizedConsumer (
           PatientReportingEvaluationStatusRepository patientStatusRepository,
           Predicate<MeasureReport> reportabilityPredicate,
           MeasureEvalMetrics measureEvalMetrics,
@@ -23,9 +22,11 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
           PatientStatusBundler patientStatusBundler,
           BlobStorageService blobStorageService,
           ConsumerRecordRecoverer recoverer,
-          MeasureReportGeneratedProducer measureReportGeneratedProducer){
+          MeasureReportGeneratedProducer measureReportGeneratedProducer,
+          RedisResourceService redisResourceService,
+          AbsResourceService absResourceService,
+          MongoOperations mongoOperations){
     super(
-            resourceRepository,
             patientStatusRepository,
             reportabilityPredicate,
             measureEvalMetrics,
@@ -34,6 +35,9 @@ public class ResourceNormalizedConsumer extends AbstractResourceConsumer<Resourc
             patientStatusBundler,
             blobStorageService,
             recoverer,
-            measureReportGeneratedProducer);
+            measureReportGeneratedProducer,
+            redisResourceService,
+            absResourceService,
+            mongoOperations);
   }
 }

@@ -47,7 +47,7 @@ public class AcquisitionProcessingScheduleService : IHostedService
         var tailRecoveryJob = JobBuilder
             .Create(typeof(TailMessageRecoveryJob))
             .StoreDurably()
-            .WithIdentity("Tail Message Recovery Job", nameof(KafkaTopic.ResourceAcquired))
+            .WithIdentity("Tail Message Recovery Job", nameof(KafkaTopic.ResourcesAcquired))
             .WithDescription("Tail Message Recovery Job")
             .Build();
 
