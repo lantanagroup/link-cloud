@@ -749,4 +749,120 @@ public class QueryPlanValidatorTests
         Assert.True(result.IsValid);
         Assert.Contains(result.Warnings, w => w.Contains("Duplicate ResourceType"));
     }
+
+    [Theory]
+    [InlineData(OperationType.Search)]
+    [InlineData(OperationType.SearchPost)]
+    public void ValidateQueryPlan_ParameterQueryWithSearchOperationType_ReturnsSuccess(OperationType operationType)
+    {
+        // Arrange
+        var initialQueries = new Dictionary<string, IQueryConfig>
+        {
+            ["0"] = new ParameterQueryConfig
+            {
+                ResourceType = "Patient",
+                OperationType = operationType,
+                Parameters = new List<IParameter>
+                {
+                    new LiteralParameter { Name = "_id", Literal = "123" }
+                }
+            }
+        };
+
+        var supplementalQueries = new Dictionary<string, IQueryConfig>
+        {
+            ["0"] = new ParameterQueryConfig
+            {
+                ResourceType = "Encounter",
+                OperationType = operationType,
+                Parameters = new List<IParameter>
+                {
+                    new LiteralParameter { Name = "patient", Literal = "456" }
+                }
+            }
+        };
+
+        // Act
+        var result = _validator.ValidateQueryPlan(initialQueries, supplementalQueries);
+
+        // Assert
+        Assert.True(result.IsValid);
+        Assert.Empty(result.Errors);
+    }
+
+    [Fact]
+    public void ValidateQueryPlan_ParameterQueryWithReadOperationType_ReturnsError()
+    {
+        // Arrange
+        var initialQueries = new Dictionary<string, IQueryConfig>
+        {
+            ["0"] = new ParameterQueryConfig
+            {
+                ResourceType = "Patient",
+                OperationType = OperationType.Read,
+                Parameters = new List<IParameter>
+                {
+                    new LiteralParameter { Name = "_id", Literal = "123" }
+                }
+            }
+        };
+
+        var supplementalQueries = new Dictionary<string, IQueryConfig>
+        {
+            ["0"] = new ParameterQueryConfig
+            {
+                ResourceType = "Encounter",
+                OperationType = OperationType.Search,
+                Parameters = new List<IParameter>
+                {
+                    new LiteralParameter { Name = "patient", Literal = "456" }
+                }
+            }
+        };
+
+        // Act
+        var result = _validator.ValidateQueryPlan(initialQueries, supplementalQueries);
+
+        // Assert
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("'Read' is not a valid operation type for ParameterQueryConfig"));
+    }
+
+    [Fact]
+    public void ValidateQueryPlan_ParameterQueryWithUndefinedOperationType_ReturnsError()
+    {
+        // Arrange
+        var initialQueries = new Dictionary<string, IQueryConfig>
+        {
+            ["0"] = new ParameterQueryConfig
+            {
+                ResourceType = "Patient",
+                OperationType = (OperationType)999, // Undefined enum value
+                Parameters = new List<IParameter>
+                {
+                    new LiteralParameter { Name = "_id", Literal = "123" }
+                }
+            }
+        };
+
+        var supplementalQueries = new Dictionary<string, IQueryConfig>
+        {
+            ["0"] = new ParameterQueryConfig
+            {
+                ResourceType = "Encounter",
+                OperationType = OperationType.Search,
+                Parameters = new List<IParameter>
+                {
+                    new LiteralParameter { Name = "patient", Literal = "456" }
+                }
+            }
+        };
+
+        // Act
+        var result = _validator.ValidateQueryPlan(initialQueries, supplementalQueries);
+
+        // Assert
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("is not a valid OperationType enum value"));
+    }
 }

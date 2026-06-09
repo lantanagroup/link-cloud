@@ -53,6 +53,8 @@ using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
+using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
@@ -91,6 +93,7 @@ public static class GeneralStartupExtensions
         builder.Services.RegisterRepositories();
         builder.Services.RegisterManagers();
         builder.Services.RegisterServices();
+        builder.Services.AddResourceCache(builder.Configuration);
         builder.Services.RegisterFactories(builder.Configuration);
         builder.Services.RegisterTelemetry(builder.Configuration, builder.Environment, serviceInformation.ServiceConfigName);
         builder.Services.RegisterProblemDetails((IHostingEnvironment)builder.Environment);
@@ -272,7 +275,6 @@ public static class GeneralStartupExtensions
         services.AddTransient<IPatientCensusService, PatientCensusService>();
         services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
         services.AddTransient<IQueryListProcessor, QueryListProcessor>();
-        services.AddTransient<IBundleEventService<ResourceKey, ResourceAcquired, ResourceAcquiredMessageGenerationRequest>, BundleResourceAcquiredEventService>();
         services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
         services.AddTransient<IAcquisitionDependencyChecker, AcquisitionDependencyChecker>();
 
@@ -336,6 +338,7 @@ public static class GeneralStartupExtensions
         services.RegisterKafkaProducer<string, DataAcquisitionRequested>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, PatientCensusScheduled>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<ResourceKey, ResourceAcquired>(kafkaConnection, producerConfig);
+        services.RegisterKafkaProducer<ResourceKey, ResourcesAcquired>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<string, PatientListMessage>(kafkaConnection, producerConfig, null, new IndentedJsonSerializer<PatientListMessage>());
         services.RegisterKafkaProducer<string, AuditEventMessage>(kafkaConnection, producerConfig);
         services.RegisterKafkaProducer<long, ReadyToAcquire>(kafkaConnection, producerConfig);
@@ -347,6 +350,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<IKafkaProducerFactory<string, DataAcquisitionRequested>, KafkaProducerFactory<string, DataAcquisitionRequested>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientCensusScheduled>, KafkaProducerFactory<string, PatientCensusScheduled>>();
         services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourceAcquired>, KafkaProducerFactory<ResourceKey, ResourceAcquired>>();
+        services.AddTransient<IKafkaProducerFactory<ResourceKey, ResourcesAcquired>, KafkaProducerFactory<ResourceKey, ResourcesAcquired>>();
         services.AddTransient<IKafkaProducerFactory<string, PatientListMessage>, KafkaProducerFactory<string, PatientListMessage>>();
         services.AddTransient<IKafkaProducerFactory<long, ReadyToAcquire>, KafkaProducerFactory<long, ReadyToAcquire>>();
         services.AddTransient<IKafkaProducerFactory<string, CernerPatientsAcquired>, KafkaProducerFactory<string, CernerPatientsAcquired>>();

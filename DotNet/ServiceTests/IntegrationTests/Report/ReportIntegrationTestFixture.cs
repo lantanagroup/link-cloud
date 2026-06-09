@@ -38,6 +38,7 @@ namespace IntegrationTests.Report
     {
         private readonly AzuriteContainer _azuriteContainer = new AzuriteBuilder()
             .WithImage("mcr.microsoft.com/azure-storage/azurite:latest")
+            .WithCommand("--skipApiVersionCheck")
             .Build();
 
         private IHost _host;
