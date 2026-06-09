@@ -136,7 +136,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
         private async Task<IDictionary<string, byte[]>> DownloadAsync(BlobContainerClient containerClient, string prefix, CancellationToken cancellationToken = default)
         {
             IDictionary<string, byte[]> files = new Dictionary<string, byte[]>();
-            await foreach (BlobItem blob in containerClient.GetBlobsAsync(prefix: prefix, cancellationToken: cancellationToken))
+            await foreach (BlobItem blob in containerClient.GetBlobsAsync(BlobTraits.None, BlobStates.None, prefix, cancellationToken))
             {
                 _logger.LogDebug("Downloading: {}", blob.Name);
                 BlockBlobClient blobClient = containerClient.GetBlockBlobClient(blob.Name);

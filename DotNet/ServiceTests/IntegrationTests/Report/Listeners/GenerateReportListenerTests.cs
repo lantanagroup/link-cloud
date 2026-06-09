@@ -211,7 +211,7 @@ public class GenerateReportListenerTests
             Times.Exactly(2));
     }
 
-    [Fact(Skip = "Requires live Census service â€” SDK clients are now concrete types injected via AddLinkSdk()")]
+    [Fact(Skip = "Requires live Census service - SDK clients are now concrete types injected via AddLinkSdk()")]
     public async Task ProcessMessageAsync_NewAdHocCensus_NoPatientIds_FetchesFromCensusAndCreatesEntries()
     {
         _fixture.DataAcquisitionRequestedKafkaProducerMock.Reset();

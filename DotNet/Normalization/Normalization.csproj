@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -9,6 +9,7 @@
 		<RootNamespace>LantanaGroup.Link.Normalization</RootNamespace>
 		<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
 		<Version>0.6.0</Version>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -18,12 +19,16 @@
 
 	<ItemGroup>
 		<Compile Remove="Application\Interfaces\**" />
+		<Compile Remove="Application\Models\Business\**" />
 		<Compile Remove="Data\**" />
 		<Content Remove="Application\Interfaces\**" />
+		<Content Remove="Application\Models\Business\**" />
 		<Content Remove="Data\**" />
 		<EmbeddedResource Remove="Application\Interfaces\**" />
+		<EmbeddedResource Remove="Application\Models\Business\**" />
 		<EmbeddedResource Remove="Data\**" />
 		<None Remove="Application\Interfaces\**" />
+		<None Remove="Application\Models\Business\**" />
 		<None Remove="Data\**" />
 	</ItemGroup>
 
@@ -59,7 +64,6 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Folder Include="Application\Models\Business\" />
 		<Folder Include="Scripts\" />
 	</ItemGroup>
 

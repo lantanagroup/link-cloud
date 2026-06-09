@@ -10,6 +10,9 @@ spring:
     mongodb:
       uri: mongodb://mongo:27017
       database: link-measureeval
+    redis:
+      host: redis_cache
+      port: 6379
 
   kafka:
     bootstrap-servers: kafka_b:9092

@@ -27,6 +27,7 @@ management:
 logging:
   level:
     com.lantanagroup.link: debug
+    com.lantanagroup.link.performance: info
 
 server:
   port: 5135
@@ -106,3 +107,9 @@ authentication:
 internal-blob-storage:
   connection-string: ''
   blob-container-name: ''
+
+resource-cache:
+  blob-storage:
+    connection-string: ''
+    blob-container-name: ''
+    blob-root: ''

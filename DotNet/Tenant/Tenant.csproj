@@ -11,6 +11,7 @@
 		<Configurations>Debug;Release;Debug IIS</Configurations>
 		<PredefinedCulturesOnly>false</PredefinedCulturesOnly>
 		<Version>0.6.0</Version>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 	</PropertyGroup>
 
 	<PropertyGroup>

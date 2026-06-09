@@ -6,6 +6,7 @@
 		<Nullable>enable</Nullable>
 		<RootNamespace>LantanaGroup.Link.Shared</RootNamespace>
 		<Configurations>Debug;Release;Debug IIS</Configurations>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -18,13 +19,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations" Version="0.*" />
+		<PackageReference Include="Azure.Storage.Blobs" Version="12.*" />
 		<PackageReference Include="AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer" Version="0.*" />
 		<PackageReference Include="AspNetCore.HealthChecks.Kafka" Version="8.*" />
 		<PackageReference Include="AutoMapper" Version="13.*" />
-		<PackageReference Include="Azure.Data.AppConfiguration" Version="1.*" />
-		<PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.4.0" />
-		<PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.8.0" />
+		<PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.*" />
+		<PackageReference Include="Azure.Identity" Version="1.*" />
+		<PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.*" />
 		<PackageReference Include="Confluent.Kafka" Version="2.*" />
 		<PackageReference Include="Confluent.Kafka.Extensions.Diagnostics" Version="0.*" />
 		<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.4.0" />
@@ -38,11 +39,10 @@
 		<PackageReference Include="Microsoft.Azure.AppConfiguration.AspNetCore" Version="7.*" />
 		<PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.*" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.AzureAppConfiguration" Version="7.*" />
-		<PackageReference Include="Microsoft.Extensions.Options" Version="10.0.2" />
-		<PackageReference Include="Microsoft.Extensions.Telemetry" Version="10.1.0" />
+		<PackageReference Include="Microsoft.Extensions.Options" Version="10.*" />
+		<PackageReference Include="Microsoft.Extensions.Telemetry" Version="10.*" />
 		<PackageReference Include="MongoDB.Driver" Version="3.*" />
-		<PackageReference Include="OpenTelemetry" Version="1.15.0" />
-		<PackageReference Include="OpenTelemetry.Api" Version="1.15.0" />
+		<PackageReference Include="OpenTelemetry" Version="1.15.3" />
 		<PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.15.0" />
 		<PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.0" />
 		<PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.15.0-beta.1" />
@@ -50,9 +50,6 @@
 		<PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
 		<PackageReference Include="Quartz" Version="3.*" />
 		<PackageReference Include="Quartz.AspNetCore" Version="3.*" />
-		<PackageReference Include="Quartz.Extensions.DependencyInjection" Version="3.*" />
-		<PackageReference Include="Quartz.Extensions.Hosting" Version="3.*" />
-		<PackageReference Include="Quartz.Jobs" Version="3.*" />
 		<PackageReference Include="Quartz.Plugins" Version="3.*" />
 		<PackageReference Include="Quartz.Plugins.TimeZoneConverter" Version="3.*" />
 		<PackageReference Include="Quartz.Serialization.Json" Version="3.*" />
@@ -60,13 +57,10 @@
 		<PackageReference Include="StackExchange.Redis" Version="2.*" />
 		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="9.*" />
 		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="6.*" />
-		<PackageReference Include="System.Text.Encodings.Web" Version="10.0.3" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.*" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="8.*" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.*" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.*" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.*" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite.Core" Version="8.*" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="8.*" />
 		<PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.*" />
 		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.*" />

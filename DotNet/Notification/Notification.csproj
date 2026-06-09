@@ -7,6 +7,7 @@
     <UserSecretsId>f84a53fa-ef00-4cf4-b334-9f70205c5bf1</UserSecretsId>
     <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 	<RootNamespace>LantanaGroup.Link.Notification</RootNamespace>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
 	<PropertyGroup>

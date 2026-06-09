@@ -9,6 +9,7 @@
 	<RootNamespace>LantanaGroup.Link.Census</RootNamespace>
 	<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
 	<Version>0.6.0</Version>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
 	<PropertyGroup>

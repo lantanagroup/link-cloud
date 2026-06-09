@@ -33,21 +33,19 @@ public class MeasureReportGeneratedProducer {
             throw new IllegalArgumentException("All parameters are required");
         }
 
-        if (logger.isTraceEnabled()) {
-            logger.trace(
-                    "Producing {} record for report tracking id {}",
-                    Topics.MEASURE_REPORT_GENERATED, report.getReportTrackingId());
-        }
+        logger.info(
+                "PRODUCING MeasureReportGenerated: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] REPORT_TYPE=[{}] REPORT_TRACKING_ID=[{}] REPORTABLE=[{}]",
+                patientStatus.getFacilityId(),
+                patientStatus.getPatientId(),
+                patientStatus.getCorrelationId(),
+                report.getReportType(),
+                report.getReportTrackingId(),
+                report.getReportable());
 
         String reportUri = null;
 
         if (payloadUri != null) {
-            int lastSlashIndex = payloadUri.lastIndexOf('/');
-            if (lastSlashIndex == -1) {
-                throw new IllegalArgumentException("payloadUri must contain at least one forward slash");
-            }
-
-            reportUri = payloadUri.substring(0, lastSlashIndex);
+            reportUri = payloadUri;
         }
 
         MeasureReportGenerated value = new MeasureReportGenerated(

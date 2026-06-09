@@ -11,6 +11,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using Medallion.Threading;
 using Microsoft.EntityFrameworkCore;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -41,7 +42,8 @@ public class DataAcquisitionLogManagerTests
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var semaphoreProvider = CreateSemaphoreProviderMock();
-        return new DataAcquisitionLogManager(logger, database, dbContext, queries, semaphoreProvider);
+        var resourceCache = scope.ServiceProvider.GetRequiredService<IResourceCache>();
+        return new DataAcquisitionLogManager(logger, database, dbContext, queries, semaphoreProvider, resourceCache);
     }
 
     private static IDistributedSemaphoreProvider CreateSemaphoreProviderMock()

@@ -20,6 +20,8 @@ using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.Da
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -68,14 +70,16 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly IDataAcquisitionLogQueries _logQueries;
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
+    private readonly IResourceCache _resourceCache;
 
-    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext, IDataAcquisitionLogQueries logQueries, IDistributedSemaphoreProvider distributedSemaphoreProvider)
+    public DataAcquisitionLogManager(ILogger<DataAcquisitionLogManager> logger, IDatabase database, DataAcquisitionDbContext dbContext, IDataAcquisitionLogQueries logQueries, IDistributedSemaphoreProvider distributedSemaphoreProvider, IResourceCache resourceCache)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logQueries = logQueries;
         _distributedSemaphoreProvider = distributedSemaphoreProvider ?? throw new ArgumentNullException(nameof(distributedSemaphoreProvider));
+        _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
     }
 
     public async Task<DataAcquisitionLogModel> CreateAsync(CreateDataAcquisitionLogModel model, CancellationToken cancellationToken = default)
@@ -901,20 +905,39 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             return null;
         }
 
+        // Only include cache keys for resource types that had at least one resource actually acquired.
+        // ResourceId rows use the format "TypeName/id" (e.g. "Patient/abc-123"), so the type name
+        // is the substring before the first '/'.
+        var acquiredResourceTypes = await _dbContext.DataAcquisitionLogResourceIds
+            .Join(_dbContext.DataAcquisitionLogs,
+                rid => rid.DataAcquisitionLogId,
+                l => l.Id,
+                (rid, l) => new { rid, l })
+            .Where(x => x.l.FacilityId == groupInfo.FacilityId
+                && x.l.CorrelationId == groupInfo.CorrelationId
+                && x.l.QueryPhase == groupInfo.QueryPhase)
+            .Select(x => x.rid.ResourceId.Substring(0, x.rid.ResourceId.IndexOf('/')))
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
         return new TailCompletionResult
         {
             FacilityId = groupInfo.FacilityId,
+            PatientId = representative.PatientId ?? "",
             CorrelationId = groupInfo.CorrelationId!,
             TraceParentId = representative.TraceId,
-            ResourceAcquired = new ResourceAcquired
+            ResourcesAcquired = new ResourcesAcquired
             {
-                AcquisitionComplete = true,
-                PatientId = representative.PatientId ?? string.Empty,
                 QueryType = QueryPhaseUtilities.ToWireQueryType(groupInfo.QueryPhase),
                 ReportableEvent = representative.ReportableEvent ?? default,
                 ScheduledReports = representative.ScheduledReport != null
                     ? new List<ScheduledReport> { representative.ScheduledReport }
-                    : new List<ScheduledReport>()
+                    : new List<ScheduledReport>(),
+                CacheType = _resourceCache.GetCacheTypeForCorrelationId(groupInfo.CorrelationId ?? string.Empty),
+                CacheKeys = acquiredResourceTypes
+                    .Select(rt => $"{groupInfo.CorrelationId}:{rt}")
+                    .Distinct()
+                    .ToList()
             }
         };
     }

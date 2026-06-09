@@ -26,6 +26,7 @@ using DateTime = System.DateTime;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 
@@ -43,23 +44,23 @@ public class FhirApiService : IFhirApiService
     private readonly IReferenceResourcesQueries _referenceResourcesQueries;
     private readonly IReadFhirCommand _readFhirCommand;
     private readonly ISearchFhirCommand _searchFhirCommand;
-    private readonly IProducer<ResourceKey, ResourceAcquired> _kafkaProducer;
     private readonly ILogger<FhirApiService> _logger;
+    private readonly IResourceCache _resourceCache;
 
     public FhirApiService(
         IReferenceResourcesManager referenceResourceManager,
         IReferenceResourcesQueries referenceResourcesQueries,
         ISearchFhirCommand searchFhirCommand,
         IReadFhirCommand readFhirCommand,
-        IProducer<ResourceKey, ResourceAcquired> kafkaProducer,
-        ILogger<FhirApiService> logger)
+        ILogger<FhirApiService> logger,
+        IResourceCache resourceCache)
     {
         _referenceResourceManager = referenceResourceManager;
         _referenceResourcesQueries = referenceResourcesQueries;
         _searchFhirCommand = searchFhirCommand;
         _readFhirCommand = readFhirCommand;
-        _kafkaProducer = kafkaProducer;
         _logger = logger;
+        _resourceCache = resourceCache;
     }
 
     #region Interface Implementation
@@ -129,7 +130,7 @@ public class FhirApiService : IFhirApiService
                 AccumulateDiscoveredReferences(refResources, referenceAccumulator);
             }
 
-            await GenerateResourceAcquiredMessage(new ResourceAcquired
+            AddResourceToCache(new ResourceAcquired
             {
                 Resource = resource,
                 ResourceType = resource.TypeName,
@@ -137,7 +138,7 @@ public class FhirApiService : IFhirApiService
                 PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                 QueryType = QueryPhaseUtilities.ToWireQueryType(log.QueryPhase),
                 ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
-            }, log.FacilityId, log.CorrelationId, cancellationToken);
+            }, log.CorrelationId);
 
             return resourceIds;
         }
@@ -278,7 +279,7 @@ public class FhirApiService : IFhirApiService
                 {
                     InsertDateExtension((DomainResource)resource);
 
-                    await GenerateResourceAcquiredMessage(new ResourceAcquired
+                    AddResourceToCache(new ResourceAcquired
                     {
                         Resource = resource,
                         ResourceType = resource.TypeName,
@@ -286,7 +287,7 @@ public class FhirApiService : IFhirApiService
                         PatientId = !fhirQuery.IsReference ?? false ? log.PatientId : null,
                         QueryType = QueryPhaseUtilities.ToWireQueryType(log.QueryPhase),
                         ReportableEvent = log.ReportableEvent ?? throw new ArgumentNullException(nameof(log.ReportableEvent)),
-                    }, log.FacilityId, log.CorrelationId, cancellationToken);
+                    }, log.CorrelationId);
                 }
             }
 
@@ -368,31 +369,14 @@ public class FhirApiService : IFhirApiService
         return searchParams;
     }
 
-    private async Task GenerateResourceAcquiredMessage(ResourceAcquired resourceAcquired, string facilityId, string correlationId, CancellationToken cancellationToken = default)
+    private void AddResourceToCache(ResourceAcquired resourceAcquired, string correlationId)
     {
-        // No manual context manipulation needed!
-        Activity.Current?.SetTag("link.resource_type", resourceAcquired.Resource?.TypeName);
-        Activity.Current?.SetTag("messaging.destination", KafkaTopic.ResourceAcquired.ToString());
-
-        await _kafkaProducer.ProduceAsync(
-            KafkaTopic.ResourceAcquired.ToString(),
-            new Message<ResourceKey, ResourceAcquired>
-            {
-                Key = new ResourceKey
-                {
-                    FacilityId = facilityId,
-                    CorrelationId = correlationId
-                },
-                Headers = new Headers
-                {
-                new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
-                    Encoding.UTF8.GetBytes(correlationId))
-                },
-                Value = resourceAcquired
-            },
-            cancellationToken);
-
-        _kafkaProducer.Flush(cancellationToken);
+        if (resourceAcquired.Resource is DomainResource domainResource
+            && !string.IsNullOrWhiteSpace(resourceAcquired.ResourceType)
+            && Enum.TryParse<ResourceType>(resourceAcquired.ResourceType, out var resourceType))
+        {
+            _resourceCache.UpdateCorrelationCache($"{correlationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType);
+        }
     }
 
     private void InsertDateExtension(DomainResource resource)
