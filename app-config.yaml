@@ -190,6 +190,15 @@ services:
     - key: "link.cql-debug"
       description: "Boolean flag to enable CQL debugging."
       required: true
+    - key: "resource-cache.blob-storage.connection-string"
+      description: "Azure Blob Storage (or Azurite) connection string for the ABS resource cache. Required only when the ABS resource-cache backend is used instead of Redis; leave empty to disable ABS caching."
+      required: false
+    - key: "resource-cache.blob-storage.blob-container-name"
+      description: "Name of the blob container backing the ABS resource cache. Required only when the ABS resource-cache backend is used."
+      required: false
+    - key: "resource-cache.blob-storage.blob-root"
+      description: "Root path/prefix within the blob container under which cached resources are stored for the ABS resource cache. Required only when the ABS resource-cache backend is used."
+      required: false
   Normalization: []
   Notification:
     - key: "SmtpConnection:Host"

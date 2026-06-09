@@ -30,7 +30,7 @@ public class BlobStorageConfig {
         if (StringUtils.isAnyEmpty(connectionString, blobContainerName)) {
             throw new IllegalStateException("Missing required internal-blob-storage configuration: connectionString and blobContainerName must be set.");
         }
-        logger.info("Creating BlobContainerClient with connectionString={}, containerName={}", connectionString, blobContainerName);
+        logger.info("Creating BlobContainerClient with containerName={}", blobContainerName);
         BlobContainerClient client = new BlobServiceClientBuilder()
                 .connectionString(connectionString)
                 .buildClient()

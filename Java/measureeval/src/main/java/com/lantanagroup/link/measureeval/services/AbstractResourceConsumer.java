@@ -125,7 +125,7 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
             measureEvalMetrics.IncrementRecordsReceivedCounter(attributes);
             if (perf) taskStopWatch.stop();
 
-            logger.info(
+            logger.debug(
                     "MESSAGE RECEIVED {}: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] CACHE=[{}] QUERY_TYPE=[{}] REPORTS={}",
                     KafkaUtils.format(record),
                     facilityId,
@@ -368,18 +368,18 @@ public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord>
     private boolean evaluateMeasures (T value, PatientReportingEvaluationStatus patientStatus, Bundle bundle, long kafkaIngestTimestamp) {
         logger.debug("Evaluating measures");
 
-        logger.info("EVALUATING MEASURES: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] QUERY_TYPE=[{}] REPORT_COUNT=[{}]",
+        logger.debug("EVALUATING MEASURES: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] QUERY_TYPE=[{}] REPORT_COUNT=[{}]",
                 patientStatus.getFacilityId(), patientStatus.getPatientId(), patientStatus.getCorrelationId(),
                 value.getQueryType(), patientStatus.getReports().size());
 
         for (PatientReportingEvaluationStatus.Report report : patientStatus.getReports()) {
-            logger.info("EVALUATING REPORT: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] REPORT_TYPE=[{}] TRACKING_ID=[{}] QUERY_TYPE=[{}] REPORTABLE=[{}]",
+            logger.debug("EVALUATING REPORT: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] REPORT_TYPE=[{}] TRACKING_ID=[{}] QUERY_TYPE=[{}] REPORTABLE=[{}]",
                     patientStatus.getFacilityId(), patientStatus.getPatientId(), patientStatus.getCorrelationId(),
                     report.getReportType(), report.getReportTrackingId(), value.getQueryType(), report.getReportable());
 
             //We only want to evaluate supplemental reports that have been marked as reportable. If they failed initial evaluation, then we should not perform a supplemental evaluation for the report.
             if (value.getQueryType() == QueryType.SUPPLEMENTAL && !Boolean.TRUE.equals(report.getReportable())) {
-                logger.info("SKIPPING SUPPLEMENTAL: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] REPORT_TYPE=[{}] — not reportable",
+                logger.debug("SKIPPING SUPPLEMENTAL: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] REPORT_TYPE=[{}] — not reportable",
                         patientStatus.getFacilityId(), patientStatus.getPatientId(), patientStatus.getCorrelationId(), report.getReportType());
                 continue;
             }
