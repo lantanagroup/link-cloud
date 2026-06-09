@@ -151,14 +151,20 @@ public static class QueryPlanAcquisitionSimulator
                 }
             }
 
-            if (string.Equals(p.ParameterType, "Literal", StringComparison.OrdinalIgnoreCase)
-                && string.Equals(p.Name, "category", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(p.ParameterType, "Literal", StringComparison.OrdinalIgnoreCase))
             {
-                if (!MatchesLiteralCategory(resource.Resource, p.Literal))
+                // Skip FHIR pagination/control parameters — they are not filters.
+                if (string.Equals(p.Name, "_count", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(p.Name, "_sort", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(p.Name, "_include", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(p.Name, "_revinclude", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (!MatchesLiteralFilter(resource.Resource, p.Name, p.Literal))
                     return false;
             }
 
-            if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+            if (IsTemporalSearchParam(p.Name)
                 && string.Equals(p.ParameterType, "Variable", StringComparison.OrdinalIgnoreCase))
             {
                 var isGe = p.Format?.StartsWith("ge", StringComparison.OrdinalIgnoreCase) == true;
@@ -176,7 +182,7 @@ public static class QueryPlanAcquisitionSimulator
                 //   ge{S}:  resource.End   >= S   (resource extends into [S, +inf))
                 //   le{E}:  resource.Start <= E   (resource extends into (-inf, E])
                 // For instant types (e.g. authoredOn) start == end.
-                if (!TryGetResourceDateRange(resource.ResourceType, resource.Resource,
+                if (!TryGetResourceDateRangeForParam(p.Name, resource.ResourceType, resource.Resource,
                         out var resourceStart, out var resourceEnd))
                 {
                     // Fail closed: the query has a date filter and we don't recognize the
@@ -186,8 +192,8 @@ public static class QueryPlanAcquisitionSimulator
                     {
                         output.WriteLine(
                             $"  [simulator] WARNING: {resource.Key} has no recognized date field for the " +
-                            $"'{resource.ResourceType}' Parameter query 'date' filter; excluding from " +
-                            "predicted-acquired set (fail-closed). Extend TryGetResourceDateRange to model this shape.");
+                            $"'{resource.ResourceType}' Parameter query '{p.Name}' filter; excluding from " +
+                            "predicted-acquired set (fail-closed). Extend TryGetResourceDateRangeForParam to model this shape.");
                     }
                     return false;
                 }
@@ -283,7 +289,12 @@ public static class QueryPlanAcquisitionSimulator
         return false;
     }
 
-    private static bool MatchesLiteralCategory(JsonElement resource, string? literal)
+    /// <summary>
+    /// Generic literal filter. Handles:
+    /// - CodeableConcept arrays (e.g. <c>category</c>) — matches if any coding.code is in the accepted set.
+    /// - Simple code/string fields (e.g. <c>intent</c>, <c>status</c>) — matches if the field value is in the accepted set.
+    /// </summary>
+    private static bool MatchesLiteralFilter(JsonElement resource, string paramName, string? literal)
     {
         if (string.IsNullOrWhiteSpace(literal))
             return true;
@@ -291,26 +302,111 @@ public static class QueryPlanAcquisitionSimulator
         var accepted = literal.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        if (!resource.TryGetProperty("category", out var categories) || categories.ValueKind != JsonValueKind.Array)
+        if (!resource.TryGetProperty(paramName, out var fieldValue))
             return false;
 
-        foreach (var category in categories.EnumerateArray())
+        // Case 1: Simple string/code field (e.g. intent, status)
+        if (fieldValue.ValueKind == JsonValueKind.String)
         {
-            if (!category.TryGetProperty("coding", out var codingArray) || codingArray.ValueKind != JsonValueKind.Array)
-                continue;
+            var value = fieldValue.GetString();
+            return !string.IsNullOrWhiteSpace(value) && accepted.Contains(value);
+        }
 
-            foreach (var coding in codingArray.EnumerateArray())
+        // Case 2: CodeableConcept array (e.g. category)
+        if (fieldValue.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in fieldValue.EnumerateArray())
             {
-                if (!coding.TryGetProperty("code", out var codeProp) || codeProp.ValueKind != JsonValueKind.String)
-                    continue;
-
-                var code = codeProp.GetString();
-                if (!string.IsNullOrWhiteSpace(code) && accepted.Contains(code))
-                    return true;
+                if (item.TryGetProperty("coding", out var codingArray) && codingArray.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var coding in codingArray.EnumerateArray())
+                    {
+                        if (coding.TryGetProperty("code", out var codeProp)
+                            && codeProp.ValueKind == JsonValueKind.String)
+                        {
+                            var code = codeProp.GetString();
+                            if (!string.IsNullOrWhiteSpace(code) && accepted.Contains(code))
+                                return true;
+                        }
+                    }
+                }
             }
+            return false;
+        }
+
+        // Case 3: Single CodeableConcept object (e.g. code)
+        if (fieldValue.ValueKind == JsonValueKind.Object
+            && fieldValue.TryGetProperty("coding", out var singleCodingArray)
+            && singleCodingArray.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var coding in singleCodingArray.EnumerateArray())
+            {
+                if (coding.TryGetProperty("code", out var codeProp)
+                    && codeProp.ValueKind == JsonValueKind.String)
+                {
+                    var code = codeProp.GetString();
+                    if (!string.IsNullOrWhiteSpace(code) && accepted.Contains(code))
+                        return true;
+                }
+            }
+            return false;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Determines whether a FHIR search parameter name is a temporal (date-like) filter.
+    /// Recognized names: <c>date</c>, <c>authoredon</c>, <c>authored</c>, <c>issued</c>,
+    /// <c>effective</c>, <c>onset-date</c>, <c>recorded-date</c>.
+    /// </summary>
+    private static bool IsTemporalSearchParam(string paramName)
+        => string.Equals(paramName, "date", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "authoredon", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "authored", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "issued", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "effective", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "onset-date", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "recorded-date", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Resolves the resource's date range for a given FHIR search parameter name.
+    /// Named search parameters like <c>authoredon</c> map to specific fields regardless of
+    /// what <c>TryGetResourceDateRange</c> would pick for the generic <c>date</c> param.
+    /// </summary>
+    private static bool TryGetResourceDateRangeForParam(string paramName, string resourceType,
+        JsonElement resource, out DateTimeOffset start, out DateTimeOffset end)
+    {
+        // Named search parameters that map to specific fields.
+        if (string.Equals(paramName, "authoredon", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(paramName, "authored", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryGetInstant(resource, "authoredOn", out start, out end);
+        }
+
+        if (string.Equals(paramName, "issued", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryGetInstant(resource, "issued", out start, out end);
+        }
+
+        if (string.Equals(paramName, "effective", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryGetEffective(resource, out start, out end);
+        }
+
+        if (string.Equals(paramName, "onset-date", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryGetInstant(resource, "onsetDateTime", out start, out end)
+                   || TryGetPeriod(resource, "onsetPeriod", out start, out end);
+        }
+
+        if (string.Equals(paramName, "recorded-date", StringComparison.OrdinalIgnoreCase))
+        {
+            return TryGetInstant(resource, "recordedDate", out start, out end);
+        }
+
+        // Generic "date" → resource-type-aware resolution.
+        return TryGetResourceDateRange(resourceType, resource, out start, out end);
     }
 
     /// <summary>

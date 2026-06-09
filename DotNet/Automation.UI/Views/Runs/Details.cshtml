@@ -584,6 +584,38 @@
             try { parsed = JSON.parse(rawJson); } catch { return; }
             if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
 
+            const importedIdCount = Array.isArray(parsed.importedPatientIds) ? parsed.importedPatientIds.length : 0;
+            const importedBundleCount = Array.isArray(parsed.importedPatientBundles) ? parsed.importedPatientBundles.length : 0;
+            const rawPatientCount = parsed.patientCount;
+            const parsedPatientCount = typeof rawPatientCount === 'number'
+                ? rawPatientCount
+                : Number.parseFloat(String(rawPatientCount ?? '0'));
+            const basePatientCount = Number.isFinite(parsedPatientCount) ? parsedPatientCount : 0;
+            const effectivePatientCount = basePatientCount + importedIdCount + importedBundleCount;
+
+            function formatArrayItem(item, key, index) {
+                if (item === null || item === undefined) return '';
+                if (typeof item !== 'object') return escapeHtml(String(item));
+
+                if (key === 'importedPatientIds') {
+                    const patientId = item.patientId || item.PatientId;
+                    return escapeHtml(String(patientId || `Patient ${index + 1}`));
+                }
+
+                if (key === 'importedPatientBundles') {
+                    const fileName = item.fileName || item.FileName;
+                    const patientId = item.patientId || item.PatientId;
+                    return escapeHtml(String(fileName || patientId || `Bundle ${index + 1}`));
+                }
+
+                const fallback = item.name ?? item.id ?? item.patientId ?? item.fileName;
+                if (fallback !== undefined && fallback !== null)
+                    return escapeHtml(String(fallback));
+
+                try { return escapeHtml(JSON.stringify(item)); }
+                catch { return escapeHtml(String(item)); }
+            }
+
             // Keys rendered elsewhere or otherwise not surfaced as plain key/value pairs.
             const skip = new Set([
                 'id', 'isSystemScenario',
@@ -599,6 +631,8 @@
                 selectedMeasures: 'Measures',
                 seed: 'Seed',
                 patientCount: 'Patients',
+                importedPatientIds: 'Imported Patient IDs',
+                importedPatientBundles: 'Imported Patient Bundles',
                 queryPlanTemplateName: 'Query Plan',
                 cleanupServiceData: 'Cleanup Service Data',
                 cleanupFhirData: 'Cleanup FHIR Data'
@@ -614,8 +648,10 @@
                     if (k === 'selectedMeasures') {
                         display = v.map(m => escapeHtml(measureShortNames[m] || toLabel(m))).join(', ');
                     } else {
-                        display = v.map(item => escapeHtml(String(item))).join(', ');
+                        display = v.map((item, index) => formatArrayItem(item, k, index)).join(', ');
                     }
+                } else if (k === 'patientCount') {
+                    display = escapeHtml(String(effectivePatientCount));
                 } else if (typeof v === 'boolean') {
                     display = v ? '<i class="bi bi-check-circle-fill text-success"></i> Yes' : '<i class="bi bi-x-circle text-muted"></i> No';
                 } else if (typeof v === 'object') {

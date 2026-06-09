@@ -23,13 +23,13 @@ public class TailMessageRecoveryJob : IJob
 {
     private readonly ILogger<TailMessageRecoveryJob> _logger;
     private readonly IServiceScopeFactory _serviceScopeFactory;
-    private readonly IProducer<ResourceKey, ResourceAcquired> _resourceAcquiredProducer;
+    private readonly IProducer<ResourceKey, ResourcesAcquired> _resourceAcquiredProducer;
     private readonly TailMessageRecoveryJobSettings _settings;
 
     public TailMessageRecoveryJob(
         ILogger<TailMessageRecoveryJob> logger,
         IServiceScopeFactory serviceScopeFactory,
-        IProducer<ResourceKey, ResourceAcquired> resourceAcquiredProducer,
+        IProducer<ResourceKey, ResourcesAcquired> resourceAcquiredProducer,
         IOptions<TailMessageRecoveryJobSettings> settings)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -47,6 +47,11 @@ public class TailMessageRecoveryJob : IJob
         var dataAcquisitionLogQueries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
         var dataAcquisitionLogManager = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogManager>();
 
+        _logger.LogInformation(
+            "TailMessageRecoveryJob started. Looking for orphaned tail logs older than {MinAge}. Time budget: {TimeBudget} seconds.",
+            minAge,
+            _settings.TimeBudgetPerRunSeconds);
+            
         try
         {
             var orphanedLogIds = await dataAcquisitionLogQueries.GetOrphanedTailLogIds(
@@ -88,23 +93,23 @@ public class TailMessageRecoveryJob : IJob
                     }
 
                     await _resourceAcquiredProducer.ProduceAsync(
-                        KafkaTopic.ResourceAcquired.ToString(),
-                        new Message<ResourceKey, ResourceAcquired>
+                        KafkaTopic.ResourcesAcquired.ToString(),
+                        new Message<ResourceKey, ResourcesAcquired>
                         {
                             Key = new ResourceKey
                             {
                                 FacilityId = tailResult.FacilityId,
-                                CorrelationId = tailResult.CorrelationId
+                                PatientId = tailResult.PatientId
                             },
                             Headers = headers,
-                            Value = tailResult.ResourceAcquired
+                            Value = tailResult.ResourcesAcquired
                         },
                         context.CancellationToken);
 
                     _logger.LogInformation(
-                        "TailMessageRecoveryJob recovered tail for FacilityId={FacilityId}, CorrelationId={CorrelationId}",
+                        "TailMessageRecoveryJob recovered tail for FacilityId={FacilityId}, PatientId={PatientId}",
                         tailResult.FacilityId.SanitizeForLog(),
-                        tailResult.CorrelationId.SanitizeForLog());
+                        tailResult.PatientId.SanitizeForLog());
 
                     processed++;
                 }
