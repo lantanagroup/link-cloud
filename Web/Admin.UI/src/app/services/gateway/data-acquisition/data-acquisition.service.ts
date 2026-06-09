@@ -1,7 +1,7 @@
 import {HttpClient} from '@angular/common/http';
 import {Injectable} from '@angular/core';
 import {ErrorHandlingService} from '../../error-handling.service';
-import {Observable, tap, map, catchError, throwError, of} from 'rxjs';
+import {Observable, tap, map, catchError, throwError} from 'rxjs';
 import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
 import {IEntityDeletedResponse} from 'src/app/interfaces/entity-deleted-response.interface';
 import {
@@ -365,9 +365,16 @@ export class DataAcquisitionService {
       )
   }
 
-  // TEMP: stubbed to always pass until the MeasureEval validation endpoint is wired up.
+  // Validate a FHIRPath expression for a resource type via the MeasureEval $validate endpoint.
   validateFhirPath(resourceType: string, fhirPath: string): Observable<IFhirPathValidationResponse> {
-    return of<IFhirPathValidationResponse>({valid: true, errors: [], warnings: []});
+    return this.http.post<IFhirPathValidationResponse>(
+      `${this.appConfigService.config?.baseApiUrl}/measureeval/fhir-path/$validate`,
+      { resourceType, fhirPath }
+    )
+      .pipe(
+        tap(_ => console.log(`FHIRPath validation request was sent.`)),
+        catchError((error) => this.errorHandler.handleError(error, false))
+      );
   }
 
 }
