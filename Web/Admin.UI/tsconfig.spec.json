@@ -5,7 +5,10 @@
     "outDir": "./out-tsc/spec",
     "types": [
       "jasmine"
-    ]
+    ],
+    "paths": {
+      "chart.js/dist/types/utils": ["node_modules/chart.js/dist/types/utils.d.ts"]
+    }
   },
   "files": [
     "src/test.ts",

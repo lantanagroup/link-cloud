@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { QueryPlanConfigComponent } from './query-plan-config.component';
+import { QueryPlanConfigFormComponent } from './query-plan-config.component';
 
-describe('QueryPlanConfigComponent', () => {
-  let component: QueryPlanConfigComponent;
-  let fixture: ComponentFixture<QueryPlanConfigComponent>;
+describe('QueryPlanConfigFormComponent', () => {
+  let component: QueryPlanConfigFormComponent;
+  let fixture: ComponentFixture<QueryPlanConfigFormComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [QueryPlanConfigComponent]
+      imports: [QueryPlanConfigFormComponent]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(QueryPlanConfigComponent);
+    fixture = TestBed.createComponent(QueryPlanConfigFormComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

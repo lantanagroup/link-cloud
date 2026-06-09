@@ -4,8 +4,8 @@ export interface IDataAcquisitionAuthenticationConfigModel {
     tokenUrl: string;
     audience: string;
     clientId: string;
-    clientSecret: string;
-    scope: string;
+    clientSecret?: string;
+    scope?: string;
     userName: string;
     password: string;
     customHeaders?: { [key: string]: string };

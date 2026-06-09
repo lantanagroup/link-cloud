@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { QueryConfigDialogComponent } from './query-dispatch-config-dialog.component';
+import { QueryDispatchConfigDialogComponent } from './query-dispatch-config-dialog.component';
 
 describe('CensusConfigDialogComponent', () => {
-  let component: QueryConfigDialogComponent;
-  let fixture: ComponentFixture<QueryConfigDialogComponent>;
+  let component: QueryDispatchConfigDialogComponent;
+  let fixture: ComponentFixture<QueryDispatchConfigDialogComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ QueryConfigDialogComponent ]
+      imports: [ QueryDispatchConfigDialogComponent ]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(QueryConfigDialogComponent);
+    fixture = TestBed.createComponent(QueryDispatchConfigDialogComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
