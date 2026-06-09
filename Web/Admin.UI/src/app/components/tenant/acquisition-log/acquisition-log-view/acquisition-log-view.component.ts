@@ -148,7 +148,7 @@ export class AcquisitionLogViewComponent implements OnInit {
   selectedPriorityFilter: string = 'Any';
   queryPhaseFilterOptions: string[] = [ "Initial", "Supplemental", "Referential", "Polling", "Monitoring" ];
   selectedQueryPhaseFilter: string = 'Any';
-  queryTypeFilterOptions: string[] = [ "Read", "Search", "BulkDataRequest", "BulkDataPoll" ];
+  queryTypeFilterOptions: string[] = [ "Read", "Search", "SearchPost", "BulkDataRequest", "BulkDataPoll" ];
   selectedQueryTypeFilter: string = 'Any';
   statusFilterOptions: string[] = [ "Pending", "Ready", "Processing", "Completed", "Failed", "Cancelled", "MaxRetriesReached", "ConfigurationMissing", "Skipped", "Queued"];
   selectedStatusFilter: string[] = [];
