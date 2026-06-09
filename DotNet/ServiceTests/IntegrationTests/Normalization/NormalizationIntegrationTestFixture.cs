@@ -131,6 +131,7 @@ namespace IntegrationTests.Normalization
             builder.Services.AddSingleton(ResourcesNormalizedProducerMock.Object);
             
             builder.Services.AddTransient<ResourcesAcquiredListener>();
+            builder.Services.AddSingleton(TimeProvider.System);
             builder.Services.AddTransient<INormalizationServiceMetrics, NormalizationServiceMetrics>();
             builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection("BlobStorage"));
             builder.Services.Configure<ResourceCacheBlobStorageSettings>(opts => opts.ConnectionString = _azuriteContainer.GetConnectionString());
