@@ -24,6 +24,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
     private readonly ILogger<AcquisitionProcessorBackgroundService> _logger;
     private readonly IServiceProvider _serviceProvider;
     private readonly Channel<AcquisitionWorkItem> _workChannel;
+    private readonly IProducer<ResourceKey, ResourcesAcquired> _resourceAcquiredProducer;
 
     // Tune these via configuration if desired
     private readonly int _maxConcurrency = 8;          // adjust based on CPU / expected query duration
@@ -32,11 +33,13 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
     public AcquisitionProcessorBackgroundService(
         ILogger<AcquisitionProcessorBackgroundService> logger,
         IServiceProvider serviceProvider,
+        IProducer<ResourceKey, ResourcesAcquired> resourceAcquiredProducer,
         IOptions<AcquisitionWorkerProcessorSettings>? settings = null
         )
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
+        _resourceAcquiredProducer = resourceAcquiredProducer;
 
         if (settings?.Value != null)
         {
@@ -68,7 +71,7 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 return;
             }
         }
-        catch (OperationCanceledException ex)
+        catch (OperationCanceledException)
         {
             _logger.LogWarning("Channel full. Timed out enqueuing LogId {LogId}.", item.LogId);
             throw new Exception($"Internal queue capacity reached for LogId {item.LogId}");
@@ -234,8 +237,6 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 return; // Group not yet complete.
             }
 
-            var producer = scopeProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
-
             var headers = new Headers
             {
                 new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
@@ -247,18 +248,20 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
                 headers.Add("traceparent", Encoding.UTF8.GetBytes(tailResult.TraceParentId));
             }
 
-            await producer.ProduceAsync(
-                KafkaTopic.ResourceAcquired.ToString(),
-                new Message<ResourceKey, ResourceAcquired>
-                {
-                    Key = new ResourceKey
+
+            await _resourceAcquiredProducer.ProduceAsync(
+                    KafkaTopic.ResourcesAcquired.ToString(),
+                    new Message<ResourceKey, ResourcesAcquired>
                     {
-                        FacilityId = tailResult.FacilityId,
-                        CorrelationId = tailResult.CorrelationId
+                        Key = new ResourceKey
+                        {
+                            FacilityId = tailResult.FacilityId,
+                            PatientId = tailResult.PatientId
+                        },
+                        Headers = headers,
+                        Value = tailResult.ResourcesAcquired
                     },
-                    Headers = headers,
-                    Value = tailResult.ResourceAcquired
-                }, ct);
+                    ct);
 
             _logger.LogInformation(
                 "Produced inline AcquisitionComplete tail for FacilityId={FacilityId}, CorrelationId={CorrelationId}",

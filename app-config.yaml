@@ -163,6 +163,27 @@ services:
     - key: "DistributedLockSettings:Expiration"
       description: "The expiration time in minutes for distributed locks."
       required: true
+    - key: "ResourceCache:CacheImplementation"
+      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
+      required: false
+    - key: "ResourceCache:Redis:ConnectionString"
+      description: "The Redis endpoint used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
+      required: true
+    - key: "ResourceCache:Redis:Password"
+      description: "Optional Redis password for the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:Redis:MemoryThresholdPercent"
+      description: "Optional Redis maxmemory percentage at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      required: false
+    - key: "ResourceCache:BlobStorage:ConnectionString"
+      description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
+      required: true
+    - key: "ResourceCache:BlobStorage:BlobContainerName"
+      description: "Optional blob container name used by the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:BlobStorage:BlobRoot"
+      description: "Optional blob name prefix used by the resource cache. Defaults to empty."
+      required: false
   DataAcquisitionWorker:
     - key: "AcquisitionWorkerProcessorSettings:MaxConcurrentAcquisitions"
       description: "The maximum number of concurrent data acquisition tasks."
@@ -170,6 +191,27 @@ services:
     - key: "AcquisitionWorkerProcessorSettings:WorkChannelCapacity"
       description: "The capacity of the internal work channel for acquisition tasks."
       required: true
+    - key: "ResourceCache:CacheImplementation"
+      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
+      required: false
+    - key: "ResourceCache:Redis:ConnectionString"
+      description: "The Redis endpoint used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
+      required: true
+    - key: "ResourceCache:Redis:Password"
+      description: "Optional Redis password for the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:Redis:MemoryThresholdPercent"
+      description: "Optional Redis maxmemory percentage at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      required: false
+    - key: "ResourceCache:BlobStorage:ConnectionString"
+      description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
+      required: true
+    - key: "ResourceCache:BlobStorage:BlobContainerName"
+      description: "Optional blob container name used by the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:BlobStorage:BlobRoot"
+      description: "Optional blob name prefix used by the resource cache. Defaults to empty."
+      required: false
   Census:
     - key: "CensusSettings:ObservationCodes"
       description: "Comma-separated list of FHIR Observation codes used to identify census events."
@@ -190,6 +232,15 @@ services:
     - key: "link.cql-debug"
       description: "Boolean flag to enable CQL debugging."
       required: true
+    - key: "resource-cache.blob-storage.connection-string"
+      description: "Azure Blob Storage (or Azurite) connection string for the ABS resource cache. Required only when the ABS resource-cache backend is used instead of Redis; leave empty to disable ABS caching."
+      required: false
+    - key: "resource-cache.blob-storage.blob-container-name"
+      description: "Name of the blob container backing the ABS resource cache. Required only when the ABS resource-cache backend is used."
+      required: false
+    - key: "resource-cache.blob-storage.blob-root"
+      description: "Root path/prefix within the blob container under which cached resources are stored for the ABS resource cache. Required only when the ABS resource-cache backend is used."
+      required: false
   Normalization: []
   Notification:
     - key: "SmtpConnection:Host"

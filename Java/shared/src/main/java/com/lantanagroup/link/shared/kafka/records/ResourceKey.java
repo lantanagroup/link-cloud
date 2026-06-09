@@ -11,5 +11,5 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ResourceKey {
     private String facilityId;
-    private String correlationId;
+    private String patientId;
 }
