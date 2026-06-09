@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { QueryConfigFormComponent } from './query-dispatch-config-form.component';
+import { QueryDispatchConfigFormComponent } from './query-dispatch-config-form.component';
 
 describe('CensusConfigFormComponent', () => {
-  let component: QueryConfigFormComponent;
-  let fixture: ComponentFixture<QueryConfigFormComponent>;
+  let component: QueryDispatchConfigFormComponent;
+  let fixture: ComponentFixture<QueryDispatchConfigFormComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ QueryConfigFormComponent ]
+      imports: [ QueryDispatchConfigFormComponent ]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(QueryConfigFormComponent);
+    fixture = TestBed.createComponent(QueryDispatchConfigFormComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
