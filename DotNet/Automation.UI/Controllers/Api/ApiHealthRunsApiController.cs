@@ -15,6 +15,7 @@ public sealed class ApiHealthRunsApiController(ApiHealthExecutionRunManager runM
     };
 
     [HttpPost("start-all")]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> StartAll(CancellationToken cancellationToken)
     {
         var runId = await runManager.StartAllAsync();
