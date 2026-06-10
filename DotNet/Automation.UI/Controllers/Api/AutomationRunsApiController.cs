@@ -2,6 +2,8 @@
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Automation.UI.Controllers.Api;
 
@@ -99,6 +101,7 @@ public sealed class AutomationRunsApiController(
         {
             Scenario = AutomationScenarioKind.Custom,
             ScenarioName = scenario.Name,
+            RunConfigurationJson = SerializeScenarioConfiguration(scenario),
             ReportMethod = scenario.ReportMethod,
             Seed = scenario.Seed,
             PatientCount = scenario.PatientCount,
@@ -113,6 +116,17 @@ public sealed class AutomationRunsApiController(
             ReportPeriodEnd = scenario.ReportPeriodEnd,
             QueryPlanTemplateId = scenario.QueryPlanTemplateId,
         };
+    }
+
+    private static string SerializeScenarioConfiguration(TestScenarioDefinition scenario)
+    {
+        var options = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+        options.Converters.Add(new JsonStringEnumConverter());
+        return JsonSerializer.Serialize(scenario, options);
     }
 
     public sealed class StartScenarioApiRequest

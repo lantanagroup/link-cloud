@@ -43,12 +43,12 @@ public class ReportApiHelper
             PatientIds = config.PatientIds
         };
 
-        var payload = await _facilityClient.GenerateAdhocReportAsync(facilityId, body);
+        var response = await _facilityClient.GenerateAdhocReportAsync(facilityId, body);
 
-        AutomationInvariant.Require(payload?.ReportId != null && payload.ReportId != Guid.Empty,
+        AutomationInvariant.Require(response.IsSuccessStatusCode && response.Body?.ReportId != null && response.Body.ReportId != Guid.Empty,
             "Expected response to include reportId but received empty payload.");
 
-        return payload!.ReportId.ToString();
+        return response.Body!.ReportId.ToString();
     }
 
     /// <summary>
@@ -65,12 +65,12 @@ public class ReportApiHelper
             BypassSubmission = false
         };
 
-        var payload = await _facilityClient.RegenerateReportAsync(facilityId, request);
+        var response = await _facilityClient.RegenerateReportAsync(facilityId, request);
 
-        AutomationInvariant.Require(payload?.ReportId != null && payload.ReportId != Guid.Empty,
+        AutomationInvariant.Require(response.IsSuccessStatusCode && response.Body?.ReportId != null && response.Body.ReportId != Guid.Empty,
             "Expected regenerate response to include a new reportId but received empty payload.");
 
-        var newReportId = payload!.ReportId.ToString();
+        var newReportId = response.Body!.ReportId.ToString();
         _output.WriteLine($"Regeneration initiated. New report ID: {newReportId}");
         return newReportId;
     }
@@ -162,14 +162,14 @@ public class ReportApiHelper
             }
 
             string currentStatus;
-            var schedule = await _reportClient.GetScheduleAsync(reportId);
-            if (schedule == null)
+            var response = await _reportClient.GetScheduleAsync(reportId);
+            if (!response.IsSuccessStatusCode || response.Body == null)
             {
                 currentStatus = "not found";
             }
             else
             {
-                currentStatus = schedule.Status.ToString() ?? "unknown";
+                currentStatus = response.Body.Status.ToString() ?? "unknown";
 
                 if (string.Equals(currentStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
                 {
@@ -209,10 +209,12 @@ public class ReportApiHelper
     {
         _output.WriteLine($"Downloading report {reportId}...");
 
-        var (bytes, contentType) = await _submissionClient.DownloadSubmissionAsync(facilityId, reportId, external);
+        var response = await _submissionClient.DownloadSubmissionAsync(facilityId, reportId, external);
 
-        AutomationInvariant.Require(contentType?.Contains("application/zip") == true,
-            $"Expected Content-Type to be application/zip but received {contentType}");
+        AutomationInvariant.Require(response.IsSuccessStatusCode && response.Body != null,
+            $"Download failed with status {response.StatusCode}");
+
+        var bytes = response.Body!;
 
         var responseDictionary = new Dictionary<string, object>();
 

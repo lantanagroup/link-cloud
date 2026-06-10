@@ -28,14 +28,14 @@ public static class FacilitySetupHelper
         List<string> measureIds)
     {
         var existing = await facilityClient.GetAsync(facilityId);
-        if (existing != null)
+        if (existing.IsSuccessStatusCode && existing.Body != null)
         {
             output.WriteLine($"Facility '{facilityId}' already exists. Skipping create.");
             await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId);
             return;
         }
 
-        await facilityClient.CreateAsync(new FacilityModel
+        var createResponse = await facilityClient.CreateAsync(new FacilityModel
         {
             FacilityId = facilityId,
             FacilityName = facilityId,
@@ -48,6 +48,12 @@ public static class FacilitySetupHelper
                 Weekly = []
             }
         });
+
+        if (!createResponse.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Failed to create facility '{facilityId}'. HTTP {createResponse.StatusCode}: {createResponse.RawBody ?? "(no body)"}");
+        }
 
         await WaitForFacilityReadConsistencyAsync(facilityClient, output, facilityId);
     }
@@ -64,7 +70,7 @@ public static class FacilitySetupHelper
         while (DateTime.UtcNow - started < timeout)
         {
             var facility = await facilityClient.GetAsync(facilityId, cancellationToken);
-            if (facility != null)
+            if (facility.IsSuccessStatusCode && facility.Body != null)
                 return;
 
             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
@@ -82,13 +88,13 @@ public static class FacilitySetupHelper
         try
         {
             var response = await normalizationClient.SearchFacilityOperationsAsync(facilityId);
-            if (response?.Records?.Count > 0)
+            if (response.IsSuccessStatusCode && response.Body?.Records?.Count > 0)
             {
                 output.WriteLine($"Normalization config for facility '{facilityId}' already exists. Skipping create.");
                 return;
             }
 
-            await normalizationClient.CreateOperationAsync(new CreateNormalizationOperationRequestApiModel
+            var normResp = await normalizationClient.CreateOperationAsync(new CreateNormalizationOperationRequestApiModel
             {
                 ResourceTypes = ["Location"],
                 FacilityId = facilityId,
@@ -103,6 +109,10 @@ public static class FacilitySetupHelper
                 Description = "Copy Location Identifier to Code",
                 VendorIds = []
             });
+
+            if (!normResp.IsSuccessStatusCode)
+                throw new InvalidOperationException(
+                    $"Failed to create normalization operation for facility '{facilityId}'. HTTP {normResp.StatusCode}: {normResp.RawBody ?? "(no body)"}");
         }
         catch (Exception ex)
         {
@@ -158,7 +168,7 @@ public static class FacilitySetupHelper
             TimeZone = config.FhirQuery.TimeZone
         });
 
-        if (!created)
+        if (!created.IsSuccessStatusCode)
             output.WriteLine($"Query config for facility '{facilityId}' already exists. Skipping create.");
     }
 
@@ -167,7 +177,7 @@ public static class FacilitySetupHelper
         IAutomationOutput output,
         string facilityId)
     {
-        await queryDispatchClient.UpsertQueryDispatchConfigurationAsync(
+        var qdResp = await queryDispatchClient.UpsertQueryDispatchConfigurationAsync(
             facilityId,
             new QueryDispatchConfigurationApiModel
             {
@@ -181,6 +191,10 @@ public static class FacilitySetupHelper
                     }
                 ]
             });
+
+        if (!qdResp.IsSuccessStatusCode)
+            throw new InvalidOperationException(
+                $"Failed to upsert query dispatch config for facility '{facilityId}'. HTTP {qdResp.StatusCode}: {qdResp.RawBody ?? "(no body)"}");
 
         output.WriteLine($"Ensured query dispatch config for facility '{facilityId}'.");
     }
@@ -251,7 +265,7 @@ public static class FacilitySetupHelper
         };
 
         var created = await dataAcqClient.CreateQueryPlanAsync(facilityId, body);
-        if (!created)
+        if (!created.IsSuccessStatusCode)
             output.WriteLine($"{type} query plan for facility '{facilityId}' already exists. Skipping create.");
     }
 }

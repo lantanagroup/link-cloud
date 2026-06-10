@@ -7,7 +7,8 @@ public class ValidationApiHelper(IValidationServiceClient validationClient, IAut
 {
     public async Task InitializeArtifactsAsync()
     {
-        if (await validationClient.HasArtifactsAsync())
+        var response = await validationClient.GetArtifactsAsync();
+        if (response.IsSuccessStatusCode && response.Body is { Count: > 0 })
         {
             output.WriteLine("Validation artifacts already initialized. Skipping initialize call.");
             return;
@@ -23,7 +24,8 @@ public class ValidationApiHelper(IValidationServiceClient validationClient, IAut
 
     public async Task InitializeCategoriesAsync()
     {
-        if (await validationClient.HasCategoriesAsync())
+        var response = await validationClient.GetCategoriesAsync();
+        if (response.IsSuccessStatusCode && response.Body is { Count: > 0 })
         {
             output.WriteLine("Validation categories already initialized. Skipping initialize call.");
             return;

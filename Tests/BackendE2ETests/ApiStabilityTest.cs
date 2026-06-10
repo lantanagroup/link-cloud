@@ -2,6 +2,7 @@
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Census;
@@ -82,8 +83,8 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
         await RunWithRetryAsync(results, "Validation.InitializeArtifacts", async () =>
         {
-            var hasArtifacts = await ValidationClient.HasArtifactsAsync();
-            if (hasArtifacts)
+            var response = await ValidationClient.GetArtifactsAsync();
+            if (response.IsSuccessStatusCode && response.Body is { Count: > 0 })
             {
                 Output.WriteLine("Validation artifacts already initialized. Skipping initialize call.");
                 return;
@@ -94,8 +95,8 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
         await RunWithRetryAsync(results, "Validation.InitializeCategories", async () =>
         {
-            var hasCategories = await ValidationClient.HasCategoriesAsync();
-            if (hasCategories)
+            var response = await ValidationClient.GetCategoriesAsync();
+            if (response.IsSuccessStatusCode && response.Body is { Count: > 0 })
             {
                 Output.WriteLine("Validation categories already initialized. Skipping initialize call.");
                 return;
@@ -157,6 +158,12 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         await RunAsync(results, "Facility.CheckFacilityExists",
             () => FacilityClient.CheckFacilityExistsAsync(_facilityId));
 
+        await RunAsync(results, "Facility.Update", async () =>
+        {
+            facilityBody.FacilityName = _facilityId + "-Updated";
+            await FacilityClient.UpdateAsync(_facilityId, facilityBody);
+        });
+
         var queryDispatchConfig = new QueryDispatchConfigurationApiModel
         {
             FacilityId = _facilityId,
@@ -175,6 +182,9 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
             await QueryDispatchClient.UpsertQueryDispatchConfigurationAsync(_facilityId, queryDispatchConfig);
             _queryDispatchConfigCreated = true;
         });
+
+        await RunAsync(results, "QueryDispatch.GetConfiguration",
+            () => QueryDispatchClient.GetConfigurationAsync(_facilityId));
 
         var queryConfigRequest = new CreateFhirQueryConfigurationRequestApiModel
         {
@@ -293,6 +303,15 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         await RunExpecting404Async(results, "Report.SoftDeleteSchedule",
             () => ReportClient.SoftDeleteScheduleAsync(Guid.NewGuid().ToString()));
 
+        await RunExpecting404Async(results, "Report.RestoreSchedule",
+            () => ReportClient.RestoreScheduleAsync(Guid.NewGuid().ToString()));
+
+        await RunAsync(results, "Report.GetSchedulesByFacility",
+            () => ReportClient.GetSchedulesByFacilityAsync(_facilityId));
+
+        await RunAsync(results, "Report.SetReportsDeletedStatusForFacility",
+            () => ReportClient.SetReportsDeletedStatusForFacilityAsync(_facilityId, false));
+
         await RunAsync(results, "Report.GetEntriesBySchedule",
             () => ReportClient.GetEntriesByScheduleAsync(Guid.NewGuid().ToString()));
 
@@ -304,7 +323,7 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
         // Submission service – non-existent report returns 404; that proves the service is reachable
         await RunExpecting404Async(results, "Submission.DownloadSubmission",
-            () => SubmissionClient.DownloadSubmissionAsync(_facilityId, Guid.NewGuid().ToString()));
+            async () => await SubmissionClient.DownloadSubmissionAsync(_facilityId, Guid.NewGuid().ToString()));
 
         await RunAsync(results, "DataAcq.SearchAcquisitionLogs",
             () => DataAcqClient.SearchAcquisitionLogsAsync(_facilityId, Guid.NewGuid().ToString()));
@@ -446,16 +465,15 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         }
     }
 
-    private async Task RunExpectingStatusAsync(ApiRunResults results, string name, int expectedStatusCode, Func<Task> action)
+    private async Task RunAsync(ApiRunResults results, string name, Func<Task<LinkApiResponse>> action)
     {
         try
         {
-            await action();
-            results.AddError(name, $"Expected HTTP {expectedStatusCode} but call succeeded.");
-        }
-        catch (FlurlHttpException ex) when (ex.StatusCode == expectedStatusCode)
-        {
-            results.AddSuccess(name, $"{expectedStatusCode} (expected)");
+            var response = await action();
+            if (response.IsSuccessStatusCode)
+                results.AddSuccess(name);
+            else
+                results.AddError(name, $"HTTP {response.StatusCode}{(response.RawBody != null ? $": {Truncate(response.RawBody)}" : "")}");
         }
         catch (Exception ex)
         {
@@ -463,20 +481,39 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
         }
     }
 
+    private async Task<LinkApiResponse?> RunExpectingStatusAsync(ApiRunResults results, string name, int expectedStatusCode, Func<Task<LinkApiResponse>> action)
+    {
+        try
+        {
+            var response = await action();
+            if (response.StatusCode == expectedStatusCode)
+                results.AddSuccess(name, $"{expectedStatusCode} (expected)");
+            else
+                results.AddError(name, $"Expected HTTP {expectedStatusCode} but got {response.StatusCode}.");
+            return response;
+        }
+        catch (Exception ex)
+        {
+            results.AddError(name, ex.Message);
+            return null;
+        }
+    }
+
     /// <summary>
     /// Runs an action where a 404 response is the expected healthy outcome
     /// (e.g., querying a non-existent resource to prove the service is reachable).
     /// </summary>
-    private async Task RunExpecting404Async(ApiRunResults results, string name, Func<Task> action)
+    private async Task RunExpecting404Async(ApiRunResults results, string name, Func<Task<LinkApiResponse>> action)
     {
         try
         {
-            await action();
-            results.AddSuccess(name);
-        }
-        catch (FlurlHttpException ex) when (ex.StatusCode == 404)
-        {
-            results.AddSuccess(name, "404 (expected for non-existent resource)");
+            var response = await action();
+            if (response.StatusCode == 404)
+                results.AddSuccess(name, "404 (expected for non-existent resource)");
+            else if (response.IsSuccessStatusCode)
+                results.AddSuccess(name);
+            else
+                results.AddError(name, $"HTTP {response.StatusCode}");
         }
         catch (Exception ex)
         {
@@ -510,6 +547,9 @@ public sealed class ApiStabilityTest : IAsyncLifetime, IClassFixture<BackendE2ET
 
     private static Task Try(Func<Task> action) =>
         action().ContinueWith(_ => { }, TaskContinuationOptions.None);
+
+    private static string Truncate(string value, int maxLength = 200) =>
+        value.Length > maxLength ? value[..maxLength] : value;
 
     private sealed class ApiRunResults(IAutomationOutput output)
     {

@@ -129,6 +129,25 @@ builder.Services.AddSingleton<MongoIndexManager>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
+builder.Services.AddSingleton<IApiHealthRunStore, MongoApiHealthRunStore>();
+
+// -- API Health test suites --
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.TenantServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.DataAcquisitionTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.NormalizationTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.CensusServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.ReportServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.QueryDispatchTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.SubmissionServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.MeasureEvalTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.ValidationServiceTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.AdminBffTestSuite>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiEndpointRegistry>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiHealthTestExecutor>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiHealthExecutionRunManager>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedContextAccessor, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedContextAccessor>();
+builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedOrchestrator, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedOrchestrator>();
+builder.Services.AddHttpClient("ApiHealthTest");
 builder.Services.AddHealthChecks();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {

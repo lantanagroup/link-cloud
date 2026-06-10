@@ -171,7 +171,8 @@ public sealed class ReportScheduledTest : IAsyncLifetime, IClassFixture<BackendE
         Assert.True(submitted,
             $"Expected scheduled workflow report {reportId} to be submitted but it was not.");
 
-        var schedule = await _sp.GetRequiredService<IReportServiceClient>().GetScheduleAsync(reportId)
+        var scheduleResponse = await _sp.GetRequiredService<IReportServiceClient>().GetScheduleAsync(reportId);
+        var schedule = scheduleResponse.Body
             ?? throw new InvalidOperationException($"Schedule {reportId} not found after submission.");
         var actualStartDate = schedule.ReportStartDate.ToUniversalTime().ToString("o");
         var actualEndDate = schedule.ReportEndDate.ToUniversalTime().ToString("o");
@@ -294,10 +295,10 @@ public sealed class ReportScheduledTest : IAsyncLifetime, IClassFixture<BackendE
 
         while (DateTime.UtcNow - started < timeout)
         {
-            var schedule = await _sp.GetRequiredService<IReportServiceClient>().GetScheduleAsync(reportId);
-            if (schedule != null)
+            var scheduleResponse = await _sp.GetRequiredService<IReportServiceClient>().GetScheduleAsync(reportId);
+            if (scheduleResponse.IsSuccessStatusCode && scheduleResponse.Body != null)
             {
-                Output.WriteLine($"Report schedule detected before patient-event publish (status={schedule.Status}).");
+                Output.WriteLine($"Report schedule detected before patient-event publish (status={scheduleResponse.Body.Status}).");
                 return;
             }
 

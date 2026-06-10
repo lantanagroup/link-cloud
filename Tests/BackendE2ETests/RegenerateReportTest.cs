@@ -181,7 +181,8 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
         Assert.True(regeneratedSubmitted,
             $"Expected regenerated report {regeneratedReportId} to be submitted but it was not.");
 
-        var regenSchedule = await _sp.GetRequiredService<IReportServiceClient>().GetScheduleAsync(regeneratedReportId)
+        var regenResponse = await _sp.GetRequiredService<IReportServiceClient>().GetScheduleAsync(regeneratedReportId);
+        var regenSchedule = regenResponse.Body
             ?? throw new InvalidOperationException($"Schedule {regeneratedReportId} not found after submission.");
         var actualStartDate = regenSchedule.ReportStartDate.ToUniversalTime().ToString("o");
         var actualEndDate = regenSchedule.ReportEndDate.ToUniversalTime().ToString("o");
@@ -305,7 +306,8 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
 
         while (DateTime.UtcNow - started < timeout)
         {
-            var schedule = await _sp.GetRequiredService<IReportServiceClient>().GetScheduleAsync(reportId);
+            var scheduleResponse = await _sp.GetRequiredService<IReportServiceClient>().GetScheduleAsync(reportId);
+            var schedule = scheduleResponse.Body;
             if (schedule != null)
             {
                 var scheduleStatus = schedule.Status.ToString();
@@ -387,16 +389,17 @@ public sealed class RegenerateReportTest : IAsyncLifetime, IClassFixture<Backend
     {
         Output.WriteLine($"Regenerating report from source reportId={sourceReportId}…");
 
-        var payload = await _sp.GetRequiredService<IFacilityServiceClient>().RegenerateReportAsync(facilityId, new RegenerateReportRequest
+        var response = await _sp.GetRequiredService<IFacilityServiceClient>().RegenerateReportAsync(facilityId, new RegenerateReportRequest
         {
             ReportId = sourceReportId,
             BypassSubmission = false
         });
 
-        Assert.NotNull(payload);
-        Assert.NotEqual(Guid.Empty, payload.ReportId);
+        Assert.True(response.IsSuccessStatusCode, $"RegenerateReport failed with status {response.StatusCode}");
+        Assert.NotNull(response.Body);
+        Assert.NotEqual(Guid.Empty, response.Body.ReportId);
 
-        return payload.ReportId.ToString();
+        return response.Body.ReportId.ToString();
     }
 
     private IEnumerable<(ProducerConfig producerConfig, String mode)> BuildProducerConfigs(string bootstrapServers)

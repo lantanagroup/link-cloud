@@ -21,16 +21,28 @@ public class QueryDispatchServiceClient : LinkApiClientBase, IQueryDispatchServi
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
-    public Task UpsertQueryDispatchConfigurationAsync(
+    public Task<LinkApiResponse<QueryDispatchConfigurationApiModel>> GetConfigurationAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<QueryDispatchConfigurationApiModel>(() => Request($"querydispatch/configuration/facility/{facilityId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> CreateQueryDispatchConfigurationAsync(
+        QueryDispatchConfigurationApiModel configuration,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("querydispatch/configuration")
+            .PostJsonAsync(configuration, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> UpsertQueryDispatchConfigurationAsync(
         string facilityId,
         QueryDispatchConfigurationApiModel configuration,
         CancellationToken cancellationToken = default) =>
-        Request($"querydispatch/configuration/facility/{facilityId}")
-            .PutJsonAsync(configuration, cancellationToken: cancellationToken);
+        SendAsync(() => Request($"querydispatch/configuration/facility/{facilityId}")
+            .PutJsonAsync(configuration, cancellationToken: cancellationToken));
 
-    public Task DeleteQueryDispatchConfigurationAsync(
+    public Task<LinkApiResponse> DeleteQueryDispatchConfigurationAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"querydispatch/configuration/facility/{facilityId}")
+        SendAsync(() => Request($"querydispatch/configuration/facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 }

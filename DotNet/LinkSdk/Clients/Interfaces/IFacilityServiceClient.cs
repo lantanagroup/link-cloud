@@ -1,14 +1,20 @@
-﻿using LantanaGroup.Link.Shared.Application.Models.Integration.Tenant;
+﻿using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Tenant;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 
 namespace LantanaGroup.Link.Sdk.Clients;
 
 public interface IFacilityServiceClient
 {
-    Task<FacilityModel> CreateAsync(FacilityModel request, CancellationToken cancellationToken = default);
-    Task<FacilityModel?> GetAsync(string facilityId, CancellationToken cancellationToken = default);
-    Task<bool> CheckFacilityExistsAsync(string facilityId, CancellationToken cancellationToken = default);
-    Task DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
-    Task<GenerateAdhocReportResponseApiModel> GenerateAdhocReportAsync(string facilityId, AdHocReportRequest request, CancellationToken cancellationToken = default);
-    Task<GenerateAdhocReportResponseApiModel> RegenerateReportAsync(string facilityId, RegenerateReportRequest request, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<FacilityModel>> CreateAsync(FacilityModel request, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<FacilityModel>> GetAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<FacilityModel>> UpdateAsync(string facilityId, FacilityModel request, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> CheckFacilityExistsAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> DeleteAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> SoftDeleteAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> RestoreAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> SearchFacilitiesAsync(string? facilityId = null, int pageSize = 10, int pageNumber = 1, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<Dictionary<string, string>>> GetFacilityListAsync(string? search = null, bool includeDeleted = false, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<GenerateAdhocReportResponseApiModel>> GenerateAdhocReportAsync(string facilityId, AdHocReportRequest request, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<GenerateAdhocReportResponseApiModel>> RegenerateReportAsync(string facilityId, RegenerateReportRequest request, CancellationToken cancellationToken = default);
 }
