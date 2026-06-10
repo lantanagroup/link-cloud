@@ -26,6 +26,8 @@ using Microsoft.Extensions.Logging;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using UnitTests.Admin.BFF.Aggregation;
 
 namespace UnitTests.DataAcquisition;
 
@@ -124,16 +126,17 @@ public class FhirApiServiceTests
         var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
+        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourcesAcquired>>();
         var logger = new Mock<ILogger<FhirApiService>>();
+        var resourceCache = new Mock<IResourceCache>();
 
         var service = new FhirApiService(
             referenceResourceManager.Object,
             referenceResourceQueries.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
-            kafkaProducer.Object,
-            logger.Object
+            logger.Object,
+            resourceCache.Object
         );
 
         var resource = new Patient();
@@ -162,16 +165,17 @@ public class FhirApiServiceTests
         var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
+        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourcesAcquired>>();
         var logger = new Mock<ILogger<FhirApiService>>();
+        var resourceCache = new Mock<IResourceCache>();
 
         var service = new FhirApiService(
             referenceResourceManager.Object,
             referenceResourceQueries.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
-            kafkaProducer.Object,
-            logger.Object
+            logger.Object,
+            resourceCache.Object
         );
 
         var resource = new Patient();
@@ -214,16 +218,17 @@ public class FhirApiServiceTests
         var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
+        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourcesAcquired>>();
         var logger = new Mock<ILogger<FhirApiService>>();
+        var resourceCache = new Mock<IResourceCache>();
 
         var service = new FhirApiService(
             referenceResourceManager.Object,
             referenceResourceQueries.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
-            kafkaProducer.Object,
-            logger.Object
+            logger.Object,
+            resourceCache.Object
         );
 
         var log = new DataAcquisitionLogModel
@@ -267,8 +272,8 @@ public class FhirApiServiceTests
             new Mock<IReferenceResourcesQueries>().Object,
             new Mock<ISearchFhirCommand>().Object,
             readFhirCommand.Object,
-            new Mock<IProducer<ResourceKey, ResourceAcquired>>().Object,
-            new Mock<ILogger<FhirApiService>>().Object
+            new Mock<ILogger<FhirApiService>>().Object,
+            new Mock<IResourceCache>().Object
         );
 
         var log = new DataAcquisitionLogModel { FacilityId = "123", ResourceId = "res-1" };
@@ -295,8 +300,8 @@ public class FhirApiServiceTests
             new Mock<IReferenceResourcesQueries>().Object,
             searchFhirCommand.Object,
             new Mock<IReadFhirCommand>().Object,
-            new Mock<IProducer<ResourceKey, ResourceAcquired>>().Object,
-            new Mock<ILogger<FhirApiService>>().Object
+            new Mock<ILogger<FhirApiService>>().Object,
+            new Mock<IResourceCache>().Object
         );
 
         var log = new DataAcquisitionLogModel { FacilityId = "123", CorrelationId = "c-1" };
@@ -318,14 +323,14 @@ public class FhirApiServiceTests
     {
         // Arrange
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
-        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
+        var resourceCache = new Mock<IResourceCache>();
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
             searchFhirCommand.Object,
             new Mock<IReadFhirCommand>().Object,
-            kafkaProducer.Object,
-            new Mock<ILogger<FhirApiService>>().Object
+            new Mock<ILogger<FhirApiService>>().Object,
+            resourceCache.Object
         );
 
         var patient = new Patient { Id = "p1" };
@@ -354,16 +359,16 @@ public class FhirApiServiceTests
         Assert.NotNull(log.Notes);
         Assert.Contains(log.Notes, n => n.Contains("OperationOutcome(s) found in search bundle"));
 
-        // Ensure only Patient was produced to Kafka
-        kafkaProducer.Verify(x => x.ProduceAsync(
-            It.IsAny<string>(),
-            It.Is<Message<ResourceKey, ResourceAcquired>>(m => m.Value.Resource.TypeName == "Patient"),
-            It.IsAny<CancellationToken>()), Times.Once);
+        // Ensure only Patient was added to cache (not OperationOutcome)
+        resourceCache.Verify(x => x.UpdateCorrelationCache(
+            It.Is<string>(k => k.Contains(":Patient")),
+            It.IsAny<List<DomainResource>>(),
+            It.IsAny<ResourceType>()), Times.Once);
 
-        kafkaProducer.Verify(x => x.ProduceAsync(
-            It.IsAny<string>(),
-            It.Is<Message<ResourceKey, ResourceAcquired>>(m => m.Value.Resource.TypeName == "OperationOutcome"),
-            It.IsAny<CancellationToken>()), Times.Never);
+        resourceCache.Verify(x => x.UpdateCorrelationCache(
+            It.Is<string>(k => k.Contains(":OperationOutcome")),
+            It.IsAny<List<DomainResource>>(),
+            It.IsAny<ResourceType>()), Times.Never);
     }
 
     private async IAsyncEnumerable<Bundle> GetExceptionBundleAsync(Exception ex)
@@ -381,8 +386,9 @@ public class FhirApiServiceTests
         var referenceResourceQueries = new Mock<IReferenceResourcesQueries>();
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var readFhirCommand = new Mock<IReadFhirCommand>();
-        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
+        var kafkaProducer = new Mock<IProducer<ResourceKey, ResourcesAcquired>>();
         var logger = new Mock<ILogger<FhirApiService>>();
+        var resourceCache = new Mock<IResourceCache>();
 
         // Prepare a shared resource (e.g., Location) with no patient context
         var location = new Location
@@ -412,26 +418,25 @@ public class FhirApiServiceTests
                 Records = new List<ReferenceResourcesModel>()
             });
 
-        // Capture the produced Kafka message
-        ResourceAcquired? producedMessage = null;
-        kafkaProducer
-            .Setup(x => x.ProduceAsync(
+        // Capture the cache key used when storing the resource
+        string? capturedCacheKey = null;
+        resourceCache
+            .Setup(x => x.UpdateCorrelationCache(
                 It.IsAny<string>(),
-                It.IsAny<Message<ResourceKey, ResourceAcquired>>(),
-                It.IsAny<CancellationToken>()))
-            .Callback<string, Message<ResourceKey, ResourceAcquired>, CancellationToken>((topic, msg, ct) =>
+                It.IsAny<List<DomainResource>>(),
+                It.IsAny<ResourceType>()))
+            .Callback<string, List<DomainResource>, ResourceType>((key, resources, type) =>
             {
-                producedMessage = msg.Value;
-            })
-            .ReturnsAsync(new DeliveryResult<ResourceKey, ResourceAcquired>());
+                capturedCacheKey = key;
+            });
 
         var service = new FhirApiService(
             referenceResourceManager.Object,
             referenceResourceQueries.Object,
             searchFhirCommand.Object,
             readFhirCommand.Object,
-            kafkaProducer.Object,
-            logger.Object
+            logger.Object,
+            resourceCache.Object
         );
 
         var log = new DataAcquisitionLogModel
@@ -458,10 +463,10 @@ public class FhirApiServiceTests
         // Act
         await service.ExecuteSearch(log, fhirQuery, fhirQueryConfig, ResourceType.Location);
 
-        // Assert: Kafka message was produced and PatientId is null
-        Assert.NotNull(producedMessage);
-        Assert.Equal(location, producedMessage.Resource);
-        Assert.Null(producedMessage.PatientId);
+        // Assert: cache was updated and the key contains Location (not Patient)
+        Assert.NotNull(capturedCacheKey);
+        Assert.Contains(":Location", capturedCacheKey);
+        Assert.DoesNotContain(":Patient", capturedCacheKey);
 
     }
 

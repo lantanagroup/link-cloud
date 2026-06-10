@@ -1,4 +1,4 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -214,7 +214,6 @@ public class DataAcquisitionLogQueriesTests
 
         var tailingMessage = Assert.Single(result, m => m.CorrelationId == correlationId);
         Assert.Equal(facilityId, tailingMessage.FacilityId);
-        Assert.True(tailingMessage.ResourceAcquired.AcquisitionComplete);
         Assert.Contains(log1.Id, tailingMessage.LogIds);
         Assert.Contains(log2.Id, tailingMessage.LogIds);
     }

@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
@@ -38,7 +38,7 @@ public class AcquisitionProcessingJobTests
     public async Task ProcessPendingLogs_WithValidConfigAndWithinWindow_ProducesMessagesAndUpdatesStatus()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
@@ -79,7 +79,6 @@ public class AcquisitionProcessingJobTests
         var log = await logManager.CreateAsync(createLog);
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
         var job = new AcquisitionProcessingJob(loggerMock.Object, scopeFactory, readyProducer, _settings);
@@ -106,7 +105,7 @@ public class AcquisitionProcessingJobTests
     public async Task ProcessPendingLogs_NoConfig_SetsConfigurationMissingWithNoteImmediately()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var testTag = Guid.NewGuid().ToString("N");
         var missingConfigFacilityId = $"MissingConfigFacility_{testTag}";
@@ -134,7 +133,6 @@ public class AcquisitionProcessingJobTests
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -167,7 +165,7 @@ public class AcquisitionProcessingJobTests
     public async Task ProcessPendingLogs_NoConfig_AlreadyFailedLog_AlsoSetsConfigurationMissingWithNote()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var testTag = Guid.NewGuid().ToString("N");
         var missingConfigFacilityId = $"MissingConfigFacility_{testTag}";
@@ -196,7 +194,6 @@ public class AcquisitionProcessingJobTests
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -222,7 +219,7 @@ public class AcquisitionProcessingJobTests
     public async Task ProcessPendingLogs_OutsideAcquisitionWindow_SkipsProcessing()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
@@ -258,7 +255,6 @@ public class AcquisitionProcessingJobTests
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -286,7 +282,7 @@ public class AcquisitionProcessingJobTests
     public async Task ProcessPendingLogs_FailedWithRetries_RetriesUpToMax()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
@@ -340,7 +336,6 @@ public class AcquisitionProcessingJobTests
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -382,7 +377,7 @@ public class AcquisitionProcessingJobTests
     public async Task ProcessPendingLogs_FailedWithPerTenantMaxRetries_RetriesUpToMax()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
@@ -434,7 +429,6 @@ public class AcquisitionProcessingJobTests
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -472,7 +466,7 @@ public class AcquisitionProcessingJobTests
     public async Task ProcessPendingLogs_MultipleFacilitiesWithLargeLogCounts_ProcessesSequentiallyAndBatches()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var testTag = Guid.NewGuid().ToString("N");
         const int numFacilities = 4; const int logsPerFacility = 120; var facilities = new List<string>();
@@ -521,7 +515,6 @@ public class AcquisitionProcessingJobTests
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -556,7 +549,7 @@ public class AcquisitionProcessingJobTests
     public async Task ProcessPendingLogs_MultipleFacilitiesWithMixedPendingAndFailed_ProcessesCorrectly()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var testTag = Guid.NewGuid().ToString("N");
         const int numFacilities = 3;
@@ -656,7 +649,6 @@ public class AcquisitionProcessingJobTests
         var totalProcessable = numFacilities * processablePerFacility;
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -706,7 +698,7 @@ public class AcquisitionProcessingJobTests
     public async Task ProcessPendingLogs_WithinSameDayWindow_Dynamic_Processes()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
@@ -744,7 +736,6 @@ public class AcquisitionProcessingJobTests
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -772,7 +763,7 @@ public class AcquisitionProcessingJobTests
     public async Task ProcessPendingLogs_OutsideSameDayWindow_Dynamic_Skips()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
@@ -824,7 +815,6 @@ public class AcquisitionProcessingJobTests
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -852,7 +842,7 @@ public class AcquisitionProcessingJobTests
     public async Task ProcessPendingLogs_WithinMidnightSpanningWindow_Dynamic_Processes()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
@@ -902,7 +892,6 @@ public class AcquisitionProcessingJobTests
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();
@@ -930,7 +919,7 @@ public class AcquisitionProcessingJobTests
     public async Task ProcessPendingLogs_OutsideMidnightSpanningWindow_Dynamic_Skips()
     {
         _fixture.ReadyToAcquireProducerMock.Reset();
-        _fixture.ResourceAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock.Reset();
 
         var testTag = Guid.NewGuid().ToString("N");
         var facilityId = $"TestFacility_{testTag}";
@@ -976,7 +965,6 @@ public class AcquisitionProcessingJobTests
         await dbContext.SaveChangesAsync();
 
         var readyProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<long, ReadyToAcquire>>();
-        var acquiredProducer = _fixture.ServiceProvider.GetRequiredService<IProducer<ResourceKey, ResourceAcquired>>();
 
         var loggerMock = new Mock<ILogger<AcquisitionProcessingJob>>();
         var scopeFactory = _fixture.ServiceProvider.GetRequiredService<IServiceScopeFactory>();

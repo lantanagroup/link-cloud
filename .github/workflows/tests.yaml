@@ -170,6 +170,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          export ADHOC_REPORT_TEST_DOWNLOAD_PATH=adhoc-report
           mkdir -p ./Tests/BackendE2ETests/TestResults
           mkdir -p ./test-logs
 
@@ -262,7 +263,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: adhoc-report-submission-zip
-          path: ./Tests/BackendE2ETests/TestResults/adhoc-report-test-submission.zip
+          path: ./Tests/BackendE2ETests/bin/**/adhoc-report-test-submission.zip
           if-no-files-found: ignore
 
       - name: Tear down services

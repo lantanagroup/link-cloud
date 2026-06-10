@@ -9,6 +9,7 @@
 		<RootNamespace>LantanaGroup.Link.Report</RootNamespace>
 		<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
 		<Version>0.6.0</Version>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -39,7 +40,7 @@
 		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
 		<PackageReference Include="AutoMapper" Version="13.*" />
 		<PackageReference Include="Azure.Identity" Version="1.*" />
-		<PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
+		<PackageReference Include="Azure.Storage.Blobs" Version="12.29.0" />
 		<PackageReference Include="Confluent.Kafka" Version="2.*" />
 		<PackageReference Include="LinqKit.Core" Version="1.*" />
 		<PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.*" />
