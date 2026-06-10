@@ -52,6 +52,7 @@ public class ApiHealthController(
     /// Run a single endpoint test. Returns the updated row partial.
     /// </summary>
     [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> RunEndpoint([FromBody] RunEndpointRequest request, CancellationToken ct)
     {
         var endpoint = registry.GetAll().FirstOrDefault(e => e.Key == request.EndpointKey);
