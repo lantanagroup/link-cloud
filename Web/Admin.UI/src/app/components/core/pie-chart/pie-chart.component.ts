@@ -13,6 +13,7 @@ export class PieChartComponent implements AfterViewInit, OnChanges {
   @Input() data: Record<string, number> = {};
   @Input() width = 700;
   @Input() height = 400;
+  @Input() colorMap?: Record<string, string>;
 
   constructor() { }
 
@@ -41,9 +42,10 @@ export class PieChartComponent implements AfterViewInit, OnChanges {
       const radius = Math.min(this.width, this.height) / 2;
 
       // Color scale
-      const color = d3.scaleOrdinal<string>()
+      const fallbackColor = d3.scaleOrdinal<string>()
         .domain(Object.keys(this.data))
         .range(d3.schemeCategory10);
+      const color = (label: string): string => this.colorMap?.[label] ?? fallbackColor(label);
 
       // Pie & Arc generators
       const pie = d3.pie<{ key: string; value: number }>()

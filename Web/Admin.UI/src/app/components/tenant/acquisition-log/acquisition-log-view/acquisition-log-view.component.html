@@ -50,7 +50,7 @@
             <div class="status-summary-loading">Loading status counts...</div>
           } @else if (hasStatusChartData) {
             <div class="status-summary-chart">
-              <app-pie-chart [data]="statusChartData" [width]="360" [height]="220"></app-pie-chart>
+              <app-pie-chart [data]="statusChartData" [colorMap]="statusChartColors" [width]="360" [height]="220"></app-pie-chart>
             </div>
           } @else {
             <div class="status-summary-empty">No status data available for the current filters.</div>
