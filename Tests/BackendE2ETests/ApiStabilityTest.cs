@@ -43,14 +43,15 @@ public sealed class ApiStabilityTest : IClassFixture<BackendE2ETestFixture>
             BaseAddress = new Uri(TestConfig.AutomationUiBase.TrimEnd('/') + "/")
         };
 
-        using var apiHealthPageResponse = await http.GetAsync("ApiHealth", cancellationToken);
-        Assert.True(apiHealthPageResponse.IsSuccessStatusCode,
-            $"GET /ApiHealth returned {(int)apiHealthPageResponse.StatusCode}");
+        // Antiforgery token is guaranteed on the Runs page; use it for API POSTs.
+        using var runsPageResponse = await http.GetAsync("Runs", cancellationToken);
+        Assert.True(runsPageResponse.IsSuccessStatusCode,
+            $"GET /Runs returned {(int)runsPageResponse.StatusCode}");
 
-        var apiHealthPageHtml = await apiHealthPageResponse.Content.ReadAsStringAsync(cancellationToken);
-        var requestVerificationToken = ExtractRequestVerificationToken(apiHealthPageHtml);
+        var runsPageHtml = await runsPageResponse.Content.ReadAsStringAsync(cancellationToken);
+        var requestVerificationToken = ExtractRequestVerificationToken(runsPageHtml);
         Assert.False(string.IsNullOrWhiteSpace(requestVerificationToken),
-            "Could not extract __RequestVerificationToken from /ApiHealth page.");
+            "Could not extract __RequestVerificationToken from /Runs page.");
 
         http.DefaultRequestHeaders.Remove("RequestVerificationToken");
         http.DefaultRequestHeaders.Add("RequestVerificationToken", requestVerificationToken);
@@ -122,7 +123,7 @@ public sealed class ApiStabilityTest : IClassFixture<BackendE2ETestFixture>
 
         var match = Regex.Match(
             html,
-            "name=\"__RequestVerificationToken\"[^>]*value=\"(?<token>[^\"]+)\"",
+            "name=['\"]__RequestVerificationToken['\"][^>]*value=['\"](?<token>[^'\"]+)['\"]",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         return match.Success ? WebUtility.HtmlDecode(match.Groups["token"].Value) : null;
