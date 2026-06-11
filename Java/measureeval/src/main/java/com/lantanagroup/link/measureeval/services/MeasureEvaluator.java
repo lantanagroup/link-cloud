@@ -29,6 +29,10 @@ import java.util.TimeZone;
 public class MeasureEvaluator {
     private static final Logger logger = LoggerFactory.getLogger(MeasureEvaluator.class);
 
+
+    public static final String INDIVIDUAL_MEASURE_REPORT_PROFILE =
+            "http://hl7.org/fhir/us/davinci-deqm/StructureDefinition/indv-measurereport-deqm";
+
     private final FhirContext fhirContext;
     private final MeasureEvaluationOptions options;
     @Getter
@@ -114,7 +118,7 @@ public class MeasureEvaluator {
                 ? periodStart.getValue().toInstant().atZone(ZoneOffset.UTC) : null;
         ZonedDateTime end = periodEnd != null && periodEnd.getValue() != null
                 ? periodEnd.getValue().toInstant().atZone(ZoneOffset.UTC) : null;
-        return measureService.evaluate(
+        MeasureReport measureReport = measureService.evaluate(
                 Eithers.forRight3(measure),
                 start,
                 end,
@@ -128,6 +132,23 @@ public class MeasureEvaluator {
                 null,
                 null,
                 null);
+        addIndividualMeasureReportProfile(measureReport);
+        return measureReport;
+    }
+
+    /**
+     * Ensures the generated MeasureReport declares the DEQM individual MeasureReport profile in
+     * Meta.Profile, adding it only if not already present so the profile is never duplicated.
+     */
+    private static void addIndividualMeasureReportProfile(MeasureReport measureReport) {
+        if (measureReport == null) {
+            return;
+        }
+        boolean alreadyPresent = measureReport.getMeta().getProfile().stream()
+                .anyMatch(profile -> INDIVIDUAL_MEASURE_REPORT_PROFILE.equals(profile.getValue()));
+        if (!alreadyPresent) {
+            measureReport.getMeta().addProfile(INDIVIDUAL_MEASURE_REPORT_PROFILE);
+        }
     }
 
     public MeasureReport evaluate(Date periodStart, Date periodEnd, String patientId, Bundle additionalData) {

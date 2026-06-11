@@ -296,6 +296,22 @@ class MeasureEvaluatorEvaluationTests {
         Assertions.assertEquals("Encounter/simple-encounter", report.getEvaluatedResourceFirstRep().getReference());
     }
 
+
+    @Test
+    void generatedMeasureReportHasIndividualProfileTest() {
+        var measurePackage = KnowledgeArtifactBuilder.SimpleCohortMeasureTrue.bundle();
+        validateMeasurePackage(measurePackage);
+        var evaluator = MeasureEvaluator.compile(fhirContext, measurePackage, false);
+        var report = evaluator.evaluate(new DateTimeType("2024-01-01"), new DateTimeType("2024-12-31"),
+                new StringType("Patient/simple-patient"), PatientDataBuilder.simplePatientOnlyBundle());
+
+        var matchingProfiles = report.getMeta().getProfile().stream()
+                .filter(profile -> MeasureEvaluator.INDIVIDUAL_MEASURE_REPORT_PROFILE.equals(profile.getValue()))
+                .toList();
+        Assertions.assertEquals(1, matchingProfiles.size(),
+                "Generated MeasureReport must declare the DEQM individual-measurereport profile exactly once");
+    }
+
     /**
      * Validates the measure package for errors using the MeasureDefinitionBundleValidator. Asserts that the measure
      * package has no validation errors.
