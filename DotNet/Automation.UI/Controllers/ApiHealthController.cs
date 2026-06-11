@@ -6,6 +6,7 @@ using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace Automation.UI.Controllers;
@@ -20,6 +21,10 @@ public class ApiHealthController(
     IOptions<AutomationConfig> automationConfig,
     ILogger<ApiHealthController> logger) : Controller
 {
+    private const int DefaultPageNumber = 1;
+    private const int DefaultPageSize = 20;
+    private const int MaxPageSize = 100;
+
     /// <summary>
     /// Main API Health dashboard page.
     /// </summary>
@@ -64,10 +69,28 @@ public class ApiHealthController(
 
         var seedSession = await seedOrchestrator.BeginServiceAsync(endpoint.ServiceName, requirements, ct);
         if (!seedSession.Success)
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = seedSession.Error ?? "Seeding failed." });
+        {
+            var problem = new ProblemDetails
+            {
+                Title = "API Health seeding failed.",
+                Detail = seedSession.Error ?? "Seeding failed.",
+                Status = StatusCodes.Status500InternalServerError
+            };
+            problem.Extensions["traceId"] = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
+            return StatusCode(StatusCodes.Status500InternalServerError, problem);
+        }
 
         if (requirements.Contains(ApiHealthSeedRequirement.ReportSchedule) && seedSession.Report == null)
-            return StatusCode(StatusCodes.Status500InternalServerError, new { error = "Seeding contract violation: ReportSchedule was required but no report seed payload was produced." });
+        {
+            var problem = new ProblemDetails
+            {
+                Title = "API Health seeding contract violation.",
+                Detail = "Seeding contract violation: ReportSchedule was required but no report seed payload was produced.",
+                Status = StatusCodes.Status500InternalServerError
+            };
+            problem.Extensions["traceId"] = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
+            return StatusCode(StatusCodes.Status500InternalServerError, problem);
+        }
 
         try
         {
@@ -162,9 +185,15 @@ public class ApiHealthController(
     /// Get paged history for a specific endpoint.
     /// </summary>
     [HttpGet]
-    public async Task<IActionResult> History(string endpointKey, int pageNumber = 1, int pageSize = 20, CancellationToken ct = default)
+    public async Task<IActionResult> History(string endpointKey, int pageNumber = DefaultPageNumber, int pageSize = DefaultPageSize, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(endpointKey)) return BadRequest("endpointKey is required.");
+
+        if (pageNumber < DefaultPageNumber)
+            return BadRequest($"pageNumber must be >= {DefaultPageNumber}.");
+
+        if (pageSize is < 1 or > MaxPageSize)
+            return BadRequest($"pageSize must be between 1 and {MaxPageSize}.");
 
         var history = await store.GetHistoryAsync(endpointKey, pageNumber, pageSize, ct);
         return Json(history);

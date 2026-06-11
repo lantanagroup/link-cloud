@@ -66,6 +66,7 @@ public sealed class ApiHealthSeedOrchestrator(
     ILogger<ApiHealthSeedOrchestrator> logger) : IApiHealthSeedOrchestrator
 {
     private static readonly Guid ApiHealthScenarioId = new("00000000-0000-0000-0000-000000000008");
+    private const string SanitizedInternalError = "An internal error occurred processing this run.";
 
     public async Task<ApiHealthSeedSession> BeginServiceAsync(string serviceName, IReadOnlyCollection<ApiHealthSeedRequirement> requirements, CancellationToken ct = default)
     {
@@ -160,13 +161,20 @@ public sealed class ApiHealthSeedOrchestrator(
 
                 if (run.Status != AutomationRunStatus.Succeeded)
                 {
+                    logger.LogWarning(
+                        "ApiHealthScenario seed run failed. Scope={Scope}, RunId={RunId}, Status={Status}, Error={RunError}",
+                        scope,
+                        runId,
+                        run.Status,
+                        run.Error);
+
                     return new ApiHealthSeedSession
                     {
                         Scope = scope,
                         Success = false,
                         SeedRunId = runId,
                         SeedRunName = scenario.Name,
-                        Error = $"ApiHealthScenario run {runId} finished with status {run.Status}. {run.Error}".Trim()
+                        Error = SanitizedInternalError
                     };
                 }
 
@@ -213,11 +221,12 @@ public sealed class ApiHealthSeedOrchestrator(
         }
         catch (Exception ex)
         {
+            logger.LogError(ex, "Unexpected error while building API Health seed session. Scope={Scope}", scope);
             return new ApiHealthSeedSession
             {
                 Scope = scope,
                 Success = false,
-                Error = ex.Message
+                Error = SanitizedInternalError
             };
         }
     }

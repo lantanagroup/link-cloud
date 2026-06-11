@@ -39,5 +39,5 @@ public sealed class ApiTestRunHistoryPage
     public int PageNumber { get; init; }
     public int PageSize { get; init; }
     public long TotalCount { get; init; }
-    public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
+    public int TotalPages => PageSize == 0 ? 0 : (int)Math.Ceiling((double)TotalCount / PageSize);
 }

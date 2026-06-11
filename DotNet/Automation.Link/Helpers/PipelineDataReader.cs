@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Net;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
@@ -242,7 +243,16 @@ public class PipelineDataReader
     public async Task<DataAcquisitionLogApiModel?> GetAcquisitionLogByIdAsync(long id)
     {
         var response = await _dataAcqClient.GetAcquisitionLogByIdAsync(id);
-        return response.Body;
+
+        if (response.IsSuccessStatusCode)
+            return response.Body;
+
+        if (response.StatusCode == (int)HttpStatusCode.NotFound)
+            return null;
+
+        throw new InvalidOperationException(
+            $"Failed to get acquisition log {id}. HTTP {response.StatusCode}" +
+            (!string.IsNullOrWhiteSpace(response.RawBody) ? $": {response.RawBody}" : string.Empty));
     }
 
     public async Task<bool> HasAnyFhirQueryRowsForReportAsync(string facilityId, string reportId)

@@ -61,7 +61,7 @@ public abstract class LinkApiClientBase : IDisposable
     /// Executes a request and returns the full response (status code + deserialized body).
     /// Does NOT swallow any status codes — the caller decides how to handle each response.
     /// </summary>
-    protected static async Task<LinkApiResponse<T>> SendAsync<T>(Func<Task<IFlurlResponse>> action) where T : class
+    protected static async Task<LinkApiResponse<T>> SendAsync<T>(Func<Task<IFlurlResponse>> action)
     {
         try
         {
@@ -151,6 +151,7 @@ public abstract class LinkApiClientBase : IDisposable
         {
             var response = await action();
             var statusCode = response.StatusCode;
+            var contentType = response.ResponseMessage.Content?.Headers?.ContentType?.ToString();
             var requestUrl = response.ResponseMessage.RequestMessage?.RequestUri?.ToString();
             var requestMethod = response.ResponseMessage.RequestMessage?.Method.Method;
             var traceId = ExtractTraceId(response);
@@ -158,18 +159,19 @@ public abstract class LinkApiClientBase : IDisposable
             if (statusCode is >= 200 and < 300)
             {
                 var bytes = await response.GetBytesAsync();
-                return new LinkApiResponse<byte[]> { StatusCode = statusCode, Body = bytes, RequestUrl = requestUrl, RequestMethod = requestMethod, TraceId = traceId };
+                return new LinkApiResponse<byte[]> { StatusCode = statusCode, Body = bytes, ContentType = contentType, RequestUrl = requestUrl, RequestMethod = requestMethod, TraceId = traceId };
             }
             var raw = await response.GetStringAsync();
-            return new LinkApiResponse<byte[]> { StatusCode = statusCode, RawBody = raw, RequestUrl = requestUrl, RequestMethod = requestMethod, TraceId = traceId };
+            return new LinkApiResponse<byte[]> { StatusCode = statusCode, RawBody = raw, ContentType = contentType, RequestUrl = requestUrl, RequestMethod = requestMethod, TraceId = traceId };
         }
         catch (FlurlHttpException ex)
         {
             var raw = await ex.GetResponseStringAsync();
+            var contentType = ex.Call?.Response?.ResponseMessage.Content?.Headers?.ContentType?.ToString();
             var requestUrl = ex.Call?.Request?.Url?.ToString();
             var requestMethod = ex.Call?.HttpRequestMessage?.Method.Method;
             var traceId = ExtractTraceId(ex.Call?.Response);
-            return new LinkApiResponse<byte[]> { StatusCode = ex.StatusCode ?? 0, RawBody = raw, RequestUrl = requestUrl, RequestMethod = requestMethod, TraceId = traceId };
+            return new LinkApiResponse<byte[]> { StatusCode = ex.StatusCode ?? 0, RawBody = raw, ContentType = contentType, RequestUrl = requestUrl, RequestMethod = requestMethod, TraceId = traceId };
         }
     }
 
@@ -177,7 +179,11 @@ public abstract class LinkApiClientBase : IDisposable
     {
         if (response == null) return null;
         if (response.Headers.TryGetFirst("traceparent", out var traceparent) && !string.IsNullOrWhiteSpace(traceparent))
-            return traceparent;
+        {
+            var parts = traceparent.Split('-', StringSplitOptions.TrimEntries);
+            if (parts.Length >= 2 && !string.IsNullOrWhiteSpace(parts[1]))
+                return parts[1];
+        }
         if (response.Headers.TryGetFirst("X-Trace-Id", out var xTraceId) && !string.IsNullOrWhiteSpace(xTraceId))
             return xTraceId;
         return null;

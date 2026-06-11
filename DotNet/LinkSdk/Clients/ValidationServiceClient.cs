@@ -36,7 +36,9 @@ public class ValidationServiceClient : LinkApiClientBase, IValidationServiceClie
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> UpsertResourceArtifactAsync(string artifactId, string resourceJson, CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"validation/artifact/RESOURCE/{artifactId}").PutStringAsync(resourceJson, cancellationToken: cancellationToken));
+        SendAsync(() => Request($"validation/artifact/RESOURCE/{artifactId}")
+            .WithHeader("Content-Type", "application/json")
+            .PutStringAsync(resourceJson, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<string>> GetValidationResultsAsync(string facilityId, string reportId, string severity = "WARNING", CancellationToken cancellationToken = default) =>
         SendStringAsync(() => Request($"validation/result/{facilityId}/{reportId}").SetQueryParam("severity", severity).GetAsync(cancellationToken: cancellationToken));

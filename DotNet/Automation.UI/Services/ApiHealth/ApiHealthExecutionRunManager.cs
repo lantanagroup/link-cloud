@@ -14,6 +14,7 @@ public sealed class ApiHealthExecutionRunManager(
     IApiHealthRunStore store,
     ILogger<ApiHealthExecutionRunManager> logger)
 {
+    private const string SanitizedInternalError = "An internal error occurred processing this run.";
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private readonly ConcurrentDictionary<Guid, RunState> _runs = new();
     private readonly object _sync = new();
@@ -148,8 +149,9 @@ public sealed class ApiHealthExecutionRunManager(
 
             if (!seedSession.Success)
             {
-                await AddPhaseAsync(run, "Failed", seedSession.Error ?? "Seeding failed.", isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
-                Complete(run, failed: true, seedSession.Error);
+                var error = SanitizeError(seedSession.Error);
+                await AddPhaseAsync(run, "Failed", error, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
+                Complete(run, failed: true, error);
                 AddDone(run);
                 return;
             }
@@ -178,8 +180,8 @@ public sealed class ApiHealthExecutionRunManager(
         catch (Exception ex)
         {
             logger.LogError(ex, "API Health service run failed unexpectedly. RunId={RunId}", run.RunId);
-            await AddPhaseAsync(run, "Failed", ex.Message, isError: true);
-            Complete(run, failed: true, ex.Message);
+            await AddPhaseAsync(run, "Failed", SanitizedInternalError, isError: true);
+            Complete(run, failed: true, SanitizedInternalError);
             AddDone(run);
         }
     }
@@ -198,8 +200,9 @@ public sealed class ApiHealthExecutionRunManager(
 
             if (!seedSession.Success)
             {
-                await AddPhaseAsync(run, "Failed", seedSession.Error ?? "Seeding failed.", isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
-                Complete(run, failed: true, seedSession.Error);
+                var error = SanitizeError(seedSession.Error);
+                await AddPhaseAsync(run, "Failed", error, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
+                Complete(run, failed: true, error);
                 AddDone(run);
                 return;
             }
@@ -228,8 +231,8 @@ public sealed class ApiHealthExecutionRunManager(
         catch (Exception ex)
         {
             logger.LogError(ex, "API Health run-all failed unexpectedly. RunId={RunId}", run.RunId);
-            await AddPhaseAsync(run, "Failed", ex.Message, isError: true);
-            Complete(run, failed: true, ex.Message);
+            await AddPhaseAsync(run, "Failed", SanitizedInternalError, isError: true);
+            Complete(run, failed: true, SanitizedInternalError);
             AddDone(run);
         }
     }
@@ -252,7 +255,7 @@ public sealed class ApiHealthExecutionRunManager(
                     ServiceName = suite.ServiceName,
                     EndpointName = "Suite Error",
                     Passed = false,
-                    ErrorMessage = $"Suite execution failed: {ex.Message}",
+                    ErrorMessage = SanitizedInternalError,
                     ExecutedAt = DateTimeOffset.UtcNow
                 }
             ];
@@ -271,6 +274,9 @@ public sealed class ApiHealthExecutionRunManager(
             AddEvent(run, "result", json);
         }
     }
+
+    private static string SanitizeError(string? error) =>
+        string.IsNullOrWhiteSpace(error) ? SanitizedInternalError : SanitizedInternalError;
 
     private Task AddPhaseAsync(RunState run, string phase, string message, bool isError = false, Guid? seedRunId = null, string? seedRunName = null)
     {

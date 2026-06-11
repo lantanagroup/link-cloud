@@ -56,14 +56,14 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
     public Task<LinkApiResponse<List<ReportEntryApiModel>>> GetEntriesByPatientAsync(string patientId, CancellationToken cancellationToken = default) =>
         SendAsync<List<ReportEntryApiModel>>(() => Request($"/entries/patients/{patientId}").GetAsync(cancellationToken: cancellationToken));
 
-    public Task<LinkApiResponse> GetEntryCountByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"/entries/schedules/{reportScheduleId}/count").GetAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse<int>> GetEntryCountByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
+        SendAsync<int>(() => Request($"/entries/schedules/{reportScheduleId}/count").GetAsync(cancellationToken: cancellationToken));
 
-    public Task<LinkApiResponse> GetEntrySummaryByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"/entries/schedules/{reportScheduleId}/summary").GetAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse<ReportEntrySummaryApiModel>> GetEntrySummaryByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
+        SendAsync<ReportEntrySummaryApiModel>(() => Request($"/entries/schedules/{reportScheduleId}/summary").GetAsync(cancellationToken: cancellationToken));
 
-    public Task<LinkApiResponse> GetEntryByScheduleAndPatientAsync(string reportScheduleId, string patientId, CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"/entries/schedules/{reportScheduleId}/patients/{patientId}").GetAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse<ReportEntryApiModel>> GetEntryByScheduleAndPatientAsync(string reportScheduleId, string patientId, CancellationToken cancellationToken = default) =>
+        SendAsync<ReportEntryApiModel>(() => Request($"/entries/schedules/{reportScheduleId}/patients/{patientId}").GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<ReportResourceApiModel>> GetResourceByIdAsync(string id, CancellationToken cancellationToken = default) =>
         SendAsync<ReportResourceApiModel>(() => Request($"/resources/{id}").GetAsync(cancellationToken: cancellationToken));
@@ -90,6 +90,6 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
         return SendAsync<List<ReportPopulationApiModel>>(() => r.GetAsync(cancellationToken: cancellationToken));
     }
 
-    public Task<LinkApiResponse> GetInitialPopulationCountAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"/populations/schedules/{reportScheduleId}/initial-population-count").GetAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse<int>> GetInitialPopulationCountAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
+        SendAsync<int>(() => Request($"/populations/schedules/{reportScheduleId}/initial-population-count").GetAsync(cancellationToken: cancellationToken));
 }

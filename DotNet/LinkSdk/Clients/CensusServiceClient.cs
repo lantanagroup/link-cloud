@@ -12,6 +12,8 @@ namespace LantanaGroup.Link.Sdk.Clients;
 
 public class CensusServiceClient : LinkApiClientBase, ICensusServiceClient
 {
+    private static readonly TimeSpan HistoricalEncounterDefaultLookback = TimeSpan.FromDays(30);
+
     public CensusServiceClient(
         IOptions<ServiceRegistry> serviceRegistry,
         IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
@@ -44,15 +46,71 @@ public class CensusServiceClient : LinkApiClientBase, ICensusServiceClient
     public Task<LinkApiResponse> GetAdmittedPatientsAsync(string facilityId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"census/{facilityId}/history/admitted").SetQueryParam("startDate", startDate).SetQueryParam("endDate", endDate).GetAsync(cancellationToken: cancellationToken));
 
-    public Task<LinkApiResponse> GetCurrentPatientEncountersAsync(string facilityId, CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request("census/patient-encounters/current").SetQueryParam("facilityId", facilityId).GetAsync(cancellationToken: cancellationToken));
-
-    public Task<LinkApiResponse> GetHistoricalPatientEncountersAsync(string facilityId, DateTime? dateThreshold, CancellationToken cancellationToken = default)
+    public Task<LinkApiResponse> GetCurrentPatientEncountersAsync(
+        string facilityId,
+        string? correlationId = null,
+        string? sortBy = null,
+        SortOrder? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default)
     {
-        var r = Request("census/patient-encounters/historical").SetQueryParam("facilityId", facilityId);
-        if (dateThreshold.HasValue) r = r.SetQueryParam("dateThreshold", dateThreshold.Value);
+        var r = Request("census/patient-encounters/current")
+            .SetQueryParam("facilityId", facilityId)
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber);
+
+        if (!string.IsNullOrWhiteSpace(correlationId)) r = r.SetQueryParam("correlationId", correlationId);
+        if (!string.IsNullOrWhiteSpace(sortBy)) r = r.SetQueryParam("sortBy", sortBy);
+        if (sortOrder.HasValue) r = r.SetQueryParam("sortOrder", sortOrder.Value.ToString());
+
         return SendAsync(() => r.GetAsync(cancellationToken: cancellationToken));
     }
+
+    public Task<LinkApiResponse> GetCurrentPatientEncountersAsync(string facilityId, CancellationToken cancellationToken = default) =>
+        GetCurrentPatientEncountersAsync(
+            facilityId,
+            correlationId: null,
+            sortBy: null,
+            sortOrder: null,
+            pageSize: 10,
+            pageNumber: 1,
+            cancellationToken: cancellationToken);
+
+    public Task<LinkApiResponse> GetHistoricalPatientEncountersAsync(
+        string facilityId,
+        DateTime? dateThreshold,
+        string? correlationId = null,
+        string? sortBy = null,
+        SortOrder? sortOrder = null,
+        int pageSize = 10,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default)
+    {
+        var effectiveDateThreshold = dateThreshold ?? DateTime.UtcNow.Subtract(HistoricalEncounterDefaultLookback);
+        var r = Request("census/patient-encounters/historical")
+            .SetQueryParam("facilityId", facilityId)
+            .SetQueryParam("dateThreshold", effectiveDateThreshold)
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber);
+
+        if (!string.IsNullOrWhiteSpace(correlationId)) r = r.SetQueryParam("correlationId", correlationId);
+        if (!string.IsNullOrWhiteSpace(sortBy)) r = r.SetQueryParam("sortBy", sortBy);
+        if (sortOrder.HasValue) r = r.SetQueryParam("sortOrder", sortOrder.Value.ToString());
+
+        return SendAsync(() => r.GetAsync(cancellationToken: cancellationToken));
+    }
+
+    public Task<LinkApiResponse> GetHistoricalPatientEncountersAsync(string facilityId, DateTime? dateThreshold, CancellationToken cancellationToken = default) =>
+        GetHistoricalPatientEncountersAsync(
+            facilityId,
+            dateThreshold,
+            correlationId: null,
+            sortBy: null,
+            sortOrder: null,
+            pageSize: 10,
+            pageNumber: 1,
+            cancellationToken: cancellationToken);
 
     public Task<LinkApiResponse> RebuildPatientEncountersAsync(string facilityId, string? correlationId = null, CancellationToken cancellationToken = default)
     {

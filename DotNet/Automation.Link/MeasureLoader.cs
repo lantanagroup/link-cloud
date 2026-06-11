@@ -224,6 +224,7 @@ public class MeasureLoader
         catch (Exception ex)
         {
             _output.WriteLine($"  WARNING: Measure definition verification failed: {ex.Message}");
+            throw;
         }
     }
 

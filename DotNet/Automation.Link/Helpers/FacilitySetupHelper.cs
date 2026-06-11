@@ -6,6 +6,7 @@ using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using System.Net;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -169,7 +170,16 @@ public static class FacilitySetupHelper
         });
 
         if (!created.IsSuccessStatusCode)
-            output.WriteLine($"Query config for facility '{facilityId}' already exists. Skipping create.");
+        {
+            if (created.StatusCode == (int)HttpStatusCode.Conflict)
+            {
+                output.WriteLine($"Query config for facility '{facilityId}' already exists. Skipping create.");
+                return;
+            }
+
+            throw new InvalidOperationException(
+                $"Failed to create query config for facility '{facilityId}'. HTTP {created.StatusCode}: {created.RawBody ?? "(no body)"}");
+        }
     }
 
     public static async Task EnsureQueryDispatchConfigAsync(
@@ -264,8 +274,17 @@ public static class FacilitySetupHelper
             SupplementalQueries = jBody["SupplementalQueries"]?.ToObject<Dictionary<string, object>>() ?? new Dictionary<string, object>()
         };
 
-        var created = await dataAcqClient.CreateQueryPlanAsync(facilityId, body);
-        if (!created.IsSuccessStatusCode)
-            output.WriteLine($"{type} query plan for facility '{facilityId}' already exists. Skipping create.");
+        var createdPlan = await dataAcqClient.CreateQueryPlanAsync(facilityId, body);
+        if (!createdPlan.IsSuccessStatusCode)
+        {
+            if (createdPlan.StatusCode == (int)HttpStatusCode.Conflict)
+            {
+                output.WriteLine($"{type} query plan for facility '{facilityId}' already exists. Skipping create.");
+                return;
+            }
+
+            throw new InvalidOperationException(
+                $"Failed to create {type} query plan for facility '{facilityId}'. HTTP {createdPlan.StatusCode}: {createdPlan.RawBody ?? "(no body)"}");
+        }
     }
 }

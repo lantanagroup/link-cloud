@@ -270,7 +270,7 @@ public sealed class ReportServiceTestSuite : ServiceTestSuiteBase
             scheduleId != null,
             "Entry Count → 200 (has data)",
             200,
-            () => _client.GetEntryCountByScheduleAsync(scheduleId!, ct),
+            async () => await _client.GetEntryCountByScheduleAsync(scheduleId!, ct),
             scheduleUnavailableReason);
 
         results.Add(await RunStepAsync("Entry Count → 404", 404, async () =>
@@ -284,7 +284,7 @@ public sealed class ReportServiceTestSuite : ServiceTestSuiteBase
             scheduleId != null,
             "Entry Summary → 200 (has data)",
             200,
-            () => _client.GetEntrySummaryByScheduleAsync(scheduleId!, ct),
+            async () => await _client.GetEntrySummaryByScheduleAsync(scheduleId!, ct),
             scheduleUnavailableReason);
 
         results.Add(await RunStepAsync("Entry Summary → 404", 404, async () =>
@@ -298,7 +298,7 @@ public sealed class ReportServiceTestSuite : ServiceTestSuiteBase
             scheduleId != null && seededPatientId != null,
             "Entry By Patient → 200 (has data)",
             200,
-            () => _client.GetEntryByScheduleAndPatientAsync(scheduleId!, seededPatientId!, ct),
+            async () => await _client.GetEntryByScheduleAndPatientAsync(scheduleId!, seededPatientId!, ct),
             seededDataUnavailableReason);
 
         results.Add(await RunStepAsync("Entry By Patient → 404", 404, async () =>
@@ -398,7 +398,7 @@ public sealed class ReportServiceTestSuite : ServiceTestSuiteBase
             scheduleId != null,
             "InitPop Count → 200 (has data)",
             200,
-            () => _client.GetInitialPopulationCountAsync(scheduleId!, ct),
+            async () => await _client.GetInitialPopulationCountAsync(scheduleId!, ct),
             scheduleUnavailableReason);
 
         results.Add(await RunStepAsync("InitPop Count → 200", 200, async () =>

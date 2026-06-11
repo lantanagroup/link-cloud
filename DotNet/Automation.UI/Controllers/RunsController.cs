@@ -38,7 +38,7 @@ public class RunsController(
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (!scenarios.Any(s => s.Id == ApiHealthScenarioId || s.Name.Equals("ApiHealthScenario", StringComparison.OrdinalIgnoreCase)))
+        if (!scenarios.Any(s => s.Id == ApiHealthScenarioId || (s.IsSystemScenario && s.Name.Equals("ApiHealthScenario", StringComparison.OrdinalIgnoreCase))))
         {
             var measures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
             var eligibilities = measures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);

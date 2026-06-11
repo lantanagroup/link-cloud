@@ -16,6 +16,8 @@ namespace Automation.UI.Services;
 /// </summary>
 public sealed class RunExportService : IRunExportService
 {
+    private const string SanitizedInternalError = "An internal error occurred processing this run.";
+
     private static readonly JsonSerializerOptions PrettyJson = new()
     {
         WriteIndented = true,
@@ -109,7 +111,7 @@ public sealed class RunExportService : IRunExportService
         WriteKvp(sb, "Started", FormatTime(run.StartedAt));
         WriteKvp(sb, "Finished", FormatTime(run.FinishedAt));
         WriteKvp(sb, "Pipeline Duration", run.Duration);
-        WriteKvp(sb, "Error", run.Error);
+        WriteKvp(sb, "Error", NormalizeErrorSummary(run.Error));
 
         if (!string.IsNullOrWhiteSpace(run.RunConfigurationJson))
         {
@@ -125,6 +127,9 @@ public sealed class RunExportService : IRunExportService
 
         return sb.ToString();
     }
+
+    private static string? NormalizeErrorSummary(string? error) =>
+        string.IsNullOrWhiteSpace(error) ? error : SanitizedInternalError;
 
     private async Task<string> BuildRunManifestAsync(Guid runId)
     {

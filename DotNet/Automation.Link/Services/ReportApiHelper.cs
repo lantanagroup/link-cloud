@@ -4,6 +4,7 @@ using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using System.Net;
 using System.IO.Compression;
 using Task = System.Threading.Tasks.Task;
 
@@ -163,7 +164,21 @@ public class ReportApiHelper
 
             string currentStatus;
             var response = await _reportClient.GetScheduleAsync(reportId);
-            if (!response.IsSuccessStatusCode || response.Body == null)
+            if (!response.IsSuccessStatusCode)
+            {
+                if (response.StatusCode == (int)HttpStatusCode.NotFound)
+                {
+                    currentStatus = "not found";
+                }
+                else
+                {
+                    AutomationInvariant.Require(false,
+                        $"GetSchedule failed during submission polling with status {response.StatusCode}." +
+                        (!string.IsNullOrWhiteSpace(response.RawBody) ? $" Body: {response.RawBody}" : string.Empty));
+                    return false;
+                }
+            }
+            else if (response.Body == null)
             {
                 currentStatus = "not found";
             }
@@ -215,6 +230,15 @@ public class ReportApiHelper
             $"Download failed with status {response.StatusCode}");
 
         var bytes = response.Body!;
+
+        var isZipPayload = bytes.Length >= 4
+            && bytes[0] == 0x50
+            && bytes[1] == 0x4B
+            && bytes[2] == 0x03
+            && bytes[3] == 0x04;
+
+        AutomationInvariant.Require(isZipPayload,
+            $"Download payload was not a ZIP (status {response.StatusCode}).");
 
         var responseDictionary = new Dictionary<string, object>();
 

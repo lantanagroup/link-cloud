@@ -20,7 +20,7 @@ public sealed class ApiHealthRunsApiController(ApiHealthExecutionRunManager runM
         var runId = await runManager.StartAllAsync();
         cancellationToken.ThrowIfCancellationRequested();
 
-        return Accepted(new
+        return CreatedAtAction(nameof(GetStatus), new { runId }, new
         {
             runId,
             scope = "All"

@@ -19,9 +19,9 @@ public interface IReportServiceClient
     Task<LinkApiResponse<ReportEntryApiModel>> GetEntryByIdAsync(string id, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<ReportEntryApiModel>>> GetEntriesByScheduleAsync(string reportId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<ReportEntryApiModel>>> GetEntriesByPatientAsync(string patientId, CancellationToken cancellationToken = default);
-    Task<LinkApiResponse> GetEntryCountByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default);
-    Task<LinkApiResponse> GetEntrySummaryByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default);
-    Task<LinkApiResponse> GetEntryByScheduleAndPatientAsync(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<int>> GetEntryCountByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<ReportEntrySummaryApiModel>> GetEntrySummaryByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<ReportEntryApiModel>> GetEntryByScheduleAndPatientAsync(string reportScheduleId, string patientId, CancellationToken cancellationToken = default);
 
     // --- Resources ---
     Task<LinkApiResponse<ReportResourceApiModel>> GetResourceByIdAsync(string id, CancellationToken cancellationToken = default);
@@ -33,5 +33,5 @@ public interface IReportServiceClient
     // --- Populations ---
     Task<LinkApiResponse<ReportPopulationApiModel>> GetPopulationByIdAsync(string id, CancellationToken cancellationToken = default);
     Task<LinkApiResponse<List<ReportPopulationApiModel>>> GetPopulationsByScheduleAsync(string reportId, string? reportType = null, CancellationToken cancellationToken = default);
-    Task<LinkApiResponse> GetInitialPopulationCountAsync(string reportScheduleId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<int>> GetInitialPopulationCountAsync(string reportScheduleId, CancellationToken cancellationToken = default);
 }

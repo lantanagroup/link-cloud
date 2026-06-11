@@ -11,6 +11,9 @@ public sealed class LinkApiResponse<T>
     public T? Body { get; init; }
     public bool IsSuccessStatusCode => StatusCode is >= 200 and < 300;
 
+    /// <summary>Response content type (for downloads and content forwarding scenarios).</summary>
+    public string? ContentType { get; init; }
+
     /// <summary>Raw response body as string (populated on non-success for diagnostics).</summary>
     public string? RawBody { get; init; }
 
@@ -31,6 +34,7 @@ public sealed class LinkApiResponse<T>
     {
         StatusCode = StatusCode,
         RawBody = RawBody,
+        ContentType = ContentType,
         RequestUrl = RequestUrl,
         RequestMethod = RequestMethod,
         TraceId = TraceId
@@ -47,6 +51,7 @@ public sealed class LinkApiResponse
     public int StatusCode { get; init; }
     public bool IsSuccessStatusCode => StatusCode is >= 200 and < 300;
     public string? RawBody { get; init; }
+    public string? ContentType { get; init; }
 
     /// <summary>The full request URL that was called.</summary>
     public string? RequestUrl { get; init; }
