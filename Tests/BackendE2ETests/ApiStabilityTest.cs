@@ -1,7 +1,8 @@
-﻿using LantanaGroup.Link.Automation.Link.Helpers;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace LantanaGroup.Link.Tests.E2ETests;
@@ -31,10 +32,28 @@ public sealed class ApiStabilityTest : IClassFixture<BackendE2ETestFixture>
         using var timeoutCts = new CancellationTokenSource(Timeout);
         var cancellationToken = timeoutCts.Token;
 
-        using var http = new HttpClient
+        var cookies = new CookieContainer();
+        using var handler = new HttpClientHandler
+        {
+            UseCookies = true,
+            CookieContainer = cookies
+        };
+        using var http = new HttpClient(handler)
         {
             BaseAddress = new Uri(TestConfig.AutomationUiBase.TrimEnd('/') + "/")
         };
+
+        using var apiHealthPageResponse = await http.GetAsync("ApiHealth", cancellationToken);
+        Assert.True(apiHealthPageResponse.IsSuccessStatusCode,
+            $"GET /ApiHealth returned {(int)apiHealthPageResponse.StatusCode}");
+
+        var apiHealthPageHtml = await apiHealthPageResponse.Content.ReadAsStringAsync(cancellationToken);
+        var requestVerificationToken = ExtractRequestVerificationToken(apiHealthPageHtml);
+        Assert.False(string.IsNullOrWhiteSpace(requestVerificationToken),
+            "Could not extract __RequestVerificationToken from /ApiHealth page.");
+
+        http.DefaultRequestHeaders.Remove("RequestVerificationToken");
+        http.DefaultRequestHeaders.Add("RequestVerificationToken", requestVerificationToken);
 
         Output.WriteLine($"Starting API Health run-all via Automation.UI at {TestConfig.AutomationUiBase}");
 
@@ -94,6 +113,19 @@ public sealed class ApiStabilityTest : IClassFixture<BackendE2ETestFixture>
             return 30;
 
         return timeoutMinutes is >= 1 and <= 240 ? timeoutMinutes : 30;
+    }
+
+    private static string? ExtractRequestVerificationToken(string html)
+    {
+        if (string.IsNullOrWhiteSpace(html))
+            return null;
+
+        var match = Regex.Match(
+            html,
+            "name=\"__RequestVerificationToken\"[^>]*value=\"(?<token>[^\"]+)\"",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        return match.Success ? WebUtility.HtmlDecode(match.Groups["token"].Value) : null;
     }
 
     private sealed class StartRunResponse
