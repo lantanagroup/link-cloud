@@ -133,6 +133,14 @@ public sealed class MongoScenarioStore : IScenarioStore
 
         foreach (var input in scenario.ImportedPatientBundles)
         {
+            if (input.UploadedBundleId.HasValue)
+            {
+                var attached = await AttachExistingBundleAsync(input.UploadedBundleId.Value, input, scenario.Id, now, ct);
+                if (attached != null)
+                    refs.Add(attached);
+                continue;
+            }
+
             if (string.IsNullOrWhiteSpace(input.BundleJson))
                 continue; // ID-only entry mistakenly placed in the bundle list — nothing to externalize.
 
@@ -171,6 +179,35 @@ public sealed class MongoScenarioStore : IScenarioStore
         }
 
         return refs;
+    }
+
+    private async Task<ImportedBundleReference?> AttachExistingBundleAsync(
+        Guid bundleId,
+        ImportedPatientInput input,
+        Guid scenarioId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        var update = Builders<ImportedBundleDocument>.Update
+            .Set(b => b.UpdatedAt, now)
+            .Set(b => b.PatientId, input.PatientId ?? string.Empty)
+            .Set(b => b.FileName, input.FileName)
+            .AddToSet(b => b.ScenarioIds, scenarioId);
+
+        var bundleDoc = await _bundles.FindOneAndUpdateAsync(
+            b => b.Id == bundleId,
+            update,
+            new FindOneAndUpdateOptions<ImportedBundleDocument> { ReturnDocument = ReturnDocument.After },
+            ct);
+
+        if (bundleDoc == null)
+            return null;
+
+        return new ImportedBundleReference
+        {
+            BundleId = bundleDoc.Id,
+            PatientId = string.IsNullOrWhiteSpace(input.PatientId) ? bundleDoc.PatientId : input.PatientId
+        };
     }
 
     /// <summary>
@@ -231,6 +268,7 @@ public sealed class MongoScenarioStore : IScenarioStore
                 Source = input.Source,
                 PatientId = input.PatientId,
                 FileName = input.FileName,
+                UploadedBundleId = input.UploadedBundleId,
                 BundleJson = null,
                 AutoDetect = input.AutoDetect,
                 MeasureEligibilities = input.MeasureEligibilities,
@@ -352,6 +390,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             if (refsByPatient.TryGetValue(key, out var queue) && queue.Count > 0)
             {
                 var bundleId = queue.Dequeue();
+                input.UploadedBundleId = bundleId;
                 if (bundlesById.TryGetValue(bundleId, out var json))
                     input.BundleJson = json;
             }

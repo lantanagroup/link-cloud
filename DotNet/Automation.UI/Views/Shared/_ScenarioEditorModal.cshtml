@@ -197,6 +197,7 @@
     var cloneUrl = '@Url.Action("CloneInline", "Scenarios")';
     var getJsonUrl = '@Url.Action("GetJson", "Scenarios")';
     var classifyImportedUrl = '@Url.Action("ClassifyImported", "Scenarios")';
+    var uploadImportedBundleUrl = '@Url.Action("UploadImportedBundle", "Scenarios")';
 
     function notifyChanged(action, id, name) {
         document.dispatchEvent(new CustomEvent('scenario-editor:changed', {
@@ -208,6 +209,10 @@
     function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     function openModal() { modal.style.display = ''; backdrop.style.display = ''; }
     function closeModal() { modal.style.display = 'none'; backdrop.style.display = 'none'; }
+    function ensureScenarioId() {
+        if (!idInput.value) idInput.value = crypto.randomUUID();
+        return idInput.value;
+    }
     document.getElementById('btnModalClose').addEventListener('click', closeModal);
     backdrop.addEventListener('click', closeModal);
 
@@ -246,6 +251,20 @@
         if (!res.ok) {
             var errText = '';
             try { errText = await res.text(); } catch (_) {}
+            throw new Error(errText || ('Server returned ' + res.status));
+        }
+        var ct = res.headers.get('content-type') || '';
+        return ct.indexOf('json') >= 0 ? res.json() : null;
+    }
+    async function postForm(url, formData) {
+        var res = await fetch(url, {
+            method: 'POST',
+            headers: { 'RequestVerificationToken': af() },
+            body: formData
+        });
+        if (!res.ok) {
+            var errText = '';
+            try { errText = await res.text(); } catch (_) { }
             throw new Error(errText || ('Server returned ' + res.status));
         }
         var ct = res.headers.get('content-type') || '';
@@ -471,6 +490,7 @@
         var detectBtn = '<button type="button" class="btn btn-sm btn-outline-secondary btn-detect-imported" title="Re-run auto-detection"><i class="bi bi-magic"></i></button>';
         var tr = document.createElement('tr');
         tr.dataset.source = row.source || 'ExistingId';
+        tr.dataset.uploadedBundleId = row.uploadedBundleId || '';
         tr.dataset.bundleJson = row.bundleJson || '';
         tr.dataset.fileName = row.fileName || '';
         tr.dataset.detectedClinicalScenarioId = row.detectedClinicalScenarioId || '';
@@ -544,7 +564,8 @@
             var body = {
                 source: src,
                 patientId: pid,
-                bundleJson: src === 'Bundle' ? row.dataset.bundleJson : null,
+                bundleJson: src === 'Bundle' && !row.dataset.uploadedBundleId ? row.dataset.bundleJson : null,
+                uploadedBundleId: src === 'Bundle' && row.dataset.uploadedBundleId ? row.dataset.uploadedBundleId : null,
                 measures: selectedMeasureTypes()
             };
             var res = await postJson(classifyImportedUrl, body);
@@ -581,36 +602,25 @@
 
     document.getElementById('importedBundleFile').addEventListener('change', async function (ev) {
         var files = Array.prototype.slice.call(ev.target.files || []);
+        var scenarioId = ensureScenarioId();
         for (var i = 0; i < files.length; i++) {
             var file = files[i];
             try {
-                var text = await file.text();
-                var parsed; try { parsed = JSON.parse(text); } catch (_) { showError('Bundle "' + file.name + '" is not valid JSON.'); continue; }
-                var patientEntry = (parsed && parsed.entry || []).find(function (e) { return e && e.resource && e.resource.resourceType === 'Patient'; });
-                if (!patientEntry || !patientEntry.resource.id) { showError('Bundle "' + file.name + '" must contain a Patient resource with an id.'); continue; }
-
-                // Best-effort encounter-date sniffing for period auto-suggest. Server-side
-                // classification will overwrite with a more accurate range when it returns.
-                var encEntries = (parsed && parsed.entry || []).map(function (e) { return e && e.resource; }).filter(function (r) { return r && r.resourceType === 'Encounter' && r.period; });
-                var minS = null, maxE = null;
-                if (encEntries.length) {
-                    encEntries.forEach(function (enc) {
-                        if (enc.period.start && (!minS || enc.period.start < minS)) minS = enc.period.start;
-                        var pe = enc.period.end || enc.period.start;
-                        if (pe && (!maxE || pe > maxE)) maxE = pe;
-                    });
-                    if (minS || maxE) suggestPeriodFromEncounter(minS, maxE);
-                }
+                var fd = new FormData();
+                fd.append('scenarioId', scenarioId);
+                fd.append('file', file);
+                var uploaded = await postForm(uploadImportedBundleUrl, fd);
 
                 addImportedRow({
                     source: 'Bundle',
-                    patientId: patientEntry.resource.id,
-                    fileName: file.name,
-                    bundleJson: text,
+                    patientId: uploaded && uploaded.patientId ? uploaded.patientId : '',
+                    fileName: uploaded && uploaded.fileName ? uploaded.fileName : file.name,
+                    uploadedBundleId: uploaded && uploaded.bundleId ? uploaded.bundleId : null,
+                    bundleJson: null,
                     autoDetect: true,
                     measureEligibilities: {},
-                    encounterStart: minS,
-                    encounterEnd: maxE
+                    encounterStart: null,
+                    encounterEnd: null
                 });
                 var row = importedRows.lastElementChild;
                 if (row) await classifyImportedRow(row);
@@ -641,7 +651,8 @@
                 source: r.dataset.source || 'ExistingId',
                 patientId: (r.querySelector('.imp-pid').value || '').trim(),
                 fileName: r.dataset.fileName || null,
-                bundleJson: r.dataset.source === 'Bundle' ? (r.dataset.bundleJson || null) : null,
+                uploadedBundleId: r.dataset.source === 'Bundle' ? (r.dataset.uploadedBundleId || null) : null,
+                bundleJson: r.dataset.source === 'Bundle' && !r.dataset.uploadedBundleId ? (r.dataset.bundleJson || null) : null,
                 autoDetect: r.dataset.autoDetect !== 'false',
                 measureEligibilities: readImportedElig(r),
                 detectedClinicalScenarioId: r.dataset.detectedClinicalScenarioId || null
@@ -756,6 +767,7 @@
                 source: 'Bundle',
                 patientId: p.patientId || '',
                 fileName: p.fileName || null,
+                uploadedBundleId: p.uploadedBundleId || null,
                 bundleJson: p.bundleJson || '',
                 autoDetect: p.autoDetect !== false,
                 measureEligibilities: p.measureEligibilities || {},
