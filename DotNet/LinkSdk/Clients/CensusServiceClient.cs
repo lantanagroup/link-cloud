@@ -12,8 +12,6 @@ namespace LantanaGroup.Link.Sdk.Clients;
 
 public class CensusServiceClient : LinkApiClientBase, ICensusServiceClient
 {
-    private static readonly TimeSpan HistoricalEncounterDefaultLookback = TimeSpan.FromDays(30);
-
     public CensusServiceClient(
         IOptions<ServiceRegistry> serviceRegistry,
         IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
@@ -87,12 +85,12 @@ public class CensusServiceClient : LinkApiClientBase, ICensusServiceClient
         int pageNumber = 1,
         CancellationToken cancellationToken = default)
     {
-        var effectiveDateThreshold = dateThreshold ?? DateTime.UtcNow.Subtract(HistoricalEncounterDefaultLookback);
         var r = Request("census/patient-encounters/historical")
             .SetQueryParam("facilityId", facilityId)
-            .SetQueryParam("dateThreshold", effectiveDateThreshold)
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber);
+
+        if (dateThreshold.HasValue) r = r.SetQueryParam("dateThreshold", dateThreshold.Value);
 
         if (!string.IsNullOrWhiteSpace(correlationId)) r = r.SetQueryParam("correlationId", correlationId);
         if (!string.IsNullOrWhiteSpace(sortBy)) r = r.SetQueryParam("sortBy", sortBy);
