@@ -848,6 +848,14 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     {
                         return (false, "RemoveExtensionsOperation.ExtensionUrls must not contain entries with leading or trailing whitespace.");
                     }
+
+                    var invalidUrls = op.ExtensionUrls
+                        .Where(u => !Uri.TryCreate(u, UriKind.Absolute, out _))
+                        .ToList();
+                    if (invalidUrls.Any())
+                    {
+                        return (false, "RemoveExtensionsOperation.ExtensionUrls must contain only valid absolute URLs.");
+                    }
                 }
                 else
                 {

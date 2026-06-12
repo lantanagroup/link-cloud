@@ -42,6 +42,17 @@ function noLeadingTrailingWhitespace(control: AbstractControl): {[key: string]: 
   return v && v !== v.trim() ? {whitespace: true} : null;
 }
 
+function absoluteUrl(control: AbstractControl): {[key: string]: boolean} | null {
+  const v = control.value as string;
+  if (!v) return null;
+  try {
+    new URL(v);
+    return null;
+  } catch {
+    return {absoluteUrl: true};
+  }
+}
+
 @Component({
   selector: 'app-remove-extensions',
   templateUrl: './remove-extensions.component.html',
@@ -176,7 +187,7 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
       );
 
       (op?.ExtensionUrls ?? []).forEach(url => {
-        this.extensionUrlsArray.push(this.fb.control(url, [Validators.required, noLeadingTrailingWhitespace]));
+        this.extensionUrlsArray.push(this.fb.control(url, [Validators.required, noLeadingTrailingWhitespace, absoluteUrl]));
       });
     }
   }
@@ -186,7 +197,7 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
   }
 
   addExtensionUrl(): void {
-    this.extensionUrlsArray.push(this.fb.control('', [Validators.required, noLeadingTrailingWhitespace]));
+    this.extensionUrlsArray.push(this.fb.control('', [Validators.required, noLeadingTrailingWhitespace, absoluteUrl]));
   }
 
   removeExtensionUrl(index: number): void {
