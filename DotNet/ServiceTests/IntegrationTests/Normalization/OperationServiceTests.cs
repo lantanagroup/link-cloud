@@ -2599,7 +2599,7 @@ namespace IntegrationTests.Normalization
             {
                 Name = "Remove Extensions - Relative URL",
                 Description = "Should fail validation",
-                ExtensionUrls = ["/relative/path"]
+                ExtensionUrls = ["relative/path"]
             };
 
             var taskResult = await _operationManager.CreateOperation(new CreateOperationModel()
