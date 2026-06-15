@@ -86,8 +86,8 @@ public class ValidationService
                     // component "redis"; map them to the Database/Cache entries the UI expects.
                     var key = component.Key switch
                     {
-                        "db" => "Database",
-                        "redis" => "Cache",
+                        var k when k.Equals("db", StringComparison.OrdinalIgnoreCase) => "Database",
+                        var k when k.Equals("redis", StringComparison.OrdinalIgnoreCase) => "Cache",
                         _ => ToPascalCase(component.Key)
                     };
 
