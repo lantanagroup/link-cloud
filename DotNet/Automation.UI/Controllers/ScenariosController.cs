@@ -17,6 +17,7 @@ public class ScenariosController(
     IOptions<AutomationConfig> automationConfig,
     IMongoDatabase database) : Controller
 {
+    private const long MaxImportedBundleUploadBytes = 12 * 1024 * 1024;
     private readonly IMongoCollection<ImportedBundleDocument> _bundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
 
     [HttpGet]
@@ -163,6 +164,8 @@ public class ScenariosController(
     {
         if (request.File == null || request.File.Length == 0)
             return BadRequest("Bundle file is required.");
+        if (request.File.Length > MaxImportedBundleUploadBytes)
+            return BadRequest($"Bundle file is too large. Maximum allowed size is {MaxImportedBundleUploadBytes / (1024 * 1024)} MB.");
 
         string json;
         using (var reader = new StreamReader(request.File.OpenReadStream(), Encoding.UTF8))
@@ -195,6 +198,8 @@ public class ScenariosController(
         var now = DateTimeOffset.UtcNow;
         var hash = ComputeContentHash(json);
         var byteCount = Encoding.UTF8.GetByteCount(json);
+        if (byteCount > MaxImportedBundleUploadBytes)
+            return BadRequest($"Bundle file is too large. Maximum allowed size is {MaxImportedBundleUploadBytes / (1024 * 1024)} MB.");
 
         var update = Builders<ImportedBundleDocument>.Update
             .SetOnInsert(b => b.Id, Guid.NewGuid())
@@ -205,8 +210,7 @@ public class ScenariosController(
             .SetOnInsert(b => b.IsLibraryEntry, false)
             .Set(b => b.PatientId, patientResource.Id)
             .Set(b => b.FileName, request.File.FileName)
-            .Set(b => b.UpdatedAt, now)
-            .AddToSet(b => b.ScenarioIds, request.ScenarioId);
+            .Set(b => b.UpdatedAt, now);
 
         var doc = await _bundles.FindOneAndUpdateAsync(
             b => b.ContentHash == hash,
@@ -327,7 +331,6 @@ public class ScenariosController(
 
     public sealed class UploadImportedBundleRequest
     {
-        public Guid ScenarioId { get; set; }
         public IFormFile? File { get; set; }
     }
 

@@ -206,7 +206,17 @@
         }
 
         function af() { var t = document.querySelector('input[name="__RequestVerificationToken"]'); return t ? t.value : ''; }
-        function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+        function escAttr(s) {
+            return esc(s)
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
         function openModal() { modal.style.display = ''; backdrop.style.display = ''; }
         function closeModal() { modal.style.display = 'none'; backdrop.style.display = 'none'; }
         function ensureScenarioId() {
@@ -500,7 +510,7 @@
             tr.innerHTML =
                 '<td class="text-center align-middle">' + (importedRows.children.length + 1) + '</td>' +
                 '<td class="align-middle">' + sourceLabel + '</td>' +
-                '<td class="align-middle"><input type="text" class="form-control form-control-sm imp-pid" maxlength="128" value="' + esc(row.patientId || '') + '" ' + (row.source === 'Bundle' ? 'readonly' : '') + ' />' + fileLabel + '</td>' +
+                '<td class="align-middle"><input type="text" class="form-control form-control-sm imp-pid" maxlength="128" value="' + escAttr(row.patientId || '') + '" ' + (row.source === 'Bundle' ? 'readonly' : '') + ' />' + fileLabel + '</td>' +
                 '<td><div class="imp-elig-editor">' + importedRowEligEditor(elig) + '</div></td>' +
                 '<td class="imp-encounter-cell align-middle small"></td>' +
                 '<td class="align-middle text-center">' + detectBtn + '</td>' +
@@ -602,12 +612,10 @@
 
         document.getElementById('importedBundleFile').addEventListener('change', async function (ev) {
             var files = Array.prototype.slice.call(ev.target.files || []);
-            var scenarioId = ensureScenarioId();
             for (var i = 0; i < files.length; i++) {
                 var file = files[i];
                 try {
                     var fd = new FormData();
-                    fd.append('scenarioId', scenarioId);
                     fd.append('file', file);
                     var uploaded = await postForm(uploadImportedBundleUrl, fd);
 

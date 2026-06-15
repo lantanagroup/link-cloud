@@ -136,8 +136,10 @@ public sealed class MongoScenarioStore : IScenarioStore
             if (input.UploadedBundleId.HasValue)
             {
                 var attached = await AttachExistingBundleAsync(input.UploadedBundleId.Value, input, scenario.Id, now, ct);
-                if (attached != null)
-                    refs.Add(attached);
+                if (attached == null)
+                    throw new InvalidOperationException($"Failed to attach uploaded bundle '{input.UploadedBundleId.Value}' for scenario '{scenario.Id}'.");
+
+                refs.Add(attached);
                 continue;
             }
 
