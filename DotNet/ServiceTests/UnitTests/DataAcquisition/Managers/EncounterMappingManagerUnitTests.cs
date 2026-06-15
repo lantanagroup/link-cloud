@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using Moq;
 using System.Linq.Expressions;
 using Xunit;
@@ -92,6 +93,53 @@ public class EncounterMappingManagerUnitTests
         // Assert
         _mockMappingRepo.Verify(r => r.AddAsync(It.IsAny<EncounterMapping>()), Times.Never);
         _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ConcurrentDuplicateInsert_ThrowsEntityAlreadyExistsException()
+    {
+        // Arrange: pre-check passes (null), SaveChanges trips the unique constraint,
+        // and the re-check then finds the row a concurrent request inserted.
+        var model = new CreateEncounterMappingModel
+        {
+            FacilityId = "Fac1",
+            EncounterId = "Enc1",
+            PatientId = "Pat1",
+            MappedToOrg = true
+        };
+
+        _mockMappingRepo.SetupSequence(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>()))
+            .ReturnsAsync((EncounterMapping)null!)                                          // pre-check
+            .ReturnsAsync(new EncounterMapping { FacilityId = "Fac1", EncounterId = "Enc1" }); // post-failure re-check
+
+        _mockDatabase.Setup(d => d.SaveChangesAsync())
+            .ThrowsAsync(new DbUpdateException("unique constraint", new Exception()));
+
+        // Act
+        var ex = await Assert.ThrowsAsync<EntityAlreadyExistsException>(() => _manager.CreateAsync(model));
+        Assert.Equal("An EncounterMapping already exists for FacilityId Fac1 and EncounterId Enc1", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateAsync_DbUpdateExceptionWithoutDuplicate_Rethrows()
+    {
+        // Arrange: SaveChanges fails for a non-duplicate reason (e.g. bad FK); the re-check
+        // finds no existing mapping, so the original DbUpdateException must propagate.
+        var model = new CreateEncounterMappingModel
+        {
+            FacilityId = "Fac1",
+            EncounterId = "Enc1",
+            PatientId = "Pat1"
+        };
+
+        _mockMappingRepo.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>()))
+            .ReturnsAsync((EncounterMapping)null!);
+
+        _mockDatabase.Setup(d => d.SaveChangesAsync())
+            .ThrowsAsync(new DbUpdateException("fk violation", new Exception()));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<DbUpdateException>(() => _manager.CreateAsync(model));
     }
 
     [Fact]
