@@ -1,8 +1,8 @@
-﻿using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
+using LantanaGroup.Link.LinkAdmin.BFF.Application.Clients;
 using LantanaGroup.Link.LinkAdmin.BFF.Application.Models.Health;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
-namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System.Hanlders;
+namespace LantanaGroup.Link.LinkAdmin.BFF.Presentation.Endpoints.System.Handlers;
 
 public static class GetSystemHealth
 {

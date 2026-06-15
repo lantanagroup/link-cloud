@@ -1,4 +1,4 @@
-﻿using MongoDB.Bson;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace Automation.UI.Services.Persistence;
@@ -26,4 +26,10 @@ public sealed class ApiHealthRunDocument
     public DateTimeOffset ExecutedAt { get; set; }
 
     public long DurationMs { get; set; }
+
+    // Diagnostic fields persisted for post-refresh detail rendering.
+    public string? RequestUrl { get; set; }
+    public string? RequestMethod { get; set; }
+    public string? TraceId { get; set; }
+    public string? ResponseBody { get; set; }
 }
