@@ -195,7 +195,7 @@ public sealed class ApiHealthExecutionRunManager(
             var requirements = suites.SelectMany(s => s.GetSeedRequirements()).Distinct().ToList();
 
             await AddPhaseAsync(run, "Seeding", "Preparing test-owned data");
-            var seedSession = await seedOrchestrator.BeginServiceAsync(serviceName, requirements, CancellationToken.None);
+            var seedSession = await seedOrchestrator.BeginServiceAsync(serviceName, requirements, run.RunId, CancellationToken.None);
 
             if (!seedSession.Success)
             {
@@ -209,18 +209,40 @@ public sealed class ApiHealthExecutionRunManager(
             await AddPhaseAsync(run, "Seeding", "Seed ready", seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
 
             await AddPhaseAsync(run, "Testing", "Executing tests");
+            var abortedBySeedCancellation = false;
             try
             {
                 foreach (var suite in suites)
                 {
+                    if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
+                    {
+                        abortedBySeedCancellation = true;
+                        break;
+                    }
+
                     seedContext.Current = seedSession;
                     await RunSuiteAsync(run, suite);
+
+                    if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
+                    {
+                        abortedBySeedCancellation = true;
+                        break;
+                    }
                 }
             }
             finally
             {
                 await AddPhaseAsync(run, "Cleanup", "Cleaning up seed data");
                 await seedOrchestrator.EndAsync(seedSession, CancellationToken.None);
+            }
+
+            if (abortedBySeedCancellation)
+            {
+                const string cancellationMessage = "ApiHealthScenario seed run was cancelled. Aborting API Health run.";
+                await AddPhaseAsync(run, "Failed", cancellationMessage, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
+                await CompleteAsync(run, failed: true, cancellationMessage);
+                AddDone(run);
+                return;
             }
 
             await AddPhaseAsync(run, "Done", "Service run complete");
@@ -246,7 +268,7 @@ public sealed class ApiHealthExecutionRunManager(
             var requirements = suites.SelectMany(s => s.GetSeedRequirements()).Distinct().ToList();
 
             await AddPhaseAsync(run, "Seeding", "Preparing test-owned data");
-            var seedSession = await seedOrchestrator.BeginAllAsync(requirements, CancellationToken.None);
+            var seedSession = await seedOrchestrator.BeginAllAsync(requirements, run.RunId, CancellationToken.None);
 
             if (!seedSession.Success)
             {
@@ -260,18 +282,40 @@ public sealed class ApiHealthExecutionRunManager(
             await AddPhaseAsync(run, "Seeding", "Seed ready", seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
 
             await AddPhaseAsync(run, "Testing", "Executing tests");
+            var abortedBySeedCancellation = false;
             try
             {
                 foreach (var suite in suites)
                 {
+                    if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
+                    {
+                        abortedBySeedCancellation = true;
+                        break;
+                    }
+
                     seedContext.Current = seedSession;
                     await RunSuiteAsync(run, suite);
+
+                    if (await seedOrchestrator.IsSeedRunCancelledAsync(seedSession, CancellationToken.None))
+                    {
+                        abortedBySeedCancellation = true;
+                        break;
+                    }
                 }
             }
             finally
             {
                 await AddPhaseAsync(run, "Cleanup", "Cleaning up seed data");
                 await seedOrchestrator.EndAsync(seedSession, CancellationToken.None);
+            }
+
+            if (abortedBySeedCancellation)
+            {
+                const string cancellationMessage = "ApiHealthScenario seed run was cancelled. Aborting API Health run.";
+                await AddPhaseAsync(run, "Failed", cancellationMessage, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
+                await CompleteAsync(run, failed: true, cancellationMessage);
+                AddDone(run);
+                return;
             }
 
             await AddPhaseAsync(run, "Done", "Run all complete");
@@ -327,6 +371,12 @@ public sealed class ApiHealthExecutionRunManager(
 
     private Task AddPhaseAsync(RunState run, string phase, string message, bool isError = false, Guid? seedRunId = null, string? seedRunName = null)
     {
+        if (seedRunId.HasValue)
+            run.SeedRunId = seedRunId;
+
+        if (!string.IsNullOrWhiteSpace(seedRunName))
+            run.SeedRunName = seedRunName;
+
         var payload = JsonSerializer.Serialize(new
         {
             phase,
@@ -394,6 +444,8 @@ public sealed class ApiHealthExecutionRunManager(
             await store.UpsertExecutionRunStatusAsync(new ApiHealthExecutionRunStatus
             {
                 RunId = run.RunId,
+                SeedRunId = run.SeedRunId,
+                SeedRunName = run.SeedRunName,
                 Scope = run.Scope,
                 ServiceName = run.ServiceName,
                 StartedAt = run.StartedAt,
@@ -462,6 +514,8 @@ public sealed class ApiHealthExecutionRunManager(
     private sealed class RunState
     {
         public Guid RunId { get; init; }
+        public Guid? SeedRunId { get; set; }
+        public string? SeedRunName { get; set; }
         public string Scope { get; init; } = string.Empty;
         public string? ServiceName { get; init; }
         public DateTimeOffset StartedAt { get; init; }

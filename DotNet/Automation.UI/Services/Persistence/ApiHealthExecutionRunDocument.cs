@@ -9,6 +9,10 @@ public sealed class ApiHealthExecutionRunDocument
     [BsonRepresentation(BsonType.String)]
     public Guid RunId { get; set; }
 
+    [BsonRepresentation(BsonType.String)]
+    public Guid? SeedRunId { get; set; }
+    public string? SeedRunName { get; set; }
+
     public string Scope { get; set; } = string.Empty;
     public string? ServiceName { get; set; }
 

@@ -31,6 +31,7 @@ public sealed class ApiHealthRunDocument
     // Diagnostic fields persisted for post-refresh detail rendering.
     public string? RequestUrl { get; set; }
     public string? RequestMethod { get; set; }
+    public string? RequestBody { get; set; }
     public string? TraceId { get; set; }
     public string? ResponseBody { get; set; }
 }

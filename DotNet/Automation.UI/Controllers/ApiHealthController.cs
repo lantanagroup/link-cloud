@@ -1,9 +1,7 @@
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth;
 using Automation.UI.Services.Persistence;
-using LantanaGroup.Link.Automation.Link.Configuration;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 
 namespace Automation.UI.Controllers;
 
@@ -11,7 +9,6 @@ public class ApiHealthController(
     ApiEndpointRegistry registry,
     ApiHealthExecutionRunManager runManager,
     IApiHealthRunStore store,
-    IOptions<AutomationConfig> automationConfig,
     ILogger<ApiHealthController> logger) : Controller
 {
     private const int DefaultPageNumber = 1;
@@ -42,7 +39,7 @@ public class ApiHealthController(
             .OrderBy(g => g.ServiceName, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var vm = new ApiHealthDashboardViewModel { Services = groups, GrafanaBaseUrl = automationConfig.Value.GrafanaBaseUrl };
+        var vm = new ApiHealthDashboardViewModel { Services = groups };
         return View(vm);
     }
 

@@ -1,4 +1,4 @@
-﻿using Automation.UI.Models.ApiHealth;
+using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
 using LantanaGroup.Link.Sdk.Clients;
 using StepNames = Automation.UI.Services.ApiHealth.TestSuites.ApiEndPointLibrary.ValidationSteps;
@@ -10,7 +10,7 @@ namespace Automation.UI.Services.ApiHealth.TestSuites;
 ///   1. Has Artifacts (check if initialized)
 ///   2. Has Categories (check if initialized)
 ///   3. Upsert Resource Artifact
-///   4. Get Validation Results (non-existent — proves reachability)
+///   4. Get Validation Results (non-existent � proves reachability)
 ///
 /// NOTE: Validation is a Java service. InitializeArtifacts/InitializeCategories
 /// are only called if not already initialized, to avoid disrupting existing state.
@@ -49,7 +49,7 @@ public sealed class ValidationServiceTestSuite : ServiceTestSuiteBase
             await RunStepAsync(StepNames.CategoriesGet200, 200, async () =>
                 await _client.GetCategoriesAsync(ct), ct: ct),
 
-            await RunStepAsync(StepNames.ArtifactPut200Or201, async () =>
+            await RunStepAsync(StepNames.ArtifactPut200Or201, [200, 201], async () =>
             {
                 var artifactId = $"OperationOutcome-{Guid.NewGuid():N}";
                 var payload = $$"""
@@ -63,9 +63,7 @@ public sealed class ValidationServiceTestSuite : ServiceTestSuiteBase
                     }]
                 }
                 """;
-                var resp = await _client.UpsertResourceArtifactAsync(artifactId, payload, ct);
-                if (!resp.IsSuccessStatusCode)
-                    throw new InvalidOperationException($"Expected 200/201 but got {resp.StatusCode}. {resp.RawBody}");
+                return await _client.UpsertResourceArtifactAsync(artifactId, payload, ct);
             }, ct: ct),
 
             await RunSeededResultsStepAsync(StepNames.ResultsGet200Seeded, ct),

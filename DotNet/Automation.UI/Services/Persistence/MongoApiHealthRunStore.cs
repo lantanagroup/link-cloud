@@ -1,5 +1,6 @@
 using Automation.UI.Models.ApiHealth;
 using MongoDB.Driver;
+using Automation.UI.Models.ApiHealth;
 
 namespace Automation.UI.Services.Persistence;
 
@@ -14,6 +15,7 @@ public interface IApiHealthRunStore
     Task<Dictionary<string, ApiTestRunResult>> GetLatestResultsAsync(IEnumerable<string> endpointKeys, CancellationToken ct = default);
     Task<ApiTestRunHistoryPage> GetHistoryAsync(string endpointKey, int pageNumber, int pageSize, CancellationToken ct = default);
     Task UpsertExecutionRunStatusAsync(ApiHealthExecutionRunStatus status, CancellationToken ct = default);
+    Task AttachSeedRunAsync(Guid runId, Guid seedRunId, string? seedRunName, CancellationToken ct = default);
     Task<ApiHealthExecutionRunStatus?> GetActiveExecutionRunStatusAsync(CancellationToken ct = default);
     Task<ApiHealthExecutionRunStatus?> GetExecutionRunStatusAsync(Guid runId, CancellationToken ct = default);
     Task CompleteExecutionRunAsync(Guid runId, bool failed, string? error, DateTimeOffset finishedAt, CancellationToken ct = default);
@@ -100,6 +102,8 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
         var filter = Builders<ApiHealthExecutionRunDocument>.Filter.Eq(d => d.RunId, status.RunId);
         var update = Builders<ApiHealthExecutionRunDocument>.Update
             .SetOnInsert(d => d.RunId, status.RunId)
+            .Set(d => d.SeedRunId, status.SeedRunId)
+            .Set(d => d.SeedRunName, status.SeedRunName)
             .Set(d => d.Scope, status.Scope)
             .Set(d => d.ServiceName, status.ServiceName)
             .Set(d => d.StartedAt, status.StartedAt)
@@ -113,6 +117,17 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
             .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow);
 
         return _executionCollection.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, ct);
+    }
+
+    public Task AttachSeedRunAsync(Guid runId, Guid seedRunId, string? seedRunName, CancellationToken ct = default)
+    {
+        var filter = Builders<ApiHealthExecutionRunDocument>.Filter.Eq(d => d.RunId, runId);
+        var update = Builders<ApiHealthExecutionRunDocument>.Update
+            .Set(d => d.SeedRunId, seedRunId)
+            .Set(d => d.SeedRunName, seedRunName)
+            .Set(d => d.UpdatedAt, DateTimeOffset.UtcNow);
+
+        return _executionCollection.UpdateOneAsync(filter, update, cancellationToken: ct);
     }
 
     public async Task<ApiHealthExecutionRunStatus?> GetActiveExecutionRunStatusAsync(CancellationToken ct = default)
@@ -164,6 +179,7 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
         ResponseSnippet = r.ResponseSnippet,
         RequestUrl = r.RequestUrl,
         RequestMethod = r.RequestMethod,
+        RequestBody = r.RequestBody,
         TraceId = r.TraceId,
         ResponseBody = r.ResponseBody,
         ExecutedAt = r.ExecutedAt,
@@ -185,6 +201,7 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
         ResponseSnippet = d.ResponseSnippet,
         RequestUrl = d.RequestUrl,
         RequestMethod = d.RequestMethod,
+        RequestBody = d.RequestBody,
         TraceId = d.TraceId,
         ResponseBody = d.ResponseBody,
         ExecutedAt = d.ExecutedAt,
@@ -194,6 +211,8 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
     private static ApiHealthExecutionRunStatus ToExecutionStatus(ApiHealthExecutionRunDocument d) => new()
     {
         RunId = d.RunId,
+        SeedRunId = d.SeedRunId,
+        SeedRunName = d.SeedRunName,
         Scope = d.Scope,
         ServiceName = d.ServiceName,
         StartedAt = d.StartedAt,

@@ -1,14 +1,13 @@
 @model ApiHealthDashboardViewModel
 @{
     ViewData["Title"] = "API Health";
-    var grafanaBase = Model.GrafanaBaseUrl?.TrimEnd('/');
 }
 
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
             <h2 class="fw-bold mb-1"><i class="bi bi-heart-pulse me-2"></i>API Health</h2>
-            <p class="text-muted mb-0">Exercises every annotated response path across all services. Each row is one test — one response code, one code path.</p>
+            <p class="text-muted mb-0">Exercises every annotated response path across all services. Each row is one test - one response code, one code path.</p>
         </div>
         <button type="button" class="btn btn-au-run" id="btnRunAll">
             <i class="bi bi-play-fill me-1"></i> Run All
@@ -46,8 +45,9 @@
     @foreach (var service in Model.Services)
     {
         var passCount = service.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult?.Passed == true);
-        var failCount = service.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult?.Passed == false);
+        var failCount = service.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult?.Passed == false && e.LastResult?.Skipped != true);
         var totalCount = service.Endpoints.Count(e => !e.Definition.IsInformational);
+        var serviceBadgeClass = failCount > 0 ? "au-badge-danger" : (passCount == totalCount && totalCount > 0 ? "au-badge-success" : "bg-secondary");
 
         <div class="accordion-item au-health-accordion mb-2" id="svc-@service.ServiceName">
             <h2 class="accordion-header au-health-header">
@@ -55,7 +55,7 @@
                     <button class="accordion-button collapsed au-health-toggle flex-grow-1" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-@service.ServiceName" aria-expanded="false">
                         <i class="bi bi-hdd-stack me-2"></i>
                         <strong>@service.ServiceName</strong>
-                        <span class="badge svc-summary ms-2" data-service="@service.ServiceName">@passCount/@totalCount</span>
+                        <span class="badge svc-summary ms-2 @serviceBadgeClass" data-service="@service.ServiceName">@passCount/@totalCount</span>
                     </button>
                     <button type="button" class="btn btn-sm btn-outline-dark btn-run-service me-2" data-service="@service.ServiceName">
                         <i class="bi bi-play-fill"></i>
@@ -155,41 +155,27 @@
                                         <td colspan="6" class="ps-4 py-2">
                                             <dl class="row mb-0 small">
                                                 <dt class="col-sm-2 text-muted">Request</dt>
-                                                <dd class="col-sm-10"><code>@(ep.LastResult.RequestMethod ?? "—") @(ep.LastResult.RequestUrl ?? "—")</code></dd>
+                                                <dd class="col-sm-10"><code>@(ep.LastResult.RequestMethod ?? "N/A") @(ep.LastResult.RequestUrl ?? "N/A")</code></dd>
+                                                <dt class="col-sm-2 text-muted">Request Body</dt>
+                                                <dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">@(string.IsNullOrWhiteSpace(ep.LastResult.RequestBody) ? "N/A" : ep.LastResult.RequestBody)</pre></dd>
                                                 <dt class="col-sm-2 text-muted">Status</dt>
-                                                <dd class="col-sm-10">@(ep.LastResult.ActualStatusCode?.ToString() ?? "—") (expected @ep.LastResult.ExpectedStatusCode)</dd>
+                                                <dd class="col-sm-10">@(ep.LastResult.ActualStatusCode?.ToString() ?? "N/A") (expected @ep.LastResult.ExpectedStatusCode)</dd>
                                                 @if (!string.IsNullOrWhiteSpace(ep.LastResult.TraceId))
                                                 {
                                                     <dt class="col-sm-2 text-muted">Trace</dt>
                                                     <dd class="col-sm-10">
                                                         <code class="user-select-all">@ep.LastResult.TraceId</code>
-                                                        @if (!string.IsNullOrWhiteSpace(grafanaBase))
-                                                        {
-                                                            var traceLink = $"{grafanaBase}/explore?left={{\"queries\":[{{\"expr\":\"{{traceID=\\\"{ep.LastResult.TraceId}\\\"}}\"}}]}}";
-                                                            <a href="@traceLink" target="_blank" class="ms-2 small"><i class="bi bi-box-arrow-up-right"></i> Grafana</a>
-                                                        }
                                                     </dd>
                                                 }
-                                                else if (!string.IsNullOrWhiteSpace(grafanaBase))
-                                                {
-                                                    var from = ep.LastResult.ExecutedAt.AddSeconds(-30).ToUnixTimeMilliseconds();
-                                                    var to = ep.LastResult.ExecutedAt.AddSeconds(30).ToUnixTimeMilliseconds();
-                                                    var timeLink = $"{grafanaBase}/explore?left={{\"range\":{{\"from\":\"{from}\",\"to\":\"{to}\"}}}}";
-                                                    <dt class="col-sm-2 text-muted">Logs</dt>
-                                                    <dd class="col-sm-10"><a href="@timeLink" target="_blank" class="small"><i class="bi bi-box-arrow-up-right"></i> View in Grafana (±30s window)</a></dd>
-                                                }
-                                                @if (!string.IsNullOrWhiteSpace(ep.LastResult.ResponseBody))
-                                                {
-                                                    <dt class="col-sm-2 text-muted">Response</dt>
-                                                    <dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">@ep.LastResult.ResponseBody</pre></dd>
-                                                }
+                                                <dt class="col-sm-2 text-muted">Response</dt>
+                                                <dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">@(string.IsNullOrWhiteSpace(ep.LastResult.ResponseBody) ? "N/A" : ep.LastResult.ResponseBody)</pre></dd>
                                                 @if (!string.IsNullOrWhiteSpace(ep.LastResult.ErrorMessage))
                                                 {
                                                     <dt class="col-sm-2 text-muted">Error</dt>
                                                     <dd class="col-sm-10 text-danger">@ep.LastResult.ErrorMessage</dd>
                                                 }
                                                 <dt class="col-sm-2 text-muted">Time</dt>
-                                                <dd class="col-sm-10">@ep.LastResult.ExecutedAt.ToString("yyyy-MM-dd HH:mm:ss.fff") UTC · @(ep.LastResult.DurationMs)ms</dd>
+                                                <dd class="col-sm-10">@ep.LastResult.ExecutedAt.ToString("yyyy-MM-dd HH:mm:ss.fff") UTC | @(ep.LastResult.DurationMs)ms</dd>
                                             </dl>
                                         </td>
                                     </tr>
@@ -226,7 +212,6 @@
 <script>
 (function () {
     const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
-    const grafanaBaseUrl = @Html.Raw(Json.Serialize(grafanaBase ?? ""));
 
     function postJson(url, body) {
         return fetch(url, {
@@ -323,7 +308,7 @@
         if (!meta || !currentSeedRunId || !currentSeedRunStartedAt) return;
         const elapsed = formatElapsed(Date.now() - currentSeedRunStartedAt.getTime());
         const base = meta.dataset.baseText || '';
-        meta.textContent = `${base} · elapsed ${elapsed}`;
+        meta.textContent = `${base} | elapsed ${elapsed}`;
     }
 
     function bindSeedRun(seedRunId, seedRunName) {
@@ -344,7 +329,7 @@
         card.style.display = '';
         link.style.display = '';
         link.href = `/Runs/Details/${encodeURIComponent(seedRunId)}`;
-        meta.dataset.baseText = `${seedRunName || 'ApiHealthScenario'} · ${seedRunId}`;
+        meta.dataset.baseText = `${seedRunName || 'ApiHealthScenario'} | ${seedRunId}`;
         if (!currentSeedRunStartedAt) {
             currentSeedRunStartedAt = new Date();
         }
@@ -436,14 +421,16 @@
         detailRow.className = 'row-detail';
         detailRow.dataset.detailFor = result.endpointKey;
         detailRow.style.display = 'none';
-        const traceHtml = result.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(result.traceId)}</code>${grafanaBaseUrl ? ` <a href="${grafanaBaseUrl}/explore?left=${encodeURIComponent(JSON.stringify({queries:[{expr:`{traceID="${result.traceId}"}`}]}))}" target="_blank" class="ms-2 small"><i class="bi bi-box-arrow-up-right"></i> Grafana</a>` : ''}</dd>` : '';
-        const responseHtml = result.responseBody ? `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.responseBody)}</pre></dd>` : '';
+        const traceHtml = result.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(result.traceId)}</code></dd>` : '';
+        const requestBodyHtml = `<dt class="col-sm-2 text-muted">Request Body</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.requestBody || 'N/A')}</pre></dd>`;
+        const responseHtml = `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.responseBody || 'N/A')}</pre></dd>`;
         const errorHtml = result.errorMessage ? `<dt class="col-sm-2 text-muted">Error</dt><dd class="col-sm-10 text-danger">${escapeHtml(result.errorMessage)}</dd>` : '';
         detailRow.innerHTML = `<td colspan="6" class="ps-4 py-2"><dl class="row mb-0 small">
-            <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(result.requestMethod || '—')} ${escapeHtml(result.requestUrl || '—')}</code></dd>
-            <dt class="col-sm-2 text-muted">Status</dt><dd class="col-sm-10">${result.actualStatusCode || '—'} (expected ${result.expectedStatusCode})</dd>
+            <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(result.requestMethod || 'N/A')} ${escapeHtml(result.requestUrl || 'N/A')}</code></dd>
+            ${requestBodyHtml}
+            <dt class="col-sm-2 text-muted">Status</dt><dd class="col-sm-10">${result.actualStatusCode || 'N/A'} (expected ${result.expectedStatusCode})</dd>
             ${traceHtml}${responseHtml}${errorHtml}
-            <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10">${new Date(result.executedAt).toISOString().replace('T',' ').substring(0,23)} UTC · ${result.durationMs}ms</dd>
+            <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10">${new Date(result.executedAt).toISOString().replace('T',' ').substring(0,23)} UTC | ${result.durationMs}ms</dd>
         </dl></td>`;
 
         // Insert after error row if it exists, otherwise after main row
@@ -552,7 +539,7 @@
         banner.style.display = '';
         banner.className = `alert ${active.isError ? 'alert-danger' : 'alert-secondary'} py-2 px-3 mb-3`;
         const phase = active.phase || 'Running';
-        title.textContent = `${active.scope}${active.serviceName ? ` · ${active.serviceName}` : ''} · ${phase}`;
+        title.textContent = `${active.scope}${active.serviceName ? ` - ${active.serviceName}` : ''} - ${phase}`;
         msg.textContent = active.message || 'Run in progress...';
     }
 
@@ -584,7 +571,7 @@
                 const msg = document.getElementById('runPhaseMessage');
                 banner.style.display = '';
                 banner.className = `alert ${p.isError ? 'alert-danger' : 'alert-secondary'} py-2 px-3 mb-3`;
-                title.textContent = `${p.scope}${p.serviceName ? ` · ${p.serviceName}` : ''} · ${p.phase}`;
+                title.textContent = `${p.scope}${p.serviceName ? ` - ${p.serviceName}` : ''} - ${p.phase}`;
                 msg.textContent = p.message || '';
 
                 if (p.seedRunId) {
@@ -671,10 +658,12 @@
             onError: () => {
                 setButtonLoading(btn, false);
                 document.querySelectorAll('.btn-run-service').forEach(b => b.disabled = false);
-                alert('Run all failed — connection lost.');
+                alert('Run all failed - connection lost.');
             }
         });
     });
+
+    updateSummary();
 
     // --- Resume active fire-and-forget run after navigation/refresh ---
     (async function resumeActiveRun() {
@@ -742,15 +731,16 @@
             let html = '<table class="table table-sm au-table"><thead><tr><th>Result</th><th>Status</th><th>Duration</th><th>Time</th><th>Error</th></tr></thead><tbody>';
             data.runs.forEach((r, idx) => {
                 const badge = r.passed ? '<span class="badge au-badge-success">PASS</span>' : '<span class="badge au-badge-danger">FAIL</span>';
-                const error = r.errorMessage ? `<small class="text-danger">${escapeHtml(r.errorMessage)}</small>` : '—';
-                html += `<tr class="cursor-pointer" data-toggle-detail="hist-${idx}"><td>${badge}</td><td><code>${r.actualStatusCode || '—'} / ${r.expectedStatusCode}</code></td><td>${r.durationMs}ms</td><td><small>${new Date(r.executedAt).toLocaleString()}</small></td><td>${error}</td></tr>`;
+                const error = r.errorMessage ? `<small class="text-danger">${escapeHtml(r.errorMessage)}</small>` : 'N/A';
+                html += `<tr class="cursor-pointer" data-toggle-detail="hist-${idx}"><td>${badge}</td><td><code>${r.actualStatusCode || 'N/A'} / ${r.expectedStatusCode}</code></td><td>${r.durationMs}ms</td><td><small>${new Date(r.executedAt).toLocaleString()}</small></td><td>${error}</td></tr>`;
                 // Expandable detail row
-                const traceHtml = r.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(r.traceId)}</code>${grafanaBaseUrl ? ` <a href="${grafanaBaseUrl}/explore?left=${encodeURIComponent(JSON.stringify({queries:[{expr:`{traceID="${r.traceId}"}`}]}))}" target="_blank" class="ms-2 small"><i class="bi bi-box-arrow-up-right"></i> Grafana</a>` : ''}</dd>` : '';
-                const responseHtml = r.responseBody ? `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.responseBody)}</pre></dd>` : '';
+                const traceHtml = r.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(r.traceId)}</code></dd>` : '';
+                const requestBodyHtml = `<dt class="col-sm-2 text-muted">Request Body</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.requestBody || 'N/A')}</pre></dd>`;
+                const responseHtml = `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.responseBody || 'N/A')}</pre></dd>`;
                 html += `<tr class="row-detail" id="hist-${idx}" style="display:none;"><td colspan="5" class="ps-3 py-2"><dl class="row mb-0 small">
-                    <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(r.requestMethod || '—')} ${escapeHtml(r.requestUrl || '—')}</code></dd>
-                    ${traceHtml}${responseHtml}
-                    <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10">${new Date(r.executedAt).toISOString().replace('T',' ').substring(0,23)} UTC · ${r.durationMs}ms</dd>
+                    <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(r.requestMethod || 'N/A')} ${escapeHtml(r.requestUrl || 'N/A')}</code></dd>
+                    ${requestBodyHtml}${traceHtml}${responseHtml}
+                    <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10">${new Date(r.executedAt).toISOString().replace('T',' ').substring(0,23)} UTC | ${r.durationMs}ms</dd>
                 </dl></td></tr>`;
             });
             html += '</tbody></table>';

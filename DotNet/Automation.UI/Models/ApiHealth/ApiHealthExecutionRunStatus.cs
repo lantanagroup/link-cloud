@@ -3,6 +3,8 @@ namespace Automation.UI.Models.ApiHealth;
 public sealed class ApiHealthExecutionRunStatus
 {
     public Guid RunId { get; init; }
+    public Guid? SeedRunId { get; init; }
+    public string? SeedRunName { get; init; }
     public string Scope { get; init; } = string.Empty;
     public string? ServiceName { get; init; }
     public DateTimeOffset StartedAt { get; init; }
