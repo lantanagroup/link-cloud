@@ -8,7 +8,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
             <h2 class="fw-bold mb-1"><i class="bi bi-heart-pulse me-2"></i>API Health</h2>
-            <p class="text-muted mb-0">Exercises every annotated response path across all services. Each row is one test â€” one response code, one code path.</p>
+            <p class="text-muted mb-0">Exercises every annotated response path across all services. Each row is one test — one response code, one code path.</p>
         </div>
         <button type="button" class="btn btn-au-run" id="btnRunAll">
             <i class="bi bi-play-fill me-1"></i> Run All
@@ -84,7 +84,7 @@
                                     || (ep.LastResult == null && ep.Definition.AlwaysSkipReason != null);
                                 var skipReason = ep.LastResult?.SkipReason ?? ep.Definition.AlwaysSkipReason;
                                 var badgeClass = isSkipped ? "au-badge-skip" : (hasPassed == null ? "bg-secondary" : (hasPassed == true ? "au-badge-success" : "au-badge-danger"));
-                                var badgeText = isSkipped ? "SKIP" : (hasPassed == null ? "â€”" : (hasPassed == true ? "PASS" : "FAIL"));
+                                var badgeText = isSkipped ? "SKIP" : (hasPassed == null ? "—" : (hasPassed == true ? "PASS" : "FAIL"));
 
                                 @if (ep.Definition.GroupName != null && ep.Definition.GroupName != lastGroup)
                                 {
@@ -112,7 +112,7 @@
                                         }
                                         else
                                         {
-                                            <span class="text-muted">â€”</span>
+                                            <span class="text-muted">—</span>
                                         }
                                     </td>
                                     <td class="cell-duration">
@@ -122,7 +122,7 @@
                                         }
                                         else
                                         {
-                                            <span class="text-muted">â€”</span>
+                                            <span class="text-muted">—</span>
                                         }
                                     </td>
                                     <td>
@@ -156,9 +156,9 @@
                                         <td colspan="5" class="ps-4 py-2">
                                             <dl class="row mb-0 small">
                                                 <dt class="col-sm-2 text-muted">Request</dt>
-                                                <dd class="col-sm-10"><code>@(ep.LastResult.RequestMethod ?? "â€”") @(ep.LastResult.RequestUrl ?? "â€”")</code></dd>
+                                                <dd class="col-sm-10"><code>@(ep.LastResult.RequestMethod ?? "—") @(ep.LastResult.RequestUrl ?? "—")</code></dd>
                                                 <dt class="col-sm-2 text-muted">Status</dt>
-                                                <dd class="col-sm-10">@(ep.LastResult.ActualStatusCode?.ToString() ?? "â€”") (expected @ep.LastResult.ExpectedStatusCode)</dd>
+                                                <dd class="col-sm-10">@(ep.LastResult.ActualStatusCode?.ToString() ?? "—") (expected @ep.LastResult.ExpectedStatusCode)</dd>
                                                 @if (!string.IsNullOrWhiteSpace(ep.LastResult.TraceId))
                                                 {
                                                     <dt class="col-sm-2 text-muted">Trace</dt>
@@ -177,7 +177,7 @@
                                                     var to = ep.LastResult.ExecutedAt.AddSeconds(30).ToUnixTimeMilliseconds();
                                                     var timeLink = $"{grafanaBase}/explore?left={{\"range\":{{\"from\":\"{from}\",\"to\":\"{to}\"}}}}";
                                                     <dt class="col-sm-2 text-muted">Logs</dt>
-                                                    <dd class="col-sm-10"><a href="@timeLink" target="_blank" class="small"><i class="bi bi-box-arrow-up-right"></i> View in Grafana (Â±30s window)</a></dd>
+                                                    <dd class="col-sm-10"><a href="@timeLink" target="_blank" class="small"><i class="bi bi-box-arrow-up-right"></i> View in Grafana (±30s window)</a></dd>
                                                 }
                                                 @if (!string.IsNullOrWhiteSpace(ep.LastResult.ResponseBody))
                                                 {
@@ -190,7 +190,7 @@
                                                     <dd class="col-sm-10 text-danger">@ep.LastResult.ErrorMessage</dd>
                                                 }
                                                 <dt class="col-sm-2 text-muted">Time</dt>
-                                                <dd class="col-sm-10">@ep.LastResult.ExecutedAt.ToString("yyyy-MM-dd HH:mm:ss.fff") UTC Â· @(ep.LastResult.DurationMs)ms</dd>
+                                                <dd class="col-sm-10">@ep.LastResult.ExecutedAt.ToString("yyyy-MM-dd HH:mm:ss.fff") UTC · @(ep.LastResult.DurationMs)ms</dd>
                                             </dl>
                                         </td>
                                     </tr>
@@ -324,7 +324,7 @@
         if (!meta || !currentSeedRunId || !currentSeedRunStartedAt) return;
         const elapsed = formatElapsed(Date.now() - currentSeedRunStartedAt.getTime());
         const base = meta.dataset.baseText || '';
-        meta.textContent = `${base} Â· elapsed ${elapsed}`;
+        meta.textContent = `${base} · elapsed ${elapsed}`;
     }
 
     function bindSeedRun(seedRunId, seedRunName) {
@@ -345,7 +345,7 @@
         card.style.display = '';
         link.style.display = '';
         link.href = `/Runs/Details/${encodeURIComponent(seedRunId)}`;
-        meta.dataset.baseText = `${seedRunName || 'ApiHealthScenario'} Â· ${seedRunId}`;
+        meta.dataset.baseText = `${seedRunName || 'ApiHealthScenario'} · ${seedRunId}`;
         if (!currentSeedRunStartedAt) {
             currentSeedRunStartedAt = new Date();
         }
@@ -453,10 +453,10 @@
         const responseHtml = result.responseBody ? `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.responseBody)}</pre></dd>` : '';
         const errorHtml = result.errorMessage ? `<dt class="col-sm-2 text-muted">Error</dt><dd class="col-sm-10 text-danger">${escapeHtml(result.errorMessage)}</dd>` : '';
         detailRow.innerHTML = `<td colspan="5" class="ps-4 py-2"><dl class="row mb-0 small">
-            <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(result.requestMethod || 'â€”')} ${escapeHtml(result.requestUrl || 'â€”')}</code></dd>
-            <dt class="col-sm-2 text-muted">Status</dt><dd class="col-sm-10">${result.actualStatusCode || 'â€”'} (expected ${result.expectedStatusCode})</dd>
+            <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(result.requestMethod || '—')} ${escapeHtml(result.requestUrl || '—')}</code></dd>
+            <dt class="col-sm-2 text-muted">Status</dt><dd class="col-sm-10">${result.actualStatusCode || '—'} (expected ${result.expectedStatusCode})</dd>
             ${traceHtml}${responseHtml}${errorHtml}
-            <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10">${new Date(result.executedAt).toISOString().replace('T',' ').substring(0,23)} UTC Â· ${result.durationMs}ms</dd>
+            <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10">${new Date(result.executedAt).toISOString().replace('T',' ').substring(0,23)} UTC · ${result.durationMs}ms</dd>
         </dl></td>`;
 
         // Insert after error row if it exists, otherwise after main row
@@ -483,9 +483,9 @@
 
     function resetRowToPending(row) {
         row.classList.remove('row-running');
-        row.querySelector('.cell-result').innerHTML = '<span class="badge bg-secondary">â€”</span>';
-        row.querySelector('.cell-status').innerHTML = '<span class="text-muted">â€”</span>';
-        row.querySelector('.cell-duration').innerHTML = '<span class="text-muted">â€”</span>';
+        row.querySelector('.cell-result').innerHTML = '<span class="badge bg-secondary">—</span>';
+        row.querySelector('.cell-status').innerHTML = '<span class="text-muted">—</span>';
+        row.querySelector('.cell-duration').innerHTML = '<span class="text-muted">—</span>';
         clearRowTransientRows(row);
     }
 
@@ -551,6 +551,41 @@
         else { btn.disabled = false; btn.innerHTML = btn.dataset.origHtml || btn.innerHTML; }
     }
 
+    function setRunButtonsDisabled(disabled) {
+        document.querySelectorAll('.btn-run-service').forEach(b => b.disabled = disabled);
+        document.getElementById('btnRunAll').disabled = disabled;
+    }
+
+    function setRunPhaseFromActive(active) {
+        const banner = document.getElementById('runPhaseBanner');
+        const title = document.getElementById('runPhaseTitle');
+        const msg = document.getElementById('runPhaseMessage');
+        if (!banner || !title || !msg || !active) return;
+
+        banner.style.display = '';
+        banner.className = `alert ${active.isError ? 'alert-danger' : 'alert-secondary'} py-2 px-3 mb-3`;
+        const phase = active.phase || 'Running';
+        title.textContent = `${active.scope}${active.serviceName ? ` · ${active.serviceName}` : ''} · ${phase}`;
+        msg.textContent = active.message || 'Run in progress...';
+    }
+
+    function pollRemoteActiveRun(runId) {
+        const timer = setInterval(async () => {
+            try {
+                const latest = await getJson('/ApiHealth/ActiveRun');
+                if (!latest || latest.runId !== runId) {
+                    clearInterval(timer);
+                    setRunButtonsDisabled(false);
+                    return;
+                }
+
+                setRunPhaseFromActive(latest);
+            } catch {
+                // best effort
+            }
+        }, 3000);
+    }
+
     // --- SSE streaming helper ---
     function runViaSSE(url, { onResult, onDone, onError }) {
         const es = new EventSource(url);
@@ -562,7 +597,7 @@
                 const msg = document.getElementById('runPhaseMessage');
                 banner.style.display = '';
                 banner.className = `alert ${p.isError ? 'alert-danger' : 'alert-secondary'} py-2 px-3 mb-3`;
-                title.textContent = `${p.scope}${p.serviceName ? ` Â· ${p.serviceName}` : ''} Â· ${p.phase}`;
+                title.textContent = `${p.scope}${p.serviceName ? ` · ${p.serviceName}` : ''} · ${p.phase}`;
                 msg.textContent = p.message || '';
 
                 if (p.seedRunId) {
@@ -649,7 +684,7 @@
             onError: () => {
                 setButtonLoading(btn, false);
                 document.querySelectorAll('.btn-run-service').forEach(b => b.disabled = false);
-                alert('Run all failed â€” connection lost.');
+                alert('Run all failed — connection lost.');
             }
         });
     });
@@ -660,19 +695,21 @@
             const active = await getJson('/ApiHealth/ActiveRun');
             if (!active || !active.runId) return;
 
-            document.getElementById('runPhaseBanner').style.display = '';
-            document.querySelectorAll('.btn-run-service').forEach(b => b.disabled = true);
-            document.getElementById('btnRunAll').disabled = true;
+            setRunPhaseFromActive(active);
+            setRunButtonsDisabled(true);
+
+            if (active.isAttachable !== true) {
+                pollRemoteActiveRun(active.runId);
+                return;
+            }
 
             runViaSSE(`/ApiHealth/RunStream?runId=${encodeURIComponent(active.runId)}`, {
                 onResult: updateRowFromResult,
                 onDone: () => {
-                    document.querySelectorAll('.btn-run-service').forEach(b => b.disabled = false);
-                    document.getElementById('btnRunAll').disabled = false;
+                    setRunButtonsDisabled(false);
                 },
                 onError: () => {
-                    document.querySelectorAll('.btn-run-service').forEach(b => b.disabled = false);
-                    document.getElementById('btnRunAll').disabled = false;
+                    setRunButtonsDisabled(false);
                 }
             });
         } catch {
@@ -718,15 +755,15 @@
             let html = '<table class="table table-sm au-table"><thead><tr><th>Result</th><th>Status</th><th>Duration</th><th>Time</th><th>Error</th></tr></thead><tbody>';
             data.runs.forEach((r, idx) => {
                 const badge = r.passed ? '<span class="badge au-badge-success">PASS</span>' : '<span class="badge au-badge-danger">FAIL</span>';
-                const error = r.errorMessage ? `<small class="text-danger">${escapeHtml(r.errorMessage)}</small>` : 'â€”';
-                html += `<tr class="cursor-pointer" data-toggle-detail="hist-${idx}"><td>${badge}</td><td><code>${r.actualStatusCode || 'â€”'} / ${r.expectedStatusCode}</code></td><td>${r.durationMs}ms</td><td><small>${new Date(r.executedAt).toLocaleString()}</small></td><td>${error}</td></tr>`;
+                const error = r.errorMessage ? `<small class="text-danger">${escapeHtml(r.errorMessage)}</small>` : '—';
+                html += `<tr class="cursor-pointer" data-toggle-detail="hist-${idx}"><td>${badge}</td><td><code>${r.actualStatusCode || '—'} / ${r.expectedStatusCode}</code></td><td>${r.durationMs}ms</td><td><small>${new Date(r.executedAt).toLocaleString()}</small></td><td>${error}</td></tr>`;
                 // Expandable detail row
                 const traceHtml = r.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(r.traceId)}</code>${grafanaBaseUrl ? ` <a href="${grafanaBaseUrl}/explore?left=${encodeURIComponent(JSON.stringify({queries:[{expr:`{traceID="${r.traceId}"}`}]}))}" target="_blank" class="ms-2 small"><i class="bi bi-box-arrow-up-right"></i> Grafana</a>` : ''}</dd>` : '';
                 const responseHtml = r.responseBody ? `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.responseBody)}</pre></dd>` : '';
                 html += `<tr class="row-detail" id="hist-${idx}" style="display:none;"><td colspan="5" class="ps-3 py-2"><dl class="row mb-0 small">
-                    <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(r.requestMethod || 'â€”')} ${escapeHtml(r.requestUrl || 'â€”')}</code></dd>
+                    <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(r.requestMethod || '—')} ${escapeHtml(r.requestUrl || '—')}</code></dd>
                     ${traceHtml}${responseHtml}
-                    <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10">${new Date(r.executedAt).toISOString().replace('T',' ').substring(0,23)} UTC Â· ${r.durationMs}ms</dd>
+                    <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10">${new Date(r.executedAt).toISOString().replace('T',' ').substring(0,23)} UTC · ${r.durationMs}ms</dd>
                 </dl></td></tr>`;
             });
             html += '</tbody></table>';

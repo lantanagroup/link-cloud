@@ -1,4 +1,4 @@
-﻿using Automation.UI.Models.ApiHealth;
+using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -63,9 +63,9 @@ public class ApiHealthController(
     }
 
     [HttpGet]
-    public IActionResult ActiveRun()
+    public async Task<IActionResult> ActiveRun(CancellationToken ct)
     {
-        var activeRun = runManager.GetActiveRun();
+        var activeRun = await runManager.GetActiveRunAsync(ct);
         return Json(activeRun);
     }
 

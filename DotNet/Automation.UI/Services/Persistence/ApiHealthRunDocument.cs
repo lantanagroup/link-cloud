@@ -1,9 +1,10 @@
-﻿using MongoDB.Bson;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
 namespace Automation.UI.Services.Persistence;
 
 /// <summary>MongoDB document for the api_health_runs collection.</summary>
+[BsonIgnoreExtraElements]
 public sealed class ApiHealthRunDocument
 {
     [BsonId]
@@ -21,6 +22,11 @@ public sealed class ApiHealthRunDocument
     public int ExpectedStatusCode { get; set; }
     public string? ErrorMessage { get; set; }
     public string? ResponseSnippet { get; set; }
+
+    public string? RequestUrl { get; set; }
+    public string? RequestMethod { get; set; }
+    public string? TraceId { get; set; }
+    public string? ResponseBody { get; set; }
 
     [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset ExecutedAt { get; set; }

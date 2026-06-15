@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
@@ -44,6 +44,8 @@ public sealed class ApiHealthExecutionRunManager(
         lock (_sync)
             _activeRunId = run.RunId;
 
+        await PersistExecutionStatusAsync(run, "Starting", "Preparing run");
+
         PruneCompletedRuns();
 
         run.ExecutionTask = Task.Run(() => ExecuteServiceRunAsync(run));
@@ -72,6 +74,8 @@ public sealed class ApiHealthExecutionRunManager(
         lock (_sync)
             _activeRunId = run.RunId;
 
+        await PersistExecutionStatusAsync(run, "Starting", "Preparing run");
+
         PruneCompletedRuns();
 
         run.ExecutionTask = Task.Run(() => ExecuteAllRunAsync(run));
@@ -94,9 +98,49 @@ public sealed class ApiHealthExecutionRunManager(
                 RunId = run.RunId,
                 Scope = run.Scope,
                 ServiceName = run.ServiceName,
-                StartedAt = run.StartedAt
+                StartedAt = run.StartedAt,
+                IsAttachable = true
             };
         }
+    }
+
+    public async Task<ApiHealthActiveRunInfo?> GetActiveRunAsync(CancellationToken ct = default)
+    {
+        var local = GetActiveRun();
+        if (local != null)
+        {
+            var localStatus = await store.GetExecutionRunStatusAsync(local.RunId, ct);
+            if (localStatus == null)
+                return local;
+
+            return new ApiHealthActiveRunInfo
+            {
+                RunId = localStatus.RunId,
+                Scope = localStatus.Scope,
+                ServiceName = localStatus.ServiceName,
+                StartedAt = localStatus.StartedAt,
+                Phase = localStatus.Phase,
+                Message = localStatus.Message,
+                IsError = localStatus.IsError,
+                IsAttachable = true
+            };
+        }
+
+        var activeStatus = await store.GetActiveExecutionRunStatusAsync(ct);
+        if (activeStatus == null)
+            return null;
+
+        return new ApiHealthActiveRunInfo
+        {
+            RunId = activeStatus.RunId,
+            Scope = activeStatus.Scope,
+            ServiceName = activeStatus.ServiceName,
+            StartedAt = activeStatus.StartedAt,
+            Phase = activeStatus.Phase,
+            Message = activeStatus.Message,
+            IsError = activeStatus.IsError,
+            IsAttachable = TryGetRun(activeStatus.RunId, out _)
+        };
     }
 
     public bool TryGetRun(Guid runId, out ApiHealthRunInfo runInfo)
@@ -157,7 +201,7 @@ public sealed class ApiHealthExecutionRunManager(
             {
                 var error = seedSession.Error;
                 await AddPhaseAsync(run, "Failed", error, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
-                Complete(run, failed: true, error);
+                await CompleteAsync(run, failed: true, error);
                 AddDone(run);
                 return;
             }
@@ -180,14 +224,14 @@ public sealed class ApiHealthExecutionRunManager(
             }
 
             await AddPhaseAsync(run, "Done", "Service run complete");
-            Complete(run, failed: false, null);
+            await CompleteAsync(run, failed: false, null);
             AddDone(run);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "API Health service run failed unexpectedly. RunId={RunId}", run.RunId);
             await AddPhaseAsync(run, "Failed", SanitizedInternalError, isError: true);
-            Complete(run, failed: true, SanitizedInternalError);
+            await CompleteAsync(run, failed: true, SanitizedInternalError);
             AddDone(run);
         }
     }
@@ -208,7 +252,7 @@ public sealed class ApiHealthExecutionRunManager(
             {
                 var error = seedSession.Error;
                 await AddPhaseAsync(run, "Failed", error, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
-                Complete(run, failed: true, error);
+                await CompleteAsync(run, failed: true, error);
                 AddDone(run);
                 return;
             }
@@ -231,14 +275,14 @@ public sealed class ApiHealthExecutionRunManager(
             }
 
             await AddPhaseAsync(run, "Done", "Run all complete");
-            Complete(run, failed: false, null);
+            await CompleteAsync(run, failed: false, null);
             AddDone(run);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "API Health run-all failed unexpectedly. RunId={RunId}", run.RunId);
             await AddPhaseAsync(run, "Failed", SanitizedInternalError, isError: true);
-            Complete(run, failed: true, SanitizedInternalError);
+            await CompleteAsync(run, failed: true, SanitizedInternalError);
             AddDone(run);
         }
     }
@@ -296,7 +340,7 @@ public sealed class ApiHealthExecutionRunManager(
         }, _jsonOptions);
 
         AddEvent(run, "phase", payload);
-        return Task.CompletedTask;
+        return PersistExecutionStatusAsync(run, phase, message, isError);
     }
 
     private void AddDone(RunState run) => AddEvent(run, "done", "{}");
@@ -318,7 +362,7 @@ public sealed class ApiHealthExecutionRunManager(
         }
     }
 
-    private void Complete(RunState run, bool failed, string? error)
+    private async Task CompleteAsync(RunState run, bool failed, string? error)
     {
         run.Completed = true;
         run.Failed = failed;
@@ -331,7 +375,41 @@ public sealed class ApiHealthExecutionRunManager(
                 _activeRunId = null;
         }
 
+        try
+        {
+            await store.CompleteExecutionRunAsync(run.RunId, failed, error, run.FinishedAt.Value);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to persist completion status for API Health run {RunId}.", run.RunId);
+        }
+
         PruneCompletedRuns();
+    }
+
+    private async Task PersistExecutionStatusAsync(RunState run, string phase, string message, bool isError = false)
+    {
+        try
+        {
+            await store.UpsertExecutionRunStatusAsync(new ApiHealthExecutionRunStatus
+            {
+                RunId = run.RunId,
+                Scope = run.Scope,
+                ServiceName = run.ServiceName,
+                StartedAt = run.StartedAt,
+                Phase = phase,
+                Message = message,
+                IsError = isError,
+                IsCompleted = run.Completed,
+                Failed = run.Failed,
+                Error = run.Error,
+                FinishedAt = run.FinishedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to persist API Health run status for run {RunId}.", run.RunId);
+        }
     }
 
     private void PruneCompletedRuns()
@@ -418,6 +496,10 @@ public sealed class ApiHealthActiveRunInfo
     public string Scope { get; init; } = string.Empty;
     public string? ServiceName { get; init; }
     public DateTimeOffset StartedAt { get; init; }
+    public string? Phase { get; init; }
+    public string? Message { get; init; }
+    public bool IsError { get; init; }
+    public bool IsAttachable { get; init; }
 }
 
 public sealed class ApiHealthRunInfo
