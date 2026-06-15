@@ -1,4 +1,4 @@
-﻿using Automation.UI.Models.ApiHealth;
+using Automation.UI.Models.ApiHealth;
 using MongoDB.Driver;
 
 namespace Automation.UI.Services.Persistence;
@@ -103,7 +103,11 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
         ErrorMessage = r.ErrorMessage,
         ResponseSnippet = r.ResponseSnippet,
         ExecutedAt = r.ExecutedAt,
-        DurationMs = r.DurationMs
+        DurationMs = r.DurationMs,
+        RequestUrl = r.RequestUrl,
+        RequestMethod = r.RequestMethod,
+        TraceId = r.TraceId,
+        ResponseBody = r.ResponseBody
     };
 
     private static ApiTestRunResult FromDocument(ApiHealthRunDocument d) => new()
@@ -120,6 +124,10 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
         ErrorMessage = d.ErrorMessage,
         ResponseSnippet = d.ResponseSnippet,
         ExecutedAt = d.ExecutedAt,
-        DurationMs = d.DurationMs
+        DurationMs = d.DurationMs,
+        RequestUrl = d.RequestUrl,
+        RequestMethod = d.RequestMethod,
+        TraceId = d.TraceId,
+        ResponseBody = d.ResponseBody
     };
 }
