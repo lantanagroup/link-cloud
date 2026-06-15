@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
@@ -67,6 +68,30 @@ public class EncounterMappingManagerUnitTests
         Assert.NotEqual(default, capturedEntity.CreateDate);
         Assert.Equal(capturedEntity.CreateDate, capturedEntity.ModifiedDate);
         _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateAsync_DuplicateMapping_ThrowsEntityAlreadyExistsException()
+    {
+        // Arrange
+        var model = new CreateEncounterMappingModel
+        {
+            FacilityId = "Fac1",
+            EncounterId = "Enc1",
+            PatientId = "Pat1",
+            MappedToOrg = true
+        };
+
+        _mockMappingRepo.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>()))
+            .ReturnsAsync(new EncounterMapping { FacilityId = "Fac1", EncounterId = "Enc1" });
+
+        // Act
+        var ex = await Assert.ThrowsAsync<EntityAlreadyExistsException>(() => _manager.CreateAsync(model));
+        Assert.Equal("An EncounterMapping already exists for FacilityId Fac1 and EncounterId Enc1", ex.Message);
+
+        // Assert
+        _mockMappingRepo.Verify(r => r.AddAsync(It.IsAny<EncounterMapping>()), Times.Never);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Never);
     }
 
     [Fact]

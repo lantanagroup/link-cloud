@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
@@ -37,6 +38,14 @@ public class EncounterMappingManager : IEncounterMappingManager
             ModifiedDate = now
         };
 
+        var existingMapping = await _database.EncounterMappingRepository.FirstOrDefaultAsync(m => 
+            m.FacilityId == model.FacilityId && 
+            m.EncounterId == model.EncounterId);
+        
+        if (existingMapping != null) {
+            throw new EntityAlreadyExistsException($"An EncounterMapping already exists for FacilityId {model.FacilityId} and EncounterId {model.EncounterId}");
+        }
+        
         if (model.OrganizationLocationMappingIds != null)
         {
             foreach (var locId in model.OrganizationLocationMappingIds)

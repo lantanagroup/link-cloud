@@ -1,5 +1,6 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -199,7 +200,7 @@ public class EncounterMappingManagerTests
         await manager.CreateAsync(model);
 
         // Second creation with same FacilityId and EncounterId should fail due to unique constraint
-        await Assert.ThrowsAsync<Microsoft.EntityFrameworkCore.DbUpdateException>(() => manager.CreateAsync(model));
+        await Assert.ThrowsAsync<EntityAlreadyExistsException>(() => manager.CreateAsync(model));
     }
 
     [Fact]
