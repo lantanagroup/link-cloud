@@ -327,7 +327,7 @@ public class EncounterMappingController : Controller
         catch (EntityAlreadyExistsException ex)
         {
             _logger.LogError(ex, "EntityAlreadyExistsException occurred.");
-            return Problem(title: "Entity Already Exists",
+            return Problem(title: "Conflict",
                 detail: "The request could not be completed because it conflicts with the current state of the resource.",
                 statusCode: (int)HttpStatusCode.Conflict);
         }
