@@ -1,4 +1,4 @@
-﻿using Automation.UI.Services;
+using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -34,6 +34,24 @@ if (!string.IsNullOrEmpty(externalConfigSource))
 
 // -- Bind options --
 builder.Services.Configure<AutomationConfig>(builder.Configuration.GetSection("Automation"));
+
+var grafanaBaseUrlFallback =
+    builder.Configuration["GRAFANA_URL"]
+    ?? builder.Configuration["GRAFANA_BASE_URL"]
+    ?? builder.Configuration["GrafanaBaseUrl"];
+
+if (!string.IsNullOrWhiteSpace(grafanaBaseUrlFallback))
+{
+    builder.Services.PostConfigure<AutomationConfig>(cfg =>
+    {
+        if (string.IsNullOrWhiteSpace(cfg.GrafanaBaseUrl)
+            || string.Equals(cfg.GrafanaBaseUrl, "http://localhost:3000", StringComparison.OrdinalIgnoreCase))
+        {
+            cfg.GrafanaBaseUrl = grafanaBaseUrlFallback.TrimEnd('/');
+        }
+    });
+}
+
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection("LinkTokenService"));
 

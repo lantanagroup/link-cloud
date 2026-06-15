@@ -23,13 +23,14 @@ public sealed class ApiHealthRunDocument
     public string? ErrorMessage { get; set; }
     public string? ResponseSnippet { get; set; }
 
-    public string? RequestUrl { get; set; }
-    public string? RequestMethod { get; set; }
-    public string? TraceId { get; set; }
-    public string? ResponseBody { get; set; }
-
     [BsonRepresentation(BsonType.DateTime)]
     public DateTimeOffset ExecutedAt { get; set; }
 
     public long DurationMs { get; set; }
+
+    // Diagnostic fields persisted for post-refresh detail rendering.
+    public string? RequestUrl { get; set; }
+    public string? RequestMethod { get; set; }
+    public string? TraceId { get; set; }
+    public string? ResponseBody { get; set; }
 }
