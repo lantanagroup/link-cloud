@@ -309,6 +309,7 @@ public class EncounterMappingController : Controller
     [ValidateAntiForgeryOrBearerToken]
     [ProducesResponseType(typeof(EncounterMappingModel), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> CreateAsync([FromBody] CreateEncounterMappingModel model)
     {
