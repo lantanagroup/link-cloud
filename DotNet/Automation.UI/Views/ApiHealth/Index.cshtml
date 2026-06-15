@@ -85,7 +85,7 @@
                                     || (ep.LastResult == null && ep.Definition.AlwaysSkipReason != null);
                                 var skipReason = ep.LastResult?.SkipReason ?? ep.Definition.AlwaysSkipReason;
                                 var badgeClass = isSkipped ? "au-badge-skip" : (hasPassed == null ? "bg-secondary" : (hasPassed == true ? "au-badge-success" : "au-badge-danger"));
-                                var badgeText = isSkipped ? "SKIP" : (hasPassed == null ? "—" : (hasPassed == true ? "PASS" : "FAIL"));
+                                var badgeText = isSkipped ? "SKIP" : (hasPassed == null ? "N/A" : (hasPassed == true ? "PASS" : "FAIL"));
 
                                 @if (ep.Definition.GroupName != null && ep.Definition.GroupName != lastGroup)
                                 {
@@ -113,7 +113,7 @@
                                         }
                                         else
                                         {
-                                            <span class="text-muted">—</span>
+                                            <span class="text-muted">N/A</span>
                                         }
                                     </td>
                                     <td class="cell-reason">
@@ -127,7 +127,7 @@
                                         }
                                         else
                                         {
-                                            <span class="text-muted">—</span>
+                                            <span class="text-muted">N/A</span>
                                         }
                                     </td>
                                     <td class="cell-duration">
@@ -137,7 +137,7 @@
                                         }
                                         else
                                         {
-                                            <span class="text-muted">—</span>
+                                            <span class="text-muted">N/A</span>
                                         }
                                     </td>
                                     <td>
@@ -409,6 +409,7 @@
         if (!row) return;
         if (row.dataset.informational === 'true') return;
 
+        const placeholderText = 'N/A';
         const skipped = result.skipped === true;
         const passed = result.passed;
         const badgeClass = skipped ? 'au-badge-skip' : (passed ? 'au-badge-success' : 'au-badge-danger');
@@ -416,11 +417,11 @@
 
         row.classList.remove('row-running');
         row.querySelector('.cell-result').innerHTML = `<span class="badge ${badgeClass}">${badgeText}</span>`;
-        row.querySelector('.cell-status').innerHTML = skipped ? `<span class="text-muted">\u2014</span>` : `<code class="small">${result.actualStatusCode || '\u2014'} / ${result.expectedStatusCode}</code>`;
+        row.querySelector('.cell-status').innerHTML = skipped ? `<span class="text-muted">${placeholderText}</span>` : `<code class="small">${result.actualStatusCode || placeholderText} / ${result.expectedStatusCode}</code>`;
         row.querySelector('.cell-reason').innerHTML = skipped
-            ? (result.skipReason ? `<small class="text-muted">${escapeHtml(result.skipReason)}</small>` : `<span class="text-muted">\u2014</span>`)
-            : (!passed && result.errorMessage ? `<small class="text-danger">${escapeHtml(result.errorMessage)}</small>` : `<span class="text-muted">\u2014</span>`);
-        row.querySelector('.cell-duration').innerHTML = skipped ? `<span class="text-muted">\u2014</span>` : `<small>${result.durationMs}ms</small>`;
+            ? (result.skipReason ? `<small class="text-muted">${escapeHtml(result.skipReason)}</small>` : `<span class="text-muted">${placeholderText}</span>`)
+            : (!passed && result.errorMessage ? `<small class="text-danger">${escapeHtml(result.errorMessage)}</small>` : `<span class="text-muted">${placeholderText}</span>`);
+        row.querySelector('.cell-duration').innerHTML = skipped ? `<span class="text-muted">${placeholderText}</span>` : `<small>${result.durationMs}ms</small>`;
 
         // Remove old error, skip, and detail rows
         let sibling = row.nextElementSibling;
@@ -468,10 +469,10 @@
 
     function resetRowToPending(row) {
         row.classList.remove('row-running');
-        row.querySelector('.cell-result').innerHTML = '<span class="badge bg-secondary">—</span>';
-        row.querySelector('.cell-status').innerHTML = '<span class="text-muted">—</span>';
-        row.querySelector('.cell-reason').innerHTML = '<span class="text-muted">—</span>';
-        row.querySelector('.cell-duration').innerHTML = '<span class="text-muted">—</span>';
+        row.querySelector('.cell-result').innerHTML = '<span class="badge bg-secondary">N/A</span>';
+        row.querySelector('.cell-status').innerHTML = '<span class="text-muted">N/A</span>';
+        row.querySelector('.cell-reason').innerHTML = '<span class="text-muted">N/A</span>';
+        row.querySelector('.cell-duration').innerHTML = '<span class="text-muted">N/A</span>';
         clearRowTransientRows(row);
     }
 
