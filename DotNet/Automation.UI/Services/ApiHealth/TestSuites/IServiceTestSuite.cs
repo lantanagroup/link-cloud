@@ -1,4 +1,4 @@
-﻿using Automation.UI.Models.ApiHealth;
+using Automation.UI.Models.ApiHealth;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
 

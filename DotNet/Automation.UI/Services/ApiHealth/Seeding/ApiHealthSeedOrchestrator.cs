@@ -1,12 +1,11 @@
-﻿using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using LantanaGroup.Link.Sdk.Clients;
 
 namespace Automation.UI.Services.ApiHealth.Seeding;
 
@@ -132,7 +131,7 @@ public sealed class ApiHealthSeedOrchestrator(
                 }
             }
 
-            var startRequest = BuildStartRequest(scenario);
+            var startRequest = StartScenarioRequest.FromScenario(scenario);
             var runId = await runManager.StartAsync(startRequest, ct);
 
             logger.LogInformation(

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
 using LantanaGroup.Link.Sdk.ApiClient;
@@ -197,7 +197,7 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
 
     /// <summary>
     /// Produces a skipped result for a step that cannot be executed in this environment.
-    /// Skipped steps are neither passed nor failed — they are shown distinctly on the dashboard.
+    /// Skipped steps are neither passed nor failed � they are shown distinctly on the dashboard.
     /// </summary>
     protected ApiTestRunResult SkipStepAsync(string endpointName, string skipReason) =>
         new()

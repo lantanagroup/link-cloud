@@ -1,4 +1,4 @@
-﻿using Automation.UI.Models.ApiHealth;
+using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.TestSuites;
 using Automation.UI.Services.Persistence;
 

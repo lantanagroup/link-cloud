@@ -1,8 +1,9 @@
-﻿using Automation.UI.Models.ApiHealth;
+using Automation.UI.Models.ApiHealth;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using StepNames = Automation.UI.Services.ApiHealth.TestSuites.ApiEndPointLibrary.NormalizationSteps;
 
 namespace Automation.UI.Services.ApiHealth.TestSuites;
 
@@ -29,40 +30,36 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
     }
 
     public override IReadOnlyList<ApiEndpointDefinition> GetEndpointDefinitions() =>
-    [
-        // POST /api/normalization/operations
-        Step("POST → 201", "Creates a CopyProperty operation", "/api/normalization/operations"),
-        Step("POST → 400 (invalid operation type)", "Returns 400 when request.OperationType does not map to a supported operation", "/api/normalization/operations"),
-        Step("POST → 400 (empty resourceTypes)", "Returns 400 when request.ResourceTypes is empty", "/api/normalization/operations"),
+        ApiEndPointLibrary.GetServiceEndpoints(ServiceName);
 
         // GET /api/normalization/operations/facility/{id}
-        Step("GET → 200 (has results)", "Returns operations after create", "/api/normalization/operations/facility/{id}"),
-        Step("GET → 200 (empty)", "Returns empty after deletion", "/api/normalization/operations/facility/{id}"),
-        Step("GET → 400 (bad facility)", "Returns 400 when facilityId is invalid/unknown", "/api/normalization/operations/facility/{id}"),
+        Step("GET ? 200 (has results)", "Returns operations after create", "/api/normalization/operations/facility/{id}"),
+        Step("GET ? 200 (empty)", "Returns empty after deletion", "/api/normalization/operations/facility/{id}"),
+        Step("GET ? 400 (bad facility)", "Returns 400 when facilityId is invalid/unknown", "/api/normalization/operations/facility/{id}"),
 
         // GET /api/normalization/operations/facility/{id}/sequences
-        Step("GET → 200 (sequences)", "Returns operation sequences", "/api/normalization/operations/facility/{id}/sequences"),
-        Step("GET → 400 (sequences bad facility)", "Returns 400 when sequence facilityId is invalid/unknown", "/api/normalization/operations/facility/{id}/sequences"),
-        Step("SEQUENCES POST → 201", "Creates operation sequence ordering for facility/resource", "/api/normalization/OperationSequence"),
-        Step("SEQUENCES POST → 400 (empty facility)", "Returns 400 when facilityId is empty", "/api/normalization/OperationSequence"),
-        Step("SEQUENCES POST → 400 (empty body)", "Returns 400 when sequence list is empty", "/api/normalization/OperationSequence"),
+        Step("GET ? 200 (sequences)", "Returns operation sequences", "/api/normalization/operations/facility/{id}/sequences"),
+        Step("GET ? 400 (sequences bad facility)", "Returns 400 when sequence facilityId is invalid/unknown", "/api/normalization/operations/facility/{id}/sequences"),
+        Step("SEQUENCES POST ? 201", "Creates operation sequence ordering for facility/resource", "/api/normalization/OperationSequence"),
+        Step("SEQUENCES POST ? 400 (empty facility)", "Returns 400 when facilityId is empty", "/api/normalization/OperationSequence"),
+        Step("SEQUENCES POST ? 400 (empty body)", "Returns 400 when sequence list is empty", "/api/normalization/OperationSequence"),
 
         // DELETE /api/normalization/operations/facility/{id}
-        Step("DELETE → 204", "Removes all operations for facility", "/api/normalization/operations/facility/{id}"),
-        Step("DELETE → 404 (no records)", "Returns 404 when facility has no operations to delete", "/api/normalization/operations/facility/{id}"),
-        Step("SEQUENCES DELETE → 204", "Deletes operation sequences for facility/resource", "/api/normalization/OperationSequence"),
-        Step("SEQUENCES DELETE → 404", "Returns 404 when no sequence exists for requested resource", "/api/normalization/OperationSequence"),
-        Step("SEQUENCES DELETE → 400 (empty facility)", "Returns 400 when facilityId is empty", "/api/normalization/OperationSequence"),
+        Step("DELETE ? 204", "Removes all operations for facility", "/api/normalization/operations/facility/{id}"),
+        Step("DELETE ? 404 (no records)", "Returns 404 when facility has no operations to delete", "/api/normalization/operations/facility/{id}"),
+        Step("SEQUENCES DELETE ? 204", "Deletes operation sequences for facility/resource", "/api/normalization/OperationSequence"),
+        Step("SEQUENCES DELETE ? 404", "Returns 404 when no sequence exists for requested resource", "/api/normalization/OperationSequence"),
+        Step("SEQUENCES DELETE ? 400 (empty facility)", "Returns 400 when facilityId is empty", "/api/normalization/OperationSequence"),
 
         // /api/normalization/vendor
-        Step("VENDOR POST → 201", "Creates vendor", "/api/normalization/vendor/{vendor}"),
-        Step("VENDOR POST → 409", "Returns 409 when vendor already exists", "/api/normalization/vendor/{vendor}"),
-        Step("VENDOR GET → 200", "Returns vendor by name", "/api/normalization/vendor/{vendor}"),
-        Step("VENDORS GET → 200", "Returns all vendors", "/api/normalization/vendor/vendors"),
-        Step("PRESET POST → 201", "Creates vendor preset", "/api/normalization/vendor/presets"),
-        Step("PRESETS GET → 200", "Returns vendor presets", "/api/normalization/vendor/presets/{vendor}"),
-        Step("PRESET DELETE → 204", "Deletes vendor preset", "/api/normalization/vendor/presets/{vendor}/{presetId}"),
-        Step("VENDOR DELETE → 204", "Deletes vendor", "/api/normalization/vendor/{vendor}"),
+        Step("VENDOR POST ? 201", "Creates vendor", "/api/normalization/vendor/{vendor}"),
+        Step("VENDOR POST ? 409", "Returns 409 when vendor already exists", "/api/normalization/vendor/{vendor}"),
+        Step("VENDOR GET ? 200", "Returns vendor by name", "/api/normalization/vendor/{vendor}"),
+        Step("VENDORS GET ? 200", "Returns all vendors", "/api/normalization/vendor/vendors"),
+        Step("PRESET POST ? 201", "Creates vendor preset", "/api/normalization/vendor/presets"),
+        Step("PRESETS GET ? 200", "Returns vendor presets", "/api/normalization/vendor/presets/{vendor}"),
+        Step("PRESET DELETE ? 204", "Deletes vendor preset", "/api/normalization/vendor/presets/{vendor}/{presetId}"),
+        Step("VENDOR DELETE ? 204", "Deletes vendor", "/api/normalization/vendor/{vendor}"),
     ];
 
     public override async Task<IReadOnlyList<ApiTestRunResult>> ExecuteAsync(CancellationToken ct = default)
@@ -83,8 +80,8 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
             await CreateFacilityAsync(facilityId, ct);
             facilityCreated = true;
 
-            // POST → 201
-            results.Add(await RunStepAsync("POST → 201", 201, async () =>
+            // POST ? 201
+            results.Add(await RunStepAsync(StepNames.Post201, 201, async () =>
             {
                 var request = new CreateNormalizationOperationRequestApiModel
                 {
@@ -98,7 +95,7 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                         SourceFhirPath = "identifier.value",
                         TargetFhirPath = "type[0].coding.code"
                     },
-                    Description = "ApiHealth test — CopyProperty",
+                    Description = "ApiHealth test � CopyProperty",
                     VendorIds = []
                 };
                 var resp = await _client.CreateOperationAsync(request, ct);
@@ -106,8 +103,8 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                 return resp;
             }, ct: ct));
 
-            // POST → 400 (invalid operation type)
-            results.Add(await RunStepAsync("POST → 400 (invalid operation type)", 400, async () =>
+            // POST ? 400 (invalid operation type)
+            results.Add(await RunStepAsync(StepNames.Post400InvalidOperationType, 400, async () =>
                 await _client.CreateOperationAsync(new CreateNormalizationOperationRequestApiModel
                 {
                     ResourceTypes = ["Location"],
@@ -124,8 +121,8 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                     VendorIds = []
                 }, ct), ct: ct));
 
-            // POST → 400 (empty resourceTypes)
-            results.Add(await RunStepAsync("POST → 400 (empty resourceTypes)", 400, async () =>
+            // POST ? 400 (empty resourceTypes)
+            results.Add(await RunStepAsync(StepNames.Post400EmptyResourceTypes, 400, async () =>
                 await _client.CreateOperationAsync(new CreateNormalizationOperationRequestApiModel
                 {
                     ResourceTypes = [],
@@ -142,8 +139,8 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                     VendorIds = []
                 }, ct), ct: ct));
 
-            // GET → 200 (has results)
-            results.Add(await RunStepAsync("GET → 200 (has results)", 200, async () =>
+            // GET ? 200 (has results)
+            results.Add(await RunStepAsync(StepNames.Get200HasResults, 200, async () =>
             {
                 var resp = await _client.SearchFacilityOperationsAsync(facilityId, cancellationToken: ct);
                 if (resp.IsSuccessStatusCode && (resp.Body?.Records == null || resp.Body.Records.Count == 0))
@@ -151,12 +148,12 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                 return resp;
             }, ct: ct));
 
-            // GET → 200 (sequences)
-            results.Add(await RunStepAsync("GET → 200 (sequences)", 200, async () =>
+            // GET ? 200 (sequences)
+            results.Add(await RunStepAsync(StepNames.Get200Sequences, 200, async () =>
                 await _client.GetOperationSequencesAsync(facilityId, ct), ct: ct));
 
-            // SEQUENCES POST → 201
-            results.Add(await RunStepAsync("SEQUENCES POST → 201", 201, async () =>
+            // SEQUENCES POST ? 201
+            results.Add(await RunStepAsync(StepNames.SequencesPost201, 201, async () =>
             {
                 var search = await _client.SearchFacilityOperationsAsync(facilityId, cancellationToken: ct);
                 var operationId = search.Body?.Records?.FirstOrDefault()?.Id;
@@ -170,46 +167,46 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                     ct);
             }, ct: ct));
 
-            // SEQUENCES POST → 400 (empty facility)
-            results.Add(await RunStepAsync("SEQUENCES POST → 400 (empty facility)", 400, async () =>
+            // SEQUENCES POST ? 400 (empty facility)
+            results.Add(await RunStepAsync(StepNames.SequencesPost400EmptyFacility, 400, async () =>
                 await _client.CreateOperationSequencesAsync(
                     " ",
                     "Location",
                     [new CreateNormalizationOperationSequenceApiModel { OperationId = Guid.NewGuid(), Sequence = 1 }],
                     ct), ct: ct));
 
-            // SEQUENCES POST → 400 (empty body)
-            results.Add(await RunStepAsync("SEQUENCES POST → 400 (empty body)", 400, async () =>
+            // SEQUENCES POST ? 400 (empty body)
+            results.Add(await RunStepAsync(StepNames.SequencesPost400EmptyBody, 400, async () =>
                 await _client.CreateOperationSequencesAsync(facilityId, "Location", [], ct), ct: ct));
 
-            // GET → 400 (bad facility)
-            results.Add(await RunStepAsync("GET → 400 (bad facility)", 400, async () =>
+            // GET ? 400 (bad facility)
+            results.Add(await RunStepAsync(StepNames.Get400BadFacility, 400, async () =>
                 await _client.SearchFacilityOperationsAsync(" ", cancellationToken: ct), ct: ct));
 
-            // GET → 400 (sequences bad facility)
-            results.Add(await RunStepAsync("GET → 400 (sequences bad facility)", 400, async () =>
+            // GET ? 400 (sequences bad facility)
+            results.Add(await RunStepAsync(StepNames.Get400SequencesBadFacility, 400, async () =>
                 await _client.GetOperationSequencesAsync(" ", ct), ct: ct));
 
-            // DELETE → 404 (no records)
+            // DELETE ? 404 (no records)
             var ghostFacilityId = $"ApiHealth-Norm-Ghost-{Guid.NewGuid():N}";
-            results.Add(await RunStepAsync("DELETE → 404 (no records)", 404, async () =>
+            results.Add(await RunStepAsync(StepNames.Delete404NoRecords, 404, async () =>
                 await _client.DeleteFacilityOperationsAsync(ghostFacilityId, ct), ct: ct));
 
-            // SEQUENCES DELETE → 400 (empty facility)
-            results.Add(await RunStepAsync("SEQUENCES DELETE → 400 (empty facility)", 400, async () =>
+            // SEQUENCES DELETE ? 400 (empty facility)
+            results.Add(await RunStepAsync(StepNames.SequencesDelete400EmptyFacility, 400, async () =>
                 await _client.DeleteOperationSequencesAsync(" ", "Location", ct), ct: ct));
 
-            // SEQUENCES DELETE → 404
-            results.Add(await RunStepAsync("SEQUENCES DELETE → 404", 404, async () =>
+            // SEQUENCES DELETE ? 404
+            results.Add(await RunStepAsync(StepNames.SequencesDelete404, 404, async () =>
                 await _client.DeleteOperationSequencesAsync(facilityId, "Observation", ct), ct: ct));
 
-            // SEQUENCES DELETE → 204
-            results.Add(await RunStepAsync("SEQUENCES DELETE → 204", 204, async () =>
+            // SEQUENCES DELETE ? 204
+            results.Add(await RunStepAsync(StepNames.SequencesDelete204, 204, async () =>
                 await _client.DeleteOperationSequencesAsync(facilityId, "Location", ct), ct: ct));
 
-            // VENDOR POST → 201
+            // VENDOR POST ? 201
             Guid vendorId = Guid.Empty;
-            results.Add(await RunStepAsync("VENDOR POST → 201", 201, async () =>
+            results.Add(await RunStepAsync(StepNames.VendorPost201, 201, async () =>
             {
                 var resp = await _client.CreateVendorAsync(vendorName, ct);
                 if (resp.IsSuccessStatusCode)
@@ -220,20 +217,20 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                 return resp;
             }, ct: ct));
 
-            // VENDOR POST → 409
-            results.Add(await RunStepAsync("VENDOR POST → 409", 409, async () =>
+            // VENDOR POST ? 409
+            results.Add(await RunStepAsync(StepNames.VendorPost409, 409, async () =>
                 await _client.CreateVendorAsync(vendorName, ct), ct: ct));
 
-            // VENDOR GET → 200
-            results.Add(await RunStepAsync("VENDOR GET → 200", 200, async () =>
+            // VENDOR GET ? 200
+            results.Add(await RunStepAsync(StepNames.VendorGet200, 200, async () =>
                 await _client.GetVendorAsync(vendorName, ct), ct: ct));
 
-            // VENDORS GET → 200
-            results.Add(await RunStepAsync("VENDORS GET → 200", 200, async () =>
+            // VENDORS GET ? 200
+            results.Add(await RunStepAsync(StepNames.VendorsGet200, 200, async () =>
                 await _client.GetAllVendorsAsync(ct), ct: ct));
 
-            // PRESET POST → 201
-            results.Add(await RunStepAsync("PRESET POST → 201", 201, async () =>
+            // PRESET POST ? 201
+            results.Add(await RunStepAsync(StepNames.PresetPost201, 201, async () =>
             {
                 if (vendorId == Guid.Empty)
                 {
@@ -302,15 +299,15 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                 return resp;
             }, ct: ct));
 
-            // PRESETS GET → 200
-            results.Add(await RunStepAsync("PRESETS GET → 200", 200, async () =>
+            // PRESETS GET ? 200
+            results.Add(await RunStepAsync(StepNames.PresetsGet200, 200, async () =>
                 await _client.GetVendorPresetsAsync(vendorName, cancellationToken: ct), ct: ct));
 
-            // PRESET DELETE → 204
+            // PRESET DELETE ? 204
             // Some deployed environments may still run a Normalization build that throws 500
             // when the preset has already been removed as a side effect of operation cleanup.
             // Treat that specific legacy error body as success-equivalent delete behavior.
-            results.Add(await RunStepAsync("PRESET DELETE → 204", async () =>
+            results.Add(await RunStepAsync(StepNames.PresetDelete204, async () =>
             {
                 var presets = await _client.GetVendorPresetsAsync(vendorName, cancellationToken: ct);
                 var toDelete = presets.Body?.FirstOrDefault(p => operationResourceTypeId == Guid.Empty || p.OperationResourceTypeId == operationResourceTypeId)?.Id
@@ -336,16 +333,16 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                 throw new InvalidOperationException($"Expected HTTP 204 but got {resp.StatusCode}.{(resp.RawBody != null ? $" Body: {resp.RawBody}" : "")}");
             }, expectedStatusCode: 204, ct: ct));
 
-            // VENDOR DELETE → 204
-            results.Add(await RunStepAsync("VENDOR DELETE → 204", 204, async () =>
+            // VENDOR DELETE ? 204
+            results.Add(await RunStepAsync(StepNames.VendorDelete204, 204, async () =>
             {
                 var resp = await _client.DeleteVendorAsync(vendorName, ct);
                 if (resp.IsSuccessStatusCode) vendorCreated = false;
                 return resp;
             }, ct: ct));
 
-            // DELETE → 204
-            results.Add(await RunStepAsync("DELETE → 204", 204, async () =>
+            // DELETE ? 204
+            results.Add(await RunStepAsync(StepNames.Delete204, 204, async () =>
             {
                 var existing = await _client.SearchFacilityOperationsAsync(facilityId, cancellationToken: ct);
                 if (existing.IsSuccessStatusCode && (existing.Body?.Records == null || existing.Body.Records.Count == 0))
@@ -358,7 +355,7 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                         {
                             OperationType = "CopyProperty",
                             Name = "ApiHealth Recovery Operation",
-                            Description = "Ensures DELETE → 204 has data to remove",
+                            Description = "Ensures DELETE ? 204 has data to remove",
                             SourceFhirPath = "identifier.value",
                             TargetFhirPath = "type[0].coding.code"
                         },
@@ -372,8 +369,8 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                 return resp;
             }, ct: ct));
 
-            // GET → 200 (empty)
-            results.Add(await RunStepAsync("GET → 200 (empty)", 200, async () =>
+            // GET ? 200 (empty)
+            results.Add(await RunStepAsync(StepNames.Get200Empty, 200, async () =>
             {
                 var resp = await _client.SearchFacilityOperationsAsync(facilityId, cancellationToken: ct);
                 if (resp.IsSuccessStatusCode && resp.Body?.Records is { Count: > 0 })

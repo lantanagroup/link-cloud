@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
@@ -15,6 +15,8 @@ public sealed class ApiHealthExecutionRunManager(
     ILogger<ApiHealthExecutionRunManager> logger)
 {
     private const string SanitizedInternalError = "An internal error occurred processing this run.";
+    private static readonly TimeSpan CompletedRunRetention = TimeSpan.FromHours(6);
+    private const int MaxCompletedRunsToRetain = 200;
     private readonly JsonSerializerOptions _jsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private readonly ConcurrentDictionary<Guid, RunState> _runs = new();
     private readonly object _sync = new();
@@ -42,6 +44,8 @@ public sealed class ApiHealthExecutionRunManager(
         lock (_sync)
             _activeRunId = run.RunId;
 
+        PruneCompletedRuns();
+
         run.ExecutionTask = Task.Run(() => ExecuteServiceRunAsync(run));
         await Task.Yield();
         return run.RunId;
@@ -67,6 +71,8 @@ public sealed class ApiHealthExecutionRunManager(
         _runs[run.RunId] = run;
         lock (_sync)
             _activeRunId = run.RunId;
+
+        PruneCompletedRuns();
 
         run.ExecutionTask = Task.Run(() => ExecuteAllRunAsync(run));
         await Task.Yield();
@@ -149,7 +155,7 @@ public sealed class ApiHealthExecutionRunManager(
 
             if (!seedSession.Success)
             {
-                var error = SanitizeError(seedSession.Error);
+                var error = seedSession.Error;
                 await AddPhaseAsync(run, "Failed", error, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
                 Complete(run, failed: true, error);
                 AddDone(run);
@@ -200,7 +206,7 @@ public sealed class ApiHealthExecutionRunManager(
 
             if (!seedSession.Success)
             {
-                var error = SanitizeError(seedSession.Error);
+                var error = seedSession.Error;
                 await AddPhaseAsync(run, "Failed", error, isError: true, seedRunId: seedSession.SeedRunId, seedRunName: seedSession.SeedRunName);
                 Complete(run, failed: true, error);
                 AddDone(run);
@@ -327,6 +333,55 @@ public sealed class ApiHealthExecutionRunManager(
             if (_activeRunId == run.RunId)
                 _activeRunId = null;
         }
+
+        PruneCompletedRuns();
+    }
+
+    private void PruneCompletedRuns()
+    {
+        Guid? activeRunId;
+        lock (_sync)
+            activeRunId = _activeRunId;
+
+        var now = DateTimeOffset.UtcNow;
+        var completedRuns = _runs
+            .Where(kvp => kvp.Value.Completed)
+            .Select(kvp => new
+            {
+                RunId = kvp.Key,
+                FinishedAt = kvp.Value.FinishedAt ?? DateTimeOffset.MinValue
+            })
+            .OrderBy(x => x.FinishedAt)
+            .ToList();
+
+        if (completedRuns.Count == 0)
+            return;
+
+        var runsToRemove = new HashSet<Guid>();
+
+        foreach (var run in completedRuns)
+        {
+            if (run.RunId == activeRunId)
+                continue;
+
+            if (now - run.FinishedAt > CompletedRunRetention)
+                runsToRemove.Add(run.RunId);
+        }
+
+        var excessCount = completedRuns.Count - MaxCompletedRunsToRetain;
+        if (excessCount > 0)
+        {
+            foreach (var run in completedRuns.Take(excessCount))
+            {
+                if (run.RunId == activeRunId)
+                    continue;
+
+                runsToRemove.Add(run.RunId);
+            }
+        }
+
+        foreach (var runId in runsToRemove)
+            _runs.TryRemove(runId, out _);
     }
 
     private sealed class RunState
