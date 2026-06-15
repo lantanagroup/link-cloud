@@ -110,6 +110,9 @@
             @if (ctrl.hasError('whitespace') && (ctrl.touched || ctrl.dirty)) {
               <mat-error>URL must not have leading or trailing whitespace</mat-error>
             }
+            @if (ctrl.hasError('absoluteUrl') && (ctrl.touched || ctrl.dirty)) {
+              <mat-error>URL must be a valid absolute URL</mat-error>
+            }
           </mat-form-field>
           @if (!viewOnly) {
             <button mat-icon-button color="warn" type="button" aria-label="Remove URL" (click)="removeExtensionUrl(i)">
