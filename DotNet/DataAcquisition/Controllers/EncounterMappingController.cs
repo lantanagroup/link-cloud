@@ -324,6 +324,13 @@ public class EncounterMappingController : Controller
             var created = await _manager.CreateAsync(model);
             return CreatedAtAction(nameof(GetByIdAsync), new { id = created.EncounterMappingId }, created);
         }
+        catch (EntityAlreadyExistsException ex)
+        {
+            _logger.LogError(ex, "EntityAlreadyExistsException occurred.");
+            return Problem(title: "Entity Already Exists",
+                detail: "The request could not be completed because it conflicts with the current state of the resource.",
+                statusCode: (int)HttpStatusCode.Conflict);
+        }
         catch (BadRequestException ex)
         {
             _logger.LogError(ex, "BadRequestException occurred.");

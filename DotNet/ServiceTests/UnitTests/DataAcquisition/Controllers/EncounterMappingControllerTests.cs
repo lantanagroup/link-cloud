@@ -1,6 +1,7 @@
 using LantanaGroup.Link.DataAcquisition.Controllers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
@@ -565,6 +566,31 @@ public class EncounterMappingControllerTests
 
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal((int)HttpStatusCode.InternalServerError, objectResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateAsync_MappingAlreadyExists_ReturnsConflict()
+    {
+        var mocker = new AutoMocker();
+        mocker.GetMock<IEncounterMappingManager>()
+            .Setup(m => m.CreateAsync(It.IsAny<CreateEncounterMappingModel>()))
+            .ThrowsAsync(new EntityAlreadyExistsException());
+
+        var controller = mocker.CreateInstance<EncounterMappingController>();
+
+        var result = await controller.CreateAsync(new CreateEncounterMappingModel
+        {
+            FacilityId = FacilityId,
+            EncounterId = EncounterId,
+            PatientId = PatientId
+        });
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        var problemDetails = Assert.IsType<ProblemDetails>(objectResult.Value);
+
+        Assert.Equal((int)HttpStatusCode.Conflict, objectResult.StatusCode);
+        Assert.Equal("The request could not be completed because it conflicts with the current state of the resource.",
+            problemDetails.Detail);
     }
 
     #endregion
