@@ -15,7 +15,6 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
     public abstract IReadOnlyList<ApiEndpointDefinition> GetEndpointDefinitions();
     public virtual IReadOnlyList<ApiHealthSeedRequirement> GetSeedRequirements() => [];
     public abstract Task<IReadOnlyList<ApiTestRunResult>> ExecuteAsync(CancellationToken ct = default);
-    public abstract Task<ApiTestRunResult> ExecuteStepAsync(string endpointKey, CancellationToken ct = default);
 
     /// <summary>
     /// Runs a step that performs custom logic (e.g., inspecting response bodies, multi-call sequences).
@@ -237,24 +236,6 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
         try { await action(); }
         catch { /* best effort cleanup */ }
     }
-
-    /// <summary>
-    /// Returns a sentinel result for an informational step that was requested
-    /// individually. Informational steps are never executed.
-    /// </summary>
-    protected ApiTestRunResult InformationalResult(string endpointKey) =>
-        new()
-        {
-            EndpointKey = endpointKey,
-            ServiceName = ServiceName,
-            EndpointName = GetEndpointDefinitions()
-                .FirstOrDefault(d => d.Key == endpointKey)?.EndpointName ?? endpointKey,
-            Skipped = true,
-            SkipReason = GetEndpointDefinitions()
-                .FirstOrDefault(d => d.Key == endpointKey)?.AlwaysSkipReason
-                ?? "This step is informational only and is never executed.",
-            ExecutedAt = DateTimeOffset.UtcNow
-        };
 
     private static string Truncate(string? value, int maxLength = 300) =>
         value == null ? "" : (value.Length > maxLength ? value[..maxLength] : value);

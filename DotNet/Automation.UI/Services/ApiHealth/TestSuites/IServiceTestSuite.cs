@@ -26,13 +26,6 @@ public interface IServiceTestSuite
     Task<IReadOnlyList<ApiTestRunResult>> ExecuteAsync(CancellationToken ct = default);
 
     /// <summary>
-    /// Executes a single step identified by <paramref name="endpointKey"/>.
-    /// NOTE: Some steps depend on prior state (e.g., a Get depends on a Create).
-    /// For dependent steps, the suite will run prerequisites automatically.
-    /// </summary>
-    Task<ApiTestRunResult> ExecuteStepAsync(string endpointKey, CancellationToken ct = default);
-
-    /// <summary>
     /// Declares seed fixtures required for this suite's stateful tests.
     /// Stateless suites should return an empty list.
     /// </summary>

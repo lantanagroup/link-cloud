@@ -2,8 +2,6 @@
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace Automation.UI.Controllers.Api;
 
@@ -38,7 +36,7 @@ public sealed class AutomationRunsApiController(
         if (scenario == null)
             return NotFound(new { error = $"Scenario {request.ScenarioId} not found." });
 
-        var startRequest = BuildStartRequest(scenario);
+        var startRequest = StartScenarioRequest.FromScenario(scenario);
 
         Guid runId;
         try
@@ -88,45 +86,6 @@ public sealed class AutomationRunsApiController(
             Duration = summary.Duration,
             Error = summary.Error,
         });
-    }
-
-    private static StartScenarioRequest BuildStartRequest(TestScenarioDefinition scenario)
-    {
-        // Treat API-launched runs as Custom: the resolver merges the scenario's
-        // saved fields onto the custom-scenario defaults, the same way the UI
-        // Quick Launch path does. RunConfigurationJson is intentionally omitted;
-        // the typed properties below are sufficient and avoid a redundant JSON
-        // round-trip.
-        return new StartScenarioRequest
-        {
-            Scenario = AutomationScenarioKind.Custom,
-            ScenarioName = scenario.Name,
-            RunConfigurationJson = SerializeScenarioConfiguration(scenario),
-            ReportMethod = scenario.ReportMethod,
-            Seed = scenario.Seed,
-            PatientCount = scenario.PatientCount,
-            ResourcesPerPatient = scenario.ResourcesPerPatientMax,
-            CleanupServiceData = scenario.CleanupServiceData,
-            CleanupFhirData = scenario.CleanupFhirData,
-            SelectedMeasures = scenario.SelectedMeasures,
-            PatientCohorts = scenario.PatientCohorts,
-            ImportedPatientIds = scenario.ImportedPatientIds,
-            ImportedPatientBundles = scenario.ImportedPatientBundles,
-            ReportPeriodStart = scenario.ReportPeriodStart,
-            ReportPeriodEnd = scenario.ReportPeriodEnd,
-            QueryPlanTemplateId = scenario.QueryPlanTemplateId,
-        };
-    }
-
-    private static string SerializeScenarioConfiguration(TestScenarioDefinition scenario)
-    {
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        };
-        options.Converters.Add(new JsonStringEnumConverter());
-        return JsonSerializer.Serialize(scenario, options);
     }
 
     public sealed class StartScenarioApiRequest

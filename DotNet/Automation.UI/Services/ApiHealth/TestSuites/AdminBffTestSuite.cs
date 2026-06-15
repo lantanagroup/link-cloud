@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -10,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
+using StepNames = Automation.UI.Services.ApiHealth.TestSuites.ApiEndPointLibrary.AdminBffSteps;
 
 namespace Automation.UI.Services.ApiHealth.TestSuites;
 
@@ -49,33 +49,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
     }
 
     public override IReadOnlyList<ApiEndpointDefinition> GetEndpointDefinitions() =>
-    [
-        // /api/monitor/health
-        Step("/api/monitor/health", "Health GET → 200", "Returns aggregated service health"),
-
-        // /api/aggregate/facility/{id}
-        Step("/api/aggregate/facility/{id}", "Facility DELETE → 200", "Soft-deletes a real facility"),
-        Step("/api/aggregate/facility/{id}", "Facility DELETE → 404", "Returns 404 for non-existent facility"),
-
-        // /api/aggregate/facility/{id}/restore
-        Step("/api/aggregate/facility/{id}/restore", "Facility Restore PATCH → 200", "Restores the soft-deleted facility"),
-        Step("/api/aggregate/facility/{id}/restore", "Facility Restore PATCH → 404", "Returns 404 for non-existent facility"),
-
-        // /api/aggregate/reports/summaries
-        Step("/api/aggregate/reports/summaries", "Summaries GET → 200", "Returns list of report summaries"),
-
-        // /api/aggregate/reports/summaries/{id}
-        Step("/api/aggregate/reports/summaries/{id}", "Summary GET → 200", "Returns summary for seeded report"),
-        Step("/api/aggregate/reports/summaries/{id}", "Summary GET → 404", "Returns 404 for non-existent report"),
-
-        // /api/aggregate/reports/{id}
-        Step("/api/aggregate/reports/{id}", "Report DELETE → 204", "Soft-deletes an existing report schedule"),
-        Step("/api/aggregate/reports/{id}", "Report DELETE → 404", "Returns 404 for non-existent report"),
-
-        // /api/aggregate/reports/{id}/restore
-        Step("/api/aggregate/reports/{id}/restore", "Report Restore PATCH → 204", "Restores the soft-deleted report schedule"),
-        Step("/api/aggregate/reports/{id}/restore", "Report Restore PATCH → 404", "Returns 404 for non-existent report"),
-    ];
+        ApiEndPointLibrary.GetServiceEndpoints(ServiceName);
 
     public override IReadOnlyList<ApiHealthSeedRequirement> GetSeedRequirements() =>
     [
@@ -91,7 +65,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         {
             results.Add(new ApiTestRunResult
             {
-                EndpointKey = $"{ServiceName}::Health GET → 200",
+                EndpointKey = $"{ServiceName}::{StepNames.HealthGet200}",
                 ServiceName = ServiceName,
                 Passed = false,
                 ErrorMessage = "AdminBffBase URL is not configured in Automation settings."
@@ -100,7 +74,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         }
 
         // --- /api/monitor/health ---
-        results.Add(await CallBffAsync("Health GET → 200", $"{baseUrl}/monitor/health", "GET", 200, ct));
+        results.Add(await CallBffAsync(StepNames.HealthGet200, $"{baseUrl}/monitor/health", "GET", 200, ct));
 
         // --- /api/aggregate/facility/{id} lifecycle ---
         var facilityId = $"ApiHealth-BFF-{Guid.NewGuid():N}";
@@ -113,13 +87,13 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
 
             if (facilityCreated)
             {
-                results.Add(await CallBffAsync("Facility DELETE → 200", $"{baseUrl}/aggregate/facility/{facilityId}", "DELETE", 200, ct));
-                results.Add(await CallBffAsync("Facility Restore PATCH → 200", $"{baseUrl}/aggregate/facility/{facilityId}/restore", "PATCH", 200, ct));
+                results.Add(await CallBffAsync(StepNames.FacilityDelete200, $"{baseUrl}/aggregate/facility/{facilityId}", "DELETE", 200, ct));
+                results.Add(await CallBffAsync(StepNames.FacilityRestorePatch200, $"{baseUrl}/aggregate/facility/{facilityId}/restore", "PATCH", 200, ct));
             }
             else
             {
-                results.Add(MakeFailedResult("Facility DELETE → 200", "Prerequisite: facility creation via BFF failed."));
-                results.Add(MakeFailedResult("Facility Restore PATCH → 200", "Prerequisite: facility creation via BFF failed."));
+                results.Add(MakeFailedResult(StepNames.FacilityDelete200, "Prerequisite: facility creation via BFF failed."));
+                results.Add(MakeFailedResult(StepNames.FacilityRestorePatch200, "Prerequisite: facility creation via BFF failed."));
             }
         }
         finally
@@ -132,11 +106,11 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         }
 
         var fakeFacilityId = $"ApiHealth-BFF-{Guid.NewGuid():N}";
-        results.Add(await CallBffAsync("Facility DELETE → 404", $"{baseUrl}/aggregate/facility/{fakeFacilityId}", "DELETE", 404, ct));
-        results.Add(await CallBffAsync("Facility Restore PATCH → 404", $"{baseUrl}/aggregate/facility/{fakeFacilityId}/restore", "PATCH", 404, ct));
+        results.Add(await CallBffAsync(StepNames.FacilityDelete404, $"{baseUrl}/aggregate/facility/{fakeFacilityId}", "DELETE", 404, ct));
+        results.Add(await CallBffAsync(StepNames.FacilityRestorePatch404, $"{baseUrl}/aggregate/facility/{fakeFacilityId}/restore", "PATCH", 404, ct));
 
         // --- /api/aggregate/reports/summaries ---
-        results.Add(await CallBffAsync("Summaries GET → 200", $"{baseUrl}/aggregate/reports/summaries", "GET", 200, ct));
+        results.Add(await CallBffAsync(StepNames.SummariesGet200, $"{baseUrl}/aggregate/reports/summaries", "GET", 200, ct));
 
         // Seed-owned only: this suite requires ReportSchedule seed fixture.
         var reportScheduleId = _seedContext.Current?.Report?.ScheduleId;
@@ -144,44 +118,31 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
 
         // --- /api/aggregate/reports/summaries/{id} ---
         if (!string.IsNullOrWhiteSpace(reportScheduleId))
-            results.Add(await CallBffAsync("Summary GET → 200", $"{baseUrl}/aggregate/reports/summaries/{reportScheduleId}", "GET", 200, ct));
+            results.Add(await CallBffAsync(StepNames.SummaryGet200, $"{baseUrl}/aggregate/reports/summaries/{reportScheduleId}", "GET", 200, ct));
         else
-            results.Add(SkipStepAsync("Summary GET → 200", reportSeedMissing));
+            results.Add(SkipStepAsync(StepNames.SummaryGet200, reportSeedMissing));
 
         var fakeReportId = Guid.NewGuid().ToString();
-        results.Add(await CallBffAsync("Summary GET → 404", $"{baseUrl}/aggregate/reports/summaries/{fakeReportId}", "GET", 404, ct));
+        results.Add(await CallBffAsync(StepNames.SummaryGet404, $"{baseUrl}/aggregate/reports/summaries/{fakeReportId}", "GET", 404, ct));
 
         // --- /api/aggregate/reports/{id} lifecycle ---
 
         if (!string.IsNullOrWhiteSpace(reportScheduleId))
         {
-            results.Add(await CallBffAsync("Report DELETE → 204", $"{baseUrl}/aggregate/reports/{reportScheduleId}", "DELETE", 204, ct));
-            results.Add(await CallBffAsync("Report Restore PATCH → 204", $"{baseUrl}/aggregate/reports/{reportScheduleId}/restore", "PATCH", 204, ct));
+            results.Add(await CallBffAsync(StepNames.ReportDelete204, $"{baseUrl}/aggregate/reports/{reportScheduleId}", "DELETE", 204, ct));
+            results.Add(await CallBffAsync(StepNames.ReportRestorePatch204, $"{baseUrl}/aggregate/reports/{reportScheduleId}/restore", "PATCH", 204, ct));
         }
         else
         {
-            results.Add(MakeFailedResult("Report DELETE → 204", reportSeedMissing));
-            results.Add(MakeFailedResult("Report Restore PATCH → 204", reportSeedMissing));
+            results.Add(MakeFailedResult(StepNames.ReportDelete204, reportSeedMissing));
+            results.Add(MakeFailedResult(StepNames.ReportRestorePatch204, reportSeedMissing));
         }
 
         var fakeScheduleId = Guid.NewGuid().ToString();
-        results.Add(await CallBffAsync("Report DELETE → 404", $"{baseUrl}/aggregate/reports/{fakeScheduleId}", "DELETE", 404, ct));
-        results.Add(await CallBffAsync("Report Restore PATCH → 404", $"{baseUrl}/aggregate/reports/{fakeScheduleId}/restore", "PATCH", 404, ct));
+        results.Add(await CallBffAsync(StepNames.ReportDelete404, $"{baseUrl}/aggregate/reports/{fakeScheduleId}", "DELETE", 404, ct));
+        results.Add(await CallBffAsync(StepNames.ReportRestorePatch404, $"{baseUrl}/aggregate/reports/{fakeScheduleId}/restore", "PATCH", 404, ct));
 
         return results;
-    }
-
-    public override async Task<ApiTestRunResult> ExecuteStepAsync(string endpointKey, CancellationToken ct = default)
-    {
-        var results = await ExecuteAsync(ct);
-        return results.FirstOrDefault(r => r.EndpointKey == endpointKey)
-            ?? new ApiTestRunResult
-            {
-                EndpointKey = endpointKey,
-                ServiceName = ServiceName,
-                Passed = false,
-                ErrorMessage = "Step not found in suite execution."
-            };
     }
 
     /// <summary>
@@ -309,12 +270,4 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         ExecutedAt = DateTimeOffset.UtcNow
     };
 
-    private ApiEndpointDefinition Step(string group, string name, string desc) => new()
-    {
-        ServiceName = ServiceName,
-        GroupName = group,
-        EndpointName = name,
-        Description = desc,
-        IsTestSuiteStep = true
-    };
 }

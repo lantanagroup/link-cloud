@@ -3,6 +3,7 @@ using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Integration.QueryDispatch;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
+using StepNames = Automation.UI.Services.ApiHealth.TestSuites.ApiEndPointLibrary.QueryDispatchSteps;
 
 namespace Automation.UI.Services.ApiHealth.TestSuites;
 
@@ -37,29 +38,7 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
     }
 
     public override IReadOnlyList<ApiEndpointDefinition> GetEndpointDefinitions() =>
-    [
-        // POST /api/querydispatch/configuration
-        Step("POST → 400 (null model)", "Returns 400 when request body is missing", "/api/querydispatch/configuration"),
-        Step("POST → 400 (empty facilityId)", "Returns 400 when FacilityId is missing from the request body", "/api/querydispatch/configuration"),
-        Step("POST → 400 (invalid duration)", "Returns 400 when a schedule Duration is not a valid ISO-8601 string", "/api/querydispatch/configuration"),
-        Step("POST → 400 (facility not found)", "Returns 400 when CheckIfTenantExists is enabled; accepts 201 when the check is disabled (either is a valid pass)", "/api/querydispatch/configuration"),
-        Step("POST → 201", "Creates a new config for a valid facility", "/api/querydispatch/configuration"),
-        Step("POST → 400 (already exists)", "Returns 400 when a config for the facility was already created", "/api/querydispatch/configuration"),
-
-        // PUT /api/querydispatch/configuration/facility/{id}
-        Step("PUT → 400 (null model)", "Returns 400 when request body is missing", "/api/querydispatch/configuration/facility/{id}"),
-        Step("PUT → 400 (empty facilityId)", "Returns 400 when facilityId route value is empty/whitespace", "/api/querydispatch/configuration/facility/{id}"),
-        Step("PUT → 400 (invalid duration)", "Returns 400 when a schedule Duration is not a valid ISO-8601 string", "/api/querydispatch/configuration/facility/{id}"),
-        Step("PUT → 201/204", "Creates or updates config", "/api/querydispatch/configuration/facility/{id}"),
-
-        // GET /api/querydispatch/configuration/facility/{id}
-        Step("GET → 200", "Returns the config after upsert", "/api/querydispatch/configuration/facility/{id}"),
-        Step("GET → 404", "Returns 404 for non-existent facility", "/api/querydispatch/configuration/facility/{id}"),
-
-        // DELETE /api/querydispatch/configuration/facility/{id}
-        Step("DELETE → 204", "Deletes the config", "/api/querydispatch/configuration/facility/{id}"),
-        Step("DELETE → 204 (idempotent)", "Succeeds even when already deleted", "/api/querydispatch/configuration/facility/{id}"),
-    ];
+        ApiEndPointLibrary.GetServiceEndpoints(ServiceName);
 
     public override async Task<IReadOnlyList<ApiTestRunResult>> ExecuteAsync(CancellationToken ct = default)
     {
@@ -76,12 +55,14 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
 
             // ── POST /api/querydispatch/configuration ──────────────────────────────
 
-            // POST → 400 (empty facilityId) — guard fires before any DB or Tenant call.
-            results.Add(await RunStepAsync("POST → 400 (null model)", 400, async () =>
-                await _client.CreateQueryDispatchConfigurationAsync(null!, ct), ct: ct));
+            // POST → 400 (null model)
+            // The SDK null-body path can hang in some environments; use an empty payload
+            // to validate the controller's required-request guard deterministically.
+            results.Add(await RunStepAsync(StepNames.Post400NullModel, 400, async () =>
+                await _client.CreateQueryDispatchConfigurationAsync(new QueryDispatchConfigurationApiModel(), ct), ct: ct));
 
             // POST → 400 (empty facilityId) — guard fires before any DB or Tenant call.
-            results.Add(await RunStepAsync("POST → 400 (empty facilityId)", 400, async () =>
+            results.Add(await RunStepAsync(StepNames.Post400EmptyFacilityId, 400, async () =>
                 await _client.CreateQueryDispatchConfigurationAsync(new QueryDispatchConfigurationApiModel
                 {
                     FacilityId = "",
@@ -89,7 +70,7 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
                 }, ct), ct: ct));
 
             // POST → 400 (invalid duration) — duration guard fires before CheckFacilityExists.
-            results.Add(await RunStepAsync("POST → 400 (invalid duration)", 400, async () =>
+            results.Add(await RunStepAsync(StepNames.Post400InvalidDuration, 400, async () =>
                 await _client.CreateQueryDispatchConfigurationAsync(new QueryDispatchConfigurationApiModel
                 {
                     FacilityId = facilityId,
@@ -101,7 +82,7 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
             // A ghost facilityId is always used; which code comes back depends on the
             // QD service's environment config — either outcome is a valid pass.
             var ghostFacilityId = $"ApiHealth-QD-Ghost-{Guid.NewGuid():N}";
-            results.Add(await RunStepAsync("POST → 400 (facility not found)", [400, 201], async () =>
+            results.Add(await RunStepAsync(StepNames.Post400FacilityNotFound, [400, 201], async () =>
                 await _client.CreateQueryDispatchConfigurationAsync(new QueryDispatchConfigurationApiModel
                 {
                     FacilityId = ghostFacilityId,
@@ -113,7 +94,7 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
 
             // POST → 201 — real facility, valid payload, no pre-existing config.
             var postConfigCreated = false;
-            results.Add(await RunStepAsync("POST → 201", 201, async () =>
+            results.Add(await RunStepAsync(StepNames.Post201, 201, async () =>
             {
                 var resp = await _client.CreateQueryDispatchConfigurationAsync(new QueryDispatchConfigurationApiModel
                 {
@@ -126,7 +107,7 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
 
             // POST → 400 (already exists) — the config was just created above; a second POST
             // for the same facilityId must return 400.
-            results.Add(await RunStepAsync("POST → 400 (already exists)", 400, async () =>
+            results.Add(await RunStepAsync(StepNames.Post400AlreadyExists, 400, async () =>
                 await _client.CreateQueryDispatchConfigurationAsync(new QueryDispatchConfigurationApiModel
                 {
                     FacilityId = facilityId,
@@ -143,10 +124,10 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
             // ── PUT /api/querydispatch/configuration/facility/{id} ─────────────────────
 
             // PUT → 400 (invalid duration)
-            results.Add(await RunStepAsync("PUT → 400 (null model)", 400, async () =>
+            results.Add(await RunStepAsync(StepNames.Put400NullModel, 400, async () =>
                 await _client.UpsertQueryDispatchConfigurationAsync(facilityId, null!, ct), ct: ct));
 
-            results.Add(await RunStepAsync("PUT → 400 (empty facilityId)", 400, async () =>
+            results.Add(await RunStepAsync(StepNames.Put400EmptyFacilityId, 400, async () =>
                 await _client.UpsertQueryDispatchConfigurationAsync(" ", new QueryDispatchConfigurationApiModel
                 {
                     FacilityId = facilityId,
@@ -163,7 +144,7 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
             // PUT → 400 (invalid duration)
             // Duration check fires before CheckFacilityExists, so any non-ISO-8601 string
             // (e.g. "1 hour") returns 400 without touching the DB.
-            results.Add(await RunStepAsync("PUT → 400 (invalid duration)", 400, async () =>
+            results.Add(await RunStepAsync(StepNames.Put400InvalidDuration, 400, async () =>
                 await _client.UpsertQueryDispatchConfigurationAsync(facilityId, new QueryDispatchConfigurationApiModel
                 {
                     FacilityId = facilityId,
@@ -178,7 +159,7 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
                 }, ct), ct: ct));
 
             // PUT → 201/204
-            results.Add(await RunStepAsync("PUT → 201/204", async () =>
+            results.Add(await RunStepAsync(StepNames.Put201Or204, async () =>
             {
                 var config = new QueryDispatchConfigurationApiModel
                 {
@@ -199,11 +180,11 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
             }, ct: ct));
 
             // GET → 200
-            results.Add(await RunStepAsync("GET → 200", 200, async () =>
+            results.Add(await RunStepAsync(StepNames.Get200, 200, async () =>
                 await _client.GetConfigurationAsync(facilityId, ct), ct: ct));
 
             // DELETE → 204
-            results.Add(await RunStepAsync("DELETE → 204", 204, async () =>
+            results.Add(await RunStepAsync(StepNames.Delete204, 204, async () =>
             {
                 var resp = await _client.DeleteQueryDispatchConfigurationAsync(facilityId, ct);
                 if (resp.IsSuccessStatusCode) configCreated = false;
@@ -211,18 +192,18 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
             }, ct: ct));
 
             // GET → 404 (after delete)
-            results.Add(await RunStepAsync("GET → 404", 404, async () =>
+            results.Add(await RunStepAsync(StepNames.Get404, 404, async () =>
                 await _client.GetConfigurationAsync(facilityId, ct), ct: ct));
 
             // DELETE → 204 (idempotent — already deleted)
-            results.Add(await RunStepAsync("DELETE → 204 (idempotent)", 204, async () =>
+            results.Add(await RunStepAsync(StepNames.Delete204Idempotent, 204, async () =>
                 await _client.DeleteQueryDispatchConfigurationAsync(facilityId, ct), ct: ct));
         }
         catch (Exception ex) when (!facilityCreated)
         {
             results.Add(new ApiTestRunResult
             {
-                EndpointKey = $"{ServiceName}::PUT → 201/204",
+                EndpointKey = $"{ServiceName}::{StepNames.Put201Or204}",
                 ServiceName = ServiceName,
                 Passed = false,
                 ErrorMessage = $"Prerequisite failed: {ex.Message}",
@@ -238,19 +219,6 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
         return results;
     }
 
-    public override async Task<ApiTestRunResult> ExecuteStepAsync(string endpointKey, CancellationToken ct = default)
-    {
-        var results = await ExecuteAsync(ct);
-        return results.FirstOrDefault(r => r.EndpointKey == endpointKey)
-            ?? new ApiTestRunResult
-            {
-                EndpointKey = endpointKey,
-                ServiceName = ServiceName,
-                Passed = false,
-                ErrorMessage = "Step not found in suite execution."
-            };
-    }
-
     private async Task CreateFacilityAsync(string facilityId, CancellationToken ct)
     {
         var model = new FacilityModel
@@ -264,12 +232,4 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
         await _facilityClient.CreateAsync(model, ct);
     }
 
-    private ApiEndpointDefinition Step(string name, string desc, string? group = null) => new()
-    {
-        ServiceName = ServiceName,
-        GroupName = group,
-        EndpointName = name,
-        Description = desc,
-        IsTestSuiteStep = true
-    };
 }

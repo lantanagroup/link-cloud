@@ -1,12 +1,6 @@
-﻿using LantanaGroup.Link.Sdk.Clients;
-using LantanaGroup.Link.Sdk.ApiClient;
-using LantanaGroup.Link.Sdk.Clients;
-using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Models.Tenant;
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using LantanaGroup.Link.Sdk.Clients;
 
 namespace Automation.UI.Services.ApiHealth.Seeding;
 
@@ -132,7 +126,7 @@ public sealed class ApiHealthSeedOrchestrator(
                 }
             }
 
-            var startRequest = BuildStartRequest(scenario);
+            var startRequest = StartScenarioRequest.FromScenario(scenario);
             var runId = await runManager.StartAsync(startRequest, ct);
 
             logger.LogInformation(
@@ -231,34 +225,4 @@ public sealed class ApiHealthSeedOrchestrator(
         }
     }
 
-    private static StartScenarioRequest BuildStartRequest(TestScenarioDefinition scenario) => new()
-    {
-        Scenario = AutomationScenarioKind.Custom,
-        ScenarioName = scenario.Name,
-        RunConfigurationJson = SerializeScenarioConfiguration(scenario),
-        ReportMethod = scenario.ReportMethod,
-        Seed = scenario.Seed,
-        PatientCount = scenario.PatientCount,
-        ResourcesPerPatient = scenario.ResourcesPerPatientMax,
-        CleanupServiceData = scenario.CleanupServiceData,
-        CleanupFhirData = scenario.CleanupFhirData,
-        SelectedMeasures = scenario.SelectedMeasures,
-        PatientCohorts = scenario.PatientCohorts,
-        ImportedPatientIds = scenario.ImportedPatientIds,
-        ImportedPatientBundles = scenario.ImportedPatientBundles,
-        ReportPeriodStart = scenario.ReportPeriodStart,
-        ReportPeriodEnd = scenario.ReportPeriodEnd,
-        QueryPlanTemplateId = scenario.QueryPlanTemplateId,
-    };
-
-    private static string SerializeScenarioConfiguration(TestScenarioDefinition scenario)
-    {
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        };
-        options.Converters.Add(new JsonStringEnumConverter());
-        return JsonSerializer.Serialize(scenario, options);
-    }
 }

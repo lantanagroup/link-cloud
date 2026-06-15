@@ -1,5 +1,4 @@
 ﻿using Automation.UI.Models.ApiHealth;
-using Automation.UI.Services.ApiHealth.TestSuites;
 using Automation.UI.Services.Persistence;
 
 namespace Automation.UI.Services.ApiHealth;
@@ -24,50 +23,6 @@ public sealed class ApiHealthTestExecutor
         _registry = registry;
         _store = store;
         _logger = logger;
-    }
-
-    /// <summary>
-    /// Run a single endpoint test by finding its owning suite and executing the step.
-    /// </summary>
-    public async Task<ApiTestRunResult> RunEndpointTestAsync(ApiEndpointDefinition endpoint, CancellationToken ct = default)
-    {
-        var suite = _registry.FindSuiteForEndpoint(endpoint.Key);
-        if (suite == null)
-        {
-            var errorResult = new ApiTestRunResult
-            {
-                EndpointKey = endpoint.Key,
-                ServiceName = endpoint.ServiceName,
-                EndpointName = endpoint.EndpointName,
-                Passed = false,
-                ErrorMessage = $"No test suite found for endpoint '{endpoint.Key}'.",
-                ExecutedAt = DateTimeOffset.UtcNow
-            };
-            await _store.SaveRunResultAsync(errorResult, ct);
-            return errorResult;
-        }
-
-        ApiTestRunResult result;
-        try
-        {
-            result = await suite.ExecuteStepAsync(endpoint.Key, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "ExecuteStepAsync failed for {EndpointKey}", endpoint.Key);
-            result = new ApiTestRunResult
-            {
-                EndpointKey = endpoint.Key,
-                ServiceName = endpoint.ServiceName,
-                EndpointName = endpoint.EndpointName,
-                Passed = false,
-                ErrorMessage = $"Suite execution failed: {ex.Message}",
-                ExecutedAt = DateTimeOffset.UtcNow
-            };
-        }
-
-        await _store.SaveRunResultAsync(result, ct);
-        return result;
     }
 
     /// <summary>

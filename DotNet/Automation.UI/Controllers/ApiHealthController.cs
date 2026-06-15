@@ -1,22 +1,15 @@
 ﻿using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth;
-using Automation.UI.Services.ApiHealth.Seeding;
-using Automation.UI.Services.ApiHealth.TestSuites;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using System.Diagnostics;
-using System.Text.Json;
 
 namespace Automation.UI.Controllers;
 
 public class ApiHealthController(
     ApiEndpointRegistry registry,
-    ApiHealthTestExecutor executor,
     ApiHealthExecutionRunManager runManager,
-    IApiHealthSeedOrchestrator seedOrchestrator,
-    IApiHealthSeedContextAccessor seedContext,
     IApiHealthRunStore store,
     IOptions<AutomationConfig> automationConfig,
     ILogger<ApiHealthController> logger) : Controller
@@ -51,57 +44,6 @@ public class ApiHealthController(
 
         var vm = new ApiHealthDashboardViewModel { Services = groups, GrafanaBaseUrl = automationConfig.Value.GrafanaBaseUrl };
         return View(vm);
-    }
-
-    /// <summary>
-    /// Run a single endpoint test. Returns the updated row partial.
-    /// </summary>
-    [HttpPost]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> RunEndpoint([FromBody] RunEndpointRequest request, CancellationToken ct)
-    {
-        var endpoint = registry.GetAll().FirstOrDefault(e => e.Key == request.EndpointKey);
-        if (endpoint == null) return NotFound(new { error = "Endpoint not found." });
-        if (endpoint.IsInformational) return BadRequest(new { error = "This endpoint is informational only and cannot be run." });
-
-        var suite = registry.FindSuiteForEndpoint(endpoint.Key);
-        var requirements = suite?.GetSeedRequirements() ?? [];
-
-        var seedSession = await seedOrchestrator.BeginServiceAsync(endpoint.ServiceName, requirements, ct);
-        if (!seedSession.Success)
-        {
-            var problem = new ProblemDetails
-            {
-                Title = "API Health seeding failed.",
-                Detail = seedSession.Error ?? "Seeding failed.",
-                Status = StatusCodes.Status500InternalServerError
-            };
-            problem.Extensions["traceId"] = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
-            return StatusCode(StatusCodes.Status500InternalServerError, problem);
-        }
-
-        if (requirements.Contains(ApiHealthSeedRequirement.ReportSchedule) && seedSession.Report == null)
-        {
-            var problem = new ProblemDetails
-            {
-                Title = "API Health seeding contract violation.",
-                Detail = "Seeding contract violation: ReportSchedule was required but no report seed payload was produced.",
-                Status = StatusCodes.Status500InternalServerError
-            };
-            problem.Extensions["traceId"] = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
-            return StatusCode(StatusCodes.Status500InternalServerError, problem);
-        }
-
-        try
-        {
-            seedContext.Current = seedSession;
-            var result = await executor.RunEndpointTestAsync(endpoint, ct);
-            return Json(result);
-        }
-        finally
-        {
-            await seedOrchestrator.EndAsync(seedSession, ct);
-        }
     }
 
     /// <summary>
@@ -199,9 +141,4 @@ public class ApiHealthController(
         return Json(history);
     }
 
-}
-
-public sealed class RunEndpointRequest
-{
-    public string EndpointKey { get; set; } = string.Empty;
 }
