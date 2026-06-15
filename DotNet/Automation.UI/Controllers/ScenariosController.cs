@@ -1,18 +1,24 @@
-﻿using Automation.UI.Models;
+using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using MongoDB.Driver;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Automation.UI.Controllers;
 
 public class ScenariosController(
     IScenarioStore scenarioStore,
     IQueryPlanTemplateStore queryPlanTemplateStore,
-    IOptions<AutomationConfig> automationConfig) : Controller
+    IOptions<AutomationConfig> automationConfig,
+    IMongoDatabase database) : Controller
 {
+    private readonly IMongoCollection<ImportedBundleDocument> _bundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
+
     [HttpGet]
     public async Task<IActionResult> Index(CancellationToken ct)
     {
@@ -47,7 +53,7 @@ public class ScenariosController(
             model.ResourcesPerPatientMax = model.ResourcesPerPatientMin;
 
         // ----- Imported-patient validation (fail save on bad input) -----
-        var importValidation = ValidateImportedPatients(model);
+        var importValidation = await ValidateImportedPatientsAsync(model, ct);
         if (importValidation != null)
             return BadRequest(importValidation);
 
@@ -66,7 +72,7 @@ public class ScenariosController(
     /// disqualification by measure-eval). The UI surfaces the mismatch as a warning so the
     /// user can design the scenario knowingly.
     /// </summary>
-    private static string? ValidateImportedPatients(TestScenarioDefinition model)
+    private async Task<string?> ValidateImportedPatientsAsync(TestScenarioDefinition model, CancellationToken ct)
     {
         // Validate the period itself.
         if (model.ReportPeriodStart.HasValue && model.ReportPeriodEnd.HasValue
@@ -83,14 +89,23 @@ public class ScenariosController(
 
         foreach (var p in model.ImportedPatientBundles ?? [])
         {
-            if (string.IsNullOrWhiteSpace(p.BundleJson))
-                return $"Imported bundle '{p.FileName ?? p.PatientId}' is missing its bundle JSON.";
+            if (string.IsNullOrWhiteSpace(p.BundleJson) && !p.UploadedBundleId.HasValue)
+                return $"Imported bundle '{p.FileName ?? p.PatientId}' is missing its uploaded reference.";
+
+            string? bundleJson = p.BundleJson;
+            if (string.IsNullOrWhiteSpace(bundleJson) && p.UploadedBundleId.HasValue)
+            {
+                var existing = await _bundles.Find(b => b.Id == p.UploadedBundleId.Value).FirstOrDefaultAsync(ct);
+                if (existing == null)
+                    return $"Imported bundle '{p.FileName ?? p.PatientId}' was not found. Please re-upload the file.";
+                bundleJson = existing.BundleJson;
+            }
 
             Bundle? bundle;
             try
             {
                 bundle = System.Text.Json.JsonSerializer.Deserialize<Bundle>(
-                    p.BundleJson,
+                    bundleJson,
                     LantanaGroup.Link.Shared.Application.SerDes.LinkFhirSerializerOptions.ForFhirWithoutValidation());
             }
             catch (Exception ex)
@@ -119,6 +134,8 @@ public class ScenariosController(
             }
 
             p.Source = ImportedPatientSource.Bundle;
+            if (p.UploadedBundleId.HasValue)
+                p.BundleJson = null;
         }
 
         return null;
@@ -142,6 +159,72 @@ public class ScenariosController(
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadImportedBundle([FromForm] UploadImportedBundleRequest request, CancellationToken ct)
+    {
+        if (request.File == null || request.File.Length == 0)
+            return BadRequest("Bundle file is required.");
+
+        string json;
+        using (var reader = new StreamReader(request.File.OpenReadStream(), Encoding.UTF8))
+        {
+            json = await reader.ReadToEndAsync(ct);
+        }
+
+        Bundle? bundle;
+        try
+        {
+            bundle = System.Text.Json.JsonSerializer.Deserialize<Bundle>(
+                json,
+                LantanaGroup.Link.Shared.Application.SerDes.LinkFhirSerializerOptions.ForFhirWithoutValidation());
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Bundle '{request.File.FileName}' could not be parsed as FHIR: {ex.Message}");
+        }
+
+        if (bundle?.Entry == null || bundle.Entry.Count == 0)
+            return BadRequest($"Bundle '{request.File.FileName}' contains no entries.");
+
+        var patientResource = bundle.Entry
+            .Select(e => e?.Resource)
+            .OfType<Patient>()
+            .FirstOrDefault();
+        if (patientResource == null || string.IsNullOrWhiteSpace(patientResource.Id))
+            return BadRequest($"Bundle '{request.File.FileName}' must contain a Patient resource with an id.");
+
+        var now = DateTimeOffset.UtcNow;
+        var hash = ComputeContentHash(json);
+        var byteCount = Encoding.UTF8.GetByteCount(json);
+
+        var update = Builders<ImportedBundleDocument>.Update
+            .SetOnInsert(b => b.Id, Guid.NewGuid())
+            .SetOnInsert(b => b.ContentHash, hash)
+            .SetOnInsert(b => b.BundleJson, json)
+            .SetOnInsert(b => b.ByteCount, byteCount)
+            .SetOnInsert(b => b.CreatedAt, now)
+            .SetOnInsert(b => b.IsLibraryEntry, false)
+            .Set(b => b.PatientId, patientResource.Id)
+            .Set(b => b.FileName, request.File.FileName)
+            .Set(b => b.UpdatedAt, now)
+            .AddToSet(b => b.ScenarioIds, request.ScenarioId);
+
+        var doc = await _bundles.FindOneAndUpdateAsync(
+            b => b.ContentHash == hash,
+            update,
+            new FindOneAndUpdateOptions<ImportedBundleDocument> { IsUpsert = true, ReturnDocument = ReturnDocument.After },
+            ct);
+
+        return Json(new
+        {
+            bundleId = doc.Id,
+            patientId = patientResource.Id,
+            fileName = request.File.FileName,
+            byteCount
+        });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
     public async Task<IActionResult> ClassifyImported([FromBody] ClassifyImportedRequest request, CancellationToken ct)
     {
         if (request == null)
@@ -163,9 +246,21 @@ public class ScenariosController(
             }
             else
             {
-                if (string.IsNullOrWhiteSpace(request.BundleJson))
-                    return BadRequest("BundleJson is required for Bundle source.");
-                bundleJson = request.BundleJson!;
+                if (!string.IsNullOrWhiteSpace(request.BundleJson))
+                {
+                    bundleJson = request.BundleJson;
+                }
+                else if (request.UploadedBundleId.HasValue)
+                {
+                    var existing = await _bundles.Find(b => b.Id == request.UploadedBundleId.Value).FirstOrDefaultAsync(ct);
+                    if (existing == null)
+                        return BadRequest("Uploaded bundle was not found. Please re-upload.");
+                    bundleJson = existing.BundleJson;
+                }
+                else
+                {
+                    return BadRequest("BundleJson or UploadedBundleId is required for Bundle source.");
+                }
             }
         }
         catch (Exception ex)
@@ -226,7 +321,14 @@ public class ScenariosController(
         public ImportedPatientSource Source { get; set; } = ImportedPatientSource.ExistingId;
         public string? PatientId { get; set; }
         public string? BundleJson { get; set; }
+        public Guid? UploadedBundleId { get; set; }
         public List<ProfiledMeasureType> Measures { get; set; } = [];
+    }
+
+    public sealed class UploadImportedBundleRequest
+    {
+        public Guid ScenarioId { get; set; }
+        public IFormFile? File { get; set; }
     }
 
     [HttpPost]
@@ -281,6 +383,7 @@ public class ScenariosController(
                     Source = p.Source,
                     PatientId = p.PatientId,
                     FileName = p.FileName,
+                    UploadedBundleId = p.UploadedBundleId,
                     BundleJson = p.BundleJson,
                     AutoDetect = p.AutoDetect,
                     MeasureEligibilities = new(p.MeasureEligibilities),
@@ -293,6 +396,7 @@ public class ScenariosController(
                     Source = p.Source,
                     PatientId = p.PatientId,
                     FileName = p.FileName,
+                    UploadedBundleId = p.UploadedBundleId,
                     BundleJson = p.BundleJson,
                     AutoDetect = p.AutoDetect,
                     MeasureEligibilities = new(p.MeasureEligibilities),
@@ -309,5 +413,12 @@ public class ScenariosController(
     public sealed class IdRequest
     {
         public Guid Id { get; set; }
+    }
+
+    private static string ComputeContentHash(string json)
+    {
+        var bytes = Encoding.UTF8.GetBytes(json);
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToHexString(hash);
     }
 }
