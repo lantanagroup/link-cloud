@@ -172,8 +172,8 @@ namespace IntegrationTests.Tenant
             // TenantDbContext is scoped, so it must be resolved from a scope, not the root provider
             using (var disposeScope = ServiceProvider.CreateScope())
             {
-                var ctx = disposeScope.ServiceProvider.GetService<TenantDbContext>();
-                ctx?.Database.EnsureDeleted();   // forces the in-memory store to clear
+                var ctx = disposeScope.ServiceProvider.GetRequiredService<TenantDbContext>();
+                ctx.Database.EnsureDeleted();   // forces the in-memory store to clear
             }
 
             // ---- QUARTZ: immediate shutdown (no waiting) ----
