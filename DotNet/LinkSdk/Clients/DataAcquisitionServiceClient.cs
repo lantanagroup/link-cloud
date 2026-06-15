@@ -22,71 +22,57 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
-    public Task GetFhirQueryConfigurationAsync(
+    public Task<LinkApiResponse> GetFhirQueryConfigurationAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        Request($"data/{facilityId}/fhirQueryConfiguration")
-            .GetAsync(cancellationToken: cancellationToken);
-
-    public Task<bool> HasFhirQueryConfigurationAsync(
-        string facilityId,
-        CancellationToken cancellationToken = default) =>
-        ExistsAsync(() => Request($"data/{facilityId}/fhirQueryConfiguration")
+        SendAsync(() => Request($"data/{facilityId}/fhirQueryConfiguration")
             .GetAsync(cancellationToken: cancellationToken));
 
-    public Task<bool> CreateFhirQueryConfigurationAsync(
+    public Task<LinkApiResponse> CreateFhirQueryConfigurationAsync(
         CreateFhirQueryConfigurationRequestApiModel request,
         CancellationToken cancellationToken = default) =>
-        CreateOrExistsAsync(() => Request("data/fhirQueryConfiguration")
+        SendAsync(() => Request("data/fhirQueryConfiguration")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
 
-    public Task DeleteFhirQueryConfigurationAsync(
+    public Task<LinkApiResponse> DeleteFhirQueryConfigurationAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"data/{facilityId}/fhirQueryConfiguration")
+        SendAsync(() => Request($"data/{facilityId}/fhirQueryConfiguration")
             .DeleteAsync(cancellationToken: cancellationToken));
 
-    public Task GetQueryPlanAsync(
+    public Task<LinkApiResponse> GetQueryPlanAsync(
         string facilityId,
         string type,
         CancellationToken cancellationToken = default) =>
-        Request($"data/{facilityId}/QueryPlan")
-            .SetQueryParam("type", type)
-            .GetAsync(cancellationToken: cancellationToken);
-
-    public Task<bool> HasQueryPlanAsync(
-        string facilityId,
-        string type,
-        CancellationToken cancellationToken = default) =>
-        ExistsAsync(() => Request($"data/{facilityId}/QueryPlan")
+        SendAsync(() => Request($"data/{facilityId}/QueryPlan")
             .SetQueryParam("type", type)
             .GetAsync(cancellationToken: cancellationToken));
 
-    public Task<bool> CreateQueryPlanAsync(
+    public Task<LinkApiResponse> CreateQueryPlanAsync(
         string facilityId,
         CreateQueryPlanRequestApiModel request,
         CancellationToken cancellationToken = default) =>
-        CreateOrExistsAsync(() => Request($"data/{facilityId}/QueryPlan")
+        SendAsync(() => Request($"data/{facilityId}/QueryPlan")
             .WithHeader("Content-Type", "application/json")
             .SendStringAsync(HttpMethod.Post,
                 Newtonsoft.Json.JsonConvert.SerializeObject(request),
                 cancellationToken: cancellationToken));
 
-    public Task DeleteQueryPlanAsync(
+    public Task<LinkApiResponse> DeleteQueryPlanAsync(
         string facilityId,
         string type,
         CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"data/{facilityId}/QueryPlan")
+        SendAsync(() => Request($"data/{facilityId}/QueryPlan")
             .SetQueryParam("type", type)
             .DeleteAsync(cancellationToken: cancellationToken));
 
-    public Task SoftDeleteLogsByFacilityAsync(
+    public Task<LinkApiResponse> SoftDeleteLogsByFacilityAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"data/acquisition-logs/facility/{facilityId}")
+        SendAsync(() => Request($"data/acquisition-logs/facility/{facilityId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
-    public Task<PagedConfigModel<DataAcquisitionLogApiModel>> SearchAcquisitionLogsAsync(
+    public Task<LinkApiResponse<PagedConfigModel<DataAcquisitionLogApiModel>>> SearchAcquisitionLogsAsync(
         string facilityId,
         string reportId,
         int pageSize = 100,
@@ -95,7 +81,7 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         string sortOrder = "Ascending",
         string? searchTerm = null,
         CancellationToken cancellationToken = default) =>
-        Request("data/acquisition-logs")
+        SendAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(() => Request("data/acquisition-logs")
             .SetQueryParam("facilityId", facilityId)
             .SetQueryParam("reportId", reportId)
             .SetQueryParam("pageSize", pageSize)
@@ -103,113 +89,111 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
             .SetQueryParam("sortBy", sortBy)
             .SetQueryParam("sortOrder", sortOrder)
             .SetQueryParam("searchTerm", string.IsNullOrWhiteSpace(searchTerm) ? null : searchTerm)
-            .GetJsonAsync<PagedConfigModel<DataAcquisitionLogApiModel>>(cancellationToken: cancellationToken);
+            .GetAsync(cancellationToken: cancellationToken));
 
-    public Task<DataAcquisitionLogApiModel?> GetAcquisitionLogByIdAsync(
+    public Task<LinkApiResponse<DataAcquisitionLogApiModel>> GetAcquisitionLogByIdAsync(
         long id,
         CancellationToken cancellationToken = default) =>
-        GetOrDefaultAsync(() => Request($"data/acquisition-logs/{id}")
-            .GetJsonAsync<DataAcquisitionLogApiModel>(cancellationToken: cancellationToken));
+        SendAsync<DataAcquisitionLogApiModel>(() => Request($"data/acquisition-logs/{id}")
+            .GetAsync(cancellationToken: cancellationToken));
 
-    public Task<List<string>> GetAcquisitionLogNotesAsync(
+    public Task<LinkApiResponse<List<string>>> GetAcquisitionLogNotesAsync(
         long id,
         CancellationToken cancellationToken = default) =>
-        Request($"data/acquisition-logs/{id}/notes")
-            .GetJsonAsync<List<string>>(cancellationToken: cancellationToken);
+        SendAsync<List<string>>(() => Request($"data/acquisition-logs/{id}/notes")
+            .GetAsync(cancellationToken: cancellationToken));
 
-    public Task<DataAcquisitionLogStatusStatisticsApiModel?> GetReportStatusCountsAsync(
+    public Task<LinkApiResponse<DataAcquisitionLogStatusStatisticsApiModel>> GetReportStatusCountsAsync(
         string reportId,
         CancellationToken cancellationToken = default) =>
-        GetOrDefaultAsync(() => Request($"data/acquisition-logs/report/{reportId}/status-counts")
-            .GetJsonAsync<DataAcquisitionLogStatusStatisticsApiModel>(cancellationToken: cancellationToken));
+        SendAsync<DataAcquisitionLogStatusStatisticsApiModel>(() => Request($"data/acquisition-logs/report/{reportId}/status-counts")
+            .GetAsync(cancellationToken: cancellationToken));
 
-    public Task GetReportStatisticsAsync(
+    public Task<LinkApiResponse> GetReportStatisticsAsync(
         string reportId,
         CancellationToken cancellationToken = default) =>
-        Request($"data/acquisition-logs/report/{reportId}/statistics")
-            .GetAsync(cancellationToken: cancellationToken);
+        SendAsync(() => Request($"data/acquisition-logs/report/{reportId}/statistics")
+            .GetAsync(cancellationToken: cancellationToken));
 
-    public Task<DataAcquisitionReportSummaryApiModel?> GetReportSummaryAsync(
+    public Task<LinkApiResponse<DataAcquisitionReportSummaryApiModel>> GetReportSummaryAsync(
         string reportId,
         CancellationToken cancellationToken = default) =>
-        GetOrDefaultAsync(() => Request($"data/acquisition-logs/report/{reportId}/summary")
-            .GetJsonAsync<DataAcquisitionReportSummaryApiModel>(cancellationToken: cancellationToken));
+        SendAsync<DataAcquisitionReportSummaryApiModel>(() => Request($"data/acquisition-logs/report/{reportId}/summary")
+            .GetAsync(cancellationToken: cancellationToken));
 
-    public Task<List<string>> GetAcquiredResourceIdsForReportAsync(
+    public Task<LinkApiResponse<List<string>>> GetAcquiredResourceIdsForReportAsync(
         string facilityId,
         string reportId,
         CancellationToken cancellationToken = default) =>
-        Request($"data/acquisition-logs/report/{reportId}/acquired-resource-ids")
+        SendAsync<List<string>>(() => Request($"data/acquisition-logs/report/{reportId}/acquired-resource-ids")
             .SetQueryParam("facilityId", facilityId)
-            .GetJsonAsync<List<string>>(cancellationToken: cancellationToken);
+            .GetAsync(cancellationToken: cancellationToken));
 
-    public Task<PagedConfigModel<ReferenceResourceApiModel>> GetReferenceResourcesForLogAsync(
+    public Task<LinkApiResponse<PagedConfigModel<ReferenceResourceApiModel>>> GetReferenceResourcesForLogAsync(
         long logId,
         int pageSize = 100,
         int pageNumber = 1,
         CancellationToken cancellationToken = default) =>
-        Request($"data/acquisition-logs/{logId}/reference-resources")
+        SendAsync<PagedConfigModel<ReferenceResourceApiModel>>(() => Request($"data/acquisition-logs/{logId}/reference-resources")
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
-            .GetJsonAsync<PagedConfigModel<ReferenceResourceApiModel>>(cancellationToken: cancellationToken);
+            .GetAsync(cancellationToken: cancellationToken));
 
-    public Task ProcessAcquisitionLogAsync(
+    public Task<LinkApiResponse> ProcessAcquisitionLogAsync(
         long id,
         CancellationToken cancellationToken = default) =>
-        Request($"data/acquisition-logs/{id}/process")
-            .PostJsonAsync(id, cancellationToken: cancellationToken);
+        SendAsync(() => Request($"data/acquisition-logs/{id}/process")
+            .PostJsonAsync(id, cancellationToken: cancellationToken));
 
-    public Task ProcessAcquisitionLogsBulkAsync(
+    public Task<LinkApiResponse> ProcessAcquisitionLogsBulkAsync(
         List<long> ids,
         CancellationToken cancellationToken = default) =>
-        Request("data/acquisition-logs/process-bulk")
-            .PostJsonAsync(ids, cancellationToken: cancellationToken);
+        SendAsync(() => Request("data/acquisition-logs/process-bulk")
+            .PostJsonAsync(ids, cancellationToken: cancellationToken));
 
-    public Task<DataAcquisitionBulkActionResultApiModel?> CancelAcquisitionLogsBulkAsync(
+    public Task<LinkApiResponse<DataAcquisitionBulkActionResultApiModel>> CancelAcquisitionLogsBulkAsync(
         List<long> ids,
         int minAgeHours = 24,
         CancellationToken cancellationToken = default) =>
-        GetOrDefaultAsync(() => Request("data/acquisition-logs/cancel-bulk")
+        SendAsync<DataAcquisitionBulkActionResultApiModel>(() => Request("data/acquisition-logs/cancel-bulk")
             .SetQueryParam("minAgeHours", minAgeHours)
-            .PostJsonAsync(ids, cancellationToken: cancellationToken)
-            .ReceiveJson<DataAcquisitionBulkActionResultApiModel>());
+            .PostJsonAsync(ids, cancellationToken: cancellationToken));
 
-    public Task ProcessAcquisitionLogsByFilterAsync(
+    public Task<LinkApiResponse> ProcessAcquisitionLogsByFilterAsync(
         object filter,
         CancellationToken cancellationToken = default) =>
-        Request("data/acquisition-logs/process-by-filter")
-            .PostJsonAsync(filter, cancellationToken: cancellationToken);
+        SendAsync(() => Request("data/acquisition-logs/process-by-filter")
+            .PostJsonAsync(filter, cancellationToken: cancellationToken));
 
-    public Task<DataAcquisitionBulkActionResultApiModel?> CancelAcquisitionLogsByFilterAsync(
+    public Task<LinkApiResponse<DataAcquisitionBulkActionResultApiModel>> CancelAcquisitionLogsByFilterAsync(
         object filter,
         int minAgeHours = 24,
         CancellationToken cancellationToken = default) =>
-        GetOrDefaultAsync(() => Request("data/acquisition-logs/cancel-by-filter")
+        SendAsync<DataAcquisitionBulkActionResultApiModel>(() => Request("data/acquisition-logs/cancel-by-filter")
             .SetQueryParam("minAgeHours", minAgeHours)
-            .PostJsonAsync(filter, cancellationToken: cancellationToken)
-            .ReceiveJson<DataAcquisitionBulkActionResultApiModel>());
+            .PostJsonAsync(filter, cancellationToken: cancellationToken));
 
-    public Task DeleteAcquisitionLogAsync(
+    public Task<LinkApiResponse> DeleteAcquisitionLogAsync(
         long id,
         CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"data/acquisition-logs/{id}")
+        SendAsync(() => Request($"data/acquisition-logs/{id}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
-    public Task SoftDeleteLogsByReportTrackingIdAsync(
+    public Task<LinkApiResponse> SoftDeleteLogsByReportTrackingIdAsync(
         string reportTrackingId,
         CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"data/acquisition-logs/report/{reportTrackingId}")
+        SendAsync(() => Request($"data/acquisition-logs/report/{reportTrackingId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
-    public Task RestoreLogsByReportTrackingIdAsync(
+    public Task<LinkApiResponse> RestoreLogsByReportTrackingIdAsync(
         string reportTrackingId,
         CancellationToken cancellationToken = default) =>
-        Request($"data/acquisition-logs/report/{reportTrackingId}/restore")
-            .PatchJsonAsync(new { }, cancellationToken: cancellationToken);
+        SendAsync(() => Request($"data/acquisition-logs/report/{reportTrackingId}/restore")
+            .PatchJsonAsync(new { }, cancellationToken: cancellationToken));
 
-    public Task RestoreLogsByFacilityAsync(
+    public Task<LinkApiResponse> RestoreLogsByFacilityAsync(
         string facilityId,
         CancellationToken cancellationToken = default) =>
-        Request($"data/acquisition-logs/facility/{facilityId}/restore")
-            .PatchJsonAsync(new { }, cancellationToken: cancellationToken);
+        SendAsync(() => Request($"data/acquisition-logs/facility/{facilityId}/restore")
+            .PatchJsonAsync(new { }, cancellationToken: cancellationToken));
 }

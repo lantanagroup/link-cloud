@@ -3,6 +3,7 @@ using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Validation;
 using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Sdk.Clients;
@@ -20,29 +21,25 @@ public class ValidationServiceClient : LinkApiClientBase, IValidationServiceClie
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
-    public Task InitializeArtifactsAsync(CancellationToken cancellationToken = default) =>
-        Request("validation/artifact/$initialize").PostAsync(cancellationToken: cancellationToken);
+    public Task<LinkApiResponse> InitializeArtifactsAsync(CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("validation/artifact/$initialize").PostAsync(cancellationToken: cancellationToken));
 
-    public Task InitializeCategoriesAsync(CancellationToken cancellationToken = default) =>
-        Request("validation/category/$initialize").PostAsync(cancellationToken: cancellationToken);
+    public Task<LinkApiResponse> InitializeCategoriesAsync(CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("validation/category/$initialize").PostAsync(cancellationToken: cancellationToken));
 
-    public async Task<bool> HasArtifactsAsync(CancellationToken cancellationToken = default)
-    {
-        var artifacts = await Request("validation/artifact")
-            .GetJsonAsync<List<object>>(cancellationToken: cancellationToken);
-        return artifacts is { Count: > 0 };
-    }
+    public Task<LinkApiResponse<List<ValidationArtifactApiModel>>> GetArtifactsAsync(CancellationToken cancellationToken = default) =>
+        SendAsync<List<ValidationArtifactApiModel>>(() => Request("validation/artifact")
+            .GetAsync(cancellationToken: cancellationToken));
 
-    public async Task<bool> HasCategoriesAsync(CancellationToken cancellationToken = default)
-    {
-        var categories = await Request("validation/category")
-            .GetJsonAsync<List<object>>(cancellationToken: cancellationToken);
-        return categories is { Count: > 0 };
-    }
+    public Task<LinkApiResponse<List<ValidationCategoryApiModel>>> GetCategoriesAsync(CancellationToken cancellationToken = default) =>
+        SendAsync<List<ValidationCategoryApiModel>>(() => Request("validation/category")
+            .GetAsync(cancellationToken: cancellationToken));
 
-    public Task UpsertResourceArtifactAsync(string artifactId, string resourceJson, CancellationToken cancellationToken = default) =>
-        Request($"validation/artifact/RESOURCE/{artifactId}").PutStringAsync(resourceJson, cancellationToken: cancellationToken);
+    public Task<LinkApiResponse> UpsertResourceArtifactAsync(string artifactId, string resourceJson, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"validation/artifact/RESOURCE/{artifactId}")
+            .WithHeader("Content-Type", "application/json")
+            .PutStringAsync(resourceJson, cancellationToken: cancellationToken));
 
-    public Task<string?> GetValidationResultsAsync(string facilityId, string reportId, string severity = "WARNING", CancellationToken cancellationToken = default) =>
-        GetOrDefaultAsync(() => Request($"validation/result/{facilityId}/{reportId}").SetQueryParam("severity", severity).GetStringAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse<string>> GetValidationResultsAsync(string facilityId, string reportId, string severity = "WARNING", CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request($"validation/result/{facilityId}/{reportId}").SetQueryParam("severity", severity).GetAsync(cancellationToken: cancellationToken));
 }

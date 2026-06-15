@@ -220,12 +220,23 @@ namespace IntegrationTests.Normalization
         }
 
         [Fact]
-        public async Task DeleteVendorVersionOperationPreset_NonExisting_ThrowsException()
+        public async Task DeleteVendorVersionOperationPreset_NonExisting_NoOp()
         {
             using var scope = _fixture.ServiceProvider.CreateScope();
             var vendorManager = scope.ServiceProvider.GetRequiredService<IVendorManager>();
+            var vendorQueries = scope.ServiceProvider.GetRequiredService<IVendorQueries>();
 
-            await Assert.ThrowsAsync<InvalidOperationException>(() => vendorManager.DeleteVendorVersionOperationPreset(Guid.NewGuid(), Guid.NewGuid()));
+            var vendorId = Guid.NewGuid();
+            var presetId = Guid.NewGuid();
+
+            await vendorManager.DeleteVendorVersionOperationPreset(vendorId, presetId);
+
+            var presets = await vendorQueries.SearchVendorVersionOperationPreset(new VendorOperationPresetSearchModel
+            {
+                Id = presetId
+            });
+
+            Assert.Empty(presets);
         }
     }
 

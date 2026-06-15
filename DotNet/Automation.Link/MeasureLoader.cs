@@ -204,10 +204,10 @@ public class MeasureLoader
                 return;
 
             var content = await _measureEvalClient.GetMeasureDefinitionAsync(definitionId);
-            if (string.IsNullOrWhiteSpace(content))
+            if (!content.IsSuccessStatusCode || string.IsNullOrWhiteSpace(content.Body))
                 throw new InvalidOperationException($"Measure definition '{definitionId}' was not found after load.");
 
-            var json = Newtonsoft.Json.Linq.JObject.Parse(content);
+            var json = Newtonsoft.Json.Linq.JObject.Parse(content.Body);
             var id = json["id"]?.ToString() ?? "(unknown)";
             var bundle = json["bundle"];
             var entryCount = (bundle?["entry"] as Newtonsoft.Json.Linq.JArray)?.Count ?? 0;
@@ -224,6 +224,7 @@ public class MeasureLoader
         catch (Exception ex)
         {
             _output.WriteLine($"  WARNING: Measure definition verification failed: {ex.Message}");
+            throw;
         }
     }
 
@@ -233,25 +234,31 @@ public class MeasureLoader
 
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            try
-            {
-                await _measureEvalClient.PutMeasureDefinitionAsync(this._evaluationBundle!.ToJson());
+            var response = await _measureEvalClient.PutMeasureDefinitionAsync(this._evaluationBundle!.ToJson());
+
+            if (response.IsSuccessStatusCode)
                 return;
-            }
-            catch (FlurlHttpException ex) when (IsRetryableMeasureDefinitionError(ex))
+
+            if (response.StatusCode is 500 or 502 or 503 or 504)
             {
                 if (await MeasureDefinitionExistsAsync())
                 {
-                    _output.WriteLine($"  Measure definition PUT returned {ex.StatusCode}, but definition already exists. Continuing.");
+                    _output.WriteLine($"  Measure definition PUT returned {response.StatusCode}, but definition already exists. Continuing.");
                     return;
                 }
 
                 if (attempt == maxAttempts)
-                    throw;
+                    throw new InvalidOperationException(
+                        $"Measure definition PUT failed after {maxAttempts} attempts. HTTP {response.StatusCode}: {response.RawBody ?? "(no body)"}");
 
                 var delay = TimeSpan.FromMilliseconds(Math.Min(4000, 250 * (1 << (attempt - 1))));
-                _output.WriteLine($"  Measure definition PUT attempt {attempt}/{maxAttempts} failed with status {ex.StatusCode}. Retrying in {delay.TotalMilliseconds:0} ms...");
+                _output.WriteLine($"  Measure definition PUT attempt {attempt}/{maxAttempts} failed with status {response.StatusCode}. Retrying in {delay.TotalMilliseconds:0} ms...");
                 await Task.Delay(delay);
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"Measure definition PUT failed with HTTP {response.StatusCode}: {response.RawBody ?? "(no body)"}");
             }
         }
     }
@@ -262,24 +269,8 @@ public class MeasureLoader
         if (string.IsNullOrWhiteSpace(definitionId))
             return false;
 
-        try
-        {
-            var content = await _measureEvalClient.GetMeasureDefinitionAsync(definitionId);
-            return !string.IsNullOrWhiteSpace(content);
-        }
-        catch (FlurlHttpException ex) when (ex.StatusCode == 404)
-        {
-            return false;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private static bool IsRetryableMeasureDefinitionError(FlurlHttpException ex)
-    {
-        return ex.StatusCode is 500 or 502 or 503 or 504;
+        var content = await _measureEvalClient.GetMeasureDefinitionAsync(definitionId);
+        return content.IsSuccessStatusCode && !string.IsNullOrWhiteSpace(content.Body);
     }
 
 

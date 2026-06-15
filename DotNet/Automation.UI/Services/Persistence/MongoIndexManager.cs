@@ -35,6 +35,7 @@ public sealed class MongoIndexManager
         EnsureScenarioIndexes();
         EnsureImportedBundleIndexes();
         EnsureQueryPlanTemplateIndexes();
+        EnsureApiHealthRunIndexes();
     }
 
     // --- automation_runs ---
@@ -134,6 +135,16 @@ public sealed class MongoIndexManager
 
         // Sort index for GetAllAsync (ORDER BY Name ASC).
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+    }
+
+    // --- api_health_runs ---
+
+    private void EnsureApiHealthRunIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("api_health_runs");
+
+        // Compound index for querying history by endpoint key, ordered by execution time.
+        CreateIndexSafe(collection, new BsonDocument { { "EndpointKey", 1 }, { "ExecutedAt", -1 } }, unique: false, "idx_endpointKey_executedAt");
     }
 
     // --- Helpers ---

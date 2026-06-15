@@ -31,8 +31,8 @@ public class ValidationResultsValidator
         try
         {
             var result = await _validationClient.GetValidationResultsAsync(facilityId, reportId, "WARNING");
-            if (result == null)
-                errors.Add("Validation API returned no results (not found).");
+            if (!result.IsSuccessStatusCode)
+                errors.Add($"Validation API returned HTTP {result.StatusCode}: {result.RawBody ?? "(no body)"}");
         }
         catch (Exception ex)
         {
