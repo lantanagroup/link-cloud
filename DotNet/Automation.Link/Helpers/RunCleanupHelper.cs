@@ -69,7 +69,7 @@ public static class RunCleanupHelper
                     minAgeHours: 0,
                     cancellationToken);
 
-                output.WriteLine($"Requested DA cancellation for facility '{facilityId}' (cancelled={cancelResult?.Cancelled ?? 0}).");
+                output.WriteLine($"Requested DA cancellation for facility '{facilityId}' (cancelled={cancelResult?.Body?.Cancelled ?? 0}).");
             }
             catch (Exception ex)
             {

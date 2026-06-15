@@ -32,6 +32,13 @@ public class ReportEntryApiModel
     public List<EntryMeasureReportApiModel> MeasureReports { get; set; } = [];
 }
 
+public class ReportEntrySummaryApiModel
+{
+    public Dictionary<string, int> ReportTypeCounts { get; set; } = [];
+    public Dictionary<string, int> ReportingStatusCounts { get; set; } = [];
+    public Dictionary<string, int> SubmissionStatusCounts { get; set; } = [];
+}
+
 public enum ReportingStatus
 {
     PatientIdentified,

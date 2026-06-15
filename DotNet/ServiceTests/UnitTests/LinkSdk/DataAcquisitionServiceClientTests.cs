@@ -25,7 +25,7 @@ public class DataAcquisitionServiceClientTests
 
         Assert.Equal("GET", request.Method);
         Assert.Equal("/api/data/acquisition-logs/42/notes", request.Path);
-        Assert.Equal(2, result.Count);
+        Assert.Equal(2, result.Body!.Count);
     }
 
     [Fact]
@@ -88,9 +88,9 @@ public class DataAcquisitionServiceClientTests
         Assert.Equal("/api/data/acquisition-logs/cancel-by-filter", request.Path);
         Assert.Contains("minAgeHours=0", request.Query);
         Assert.Contains("facilityId", request.Body);
-        Assert.NotNull(result);
-        Assert.Equal(2, result.Requested);
-        Assert.Equal(1, result.Cancelled);
+        Assert.NotNull(result.Body);
+        Assert.Equal(2, result.Body.Requested);
+        Assert.Equal(1, result.Body.Cancelled);
     }
 
     [Fact]
@@ -108,9 +108,9 @@ public class DataAcquisitionServiceClientTests
         Assert.Equal("/api/data/acquisition-logs/cancel-bulk", request.Path);
         Assert.Contains("minAgeHours=3", request.Query);
         Assert.Contains("99", request.Body);
-        Assert.NotNull(result);
-        Assert.Equal(1, result.Requested);
-        Assert.Equal(1, result.Cancelled);
+        Assert.NotNull(result.Body);
+        Assert.Equal(1, result.Body.Requested);
+        Assert.Equal(1, result.Body.Cancelled);
     }
 
     [Fact]

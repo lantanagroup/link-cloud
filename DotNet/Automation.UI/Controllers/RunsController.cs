@@ -1,6 +1,7 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.AspNetCore.Mvc;
@@ -15,6 +16,8 @@ public class RunsController(
     IRunExportService runExportService,
     ILogger<RunsController> logger) : Controller
 {
+    private static readonly Guid ApiHealthScenarioId = new("00000000-0000-0000-0000-000000000008");
+
     [HttpGet]
     public async Task<IActionResult> Index(
         int pageNumber = 1,
@@ -34,6 +37,47 @@ public class RunsController(
             .OrderBy(s => s.IsSystemScenario)
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+        if (!scenarios.Any(s => s.Id == ApiHealthScenarioId || (s.IsSystemScenario && s.Name.Equals("ApiHealthScenario", StringComparison.OrdinalIgnoreCase))))
+        {
+            var measures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
+            var eligibilities = measures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);
+            var eligibleScenarioIds = ClinicalScenarioEligibility.GetEligibleScenarioIds(measures, MeasureEligibility.Qualifying);
+
+            var apiHealthScenario = new TestScenarioDefinition
+            {
+                Id = ApiHealthScenarioId,
+                Name = "ApiHealthScenario",
+                Description = "System scenario for API Health stateful seeding and diagnostics.",
+                IsSystemScenario = true,
+                ReportMethod = ReportMethod.ScheduledReport,
+                SelectedMeasures = [.. measures],
+                Seed = 20260501,
+                PatientCount = 1,
+                ResourcesPerPatientMin = 100,
+                ResourcesPerPatientMax = 100,
+                PatientCohorts =
+                [
+                    new PatientCohortDefinition
+                    {
+                        PatientCount = 1,
+                        MeasureEligibilities = new(eligibilities),
+                        EligibleClinicalScenarioIds = [.. eligibleScenarioIds],
+                        ResourcesPerPatientMin = 100,
+                        ResourcesPerPatientMax = 100
+                    }
+                ],
+                CleanupServiceData = false,
+                CleanupFhirData = true,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+
+            await scenarioStore.UpsertAsync(apiHealthScenario, cancellationToken);
+            scenarios = (await scenarioStore.GetAllAsync(cancellationToken))
+                .OrderBy(s => s.IsSystemScenario)
+                .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
 
         // Active runs are surfaced by status, not by what page the user is on,
         // so they always come from a default-sorted first page slice. Otherwise
@@ -326,7 +370,7 @@ public class RunsController(
                 normalizedSearchTerm,
                 cancellationToken);
 
-            if ((result?.Records?.Count ?? 0) == 0)
+            if ((result?.Body?.Records?.Count ?? 0) == 0)
             {
                 result = await dataAcqClient.SearchAcquisitionLogsAsync(
                     string.Empty,
@@ -339,7 +383,7 @@ public class RunsController(
                     cancellationToken);
             }
 
-            var records = (result?.Records ?? [])
+            var records = (result?.Body?.Records ?? [])
                 .Select(r => new
                 {
                     r.Id,
@@ -360,10 +404,10 @@ public class RunsController(
 
             var metadata = new
             {
-                TotalCount = result?.Metadata?.TotalCount ?? 0,
-                PageNumber = result?.Metadata?.PageNumber ?? pageNumber,
-                PageSize = result?.Metadata?.PageSize ?? pageSize,
-                TotalPages = result?.Metadata?.TotalPages ?? 0
+                TotalCount = result?.Body?.Metadata?.TotalCount ?? 0,
+                PageNumber = result?.Body?.Metadata?.PageNumber ?? pageNumber,
+                PageSize = result?.Body?.Metadata?.PageSize ?? pageSize,
+                TotalPages = result?.Body?.Metadata?.TotalPages ?? 0
             };
 
             return Json(new { records, metadata });
@@ -408,7 +452,7 @@ public class RunsController(
                 while (true)
                 {
                     var refPage = await dataAcqClient.GetReferenceResourcesForLogAsync(logId, refPageSize, pageNum, cancellationToken);
-                    var refRecords = refPage?.Records ?? [];
+                    var refRecords = refPage?.Body?.Records ?? [];
                     if (refRecords.Count == 0)
                         break;
 
@@ -430,7 +474,7 @@ public class RunsController(
             // Build the human-readable "Resource?param=value&..." form per FhirQuery.
             // Mirrors the FhirQueryModel.Query getter so the UI shows what was actually
             // sent to the FHIR server.
-            var queries = (detailed.FhirQuery ?? [])
+            var queries = (detailed.Body?.FhirQuery ?? [])
                 .Select(q =>
                 {
                     var firstResource = q.ResourceTypes?.FirstOrDefault();
@@ -448,40 +492,40 @@ public class RunsController(
                 .Where(s => !string.IsNullOrWhiteSpace(s))
                 .ToList();
 
-            var queryType = (detailed.FhirQuery ?? [])
+            var queryType = (detailed.Body?.FhirQuery ?? [])
                 .Select(q => q.QueryType.ToString())
                 .FirstOrDefault();
 
             return Json(new
             {
-                detailed.Id,
-                detailed.PatientId,
-                Status = detailed.Status?.ToString(),
-                QueryPhase = detailed.QueryPhase?.ToString(),
-                IsReferenceLog = detailed.IsReferenceLog
-                                 || string.Equals(detailed.QueryPhase?.ToString(), "Referential", StringComparison.OrdinalIgnoreCase)
-                                 || detailed.ReferenceResourceCount > 0,
-                ReferenceResourceCount = detailed.ReferenceResourceCount,
-                detailed.ReportTrackingId,
-                detailed.CorrelationId,
-                detailed.TraceId,
-                detailed.FhirVersion,
-                detailed.Priority,
-                detailed.RetryAttempts,
+                detailed.Body?.Id,
+                detailed.Body?.PatientId,
+                Status = detailed.Body?.Status?.ToString(),
+                QueryPhase = detailed.Body?.QueryPhase?.ToString(),
+                IsReferenceLog = detailed.Body?.IsReferenceLog == true
+                                 || string.Equals(detailed.Body?.QueryPhase?.ToString(), "Referential", StringComparison.OrdinalIgnoreCase)
+                                 || (detailed.Body?.ReferenceResourceCount ?? 0) > 0,
+                ReferenceResourceCount = detailed.Body?.ReferenceResourceCount ?? 0,
+                detailed.Body?.ReportTrackingId,
+                detailed.Body?.CorrelationId,
+                detailed.Body?.TraceId,
+                detailed.Body?.FhirVersion,
+                detailed.Body?.Priority,
+                detailed.Body?.RetryAttempts,
                 QueryType = queryType,
                 Queries = queries,
-                detailed.CompletionDate,
-                detailed.CompletionTimeMilliseconds,
-                ResourceTypes = (detailed.ResourceTypes ?? [])
-                    .Concat(detailed.FhirQuery.SelectMany(q => q.ResourceTypes ?? []))
+                detailed.Body?.CompletionDate,
+                CompletionTimeMilliseconds = detailed.Body?.CompletionTimeMilliseconds,
+                ResourceTypes = (detailed.Body?.ResourceTypes ?? [])
+                    .Concat((detailed.Body?.FhirQuery ?? []).SelectMany(q => q.ResourceTypes ?? []))
                     .Concat(referenceResourceIds
                         .Select(r => r.Contains('/') ? r.Split('/')[0] : r)
                         .Where(rt => !string.IsNullOrWhiteSpace(rt)))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList(),
-                ResourceAcquiredIds = detailed.ResourceAcquiredIds?.ToList() ?? new List<string>(),
+                ResourceAcquiredIds = detailed.Body?.ResourceAcquiredIds?.ToList() ?? new List<string>(),
                 ReferenceResourceIds = referenceResourceIds,
-                Notes = detailed.Notes?.ToList() ?? new List<string>()
+                Notes = detailed.Body?.Notes?.ToList() ?? new List<string>()
             });
         }
         catch (Exception ex)

@@ -14,9 +14,8 @@ This README is aimed at three audiences:
 
 - **Product owners / project managers** -- sections 1-4 describe what the UI does and how
   users interact with it.
-- **QA** -- sections 5-7 describe the dashboard, run inspection, and the strict
-  prediction-vs-actual report surface.
-- **Developers** -- sections 8-12 describe the code structure, persistence model, and
+- **QA** -- sections 5-7 and 15 describe run workflows and API Health execution/coverage.
+- **Developers** -- sections 8-15 describe the code structure, persistence model, and
   extension points.
 
 ---
@@ -36,6 +35,8 @@ pipeline tests. It provides:
 7. **Snapshot-based inspection** -- pipeline domains pre-aggregated for UI rendering.
 8. **Validation-backed confidence** -- report, ABS, DA, normalization, tenant, validation
    checks.
+9. **API Health automated testing** -- service-oriented endpoint/status-path verification with
+   seeded test data, streaming progress, and run history.
 
 ---
 
@@ -47,6 +48,8 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 |   +-- RunsController          dashboard, run lifecycle, snapshot/log APIs
 |   +-- ScenariosController     inline CRUD for scenario templates
 |   +-- QueryPlansController    inline CRUD for query plan templates
+|   +-- ApiHealthController     API Health dashboard + SSE run streaming
+|   +-- Api/AutomationRunsApiController  external start/status API
 |   +-- HomeController          landing redirect
 +-- Views/
 |   +-- Runs/Index.cshtml       dashboard: KPIs, run history, quick-launch
@@ -54,11 +57,16 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 |   +-- Runs/Manifest.cshtml    Generation-Manifest deep dive (generated / predicted / actual)
 |   +-- Scenarios/Index.cshtml  scenario list (uses shared editor modal)
 |   +-- QueryPlans/Index.cshtml query plan list + inline modal editor
+|   +-- ApiHealth/Index.cshtml  API test matrix, run controls, SSE/live updates
 |   +-- Shared/_ScenarioEditorModal.cshtml   reusable scenario editor (markup + JS)
 +-- Models/
 |   +-- RunDashboardViewModel, RunDashboardStats, TestScenarioDefinition, --
 +-- Services/
 |   +-- AutomationRunManager    run lifecycle orchestration
+|   +-- ApiEndpointRegistry     API Health endpoint catalog
+|   +-- ApiHealthTestExecutor   per-endpoint execution abstraction
+|   +-- ApiHealthExecutionRunManager  long-running API Health service/all runs
+|   +-- ApiHealthSeedOrchestrator     seed run lifecycle + context propagation
 |   +-- RunSnapshotOrchestrator background pollers per active run
 |   +-- StoreBackedServicePoller polls pipeline domains and writes snapshots
 |   +-- RunHub                  SignalR hub for run logs + dashboard updates
@@ -168,6 +176,24 @@ scenarios unless overridden.
 
 Redirects to `Runs/Index`.
 
+### 3.5 `ApiHealthController`
+
+Primary API Health UI surface. Provides dashboard rendering, run launch, SSE streaming,
+active-run resume, and history APIs.
+
+| Action | Method | Purpose |
+|---|---|---|
+| `Index` | GET | API Health matrix page (grouped by service, latest status per endpoint). |
+| `RunEndpoint` | POST | Run one endpoint test (seeded as required by suite contract). |
+| `RunServiceStream` | GET | Start service-scoped API Health run; stream events via SSE. |
+| `RunAllStream` | GET | Start run-all API Health run; stream events via SSE. |
+| `RunStream` | GET | Attach to an existing API Health run id and stream events. |
+| `ActiveRun` | GET | Returns currently active API Health run metadata for resume-on-refresh UX. |
+| `History` | GET | Paged endpoint history from `api_health_runs` persistence. |
+
+Execution events are streamed as `text/event-stream` (`phase`, `result`, `done`) and the
+client updates row status/badges in real time.
+
 ---
 
 ## 4. View architecture
@@ -213,6 +239,16 @@ document.addEventListener('scenario-editor:changed', function (e) {
 The Scenarios page reloads on this event; the Runs page appends the saved scenario to the
 quick-launch dropdown, selects it, and fires the dropdown's `change` event so the Run button
 becomes ready immediately.
+
+### API Health view model
+
+`Views/ApiHealth/Index.cshtml` is a service-grouped test matrix (not modal CRUD). It provides:
+
+- **Run All** and **Run Service** controls.
+- Real-time phase/result rendering through SSE.
+- Seed-run status card (run link, live status, elapsed timer).
+- Endpoint-level history modal backed by persisted API Health results.
+- Run-start reset behavior (service-only or all rows) so each execution starts from pending state.
 
 ### Antiforgery
 
@@ -352,6 +388,25 @@ The editor enforces measure eligibility constraints in the UI:
 `AutomationRunManager` broadcasts to both groups on every status transition, enabling live log
 streaming on the run details page and real-time dashboard KPI updates without polling.
 
+### 6.3 API Health streaming model
+
+API Health uses **SSE** (not SignalR) for long-running test execution streams:
+
+- `ApiHealthExecutionRunManager` owns in-memory active run state and ordered event buffers.
+- `ApiHealthController.StreamRunAsync` emits `phase`, `result`, and terminal `done` events.
+- Browser-side code supports reconnect/resume by requesting `ActiveRun` then attaching with
+  `RunStream?runId=...`.
+- Seed orchestration is surfaced in-phase, including linked seed run metadata when available.
+
+Why SSE here:
+
+- API Health execution is a one-way server→browser event feed (`phase`/`result`/`done`) with no
+  client-to-server hub messaging requirements.
+- `EventSource` keeps the transport model small and explicit for this workflow (single long-lived
+  HTTP response per stream).
+- Existing run-log telemetry remains on SignalR (`RunHub`) where group subscription semantics are
+  needed; API Health keeps a separate, purpose-fit stream model to avoid unnecessary hub coupling.
+
 ---
 
 ## 7. End-to-end run workflow
@@ -489,6 +544,17 @@ Per-run poller with one cadence for all key domains:
 Each domain write is independent and fault-isolated. Failures are logged to run logs without
 taking down the whole poll cycle.
 
+### API Health services
+
+- `ApiEndpointRegistry` discovers/normalizes endpoint definitions from all registered suites.
+- `ApiHealthTestExecutor` executes endpoint/suite tests and persists results.
+- `ApiHealthExecutionRunManager` coordinates service/all runs, emits ordered execution events,
+  and handles run state transitions.
+- `ApiHealthSeedOrchestrator` launches/monitors seed scenario runs, exposes seed context to
+  suites, and performs teardown cleanup.
+- `IApiHealthSeedContextAccessor` carries per-run seed payloads (facility/report ids and seed
+  run metadata) across suite execution.
+
 ### `ISnapshotStore` + Mongo stores
 
 Persistence abstraction used by both execution and UI reads:
@@ -512,6 +578,7 @@ Collections:
 - `automation_logs` -- full run logs.
 - `automation_scenarios` -- user and system scenario templates.
 - `automation_query_plan_templates` -- query plan templates.
+- `api_health_runs` -- API Health endpoint execution history.
 
 ### Document conventions
 
@@ -625,3 +692,38 @@ Port mapping: host `5256` -- container `5257`.
   report method is used.
 - Data-Acquisition log search is server-side. The Run Details DA-logs panel debounces
   the search input and re-issues a paged request with `searchTerm` on every change.
+
+---
+
+## 15. API Health automated testing workflow
+
+API Health is a dedicated automation workflow for service API validation in `Automation.UI`.
+
+### What it does
+
+- Executes endpoint/status-path checks across registered service suites.
+- Supports service-scoped and run-all execution.
+- Persists endpoint history and latest status for dashboard hydration.
+- Streams execution progress/results live to the browser.
+
+### Seeded execution model
+
+- Suites declare seed requirements via `GetSeedRequirements()`.
+- When required, API Health launches `ApiHealthScenario` through `IAutomationRunManager`.
+- The resulting seed payload (e.g., facility/report ids) is attached to execution context.
+- Seed teardown runs after suite execution, preserving test reliability during run and
+  performing cleanup at the appropriate lifecycle stage.
+
+### Result model
+
+Each endpoint result tracks:
+
+- expected vs actual status code,
+- pass/fail/skip semantics,
+- duration,
+- request metadata,
+- response snippet/error context,
+- execution timestamp.
+
+Skipped steps are explicit (with reason) for paths that are intentionally non-deterministic or
+cannot be self-seeded through API-only orchestration.

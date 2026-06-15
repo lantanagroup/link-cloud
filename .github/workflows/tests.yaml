@@ -47,7 +47,7 @@ jobs:
         run: echo "run_job=${{ steps.should.outputs.run_job }}"
 
   backend-e2e-tests:
-    # All test categories run in parallel against a SINGLE shared
+    # PR-safe Backend E2E categories run in parallel against a SINGLE shared
     # docker compose stack (one build, one up). Each `dotnet test`
     # invocation writes to its own log file and is then rendered as its own
     # collapsible ::group:: in the Actions UI so logs are segmented per
@@ -160,7 +160,7 @@ jobs:
             --configuration Debug \
             --no-restore
 
-      # ---- All test categories run CONCURRENTLY against the SAME stack. ----
+      # ---- PR-safe Backend E2E categories run CONCURRENTLY against the SAME stack. ----
       # Each `dotnet test` is launched in the background with its stdout/stderr
       # redirected to a dedicated log file. After they all finish we emit each
       # log wrapped in ::group::/::endgroup:: markers so the GitHub Actions UI
