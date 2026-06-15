@@ -82,7 +82,14 @@ public class ValidationService
             {
                 foreach (var component in health.Components)
                 {
-                    var key = component.Key == "db" ? "Database" : ToPascalCase(component.Key);
+                    // Spring names the Mongo component "db" and the auto-configured Redis
+                    // component "redis"; map them to the Database/Cache entries the UI expects.
+                    var key = component.Key switch
+                    {
+                        "db" => "Database",
+                        "redis" => "Cache",
+                        _ => ToPascalCase(component.Key)
+                    };
 
                     var componentStatus = component.Value?.Status?.ToUpperInvariant() == HealthUp
                         ? HealthStatus.Healthy
