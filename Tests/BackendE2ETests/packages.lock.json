@@ -3145,7 +3145,7 @@
           "Confluent.Kafka": "[2.*, )",
           "LinqKit.Core": "[1.*, )",
           "Microsoft.AspNetCore.Grpc.JsonTranscoding": "[8.*, )",
-          "Microsoft.EntityFrameworkCore": "[8.0.28, )",
+          "Microsoft.EntityFrameworkCore": "[8.*, )",
           "Microsoft.VisualStudio.Azure.Containers.Tools.Targets": "[1.*, )",
           "Quartz": "[3.*, )",
           "Quartz.Serialization.Json": "[3.*, )",
