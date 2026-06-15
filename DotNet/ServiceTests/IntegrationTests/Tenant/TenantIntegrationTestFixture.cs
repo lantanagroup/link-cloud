@@ -16,6 +16,7 @@ using LantanaGroup.Link.Tenant.Config;
 using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Data.Repository;
 using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Tenant.Interfaces;
 using LantanaGroup.Link.Tenant.Jobs;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Repository.Context;
@@ -123,6 +124,10 @@ namespace IntegrationTests.Tenant
             // Add logging
             builder.Services.AddLogging();
 
+            // ReportScheduledJob depends on ITenantServiceMetrics, which needs IMeterFactory (AddMetrics)
+            builder.Services.AddMetrics();
+            builder.Services.AddSingleton<ITenantServiceMetrics, TenantServiceMetrics>();
+
             // Add job classes
             builder.Services.AddTransient<ReportScheduledJob>();
 
@@ -132,8 +137,11 @@ namespace IntegrationTests.Tenant
             builder.Services.AddSingleton<ScheduleService>();
             //builder.Services.AddHostedService(sp => sp.GetRequiredService<ScheduleService>());
 
-            // Add Kafka producer factory for GenerateReportValue
+            // Add Kafka producer factories (mirrors Program.cs):
+            //   <string, GenerateReportValue> -> FacilityController (ad-hoc report path)
+            //   <string, object>              -> ReportScheduledJob / RetentionCheckScheduledJob
             builder.Services.AddTransient<IKafkaProducerFactory<string, GenerateReportValue>, StubKafkaProducerFactory<string, GenerateReportValue>>();
+            builder.Services.AddTransient<IKafkaProducerFactory<string, object>, StubKafkaProducerFactory<string, object>>();
 
             // Add AutoMapper
             builder.Services.AddAutoMapper(cfg =>
@@ -161,9 +169,12 @@ namespace IntegrationTests.Tenant
 
         public void Dispose()
         {
-            var ctx = ServiceProvider.GetService<TenantDbContext>();
-            ctx?.Database.EnsureDeleted();   // forces the in-memory store to clear
-            ctx?.Dispose();
+            // TenantDbContext is scoped, so it must be resolved from a scope, not the root provider
+            using (var disposeScope = ServiceProvider.CreateScope())
+            {
+                var ctx = disposeScope.ServiceProvider.GetService<TenantDbContext>();
+                ctx?.Database.EnsureDeleted();   // forces the in-memory store to clear
+            }
 
             // ---- QUARTZ: immediate shutdown (no waiting) ----
             var scheduler = ServiceProvider.GetService<IScheduler>();
