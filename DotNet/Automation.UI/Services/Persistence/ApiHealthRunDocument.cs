@@ -4,6 +4,7 @@ using MongoDB.Bson.Serialization.Attributes;
 namespace Automation.UI.Services.Persistence;
 
 /// <summary>MongoDB document for the api_health_runs collection.</summary>
+[BsonIgnoreExtraElements]
 public sealed class ApiHealthRunDocument
 {
     [BsonId]
@@ -30,6 +31,7 @@ public sealed class ApiHealthRunDocument
     // Diagnostic fields persisted for post-refresh detail rendering.
     public string? RequestUrl { get; set; }
     public string? RequestMethod { get; set; }
+    public string? RequestBody { get; set; }
     public string? TraceId { get; set; }
     public string? ResponseBody { get; set; }
 }

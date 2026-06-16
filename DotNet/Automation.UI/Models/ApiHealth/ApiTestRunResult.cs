@@ -1,4 +1,4 @@
-﻿namespace Automation.UI.Models.ApiHealth;
+namespace Automation.UI.Models.ApiHealth;
 
 /// <summary>
 /// Result of a single API endpoint test execution.
@@ -40,6 +40,9 @@ public sealed class ApiTestRunResult
 
     /// <summary>HTTP method used (GET, POST, PUT, DELETE, etc.).</summary>
     public string? RequestMethod { get; set; }
+
+    /// <summary>Request body captured for the call (if any).</summary>
+    public string? RequestBody { get; set; }
 
     /// <summary>Trace ID from the response headers for correlating with Grafana/distributed tracing.</summary>
     public string? TraceId { get; set; }
