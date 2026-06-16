@@ -78,7 +78,13 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                             ? HealthStatus.Healthy
                             : HealthStatus.Unhealthy;
 
-                        report.Entries[ToPascalCase(component.Key)] = new LinkServiceHealthReportEntry
+                        // Spring auto-configures the Redis health indicator under the "redis"
+                        // component; map it to the "Cache" entry the UI's Cache column expects.
+                        var key = component.Key.Equals("redis", StringComparison.OrdinalIgnoreCase)
+                            ? "Cache"
+                            : ToPascalCase(component.Key);
+
+                        report.Entries[key] = new LinkServiceHealthReportEntry
                         {
                             Status = componentStatus,
                             Duration = TimeSpan.Zero
