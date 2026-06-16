@@ -222,4 +222,123 @@ class CategoryBackedPolicyAdvisorTest {
         verify(metrics, never())
                 .incrementRuleOutcome(eq("rule_b"), eq(ValidationMetrics.OUTCOME_SKIPPED));
     }
+
+    // --- excludeActions (Phase 2) -------------------------------------------------------------
+
+    private static Category excludeActionsRule(String id, List<String> codeSystems, List<String> excludeActions) {
+        Category c = skipRule(id, true, codeSystems);
+        if (c.getScope() == null) {
+            c.setScope(new CategoryScope());
+        }
+        c.getScope().setExcludeActions(excludeActions);
+        return c;
+    }
+
+    @Test
+    void excludeActions_ruleWithoutExcludeActions_returnsNoneOf() {
+        // Phase 1 default: a matched SKIP rule with no excludeActions skips every check.
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                skipRule("epic_codes", true, List.of("https?://open\\.epic\\.com/.*"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        EnumSet<IValidationPolicyAdvisor.CodedContentValidationAction> result = advisor.policyForCodedContent(
+                null, null, "Patient.code.coding[0].system", null, null, null, null, null,
+                List.of("https://open.epic.com/FHIR/X"));
+
+        assertTrue(result.isEmpty(),
+                "Without excludeActions a matched rule must keep returning the empty set");
+    }
+
+    @Test
+    void excludeActions_singleAction_returnsComplementOf() {
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                excludeActionsRule("display_only", null, List.of("InvalidDisplay"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        EnumSet<IValidationPolicyAdvisor.CodedContentValidationAction> result = advisor.policyForCodedContent(
+                null, null, "Patient.code.coding[0].system", null, null, null, null, null,
+                List.of("http://loinc.org"));
+
+        assertEquals(
+                EnumSet.complementOf(EnumSet.of(IValidationPolicyAdvisor.CodedContentValidationAction.InvalidDisplay)),
+                result,
+                "Excluding InvalidDisplay must leave every other action in the returned set");
+        verify(metrics, times(1))
+                .incrementRuleOutcome(eq("display_only"), eq(ValidationMetrics.OUTCOME_SKIPPED));
+    }
+
+    @Test
+    void excludeActions_multipleActions_returnsComplementOfAll() {
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                excludeActionsRule("display_and_code", null, List.of("InvalidDisplay", "InvalidCode"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        EnumSet<IValidationPolicyAdvisor.CodedContentValidationAction> result = advisor.policyForCodedContent(
+                null, null, "Patient.code.coding[0].system", null, null, null, null, null,
+                List.of("http://loinc.org"));
+
+        assertEquals(
+                EnumSet.complementOf(EnumSet.of(
+                        IValidationPolicyAdvisor.CodedContentValidationAction.InvalidDisplay,
+                        IValidationPolicyAdvisor.CodedContentValidationAction.InvalidCode)),
+                result);
+    }
+
+    @Test
+    void excludeActions_unknownActionName_isDroppedRuleStillLoadsIfAnyValid() {
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                excludeActionsRule("mixed", null, List.of("NotARealAction", "InvalidDisplay"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        assertEquals(List.of("mixed"), advisor.getLoadedSkipRuleIds(),
+                "Rule with at least one valid action should still be loaded");
+
+        EnumSet<IValidationPolicyAdvisor.CodedContentValidationAction> result = advisor.policyForCodedContent(
+                null, null, "Patient.code.coding[0].system", null, null, null, null, null,
+                List.of("http://loinc.org"));
+
+        assertEquals(
+                EnumSet.complementOf(EnumSet.of(IValidationPolicyAdvisor.CodedContentValidationAction.InvalidDisplay)),
+                result,
+                "Only the valid action name should affect the returned set");
+    }
+
+    @Test
+    void excludeActions_allInvalidActionNames_demotesRule() {
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                excludeActionsRule("all_bad", null, List.of("NotARealAction", "AlsoNotReal"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        assertTrue(advisor.getLoadedSkipRuleIds().isEmpty(),
+                "If every action name fails to resolve, the rule must be demoted to LABEL — " +
+                        "silently reverting to 'skip every action' would change semantics the author didn't request");
+    }
+
+    @Test
+    void excludeActions_combinedWithCodeSystemsScope() {
+        // The two axes compose: codeSystems narrows WHEN the rule fires, excludeActions narrows
+        // WHICH actions are removed when it does.
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                excludeActionsRule("epic_display_only",
+                        List.of("https?://open\\.epic\\.com/.*"),
+                        List.of("InvalidDisplay"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        // Matching system → complementOf({InvalidDisplay})
+        EnumSet<IValidationPolicyAdvisor.CodedContentValidationAction> matched = advisor.policyForCodedContent(
+                null, null, "Patient.code.coding[0].system", null, null, null, null, null,
+                List.of("https://open.epic.com/FHIR/X"));
+        assertEquals(
+                EnumSet.complementOf(EnumSet.of(IValidationPolicyAdvisor.CodedContentValidationAction.InvalidDisplay)),
+                matched);
+        verify(metrics, times(1))
+                .incrementRuleOutcome(eq("epic_display_only"), eq(ValidationMetrics.OUTCOME_SKIPPED));
+
+        // Non-matching system → delegate to super, counter NOT incremented again
+        advisor.policyForCodedContent(
+                null, null, "Patient.code.coding[0].system", null, null, null, null, null,
+                List.of("http://loinc.org"));
+        verify(metrics, times(1))  // still 1
+                .incrementRuleOutcome(eq("epic_display_only"), eq(ValidationMetrics.OUTCOME_SKIPPED));
+    }
 }

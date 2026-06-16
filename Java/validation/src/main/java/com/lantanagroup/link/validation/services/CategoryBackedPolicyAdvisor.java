@@ -26,19 +26,27 @@ import java.util.regex.PatternSyntaxException;
 /**
  * HAPI {@code IValidationPolicyAdvisor} backed by the categorization rule set. Currently only
  * implements the {@code policyForCodedContent} hook — when a {@link CategoryStrategy#SKIP} rule's
- * scope matches an incoming code system URL, we return an empty action set so the validator
- * short-circuits all coded-content checks (no terminology lookup, no message produced). All other
- * advisor methods inherit from {@link FhirDefaultPolicyAdvisor} so HAPI's default policy decisions
- * apply unchanged.
+ * scope matches an incoming code system URL, we return either an empty action set (the rule's
+ * scope has no {@code excludeActions}) or the complement of the named actions (the rule narrows
+ * which specific checks to remove). All other advisor methods inherit from
+ * {@link FhirDefaultPolicyAdvisor} so HAPI's default policy decisions apply unchanged.
+ *
+ * <p><b>excludeActions surgical narrowing.</b> The default Phase 1 semantic for a matched SKIP
+ * rule was "skip every coded-content check" ({@code EnumSet.noneOf(...)}), which is correct
+ * when the team's intent for that code system URL is "don't validate anything." Phase 2 adds
+ * {@code scope.excludeActions} so a rule can declare {@code ["InvalidDisplay"]} (for example)
+ * and the advisor returns {@code EnumSet.complementOf(EnumSet.of(InvalidDisplay))} — every
+ * check runs except the display-name check. Lets us migrate rules like
+ * {@code incorrect_display_value_for_code} as unscoped SKIP without the over-skip hazard.</p>
  *
  * <p><b>Unscoped SKIP rules.</b> A SKIP rule with no {@code scope.codeSystems} narrowing fires on
- * every {@code policyForCodedContent} call, suppressing all coded-content validation for that
- * element. This is a coarse, high-risk semantic — returning an empty action set kills validation
+ * every {@code policyForCodedContent} call. Without {@code excludeActions} this suppresses all
+ * coded-content validation for that element — a coarse, high-risk semantic that kills validation
  * for any other rule that would have caught a message at that element, including rules with
- * {@code acceptable=false}. The capability is left in place for genuinely-global suppression
- * cases that may come up later, but it should not be used to mean "I haven't figured out the
- * scope yet." Prefer a precise {@code scope.codeSystems} list, or stay LABEL until SUPPRESS
- * support exists.</p>
+ * {@code acceptable=false}. Unscoped SKIP is acceptable when paired with {@code excludeActions}
+ * (surgical removal of one or two actions across every call) but should not be used without it
+ * to mean "I haven't figured out the scope yet." Prefer precise {@code scope.codeSystems}, or
+ * stay LABEL until SUPPRESS support exists.</p>
  *
  * <p><b>SUPPRESS gap (TODO).</b> Some categorization rules cover messages that can't be safely
  * targeted via {@code policyForCodedContent} (the four generic-shape branches of
@@ -112,7 +120,28 @@ public class CategoryBackedPolicyAdvisor extends FhirDefaultPolicyAdvisor {
                     continue;
                 }
             }
-            result.add(new CompiledSkipRule(category.getId(), patterns));
+            // Resolve excludeActions enum names. Unknown names are logged and dropped. If the
+            // author specified excludeActions but every name failed to resolve, demote — falling
+            // back to "skip every action" semantics would be a behaviour change the author didn't
+            // request.
+            EnumSet<IValidationPolicyAdvisor.CodedContentValidationAction> excludeActions = null;
+            if (scope != null && scope.getExcludeActions() != null && !scope.getExcludeActions().isEmpty()) {
+                excludeActions = EnumSet.noneOf(IValidationPolicyAdvisor.CodedContentValidationAction.class);
+                for (String name : scope.getExcludeActions()) {
+                    try {
+                        excludeActions.add(IValidationPolicyAdvisor.CodedContentValidationAction.valueOf(name));
+                    } catch (IllegalArgumentException e) {
+                        logger.warn("Category '{}' has an unknown excludeActions value: '{}'; ignoring that name.",
+                                category.getId(), name);
+                    }
+                }
+                if (excludeActions.isEmpty()) {
+                    logger.warn("Category '{}' has excludeActions scope but every action name failed to resolve; demoting to LABEL.",
+                            category.getId());
+                    continue;
+                }
+            }
+            result.add(new CompiledSkipRule(category.getId(), patterns, excludeActions));
         }
         return result;
     }
@@ -131,7 +160,7 @@ public class CategoryBackedPolicyAdvisor extends FhirDefaultPolicyAdvisor {
         for (CompiledSkipRule rule : codeSystemSkipRules) {
             if (rule.matchesAnyOf(systems)) {
                 metrics.incrementRuleOutcome(rule.ruleId(), ValidationMetrics.OUTCOME_SKIPPED);
-                return EnumSet.noneOf(IValidationPolicyAdvisor.CodedContentValidationAction.class);
+                return rule.resolveActionSet();
             }
         }
         return super.policyForCodedContent(
@@ -148,8 +177,13 @@ public class CategoryBackedPolicyAdvisor extends FhirDefaultPolicyAdvisor {
     /**
      * @param codeSystemPatterns {@code null} or empty means "always match" — the SKIP rule was
      *                           authored without a {@code scope.codeSystems} narrowing.
+     * @param excludeActions     {@code null} or empty means "skip every action" ({@code noneOf}).
+     *                           Non-empty means "skip only these actions" ({@code complementOf}).
      */
-    private record CompiledSkipRule(String ruleId, List<Pattern> codeSystemPatterns) {
+    private record CompiledSkipRule(
+            String ruleId,
+            List<Pattern> codeSystemPatterns,
+            EnumSet<IValidationPolicyAdvisor.CodedContentValidationAction> excludeActions) {
         boolean matchesAnyOf(List<String> systems) {
             if (codeSystemPatterns == null || codeSystemPatterns.isEmpty()) {
                 // Unscoped SKIP rule — fires on any policyForCodedContent call regardless of the
@@ -172,6 +206,15 @@ public class CategoryBackedPolicyAdvisor extends FhirDefaultPolicyAdvisor {
                 }
             }
             return false;
+        }
+
+        EnumSet<IValidationPolicyAdvisor.CodedContentValidationAction> resolveActionSet() {
+            if (excludeActions == null || excludeActions.isEmpty()) {
+                // Default Phase 1 behaviour: remove every check.
+                return EnumSet.noneOf(IValidationPolicyAdvisor.CodedContentValidationAction.class);
+            }
+            // Surgical narrowing: every check runs except the named ones.
+            return EnumSet.complementOf(excludeActions);
         }
     }
 }
