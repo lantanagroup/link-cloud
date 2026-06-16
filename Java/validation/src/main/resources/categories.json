@@ -4,7 +4,13 @@
     "title": "Incorrect Display Value for Code",
     "severity": "WARNING",
     "acceptable": true,
-    "guidance": "External: Code display values are not usually used, except for human readability. Incorrect display values are acceptable for reporting to NHSN",
+    "strategy": "SKIP",
+    "scope": {
+      "excludeActions": [
+        "InvalidDisplay"
+      ]
+    },
+    "guidance": "External: Code display values are not usually used, except for human readability. Incorrect display values are acceptable for reporting to NHSN. Phase 2 SKIP migration: HAPI's display-name check is suppressed globally via scope.excludeActions=['InvalidDisplay']. Every other coded-content check (ValueSet membership, code validity, terminology lookups) still runs — only the 'Wrong Display Name X' messages are silenced. The matcher below remains as a defensive fallback in case the advisor does not fire.",
     "matcher": {
       "field": "MESSAGE",
       "regex": "^Wrong Display Name '.*' for .* should be .*'.*' .*"
