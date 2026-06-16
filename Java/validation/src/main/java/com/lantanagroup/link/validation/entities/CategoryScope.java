@@ -45,11 +45,30 @@ public class CategoryScope {
      */
     private List<String> referencePaths;
 
+    /**
+     * Names of HAPI {@code CodedContentValidationAction} enum values to exclude from the action
+     * set returned by {@code policyForCodedContent} when the rule matches. Lets a SKIP rule be
+     * surgical — remove only the named actions (e.g. {@code ["InvalidDisplay"]}) instead of
+     * collapsing the entire action set to empty.
+     *
+     * <p>When this list is null or empty, the matched rule returns {@code EnumSet.noneOf(...)}
+     * (the Phase 1 behaviour: skip every action). When non-empty, the advisor returns
+     * {@code EnumSet.complementOf(EnumSet of named actions)} — every action except the named
+     * ones still runs. Invalid action names are logged and dropped at load time; if every name
+     * fails to resolve, the rule is demoted to LABEL.</p>
+     *
+     * <p>Combinable with {@link #codeSystems} (and later {@link #valueSets} / {@link #referencePaths}):
+     * a rule with both code-system patterns and excludeActions fires only when the system matches
+     * and then only removes the named actions.</p>
+     */
+    private List<String> excludeActions;
+
     @JsonIgnore
     public boolean isEmpty() {
         return isNullOrEmpty(codeSystems)
                 && isNullOrEmpty(valueSets)
-                && isNullOrEmpty(referencePaths);
+                && isNullOrEmpty(referencePaths)
+                && isNullOrEmpty(excludeActions);
     }
 
     private static boolean isNullOrEmpty(List<String> list) {
