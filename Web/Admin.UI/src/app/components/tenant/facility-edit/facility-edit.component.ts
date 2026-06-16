@@ -128,6 +128,7 @@ export class FacilityEditComponent implements OnInit {
   facilityConfig!: IFacilityConfigModel;
   censusConfig!: ICensusConfiguration;
   queryDispatchConfig!: IQueryDispatchConfiguration;
+
   // Backed by accessors so hasEncounterParameter is recomputed automatically
   // whenever the query config or query plan is (re)assigned. See the getters/
   // setters and updateHasEncounterParameter() below.
@@ -372,6 +373,9 @@ export class FacilityEditComponent implements OnInit {
   }
 
   showDataAcqFhirQueryDialog(): void {
+    // Ensure the hasEncounterParameter flag is current on the config object
+    // before it is handed to the dialog (loads may have resolved in any order).
+    this.updateHasEncounterParameter();
     this.dialog.open(DataAcquisitionFhirQueryConfigDialogComponent,
       {
         width: '75%',
@@ -1098,14 +1102,14 @@ export class FacilityEditComponent implements OnInit {
       return;
     }
 
-    if (!this.dataAcqQueryPlanConfig) {
-      return;
-    }
-
+    // Default to false so the flag is always a concrete boolean once the query
+    // config is loaded. If the query plan loads (or is reassigned) later, its
+    // setter re-runs this and flips the flag to true when an Encounter is found.
     let hasEncounterParameter = false;
 
-    if (this.dataAcqQueryPlanConfig.initialQueries) {
-      hasEncounterParameter = Object.values(this.dataAcqQueryPlanConfig.initialQueries).some(query => {
+    const initialQueries = this.dataAcqQueryPlanConfig?.initialQueries;
+    if (initialQueries) {
+      hasEncounterParameter = Object.values(initialQueries).some(query => {
         return (query.resourceType || '').toLowerCase() === 'encounter';
       });
     }

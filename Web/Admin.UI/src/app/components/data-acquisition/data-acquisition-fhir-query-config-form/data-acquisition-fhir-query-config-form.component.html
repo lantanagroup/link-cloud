@@ -151,6 +151,11 @@
       <mat-checkbox [formControl]="enableLocationResolutionMappingControl" [disabled]="viewOnly">
         Enable Location Resolution Mapping
       </mat-checkbox>
+      @if (enableLocationResolutionMappingControl.value && !hasEncounterParameter) {
+        <div class="warning" style="margin-top: 8px;">
+          Query Plan contains no Encounter parameter
+        </div>
+      }
     </div>
 
     @if (!viewOnly) {

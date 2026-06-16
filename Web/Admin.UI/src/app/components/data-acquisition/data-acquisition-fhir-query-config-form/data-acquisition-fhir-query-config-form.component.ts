@@ -103,8 +103,7 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       scope: new FormControl(''),
       userName: new FormControl(''),
       password: new FormControl(''),
-      customHeaders: new FormArray([]),
-      hasEncounterParameter: this.item?.hasEncounterParameter ?? false
+      customHeaders: new FormArray([])
     },  { validators: this.bothOrNoneHoursValidator } as AbstractControlOptions);
   }
 
@@ -355,6 +354,10 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
 
   get enableLocationResolutionMappingControl(): FormControl {
     return this.configForm.get('enableLocationResolutionMapping') as FormControl;
+  }
+
+  get hasEncounterParameter(): boolean {
+    return this.item?.hasEncounterParameter ?? false;
   }
 
   private parseTime(time: string | null): { hour: number; minute: number; second: number } {
