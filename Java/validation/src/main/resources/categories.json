@@ -30,7 +30,16 @@
         "urn:oid:1\\.2\\.246\\.537\\.6\\.96.*"
       ]
     },
-    "guidance": "Internal: This is an unrecognized code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code'). Phase 1 partial SKIP migration: terminology checks for known EHR-vendor URL patterns (Cerner, Epic, urn:oid:1.2.840.114350.*, urn:oid:1.2.246.537.6.96.*) are short-circuited via the policy advisor's scope.codeSystems. The matcher branches below remain as the LABEL fallback for the four generic-shape messages this rule covers ('Unknown Code System X', 'A code with no system', 'CodeSystem is unknown', 'V3 ValueSet ActEncounterCode' violations). Completing the migration would require SUPPRESS support targeting specific HAPI message IDs — pending I18nConstants investigation.",
+    "suppressMessageIds": [
+      "Terminology_TX_System_Unknown",
+      "Coding_has_no_system__cannot_validate",
+      "TERMINOLOGY_TX_SYSTEM_NO_CODE",
+      "UNKNOWN_CODESYSTEM",
+      "UNKNOWN_CODESYSTEM_VERSION",
+      "UNKNOWN_CODESYSTEM_VERSION_UNK",
+      "UNKNOWN_CODESYSTEM_VERSION_NONE"
+    ],
+    "guidance": "Internal: This is an unrecognized code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code'). Phase 1 SKIP migration covers four URL-specific matcher branches via scope.codeSystems (Cerner FHIR, Epic FHIR StructureDefinition, Epic OIDs urn:oid:1.2.840.114350.*, namespace urn:oid:1.2.246.537.6.96.*). Phase 4 SUPPRESS migration covers three of the four generic-shape branches via suppressMessageIds: Terminology_TX_System_Unknown ('Unknown Code System X'), Coding_has_no_system__cannot_validate + TERMINOLOGY_TX_SYSTEM_NO_CODE ('A code with no system, a system should be provided'), and the UNKNOWN_CODESYSTEM* family ('A definition for CodeSystem X could not be found' — the modern HAPI shape of the rule's '^CodeSystem is unknown and can't be validated' matcher branch). The eighth matcher branch ('The Coding provided (...) is not in the value set V3 Value SetActEncounterCode') still relies on the LABEL fallback — promoting it would require a suppressValueSets narrowing axis to target only V3 ValueSet ActEncounterCode binding violations rather than the broader Terminology_TX_NoValid_* family. After this migration the matcher below should rarely fire; it remains as a defensive fallback for the cold-start window before categories load and for the V3 ValueSet branch.",
     "matcher": {
       "children": [
         {
