@@ -126,6 +126,19 @@ public class RunsController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Start(StartScenarioRequest request, CancellationToken cancellationToken)
     {
+        if (request.Scenario == AutomationScenarioKind.Custom && request.ScenarioId is Guid scenarioId)
+        {
+            var scenario = await scenarioStore.GetByIdAsync(scenarioId, cancellationToken);
+            if (scenario == null)
+            {
+                TempData["RunStartError"] = "Unable to start test: selected scenario was not found.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
+            return RedirectToAction(nameof(Index));
+        }
+
         if (!ModelState.IsValid)
         {
             var errors = ModelState.Values
