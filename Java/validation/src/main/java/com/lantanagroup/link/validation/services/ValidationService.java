@@ -3,7 +3,6 @@ package com.lantanagroup.link.validation.services;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
 import ca.uhn.fhir.validation.FhirValidator;
-import ca.uhn.fhir.validation.IValidatorModule;
 import ca.uhn.fhir.validation.ValidationResult;
 import com.lantanagroup.link.shared.Timer;
 import com.lantanagroup.link.validation.configs.LinkConfig;
@@ -31,7 +30,11 @@ public class ValidationService {
     private final FhirValidator fhirValidator;
 
 
-    public ValidationService(FhirContext fhirContext, ArtifactService artifactService, LinkConfig linkConfig, ValidationCacheService validationCacheService) throws IOException {
+    public ValidationService(FhirContext fhirContext,
+                             ArtifactService artifactService,
+                             LinkConfig linkConfig,
+                             ValidationCacheService validationCacheService,
+                             CategoryBackedPolicyAdvisor policyAdvisor) throws IOException {
         ValidationSupportChain validationSupportChain = new ValidationSupportChain(
                 new DefaultProfileValidationSupport(fhirContext),
                 artifactService.getValidationSupport(),
@@ -40,9 +43,13 @@ public class ValidationService {
         loadTerminologyValidationSupport(fhirContext, linkConfig, validationSupportChain, validationCacheService);
 
         CachingValidationSupport cachingValidationSupport = new CachingValidationSupport(validationSupportChain);
-        IValidatorModule validatorModule = new FhirInstanceValidator(cachingValidationSupport);
+        FhirInstanceValidator instanceValidator = new FhirInstanceValidator(cachingValidationSupport);
+        // Consulted before terminology validation runs. SKIP-strategy categories short-circuit
+        // here so unrecognized code systems never hit the terminology service. All other policy
+        // decisions inherit FhirDefaultPolicyAdvisor's behaviour.
+        instanceValidator.setValidatorPolicyAdvisor(policyAdvisor);
         fhirValidator = new FhirValidator(fhirContext);
-        fhirValidator.registerValidatorModule(validatorModule);
+        fhirValidator.registerValidatorModule(instanceValidator);
         fhirValidator.setConcurrentBundleValidation(true);
         fhirValidator.setExecutorService(ForkJoinPool.commonPool());
     }

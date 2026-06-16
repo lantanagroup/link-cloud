@@ -24,6 +24,9 @@ public class CategorizationServiceTest {
     @Mock
     private CategoryRepository categoryRepository;
 
+    @Mock
+    private ValidationMetrics validationMetrics;
+
     @InjectMocks
     private CategorizationService categorizationService;
 
