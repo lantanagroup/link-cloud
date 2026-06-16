@@ -60,6 +60,15 @@ public class MeasureEvaluator {
     public static final String INDIVIDUAL_MEASURE_REPORT_PROFILE =
             "http://hl7.org/fhir/us/davinci-deqm/StructureDefinition/indv-measurereport-deqm";
 
+    /**
+     * Soft cap on the number of trace frames captured into {@code DebugInfo.traces}.
+     * Trace trees on real-world measures can balloon into hundreds of thousands of
+     * frames; rendering all of them risks OOM and tens-of-MB JSON responses. When the
+     * cap is hit, recursion stops and {@code DebugInfo.truncated} is set to {@code true}
+     * so callers know the captured trace is incomplete.
+     */
+    static final int MAX_TRACE_FRAMES = 10_000;
+
     private final FhirContext fhirContext;
     private final MeasureEvaluationOptions options;
     @Getter
@@ -220,6 +229,10 @@ public class MeasureEvaluator {
             return debugInfo;
         }
 
+        // Per-DebugInfo budget for total trace frames captured across all subjects.
+        // When the budget reaches zero we stop appending frames and mark the response truncated.
+        int[] remainingTraceFrames = { MAX_TRACE_FRAMES };
+
         for (Map.Entry<String, EvaluationResult> evalEntry : evaluationResults.entrySet()) {
             String evalSubjectId = evalEntry.getKey();
             EvaluationResult evalResult = evalEntry.getValue();
@@ -289,7 +302,17 @@ public class MeasureEvaluator {
                         debugInfo.setTraces(allTraces);
                     }
                     for (TraceFrame frame : trace.getFrames()) {
-                        allTraces.add(buildTraceTree(frame));
+                        if (remainingTraceFrames[0] <= 0) {
+                            debugInfo.setTruncated(true);
+                            break;
+                        }
+                        MeasureEvaluationResult.ExpressionTrace t = buildTraceTree(frame, remainingTraceFrames);
+                        if (t != null) {
+                            allTraces.add(t);
+                        }
+                    }
+                    if (remainingTraceFrames[0] <= 0) {
+                        debugInfo.setTruncated(true);
                     }
                 }
             }
@@ -316,7 +339,11 @@ public class MeasureEvaluator {
         return debugInfo;
     }
 
-    private static MeasureEvaluationResult.ExpressionTrace buildTraceTree(TraceFrame frame) {
+    private static MeasureEvaluationResult.ExpressionTrace buildTraceTree(TraceFrame frame, int[] remaining) {
+        if (remaining[0] <= 0) {
+            return null;
+        }
+        remaining[0]--;
         MeasureEvaluationResult.ExpressionTrace trace = new MeasureEvaluationResult.ExpressionTrace();
 
         if (frame.getLibrary() != null) {
@@ -349,9 +376,17 @@ public class MeasureEvaluator {
             if (exprFrame.getSubframes() != null && !exprFrame.getSubframes().isEmpty()) {
                 List<MeasureEvaluationResult.ExpressionTrace> children = new ArrayList<>();
                 for (TraceFrame child : exprFrame.getSubframes()) {
-                    children.add(buildTraceTree(child));
+                    if (remaining[0] <= 0) {
+                        break;
+                    }
+                    MeasureEvaluationResult.ExpressionTrace childTrace = buildTraceTree(child, remaining);
+                    if (childTrace != null) {
+                        children.add(childTrace);
+                    }
                 }
-                trace.setChildren(children);
+                if (!children.isEmpty()) {
+                    trace.setChildren(children);
+                }
             }
         } else if (frame instanceof SubExpressionTraceFrame subFrame) {
             if (subFrame.getElement() != null) {
@@ -370,9 +405,17 @@ public class MeasureEvaluator {
             if (subFrame.getSubframes() != null && !subFrame.getSubframes().isEmpty()) {
                 List<MeasureEvaluationResult.ExpressionTrace> children = new ArrayList<>();
                 for (TraceFrame child : subFrame.getSubframes()) {
-                    children.add(buildTraceTree(child));
+                    if (remaining[0] <= 0) {
+                        break;
+                    }
+                    MeasureEvaluationResult.ExpressionTrace childTrace = buildTraceTree(child, remaining);
+                    if (childTrace != null) {
+                        children.add(childTrace);
+                    }
                 }
-                trace.setChildren(children);
+                if (!children.isEmpty()) {
+                    trace.setChildren(children);
+                }
             }
         }
 

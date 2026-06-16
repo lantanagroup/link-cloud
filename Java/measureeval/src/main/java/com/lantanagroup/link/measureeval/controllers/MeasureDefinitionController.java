@@ -172,6 +172,11 @@ public class MeasureDefinitionController {
 
         Set<DebugSections> debugSections = DebugSections.parse(debug);
 
+        if (!debugSections.isEmpty()) {
+            _logger.info("Measure evaluation requested with debug sections {} for measure {}",
+                    debugSections, id);
+        }
+
         try {
             // Recompile the bundle every time because the debug flag may not match what's in the cache
             return MeasureEvaluator.compileAndEvaluate(FhirContext.forR4(), evaluator.getBundle(), parameters, debugSections);

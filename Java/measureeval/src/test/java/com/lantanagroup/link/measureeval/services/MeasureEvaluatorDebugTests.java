@@ -169,6 +169,20 @@ class MeasureEvaluatorDebugTests {
     }
 
     @Test
+    void truncatedFlagAbsentForSmallMeasure() {
+        // The simple cohort measure produces far fewer than MAX_TRACE_FRAMES frames,
+        // so the truncated flag should remain null (and be omitted from JSON output).
+        var bundle = KnowledgeArtifactBuilder.SimpleCohortMeasureTrue.bundle();
+        var result = MeasureEvaluator.compileAndEvaluate(
+                fhirContext, bundle, defaultParameters(), EnumSet.allOf(DebugSections.class));
+
+        MeasureEvaluationResult.DebugInfo info = result.getDebugInfo();
+        assertNotNull(info);
+        assertNull(info.getTruncated(),
+                "truncated should be null for a measure well under the trace cap; got: " + info.getTruncated());
+    }
+
+    @Test
     void measureReportIsByteForByteEquivalentBetweenFastAndDebugPath() {
         // The two code paths (R4MultiMeasureService.evaluate vs evaluateSingleMeasureCaptureDef)
         // should produce the same MeasureReport. Verify by comparing population counts on

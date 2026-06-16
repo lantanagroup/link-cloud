@@ -47,8 +47,23 @@ public class MeasureEvaluationResult {
         private List<String> cqlMessages;
         private List<ExpressionTrace> traces;
         private String debugLog;
+        /**
+         * Set to {@code true} if any debug section was truncated to protect the
+         * response from runaway memory use (currently only the trace tree, capped at
+         * {@code MeasureEvaluator.MAX_TRACE_FRAMES}). {@code null} when no truncation
+         * occurred so the field is omitted from the JSON response entirely.
+         */
+        private Boolean truncated;
 
         public DebugInfo() {}
+
+        public Boolean getTruncated() {
+            return truncated;
+        }
+
+        public void setTruncated(Boolean truncated) {
+            this.truncated = truncated;
+        }
 
         public List<String> getErrors() {
             return errors;
