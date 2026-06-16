@@ -128,10 +128,14 @@
     }
 
     @if (!viewOnly) {
-      <div>
+      <div class="url-actions">
         <button mat-stroked-button type="button" (click)="addExtensionUrl()">
           <mat-icon>add</mat-icon>
           Add URL
+        </button>
+        <button mat-stroked-button type="button" (click)="openCsvImportDialog()">
+          <mat-icon>upload_file</mat-icon>
+          Import from CSV
         </button>
       </div>
     }
