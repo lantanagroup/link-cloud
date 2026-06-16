@@ -34,6 +34,7 @@ if (!string.IsNullOrEmpty(externalConfigSource))
 
 // -- Bind options --
 builder.Services.Configure<AutomationConfig>(builder.Configuration.GetSection("Automation"));
+
 var grafanaBaseUrlFallback =
     builder.Configuration["GRAFANA_URL"]
     ?? builder.Configuration["GRAFANA_BASE_URL"]
@@ -164,6 +165,7 @@ builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiHealthTestExec
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiHealthExecutionRunManager>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedContextAccessor, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedContextAccessor>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedOrchestrator, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedOrchestrator>();
+builder.Services.AddHostedService<Automation.UI.Services.ApiHealth.ApiHealthStartupRecoveryService>();
 builder.Services.AddHttpClient("ApiHealthTest");
 builder.Services.AddHealthChecks();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
