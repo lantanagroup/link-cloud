@@ -17,10 +17,10 @@
     @* --- Summary bar --- *@
     <div class="d-flex gap-3 mb-3 flex-wrap" id="summaryBar">
         <span class="badge bg-secondary" id="sumTotal">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational)) tests</span>
-        <span class="badge au-badge-success" id="sumPass">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult?.Passed == true)) passed</span>
-        <span class="badge au-badge-danger" id="sumFail">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult?.Passed == false && e.LastResult?.Skipped != true)) failed</span>
-        <span class="badge au-badge-skip" id="sumSkip">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult?.Skipped == true)) skipped</span>
-        <span class="badge bg-light text-dark border" id="sumPending">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult == null)) not run</span>
+        <span class="badge au-badge-success" id="sumPass">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Passed == true)) passed</span>
+        <span class="badge au-badge-danger" id="sumFail">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Passed == false && e.LastResult?.Skipped != true)) failed</span>
+        <span class="badge au-badge-skip" id="sumSkip">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Skipped == true)) skipped</span>
+        <span class="badge bg-light text-dark border" id="sumPending">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && (!s.IsIncludedInLatestRun || e.LastResult == null))) not run</span>
     </div>
 
     <div id="runPhaseBanner" class="alert alert-secondary py-2 px-3 mb-3" style="display:none;">
@@ -47,9 +47,14 @@
         var passCount = service.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult?.Passed == true);
         var failCount = service.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult?.Passed == false && e.LastResult?.Skipped != true);
         var totalCount = service.Endpoints.Count(e => !e.Definition.IsInformational);
-        var serviceBadgeClass = failCount > 0 ? "au-badge-danger" : (passCount == totalCount && totalCount > 0 ? "au-badge-success" : "bg-secondary");
+        var staleOnly = !service.IsIncludedInLatestRun;
+        var serviceBadgeClass = failCount > 0
+            ? (staleOnly ? "border border-danger text-danger bg-transparent" : "au-badge-danger")
+            : (passCount == totalCount && totalCount > 0
+                ? (staleOnly ? "border border-success text-success bg-transparent" : "au-badge-success")
+                : (staleOnly ? "border border-secondary text-muted bg-transparent" : "bg-secondary"));
 
-        <div class="accordion-item au-health-accordion mb-2" id="svc-@service.ServiceName">
+        <div class="accordion-item au-health-accordion mb-2" id="svc-@service.ServiceName" data-service-included="@(service.IsIncludedInLatestRun ? "true" : "false")">
             <h2 class="accordion-header au-health-header">
                 <div class="d-flex align-items-center w-100">
                     <button class="accordion-button collapsed au-health-toggle flex-grow-1" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-@service.ServiceName" aria-expanded="false">
@@ -83,8 +88,11 @@
                                 var hasPassed = ep.LastResult?.Passed;
                                 var isSkipped = ep.LastResult?.Skipped == true
                                     || (ep.LastResult == null && ep.Definition.AlwaysSkipReason != null);
+                                var isStale = ep.LastResult != null && !service.IsIncludedInLatestRun;
                                 var skipReason = ep.LastResult?.SkipReason ?? ep.Definition.AlwaysSkipReason;
-                                var badgeClass = isSkipped ? "au-badge-skip" : (hasPassed == null ? "bg-secondary" : (hasPassed == true ? "au-badge-success" : "au-badge-danger"));
+                                var badgeClass = isStale
+                                    ? (isSkipped ? "border border-secondary text-muted bg-transparent" : (hasPassed == true ? "border border-success text-success bg-transparent" : "border border-danger text-danger bg-transparent"))
+                                    : (isSkipped ? "au-badge-skip" : (hasPassed == null ? "bg-secondary" : (hasPassed == true ? "au-badge-success" : "au-badge-danger")));
                                 var badgeText = isSkipped ? "SKIP" : (hasPassed == null ? "N/A" : (hasPassed == true ? "PASS" : "FAIL"));
 
                                 @if (ep.Definition.GroupName != null && ep.Definition.GroupName != lastGroup)
@@ -95,7 +103,7 @@
                                     </tr>
                                 }
 
-                                <tr data-endpoint-key="@key" data-informational="@(ep.Definition.IsInformational ? "true" : "false")">
+                                <tr data-endpoint-key="@key" data-informational="@(ep.Definition.IsInformational ? "true" : "false")" data-stale="@(isStale ? "true" : "false")" data-included="@(service.IsIncludedInLatestRun ? "true" : "false")">
                                     <td class="@(ep.Definition.GroupName != null ? "ps-4" : "")">
                                         <span>@ep.Definition.EndpointName</span>
                                         @if (!string.IsNullOrWhiteSpace(ep.Definition.Description))
@@ -232,7 +240,20 @@
     }
 
     function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+    function normalizeText(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/\uFFFD/g, '—')
+            .replace(/â€”/g, '—')
+            .trim();
+    }
     const runnableRowSelector = 'tr[data-endpoint-key][data-informational="false"]';
+    const initialRunMode = '@(Model.LatestRunMode ?? "")';
+    const initialRunServiceName = '@(Model.LatestRunServiceName ?? "")';
+    let latestRunContext = {
+        mode: initialRunMode || null,
+        serviceName: initialRunServiceName || null
+    };
     let seedRunPollTimer = null;
     let seedRunTickerTimer = null;
     let seedRunDiscoveryTimer = null;
@@ -399,13 +420,24 @@
         const passed = result.passed;
         const badgeClass = skipped ? 'au-badge-skip' : (passed ? 'au-badge-success' : 'au-badge-danger');
         const badgeText  = skipped ? 'SKIP' : (passed ? 'PASS' : 'FAIL');
+        const serviceName = getServiceNameForRow(row);
+        const included = isIncludedService(serviceName);
 
         row.classList.remove('row-running');
+        row.dataset.included = included ? 'true' : 'false';
+        row.dataset.stale = included ? 'false' : 'true';
         row.querySelector('.cell-result').innerHTML = `<span class="badge ${badgeClass}">${badgeText}</span>`;
+        if (!included) {
+            const badge = row.querySelector('.cell-result .badge');
+            if (badge) toHollowBadgeClass(badge);
+        }
         row.querySelector('.cell-status').innerHTML = skipped ? `<span class="text-muted">${placeholderText}</span>` : `<code class="small">${result.actualStatusCode || placeholderText} / ${result.expectedStatusCode}</code>`;
         row.querySelector('.cell-reason').innerHTML = skipped
             ? (result.skipReason ? `<small class="text-muted">${escapeHtml(result.skipReason)}</small>` : `<span class="text-muted">${placeholderText}</span>`)
-            : (!passed && result.errorMessage ? `<small class="text-danger">${escapeHtml(result.errorMessage)}</small>` : `<span class="text-muted">${placeholderText}</span>`);
+            : (() => {
+                const msg = normalizeText(result.errorMessage);
+                return !passed && msg ? `<small class="text-danger">${escapeHtml(msg)}</small>` : `<span class="text-muted">${placeholderText}</span>`;
+            })();
         row.querySelector('.cell-duration').innerHTML = skipped ? `<span class="text-muted">${placeholderText}</span>` : `<small>${result.durationMs}ms</small>`;
 
         // Remove old error, skip, and detail rows
@@ -424,7 +456,8 @@
         const traceHtml = result.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(result.traceId)}</code></dd>` : '';
         const requestBodyHtml = `<dt class="col-sm-2 text-muted">Request Body</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.requestBody || 'N/A')}</pre></dd>`;
         const responseHtml = `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.responseBody || 'N/A')}</pre></dd>`;
-        const errorHtml = result.errorMessage ? `<dt class="col-sm-2 text-muted">Error</dt><dd class="col-sm-10 text-danger">${escapeHtml(result.errorMessage)}</dd>` : '';
+        const normalizedError = normalizeText(result.errorMessage);
+        const errorHtml = normalizedError ? `<dt class="col-sm-2 text-muted">Error</dt><dd class="col-sm-10 text-danger">${escapeHtml(normalizedError)}</dd>` : '';
         detailRow.innerHTML = `<td colspan="6" class="ps-4 py-2"><dl class="row mb-0 small">
             <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(result.requestMethod || 'N/A')} ${escapeHtml(result.requestUrl || 'N/A')}</code></dd>
             ${requestBodyHtml}
@@ -454,8 +487,82 @@
         }
     }
 
+    function isIncludedService(serviceName) {
+        const mode = (latestRunContext.mode || '').toLowerCase();
+        if (!mode) return true;
+        if (mode === 'all') return true;
+        if (mode === 'single') return (latestRunContext.serviceName || '').toLowerCase() === (serviceName || '').toLowerCase();
+        return true;
+    }
+
+    function getServiceNameForRow(row) {
+        const card = row.closest('.accordion-item.au-health-accordion');
+        return card && card.id && card.id.startsWith('svc-') ? card.id.substring(4) : '';
+    }
+
+    function toSolidBadgeClass(badge) {
+        if (badge.classList.contains('border-success')) {
+            badge.className = 'badge au-badge-success';
+            return;
+        }
+        if (badge.classList.contains('border-danger')) {
+            badge.className = 'badge au-badge-danger';
+            return;
+        }
+        if (badge.classList.contains('border-secondary')) {
+            badge.className = 'badge au-badge-skip';
+        }
+    }
+
+    function toHollowBadgeClass(badge) {
+        if (badge.classList.contains('au-badge-success')) {
+            badge.className = 'badge border border-success text-success bg-transparent';
+            return;
+        }
+        if (badge.classList.contains('au-badge-danger')) {
+            badge.className = 'badge border border-danger text-danger bg-transparent';
+            return;
+        }
+        if (badge.classList.contains('au-badge-skip')) {
+            badge.className = 'badge border border-secondary text-muted bg-transparent';
+        }
+    }
+
+    function setRowInclusion(row, included) {
+        row.dataset.included = included ? 'true' : 'false';
+        row.dataset.stale = included ? 'false' : 'true';
+        const badge = row.querySelector('.cell-result .badge');
+        if (!badge) return;
+        if (badge.classList.contains('bg-secondary')) return;
+        if (included) toSolidBadgeClass(badge);
+        else toHollowBadgeClass(badge);
+    }
+
+    function setServiceInclusion(serviceName, included) {
+        const card = document.getElementById(`svc-${serviceName}`);
+        if (!card) return;
+        card.dataset.serviceIncluded = included ? 'true' : 'false';
+        card.querySelectorAll(runnableRowSelector).forEach(row => setRowInclusion(row, included));
+    }
+
+    function applyLatestRunContext(mode, serviceName) {
+        latestRunContext = {
+            mode: mode || null,
+            serviceName: serviceName || null
+        };
+
+        document.querySelectorAll('.accordion-item.au-health-accordion').forEach(card => {
+            const name = card.id && card.id.startsWith('svc-') ? card.id.substring(4) : '';
+            if (!name) return;
+            setServiceInclusion(name, isIncludedService(name));
+        });
+
+        updateSummary();
+    }
+
     function resetRowToPending(row) {
         row.classList.remove('row-running');
+        setRowInclusion(row, row.dataset.included !== 'false');
         row.querySelector('.cell-result').innerHTML = '<span class="badge bg-secondary">N/A</span>';
         row.querySelector('.cell-status').innerHTML = '<span class="text-muted">N/A</span>';
         row.querySelector('.cell-reason').innerHTML = '<span class="text-muted">N/A</span>';
@@ -479,6 +586,7 @@
         const card = document.getElementById(`svc-${serviceName}`);
         if (!card) return;
         card.querySelectorAll(runnableRowSelector).forEach(row => {
+            if (row.dataset.included === 'false') return;
             row.classList.add('row-running');
             row.querySelector('.cell-result').innerHTML = '<span class="spinner-border spinner-border-sm text-primary"></span>';
         });
@@ -488,6 +596,10 @@
     function updateSummary() {
         let pass = 0, fail = 0, skip = 0, pending = 0;
         document.querySelectorAll(runnableRowSelector).forEach(row => {
+            if (row.dataset.included === 'false') {
+                pending++;
+                return;
+            }
             const badge = row.querySelector('.cell-result .badge');
             if (!badge) { pending++; return; }
             if (badge.classList.contains('au-badge-success')) pass++;
@@ -509,14 +621,30 @@
             const card = document.getElementById(`svc-${svc}`);
             if (!card) return;
             let sp = 0, sf = 0, st = 0;
+            const included = card.dataset.serviceIncluded !== 'false';
             card.querySelectorAll(runnableRowSelector).forEach(row => {
                 st++;
                 const b = row.querySelector('.cell-result .badge');
-                if (b && b.classList.contains('au-badge-success')) sp++;
-                else if (b && b.classList.contains('au-badge-danger')) sf++;
+                if (!b) return;
+
+                const isPass = b.classList.contains('au-badge-success') || b.classList.contains('border-success');
+                const isFail = b.classList.contains('au-badge-danger') || b.classList.contains('border-danger');
+
+                if (isPass) {
+                    sp++;
+                }
+                else if (isFail) {
+                    sf++;
+                }
             });
+
             badge.textContent = `${sp}/${st}`;
-            badge.className = `badge svc-summary ms-2 ${sf > 0 ? 'au-badge-danger' : (sp === st && st > 0 ? 'au-badge-success' : 'bg-secondary')}`;
+            const cls = sf > 0
+                ? (!included ? 'border border-danger text-danger bg-transparent' : 'au-badge-danger')
+                : (sp === st && st > 0
+                    ? (!included ? 'border border-success text-success bg-transparent' : 'au-badge-success')
+                    : (!included ? 'border border-secondary text-muted bg-transparent' : 'bg-secondary'));
+            badge.className = `badge svc-summary ms-2 ${cls}`;
         });
     }
 
@@ -560,6 +688,33 @@
         }, 3000);
     }
 
+    function attachToActiveRun(active) {
+        if (!active || !active.runId) return;
+
+        applyLatestRunContext(active.scope === 'All' ? 'All' : 'Single', active.serviceName || null);
+
+        setRunPhaseFromActive(active);
+        setRunButtonsDisabled(true);
+
+        if (active.isAttachable !== true) {
+            pollRemoteActiveRun(active.runId);
+            return;
+        }
+
+        runViaSSE(`/ApiHealth/RunStream?runId=${encodeURIComponent(active.runId)}`, {
+            onResult: updateRowFromResult,
+            onDone: () => {
+                setRunButtonsDisabled(false);
+            },
+            onError: () => {
+                // Connection drops are expected across refresh/navigation and some
+                // reverse proxies. Keep the run in background and fall back to
+                // status polling instead of surfacing a hard failure banner.
+                pollRemoteActiveRun(active.runId);
+            }
+        });
+    }
+
     // --- SSE streaming helper ---
     function runViaSSE(url, { onResult, onDone, onError }) {
         const es = new EventSource(url);
@@ -582,8 +737,10 @@
 
                 if (p.phase === 'Testing') {
                     if (p.scope === 'Service' && p.serviceName) {
+                        applyLatestRunContext('Single', p.serviceName);
                         markServiceRunning(p.serviceName);
                     } else if (p.scope === 'All') {
+                        applyLatestRunContext('All', null);
                         document.querySelectorAll(runnableRowSelector).forEach(row => {
                             row.classList.add('row-running');
                             row.querySelector('.cell-result').innerHTML = '<span class="spinner-border spinner-border-sm text-primary"></span>';
@@ -613,7 +770,9 @@
         btn.addEventListener('click', () => {
             const svc = btn.dataset.service;
             resetSeedRunDisplay();
+            applyLatestRunContext('Single', svc);
             resetServiceRows(svc);
+            setRunButtonsDisabled(true);
             setButtonLoading(btn, true);
             document.getElementById('runPhaseBanner').style.display = '';
 
@@ -627,13 +786,21 @@
                 onResult: updateRowFromResult,
                 onDone: () => {
                     setButtonLoading(btn, false);
-                    document.querySelectorAll('.btn-run-service').forEach(b => b.disabled = false);
+                    setRunButtonsDisabled(false);
                 },
-                onError: () => { setButtonLoading(btn, false); document.querySelectorAll('.btn-run-service').forEach(b => b.disabled = false); }
-            });
-
-            document.querySelectorAll('.btn-run-service').forEach(b => {
-                if (b !== btn) b.disabled = true;
+                onError: async () => {
+                    setButtonLoading(btn, false);
+                    try {
+                        const active = await getJson('/ApiHealth/ActiveRun');
+                        if (active?.runId) {
+                            attachToActiveRun(active);
+                            return;
+                        }
+                    } catch {
+                        // best effort fallback below
+                    }
+                    setRunButtonsDisabled(false);
+                }
             });
         });
     });
@@ -642,56 +809,46 @@
     document.getElementById('btnRunAll').addEventListener('click', function () {
         const btn = this;
         resetSeedRunDisplay();
+        applyLatestRunContext('All', null);
         resetAllRows();
+        setRunButtonsDisabled(true);
         setButtonLoading(btn, true);
         document.getElementById('runPhaseBanner').style.display = '';
-
-        // Disable service-level run buttons while run-all is active
-        document.querySelectorAll('.btn-run-service').forEach(b => b.disabled = true);
 
         runViaSSE('/ApiHealth/RunAllStream', {
             onResult: updateRowFromResult,
             onDone: () => {
                 setButtonLoading(btn, false);
-                document.querySelectorAll('.btn-run-service').forEach(b => b.disabled = false);
+                setRunButtonsDisabled(false);
             },
-            onError: () => {
+            onError: async () => {
                 setButtonLoading(btn, false);
-                document.querySelectorAll('.btn-run-service').forEach(b => b.disabled = false);
-                alert('Run all failed - connection lost.');
+                try {
+                    const active = await getJson('/ApiHealth/ActiveRun');
+                    if (active?.runId) {
+                        attachToActiveRun(active);
+                        return;
+                    }
+                } catch {
+                    // best effort fallback below
+                }
+                setRunButtonsDisabled(false);
             }
         });
     });
-
-    updateSummary();
 
     // --- Resume active fire-and-forget run after navigation/refresh ---
     (async function resumeActiveRun() {
         try {
             const active = await getJson('/ApiHealth/ActiveRun');
             if (!active || !active.runId) return;
-
-            setRunPhaseFromActive(active);
-            setRunButtonsDisabled(true);
-
-            if (active.isAttachable !== true) {
-                pollRemoteActiveRun(active.runId);
-                return;
-            }
-
-            runViaSSE(`/ApiHealth/RunStream?runId=${encodeURIComponent(active.runId)}`, {
-                onResult: updateRowFromResult,
-                onDone: () => {
-                    setRunButtonsDisabled(false);
-                },
-                onError: () => {
-                    setRunButtonsDisabled(false);
-                }
-            });
+            attachToActiveRun(active);
         } catch {
             // No active run or transient fetch failure.
         }
     })();
+
+    updateSummary();
 
     // --- History modal ---
     const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
@@ -731,7 +888,8 @@
             let html = '<table class="table table-sm au-table"><thead><tr><th>Result</th><th>Status</th><th>Duration</th><th>Time</th><th>Error</th></tr></thead><tbody>';
             data.runs.forEach((r, idx) => {
                 const badge = r.passed ? '<span class="badge au-badge-success">PASS</span>' : '<span class="badge au-badge-danger">FAIL</span>';
-                const error = r.errorMessage ? `<small class="text-danger">${escapeHtml(r.errorMessage)}</small>` : 'N/A';
+                const normalizedError = normalizeText(r.errorMessage);
+                const error = normalizedError ? `<small class="text-danger">${escapeHtml(normalizedError)}</small>` : 'N/A';
                 html += `<tr class="cursor-pointer" data-toggle-detail="hist-${idx}"><td>${badge}</td><td><code>${r.actualStatusCode || 'N/A'} / ${r.expectedStatusCode}</code></td><td>${r.durationMs}ms</td><td><small>${new Date(r.executedAt).toLocaleString()}</small></td><td>${error}</td></tr>`;
                 // Expandable detail row
                 const traceHtml = r.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(r.traceId)}</code></dd>` : '';

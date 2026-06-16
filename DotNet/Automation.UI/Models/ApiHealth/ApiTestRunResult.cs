@@ -1,3 +1,6 @@
+﻿using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+
 namespace Automation.UI.Models.ApiHealth;
 
 /// <summary>
@@ -5,7 +8,11 @@ namespace Automation.UI.Models.ApiHealth;
 /// </summary>
 public sealed class ApiTestRunResult
 {
+    [BsonRepresentation(BsonType.String)]
     public Guid Id { get; set; } = Guid.NewGuid();
+
+    [BsonRepresentation(BsonType.String)]
+    public Guid RunId { get; set; }
 
     /// <summary>Matches <see cref="ApiEndpointDefinition.Key"/>.</summary>
     public string EndpointKey { get; set; } = string.Empty;
