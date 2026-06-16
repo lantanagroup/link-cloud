@@ -10,6 +10,7 @@ public class FhirResourceConverter : JsonConverter<DomainResource>
 
     public override DomainResource Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
+        _fhirParser.Settings.PermissiveParsing = true;
         try
         {
             // Read the JSON string for the resource
