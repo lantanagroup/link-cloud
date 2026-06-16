@@ -17,7 +17,6 @@ import com.lantanagroup.link.shared.serdes.Views;
 import io.opentelemetry.api.trace.Span;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import javassist.NotFoundException;
 import org.apache.commons.text.StringEscapeUtils;
 import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Parameters;
@@ -138,7 +137,7 @@ public class MeasureDefinitionController {
 
         try {
             return CqlUtils.getCql(measureDefinition.getBundle(), libraryId, range);
-        } catch (NotFoundException e) {
+        } catch (CqlUtils.ResourceNotFoundException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage(), e);
         }
     }
