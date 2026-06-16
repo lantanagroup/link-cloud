@@ -130,24 +130,48 @@ to be both noisy and expensive (remote terminology calls, ValueSet expansion).
 ```
 
 - `strategy`: enum (`SKIP` / `SUPPRESS` / `LABEL`); default `LABEL` when absent.
-- `scope`: present on `SKIP` rules to narrow which calls the rule applies to.
-  Shape depends on the policy hook:
+- `scope`: present on `SKIP` rules to narrow which calls the rule applies to and
+  which specific actions are short-circuited when it does. Shape depends on the
+  policy hook:
   - `codeSystems`: regex patterns matched against `system` URLs in the
-    `policyForCodedContent` advisory call. Phase 1.
+    `policyForCodedContent` advisory call. **Narrows when** the rule fires.
+    Phase 1.
+  - `excludeActions`: names of HAPI `CodedContentValidationAction` enum values
+    to remove from the returned action set. **Narrows what** the rule does when
+    it fires — instead of removing every check (`EnumSet.noneOf(...)`), it
+    removes only the named actions (`EnumSet.complementOf(...)`). Phase 2.
   - `valueSets`: regex patterns matched against the bound ValueSet URL. Phase 1
-    follow-up.
+    follow-up — **deferred** until there's a clean use case (no proposed Phase 2
+    candidate actually fit the `valueSets` axis once we examined the matchers).
   - `referencePaths`: regex patterns matched against the reference target path.
     Phase 3.
 
-  **Unscoped `SKIP`** is a separate, deliberately-coarse semantic: a `SKIP` rule
-  with no `scope` at all fires on every relevant policy-hook call. It is reserved
-  for the rare case where the team genuinely wants global suppression at the hook
-  layer and accepts the over-skip risk — returning an empty action set from
-  `policyForCodedContent` kills validation for every rule that would have caught
-  a message at that element, including rules with `acceptable: false`. Do not
-  use unscoped `SKIP` to mean "I haven't figured out the scope yet"; prefer a
-  precise scope, or stay `LABEL` until `SUPPRESS` is available (Phase 4). The
-  advisor logs loudly on load if an unscoped SKIP rule is configured.
+  The axes compose: a rule with `codeSystems` AND `excludeActions` fires only
+  when the system matches AND removes only the named actions when fired
+  (useful pattern: "Epic display mismatches don't matter, but standard codes
+  still do"). The matcher-narrowing-vs-action-narrowing distinction is
+  important — they answer different questions and can be combined to express
+  a precise policy.
+
+  **Unscoped `SKIP`** is a separate semantic: a `SKIP` rule with no `scope` at
+  all fires on every relevant policy-hook call.
+
+  - **Unscoped + no `excludeActions`**: returns an empty action set on every
+    call — a coarse, high-risk semantic that kills validation for every rule
+    that would have caught a message at that element, including rules with
+    `acceptable: false`. Reserved for the rare case where the team genuinely
+    wants global suppression at the hook layer. Do not use this shape to mean
+    "I haven't figured out the scope yet"; prefer a precise scope, or stay
+    `LABEL` until `SUPPRESS` is available (Phase 4).
+  - **Unscoped + `excludeActions`**: surgical global suppression — fires on
+    every call but only removes the named action(s). No over-skip risk because
+    other rules' actions still run. This is the safe shape for rules whose
+    intent is "we never care about HAPI's X check anywhere"
+    (`incorrect_display_value_for_code`'s `["InvalidDisplay"]` is the
+    canonical example).
+
+  The advisor logs loudly on load if an unscoped SKIP rule is configured
+  without `excludeActions`.
 - `matcher`: retained even on `SKIP` / `SUPPRESS` rules — it's the fallback
   identification for cases where the advisor call doesn't have enough context
   to disambiguate, and it stays useful for testing and human review of what
@@ -208,18 +232,40 @@ updated with a `ValidationMetrics` mock.
   columns; running the `local` profile against a SQL Server instance
   regenerates this file from JPA metadata. Verify on first opportunity.
 
-### Phase 2 — Migrate terminology rules to SKIP (one PR per batch)
+### Phase 2 — Migrate terminology rules to SKIP ✔ DONE
 
-For each acceptable-true terminology rule, identify the scope it should cover
-and promote it to `SKIP`. Suggested order (lowest risk first):
+This phase started as "data-only JSON migrations on top of Phase 1's
+mechanism." Walking through the candidates revealed that mechanism extension
+was needed too: most candidate rules couldn't be expressed as scope-narrowed
+SKIP without over-skipping other rules' territory. Phase 2 ended up shipping
+a small mechanism extension (`excludeActions` for surgical per-action
+narrowing) plus three migrations.
 
-1. `unknown_code_system` (already done in Phase 1)
-2. `unable_to_validate_code`
-3. `unresolved_code_system`
-4. `non_loinc_code_glucose_point_of_testing`
-5. `incorrect_display_value_for_code`
+**Shipped:**
 
-Each migration is a data-only JSON change after Phase 1 ships.
+- `scope.excludeActions` on `CategoryScope` and the corresponding return-value
+  branch in `CategoryBackedPolicyAdvisor`. When a matched SKIP rule has
+  `excludeActions`, the advisor returns `EnumSet.complementOf(EnumSet of named
+  actions)` instead of `EnumSet.noneOf(...)`. Unknown action names are logged
+  and dropped at load time; all-invalid demotes the rule to LABEL.
+- Class-level Javadoc on `CategoryBackedPolicyAdvisor` updated to introduce
+  the new capability and frame the unscoped-SKIP-with-`excludeActions` shape
+  as safe (vs. unscoped-without-`excludeActions`, which stays discouraged).
+- Three rules migrated to `SKIP`. See the Migration log below for each rule's
+  shape and rationale.
+- The proposed `unable_to_validate_code` candidate was removed from the list —
+  `acceptable: false`, the advisor would have demoted it anyway.
+  `unresolved_code_system` and `non_loinc_code_glucose_point_of_testing` were
+  re-classified as Phase 4 candidates because their matchers are too narrow
+  for pre-validation hooks to target precisely.
+- `scope.valueSets` deferred — none of the proposed candidates actually fit
+  the axis once we examined the matchers. Adding the implementation without
+  a real use case is YAGNI; we'll add it when a clean case appears.
+
+**Tests added:** six new cases in `CategoryBackedPolicyAdvisorTest` covering
+single-action, multi-action, partial-failure (one valid + one invalid name),
+total-failure (all names invalid), and composability of `codeSystems` +
+`excludeActions` on the same rule.
 
 ### Phase 3 — Add policyForReference support and migrate (one PR)
 
@@ -367,6 +413,9 @@ where, what stayed behind, and what blocks the rest.
 | Date | Rule | Strategy | Coverage | Notes |
 |---|---|---|---|---|
 | 2026-06-16 | `unknown_code_system` | `SKIP` (scoped) | Partial — 4 of 8 matcher branches | URL-specific branches (Cerner FHIR, Epic FHIR StructureDefinition, Epic OIDs `1.2.840.114350.*`, namespace `1.2.246.537.6.96.*`) targeted via `scope.codeSystems`. The four generic-shape branches (`Unknown Code System '<...>'`, `A code with no system...`, `CodeSystem is unknown...`, `V3 ValueSet ActEncounterCode`) stay as the `LABEL` fallback until Phase 4 SUPPRESS support exists. |
+| 2026-06-16 | `unresolved_epic_code_system_uri` | `SKIP` (scoped) | Complete | Two anchored `scope.codeSystems` patterns mirror the rule's existing composite matcher: `^urn:oid:1\.2\.840\.114350.*$` (Epic OID prefix) and `^https?://.*epic\.com/.*$` (any URL containing `epic.com`). Scope is broader than `unknown_code_system`'s Epic patterns; the overlap is harmless (first-match-wins on overlapping calls, identical outcome). Matcher kept as defensive fallback. |
+| 2026-06-16 | `unresolved_medispan_code_system_uri` | `SKIP` (scoped) | Complete | Single anchored exact-match pattern `^urn:oid:2\.16\.840\.1\.113883\.6\.68$` for the Medispan GPI root OID. Anchoring is deliberate — Medispan sub-OIDs (`2.16.840.1.113883.6.68.X`) are different code systems and should continue to validate. `Pattern.find()` semantics without anchors would over-match them. |
+| 2026-06-16 | `incorrect_display_value_for_code` | `SKIP` (unscoped + `excludeActions`) | Complete | First use of the Phase 2 `excludeActions` mechanism. Unscoped (fires on every `policyForCodedContent` call), with `excludeActions: ["InvalidDisplay"]`. Returns `EnumSet.complementOf(EnumSet.of(InvalidDisplay))` — every coded-content check runs except the display-name check. No over-skip risk: other rules' actions (`VSCheck`, `InvalidCode`, etc.) are untouched, so `invalid_code_in_required_valueset` (`acceptable: false`) and friends still produce their messages. Matcher kept as defensive fallback. |
 
 ## Related code
 
