@@ -2,6 +2,7 @@ package com.lantanagroup.link.validation.entities;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.lantanagroup.link.validation.converters.CategoryScopeConverter;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -40,6 +41,24 @@ public class Category {
 
     @Column(length = 1000, nullable = false)
     private String guidance;
+
+    /**
+     * When during validation this category's matcher takes effect. See {@link CategoryStrategy}.
+     * Defaults to {@link CategoryStrategy#LABEL} so adding the field is backward-compatible
+     * for existing rule data that doesn't carry it.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50,
+            columnDefinition = "varchar(50) default 'LABEL' not null")
+    private CategoryStrategy strategy = CategoryStrategy.LABEL;
+
+    /**
+     * Scoping metadata for {@link CategoryStrategy#SKIP} rules. Nullable for
+     * {@code LABEL} / {@code SUPPRESS}. See {@link CategoryScope}.
+     */
+    @Convert(converter = CategoryScopeConverter.class)
+    @Column(columnDefinition = "varchar(max)")
+    private CategoryScope scope;
 
     @OneToMany(fetch = FetchType.EAGER, mappedBy = "category")
     @JsonIgnore
