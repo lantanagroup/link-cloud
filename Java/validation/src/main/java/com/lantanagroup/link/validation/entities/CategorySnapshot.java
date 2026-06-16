@@ -12,6 +12,14 @@ public class CategorySnapshot {
     private CategorySeverity severity;
     private boolean acceptable;
     private String guidance;
+    /**
+     * Optional in the source JSON. Absent or null → {@link CategoryStrategy#LABEL}.
+     */
+    private CategoryStrategy strategy = CategoryStrategy.LABEL;
+    /**
+     * Optional. Only meaningful for {@link CategoryStrategy#SKIP} rules.
+     */
+    private CategoryScope scope;
     private Matcher matcher;
 
     public CategorySnapshot() {
@@ -23,6 +31,8 @@ public class CategorySnapshot {
         severity = category.getSeverity();
         acceptable = category.isAcceptable();
         guidance = category.getGuidance();
+        strategy = category.getStrategy() != null ? category.getStrategy() : CategoryStrategy.LABEL;
+        scope = category.getScope();
         CategoryRule latestRule = category.getLatestRule();
         if (latestRule != null) {
             matcher = latestRule.getMatcher();
@@ -39,6 +49,8 @@ public class CategorySnapshot {
         category.setSeverity(severity);
         category.setAcceptable(acceptable);
         category.setGuidance(guidance);
+        category.setStrategy(strategy != null ? strategy : CategoryStrategy.LABEL);
+        category.setScope(scope);
         return category;
     }
 
