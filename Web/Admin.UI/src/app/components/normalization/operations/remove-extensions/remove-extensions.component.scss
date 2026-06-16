@@ -41,3 +41,9 @@ $primary: #398eb4;
     flex: 1;
   }
 }
+
+.url-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
