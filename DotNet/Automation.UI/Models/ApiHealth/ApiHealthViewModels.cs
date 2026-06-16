@@ -1,4 +1,4 @@
-﻿namespace Automation.UI.Models.ApiHealth;
+namespace Automation.UI.Models.ApiHealth;
 
 /// <summary>
 /// View model for the API Health dashboard page.
@@ -6,7 +6,6 @@
 public sealed class ApiHealthDashboardViewModel
 {
     public IReadOnlyList<ServiceEndpointGroup> Services { get; init; } = [];
-    public string? GrafanaBaseUrl { get; init; }
 }
 
 /// <summary>

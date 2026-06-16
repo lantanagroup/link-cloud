@@ -100,7 +100,7 @@ public sealed class ScenarioSeedService : IHostedService
             Name = "ApiHealthScenario",
             Description = "System scenario for API Health stateful seeding and diagnostics.",
             IsSystemScenario = true,
-            ReportMethod = ReportMethod.ScheduledReport,
+            ReportMethod = ReportMethod.Adhoc,
             SelectedMeasures = [..DefaultMeasures],
             Seed = 20260501,
             PatientCount = 1,
@@ -113,8 +113,8 @@ public sealed class ScenarioSeedService : IHostedService
                     PatientCount = 1,
                     MeasureEligibilities = new(DefaultQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
-                    ResourcesPerPatientMin = 100,
-                    ResourcesPerPatientMax = 100
+                    ResourcesPerPatientMin = 15,
+                    ResourcesPerPatientMax = 15
                 }
             ],
             CleanupServiceData = false,

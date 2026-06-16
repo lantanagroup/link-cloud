@@ -1,4 +1,4 @@
-ï»¿using MongoDB.Bson;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace Automation.UI.Services.Persistence;
@@ -26,7 +26,7 @@ public sealed class MongoIndexManager
 
     /// <summary>
     /// Ensures all indexes required by the Automation.UI stores exist.
-    /// Safe to call on every startup â€” idempotent.
+    /// Safe to call on every startup — idempotent.
     /// </summary>
     public void EnsureAllIndexes()
     {
@@ -36,6 +36,7 @@ public sealed class MongoIndexManager
         EnsureImportedBundleIndexes();
         EnsureQueryPlanTemplateIndexes();
         EnsureApiHealthRunIndexes();
+        EnsureApiHealthExecutionRunIndexes();
     }
 
     // --- automation_runs ---
@@ -58,7 +59,7 @@ public sealed class MongoIndexManager
         //
         // Direction is intentionally ascending (1). Both Cosmos Mongo API and
         // native MongoDB can scan a single-field index in reverse, so one
-        // index serves both ASC and DESC for the same column â€” no need for a
+        // index serves both ASC and DESC for the same column — no need for a
         // mirrored "_desc" copy.
         //
         // BSON field names match the C# property casing (PascalCase) because
@@ -147,6 +148,15 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "EndpointKey", 1 }, { "ExecutedAt", -1 } }, unique: false, "idx_endpointKey_executedAt");
     }
 
+    // --- api_health_execution_runs ---
+
+    private void EnsureApiHealthExecutionRunIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("api_health_execution_runs");
+
+        CreateIndexSafe(collection, new BsonDocument { { "IsCompleted", 1 }, { "StartedAt", -1 } }, unique: false, "idx_isCompleted_startedAt");
+    }
+
     // --- Helpers ---
 
     private void CreateIndexSafe(IMongoCollection<BsonDocument> collection, BsonDocument keys, bool unique, string name)
@@ -155,7 +165,7 @@ public sealed class MongoIndexManager
         {
             if (HasIndexWithKeys(collection, keys))
             {
-                _logger.LogDebug("Index {IndexName} already exists on {Collection} â€” skipping.", name, collection.CollectionNamespace.CollectionName);
+                _logger.LogDebug("Index {IndexName} already exists on {Collection} — skipping.", name, collection.CollectionNamespace.CollectionName);
                 return;
             }
 

@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
 using LantanaGroup.Link.Sdk.ApiClient;
@@ -50,6 +50,7 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
             result.DurationMs = sw.ElapsedMilliseconds;
             result.Passed = false;
             result.ErrorMessage = ex.Message;
+            result.ResponseBody = Truncate(ex.ToString());
         }
 
         return result;
@@ -84,6 +85,7 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
             result.Passed = response.StatusCode == expectedStatusCode;
             result.RequestUrl = response.RequestUrl;
             result.RequestMethod = response.RequestMethod;
+            result.RequestBody = Truncate(response.RequestBody);
             result.TraceId = response.TraceId;
             result.ResponseBody = Truncate(response.RawBody);
             if (!result.Passed)
@@ -95,6 +97,7 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
             result.DurationMs = sw.ElapsedMilliseconds;
             result.Passed = false;
             result.ErrorMessage = ex.Message;
+            result.ResponseBody = Truncate(ex.ToString());
         }
 
         return result;
@@ -128,6 +131,7 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
             result.Passed = response.StatusCode == expectedStatusCode;
             result.RequestUrl = response.RequestUrl;
             result.RequestMethod = response.RequestMethod;
+            result.RequestBody = Truncate(response.RequestBody);
             result.TraceId = response.TraceId;
             result.ResponseBody = Truncate(response.RawBody);
             if (!result.Passed)
@@ -139,6 +143,7 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
             result.DurationMs = sw.ElapsedMilliseconds;
             result.Passed = false;
             result.ErrorMessage = ex.Message;
+            result.ResponseBody = Truncate(ex.ToString());
         }
 
         return result;
@@ -176,6 +181,7 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
             result.Passed = acceptedStatusCodes.Contains(response.StatusCode);
             result.RequestUrl = response.RequestUrl;
             result.RequestMethod = response.RequestMethod;
+            result.RequestBody = Truncate(response.RequestBody);
             result.TraceId = response.TraceId;
             result.ResponseBody = Truncate(response.RawBody);
             if (result.Passed)
@@ -189,6 +195,7 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
             result.DurationMs = sw.ElapsedMilliseconds;
             result.Passed = false;
             result.ErrorMessage = ex.Message;
+            result.ResponseBody = Truncate(ex.ToString());
         }
 
         return result;
@@ -196,7 +203,7 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
 
     /// <summary>
     /// Produces a skipped result for a step that cannot be executed in this environment.
-    /// Skipped steps are neither passed nor failed — they are shown distinctly on the dashboard.
+    /// Skipped steps are neither passed nor failed � they are shown distinctly on the dashboard.
     /// </summary>
     protected ApiTestRunResult SkipStepAsync(string endpointName, string skipReason) =>
         new()

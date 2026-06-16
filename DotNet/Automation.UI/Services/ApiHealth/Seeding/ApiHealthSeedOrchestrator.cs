@@ -43,9 +43,10 @@ public sealed class ApiHealthSeedContextAccessor : IApiHealthSeedContextAccessor
 
 public interface IApiHealthSeedOrchestrator
 {
-    Task<ApiHealthSeedSession> BeginServiceAsync(string serviceName, IReadOnlyCollection<ApiHealthSeedRequirement> requirements, CancellationToken ct = default);
-    Task<ApiHealthSeedSession> BeginAllAsync(IReadOnlyCollection<ApiHealthSeedRequirement> requirements, CancellationToken ct = default);
+    Task<ApiHealthSeedSession> BeginServiceAsync(string serviceName, IReadOnlyCollection<ApiHealthSeedRequirement> requirements, Guid? apiHealthRunId = null, CancellationToken ct = default);
+    Task<ApiHealthSeedSession> BeginAllAsync(IReadOnlyCollection<ApiHealthSeedRequirement> requirements, Guid? apiHealthRunId = null, CancellationToken ct = default);
     Task EndAsync(ApiHealthSeedSession session, CancellationToken ct = default);
+    Task<bool> IsSeedRunCancelledAsync(ApiHealthSeedSession session, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -55,6 +56,7 @@ public interface IApiHealthSeedOrchestrator
 public sealed class ApiHealthSeedOrchestrator(
     IAutomationRunManager runManager,
     IScenarioStore scenarioStore,
+    IApiHealthRunStore apiHealthRunStore,
     IFacilityServiceClient facilityClient,
     IApiHealthSeedContextAccessor context,
     ILogger<ApiHealthSeedOrchestrator> logger) : IApiHealthSeedOrchestrator
@@ -62,22 +64,22 @@ public sealed class ApiHealthSeedOrchestrator(
     private static readonly Guid ApiHealthScenarioId = new("00000000-0000-0000-0000-000000000008");
     private const string SanitizedInternalError = "An internal error occurred processing this run.";
 
-    public async Task<ApiHealthSeedSession> BeginServiceAsync(string serviceName, IReadOnlyCollection<ApiHealthSeedRequirement> requirements, CancellationToken ct = default)
+    public async Task<ApiHealthSeedSession> BeginServiceAsync(string serviceName, IReadOnlyCollection<ApiHealthSeedRequirement> requirements, Guid? apiHealthRunId = null, CancellationToken ct = default)
     {
         var needsReportSeed = requirements.Contains(ApiHealthSeedRequirement.ReportSchedule);
         var session = needsReportSeed
-            ? await BuildReportSeedSessionAsync($"Service:{serviceName}", ct)
+            ? await BuildReportSeedSessionAsync($"Service:{serviceName}", apiHealthRunId, ct)
             : new ApiHealthSeedSession { Scope = $"Service:{serviceName}", Success = true };
 
         context.Current = session;
         return session;
     }
 
-    public async Task<ApiHealthSeedSession> BeginAllAsync(IReadOnlyCollection<ApiHealthSeedRequirement> requirements, CancellationToken ct = default)
+    public async Task<ApiHealthSeedSession> BeginAllAsync(IReadOnlyCollection<ApiHealthSeedRequirement> requirements, Guid? apiHealthRunId = null, CancellationToken ct = default)
     {
         var needsReportSeed = requirements.Contains(ApiHealthSeedRequirement.ReportSchedule);
         var session = needsReportSeed
-            ? await BuildReportSeedSessionAsync("All", ct)
+            ? await BuildReportSeedSessionAsync("All", apiHealthRunId, ct)
             : new ApiHealthSeedSession { Scope = "All", Success = true };
         context.Current = session;
         return session;
@@ -106,7 +108,16 @@ public sealed class ApiHealthSeedOrchestrator(
         }
     }
 
-    private async Task<ApiHealthSeedSession> BuildReportSeedSessionAsync(string scope, CancellationToken ct)
+    public async Task<bool> IsSeedRunCancelledAsync(ApiHealthSeedSession session, CancellationToken ct = default)
+    {
+        if (session.SeedRunId is not Guid seedRunId)
+            return false;
+
+        var run = await runManager.GetRunAsync(seedRunId, ct);
+        return run?.Status == AutomationRunStatus.Cancelled;
+    }
+
+    private async Task<ApiHealthSeedSession> BuildReportSeedSessionAsync(string scope, Guid? apiHealthRunId, CancellationToken ct)
     {
         try
         {
@@ -128,6 +139,23 @@ public sealed class ApiHealthSeedOrchestrator(
 
             var startRequest = StartScenarioRequest.FromScenario(scenario);
             var runId = await runManager.StartAsync(startRequest, ct);
+
+            if (apiHealthRunId.HasValue)
+            {
+                try
+                {
+                    await apiHealthRunStore.AttachSeedRunAsync(apiHealthRunId.Value, runId, scenario.Name, ct);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(
+                        ex,
+                        "API Health seed run attachment failed; continuing with degraded linkage. ApiHealthRunId={ApiHealthRunId}, SeedRunId={SeedRunId}, Scope={Scope}",
+                        apiHealthRunId.Value,
+                        runId,
+                        scope);
+                }
+            }
 
             logger.LogInformation(
                 "API Health seeding started via automation scenario. Scope={Scope}, ScenarioId={ScenarioId}, ScenarioName={ScenarioName}, RunId={RunId}",

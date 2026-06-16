@@ -1,4 +1,4 @@
-﻿namespace LantanaGroup.Link.Sdk.ApiClient;
+namespace LantanaGroup.Link.Sdk.ApiClient;
 
 /// <summary>
 /// Wraps an HTTP response from a Link service call, exposing the status code
@@ -23,6 +23,9 @@ public sealed class LinkApiResponse<T>
     /// <summary>HTTP method used (GET, POST, etc.).</summary>
     public string? RequestMethod { get; init; }
 
+    /// <summary>Raw request body as string (if available).</summary>
+    public string? RequestBody { get; init; }
+
     /// <summary>Trace ID from response headers (traceparent or X-Trace-Id) for log correlation.</summary>
     public string? TraceId { get; init; }
 
@@ -37,6 +40,7 @@ public sealed class LinkApiResponse<T>
         ContentType = ContentType,
         RequestUrl = RequestUrl,
         RequestMethod = RequestMethod,
+        RequestBody = RequestBody,
         TraceId = TraceId
     };
 
@@ -58,6 +62,9 @@ public sealed class LinkApiResponse
 
     /// <summary>HTTP method used (GET, POST, etc.).</summary>
     public string? RequestMethod { get; init; }
+
+    /// <summary>Raw request body as string (if available).</summary>
+    public string? RequestBody { get; init; }
 
     /// <summary>Trace ID from response headers (traceparent or X-Trace-Id) for log correlation.</summary>
     public string? TraceId { get; init; }
