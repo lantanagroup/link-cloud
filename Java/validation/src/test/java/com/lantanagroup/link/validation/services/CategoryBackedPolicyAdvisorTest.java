@@ -341,4 +341,140 @@ class CategoryBackedPolicyAdvisorTest {
         verify(metrics, times(1))  // still 1
                 .incrementRuleOutcome(eq("epic_display_only"), eq(ValidationMetrics.OUTCOME_SKIPPED));
     }
+
+    // --- isSuppressMessageId (Phase 4) ---------------------------------------------------------
+
+    private static Category suppressRule(String id, boolean acceptable, List<String> messageIds) {
+        Category c = new Category();
+        c.setId(id);
+        c.setTitle(id);
+        c.setSeverity(CategorySeverity.ERROR);
+        c.setAcceptable(acceptable);
+        c.setGuidance("test");
+        c.setStrategy(CategoryStrategy.SUPPRESS);
+        c.setSuppressMessageIds(messageIds);
+        return c;
+    }
+
+    @Test
+    void isSuppressMessageId_noRules_returnsFalse() {
+        when(categoryRepository.findAll()).thenReturn(List.of());
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        assertFalse(advisor.isSuppressMessageId("Patient.gender", "Terminology_TX_System_Unknown"));
+        verify(metrics, never()).incrementRuleOutcome(anyString(), anyString());
+    }
+
+    @Test
+    void isSuppressMessageId_matchingId_returnsTrueAndIncrementsCounter() {
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRule("unknown_cs_generic", true, List.of("Terminology_TX_System_Unknown"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        assertTrue(advisor.isSuppressMessageId(
+                "Patient.identifier.system", "Terminology_TX_System_Unknown"));
+        verify(metrics, times(1))
+                .incrementRuleOutcome(eq("unknown_cs_generic"), eq(ValidationMetrics.OUTCOME_SUPPRESSED));
+    }
+
+    @Test
+    void isSuppressMessageId_nonMatchingId_returnsFalse() {
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRule("unknown_cs_generic", true, List.of("Terminology_TX_System_Unknown"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        assertFalse(advisor.isSuppressMessageId("Patient.gender", "Some_Other_Message_Id"));
+        verify(metrics, never())
+                .incrementRuleOutcome(anyString(), eq(ValidationMetrics.OUTCOME_SUPPRESSED));
+    }
+
+    @Test
+    void isSuppressMessageId_nullMessageId_returnsFalse() {
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRule("unknown_cs_generic", true, List.of("Terminology_TX_System_Unknown"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        assertFalse(advisor.isSuppressMessageId("Patient.gender", null));
+        verify(metrics, never()).incrementRuleOutcome(anyString(), anyString());
+    }
+
+    @Test
+    void isSuppressMessageId_multipleIdsOneRule_eachFires() {
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRule("unknown_cs_generic", true,
+                        List.of("Terminology_TX_System_Unknown", "Coding_has_no_system__cannot_validate"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        assertTrue(advisor.isSuppressMessageId("Patient.gender", "Terminology_TX_System_Unknown"));
+        assertTrue(advisor.isSuppressMessageId("Patient.gender", "Coding_has_no_system__cannot_validate"));
+        verify(metrics, times(2))
+                .incrementRuleOutcome(eq("unknown_cs_generic"), eq(ValidationMetrics.OUTCOME_SUPPRESSED));
+    }
+
+    @Test
+    void isSuppressMessageId_messageIdClaimedByTwoRules_firstClaimerWins() {
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRule("rule_a", true, List.of("Shared_Message_Id")),
+                suppressRule("rule_b", true, List.of("Shared_Message_Id"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        assertTrue(advisor.isSuppressMessageId("Patient.gender", "Shared_Message_Id"));
+        // First rule iterated by the repository wins the counter credit; the outcome (suppress)
+        // is identical either way, only attribution differs.
+        verify(metrics, times(1))
+                .incrementRuleOutcome(eq("rule_a"), eq(ValidationMetrics.OUTCOME_SUPPRESSED));
+        verify(metrics, never())
+                .incrementRuleOutcome(eq("rule_b"), eq(ValidationMetrics.OUTCOME_SUPPRESSED));
+    }
+
+    @Test
+    void isSuppressMessageId_acceptableFalseRule_isDemoted() {
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRule("blocking", false, List.of("Critical_Error_Id"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        // The rule must NOT load — silently suppressing a blocking message would mask failures.
+        assertTrue(advisor.getLoadedSuppressMap().isEmpty());
+        assertFalse(advisor.isSuppressMessageId("Patient.gender", "Critical_Error_Id"));
+    }
+
+    @Test
+    void isSuppressMessageId_nullAndBlankIdsAreDropped() {
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRule("mixed", true,
+                        java.util.Arrays.asList("Valid_Id", null, "  ", "Other_Valid_Id"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        // Only the two non-blank IDs should be loaded.
+        assertEquals(2, advisor.getLoadedSuppressMap().size());
+        assertTrue(advisor.isSuppressMessageId("Patient.gender", "Valid_Id"));
+        assertTrue(advisor.isSuppressMessageId("Patient.gender", "Other_Valid_Id"));
+    }
+
+    @Test
+    void isSuppressMessageId_ruleWithBothScopeAndSuppressMessageIds_loadsBothHooks() {
+        // The unknown_code_system migration shape: scope.codeSystems handles the URL-specific
+        // matcher branches via policyForCodedContent; suppressMessageIds handles the generic-
+        // shape branches via isSuppressMessageId. Same rule, both hooks loaded.
+        Category mixed = skipRule("unknown_code_system", true,
+                List.of("https?://open\\.epic\\.com/.*"));
+        mixed.setSuppressMessageIds(List.of("Terminology_TX_System_Unknown"));
+        when(categoryRepository.findAll()).thenReturn(List.of(mixed));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        assertEquals(List.of("unknown_code_system"), advisor.getLoadedSkipRuleIds());
+        assertEquals(1, advisor.getLoadedSuppressMap().size());
+
+        // SKIP hook fires on the URL system
+        advisor.policyForCodedContent(
+                null, null, "Patient.code.coding[0].system", null, null, null, null, null,
+                List.of("https://open.epic.com/FHIR/X"));
+        verify(metrics, times(1))
+                .incrementRuleOutcome(eq("unknown_code_system"), eq(ValidationMetrics.OUTCOME_SKIPPED));
+
+        // SUPPRESS hook fires on the message ID
+        assertTrue(advisor.isSuppressMessageId("Patient.gender", "Terminology_TX_System_Unknown"));
+        verify(metrics, times(1))
+                .incrementRuleOutcome(eq("unknown_code_system"), eq(ValidationMetrics.OUTCOME_SUPPRESSED));
+    }
 }

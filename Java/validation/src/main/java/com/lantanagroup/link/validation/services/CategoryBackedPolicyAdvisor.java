@@ -19,17 +19,25 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 /**
- * HAPI {@code IValidationPolicyAdvisor} backed by the categorization rule set. Currently only
- * implements the {@code policyForCodedContent} hook — when a {@link CategoryStrategy#SKIP} rule's
- * scope matches an incoming code system URL, we return either an empty action set (the rule's
- * scope has no {@code excludeActions}) or the complement of the named actions (the rule narrows
- * which specific checks to remove). All other advisor methods inherit from
- * {@link FhirDefaultPolicyAdvisor} so HAPI's default policy decisions apply unchanged.
+ * HAPI {@code IValidationPolicyAdvisor} backed by the categorization rule set. Implements two
+ * hooks: {@code policyForCodedContent} (SKIP strategy — short-circuit terminology validation
+ * before it runs) and {@code isSuppressMessageId} (SUPPRESS strategy — drop a specific message
+ * by its stable {@code I18nConstants} ID after the check ran). All other advisor methods inherit
+ * from {@link FhirDefaultPolicyAdvisor} so HAPI's default policy decisions apply unchanged.
+ *
+ * <p>The two strategies are independent and can coexist on a single rule. {@code unknown_code_system}
+ * uses SKIP for the URL-specific matcher branches and SUPPRESS for the generic-shape branches
+ * that can't be safely targeted via {@code policyForCodedContent}. The rule's {@code strategy}
+ * field is a human-readable hint for the primary intent; the advisor wires whichever hooks are
+ * configured by field presence (a non-null {@code scope} for SKIP, a non-empty
+ * {@code suppressMessageIds} list for SUPPRESS).</p>
  *
  * <p><b>excludeActions surgical narrowing.</b> The default Phase 1 semantic for a matched SKIP
  * rule was "skip every coded-content check" ({@code EnumSet.noneOf(...)}), which is correct
@@ -46,23 +54,29 @@ import java.util.regex.PatternSyntaxException;
  * {@code acceptable=false}. Unscoped SKIP is acceptable when paired with {@code excludeActions}
  * (surgical removal of one or two actions across every call) but should not be used without it
  * to mean "I haven't figured out the scope yet." Prefer precise {@code scope.codeSystems}, or
- * stay LABEL until SUPPRESS support exists.</p>
+ * stay LABEL — or pair with a SUPPRESS rule that targets the same message family by ID.</p>
  *
- * <p><b>SUPPRESS gap (TODO).</b> Some categorization rules cover messages that can't be safely
- * targeted via {@code policyForCodedContent} (the four generic-shape branches of
- * {@code unknown_code_system}, for example: {@code ^Unknown Code System '.*'$},
- * {@code A code with no system...}, {@code ^CodeSystem is unknown...}, and the
- * {@code V3 ValueSet ActEncounterCode} variant). Properly handling those requires
- * {@code isSuppressMessageId(path, messageId)} matched against the stable HAPI message
- * identifiers in {@code org.hl7.fhir.utilities.i18n.I18nConstants}. Mapping each rule's matcher
- * branches to specific {@code I18nConstants} entries is research-heavy but bounded; see the
- * Phase 4 entry in {@code Java/validation/VALIDATION-CATEGORIES-DESIGN.md}.</p>
+ * <p><b>SUPPRESS via {@code isSuppressMessageId}.</b> A rule with a non-empty
+ * {@code suppressMessageIds} list declares which stable HAPI message IDs (from
+ * {@code org.hl7.fhir.utilities.i18n.I18nConstants}) the advisor should drop. The check still
+ * runs — SUPPRESS saves no CPU — but the message is dropped before reaching the
+ * {@code OperationOutcome}. Unlike SKIP, the advisor's current implementation does not
+ * consider the {@code path} input: a listed message ID is suppressed globally regardless of
+ * which element produced it. A {@code suppressPathPatterns} narrowing axis can be added
+ * when a rule needs path-aware suppression.</p>
+ *
+ * <p>A message ID claimed by multiple rules awards the {@code outcome=suppressed} counter
+ * credit to the first rule iterated (insertion order from {@code categoryRepository.findAll()}).
+ * Both rules wanted the message suppressed, so the user-visible outcome is identical; only
+ * metric attribution is affected.</p>
  *
  * <p>Constructor-time validation drops malformed rules with a warning rather than failing
- * startup: a category with {@code strategy=SKIP} but {@code acceptable=false} is demoted with a
- * warning (silently promoting a blocking rule to SKIP would mask failures). A SKIP rule whose
- * scope.codeSystems patterns all fail to compile is also demoted — falling back to "always skip"
- * semantics the author didn't ask for would over-skip.</p>
+ * startup: a category with {@code strategy=SKIP} but {@code acceptable=false} is demoted (silently
+ * promoting a blocking rule to SKIP would mask failures); the same demotion applies to
+ * SUPPRESS rules with {@code acceptable=false}. A SKIP rule whose scope.codeSystems patterns
+ * all fail to compile is demoted — falling back to "always skip" semantics the author didn't
+ * ask for would over-skip. Null or blank entries in {@code suppressMessageIds} are individually
+ * dropped with a warning.</p>
  *
  * <p>Scoped {@code prototype} so each {@link ValidationService} instance gets a fresh rule
  * snapshot at injection time — categories can be updated via {@code initializeCategories()} and
@@ -75,12 +89,18 @@ public class CategoryBackedPolicyAdvisor extends FhirDefaultPolicyAdvisor {
 
     private final ValidationMetrics metrics;
     private final List<CompiledSkipRule> codeSystemSkipRules;
+    /**
+     * Map from suppressible HAPI message ID to the rule ID that claimed it. Lookup at the hook
+     * is O(1) on the message ID. First claimer wins on collisions.
+     */
+    private final Map<String, String> suppressMessageIdToRuleId;
 
     public CategoryBackedPolicyAdvisor(CategoryRepository categoryRepository, ValidationMetrics metrics) {
         this.metrics = metrics;
         this.codeSystemSkipRules = loadCodeSystemSkipRules(categoryRepository);
-        logger.info("CategoryBackedPolicyAdvisor loaded with {} code-system SKIP rule(s)",
-                codeSystemSkipRules.size());
+        this.suppressMessageIdToRuleId = loadSuppressRules(categoryRepository);
+        logger.info("CategoryBackedPolicyAdvisor loaded with {} code-system SKIP rule(s) and {} SUPPRESS message ID(s) across the rule set",
+                codeSystemSkipRules.size(), suppressMessageIdToRuleId.size());
     }
 
     private static List<CompiledSkipRule> loadCodeSystemSkipRules(CategoryRepository categoryRepository) {
@@ -167,11 +187,63 @@ public class CategoryBackedPolicyAdvisor extends FhirDefaultPolicyAdvisor {
                 validator, appContext, stackPath, definition, structure, kind, purpose, valueSet, systems);
     }
 
+    @Override
+    public boolean isSuppressMessageId(String path, String messageId) {
+        if (messageId == null) {
+            return false;
+        }
+        String ruleId = suppressMessageIdToRuleId.get(messageId);
+        if (ruleId == null) {
+            return false;
+        }
+        metrics.incrementRuleOutcome(ruleId, ValidationMetrics.OUTCOME_SUPPRESSED);
+        return true;
+    }
+
+    private static Map<String, String> loadSuppressRules(CategoryRepository categoryRepository) {
+        // LinkedHashMap to preserve insertion order — makes "first claimer wins" deterministic
+        // when iterating, and keeps test/log output stable.
+        Map<String, String> result = new LinkedHashMap<>();
+        for (Category category : categoryRepository.findAll()) {
+            List<String> messageIds = category.getSuppressMessageIds();
+            if (messageIds == null || messageIds.isEmpty()) {
+                continue;
+            }
+            if (!category.isAcceptable()) {
+                logger.warn(
+                        "Category '{}' has suppressMessageIds but acceptable=false; ignoring SUPPRESS and falling back to LABEL behaviour. " +
+                                "Silently dropping a blocking message would mask failures; fix the data.",
+                        category.getId());
+                continue;
+            }
+            for (String id : messageIds) {
+                if (id == null || id.isBlank()) {
+                    logger.warn("Category '{}' has a null/blank entry in suppressMessageIds; ignoring.",
+                            category.getId());
+                    continue;
+                }
+                String existing = result.putIfAbsent(id, category.getId());
+                if (existing != null) {
+                    logger.warn("Category '{}' wanted to suppress message ID '{}' but it's already claimed by rule '{}'; first-claimer wins for counter attribution.",
+                            category.getId(), id, existing);
+                }
+            }
+        }
+        return result;
+    }
+
     /**
      * Test/diagnostic accessor. Not part of the runtime contract.
      */
     List<String> getLoadedSkipRuleIds() {
         return codeSystemSkipRules.stream().map(CompiledSkipRule::ruleId).toList();
+    }
+
+    /**
+     * Test/diagnostic accessor. Not part of the runtime contract.
+     */
+    Map<String, String> getLoadedSuppressMap() {
+        return suppressMessageIdToRuleId;
     }
 
     /**
