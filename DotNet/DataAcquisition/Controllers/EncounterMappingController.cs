@@ -309,6 +309,7 @@ public class EncounterMappingController : Controller
     [ValidateAntiForgeryOrBearerToken]
     [ProducesResponseType(typeof(EncounterMappingModel), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> CreateAsync([FromBody] CreateEncounterMappingModel model)
     {
@@ -323,6 +324,13 @@ public class EncounterMappingController : Controller
 
             var created = await _manager.CreateAsync(model);
             return CreatedAtAction(nameof(GetByIdAsync), new { id = created.EncounterMappingId }, created);
+        }
+        catch (EntityAlreadyExistsException ex)
+        {
+            _logger.LogError(ex, "EntityAlreadyExistsException occurred.");
+            return Problem(title: "Conflict",
+                detail: "The request could not be completed because it conflicts with the current state of the resource.",
+                statusCode: (int)HttpStatusCode.Conflict);
         }
         catch (BadRequestException ex)
         {
