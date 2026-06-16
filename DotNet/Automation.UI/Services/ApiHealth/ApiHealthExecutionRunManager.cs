@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Text.Json;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
@@ -44,6 +44,8 @@ public sealed class ApiHealthExecutionRunManager(
         lock (_sync)
             _activeRunId = run.RunId;
 
+        await store.SaveServiceRunStateAsync(run.RunId, "Single", [serviceName], run.StartedAt);
+
         await PersistExecutionStatusAsync(run, "Starting", "Preparing run");
 
         PruneCompletedRuns();
@@ -73,6 +75,13 @@ public sealed class ApiHealthExecutionRunManager(
         _runs[run.RunId] = run;
         lock (_sync)
             _activeRunId = run.RunId;
+
+        var serviceNames = registry.GetAll()
+            .Where(e => !e.IsInformational)
+            .Select(e => e.ServiceName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        await store.SaveServiceRunStateAsync(run.RunId, "All", serviceNames, run.StartedAt);
 
         await PersistExecutionStatusAsync(run, "Starting", "Preparing run");
 
@@ -355,12 +364,21 @@ public sealed class ApiHealthExecutionRunManager(
             ];
         }
 
-        await store.SaveRunResultsAsync(results, CancellationToken.None);
-
         var informationalKeys = suite.GetEndpointDefinitions()
             .Where(d => d.IsInformational)
             .Select(d => d.Key)
             .ToHashSet();
+
+        foreach (var result in results)
+        {
+            result.RunId = run.RunId;
+        }
+
+        await store.SaveRunResultsAsync(
+            results,
+            string.Equals(run.Scope, "All", StringComparison.OrdinalIgnoreCase) ? "All" : "Single",
+            run.StartedAt,
+            CancellationToken.None);
 
         foreach (var result in results.Where(r => !informationalKeys.Contains(r.EndpointKey)))
         {

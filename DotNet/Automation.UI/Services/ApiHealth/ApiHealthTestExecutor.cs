@@ -54,7 +54,7 @@ public sealed class ApiHealthTestExecutor
             }
         }
 
-        await _store.SaveRunResultsAsync(allResults, ct);
+        await _store.SaveRunResultsAsync(allResults, "Single", DateTimeOffset.UtcNow, ct);
         return allResults;
     }
 
@@ -86,7 +86,7 @@ public sealed class ApiHealthTestExecutor
             }
         }
 
-        await _store.SaveRunResultsAsync(allResults, ct);
+        await _store.SaveRunResultsAsync(allResults, "All", DateTimeOffset.UtcNow, ct);
         return allResults;
     }
 }

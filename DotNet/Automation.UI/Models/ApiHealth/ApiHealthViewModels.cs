@@ -1,4 +1,4 @@
-namespace Automation.UI.Models.ApiHealth;
+﻿namespace Automation.UI.Models.ApiHealth;
 
 /// <summary>
 /// View model for the API Health dashboard page.
@@ -6,6 +6,9 @@ namespace Automation.UI.Models.ApiHealth;
 public sealed class ApiHealthDashboardViewModel
 {
     public IReadOnlyList<ServiceEndpointGroup> Services { get; init; } = [];
+    public bool HasActiveRun { get; init; }
+    public string? LatestRunMode { get; init; }
+    public string? LatestRunServiceName { get; init; }
 }
 
 /// <summary>
@@ -14,6 +17,7 @@ public sealed class ApiHealthDashboardViewModel
 public sealed class ServiceEndpointGroup
 {
     public string ServiceName { get; init; } = string.Empty;
+    public bool IsIncludedInLatestRun { get; init; } = true;
     public IReadOnlyList<EndpointViewModel> Endpoints { get; init; } = [];
 }
 
@@ -26,6 +30,12 @@ public sealed class EndpointViewModel
 
     /// <summary>Most recent test result (null if never run).</summary>
     public ApiTestRunResult? LastResult { get; init; }
+
+    /// <summary>
+    /// True when <see cref="LastResult"/> belongs to the currently active API Health run.
+    /// False indicates a fallback result from a previous run (stale visual state).
+    /// </summary>
+    public bool IsCurrentRunResult { get; init; } = true;
 }
 
 /// <summary>

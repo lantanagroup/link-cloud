@@ -1,4 +1,4 @@
-namespace Automation.UI.Models.ApiHealth;
+﻿namespace Automation.UI.Models.ApiHealth;
 
 public sealed class ApiHealthExecutionRunStatus
 {
@@ -15,4 +15,6 @@ public sealed class ApiHealthExecutionRunStatus
     public bool Failed { get; init; }
     public string? Error { get; init; }
     public DateTimeOffset? FinishedAt { get; init; }
+
+    public string RunMode => string.Equals(Scope, "All", StringComparison.OrdinalIgnoreCase) ? "All" : "Single";
 }

@@ -1,4 +1,4 @@
-using Automation.UI.Models.ApiHealth;
+﻿using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth;
 using Automation.UI.Services.Persistence;
 using Microsoft.AspNetCore.Mvc;
@@ -23,23 +23,52 @@ public class ApiHealthController(
     {
         var endpoints = registry.GetAll();
         var keys = endpoints.Where(e => !e.IsInformational).Select(e => e.Key).ToList();
-        var latestResults = await store.GetLatestResultsAsync(keys, ct);
+        var activeExecution = await store.GetActiveExecutionRunStatusAsync(ct);
+        var latestRunContext = await store.GetLatestRunContextAsync(ct);
+        var latestServiceResults = await store.GetLatestResultsByServiceAsync(keys, ct);
+        var selectedRunId = activeExecution?.RunId ?? latestRunContext?.RunId;
+        var selectedRunMode = activeExecution?.RunMode ?? latestRunContext?.RunMode;
+        var selectedServiceName = activeExecution?.ServiceName ?? latestRunContext?.ServiceName;
+        var selectedRunResults = selectedRunId is Guid runId
+            ? await store.GetLatestResultsForRunAsync(runId, keys, ct)
+            : new Dictionary<string, ApiTestRunResult>(StringComparer.Ordinal);
+
+        var selectedIsAll = string.Equals(selectedRunMode, "All", StringComparison.OrdinalIgnoreCase);
 
         var groups = endpoints
             .GroupBy(e => e.ServiceName)
             .Select(g => new ServiceEndpointGroup
             {
                 ServiceName = g.Key,
+                IsIncludedInLatestRun = selectedRunId == null
+                    || selectedIsAll
+                    || string.Equals(selectedServiceName, g.Key, StringComparison.OrdinalIgnoreCase),
                 Endpoints = g.Select(e => new EndpointViewModel
                 {
                     Definition = e,
-                    LastResult = e.IsInformational ? null : latestResults.GetValueOrDefault(e.Key)
+                    LastResult = e.IsInformational
+                        ? null
+                        : (selectedRunId == null
+                            ? latestServiceResults.GetValueOrDefault(e.Key)
+                            : (selectedIsAll || string.Equals(selectedServiceName, e.ServiceName, StringComparison.OrdinalIgnoreCase)
+                                ? selectedRunResults.GetValueOrDefault(e.Key)
+                                : latestServiceResults.GetValueOrDefault(e.Key))),
+                    IsCurrentRunResult = e.IsInformational
+                        || selectedRunId == null
+                        || selectedIsAll
+                        || string.Equals(selectedServiceName, e.ServiceName, StringComparison.OrdinalIgnoreCase)
                 }).ToList()
             })
             .OrderBy(g => g.ServiceName, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var vm = new ApiHealthDashboardViewModel { Services = groups };
+        var vm = new ApiHealthDashboardViewModel
+        {
+            Services = groups,
+            HasActiveRun = activeExecution != null,
+            LatestRunMode = selectedRunMode,
+            LatestRunServiceName = selectedServiceName
+        };
         return View(vm);
     }
 
@@ -82,8 +111,11 @@ public class ApiHealthController(
         Response.ContentType = "text/event-stream";
         Response.Headers["Cache-Control"] = "no-cache";
         Response.Headers["X-Accel-Buffering"] = "no";
+        Response.Headers["Connection"] = "keep-alive";
 
         long afterSequence = 0;
+        var lastWriteAt = DateTimeOffset.UtcNow;
+        var heartbeatInterval = TimeSpan.FromSeconds(15);
         try
         {
             while (true)
@@ -102,6 +134,7 @@ public class ApiHealthController(
                     await Response.WriteAsync($"event: {evt.EventName}\ndata: {evt.Data}\n\n", ct);
                     await Response.Body.FlushAsync(ct);
                     afterSequence = evt.Sequence;
+                    lastWriteAt = DateTimeOffset.UtcNow;
                 }
 
                 if (runInfo.Completed && events.Count == 0)
@@ -109,6 +142,15 @@ public class ApiHealthController(
                     await Response.WriteAsync("event: done\ndata: {}\n\n", ct);
                     await Response.Body.FlushAsync(ct);
                     return;
+                }
+
+                if (events.Count == 0 && DateTimeOffset.UtcNow - lastWriteAt >= heartbeatInterval)
+                {
+                    // Keep the SSE connection alive through reverse proxies while
+                    // long-running suites execute without emitting result events.
+                    await Response.WriteAsync(": keep-alive\n\n", ct);
+                    await Response.Body.FlushAsync(ct);
+                    lastWriteAt = DateTimeOffset.UtcNow;
                 }
 
                 await Task.Delay(500, ct);
