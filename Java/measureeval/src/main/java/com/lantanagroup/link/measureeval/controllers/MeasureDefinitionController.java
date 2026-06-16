@@ -156,30 +156,38 @@ public class MeasureDefinitionController {
             @AuthenticationPrincipal PrincipalUser user,
             @PathVariable String id,
             @RequestBody Parameters parameters,
-            @RequestParam(required = false, defaultValue = "false") String debug) {
+            @RequestParam(required = false, defaultValue = "false") Set<DebugSections> debug) {
 
         if (user != null){
             Span currentSpan = Span.current();
             currentSpan.setAttribute("user", user.getEmailAddress());
         }
 
-        // Ensure that a measure evaluator is cached (so that CQL logging can use it)
+        // Resolve the cached evaluator. Two things this gives us:
+        //   1. A cheap existence check for the measure (returns null -> 404).
+        //   2. Side effect: ensures the measure's libraries are registered with
+        //      MeasureEvaluatorCache's LibraryResolver, which CqlLogAppender uses
+        //      to translate CQL log locators back to source ranges.
+        // We intentionally do NOT call evaluator.evaluate(...) here. The cached
+        // evaluator was compiled once at first-use time with `linkConfig.cqlDebug`
+        // baked in as its only debug flag; reusing it would either log too much or
+        // too little relative to the per-request `debug` parameter. So we always
+        // recompile via compileAndEvaluate(...) with the explicit per-request
+        // section set, which sets the engine's debug/tracing flags correctly for
+        // this specific call.
         MeasureEvaluator evaluator = evaluatorCache.get(id);
 
         if (evaluator == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Measure definition not found");
         }
 
-        Set<DebugSections> debugSections = DebugSections.parse(debug);
-
-        if (!debugSections.isEmpty()) {
+        if (!debug.isEmpty()) {
             _logger.info("Measure evaluation requested with debug sections {} for measure {}",
-                    debugSections, id);
+                    debug, id);
         }
 
         try {
-            // Recompile the bundle every time because the debug flag may not match what's in the cache
-            return MeasureEvaluator.compileAndEvaluate(FhirContext.forR4(), evaluator.getBundle(), parameters, debugSections);
+            return MeasureEvaluator.compileAndEvaluate(FhirContext.forR4(), evaluator.getBundle(), parameters, debug);
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
         }
