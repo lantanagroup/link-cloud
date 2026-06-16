@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Sdk.Clients;
 
@@ -141,7 +141,21 @@ public sealed class ApiHealthSeedOrchestrator(
             var runId = await runManager.StartAsync(startRequest, ct);
 
             if (apiHealthRunId.HasValue)
-                await apiHealthRunStore.AttachSeedRunAsync(apiHealthRunId.Value, runId, scenario.Name, ct);
+            {
+                try
+                {
+                    await apiHealthRunStore.AttachSeedRunAsync(apiHealthRunId.Value, runId, scenario.Name, ct);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(
+                        ex,
+                        "API Health seed run attachment failed; continuing with degraded linkage. ApiHealthRunId={ApiHealthRunId}, SeedRunId={SeedRunId}, Scope={Scope}",
+                        apiHealthRunId.Value,
+                        runId,
+                        scope);
+                }
+            }
 
             logger.LogInformation(
                 "API Health seeding started via automation scenario. Scope={Scope}, ScenarioId={ScenarioId}, ScenarioName={ScenarioName}, RunId={RunId}",
