@@ -267,11 +267,53 @@ single-action, multi-action, partial-failure (one valid + one invalid name),
 total-failure (all names invalid), and composability of `codeSystems` +
 `excludeActions` on the same rule.
 
-### Phase 3 — Add policyForReference support and migrate (one PR)
+### Phase 3 — `policyForReference` support — ⏭ DEFERRED (no current candidates)
 
-- Extend `CategoryBackedPolicyAdvisor` with `policyForReference(...)`.
-- Add `referencePaths` to the `scope` schema.
-- Migrate the small set of reference-resolution rules to `SKIP`.
+Phase 3 was planned as "implement `policyForReference` + `referencePaths` scope
+axis + migrate the small set of reference-resolution rules to SKIP." Walking
+through the rule set revealed that **no current `acceptable=true` rule has a
+matcher targeting messages that `policyForReference` actually controls**.
+
+`policyForReference` returns a single `ReferenceValidationPolicy` enum value
+(`IGNORE` / `CHECK_TYPE_IF_EXISTS` / `CHECK_EXISTS` / `CHECK_EXISTS_AND_TYPE` /
+`CHECK_VALID`) and decides how the validator handles a Reference target —
+whether to resolve, what to check after resolution. It does not affect
+Reference *structure* messages (`ref-1`-style "Reference should have a
+display"), nor cardinality (`Patient.link.other: minimum required = 1`), nor
+FHIRPath invariants (`Rule us-core-2 Failed`).
+
+The reference-themed rules in `categories.json` cluster into three categories,
+none of which Phase 3's mechanism would help:
+
+- **Structural reference rules** (e.g.
+  `medicationrequest_requester_does_not_have_a_proper_reference`) — fire on
+  HAPI's `ref-1` structural warning before resolution. Better fit for SUPPRESS
+  (Phase 4) against the underlying `I18nConstants` message ID.
+- **Canonical-URL resolution rules** (e.g. `unresolved_url`,
+  `unable_to_validate_measure_measure_not_found`) — about profile / ValueSet /
+  Measure canonical URLs, not Resource Reference URLs. `policyForReference`
+  doesn't apply. All `acceptable: false` anyway.
+- **Cardinality / invariant rules** that happen to mention "reference"
+  (`missing_reference_to_linked_patient_resource`, `us_core_2`) — also
+  `acceptable: false` and structurally unrelated to resolution policy.
+
+**Revisit criteria.** If a future bundle shape produces resolution-failure
+messages (`"Could not resolve reference"`, `"Reference target is of wrong
+type"`) that the team classifies as acceptable, that's the trigger to
+implement Phase 3. At that point the work is small:
+
+1. Override `policyForReference(...)` on `CategoryBackedPolicyAdvisor` to
+   return `IGNORE` (or another less-strict policy) when a SKIP rule's scope
+   matches the incoming `path` / `url` / `destinationType`.
+2. Wire up the already-stubbed `scope.referencePaths` axis on
+   `CategoryScope` plus a new `scope.referenceUrls` axis if URL-based
+   narrowing turns out to matter.
+3. Add unit tests mirroring the Phase 1 pattern.
+
+Until then, the `referencePaths` field stays in `CategoryScope` as a
+forward-compat stub. The advisor doesn't read it.
+
+Phase 4 (SUPPRESS) is the next investment — see below.
 
 ### Phase 4 — Add isSuppressMessageId support and migrate (research-heavy)
 
