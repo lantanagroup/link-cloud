@@ -75,13 +75,13 @@ public sealed class ScenarioRunStartupRecoveryService(
                         logger.LogError(deleteEx, "Startup recovery could not hard-delete run {RunId}. Manual cleanup may be required.", runId);
                     }
                 }
+            }
 
             logger.LogWarning(
                 "Startup recovery reconciliation complete. Candidates={Candidates}, Cancelled={Cancelled}, HardDeleted={Deleted}.",
                 candidateRunIds.Count,
                 cancelledCount,
                 deletedCount);
-            }
         }
         catch (Exception ex)
         {

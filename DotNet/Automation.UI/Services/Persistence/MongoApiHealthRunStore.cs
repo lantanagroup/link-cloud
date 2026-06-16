@@ -43,18 +43,18 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
         var normalizedMode = string.Equals(runMode, "All", StringComparison.OrdinalIgnoreCase) ? "All" : "Single";
         var resultGroups = results
             .Where(r => !string.IsNullOrWhiteSpace(r.ServiceName))
-            .GroupBy(r => r.ServiceName, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(r => (r.RunId, ServiceName: r.ServiceName), RunServiceGroupKeyComparer.Instance)
             .ToList();
 
         foreach (var group in resultGroups)
         {
-            var runId = group.Select(r => r.RunId).FirstOrDefault(id => id != Guid.Empty);
+            var runId = group.Key.RunId;
             if (runId == Guid.Empty)
                 continue;
 
             var filter = Builders<ApiHealthRunDocument>.Filter.And(
                 Builders<ApiHealthRunDocument>.Filter.Eq(d => d.RunId, runId),
-                Builders<ApiHealthRunDocument>.Filter.Eq(d => d.ServiceName, group.Key));
+                Builders<ApiHealthRunDocument>.Filter.Eq(d => d.ServiceName, group.Key.ServiceName));
 
             var existing = await _collection.Find(filter).Limit(1).FirstOrDefaultAsync(ct);
             var merged = (existing?.EndpointResults ?? [])
@@ -67,7 +67,7 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
             {
                 Id = existing?.Id ?? Guid.NewGuid(),
                 RunId = runId,
-                ServiceName = group.Key,
+                ServiceName = group.Key.ServiceName,
                 RunMode = normalizedMode,
                 StartedAt = startedAt,
                 EndpointResults = merged.Values
@@ -77,6 +77,18 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
 
             await _collection.ReplaceOneAsync(filter, doc, new ReplaceOptions { IsUpsert = true }, ct);
         }
+    }
+
+    private sealed class RunServiceGroupKeyComparer : IEqualityComparer<(Guid RunId, string ServiceName)>
+    {
+        public static readonly RunServiceGroupKeyComparer Instance = new();
+
+        public bool Equals((Guid RunId, string ServiceName) x, (Guid RunId, string ServiceName) y)
+            => x.RunId == y.RunId
+               && string.Equals(x.ServiceName, y.ServiceName, StringComparison.OrdinalIgnoreCase);
+
+        public int GetHashCode((Guid RunId, string ServiceName) obj)
+            => HashCode.Combine(obj.RunId, StringComparer.OrdinalIgnoreCase.GetHashCode(obj.ServiceName));
     }
 
     public async Task SaveServiceRunStateAsync(
@@ -137,19 +149,16 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
         var keys = endpointKeys.ToHashSet(StringComparer.Ordinal);
         if (keys.Count == 0) return new();
 
-        var docs = await _collection
-            .Find(d => d.EndpointResults.Any(r => keys.Contains(r.EndpointKey)))
+        var latestByService = await _collection.Aggregate()
+            .Match(d => d.EndpointResults.Any(r => keys.Contains(r.EndpointKey)))
             .SortByDescending(d => d.StartedAt)
+            .Group(
+                d => d.ServiceName,
+                g => new { ServiceName = g.Key, Doc = g.First() })
             .ToListAsync(ct);
 
-        var latestByService = new Dictionary<string, ApiHealthRunDocument>(StringComparer.OrdinalIgnoreCase);
-        foreach (var doc in docs)
-        {
-            if (!latestByService.ContainsKey(doc.ServiceName))
-                latestByService[doc.ServiceName] = doc;
-        }
-
-        return latestByService.Values
+        return latestByService
+            .Select(x => x.Doc)
             .SelectMany(d => d.EndpointResults)
             .Where(r => keys.Contains(r.EndpointKey))
             .GroupBy(r => r.EndpointKey, StringComparer.Ordinal)
@@ -178,21 +187,20 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
     public async Task<ApiTestRunHistoryPage> GetHistoryAsync(
         string endpointKey, int pageNumber, int pageSize, CancellationToken ct = default)
     {
+        var filter = Builders<ApiHealthRunDocument>.Filter.ElemMatch(d => d.EndpointResults, r => r.EndpointKey == endpointKey);
+        var totalCount = await _collection.CountDocumentsAsync(filter, cancellationToken: ct);
+
         var docs = await _collection
-            .Find(d => d.EndpointResults.Any(r => r.EndpointKey == endpointKey))
+            .Find(filter)
             .SortByDescending(d => d.StartedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Limit(pageSize)
             .ToListAsync(ct);
 
-        var allRuns = docs
+        var pagedRuns = docs
             .SelectMany(d => d.EndpointResults)
             .Where(r => string.Equals(r.EndpointKey, endpointKey, StringComparison.Ordinal))
             .OrderByDescending(r => r.ExecutedAt)
-            .ToList();
-
-        var totalCount = (long)allRuns.Count;
-        var pagedRuns = allRuns
-            .Skip((pageNumber - 1) * pageSize)
-            .Take(pageSize)
             .ToList();
 
         return new ApiTestRunHistoryPage
