@@ -103,7 +103,8 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       scope: new FormControl(''),
       userName: new FormControl(''),
       password: new FormControl(''),
-      customHeaders: new FormArray([])
+      customHeaders: new FormArray([]),
+      hasEncounterParameter: this.item?.hasEncounterParameter ?? false
     },  { validators: this.bothOrNoneHoursValidator } as AbstractControlOptions);
   }
 

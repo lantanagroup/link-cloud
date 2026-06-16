@@ -128,7 +128,18 @@ export class FacilityEditComponent implements OnInit {
   facilityConfig!: IFacilityConfigModel;
   censusConfig!: ICensusConfiguration;
   queryDispatchConfig!: IQueryDispatchConfiguration;
-  dataAcqFhirQueryConfig!: IDataAcquisitionQueryConfigModel;
+  // Backed by accessors so hasEncounterParameter is recomputed automatically
+  // whenever the query config or query plan is (re)assigned. See the getters/
+  // setters and updateHasEncounterParameter() below.
+  private _dataAcqFhirQueryConfig!: IDataAcquisitionQueryConfigModel;
+  get dataAcqFhirQueryConfig(): IDataAcquisitionQueryConfigModel {
+    return this._dataAcqFhirQueryConfig;
+  }
+  set dataAcqFhirQueryConfig(value: IDataAcquisitionQueryConfigModel) {
+    this._dataAcqFhirQueryConfig = value;
+    this.updateHasEncounterParameter();
+  }
+
   dataAcqFhirListConfig!: IDataAcquisitionFhirListConfigModel;
 
   linkNoConfigAlertType = LinkAlertType.info;
@@ -154,7 +165,14 @@ export class FacilityEditComponent implements OnInit {
   noDataAcqQueryPlanConfigAlertMessage = 'No FHIR query plan found for this facility and type';
   showNoDataAcqQueryPlanConfigAlert: boolean = false;
 
-  dataAcqQueryPlanConfig!: IQueryPlanModel;
+  private _dataAcqQueryPlanConfig!: IQueryPlanModel;
+  get dataAcqQueryPlanConfig(): IQueryPlanModel {
+    return this._dataAcqQueryPlanConfig;
+  }
+  set dataAcqQueryPlanConfig(value: IQueryPlanModel) {
+    this._dataAcqQueryPlanConfig = value;
+    this.updateHasEncounterParameter();
+  }
 
   private _displayReportDashboard: boolean = false;
 
@@ -1075,5 +1093,25 @@ export class FacilityEditComponent implements OnInit {
     });
   }
 
+  updateHasEncounterParameter() {
+    if (!this.dataAcqFhirQueryConfig) {
+      return;
+    }
+
+    if (!this.dataAcqQueryPlanConfig) {
+      return;
+    }
+
+    let hasEncounterParameter = false;
+
+    if (this.dataAcqQueryPlanConfig.initialQueries) {
+      hasEncounterParameter = Object.values(this.dataAcqQueryPlanConfig.initialQueries).some(query => {
+        return (query.resourceType || '').toLowerCase() === 'encounter';
+      });
+    }
+
+    this.dataAcqFhirQueryConfig.hasEncounterParameter = hasEncounterParameter;
+  }
 
 }
+
