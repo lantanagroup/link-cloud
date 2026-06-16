@@ -119,7 +119,14 @@
     "title": "Unresolved Epic Code System URI",
     "severity": "INFORMATION",
     "acceptable": true,
-    "guidance": "Internal: This is an Epic-defined code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code')",
+    "strategy": "SKIP",
+    "scope": {
+      "codeSystems": [
+        "^urn:oid:1\\.2\\.840\\.114350.*$",
+        "^https?://.*epic\\.com/.*$"
+      ]
+    },
+    "guidance": "Internal: This is an Epic-defined code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code'). Phase 2 SKIP migration: terminology checks for Epic code system URLs (OID 1.2.840.114350.*, any *.epic.com URL) are short-circuited via the policy advisor (scope.codeSystems). The matcher branches below remain as a defensive fallback in case the advisor does not fire.",
     "matcher": {
       "children": [
         {
@@ -139,7 +146,13 @@
     "title": "Unresolved Medispan Code System URI",
     "severity": "INFORMATION",
     "acceptable": true,
-    "guidance": "Internal: This is a Medispan-defined code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code')",
+    "strategy": "SKIP",
+    "scope": {
+      "codeSystems": [
+        "^urn:oid:2\\.16\\.840\\.1\\.113883\\.6\\.68$"
+      ]
+    },
+    "guidance": "Internal: This is a Medispan-defined code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code'). Phase 2 SKIP migration: terminology checks for the Medispan Generic Product Identifier OID (urn:oid:2.16.840.1.113883.6.68 exact match) are short-circuited via the policy advisor (scope.codeSystems). The matcher below remains as a defensive fallback in case the advisor does not fire. Sub-OIDs (e.g., urn:oid:2.16.840.1.113883.6.68.X) are NOT covered by this rule and continue to validate normally.",
     "matcher": {
       "field": "MESSAGE",
       "regex": "^Code System URI 'urn:oid:2\\.16\\.840\\.1\\.113883\\.6\\.68' is unknown so the code cannot be validated"
