@@ -10,5 +10,6 @@ export interface IDataAcquisitionQueryConfigModel {
   maxAcquisitionPullTime?: string,
   maxConcurrentRequests?: number,
   maxRetries?: number,
-  enableLocationResolutionMapping?: boolean
+  enableLocationResolutionMapping?: boolean,
+  hasEncounterParameter?: boolean
 }
