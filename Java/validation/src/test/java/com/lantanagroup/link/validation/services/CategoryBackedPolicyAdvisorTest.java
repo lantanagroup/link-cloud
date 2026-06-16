@@ -93,13 +93,22 @@ class CategoryBackedPolicyAdvisorTest {
     }
 
     @Test
-    void skipRuleWithNullOrEmptyScope_isDropped() {
-        Category nullScope = skipRule("no_scope", true, null);
+    void skipRuleWithNoScope_isLoaded() {
+        // "no scope" is a valid SKIP rule shape — it means "always skip" at this hook.
+        Category nullScope = skipRule("always_skip", true, null);
         nullScope.setScope(null);
 
-        Category emptyAxes = skipRule("empty_axes", true, List.of());
+        when(categoryRepository.findAll()).thenReturn(List.of(nullScope));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+        assertEquals(List.of("always_skip"), advisor.getLoadedSkipRuleIds());
+    }
 
-        when(categoryRepository.findAll()).thenReturn(List.of(nullScope, emptyAxes));
+    @Test
+    void skipRuleWithAllInvalidRegex_isDemoted() {
+        // If every pattern in the scope failed to compile, falling back to "always skip" would
+        // silently apply semantics the author didn't ask for. Better to demote and log loudly.
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                skipRule("all_invalid", true, List.of("[unterminated", "(also-unterminated"))));
         CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
         assertTrue(advisor.getLoadedSkipRuleIds().isEmpty());
     }
@@ -158,6 +167,41 @@ class CategoryBackedPolicyAdvisorTest {
                 null, null, "Patient.code.coding[0].system", null, null, null, null, null, null);
 
         verify(metrics, never()).incrementRuleOutcome(anyString(), eq(ValidationMetrics.OUTCOME_SKIPPED));
+    }
+
+    @Test
+    void policyForCodedContent_unscopedSkipRule_firesOnAnySystem() {
+        Category unscoped = skipRule("always_skip", true, null);
+        unscoped.setScope(null);
+        when(categoryRepository.findAll()).thenReturn(List.of(unscoped));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        EnumSet<IValidationPolicyAdvisor.CodedContentValidationAction> result = advisor.policyForCodedContent(
+                null, null, "Patient.code.coding[0].system", null, null, null, null, null,
+                List.of("http://loinc.org"));
+
+        assertTrue(result.isEmpty(), "Unscoped SKIP rule must fire on any system");
+        verify(metrics, times(1))
+                .incrementRuleOutcome(eq("always_skip"), eq(ValidationMetrics.OUTCOME_SKIPPED));
+    }
+
+    @Test
+    void policyForCodedContent_unscopedSkipRule_firesEvenWhenSystemsEmpty() {
+        // A coded element with no system specified still triggers policyForCodedContent with an
+        // empty/null systems list. Unscoped SKIP rules cover that case — the team's intent for
+        // "I don't care about unknown systems" includes "I don't care when there's no system."
+        Category unscoped = skipRule("always_skip", true, null);
+        unscoped.setScope(null);
+        when(categoryRepository.findAll()).thenReturn(List.of(unscoped));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        advisor.policyForCodedContent(
+                null, null, "Patient.code.coding[0].system", null, null, null, null, null, List.of());
+        advisor.policyForCodedContent(
+                null, null, "Patient.code.coding[0].system", null, null, null, null, null, null);
+
+        verify(metrics, times(2))
+                .incrementRuleOutcome(eq("always_skip"), eq(ValidationMetrics.OUTCOME_SKIPPED));
     }
 
     @Test
