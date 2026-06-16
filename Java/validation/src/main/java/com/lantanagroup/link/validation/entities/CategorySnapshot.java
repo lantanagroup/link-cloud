@@ -4,6 +4,8 @@ import com.lantanagroup.link.validation.matchers.Matcher;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 public class CategorySnapshot {
@@ -20,6 +22,12 @@ public class CategorySnapshot {
      * Optional. Only meaningful for {@link CategoryStrategy#SKIP} rules.
      */
     private CategoryScope scope;
+    /**
+     * Optional. Stable HAPI message IDs to suppress via
+     * {@code CategoryBackedPolicyAdvisor.isSuppressMessageId(...)}. Independent of
+     * {@link #strategy} — a rule can declare both SKIP scope and SUPPRESS message IDs.
+     */
+    private List<String> suppressMessageIds;
     private Matcher matcher;
 
     public CategorySnapshot() {
@@ -33,6 +41,7 @@ public class CategorySnapshot {
         guidance = category.getGuidance();
         strategy = category.getStrategy() != null ? category.getStrategy() : CategoryStrategy.LABEL;
         scope = category.getScope();
+        suppressMessageIds = category.getSuppressMessageIds();
         CategoryRule latestRule = category.getLatestRule();
         if (latestRule != null) {
             matcher = latestRule.getMatcher();
@@ -51,6 +60,7 @@ public class CategorySnapshot {
         category.setGuidance(guidance);
         category.setStrategy(strategy != null ? strategy : CategoryStrategy.LABEL);
         category.setScope(scope);
+        category.setSuppressMessageIds(suppressMessageIds);
         return category;
     }
 
