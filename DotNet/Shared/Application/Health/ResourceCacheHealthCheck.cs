@@ -10,6 +10,8 @@ namespace LantanaGroup.Link.Shared.Application.Health
 {
     public class ResourceCacheHealthCheck : IHealthCheck
     {
+        private static readonly TimeSpan HealthCheckTimeout = TimeSpan.FromSeconds(5);
+
         private readonly IConnectionMultiplexer? _redis;
         private readonly ResourceCacheSettings _settings;
 
@@ -23,19 +25,22 @@ namespace LantanaGroup.Link.Shared.Application.Health
             HealthCheckContext context,
             CancellationToken cancellationToken = default)
         {
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(HealthCheckTimeout);
+
             try
             {
                 switch (_settings.CacheImplementation)
                 {
                     case ResourceCacheType.Redis:
-                        await CheckRedisAsync();
+                        await CheckRedisAsync(timeoutCts.Token);
                         break;
                     case ResourceCacheType.ABS:
-                        await CheckBlobStorageAsync(cancellationToken);
+                        await CheckBlobStorageAsync(timeoutCts.Token);
                         break;
                     default:
-                        await CheckRedisAsync();
-                        await CheckBlobStorageAsync(cancellationToken);
+                        await CheckRedisAsync(timeoutCts.Token);
+                        await CheckBlobStorageAsync(timeoutCts.Token);
                         break;
                 }
 
@@ -47,14 +52,14 @@ namespace LantanaGroup.Link.Shared.Application.Health
             }
         }
 
-        private async Task CheckRedisAsync()
+        private async Task CheckRedisAsync(CancellationToken cancellationToken)
         {
             if (_redis is null || !_redis.IsConnected)
             {
                 throw new InvalidOperationException("Redis cache is not connected.");
             }
 
-            await _redis.GetDatabase().PingAsync();
+            await _redis.GetDatabase().PingAsync().WaitAsync(cancellationToken);
         }
 
         private async Task CheckBlobStorageAsync(CancellationToken cancellationToken)
