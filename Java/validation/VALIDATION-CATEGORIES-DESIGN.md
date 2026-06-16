@@ -129,47 +129,84 @@ to be both noisy and expensive (remote terminology calls, ValueSet expansion).
 }
 ```
 
-- `strategy`: enum (`SKIP` / `SUPPRESS` / `LABEL`); default `LABEL` when absent
-- `scope`: present only for `SKIP` rules; shape depends on the policy hook
+- `strategy`: enum (`SKIP` / `SUPPRESS` / `LABEL`); default `LABEL` when absent.
+- `scope`: present on `SKIP` rules to narrow which calls the rule applies to.
+  Shape depends on the policy hook:
   - `codeSystems`: regex patterns matched against `system` URLs in the
-    `policyForCodedContent` advisory call
-  - `valueSets`: regex patterns matched against the bound ValueSet URL
-  - `referencePaths`: regex patterns matched against the reference target path
+    `policyForCodedContent` advisory call. Phase 1.
+  - `valueSets`: regex patterns matched against the bound ValueSet URL. Phase 1
+    follow-up.
+  - `referencePaths`: regex patterns matched against the reference target path.
+    Phase 3.
+
+  **Unscoped `SKIP`** is a separate, deliberately-coarse semantic: a `SKIP` rule
+  with no `scope` at all fires on every relevant policy-hook call. It is reserved
+  for the rare case where the team genuinely wants global suppression at the hook
+  layer and accepts the over-skip risk — returning an empty action set from
+  `policyForCodedContent` kills validation for every rule that would have caught
+  a message at that element, including rules with `acceptable: false`. Do not
+  use unscoped `SKIP` to mean "I haven't figured out the scope yet"; prefer a
+  precise scope, or stay `LABEL` until `SUPPRESS` is available (Phase 4). The
+  advisor logs loudly on load if an unscoped SKIP rule is configured.
 - `matcher`: retained even on `SKIP` / `SUPPRESS` rules — it's the fallback
   identification for cases where the advisor call doesn't have enough context
   to disambiguate, and it stays useful for testing and human review of what
-  the rule was originally written against.
+  the rule was originally written against. A migration that promotes some
+  matcher branches to `SKIP` while leaving others as `LABEL` is a **partial
+  migration**; the rule's `guidance` should explicitly call out which branches
+  are which (see the `unknown_code_system` entry in the Migration log below for
+  the worked example).
 
 ## Implementation roadmap
 
 The goal is a sequence of independently-mergeable PRs, each of which either
 adds capability or migrates a small set of rules. No big-bang change.
 
-### Phase 1 — Mechanism (one PR)
+### Phase 1 — Mechanism (one PR) ✔ DONE
 
-Add the plumbing for `SKIP` rules with the smallest possible production change.
+Adds the plumbing for `SKIP` rules with the smallest possible production change
+and migrates one rule end-to-end to prove the pipeline.
 
-- Extend `CategorySnapshot` / `Category` / `CategoryRule` entities with
-  `strategy` (default `LABEL`) and `scope` (nullable JSON column).
-- Implement `CategoryBackedPolicyAdvisor implements IValidationPolicyAdvisor`,
-  initially handling only `policyForCodedContent(...)`. Other methods fall
-  through to default behaviour.
-- Wire the advisor into `ValidationService`:
-  ```java
-  instanceValidator.setValidatorPolicyAdvisor(policyAdvisor);
-  ```
-- Add per-rule counter metrics: `validation.rule.skipped{rule_id="..."}`,
-  `validation.rule.suppressed{rule_id="..."}`, `validation.rule.labeled{rule_id="..."}`.
-- Pick **one** rule for migration — `unknown_code_system` is the safest
-  candidate (acceptable=true, terminology, well-understood). Migrate it to
-  `SKIP` with the Epic/Cerner/Oracle URL patterns as scope.
-- Document the new strategy field in this file and in the JSON schema (if any).
+**Shipped:**
 
-**Acceptance criteria:**
-- All existing tests pass.
-- Smoke test still works — `unknown_code_system` matches behaviour-preservingly
-  but the underlying terminology call is now skipped.
-- Metrics show the rule firing as `skipped` instead of `labeled`.
+- `CategoryStrategy` enum (`SKIP` / `SUPPRESS` / `LABEL`) and `CategoryScope`
+  DTO with `codeSystems` / `valueSets` / `referencePaths` regex axes. Only
+  `codeSystems` is consumed in Phase 1; the others are present in the schema
+  so later phases don't need to break it.
+- `Category` and `CategorySnapshot` entities carry `strategy` (default
+  `LABEL`) and `scope` (nullable JSON column via `CategoryScopeConverter`).
+- `V20260616__Add_category_strategy_and_scope.sql` and matching `U` undo
+  script for the column additions, with defensive `if not exists` guards.
+- `CategoryBackedPolicyAdvisor extends FhirDefaultPolicyAdvisor` overriding
+  only `policyForCodedContent(...)`. All other advisor methods inherit
+  HAPI's defaults. Constructor-time validation drops rules that would be
+  unsafe (`acceptable=false` SKIP rules, regex-only SKIP rules whose every
+  pattern fails to compile) with WARN logs.
+- Unscoped `SKIP` capability is intentionally kept but discouraged in code
+  comments and in this document.
+- Wired into `ValidationService` via `instanceValidator.setValidatorPolicyAdvisor(...)`.
+- New metric `link.validation.rule.outcome` (tagged with `rule_id` and
+  `outcome=skipped|suppressed|labeled`) on `ValidationMetrics`. The advisor
+  increments `skipped`; `CategorizationService` increments `labeled` for
+  every post-validation match. `suppressed` is wired but unused until
+  Phase 4 lands.
+- `unknown_code_system` migrated to `SKIP` with the four EHR-vendor URL
+  patterns as scope. This is a **partial** migration: the rule's four
+  generic-shape matcher branches stay as a `LABEL` fallback until Phase 4
+  ships SUPPRESS support.
+
+**Tests added:** `CategoryStrategyTest`, `CategoryScopeConverterTest`,
+`CategoryBackedPolicyAdvisorTest`. Existing `CategorizationServiceTest`
+updated with a `ValidationMetrics` mock.
+
+**Open follow-ups carried out of Phase 1:**
+
+- Production migration runbook: we don't yet know who runs the V/U scripts
+  in prod (Hibernate's `ddl-auto: update` handles dev/docker/local; only
+  the `docker` profile sets that). Confirm before the next migration ships.
+- `database/reference/create.sql` was manually updated to reflect the new
+  columns; running the `local` profile against a SQL Server instance
+  regenerates this file from JPA metadata. Verify on first opportunity.
 
 ### Phase 2 — Migrate terminology rules to SKIP (one PR per batch)
 
@@ -190,13 +227,55 @@ Each migration is a data-only JSON change after Phase 1 ships.
 - Add `referencePaths` to the `scope` schema.
 - Migrate the small set of reference-resolution rules to `SKIP`.
 
-### Phase 4 — Add isSuppressMessageId support and migrate (one or two PRs)
+### Phase 4 — Add isSuppressMessageId support and migrate (research-heavy)
 
-- Extend `CategoryBackedPolicyAdvisor` with `isSuppressMessageId(path, messageId)`.
-- Build a mapping from each rule's matcher to the corresponding HAPI message id
-  (using `org.hl7.fhir.utilities.i18n.I18nConstants` as the authoritative list).
-  This is one-time research per rule.
-- Migrate rules where the mapping is clean and stable.
+`SUPPRESS` runs the validation check but drops the produced message before it
+reaches the `OperationOutcome`. No CPU savings, but unlike `SKIP` it can target
+a specific HAPI message ID without over-skipping other rules' territory. The
+four generic-shape matcher branches of `unknown_code_system` (and the same
+shape across other partially-migrated rules) need this strategy to complete
+their migration.
+
+**Concrete work, in order:**
+
+1. **Identify HAPI message IDs for each currently-LABEL'd matcher branch.**
+   The authoritative list is `org.hl7.fhir.utilities.i18n.I18nConstants` —
+   each user-facing validation message is generated from a constant whose
+   value is the template. The research method: for a given matcher branch
+   (e.g., `^Unknown Code System '.*'$`), find the `I18nConstants` constant
+   whose template produces that text. Some sample mappings (unverified —
+   need to confirm on the version of `org.hl7.fhir.utilities` shipped with
+   the current HAPI):
+   - `^Unknown Code System '.*'$` → likely `UNKNOWN_CODESYSTEM` or
+     `Unknown_Code_System_R5`
+   - `A code with no system .* A system should be provided` → likely
+     `Code_Without_a_System_R5`
+   - `^CodeSystem is unknown and can't be validated` → likely
+     `CodeSystem_CS_UNK_EXTERNAL_R5`
+   - `The Coding provided \(.*\) is not in the value set 'V3 Value SetActEncounterCode'`
+     → likely `Terminology_TX_NoValid_SET_2` with the V3 binding
+2. **Schema decision.** A single rule can hold both a `SKIP` scope and one
+   or more `SUPPRESS` message IDs (the `unknown_code_system` migration
+   shape). Decide whether to add a `suppressMessageIds: string[]` field
+   alongside `scope` (each rule can declare both axes) or to split into
+   separate categories. The author's lean is the former — keeps related
+   matcher branches under one rule entry.
+3. **Implementation.** Extend `CategoryBackedPolicyAdvisor` to override
+   `isSuppressMessageId(path, messageId)`. Pre-compile the set of
+   suppressible message IDs at advisor construction (same lifecycle as the
+   existing SKIP rule load). Increment
+   `link.validation.rule.outcome{outcome=suppressed}` on match.
+4. **Migrate.** Start by completing `unknown_code_system` — once SUPPRESS
+   works for its four generic-shape branches, the rule is fully covered
+   and the matcher fallback becomes pure dead-letter defense. Then move on
+   to other rules with the same shape (`unable_to_validate_code`'s generic
+   branches, `incorrect_display_value_for_code`'s generic branches, etc.).
+5. **Verify** on a representative bundle that the messages actually stop
+   appearing and that no `acceptable=false` rule is silently swallowed by
+   accident.
+
+A `TODO` comment in `CategoryBackedPolicyAdvisor`'s Javadoc points at this
+section so the gap is discoverable from the code.
 
 ### Phase 5 — Profile scope audit (separate, larger PR)
 
@@ -279,14 +358,31 @@ These aren't blockers for Phase 1 but should be answered before later phases:
    messages reappear. Is that the desired behaviour, or do we want explicit
    sunset markers?
 
+## Migration log
+
+A record of which rules have been promoted out of `LABEL`, when, and what the
+remaining gaps are. Each entry should answer: which matcher branches moved
+where, what stayed behind, and what blocks the rest.
+
+| Date | Rule | Strategy | Coverage | Notes |
+|---|---|---|---|---|
+| 2026-06-16 | `unknown_code_system` | `SKIP` (scoped) | Partial — 4 of 8 matcher branches | URL-specific branches (Cerner FHIR, Epic FHIR StructureDefinition, Epic OIDs `1.2.840.114350.*`, namespace `1.2.246.537.6.96.*`) targeted via `scope.codeSystems`. The four generic-shape branches (`Unknown Code System '<...>'`, `A code with no system...`, `CodeSystem is unknown...`, `V3 ValueSet ActEncounterCode`) stay as the `LABEL` fallback until Phase 4 SUPPRESS support exists. |
+
 ## Related code
 
 | File | Role |
 |---|---|
-| `src/main/resources/categories.json` | The hand-curated rule set (50 rules today) |
-| `src/main/java/.../services/CategorizationService.java` | Loads rules; runs `LABEL` matching post-validation |
+| `src/main/resources/categories.json` | The hand-curated rule set (50 rules) |
+| `src/main/resources/database/migrations/V*.sql`, `U*.sql` | Forward and undo schema migrations |
+| `src/main/resources/database/reference/create.sql`, `drop.sql` | Hibernate-regenerated schema snapshots; PR-review aid |
 | `src/main/java/.../entities/Category.java`, `CategoryRule.java`, `CategorySnapshot.java` | DB entities backing each rule and its versioned history |
-| `src/main/java/.../matchers/Matcher.java`, `CompositeMatcher.java`, `RegexMatcher.java` | The matcher polymorphism |
+| `src/main/java/.../entities/CategoryStrategy.java` | Enum (`SKIP` / `SUPPRESS` / `LABEL`) — added in Phase 1 |
+| `src/main/java/.../entities/CategoryScope.java` | Scope DTO with `codeSystems` / `valueSets` / `referencePaths` axes — added in Phase 1 |
+| `src/main/java/.../converters/CategoryScopeConverter.java` | JPA `AttributeConverter` for `CategoryScope` ↔ JSON column |
+| `src/main/java/.../matchers/Matcher.java`, `CompositeMatcher.java`, `RegexMatcher.java` | The matcher polymorphism (used by `LABEL`) |
 | `src/main/java/.../entities/ResultField.java` | Enumerates which message fields a matcher can target |
-| `src/main/java/.../services/ValidationService.java` | Where the `FhirInstanceValidator` lives — Phase 1 wires the advisor here |
+| `src/main/java/.../services/CategorizationService.java` | Loads rules; runs `LABEL` matching post-validation; increments the `labeled` counter |
+| `src/main/java/.../services/CategoryBackedPolicyAdvisor.java` | HAPI policy advisor — runs `SKIP` decisions at `policyForCodedContent`. Added in Phase 1; Phase 4 adds `isSuppressMessageId` here |
+| `src/main/java/.../services/ValidationService.java` | Where the `FhirInstanceValidator` lives — Phase 1 wires the advisor here via `setValidatorPolicyAdvisor(...)` |
+| `src/main/java/.../services/ValidationMetrics.java` | Bean owning the `link.validation.rule.outcome` counter; constants `OUTCOME_SKIPPED` / `OUTCOME_SUPPRESSED` / `OUTCOME_LABELED` are the canonical outcome labels |
 | `src/main/java/.../services/ReadyForValidationConsumer.java` | Kafka consumer that drives the categorize → persist → publish pipeline |
