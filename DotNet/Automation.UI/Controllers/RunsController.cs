@@ -50,12 +50,12 @@ public class RunsController(
                 Name = "ApiHealthScenario",
                 Description = "System scenario for API Health stateful seeding and diagnostics.",
                 IsSystemScenario = true,
-                ReportMethod = ReportMethod.ScheduledReport,
+                ReportMethod = ReportMethod.Adhoc,
                 SelectedMeasures = [.. measures],
                 Seed = 20260501,
                 PatientCount = 1,
-                ResourcesPerPatientMin = 100,
-                ResourcesPerPatientMax = 100,
+                ResourcesPerPatientMin = 15,
+                ResourcesPerPatientMax = 15,
                 PatientCohorts =
                 [
                     new PatientCohortDefinition
@@ -63,8 +63,8 @@ public class RunsController(
                         PatientCount = 1,
                         MeasureEligibilities = new(eligibilities),
                         EligibleClinicalScenarioIds = [.. eligibleScenarioIds],
-                        ResourcesPerPatientMin = 100,
-                        ResourcesPerPatientMax = 100
+                        ResourcesPerPatientMin = 15,
+                        ResourcesPerPatientMax = 15
                     }
                 ],
                 CleanupServiceData = false,
