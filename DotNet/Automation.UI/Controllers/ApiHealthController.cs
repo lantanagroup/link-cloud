@@ -8,8 +8,7 @@ namespace Automation.UI.Controllers;
 public class ApiHealthController(
     ApiEndpointRegistry registry,
     ApiHealthExecutionRunManager runManager,
-    IApiHealthRunStore store,
-    ILogger<ApiHealthController> logger) : Controller
+    IApiHealthRunStore store) : Controller
 {
     private const int DefaultPageNumber = 1;
     private const int DefaultPageSize = 20;
@@ -52,11 +51,7 @@ public class ApiHealthController(
                             ? latestServiceResults.GetValueOrDefault(e.Key)
                             : (selectedIsAll || string.Equals(selectedServiceName, e.ServiceName, StringComparison.OrdinalIgnoreCase)
                                 ? selectedRunResults.GetValueOrDefault(e.Key)
-                                : latestServiceResults.GetValueOrDefault(e.Key))),
-                    IsCurrentRunResult = e.IsInformational
-                        || selectedRunId == null
-                        || selectedIsAll
-                        || string.Equals(selectedServiceName, e.ServiceName, StringComparison.OrdinalIgnoreCase)
+                                : latestServiceResults.GetValueOrDefault(e.Key)))
                 }).ToList()
             })
             .OrderBy(g => g.ServiceName, StringComparer.OrdinalIgnoreCase)

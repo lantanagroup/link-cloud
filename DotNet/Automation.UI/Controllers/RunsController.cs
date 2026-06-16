@@ -9,6 +9,7 @@ namespace Automation.UI.Controllers;
 
 public class RunsController(
     IAutomationRunManager runManager,
+    ISnapshotStore snapshotStore,
     IScenarioStore scenarioStore,
     IQueryPlanTemplateStore queryPlanTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
@@ -35,14 +36,22 @@ public class RunsController(
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        // Active runs are surfaced by status, not by what page the user is on,
-        // so they always come from a default-sorted first page slice. Otherwise
-        // a user paged deep into history would lose the Active Runs card.
+        var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
+        var activeRunSummaries = await Task.WhenAll(activeRunMetas.Select(meta => runManager.GetRunAsync(meta.RunId, cancellationToken)));
+
         var activeRunsSource = recentPage.PageNumber == 1
             ? recentPage.Runs
             : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
-        var activeRuns = activeRunsSource
-            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+        var statusActiveRuns = activeRunsSource
+            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running);
+
+        var activeRuns = activeRunSummaries
+            .Where(r => r != null && (r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running))
+            .Select(r => r!)
+            .Concat(statusActiveRuns)
+            .GroupBy(r => r.RunId)
+            .Select(g => g.First())
+            .OrderByDescending(r => r.CreatedAt)
             .ToList();
 
         // Populate query plan templates for the shared scenario editor modal embedded in this view.
@@ -98,11 +107,22 @@ public class RunsController(
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
         var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
 
+        var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
+        var activeRunSummaries = await Task.WhenAll(activeRunMetas.Select(meta => runManager.GetRunAsync(meta.RunId, cancellationToken)));
+
         var activeRunsSource = recentPage.PageNumber == 1
             ? recentPage.Runs
             : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
-        var activeRuns = activeRunsSource
-            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+        var statusActiveRuns = activeRunsSource
+            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running);
+
+        var activeRuns = activeRunSummaries
+            .Where(r => r != null && (r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running))
+            .Select(r => r!)
+            .Concat(statusActiveRuns)
+            .GroupBy(r => r.RunId)
+            .Select(g => g.First())
+            .OrderByDescending(r => r.CreatedAt)
             .ToList();
 
         return Json(new

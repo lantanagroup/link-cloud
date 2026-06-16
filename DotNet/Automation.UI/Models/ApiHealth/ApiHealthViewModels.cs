@@ -30,12 +30,6 @@ public sealed class EndpointViewModel
 
     /// <summary>Most recent test result (null if never run).</summary>
     public ApiTestRunResult? LastResult { get; init; }
-
-    /// <summary>
-    /// True when <see cref="LastResult"/> belongs to the currently active API Health run.
-    /// False indicates a fallback result from a previous run (stale visual state).
-    /// </summary>
-    public bool IsCurrentRunResult { get; init; } = true;
 }
 
 /// <summary>

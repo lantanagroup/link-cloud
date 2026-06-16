@@ -17,10 +17,10 @@
     @* --- Summary bar --- *@
     <div class="d-flex gap-3 mb-3 flex-wrap" id="summaryBar">
         <span class="badge bg-secondary" id="sumTotal">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational)) tests</span>
-        <span class="badge au-badge-success" id="sumPass">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && e.IsCurrentRunResult && e.LastResult?.Passed == true)) passed</span>
-        <span class="badge au-badge-danger" id="sumFail">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && e.IsCurrentRunResult && e.LastResult?.Passed == false && e.LastResult?.Skipped != true)) failed</span>
-        <span class="badge au-badge-skip" id="sumSkip">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && e.IsCurrentRunResult && e.LastResult?.Skipped == true)) skipped</span>
-        <span class="badge bg-light text-dark border" id="sumPending">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && (!e.IsCurrentRunResult || e.LastResult == null))) not run</span>
+        <span class="badge au-badge-success" id="sumPass">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Passed == true)) passed</span>
+        <span class="badge au-badge-danger" id="sumFail">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Passed == false && e.LastResult?.Skipped != true)) failed</span>
+        <span class="badge au-badge-skip" id="sumSkip">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Skipped == true)) skipped</span>
+        <span class="badge bg-light text-dark border" id="sumPending">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && (!s.IsIncludedInLatestRun || e.LastResult == null))) not run</span>
     </div>
 
     <div id="runPhaseBanner" class="alert alert-secondary py-2 px-3 mb-3" style="display:none;">

@@ -9,10 +9,7 @@ namespace Automation.UI.Services.Persistence;
 /// </summary>
 public interface IApiHealthRunStore
 {
-    Task SaveRunResultAsync(ApiTestRunResult result, string runMode, DateTimeOffset startedAt, CancellationToken ct = default);
     Task SaveRunResultsAsync(IEnumerable<ApiTestRunResult> results, string runMode, DateTimeOffset startedAt, CancellationToken ct = default);
-    Task<ApiTestRunResult?> GetLatestResultAsync(string endpointKey, CancellationToken ct = default);
-    Task<Dictionary<string, ApiTestRunResult>> GetLatestResultsAsync(IEnumerable<string> endpointKeys, CancellationToken ct = default);
     Task<Dictionary<string, ApiTestRunResult>> GetLatestResultsByServiceAsync(IEnumerable<string> endpointKeys, CancellationToken ct = default);
     Task<Dictionary<string, ApiTestRunResult>> GetLatestResultsForRunAsync(Guid runId, IEnumerable<string> endpointKeys, CancellationToken ct = default);
     Task SaveServiceRunStateAsync(Guid runId, string runMode, IEnumerable<string> serviceNames, DateTimeOffset startedAt, CancellationToken ct = default);
@@ -36,9 +33,6 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
         _collection = database.GetCollection<ApiHealthRunDocument>("api_health_runs");
         _executionCollection = database.GetCollection<ApiHealthExecutionRunDocument>("api_health_execution_runs");
     }
-
-    public Task SaveRunResultAsync(ApiTestRunResult result, string runMode, DateTimeOffset startedAt, CancellationToken ct = default)
-        => SaveRunResultsAsync([result], runMode, startedAt, ct);
 
     public async Task SaveRunResultsAsync(
         IEnumerable<ApiTestRunResult> results,
@@ -83,47 +77,6 @@ public sealed class MongoApiHealthRunStore : IApiHealthRunStore
 
             await _collection.ReplaceOneAsync(filter, doc, new ReplaceOptions { IsUpsert = true }, ct);
         }
-    }
-
-    public async Task<ApiTestRunResult?> GetLatestResultAsync(string endpointKey, CancellationToken ct = default)
-    {
-        var docs = await _collection
-            .Find(d => d.EndpointResults.Any(r => r.EndpointKey == endpointKey))
-            .SortByDescending(d => d.StartedAt)
-            .ToListAsync(ct);
-
-        return docs
-            .SelectMany(d => d.EndpointResults)
-            .Where(r => string.Equals(r.EndpointKey, endpointKey, StringComparison.Ordinal))
-            .OrderByDescending(r => r.ExecutedAt)
-            .FirstOrDefault();
-    }
-
-    public async Task<Dictionary<string, ApiTestRunResult>> GetLatestResultsAsync(
-        IEnumerable<string> endpointKeys,
-        CancellationToken ct = default)
-    {
-        var keys = endpointKeys.ToHashSet(StringComparer.Ordinal);
-        if (keys.Count == 0) return new();
-
-        var docs = await _collection
-            .Find(d => d.EndpointResults.Any(r => keys.Contains(r.EndpointKey)))
-            .SortByDescending(d => d.StartedAt)
-            .ToListAsync(ct);
-
-        var result = new Dictionary<string, ApiTestRunResult>(StringComparer.Ordinal);
-        foreach (var endpointResult in docs.SelectMany(d => d.EndpointResults).OrderByDescending(r => r.ExecutedAt))
-        {
-            if (!keys.Contains(endpointResult.EndpointKey) || result.ContainsKey(endpointResult.EndpointKey))
-                continue;
-
-            result[endpointResult.EndpointKey] = endpointResult;
-
-            if (result.Count == keys.Count)
-                break;
-        }
-
-        return result;
     }
 
     public async Task SaveServiceRunStateAsync(
