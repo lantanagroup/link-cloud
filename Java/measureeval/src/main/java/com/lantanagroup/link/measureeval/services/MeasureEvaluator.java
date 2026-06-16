@@ -3,6 +3,8 @@ package com.lantanagroup.link.measureeval.services;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.FhirVersionEnum;
 import ca.uhn.fhir.model.api.TemporalPrecisionEnum;
+import com.lantanagroup.link.measureeval.models.DebugSections;
+import com.lantanagroup.link.measureeval.models.MeasureEvaluationResult;
 import com.lantanagroup.link.measureeval.repositories.LinkInMemoryFhirRepository;
 import com.lantanagroup.link.measureeval.utils.ParametersUtils;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
@@ -23,7 +25,9 @@ import org.slf4j.LoggerFactory;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.TimeZone;
 
 public class MeasureEvaluator {
@@ -40,10 +44,15 @@ public class MeasureEvaluator {
     private final Measure measure;
 
     private MeasureEvaluator(FhirContext fhirContext, Bundle bundle) {
-        this(fhirContext, bundle, false);
+        this(fhirContext, bundle, EnumSet.noneOf(DebugSections.class));
     }
 
     private MeasureEvaluator(FhirContext fhirContext, Bundle bundle, boolean isDebug) {
+        this(fhirContext, bundle,
+                isDebug ? EnumSet.allOf(DebugSections.class) : EnumSet.noneOf(DebugSections.class));
+    }
+
+    private MeasureEvaluator(FhirContext fhirContext, Bundle bundle, Set<DebugSections> debugSections) {
         if (fhirContext.getVersion().getVersion() != FhirVersionEnum.R4) {
             logger.error("Unsupported FHIR version! Expected R4 found {}",
                     fhirContext.getVersion().getVersion().getFhirVersionString());
@@ -62,7 +71,8 @@ public class MeasureEvaluator {
                 .setTerminologyParameterMode(RetrieveSettings.TERMINOLOGY_FILTER_MODE.FILTER_IN_MEMORY)
                 .setSearchParameterMode(RetrieveSettings.SEARCH_FILTER_MODE.FILTER_IN_MEMORY)
                 .setProfileMode(RetrieveSettings.PROFILE_MODE.DECLARED);
-        evaluationSettings.getCqlOptions().getCqlEngineOptions().setDebugLoggingEnabled(isDebug);
+        evaluationSettings.getCqlOptions().getCqlEngineOptions().setDebugLoggingEnabled(
+                DebugSections.needsDebugLogging(debugSections));
 
         this.bundle = bundle;
         if (!this.bundle.hasEntry()) {
@@ -98,13 +108,16 @@ public class MeasureEvaluator {
         doEvaluate(null, null, new StringType(subject), additionalData);
     }
 
-    public static MeasureReport compileAndEvaluate(FhirContext fhirContext, Bundle bundle, Parameters parameters, boolean isDebug) {
-        MeasureEvaluator evaluator = new MeasureEvaluator(fhirContext, bundle, isDebug);
+    public static MeasureEvaluationResult compileAndEvaluate(
+            FhirContext fhirContext, Bundle bundle, Parameters parameters, Set<DebugSections> debugSections) {
+        MeasureEvaluator evaluator = new MeasureEvaluator(fhirContext, bundle, debugSections);
         DateTimeType periodStart = ParametersUtils.getValue(parameters, "periodStart", DateTimeType.class);
         DateTimeType periodEnd = ParametersUtils.getValue(parameters, "periodEnd", DateTimeType.class);
         StringType subject = ParametersUtils.getValue(parameters, "subject", StringType.class);
         Bundle additionalData = ParametersUtils.getResource(parameters, "additionalData", Bundle.class);
-        return evaluator.doEvaluate(periodStart, periodEnd, subject, additionalData);
+        MeasureReport measureReport = evaluator.doEvaluate(periodStart, periodEnd, subject, additionalData);
+        // debugInfo populated in a follow-up commit; for now expose only the MeasureReport.
+        return new MeasureEvaluationResult(measureReport, null);
     }
 
     private MeasureReport doEvaluate(

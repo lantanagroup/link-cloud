@@ -3,6 +3,8 @@ package com.lantanagroup.link.measureeval.controllers;
 import ca.uhn.fhir.context.FhirContext;
 import com.fasterxml.jackson.annotation.JsonView;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
+import com.lantanagroup.link.measureeval.models.DebugSections;
+import com.lantanagroup.link.measureeval.models.MeasureEvaluationResult;
 import com.lantanagroup.link.measureeval.models.RelatedArtifactInfo;
 import com.lantanagroup.link.measureeval.repositories.MeasureDefinitionRepository;
 import com.lantanagroup.link.measureeval.services.MeasureDefinitionBundleValidator;
@@ -18,7 +20,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import javassist.NotFoundException;
 import org.apache.commons.text.StringEscapeUtils;
 import org.hl7.fhir.r4.model.Bundle;
-import org.hl7.fhir.r4.model.MeasureReport;
 import org.hl7.fhir.r4.model.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/measureeval/measure-definition")
@@ -146,8 +148,16 @@ public class MeasureDefinitionController {
     @Operation(summary = "Evaluate a measure against data in request body", tags = {"Measure Definitions"})
     @Parameter(name = "id", description = "The ID of the measure definition", required = true)
     @Parameter(name = "parameters", description = "The parameters to use in the evaluation", required = true)
-    @Parameter(name = "debug", description = "Whether to log CQL debugging information during evaluation", required = false)
-    public MeasureReport evaluate(@AuthenticationPrincipal PrincipalUser user, @PathVariable String id, @RequestBody Parameters parameters, @RequestParam(required = false, defaultValue = "false") boolean debug) {
+    @Parameter(name = "debug",
+            description = "Which debug sections to populate on the response. " +
+                    "Accepts `true`/`all` (every section), `false`/empty (no sections), " +
+                    "or a comma-separated list of: groups, expressions, librarydebug, messages, traces, debuglog.",
+            required = false)
+    public MeasureEvaluationResult evaluate(
+            @AuthenticationPrincipal PrincipalUser user,
+            @PathVariable String id,
+            @RequestBody Parameters parameters,
+            @RequestParam(required = false, defaultValue = "false") String debug) {
 
         if (user != null){
             Span currentSpan = Span.current();
@@ -161,9 +171,11 @@ public class MeasureDefinitionController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Measure definition not found");
         }
 
+        Set<DebugSections> debugSections = DebugSections.parse(debug);
+
         try {
-            // But recompile the bundle every time because the debug flag may not match what's in the cache
-            return MeasureEvaluator.compileAndEvaluate(FhirContext.forR4(), evaluator.getBundle(), parameters, debug);
+            // Recompile the bundle every time because the debug flag may not match what's in the cache
+            return MeasureEvaluator.compileAndEvaluate(FhirContext.forR4(), evaluator.getBundle(), parameters, debugSections);
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
         }
