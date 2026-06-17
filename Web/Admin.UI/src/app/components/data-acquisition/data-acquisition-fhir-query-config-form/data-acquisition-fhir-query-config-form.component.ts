@@ -356,6 +356,10 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     return this.configForm.get('enableLocationResolutionMapping') as FormControl;
   }
 
+  get hasEncounterParameter(): boolean {
+    return this.item?.hasEncounterParameter ?? false;
+  }
+
   private parseTime(time: string | null): { hour: number; minute: number; second: number } {
     if (!time) return { hour: 0, minute: 0, second: 0 };
 

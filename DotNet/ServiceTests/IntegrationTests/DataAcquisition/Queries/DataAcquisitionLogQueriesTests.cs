@@ -342,6 +342,103 @@ public class DataAcquisitionLogQueriesTests
     }
 
     [Fact]
+    public async Task SearchAsync_CompletedLogWithoutCompletionDate_ReturnsModifyDateAsCompletionDate()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"CompletedDateFallback_{tag}";
+        var reportTrackingId = Guid.NewGuid();
+        var modifyDate = DateTime.UtcNow.AddMinutes(-5);
+
+        var log = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            Status = RequestStatus.Completed,
+            CompletionDate = null,
+            ModifyDate = modifyDate,
+            CorrelationId = Guid.NewGuid().ToString(),
+            ReportTrackingId = reportTrackingId,
+            PatientId = "Patient/123",
+            ScheduledReportEntity = new ScheduledReportEntity { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow }
+        };
+        dbContext.DataAcquisitionLogs.Add(log);
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var result = await queries.SearchAsync(new SearchDataAcquisitionLogRequest
+        {
+            FacilityId = facilityId,
+            RequestStatuses = [RequestStatus.Completed],
+            PageNumber = 1,
+            PageSize = 10
+        });
+
+        var record = Assert.Single(result.Records);
+        Assert.Equal(log.Id, record.Id);
+        Assert.Equal(modifyDate, record.CompletionDate);
+    }
+
+    [Fact]
+    public async Task SearchQueryLogSummaryAsync_CompletedLogWithoutCompletionDate_ReturnsModifyDateAsCompletionDate()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"CompletedDateListFallback_{tag}";
+        var reportTrackingId = Guid.NewGuid();
+        var modifyDate = DateTime.UtcNow.AddMinutes(-5);
+
+        var log = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            Status = RequestStatus.Completed,
+            CompletionDate = null,
+            ModifyDate = modifyDate,
+            CorrelationId = Guid.NewGuid().ToString(),
+            ReportTrackingId = reportTrackingId,
+            PatientId = "Patient/123",
+            QueryType = FhirQueryType.Read,
+            ScheduledReportEntity = new ScheduledReportEntity { ReportTrackingId = reportTrackingId, StartDate = DateTime.UtcNow.AddDays(-1), EndDate = DateTime.UtcNow },
+            FhirQueries = new List<FhirQuery>
+            {
+                new FhirQuery
+                {
+                    FacilityId = facilityId,
+                    QueryType = FhirQueryType.Read,
+                    FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                    {
+                        new() { ResourceType = Hl7.Fhir.Model.ResourceType.Patient }
+                    }
+                }
+            }
+        };
+        dbContext.DataAcquisitionLogs.Add(log);
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var result = await queries.SearchQueryLogSummaryAsync(new SearchDataAcquisitionLogRequest
+        {
+            FacilityId = facilityId,
+            RequestStatuses = [RequestStatus.Completed],
+            PageNumber = 1,
+            PageSize = 10
+        });
+
+        var record = Assert.Single(result.Records);
+        Assert.Equal(log.Id, record.Id);
+        Assert.Equal(modifyDate, record.CompletionDate);
+    }
+
+    [Fact]
     public async Task SearchAsync_ReturnsMatchingResults()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
@@ -715,6 +812,98 @@ public class DataAcquisitionLogQueriesTests
 
         Assert.Equal(3, batch.Count);
         Assert.All(batch, l => Assert.Equal(facilityId, l.FacilityId));
+    }
+
+    [Fact]
+    public async Task GetNextEligibleBatchForFacility_ReturnsInitialLocationReferenceLog_WhenOrganizationLocationConfigurationIsActive()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var tag = Guid.NewGuid().ToString("N");
+        var facilityId = $"OrgLocBatch_{tag}";
+        var correlationId = Guid.NewGuid().ToString();
+        var reportTrackingId = Guid.NewGuid();
+        var scheduledReport = new ScheduledReportEntity
+        {
+            ReportTrackingId = reportTrackingId,
+            StartDate = DateTime.UtcNow.AddDays(-1),
+            EndDate = DateTime.UtcNow
+        };
+
+        dbContext.LocationConfigurations.Add(new OrganizationLocationConfiguration
+        {
+            FacilityId = facilityId,
+            Description = "Active org-location mapping",
+            IsActive = true
+        });
+
+        var pendingPrimary = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Pending,
+            QueryPhase = QueryPhase.Initial,
+            PatientId = "Patient/123",
+            ScheduledReportEntity = scheduledReport,
+            FhirQueries =
+            [
+                new FhirQuery
+                {
+                    FacilityId = facilityId,
+                    QueryType = FhirQueryType.Search,
+                    FhirQueryResourceTypes =
+                    [
+                        new FhirQueryResourceType { ResourceType = Hl7.Fhir.Model.ResourceType.Condition }
+                    ]
+                }
+            ]
+        };
+
+        var locationReferenceLog = new DataAcquisitionLog
+        {
+            FhirVersion = "test",
+            TraceId = Guid.NewGuid().ToString(),
+            FacilityId = facilityId,
+            CorrelationId = correlationId,
+            ReportTrackingId = reportTrackingId,
+            Status = RequestStatus.Pending,
+            QueryPhase = QueryPhase.Initial,
+            ReferenceResourceType = Hl7.Fhir.Model.ResourceType.Location.ToString(),
+            PatientId = "Patient/123",
+            ScheduledReportEntity = scheduledReport,
+            FhirQueries =
+            [
+                new FhirQuery
+                {
+                    FacilityId = facilityId,
+                    IsReference = true,
+                    QueryType = FhirQueryType.Search,
+                    FhirQueryResourceTypes =
+                    [
+                        new FhirQueryResourceType { ResourceType = Hl7.Fhir.Model.ResourceType.Location }
+                    ]
+                }
+            ]
+        };
+
+        dbContext.DataAcquisitionLogs.AddRange(pendingPrimary, locationReferenceLog);
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var batch = await queries.GetNextEligibleBatchForFacility(
+            facilityId,
+            null,
+            10,
+            [RequestStatus.Pending],
+            DateTime.UtcNow);
+
+        Assert.DoesNotContain(batch, log => log.Id == pendingPrimary.Id);
+        Assert.Contains(batch, log => log.Id == locationReferenceLog.Id);
     }
 
     [Fact]

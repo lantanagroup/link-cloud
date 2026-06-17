@@ -1,6 +1,8 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -37,6 +39,14 @@ public class EncounterMappingManager : IEncounterMappingManager
             ModifiedDate = now
         };
 
+        var existingMapping = await _database.EncounterMappingRepository.FirstOrDefaultAsync(m => 
+            m.FacilityId == model.FacilityId && 
+            m.EncounterId == model.EncounterId);
+        
+        if (existingMapping != null) {
+            throw new EntityAlreadyExistsException($"An EncounterMapping already exists for FacilityId {model.FacilityId} and EncounterId {model.EncounterId}");
+        }
+        
         if (model.OrganizationLocationMappingIds != null)
         {
             foreach (var locId in model.OrganizationLocationMappingIds)
@@ -50,8 +60,28 @@ public class EncounterMappingManager : IEncounterMappingManager
             }
         }
 
-        await _database.EncounterMappingRepository.AddAsync(entity);
-        await _database.SaveChangesAsync();
+        try
+        {
+            await _database.EncounterMappingRepository.AddAsync(entity);
+            await _database.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            // The pre-check above is non-atomic: a concurrent request can insert the same
+            // (FacilityId, EncounterId) between the check and SaveChanges, tripping the
+            // unique constraint (UQ_EncounterMapping_FacilityId_EncounterId). Re-check so we
+            // still surface a 409 in that race; if it isn't a duplicate, rethrow the original.
+            var concurrent = await _database.EncounterMappingRepository.FirstOrDefaultAsync(m =>
+                m.FacilityId == model.FacilityId &&
+                m.EncounterId == model.EncounterId);
+
+            if (concurrent != null)
+            {
+                throw new EntityAlreadyExistsException($"An EncounterMapping already exists for FacilityId {model.FacilityId} and EncounterId {model.EncounterId}");
+            }
+
+            throw;
+        }
 
         return ProjectToModel(entity);
     }

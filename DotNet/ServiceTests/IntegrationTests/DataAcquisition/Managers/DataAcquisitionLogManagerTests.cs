@@ -171,6 +171,34 @@ public class DataAcquisitionLogManagerTests
     }
 
     [Fact]
+    public async Task UpdateStatusBatchAsync_ToCompleted_SetsCompletionDate()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var log = new DataAcquisitionLog
+        {
+            FacilityId = $"TestFacility_{Guid.NewGuid():N}",
+            Status = RequestStatus.Processing,
+            CompletionDate = null
+        };
+        dbContext.DataAcquisitionLogs.Add(log);
+        await dbContext.SaveChangesAsync();
+
+        var beforeUpdate = DateTime.UtcNow.AddSeconds(-1);
+        var manager = CreateManager(scope);
+
+        var updated = await manager.UpdateStatusBatchAsync([log.Id], RequestStatus.Completed, incrementRetry: false);
+
+        Assert.Equal(1, updated);
+
+        await dbContext.Entry(log).ReloadAsync();
+        Assert.Equal(RequestStatus.Completed, log.Status);
+        Assert.NotNull(log.CompletionDate);
+        Assert.True(log.CompletionDate >= beforeUpdate, $"CompletionDate {log.CompletionDate} should be >= {beforeUpdate}");
+    }
+
+    [Fact]
     public async Task UpdateAsync_NoExistingLog_ThrowsNotFound()
     {
         // Arrange

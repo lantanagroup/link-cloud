@@ -416,6 +416,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     public async Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, bool incrementRetry = false, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.UpdateStatusBatchAsync");
+        var now = DateTime.UtcNow;
 
         // High-speed bulk update without fetching entities. 
         return await _dbContext.DataAcquisitionLogs
@@ -423,7 +424,8 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(l => l.Status, newStatus)
                 .SetProperty(l => l.RetryAttempts, l => incrementRetry ? l.RetryAttempts + 1 : l.RetryAttempts)
-                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                .SetProperty(l => l.CompletionDate, l => newStatus == RequestStatus.Completed ? l.CompletionDate ?? now : l.CompletionDate)
+                .SetProperty(l => l.ModifyDate, now),
                 cancellationToken);
     }
 
@@ -607,12 +609,14 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.TrySetLogStatusAsync");
         activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, logId);
+        var now = DateTime.UtcNow;
 
         int rowsAffected = await _dbContext.DataAcquisitionLogs
             .Where(l => l.Id == logId && l.Status != null && validCurrentStatuses.Contains(l.Status.Value))
             .ExecuteUpdateAsync(setters => setters
                     .SetProperty(l => l.Status, newStatus)
-                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    .SetProperty(l => l.CompletionDate, l => newStatus == RequestStatus.Completed ? l.CompletionDate ?? now : l.CompletionDate)
+                    .SetProperty(l => l.ModifyDate, now),
                 cancellationToken);
 
         if (rowsAffected > 0 && !string.IsNullOrWhiteSpace(note))
@@ -621,7 +625,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             {
                 DataAcquisitionLogId = logId,
                 Note = note,
-                CreateDate = DateTime.UtcNow
+                CreateDate = now
             });
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
