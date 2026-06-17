@@ -91,6 +91,10 @@ management:
       enabled: false
     refresh:
       enabled: false
+    redis:
+      enabled: false     # Custom RedisHealthIndicator (bounded PING) is used instead of the auto one
+      timeout-ms: 3000   # backstop deadline for the custom indicator's PING; the 2s command timeout
+                         # (RedisCacheConfig commandTimeout) reports DOWN sooner in the common case
 
 logging:
   level:
