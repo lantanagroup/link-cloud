@@ -84,9 +84,10 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Application.Clients
                             ? HealthStatus.Healthy
                             : HealthStatus.Unhealthy;
 
-                        // Spring auto-configures the Redis health indicator under the "redis"
-                        // component; map it to the "Cache" entry the UI's Cache column expects.
-                        var key = component.Key.Equals("redis", StringComparison.OrdinalIgnoreCase)
+                        // MeasureEval's ResourceCacheHealthIndicator reports the combined Redis + ABS
+                        // resource-cache status under the "resourceCache" component; map it to the
+                        // "Cache" entry the UI's Cache column expects.
+                        var key = component.Key.Equals("resourceCache", StringComparison.OrdinalIgnoreCase)
                             ? "Cache"
                             : ToPascalCase(component.Key);
 
