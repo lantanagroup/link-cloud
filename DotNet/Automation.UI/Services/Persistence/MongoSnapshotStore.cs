@@ -1,6 +1,6 @@
-﻿using System.Text.Json;
-using MongoDB.Driver;
-using Microsoft.Extensions.Logging;
+﻿using MongoDB.Driver;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Automation.UI.Services.Persistence;
 
@@ -19,15 +19,19 @@ namespace Automation.UI.Services.Persistence;
 public sealed class MongoSnapshotStore : ISnapshotStore
 {
     private readonly IMongoCollection<AutomationRunDocument> _runs;
+    private readonly IMongoCollection<AutomationRunInputDocument> _runInputs;
     private readonly IMongoCollection<DomainSnapshotDocument> _snapshots;
     private readonly IMongoCollection<RunLogDocument> _logs;
+    private readonly IMongoCollection<ImportedBundleDocument> _importedBundles;
     private readonly ILogger<MongoSnapshotStore> _logger;
 
     public MongoSnapshotStore(IMongoDatabase database, ILogger<MongoSnapshotStore> logger)
     {
         _runs = database.GetCollection<AutomationRunDocument>("automation_runs");
+        _runInputs = database.GetCollection<AutomationRunInputDocument>("automation_run_inputs");
         _snapshots = database.GetCollection<DomainSnapshotDocument>("automation_snapshots");
         _logs = database.GetCollection<RunLogDocument>("automation_logs");
+        _importedBundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
         _logger = logger;
     }
 
@@ -40,6 +44,9 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             .Set(r => r.ReportId, meta.ReportId)
             .Set(r => r.IsActive, true)
             .Set(r => r.StartedAt, meta.StartedAt)
+            .SetOnInsert(r => r.RunName, $"Run {runId}")
+            .SetOnInsert(r => r.Scenario, AutomationScenarioKind.Custom.ToString())
+            .SetOnInsert(r => r.Status, AutomationRunStatus.Running.ToString())
             .SetOnInsert(r => r.RunId, runId)
             .SetOnInsert(r => r.CreatedAt, DateTimeOffset.UtcNow);
 
@@ -81,7 +88,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             .Set(r => r.PatientCount, summary.PatientCount)
             .Set(r => r.ResourcesPerPatient, summary.ResourcesPerPatient)
             .Set(r => r.Seed, summary.Seed)
-            .Set(r => r.RunConfigurationJson, summary.RunConfigurationJson)
             .Set(r => r.Status, summary.Status.ToString())
             .Set(r => r.CreatedAt, summary.CreatedAt)
             .Set(r => r.StartedAt, summary.StartedAt ?? summary.CreatedAt)
@@ -94,6 +100,20 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             .SetOnInsert(r => r.RunId, summary.RunId);
 
         await _runs.UpdateOneAsync(r => r.RunId == summary.RunId, update, new UpdateOptions { IsUpsert = true }, ct);
+    }
+
+    public Task UpsertRunInputAsync(AutomationRunInputSnapshot input, CancellationToken ct = default)
+    {
+        var update = Builders<AutomationRunInputDocument>.Update
+            .Set(d => d.ScenarioId, input.ScenarioId)
+            .Set(d => d.ScenarioName, input.ScenarioName)
+            .Set(d => d.RunConfigurationJson, input.RunConfigurationJson)
+            .Set(d => d.ImportedBundleIds, input.ImportedBundleIds.Distinct().ToList())
+            .Set(d => d.UpdatedAt, input.UpdatedAt)
+            .SetOnInsert(d => d.RunId, input.RunId)
+            .SetOnInsert(d => d.CreatedAt, input.CreatedAt);
+
+        return _runInputs.UpdateOneAsync(d => d.RunId == input.RunId, update, new UpdateOptions { IsUpsert = true }, ct);
     }
 
     public async Task<IReadOnlyList<RunSnapshotMeta>> GetActiveRunsAsync(CancellationToken ct = default)
@@ -111,7 +131,55 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     public async Task<AutomationRunSummary?> GetRunSummaryAsync(Guid runId, CancellationToken ct = default)
     {
         var doc = await _runs.Find(r => r.RunId == runId).FirstOrDefaultAsync(ct);
-        return doc == null ? null : ToSummary(doc);
+        if (doc == null)
+            return null;
+
+        var summary = ToSummary(doc);
+        var input = await GetRunInputAsync(runId, ct);
+        if (input != null)
+            summary.RunConfigurationJson = await BuildHydratedRunConfigurationJsonAsync(input, ct);
+
+        return summary;
+    }
+
+    public async Task<AutomationRunInputSnapshot?> GetRunInputAsync(Guid runId, CancellationToken ct = default)
+    {
+        var doc = await _runInputs.Find(d => d.RunId == runId).FirstOrDefaultAsync(ct);
+        if (doc == null)
+            return null;
+
+        return new AutomationRunInputSnapshot
+        {
+            RunId = doc.RunId,
+            ScenarioId = doc.ScenarioId,
+            ScenarioName = doc.ScenarioName,
+            RunConfigurationJson = doc.RunConfigurationJson,
+            ImportedBundleIds = doc.ImportedBundleIds,
+            CreatedAt = doc.CreatedAt,
+            UpdatedAt = doc.UpdatedAt
+        };
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, ImportedBundleSnapshot>> GetImportedBundlesByIdsAsync(IEnumerable<Guid> bundleIds, CancellationToken ct = default)
+    {
+        var ids = bundleIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return new Dictionary<Guid, ImportedBundleSnapshot>();
+
+        var docs = await _importedBundles
+            .Find(Builders<ImportedBundleDocument>.Filter.In(d => d.Id, ids))
+            .ToListAsync(ct);
+
+        return docs.ToDictionary(
+            d => d.Id,
+            d => new ImportedBundleSnapshot
+            {
+                BundleId = d.Id,
+                PatientId = d.PatientId,
+                FileName = d.FileName,
+                BundleJson = d.BundleJson,
+                ByteCount = d.ByteCount
+            });
     }
 
     public async Task<PagedRunResult> GetRunsPageAsync(int pageNumber, int pageSize, string? sortBy = null, bool sortDescending = true, CancellationToken ct = default)
@@ -175,8 +243,64 @@ public sealed class MongoSnapshotStore : ISnapshotStore
     public async Task DeleteRunAsync(Guid runId, CancellationToken ct = default)
     {
         await _runs.DeleteOneAsync(r => r.RunId == runId, ct);
+        await _runInputs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
         await _logs.DeleteOneAsync(l => l.RunId == runId, ct);
+    }
+
+    private async Task<string?> BuildHydratedRunConfigurationJsonAsync(AutomationRunInputSnapshot input, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(input.RunConfigurationJson))
+            return null;
+
+        try
+        {
+            var root = JsonNode.Parse(input.RunConfigurationJson) as JsonObject;
+            if (root == null)
+                return input.RunConfigurationJson;
+
+            if (input.ImportedBundleIds.Count == 0)
+                return root.ToJsonString();
+
+            var bundles = await GetImportedBundlesByIdsAsync(input.ImportedBundleIds, ct);
+            var byPatient = bundles.Values
+                .GroupBy(b => b.PatientId, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => new Queue<ImportedBundleSnapshot>(g));
+
+            if (root["importedPatientBundles"] is JsonArray arr)
+            {
+                foreach (var node in arr.OfType<JsonObject>())
+                {
+                    var uploadedId = node["uploadedBundleId"]?.GetValue<string>();
+                    ImportedBundleSnapshot? bundle = null;
+
+                    if (Guid.TryParse(uploadedId, out var bundleId) && bundles.TryGetValue(bundleId, out var byId))
+                    {
+                        bundle = byId;
+                    }
+                    else
+                    {
+                        var patientId = node["patientId"]?.GetValue<string>() ?? string.Empty;
+                        if (byPatient.TryGetValue(patientId, out var queue) && queue.Count > 0)
+                            bundle = queue.Dequeue();
+                    }
+
+                    if (bundle != null)
+                    {
+                        node["uploadedBundleId"] = bundle.BundleId.ToString();
+                        node["patientId"] = string.IsNullOrWhiteSpace(node["patientId"]?.GetValue<string>()) ? bundle.PatientId : node["patientId"]?.GetValue<string>();
+                        node["fileName"] = string.IsNullOrWhiteSpace(node["fileName"]?.GetValue<string>()) ? bundle.FileName : node["fileName"]?.GetValue<string>();
+                        node["bundleJson"] = null;
+                    }
+                }
+            }
+
+            return root.ToJsonString();
+        }
+        catch
+        {
+            return input.RunConfigurationJson;
+        }
     }
 
     private static RunSnapshotMeta ToMeta(AutomationRunDocument doc) => new()
@@ -190,19 +314,27 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     private static AutomationRunSummary ToSummary(AutomationRunDocument doc)
     {
-        _ = Enum.TryParse<AutomationScenarioKind>(doc.Scenario, ignoreCase: true, out var scenario);
-        _ = Enum.TryParse<AutomationRunStatus>(doc.Status, ignoreCase: true, out var status);
+        var scenarioParsed = Enum.TryParse<AutomationScenarioKind>(doc.Scenario, ignoreCase: true, out var scenario);
+        var statusParsed = Enum.TryParse<AutomationRunStatus>(doc.Status, ignoreCase: true, out var status);
+
+        if (!scenarioParsed)
+            scenario = AutomationScenarioKind.Custom;
+
+        if (!statusParsed)
+            status = AutomationRunStatus.Failed;
 
         return new AutomationRunSummary
         {
             RunId = doc.RunId,
-            RunName = string.IsNullOrWhiteSpace(doc.RunName) ? scenario.ToString() : doc.RunName,
+            RunName = string.IsNullOrWhiteSpace(doc.RunName)
+                ? (scenario == AutomationScenarioKind.Custom ? $"Run {doc.RunId}" : scenario.ToString())
+                : doc.RunName,
             Scenario = scenario,
             SelectedMeasure = doc.SelectedMeasure,
             PatientCount = doc.PatientCount,
             ResourcesPerPatient = doc.ResourcesPerPatient,
             Seed = doc.Seed,
-            RunConfigurationJson = doc.RunConfigurationJson,
+            RunConfigurationJson = null,
             Status = status,
             CreatedAt = doc.CreatedAt,
             StartedAt = doc.StartedAt,
