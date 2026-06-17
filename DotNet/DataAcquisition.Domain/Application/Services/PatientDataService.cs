@@ -16,6 +16,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services.FhirApi.Commands;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.Enums;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -65,6 +66,7 @@ public class PatientDataService : IPatientDataService
     private readonly IReadFhirCommand _readFhirCommand;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
+    private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries;
     private readonly IFhirApiService _fhirApiService;
     private readonly IReferenceResourceService _referenceResourceService;
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
@@ -82,6 +84,7 @@ public class PatientDataService : IPatientDataService
         IReadFhirCommand readFhirCommand,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
+        IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
         IFhirApiService fhirApiService,
         IReferenceResourceService referenceResourceService,
         IDistributedSemaphoreProvider distributedSemaphoreProvider,
@@ -107,6 +110,8 @@ public class PatientDataService : IPatientDataService
                                      throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
         _dataAcquisitionLogQueries = dataAcquisitionLogQueries ??
                                      throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
+        _organizationLocationConfigurationQueries = organizationLocationConfigurationQueries ??
+                                                throw new ArgumentNullException(nameof(organizationLocationConfigurationQueries));
         _fhirApiService = fhirApiService ?? throw new ArgumentNullException(nameof(fhirApiService));
         _referenceResourceService = referenceResourceService ?? throw new ArgumentNullException(nameof(referenceResourceService));
         _scheduledReportManager = scheduledReportManager ?? throw new ArgumentNullException(nameof(scheduledReportManager));
@@ -243,129 +248,165 @@ public class PatientDataService : IPatientDataService
             return;
         }
 
-        if (queryPlan != null)
-        {
-            var initialQueries =
-                queryPlan.InitialQueries.OrderBy(x => int.TryParse(x.Key, out int num) ? num : int.MaxValue);
-            var supplementalQueries =
-                queryPlan.SupplementalQueries.OrderBy(x => int.TryParse(x.Key, out int num) ? num : int.MaxValue);
+        var isOrganizationLocationConfigurationEnabled =
+            await IsOrganizationLocationConfigurationEnabled(request.FacilityId, cancellationToken);
 
-            var referenceStrTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>()
-                .Select(x => x.ResourceType).Distinct().ToList();
-            referenceStrTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>()
-                .Select(x => x.ResourceType).Distinct().ToList());
+        var initialQueries =
+            OrderInitialQueries(queryPlan.InitialQueries, isOrganizationLocationConfigurationEnabled);
+        var supplementalQueries =
+            queryPlan.SupplementalQueries.OrderBy(x => int.TryParse(x.Key, out int num) ? num : int.MaxValue);
 
-            var referenceTypes = referenceStrTypes.Select(x =>
-                new ResourceReferenceType
-                {
-                    FacilityId = request.FacilityId,
-                    QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType),
-                    ResourceType = x,
-                }).ToList();
+        var referenceStrTypes = queryPlan.InitialQueries.Values.OfType<ReferenceQueryConfig>()
+            .Select(x => x.ResourceType).Distinct().ToList();
+        referenceStrTypes.AddRange(queryPlan.SupplementalQueries.Values.OfType<ReferenceQueryConfig>()
+            .Select(x => x.ResourceType).Distinct().ToList());
 
-            int totalLogsCreated = 0;
-
-            foreach (var schedReport in request.ConsumeResult.Message.Value.ScheduledReports)
+        var referenceTypes = referenceStrTypes.Select(x =>
+            new ResourceReferenceType
             {
-                // Ensure the ScheduledReport row exists (concurrency-safe, deduplicated by ReportTrackingId).
-                if (!string.IsNullOrWhiteSpace(schedReport.ReportTrackingId))
-                {
-                    await _scheduledReportManager.EnsureCreatedAsync(schedReport, cancellationToken);
-                }
+                FacilityId = request.FacilityId,
+                QueryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType),
+                ResourceType = x,
+            }).ToList();
 
-                if (request.QueryPlanType == QueryPlanType.Initial)
-                {
-                    var priority = schedReport.Frequency == Frequency.Daily
-                        ? AcquisitionPriority.High
-                        : AcquisitionPriority.Normal;
+        int totalLogsCreated = 0;
 
-                    try
-                    {
-                        await _dataAcquisitionLogManager.CreateAsync(
-                            new CreateDataAcquisitionLogModel
-                            {
-                                FacilityId = request.FacilityId,
-                                CorrelationId = request.CorrelationId,
-                                PatientId = request.ConsumeResult.Message.Value.PatientId,
-                                Priority = priority,
-                                ExecutionDate = DateTime.UtcNow,
-                                ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
-                                Status = RequestStatus.Pending,
-                                FhirVersion = "R4",
-                                QueryType = FhirQueryType.Read,
-                                QueryPhase =
-                                    QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
-                                ReportTrackingId = schedReport.ReportTrackingId,
-                                TraceId = traceAndSpanDelimited,
-                                FhirQuery = new List<CreateFhirQueryModel>
-                                {
-                                    new CreateFhirQueryModel
-                                    {
-                                        QueryType = FhirQueryType.Read,
-                                        ResourceTypes = new List<ResourceType> { ResourceType.Patient },
-                                        QueryParameters = new List<string>(),
-                                        FacilityId = request.FacilityId,
-                                        ResourceReferenceTypes = referenceTypes.Select(x =>
-                                            new CreateResourceReferenceTypeModel
-                                            {
-                                                FacilityId = request.FacilityId,
-                                                QueryPhase =
-                                                    QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value
-                                                        .QueryType),
-                                                ResourceType = x.ResourceType,
-                                            }).ToList(),
-                                    }
-                                },
-                            }, cancellationToken);
+        foreach (var schedReport in request.ConsumeResult.Message.Value.ScheduledReports)
+        {
+            // Ensure the ScheduledReport row exists (concurrency-safe, deduplicated by ReportTrackingId).
+            if (!string.IsNullOrWhiteSpace(schedReport.ReportTrackingId))
+            {
+                await _scheduledReportManager.EnsureCreatedAsync(schedReport, cancellationToken);
+            }
 
-                        totalLogsCreated++;
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex,
-                            "Error creating log entry for facility {FacilityId} and patient {PatientId}",
-                            request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
-
-                        throw;
-                    }
-                }
+            if (request.QueryPlanType == QueryPlanType.Initial)
+            {
+                var priority = schedReport.Frequency == Frequency.Daily
+                    ? AcquisitionPriority.High
+                    : AcquisitionPriority.Normal;
 
                 try
                 {
-                    totalLogsCreated += await _queryListProcessor.Process(
-                        dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase)
-                            ? initialQueries
-                            : supplementalQueries,
-                        request,
-                        fhirQueryConfiguration,
-                        queryPlan,
-                        referenceTypes,
-                        dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase)
-                            ? QueryPlanType.Initial.ToString()
-                            : QueryPlanType.Supplemental.ToString(),
-                        schedReport,
-                        cancellationToken);
+                    await _dataAcquisitionLogManager.CreateAsync(
+                        new CreateDataAcquisitionLogModel
+                        {
+                            FacilityId = request.FacilityId,
+                            CorrelationId = request.CorrelationId,
+                            PatientId = request.ConsumeResult.Message.Value.PatientId,
+                            Priority = priority,
+                            ExecutionDate = DateTime.UtcNow,
+                            ReportableEvent = request.ConsumeResult.Message.Value.ReportableEvent,
+                            Status = RequestStatus.Pending,
+                            FhirVersion = "R4",
+                            QueryType = FhirQueryType.Read,
+                            QueryPhase =
+                                QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value.QueryType),
+                            ReportTrackingId = schedReport.ReportTrackingId,
+                            TraceId = traceAndSpanDelimited,
+                            FhirQuery = new List<CreateFhirQueryModel>
+                            {
+                                new CreateFhirQueryModel
+                                {
+                                    QueryType = FhirQueryType.Read,
+                                    ResourceTypes = new List<ResourceType> { ResourceType.Patient },
+                                    QueryParameters = new List<string>(),
+                                    FacilityId = request.FacilityId,
+                                    ResourceReferenceTypes = referenceTypes.Select(x =>
+                                        new CreateResourceReferenceTypeModel
+                                        {
+                                            FacilityId = request.FacilityId,
+                                            QueryPhase =
+                                                QueryPhaseUtilities.ToDomain(request.ConsumeResult.Message.Value
+                                                    .QueryType),
+                                            ResourceType = x.ResourceType,
+                                        }).ToList(),
+                                }
+                            },
+                        }, cancellationToken);
+
+                    totalLogsCreated++;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error retrieving data from EHR for facility: {FacilityId}",
-                        request.FacilityId);
+                    _logger.LogError(ex,
+                        "Error creating log entry for facility {FacilityId} and patient {PatientId}",
+                        request.FacilityId.Sanitize(), dataAcqRequested.PatientId);
+
                     throw;
                 }
             }
 
-            // All logs committed — stamp the sibling count so workers know the full set exists.
-            if (totalLogsCreated > 0)
+            try
             {
-                var queryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType);
-                await _dataAcquisitionLogManager.StampSiblingCountAsync(
-                    request.FacilityId,
-                    request.CorrelationId,
-                    queryPhase,
-                    totalLogsCreated,
+                totalLogsCreated += await _queryListProcessor.Process(
+                    dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase)
+                        ? initialQueries
+                        : supplementalQueries,
+                    request,
+                    fhirQueryConfiguration,
+                    queryPlan,
+                    referenceTypes,
+                    dataAcqRequested.QueryType.Equals("Initial", StringComparison.InvariantCultureIgnoreCase)
+                        ? QueryPlanType.Initial.ToString()
+                        : QueryPlanType.Supplemental.ToString(),
+                    schedReport,
                     cancellationToken);
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving data from EHR for facility: {FacilityId}",
+                    request.FacilityId);
+                throw;
+            }
         }
+
+        // All logs committed — stamp the sibling count so workers know the full set exists.
+        if (totalLogsCreated > 0)
+        {
+            var queryPhase = QueryPhaseUtilities.ToDomain(request.ConsumeResult.Value.QueryType);
+            await _dataAcquisitionLogManager.StampSiblingCountAsync(
+                request.FacilityId,
+                request.CorrelationId,
+                queryPhase,
+                totalLogsCreated,
+                cancellationToken);
+        }
+    }
+
+    private async Task<bool> IsOrganizationLocationConfigurationEnabled(string facilityId, CancellationToken cancellationToken)
+    {
+        var configurations = await _organizationLocationConfigurationQueries.GetByFacilityIdAsync(facilityId);
+        return configurations?.Any(x => x.IsActive) == true;
+    }
+
+    private static IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> OrderInitialQueries(
+        Dictionary<string, IQueryConfig> queries,
+        bool prioritizeOrganizationLocationDependencies)
+    {
+        return queries.OrderBy(x =>
+            prioritizeOrganizationLocationDependencies
+                ? GetOrganizationLocationPriority(x.Value)
+                : 0)
+            .ThenBy(x => int.TryParse(x.Key, out int num) ? num : int.MaxValue)
+            .ThenBy(x => x.Key, StringComparer.Ordinal);
+    }
+
+    private static int GetOrganizationLocationPriority(IQueryConfig queryConfig)
+    {
+        var resourceType = queryConfig switch
+        {
+            ParameterQueryConfig parameterQueryConfig => parameterQueryConfig.ResourceType,
+            ReferenceQueryConfig referenceQueryConfig => referenceQueryConfig.ResourceType,
+            _ => string.Empty
+        };
+
+        return resourceType switch
+        {
+            nameof(ResourceType.Patient) => 0,
+            nameof(ResourceType.Encounter) => 1,
+            nameof(ResourceType.Location) => 2,
+            _ => 3
+        };
     }
 
     /// <summary>

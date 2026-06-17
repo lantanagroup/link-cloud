@@ -26,15 +26,18 @@ public class AcquisitionDependencyChecker : IAcquisitionDependencyChecker
 {
     private readonly IQueryPlanQueries _queryPlanQueries;
     private readonly IDataAcquisitionLogQueries _logQueries;
+    private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries;
     private readonly ILogger<AcquisitionDependencyChecker> _logger;
 
     public AcquisitionDependencyChecker(
         IQueryPlanQueries queryPlanQueries,
         IDataAcquisitionLogQueries logQueries,
+        IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
         ILogger<AcquisitionDependencyChecker> logger)
     {
         _queryPlanQueries = queryPlanQueries ?? throw new ArgumentNullException(nameof(queryPlanQueries));
         _logQueries = logQueries ?? throw new ArgumentNullException(nameof(logQueries));
+        _organizationLocationConfigurationQueries = organizationLocationConfigurationQueries ?? throw new ArgumentNullException(nameof(organizationLocationConfigurationQueries));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -120,6 +123,29 @@ public class AcquisitionDependencyChecker : IAcquisitionDependencyChecker
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
+        // If this is an initial query and the organization location configuration is enabled,
+        // we need to include the Encounter, Location, and Patient resource types as dependencies.
+        if (log.QueryPhase == QueryPhase.Initial
+            && !logResourceTypes.Contains(nameof(Hl7.Fhir.Model.ResourceType.Patient))
+            && !logResourceTypes.Contains(nameof(Hl7.Fhir.Model.ResourceType.Encounter))
+            && !logResourceTypes.Contains(nameof(Hl7.Fhir.Model.ResourceType.Location))
+            && await IsOrganizationLocationConfigurationEnabled(log.FacilityId))
+        {
+            var orderedDependencyTypes = phaseQueries
+                .Select(kvp => kvp.Value)
+                .Select(GetConfiguredResourceType)
+                .Where(resourceType =>
+                    string.Equals(resourceType, nameof(Hl7.Fhir.Model.ResourceType.Encounter), StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(resourceType, nameof(Hl7.Fhir.Model.ResourceType.Location), StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var resourceType in orderedDependencyTypes)
+            {
+                if (!dependencyResourceTypes.Contains(resourceType, StringComparer.OrdinalIgnoreCase))
+                    dependencyResourceTypes.Add(resourceType);
+            }
+        }
+
         if (dependencyResourceTypes.Count == 0)
             return DependencyCheckResult.Met;
 
@@ -131,5 +157,19 @@ public class AcquisitionDependencyChecker : IAcquisitionDependencyChecker
 
         return new DependencyCheckResult(false, blocking);
     }
+
+    private async Task<bool> IsOrganizationLocationConfigurationEnabled(string facilityId)
+    {
+        var configurations = await _organizationLocationConfigurationQueries.GetByFacilityIdAsync(facilityId);
+        return configurations?.Any(x => x.IsActive) == true;
+    }
+
+    private static string? GetConfiguredResourceType(IQueryConfig queryConfig) =>
+        queryConfig switch
+        {
+            ParameterQueryConfig parameterQueryConfig => parameterQueryConfig.ResourceType,
+            ReferenceQueryConfig referenceQueryConfig => referenceQueryConfig.ResourceType,
+            _ => null
+        };
 
 }

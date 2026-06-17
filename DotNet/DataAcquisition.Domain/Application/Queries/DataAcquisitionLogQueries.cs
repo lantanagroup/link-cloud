@@ -284,7 +284,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 CreateDate = l.CreateDate,
                 TraceId = l.TraceId,
                 RetryAttempts = l.RetryAttempts,
-                CompletionDate = l.CompletionDate,
+                CompletionDate = l.CompletionDate ?? (l.Status == RequestStatus.Completed ? l.ModifyDate : null),
                 CompletionTimeMilliseconds = l.CompletionTimeMilliseconds,
                 ResourceAcquiredIds = l.ResourceIds.Select(r => r.ResourceId).ToList(),
                 ReferenceResourceCount = l.ReferenceResources.Count(),
@@ -492,6 +492,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     log.QueryPhase,
                     log.ExecutionDate,
                     log.CreateDate,
+                    CompletionDate = log.CompletionDate ?? (log.Status == RequestStatus.Completed ? log.ModifyDate : null),
                     log.RetryAttempts,
                     log.Status,
                     log.IsDeleted
@@ -583,6 +584,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         QueryPhase = log.QueryPhase,
                         ExecutionDate = log.ExecutionDate,
                         CreateDate = log.CreateDate,
+                        CompletionDate = log.CompletionDate,
                         RetryAttempts = log.RetryAttempts,
                         Status = log.Status,
                         IsDeleted = log.IsDeleted,
@@ -632,7 +634,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 CreateDate = l.CreateDate,
                 TraceId = l.TraceId,
                 RetryAttempts = l.RetryAttempts,
-                CompletionDate = l.CompletionDate,
+                CompletionDate = l.CompletionDate ?? (l.Status == RequestStatus.Completed ? l.ModifyDate : null),
                 CompletionTimeMilliseconds = l.CompletionTimeMilliseconds,
                 ResourceAcquiredCount = l.ResourceIds.Count,
                 Notes = null,
@@ -1003,6 +1005,9 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             "status" => descending ? query.OrderByDescending(log => log.Status) : query.OrderBy(log => log.Status),
             "priority" => descending ? query.OrderByDescending(log => log.Priority) : query.OrderBy(log => log.Priority),
             "retryattempts" => descending ? query.OrderByDescending(log => log.RetryAttempts) : query.OrderBy(log => log.RetryAttempts),
+            "completiondate" => descending
+                ? query.OrderByDescending(log => log.CompletionDate ?? (log.Status == RequestStatus.Completed ? log.ModifyDate : null))
+                : query.OrderBy(log => log.CompletionDate ?? (log.Status == RequestStatus.Completed ? log.ModifyDate : null)),
             "isdeleted" => descending ? query.OrderByDescending(log => log.IsDeleted) : query.OrderBy(log => log.IsDeleted),
             "reporttrackingid" => descending ? query.OrderByDescending(log => log.ReportTrackingId) : query.OrderBy(log => log.ReportTrackingId),
             _ => descending ? query.OrderByDescending(log => log.Id) : query.OrderBy(log => log.Id)
@@ -1028,7 +1033,31 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                           && (lastId == null || log.Id > lastId)
                           && (log.ExecutionDate == null || log.ExecutionDate <= designagtedExecutionTime)
                           && (log.Status == null || statuses.Contains(log.Status.Value))
+                          && (log.ReferenceResourceType != null
+                              || log.QueryPhase != QueryPhase.Initial
+                              || !_dbContext.LocationConfigurations.Any(config =>
+                                  config.FacilityId == log.FacilityId
+                                  && config.IsActive)
+                              || log.FhirQueries.Any(query => query.FhirQueryResourceTypes.Any(resourceTypeEntry =>
+                                     resourceTypeEntry.ResourceType == ResourceType.Patient
+                                  || resourceTypeEntry.ResourceType == ResourceType.Encounter
+                                  || resourceTypeEntry.ResourceType == ResourceType.Location))
+                              || !_dbContext.DataAcquisitionLogs.Any(sibling =>
+                                  sibling.FacilityId == log.FacilityId
+                                  && sibling.CorrelationId == log.CorrelationId
+                                  && sibling.QueryPhase == log.QueryPhase
+                                  && (sibling.Status == null || !terminalStatuses.Contains(sibling.Status.Value))
+                                  && (sibling.ReferenceResourceType == ResourceType.Location.ToString()
+                                      || sibling.FhirQueries.Any(query => query.FhirQueryResourceTypes.Any(resourceTypeEntry =>
+                                          resourceTypeEntry.ResourceType == ResourceType.Patient
+                                          || resourceTypeEntry.ResourceType == ResourceType.Encounter
+                                          || resourceTypeEntry.ResourceType == ResourceType.Location)))))
                           && (log.ReferenceResourceType == null
+                              || (log.ReferenceResourceType == ResourceType.Location.ToString()
+                                  && log.QueryPhase == QueryPhase.Initial
+                                  && _dbContext.LocationConfigurations.Any(config =>
+                                      config.FacilityId == log.FacilityId
+                                      && config.IsActive))
                               || (log.CorrelationId != null
                                   && log.QueryPhase != null
                                   && !_dbContext.DataAcquisitionLogs.Any(sibling =>
