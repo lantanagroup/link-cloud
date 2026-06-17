@@ -1,11 +1,18 @@
-﻿namespace Automation.UI.Models.ApiHealth;
+﻿using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+
+namespace Automation.UI.Models.ApiHealth;
 
 /// <summary>
 /// Result of a single API endpoint test execution.
 /// </summary>
 public sealed class ApiTestRunResult
 {
+    [BsonRepresentation(BsonType.String)]
     public Guid Id { get; set; } = Guid.NewGuid();
+
+    [BsonRepresentation(BsonType.String)]
+    public Guid RunId { get; set; }
 
     /// <summary>Matches <see cref="ApiEndpointDefinition.Key"/>.</summary>
     public string EndpointKey { get; set; } = string.Empty;
@@ -40,6 +47,9 @@ public sealed class ApiTestRunResult
 
     /// <summary>HTTP method used (GET, POST, PUT, DELETE, etc.).</summary>
     public string? RequestMethod { get; set; }
+
+    /// <summary>Request body captured for the call (if any).</summary>
+    public string? RequestBody { get; set; }
 
     /// <summary>Trace ID from the response headers for correlating with Grafana/distributed tracing.</summary>
     public string? TraceId { get; set; }

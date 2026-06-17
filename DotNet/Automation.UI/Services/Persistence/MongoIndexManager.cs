@@ -36,6 +36,7 @@ public sealed class MongoIndexManager
         EnsureImportedBundleIndexes();
         EnsureQueryPlanTemplateIndexes();
         EnsureApiHealthRunIndexes();
+        EnsureApiHealthExecutionRunIndexes();
     }
 
     // --- automation_runs ---
@@ -143,8 +144,19 @@ public sealed class MongoIndexManager
     {
         var collection = _database.GetCollection<BsonDocument>("api_health_runs");
 
-        // Compound index for querying history by endpoint key, ordered by execution time.
-        CreateIndexSafe(collection, new BsonDocument { { "EndpointKey", 1 }, { "ExecutedAt", -1 } }, unique: false, "idx_endpointKey_executedAt");
+        CreateIndexSafe(collection, new BsonDocument { { "RunId", 1 }, { "ServiceName", 1 } }, unique: false, "idx_runId_serviceName");
+        CreateIndexSafe(collection, new BsonDocument { { "StartedAt", -1 } }, unique: false, "idx_startedAt_desc");
+        CreateIndexSafe(collection, new BsonDocument { { "ServiceName", 1 }, { "StartedAt", -1 } }, unique: false, "idx_serviceName_startedAt");
+        CreateIndexSafe(collection, new BsonDocument { { "EndpointResults.EndpointKey", 1 }, { "StartedAt", -1 } }, unique: false, "idx_endpoint_results_endpointKey_startedAt");
+    }
+
+    // --- api_health_execution_runs ---
+
+    private void EnsureApiHealthExecutionRunIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("api_health_execution_runs");
+
+        CreateIndexSafe(collection, new BsonDocument { { "IsCompleted", 1 }, { "StartedAt", -1 } }, unique: false, "idx_isCompleted_startedAt");
     }
 
     // --- Helpers ---

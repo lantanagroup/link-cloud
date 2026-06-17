@@ -1,7 +1,6 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
-using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using Microsoft.AspNetCore.Mvc;
@@ -10,14 +9,13 @@ namespace Automation.UI.Controllers;
 
 public class RunsController(
     IAutomationRunManager runManager,
+    ISnapshotStore snapshotStore,
     IScenarioStore scenarioStore,
     IQueryPlanTemplateStore queryPlanTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
     IRunExportService runExportService,
     ILogger<RunsController> logger) : Controller
 {
-    private static readonly Guid ApiHealthScenarioId = new("00000000-0000-0000-0000-000000000008");
-
     [HttpGet]
     public async Task<IActionResult> Index(
         int pageNumber = 1,
@@ -38,55 +36,22 @@ public class RunsController(
             .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        if (!scenarios.Any(s => s.Id == ApiHealthScenarioId || (s.IsSystemScenario && s.Name.Equals("ApiHealthScenario", StringComparison.OrdinalIgnoreCase))))
-        {
-            var measures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
-            var eligibilities = measures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);
-            var eligibleScenarioIds = ClinicalScenarioEligibility.GetEligibleScenarioIds(measures, MeasureEligibility.Qualifying);
+        var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
+        var activeRunSummaries = await Task.WhenAll(activeRunMetas.Select(meta => runManager.GetRunAsync(meta.RunId, cancellationToken)));
 
-            var apiHealthScenario = new TestScenarioDefinition
-            {
-                Id = ApiHealthScenarioId,
-                Name = "ApiHealthScenario",
-                Description = "System scenario for API Health stateful seeding and diagnostics.",
-                IsSystemScenario = true,
-                ReportMethod = ReportMethod.ScheduledReport,
-                SelectedMeasures = [.. measures],
-                Seed = 20260501,
-                PatientCount = 1,
-                ResourcesPerPatientMin = 100,
-                ResourcesPerPatientMax = 100,
-                PatientCohorts =
-                [
-                    new PatientCohortDefinition
-                    {
-                        PatientCount = 1,
-                        MeasureEligibilities = new(eligibilities),
-                        EligibleClinicalScenarioIds = [.. eligibleScenarioIds],
-                        ResourcesPerPatientMin = 100,
-                        ResourcesPerPatientMax = 100
-                    }
-                ],
-                CleanupServiceData = false,
-                CleanupFhirData = true,
-                UpdatedAt = DateTimeOffset.UtcNow
-            };
-
-            await scenarioStore.UpsertAsync(apiHealthScenario, cancellationToken);
-            scenarios = (await scenarioStore.GetAllAsync(cancellationToken))
-                .OrderBy(s => s.IsSystemScenario)
-                .ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-        }
-
-        // Active runs are surfaced by status, not by what page the user is on,
-        // so they always come from a default-sorted first page slice. Otherwise
-        // a user paged deep into history would lose the Active Runs card.
         var activeRunsSource = recentPage.PageNumber == 1
             ? recentPage.Runs
             : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
-        var activeRuns = activeRunsSource
-            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+        var statusActiveRuns = activeRunsSource
+            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running);
+
+        var activeRuns = activeRunSummaries
+            .Where(r => r != null && (r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running))
+            .Select(r => r!)
+            .Concat(statusActiveRuns)
+            .GroupBy(r => r.RunId)
+            .Select(g => g.First())
+            .OrderByDescending(r => r.CreatedAt)
             .ToList();
 
         // Populate query plan templates for the shared scenario editor modal embedded in this view.
@@ -142,11 +107,22 @@ public class RunsController(
         var stats = await runManager.GetDashboardStatsAsync(cancellationToken);
         var recentPage = await runManager.GetRunsPageAsync(pageNumber, pageSize, sortBy, descending, cancellationToken);
 
+        var activeRunMetas = await snapshotStore.GetActiveRunsAsync(cancellationToken);
+        var activeRunSummaries = await Task.WhenAll(activeRunMetas.Select(meta => runManager.GetRunAsync(meta.RunId, cancellationToken)));
+
         var activeRunsSource = recentPage.PageNumber == 1
             ? recentPage.Runs
             : (await runManager.GetRunsPageAsync(1, pageSize, "createdAt", true, cancellationToken)).Runs;
-        var activeRuns = activeRunsSource
-            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
+        var statusActiveRuns = activeRunsSource
+            .Where(r => r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running);
+
+        var activeRuns = activeRunSummaries
+            .Where(r => r != null && (r.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running))
+            .Select(r => r!)
+            .Concat(statusActiveRuns)
+            .GroupBy(r => r.RunId)
+            .Select(g => g.First())
+            .OrderByDescending(r => r.CreatedAt)
             .ToList();
 
         return Json(new
@@ -170,6 +146,19 @@ public class RunsController(
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Start(StartScenarioRequest request, CancellationToken cancellationToken)
     {
+        if (request.Scenario == AutomationScenarioKind.Custom && request.ScenarioId is Guid scenarioId)
+        {
+            var scenario = await scenarioStore.GetByIdAsync(scenarioId, cancellationToken);
+            if (scenario == null)
+            {
+                TempData["RunStartError"] = "Unable to start test: selected scenario was not found.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
+            return RedirectToAction(nameof(Index));
+        }
+
         if (!ModelState.IsValid)
         {
             var errors = ModelState.Values
