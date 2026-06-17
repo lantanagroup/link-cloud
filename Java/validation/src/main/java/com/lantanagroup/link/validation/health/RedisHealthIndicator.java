@@ -1,5 +1,6 @@
 package com.lantanagroup.link.validation.health;
 
+import com.lantanagroup.link.shared.utils.LogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -12,7 +13,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -36,13 +38,18 @@ public class RedisHealthIndicator implements HealthIndicator {
     private final RedisConnectionFactory connectionFactory;
     // Backstop deadline for the PING; configurable via management.health.redis.timeout-ms (default 3s).
     private final long checkTimeoutMs;
-    // Daemon threads so a PING stuck inside Lettuce never blocks JVM shutdown; cached pool so a hung
-    // check is abandoned rather than queueing behind the previous one when health is polled.
-    private final ExecutorService executor = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r, "redis-health-check");
-        t.setDaemon(true);
-        return t;
-    });
+    // Single bounded worker with no queue (SynchronousQueue): while a PING is still running -- e.g.
+    // stuck on a non-interruptible Lettuce call -- further health requests are rejected rather than
+    // spawning unbounded daemon threads. A rejection surfaces as DOWN via the catch below.
+    // Daemon thread so a stuck PING never blocks JVM shutdown.
+    private final ExecutorService executor = new ThreadPoolExecutor(
+            1, 1, 0L, TimeUnit.MILLISECONDS,
+            new SynchronousQueue<>(),
+            runnable -> {
+                Thread t = new Thread(runnable, "redis-health-check");
+                t.setDaemon(true);
+                return t;
+            });
 
     public RedisHealthIndicator(
             RedisConnectionFactory connectionFactory,
@@ -61,20 +68,23 @@ public class RedisHealthIndicator implements HealthIndicator {
     }
 
     private boolean checkRedisConnection() {
-        CompletableFuture<String> ping = CompletableFuture.supplyAsync(() -> {
-            try (RedisConnection connection = connectionFactory.getConnection()) {
-                return connection.ping();
-            }
-        }, executor);
-
+        CompletableFuture<String> ping = null;
         try {
+            ping = CompletableFuture.supplyAsync(() -> {
+                try (RedisConnection connection = connectionFactory.getConnection()) {
+                    return connection.ping();
+                }
+            }, executor);
             // bound the check so an unreachable Redis is reported DOWN within the deadline rather
             // than waiting on Lettuce's reconnect/connect behavior
             String response = ping.get(checkTimeoutMs, TimeUnit.MILLISECONDS);
             return "PONG".equalsIgnoreCase(response);
         } catch (Exception e) {
-            ping.cancel(true);
-            logger.warn("Redis health check failed: {}", e.getMessage());
+            // includes RejectedExecutionException when a previous probe is still occupying the worker
+            if (ping != null) {
+                ping.cancel(true);
+            }
+            logger.warn("Redis health check failed: {}", LogUtils.sanitize(e.getMessage()));
             return false;
         }
     }

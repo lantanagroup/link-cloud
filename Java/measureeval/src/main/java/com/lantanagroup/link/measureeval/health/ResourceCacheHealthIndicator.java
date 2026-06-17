@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.health;
 
 import com.lantanagroup.link.measureeval.services.AbsResourceService;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -12,9 +13,12 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Unified resource-cache health for MeasureEval, mirroring the .NET {@code ResourceCacheHealthCheck}:
@@ -44,13 +48,18 @@ public class ResourceCacheHealthIndicator implements HealthIndicator {
     private final ObjectProvider<AbsResourceService> absResourceServiceProvider;
     // Backstop deadline for the combined check; configurable via management.health.resource-cache.timeout-ms.
     private final long checkTimeoutMs;
-    // Daemon threads so a probe stuck inside Lettuce/Azure never blocks JVM shutdown; cached pool so a
-    // hung check is abandoned rather than queueing behind the previous one when health is polled.
-    private final ExecutorService executor = Executors.newCachedThreadPool(r -> {
-        Thread t = new Thread(r, "resource-cache-health-check");
-        t.setDaemon(true);
-        return t;
-    });
+    // Single bounded worker with no queue (SynchronousQueue): while a probe is still running -- e.g.
+    // stuck on a non-interruptible Lettuce/Azure call -- further health requests are rejected rather
+    // than spawning unbounded daemon threads. A rejection surfaces as DOWN via the catch in health().
+    // Daemon thread so a stuck probe never blocks JVM shutdown.
+    private final ExecutorService executor = new ThreadPoolExecutor(
+            1, 1, 0L, TimeUnit.MILLISECONDS,
+            new SynchronousQueue<>(),
+            runnable -> {
+                Thread t = new Thread(runnable, "resource-cache-health-check");
+                t.setDaemon(true);
+                return t;
+            });
 
     public ResourceCacheHealthIndicator(
             RedisConnectionFactory redisConnectionFactory,
@@ -63,17 +72,37 @@ public class ResourceCacheHealthIndicator implements HealthIndicator {
 
     @Override
     public Health health() {
-        CompletableFuture<CacheStatus> probe = CompletableFuture.supplyAsync(this::runChecks, executor);
+        CompletableFuture<CacheStatus> probe = null;
         try {
+            probe = CompletableFuture.supplyAsync(this::runChecks, executor);
             CacheStatus status = probe.get(checkTimeoutMs, TimeUnit.MILLISECONDS);
             // Healthy only if Redis is up and ABS is up-or-absent; an unreachable configured backend fails.
             boolean healthy = AVAILABLE.equals(status.redis) && !UNAVAILABLE.equals(status.abs);
             Health.Builder builder = healthy ? Health.up() : Health.down();
             return builder.withDetail("Redis", status.redis).withDetail("ABS", status.abs).build();
-        } catch (Exception e) {
+        } catch (TimeoutException e) {
             probe.cancel(true);
-            logger.warn("Resource cache health check failed: {}", e.getMessage());
+            logger.warn("Resource cache health check timed out after {}ms", checkTimeoutMs);
             return Health.down().withDetail("error", "Resource cache health check timed out").build();
+        } catch (InterruptedException e) {
+            probe.cancel(true);
+            Thread.currentThread().interrupt();
+            logger.warn("Resource cache health check interrupted");
+            return Health.down().withDetail("error", "Resource cache health check interrupted").build();
+        } catch (ExecutionException e) {
+            // The probe itself threw; unwrap to the underlying cause for an accurate reason.
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            String reason = LogUtils.sanitize(cause.getMessage());
+            logger.warn("Resource cache health check failed: {}", reason);
+            return Health.down().withDetail("error", reason).build();
+        } catch (Exception e) {
+            // e.g. RejectedExecutionException if the probe could not be scheduled.
+            if (probe != null) {
+                probe.cancel(true);
+            }
+            String reason = LogUtils.sanitize(e.getMessage());
+            logger.warn("Resource cache health check failed: {}", reason);
+            return Health.down().withDetail("error", reason).build();
         }
     }
 
@@ -85,7 +114,7 @@ public class ResourceCacheHealthIndicator implements HealthIndicator {
         try (RedisConnection connection = redisConnectionFactory.getConnection()) {
             return "PONG".equalsIgnoreCase(connection.ping()) ? AVAILABLE : UNAVAILABLE;
         } catch (Exception e) {
-            logger.warn("Redis cache check failed: {}", e.getMessage());
+            logger.warn("Redis cache check failed: {}", LogUtils.sanitize(e.getMessage()));
             return UNAVAILABLE;
         }
     }
@@ -98,7 +127,7 @@ public class ResourceCacheHealthIndicator implements HealthIndicator {
         try {
             return absResourceService.isContainerAvailable() ? AVAILABLE : UNAVAILABLE;
         } catch (Exception e) {
-            logger.warn("ABS cache check failed: {}", e.getMessage());
+            logger.warn("ABS cache check failed: {}", LogUtils.sanitize(e.getMessage()));
             return UNAVAILABLE;
         }
     }
