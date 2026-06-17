@@ -5,8 +5,6 @@ using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using LantanaGroup.Link.Sdk.Clients;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Options;
@@ -53,7 +51,7 @@ public class AutomationRunManager : IAutomationRunManager
             _logger);
     }
 
-    public Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
+    public async Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
     {
         var runId = Guid.NewGuid();
         var options = StartScenarioRequestResolver.Resolve(request);
@@ -62,9 +60,9 @@ public class AutomationRunManager : IAutomationRunManager
         var state = new MutableRunState(runId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
         _runs[runId] = state;
 
-        _ = PersistRunInputAsync(runId, request);
+        await PersistRunInputAsync(runId, request);
 
-        _ = PersistRunSummaryAsync(state);
+        await PersistRunSummaryAsync(state);
 
         state.ExecutionTask = Task.Run(async () =>
         {
@@ -98,7 +96,7 @@ public class AutomationRunManager : IAutomationRunManager
             }
         }, CancellationToken.None);
 
-        return Task.FromResult(runId);
+        return runId;
     }
 
     private async Task PersistRunInputAsync(Guid runId, StartScenarioRequest request)
@@ -112,14 +110,12 @@ public class AutomationRunManager : IAutomationRunManager
                 .Distinct()
                 .ToList() ?? [];
 
-            var sanitizedRunConfig = SanitizeRunConfigurationJson(request.RunConfigurationJson);
-
             await _snapshotStore.UpsertRunInputAsync(new AutomationRunInputSnapshot
             {
                 RunId = runId,
                 ScenarioId = request.ScenarioId,
                 ScenarioName = request.ScenarioName,
-                RunConfigurationJson = sanitizedRunConfig,
+                RunConfigurationJson = request.RunConfigurationJson,
                 ImportedBundleIds = bundleIds,
                 CreatedAt = now,
                 UpdatedAt = now
@@ -128,31 +124,6 @@ public class AutomationRunManager : IAutomationRunManager
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to persist run input snapshot for {RunId}.", runId);
-        }
-    }
-
-    private static string? SanitizeRunConfigurationJson(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return json;
-
-        try
-        {
-            var root = JsonNode.Parse(json) as JsonObject;
-            if (root == null)
-                return json;
-
-            if (root["importedPatientBundles"] is JsonArray bundles)
-            {
-                foreach (var node in bundles.OfType<JsonObject>())
-                    node["bundleJson"] = null;
-            }
-
-            return root.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
-        }
-        catch
-        {
-            return json;
         }
     }
 
