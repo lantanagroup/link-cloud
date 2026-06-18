@@ -151,6 +151,13 @@ public class FhirApiService : IFhirApiService
                 AccumulateDiscoveredReferences(refResources, referenceAccumulator);
             }
 
+            if (resource is Location location && fhirQueryConfiguration.EnableLocationResolutionMapping)
+            {
+                await _locationMappingService.UpdateLocationMappingAsync(
+                    log.FacilityId, location,
+                    cancellationToken: cancellationToken);
+            }
+
             AddResourceToCache(new ResourceAcquired
             {
                 Resource = resource,
