@@ -16,6 +16,5 @@ public sealed class ImportedBundleSnapshot
     public Guid BundleId { get; init; }
     public string PatientId { get; init; } = string.Empty;
     public string? FileName { get; init; }
-    public string BundleJson { get; init; } = string.Empty;
     public long ByteCount { get; init; }
 }
