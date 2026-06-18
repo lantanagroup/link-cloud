@@ -649,6 +649,7 @@ public class PatientDataService : IPatientDataService
                 {
                     var preparedReferenceLog = await _referenceResourceService.PrepareReferenceLogExecutionAsync(
                         log,
+                        referenceAccumulator,
                         cancellationToken);
 
                     foreach (var resourceId in preparedReferenceLog.ResourceIds)
