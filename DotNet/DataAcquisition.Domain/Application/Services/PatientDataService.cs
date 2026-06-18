@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
@@ -643,7 +643,7 @@ public class PatientDataService : IPatientDataService
                 // log's bundles. Drained once at the end of the fetch loop into the
                 // single durable same-phase reference log per (correlation, type).
                 var isReferenceLog = log.FhirQuery.Any(q => q.IsReference.GetValueOrDefault());
-                var referenceAccumulator = isReferenceLog ? null : new DiscoveredReferenceAccumulator();
+                var referenceAccumulator = new DiscoveredReferenceAccumulator();
 
                 if (isReferenceLog)
                 {
@@ -741,9 +741,17 @@ public class PatientDataService : IPatientDataService
                 // Stop timer and persist the terminal state for this execution.
                 stopwatch.Stop();
 
-                log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
-                log.CompletionDate = System.DateTime.UtcNow;
-                log.Status = skipFetch && !isReferenceLog ? RequestStatus.Skipped : RequestStatus.Completed;
+                if (isReferenceLog && referenceAccumulator != null && referenceAccumulator.HasAny)
+                {
+                    newNotes.Add($"[{DateTime.UtcNow}] Reference log discovered {referenceAccumulator.Count} more references during execution. Setting status back to Pending for re-execution.");
+                    log.Status = RequestStatus.Pending;
+                }
+                else
+                {
+                    log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
+                    log.CompletionDate = System.DateTime.UtcNow;
+                    log.Status = skipFetch && !isReferenceLog ? RequestStatus.Skipped : RequestStatus.Completed;
+                }
 
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
                 {

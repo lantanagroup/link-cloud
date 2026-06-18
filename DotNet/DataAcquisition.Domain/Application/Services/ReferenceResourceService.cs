@@ -98,8 +98,7 @@ public class ReferenceResourceService : IReferenceResourceService
         }
 
         var validReferenceResources =
-            referenceQueryFactoryResult
-            .ReferenceIds
+            (referenceQueryFactoryResult.ReferenceIds ?? Enumerable.Empty<ResourceReference>())
             .Where(x => x.TypeName == referenceQueryConfig.ResourceType || x.Reference.StartsWith(referenceQueryConfig.ResourceType, StringComparison.InvariantCultureIgnoreCase))
             .ToList();
 
@@ -204,6 +203,15 @@ public class ReferenceResourceService : IReferenceResourceService
                 parsedResourceType,
                 refConfig,
                 requestedIds,
+                new List<CreateResourceReferenceTypeModel>
+                {
+                    new CreateResourceReferenceTypeModel
+                    {
+                        FacilityId = primaryLog.FacilityId,
+                        QueryPhase = primaryLog.QueryPhase.GetValueOrDefault(),
+                        ResourceType = resourceType,
+                    }
+                },
                 cancellationToken);
         }
     }
@@ -333,6 +341,7 @@ public class ReferenceResourceService : IReferenceResourceService
         ResourceType resourceType,
         ReferenceQueryConfig refConfig,
         List<string> resourceIds,
+        List<CreateResourceReferenceTypeModel> resourceReferenceTypes,
         CancellationToken cancellationToken)
     {
         bool created = false;
@@ -395,7 +404,8 @@ public class ReferenceResourceService : IReferenceResourceService
                                 QueryType = fhirQueryType,
                                 Paged = pageSize,
                                 ResourceTypes = new List<ResourceType> { resourceType },
-                                QueryParameters = new List<string>()
+                                QueryParameters = new List<string>(),
+                                ResourceReferenceTypes = resourceReferenceTypes ?? new List<CreateResourceReferenceTypeModel>()
                             }
                         }
                     }, ct);

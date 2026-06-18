@@ -120,11 +120,7 @@ public class FhirApiService : IFhirApiService
             // batched reference-fetch DataAcquisitionLog per (correlation, type) for
             // cache misses (executed inline, retried by the AcquisitionProcessingJob on
             // failure) and a separate audit-only Completed log for cache hits.
-            //
-            // Skip when this log IS itself a reference fetch (`IsReference`) — its
-            // results are already canonical and re-extracting would chain-discover
-            // refs of refs.
-            if (!fhirQuery.IsReference.GetValueOrDefault() && referenceAccumulator != null)
+            if (referenceAccumulator != null)
             {
                 var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
                 AccumulateDiscoveredReferences(refResources, referenceAccumulator);
@@ -235,9 +231,8 @@ public class FhirApiService : IFhirApiService
             {
                 // Reference discovery: collect ref ids from this bundle into the per-
                 // execution accumulator. Drained at end of primary log execution by
-                // ReferenceResourceService.FetchAndPersistAsync. Reference-fetch logs
-                // skip extraction so we don't chain-discover refs of refs.
-                if (!isReferenceLog && referenceAccumulator != null)
+                // ReferenceResourceService.FetchAndPersistAsync.
+                if (referenceAccumulator != null)
                 {
                     var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
                     AccumulateDiscoveredReferences(refResources, referenceAccumulator);
