@@ -177,7 +177,6 @@ public sealed class MongoSnapshotStore : ISnapshotStore
                 BundleId = d.Id,
                 PatientId = d.PatientId,
                 FileName = d.FileName,
-                //BundleJson = d.BundleJson,
                 ByteCount = d.ByteCount
             });
     }
