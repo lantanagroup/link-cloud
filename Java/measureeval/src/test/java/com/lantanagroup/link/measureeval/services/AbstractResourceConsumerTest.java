@@ -354,6 +354,72 @@ class AbstractResourceConsumerTest {
         verify(redisResourceService, never()).cleanup(anyString());
     }
 
+    /**
+     * Anchors the non-idempotent-replay defect: process() emits MeasureReportGenerated DURING
+     * evaluation, before the Mongo bulk write. When the Mongo write fails (e.g. Cosmos RU
+     * throttling), each delivery attempt re-runs process() and re-emits the downstream event.
+     * <p>
+     * Asserts the desired invariant — the event is emitted at most once regardless of how many
+     * attempts occur. This currently FAILS ("wanted at most 1 time but was 2 times"), proving the
+     * duplicate emission. It should pass once produces are moved after all fallible persistence.
+     */
+    @Test
+    void process_failsAtMongoWrite_doesNotDuplicateDownstreamEventAcrossRetries() throws Exception {
+        String facilityId = "facility-1";
+        String patientId = "patient-1";
+        String cacheKey = "cache-key-dup";
+
+        ResourcesNormalized value = buildAbsValue(cacheKey); // INITIAL
+
+        Resource resource = new Resource();
+        resource.setFacilityId(facilityId);
+        resource.setCorrelationId(cacheKey);
+        resource.setPatientId(patientId);
+        resource.setResourceType(ResourceType.Patient);
+        resource.setResourceId("p-1");
+        resource.setResource("{}");
+        when(absResourceService.readResources(facilityId, cacheKey, patientId, cacheKey))
+                .thenReturn(List.of(resource));
+
+        PatientReportingEvaluationStatus patientStatus = new PatientReportingEvaluationStatus();
+        patientStatus.setFacilityId(facilityId);
+        patientStatus.setCorrelationId(cacheKey);
+        patientStatus.setPatientId(patientId);
+        PatientReportingEvaluationStatus.Report report = new PatientReportingEvaluationStatus.Report();
+        report.setReportType("TestMeasure");
+        report.setReportTrackingId("tracking-1");
+        report.setReportable(null);
+        patientStatus.setReports(Collections.singletonList(report));
+        when(patientStatusRepository.findByFacilityIdAndCorrelationId(facilityId, cacheKey))
+                .thenReturn(Optional.of(patientStatus));
+
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(nonEmptyPatient());
+        when(patientStatusBundler.createBundleFromResources(anyList())).thenReturn(bundle);
+
+        MeasureReport measureReport = new MeasureReport();
+        measureReport.setId("mr-1");
+        when(evaluateMeasureService.evaluateMeasure(anyString(), any(), any(), any())).thenReturn(measureReport);
+        // Non-reportable INITIAL -> emits MeasureReportGenerated, then proceeds to the Mongo write.
+        when(reportabilityPredicate.test(any())).thenReturn(false);
+        when(patientStatusRepository.save(any())).thenReturn(patientStatus);
+
+        // Transient persistence failure AFTER the event was already emitted.
+        BulkOperations bulkOps = mock(BulkOperations.class);
+        when(mongoOperations.bulkOps(any(), eq(Resource.class))).thenReturn(bulkOps);
+        when(bulkOps.execute()).thenThrow(new RuntimeException("Mongo throttled (simulated RU limit)"));
+
+        ConsumerRecord<ResourceKey, ResourcesNormalized> record = buildConsumerRecord(facilityId, patientId, value);
+
+        // Original delivery + one retry, each failing at the Mongo write.
+        assertThrows(RuntimeException.class, () -> consumerWithAbs.process(record));
+        assertThrows(RuntimeException.class, () -> consumerWithAbs.process(record));
+
+        // The downstream event must not be emitted once per attempt.
+        verify(measureReportGeneratedProducer, atMost(1)).produceMeasureReportGeneratedRecord(
+                eq(patientStatus), eq(report), anyString(), isNull(), isNull());
+    }
+
     private static org.hl7.fhir.r4.model.Patient nonEmptyPatient() {
         org.hl7.fhir.r4.model.Patient patient = new org.hl7.fhir.r4.model.Patient();
         patient.setId("patient-1");

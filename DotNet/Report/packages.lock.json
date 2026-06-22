@@ -67,7 +67,7 @@
       },
       "Microsoft.EntityFrameworkCore": {
         "type": "Direct",
-        "requested": "[8.0.28, )",
+        "requested": "[8.*, )",
         "resolved": "8.0.28",
         "contentHash": "rC28OvTXi/6+C8cisqZ/dr69aP8d0suvkFkGu2dBHa4UFwPZVt9cqni4pYwp9Hd3CuJ+NRDCn7YtwSexoBn/Hw==",
         "dependencies": {
@@ -79,7 +79,7 @@
       },
       "Microsoft.EntityFrameworkCore.Design": {
         "type": "Direct",
-        "requested": "[8.0.28, )",
+        "requested": "[8.*, )",
         "resolved": "8.0.28",
         "contentHash": "WKAI6l+sX59/VzirT2nyjzXLu+btRX9GEXokd9Fdx3ONU3Cvi2Mj1zwcx2esLwKXYyng6ExaVwhiab/0+bN4mg==",
         "dependencies": {
@@ -92,7 +92,7 @@
       },
       "Microsoft.EntityFrameworkCore.Tools": {
         "type": "Direct",
-        "requested": "[8.0.28, )",
+        "requested": "[8.*, )",
         "resolved": "8.0.28",
         "contentHash": "jtdUn/+syANFgwf+GboaJqb7k5nGBIk7SUS4TFilkDbY7kpzypqjQq4HZqPgnl8RinGp4kqXbQBJBpYl04ywyw==",
         "dependencies": {
