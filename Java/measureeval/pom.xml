@@ -168,13 +168,6 @@
             <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
-
-        <!-- Embedded Kafka broker for RetryTopicBackoffDelayTest (behavior-side retry-delay guard). Version managed by the Spring Boot BOM to match spring-kafka. -->
-        <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka-test</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>
