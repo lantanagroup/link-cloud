@@ -9,6 +9,7 @@ public interface IOrganizationLocationConfigurationQueries
 {
     Task<OrganizationLocationConfigurationModel> GetByIdAsync(int configId);
     Task<List<OrganizationLocationConfigurationModel>> GetByFacilityIdAsync(string facilityId);
+    Task<bool> HasActiveByFacilityIdAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<PagedConfigModel<OrganizationLocationConfigurationModel>> SearchAsync(
         OrganizationLocationConfigurationSearchModel search,
         int pageNumber = 1,
@@ -70,6 +71,12 @@ public class OrganizationLocationConfigurationQueries : IOrganizationLocationCon
                 }).ToList()
             })
             .ToListAsync();
+    }
+
+    public async Task<bool> HasActiveByFacilityIdAsync(string facilityId, CancellationToken cancellationToken = default)
+    {
+        return await _context.LocationConfigurations
+            .AnyAsync(c => c.FacilityId == facilityId && c.IsActive, cancellationToken);
     }
 
     public async Task<PagedConfigModel<OrganizationLocationConfigurationModel>> SearchAsync(
