@@ -9,8 +9,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @Setter
 public class KafkaRetryConfig {
 
-  private int maxAttempts;
+  private int maxAttempts = 3;
 
-  private long retryBackoffMs;
+  private long retryBackoffMs = 3000;
 
 }

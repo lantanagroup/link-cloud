@@ -10,6 +10,7 @@ import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluation
 import com.lantanagroup.link.shared.exceptions.ValidationException;
 import com.lantanagroup.link.shared.kafka.AsyncListener;
 import com.lantanagroup.link.shared.kafka.Headers;
+import com.lantanagroup.link.shared.kafka.SimpleAsyncListener;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.kafka.records.ResourceKey;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
@@ -38,7 +39,7 @@ import java.util.stream.Collectors;
 
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
-public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends AsyncListener<ResourceKey, T> {
+public abstract class AbstractResourceConsumer<T extends AbstractResourceRecord> extends SimpleAsyncListener<ResourceKey, T> {
     private static final Logger logger = LoggerFactory.getLogger(AbstractResourceConsumer.class);
     private static final Logger performanceLogger = LoggerFactory.getLogger("com.lantanagroup.link.performance." + AbstractResourceConsumer.class.getSimpleName());
 

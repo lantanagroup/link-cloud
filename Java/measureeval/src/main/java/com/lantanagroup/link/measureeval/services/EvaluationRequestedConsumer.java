@@ -7,8 +7,9 @@ import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.EvaluationRequested;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
-import com.lantanagroup.link.shared.kafka.AsyncListener;
+import com.lantanagroup.link.shared.kafka.SimpleAsyncListener;
 import com.lantanagroup.link.shared.kafka.Headers;
+import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.Span;
@@ -19,8 +20,11 @@ import org.hl7.fhir.r4.model.MeasureReport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
@@ -30,7 +34,7 @@ import java.util.function.Predicate;
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
 @Service
-public class EvaluationRequestedConsumer extends AsyncListener<String, EvaluationRequested> {
+public class EvaluationRequestedConsumer extends SimpleAsyncListener<String, EvaluationRequested> {
 
     private static final Logger logger = LoggerFactory.getLogger(EvaluationRequestedConsumer.class);
     private final PatientReportingEvaluationStatusRepository patientStatusRepository;
@@ -51,7 +55,8 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
                                 MeasureReportGeneratedProducer measureReportGeneratedProducer,
                                 BlobStorageService blobStorageService,
                                 EvaluateMeasureService evaluateMeasureService,
-                                ConsumerRecordRecoverer recoverer, FhirContext fhirContext) {
+                                @Qualifier("evaluationRequestedRecoverer") ConsumerRecordRecoverer recoverer,
+                                FhirContext fhirContext) {
         super(recoverer);
         this.patientStatusRepository = patientStatusRepository;
         this.reportabilityPredicate = reportabilityPredicate;
@@ -61,6 +66,13 @@ public class EvaluationRequestedConsumer extends AsyncListener<String, Evaluatio
         this.blobStorageService = blobStorageService;
         this.evaluateMeasureService = evaluateMeasureService;
         this.fhirContext = fhirContext;
+    }
+
+    @KafkaListener(topics = Topics.EVALUATION_REQUESTED, containerFactory = "manualAckListenerContainerFactory")
+    public void consume(
+            ConsumerRecord<String, EvaluationRequested> record,
+            Acknowledgment acknowledgment) {
+        doConsume(record, acknowledgment);
     }
 
     @Override
