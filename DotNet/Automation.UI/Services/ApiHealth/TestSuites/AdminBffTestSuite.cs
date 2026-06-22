@@ -236,11 +236,13 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
                     ? $"No response body was returned (HTTP {result.ActualStatusCode})."
                     : capturedBody;
                 if (!result.Passed)
-                    result.ErrorMessage = $"Expected {expectedStatus} but got {result.ActualStatusCode}.";
+                    result.ErrorMessage = BuildStatusMismatchMessage(expectedStatus, result.ActualStatusCode ?? 0, result.ResponseBody, result.TraceId);
             }
             catch
             {
                 result.ResponseBody = $"Response body could not be read (HTTP {result.ActualStatusCode}).";
+                if (!result.Passed)
+                    result.ErrorMessage = BuildStatusMismatchMessage(expectedStatus, result.ActualStatusCode ?? 0, result.ResponseBody, result.TraceId);
             }
         }
         catch (TaskCanceledException)
@@ -286,5 +288,54 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
 
     private static string Truncate(string? value, int maxLength = 300) =>
         value == null ? "" : (value.Length > maxLength ? value[..maxLength] : value);
+
+    private static string BuildStatusMismatchMessage(int expectedStatus, int actualStatus, string? responseBody, string? traceId)
+    {
+        var baseMessage = $"Error: Expected HTTP {expectedStatus} but got {actualStatus}.";
+        if (actualStatus != 500)
+            return baseMessage;
+
+        var parts = new List<string> { baseMessage };
+
+        var apiResponse = ExtractApiResponseMessage(responseBody);
+        if (!string.IsNullOrWhiteSpace(apiResponse))
+            parts.Add($"Detail: {apiResponse}");
+
+        if (!string.IsNullOrWhiteSpace(traceId))
+            parts.Add($"Trace ID: {traceId}");
+
+        return string.Join(" ", parts);
+    }
+
+    private static string? ExtractApiResponseMessage(string? rawBody)
+    {
+        if (string.IsNullOrWhiteSpace(rawBody))
+            return null;
+
+        var trimmed = Truncate(rawBody).Trim();
+
+        try
+        {
+            using var doc = JsonDocument.Parse(trimmed);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                return trimmed;
+
+            string? TryGet(string propertyName)
+                => doc.RootElement.TryGetProperty(propertyName, out var p) && p.ValueKind == JsonValueKind.String
+                    ? p.GetString()
+                    : null;
+
+            var message = TryGet("error")
+                ?? TryGet("message")
+                ?? TryGet("title")
+                ?? TryGet("detail");
+
+            return string.IsNullOrWhiteSpace(message) ? trimmed : message.Trim();
+        }
+        catch
+        {
+            return trimmed;
+        }
+    }
 
 }

@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Text.Json;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
 using LantanaGroup.Link.Sdk.ApiClient;
@@ -92,7 +93,12 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
             result.TraceId = response.TraceId;
             result.ResponseBody = BodyOrNote(response.RawBody, NoResponseBodyNote(response.StatusCode));
             if (!result.Passed)
-                result.ErrorMessage = $"Expected HTTP {expectedStatusCode} but got {response.StatusCode}.{(response.RawBody != null ? $" Body: {Truncate(response.RawBody)}" : "")}";
+                result.ErrorMessage = BuildStatusMismatchMessage(
+                    $"Expected HTTP {expectedStatusCode}",
+                    response.StatusCode,
+                    response.RawBody,
+                    response.TraceId,
+                    includeBodyForNon500: true);
         }
         catch (Exception ex)
         {
@@ -139,7 +145,12 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
             result.TraceId = response.TraceId;
             result.ResponseBody = BodyOrNote(response.RawBody, NoResponseBodyNote(response.StatusCode));
             if (!result.Passed)
-                result.ErrorMessage = $"Expected HTTP {expectedStatusCode} but got {response.StatusCode}.{(response.RawBody != null ? $" Body: {Truncate(response.RawBody)}" : "")}";
+                result.ErrorMessage = BuildStatusMismatchMessage(
+                    $"Expected HTTP {expectedStatusCode}",
+                    response.StatusCode,
+                    response.RawBody,
+                    response.TraceId,
+                    includeBodyForNon500: true);
         }
         catch (Exception ex)
         {
@@ -192,7 +203,12 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
             if (result.Passed)
                 result.ExpectedStatusCode = response.StatusCode;
             else
-                result.ErrorMessage = $"Expected one of [{string.Join(", ", acceptedStatusCodes)}] but got {response.StatusCode}.{(response.RawBody != null ? $" Body: {Truncate(response.RawBody)}" : "")}";
+                result.ErrorMessage = BuildStatusMismatchMessage(
+                    $"Expected one of [{string.Join(", ", acceptedStatusCodes)}]",
+                    response.StatusCode,
+                    response.RawBody,
+                    response.TraceId,
+                    includeBodyForNon500: true);
         }
         catch (Exception ex)
         {
@@ -277,5 +293,64 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
         return statusCode.HasValue
             ? $"No response body was returned (HTTP {statusCode.Value})."
             : "No response body was returned.";
+    }
+
+    private static string BuildStatusMismatchMessage(
+        string expectedText,
+        int actualStatusCode,
+        string? rawBody,
+        string? traceId,
+        bool includeBodyForNon500)
+    {
+        var baseMessage = $"Error: {expectedText} but got {actualStatusCode}.";
+
+        if (actualStatusCode == 500)
+        {
+            var parts = new List<string> { baseMessage };
+            var apiResponse = ExtractApiResponseMessage(rawBody);
+            if (!string.IsNullOrWhiteSpace(apiResponse))
+                parts.Add($"Detail: {apiResponse}");
+
+            if (!string.IsNullOrWhiteSpace(traceId))
+                parts.Add($"Trace ID: {traceId}");
+
+            return string.Join(" ", parts);
+        }
+
+        if (includeBodyForNon500 && !string.IsNullOrWhiteSpace(rawBody))
+            return $"{baseMessage} Body: {Truncate(rawBody)}";
+
+        return baseMessage;
+    }
+
+    private static string? ExtractApiResponseMessage(string? rawBody)
+    {
+        if (string.IsNullOrWhiteSpace(rawBody))
+            return null;
+
+        var trimmed = Truncate(rawBody).Trim();
+
+        try
+        {
+            using var doc = JsonDocument.Parse(trimmed);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                return trimmed;
+
+            string? TryGet(string propertyName)
+                => doc.RootElement.TryGetProperty(propertyName, out var p) && p.ValueKind == JsonValueKind.String
+                    ? p.GetString()
+                    : null;
+
+            var message = TryGet("error")
+                ?? TryGet("message")
+                ?? TryGet("title")
+                ?? TryGet("detail");
+
+            return string.IsNullOrWhiteSpace(message) ? trimmed : message.Trim();
+        }
+        catch
+        {
+            return trimmed;
+        }
     }
 }
