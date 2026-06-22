@@ -83,7 +83,7 @@ public class FhirApiService : IFhirApiService
         activity?.SetTag(DiagnosticNames.ResourceType, resourceType.ToString());
 
         var resourceIds = new List<string>();
-        List<string> resourceIdsToAcquire =
+        var resourceIdsToAcquire =
             fhirQuery.IsReference.GetValueOrDefault()
             ? fhirQuery.IdQueryParameterValues.ToList()
             : [resourceType == ResourceType.Patient ? log.PatientId.SplitReference() : log.ResourceId];
@@ -317,12 +317,14 @@ public class FhirApiService : IFhirApiService
                     await PersistAcquiredReferenceResourcesAsync(log, resources, cancellationToken);
                 }
 
+                var locationMappingConfigured =
+                    await _locationMappingService.IsConfigured(log.FacilityId, cancellationToken);
+
                 foreach (var resource in resources)
                 {
                     InsertDateExtension((DomainResource)resource);
 
-                    if (resource is Location location &&
-                        await _locationMappingService.IsConfigured(log.FacilityId, cancellationToken))
+                    if (locationMappingConfigured && resource is Location location)
                     {
                         await _locationMappingService.UpdateLocationMappingAsync(
                             log.FacilityId, location,
