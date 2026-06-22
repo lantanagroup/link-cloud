@@ -1,0 +1,313 @@
+using Hl7.Fhir.Model;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Task = System.Threading.Tasks.Task;
+
+namespace IntegrationTests.DataAcquisition.Services;
+
+/// <summary>
+/// LEGLINK-139: "Add to mapping table when Location resources are queried."
+///
+/// When a facility is configured for Encounter Location resolution, Data Acquisition must
+/// store each queried Location into the OrganizationLocationMapping table. For each
+/// Location.Id, the mapping is inserted only when it does not already exist, and there must
+/// never be more than one entry per (FacilityId, Location.Id).
+///
+/// These tests drive the production <see cref="LocationMappingService"/> against the real
+/// configuration and mapping tables (via the fixture's SQL Server) and a real
+/// <see cref="InMemoryCacheService"/>. Only the FHIR API / Kafka edges are absent — the
+/// insert-or-skip decision, the org-location classification, and the database write are all
+/// exercised end-to-end, which is what the existing unit tests cannot cover.
+/// </summary>
+[Collection("IntegrationTests")]
+[Trait("Category", "IntegrationTests")]
+public class LocationMappingAcquisitionTests
+{
+    private readonly DataAcquisitionIntegrationTestFixture _fixture;
+
+    public LocationMappingAcquisitionTests(DataAcquisitionIntegrationTestFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    private static string NewFacilityId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";
+    private static string NewLocationId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";
+
+    /// <summary>
+    /// Builds the real service from scope-resolved dependencies, mirroring how DataAcquisition
+    /// wires it in production. Each call uses a fresh <see cref="InMemoryCacheService"/> so cached
+    /// conditions never leak across assertions within a test.
+    /// </summary>
+    private static LocationMappingService CreateService(IServiceScope scope)
+    {
+        return new LocationMappingService(
+            scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>(),
+            scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>(),
+            scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>(),
+            new InMemoryCacheService(new MemoryCache(new MemoryCacheOptions { SizeLimit = 1024 })),
+            NullLogger<LocationMappingService>.Instance);
+    }
+
+    /// <summary>
+    /// Seeds an active Location configuration whose single condition flags a Location as an
+    /// org-location when its managingOrganization points at <paramref name="orgReference"/>.
+    /// This is the configuration the requirement gates on ("configured to perform Encounter
+    /// Location resolutions").
+    /// </summary>
+    private async Task SeedActiveConfigAsync(string facilityId, string orgReference)
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var configManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationManager>();
+        await configManager.CreateAsync(new CreateOrganizationLocationConfigurationModel
+        {
+            FacilityId = facilityId,
+            Description = "Integration test config",
+            IsActive = true,
+            Conditions = new List<CreateOrganizationLocationConditionModel>
+            {
+                new() { FhirPath = $"managingOrganization.reference = '{orgReference}'", Priority = 1 }
+            }
+        });
+    }
+
+    [Fact]
+    public async Task IsConfigured_NoActiveConfiguration_ReturnsFalse()
+    {
+        var facilityId = NewFacilityId("Unconfigured");
+
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var service = CreateService(scope);
+
+        Assert.False(await service.IsConfigured(facilityId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task IsConfigured_WithActiveConfiguration_ReturnsTrue()
+    {
+        var facilityId = NewFacilityId("Configured");
+        await SeedActiveConfigAsync(facilityId, "Organization/org-1");
+
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var service = CreateService(scope);
+
+        Assert.True(await service.IsConfigured(facilityId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task UpdateLocationMappingAsync_ConfiguredFacilityNewLocation_InsertsMapping()
+    {
+        var facilityId = NewFacilityId("Insert");
+        var orgReference = "Organization/org-1";
+        await SeedActiveConfigAsync(facilityId, orgReference);
+
+        var locationId = NewLocationId("Loc");
+        var location = new Location
+        {
+            Id = locationId,
+            Name = "Med-Surg Unit 3",
+            ManagingOrganization = new ResourceReference(orgReference)
+        };
+
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var service = CreateService(scope);
+            var result = await service.UpdateLocationMappingAsync(facilityId, location, cancellationToken: CancellationToken.None);
+
+            Assert.Equal(facilityId, result.FacilityId);
+            Assert.Equal(locationId, result.LocationId);
+            Assert.Equal("Med-Surg Unit 3", result.LocationName);
+            Assert.True(result.IsActive);
+            // managingOrganization matched the active condition, so it is flagged as an org-location.
+            Assert.True(result.IsOrgLocation);
+        }
+
+        // The row is durable: a fresh scope re-reads exactly one persisted mapping.
+        using var verifyScope = _fixture.ServiceProvider.CreateScope();
+        var queries = verifyScope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var rows = await queries.GetByFacilityIdAsync(facilityId);
+        var row = Assert.Single(rows);
+        Assert.Equal(locationId, row.LocationId);
+        Assert.Equal("Med-Surg Unit 3", row.LocationName);
+    }
+
+    [Fact]
+    public async Task UpdateLocationMappingAsync_SameLocationQueriedTwice_DoesNotDuplicate()
+    {
+        var facilityId = NewFacilityId("NoDup");
+        var orgReference = "Organization/org-1";
+        await SeedActiveConfigAsync(facilityId, orgReference);
+
+        var locationId = NewLocationId("Loc");
+
+        // Two separate acquisitions of the same Location.Id (e.g. it appears across patients/runs).
+        // The second query carries an updated name to prove the existing row is updated in place,
+        // not inserted again.
+        using (var scope1 = _fixture.ServiceProvider.CreateScope())
+        {
+            var service = CreateService(scope1);
+            await service.UpdateLocationMappingAsync(
+                facilityId,
+                new Location { Id = locationId, Name = "Original Name", ManagingOrganization = new ResourceReference(orgReference) },
+                cancellationToken: CancellationToken.None);
+        }
+
+        using (var scope2 = _fixture.ServiceProvider.CreateScope())
+        {
+            var service = CreateService(scope2);
+            await service.UpdateLocationMappingAsync(
+                facilityId,
+                new Location { Id = locationId, Name = "Renamed", ManagingOrganization = new ResourceReference(orgReference) },
+                cancellationToken: CancellationToken.None);
+        }
+
+        // Requirement: at most one entry per (FacilityId, Location.Id).
+        using var verifyScope = _fixture.ServiceProvider.CreateScope();
+        var queries = verifyScope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var rows = await queries.GetByFacilityIdAsync(facilityId);
+        var row = Assert.Single(rows);
+        Assert.Equal(locationId, row.LocationId);
+        Assert.Equal("Renamed", row.LocationName);
+    }
+
+    [Fact]
+    public async Task UpdateLocationMappingAsync_ParentQueriedAfterChild_BackfillsChildPartOfId()
+    {
+        var facilityId = NewFacilityId("Backfill");
+        var orgReference = "Organization/org-1";
+        await SeedActiveConfigAsync(facilityId, orgReference);
+
+        var parentLocationId = NewLocationId("Parent");
+        var childLocationId = NewLocationId("Child");
+
+        // The child arrives first, referencing a parent that is not yet in the mapping table.
+        // Its PartOfValue records the unresolved parent id; PartOfId stays null until the parent appears.
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var service = CreateService(scope);
+            await service.UpdateLocationMappingAsync(
+                facilityId,
+                new Location
+                {
+                    Id = childLocationId,
+                    Name = "Bed 12",
+                    ManagingOrganization = new ResourceReference(orgReference),
+                    PartOf = new ResourceReference($"Location/{parentLocationId}")
+                },
+                cancellationToken: CancellationToken.None);
+        }
+
+        // Precondition: the child is an orphan — PartOfValue points at the parent, PartOfId is unresolved.
+        using (var preScope = _fixture.ServiceProvider.CreateScope())
+        {
+            var preQueries = preScope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+            var orphan = await preQueries.GetByFacilityIdAndLocationIdAsync(facilityId, childLocationId);
+            Assert.NotNull(orphan);
+            Assert.Equal(parentLocationId, orphan.PartOfValue);
+            Assert.Null(orphan.PartOfId);
+        }
+
+        // The parent is queried later. Inserting it must adopt the waiting child.
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var service = CreateService(scope);
+            await service.UpdateLocationMappingAsync(
+                facilityId,
+                new Location { Id = parentLocationId, Name = "Med-Surg Unit 3", ManagingOrganization = new ResourceReference(orgReference) },
+                cancellationToken: CancellationToken.None);
+        }
+
+        // The child's PartOfId is backfilled to the parent's mapping id, with PartOfValue unchanged.
+        using var verifyScope = _fixture.ServiceProvider.CreateScope();
+        var queries = verifyScope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var parent = await queries.GetByFacilityIdAndLocationIdAsync(facilityId, parentLocationId);
+        var child = await queries.GetByFacilityIdAndLocationIdAsync(facilityId, childLocationId);
+
+        Assert.NotNull(parent);
+        Assert.NotNull(child);
+        Assert.Equal(parentLocationId, child.PartOfValue);
+        Assert.Equal(parent.LocationMappingId, child.PartOfId);
+    }
+
+    [Fact]
+    public async Task UpdateLocationMappingAsync_ChildQueriedAfterParent_LinksPartOfIdOnInsert()
+    {
+        var facilityId = NewFacilityId("ForwardLink");
+        var orgReference = "Organization/org-1";
+        await SeedActiveConfigAsync(facilityId, orgReference);
+
+        var parentLocationId = NewLocationId("Parent");
+        var childLocationId = NewLocationId("Child");
+
+        // Parent first this time: when the child is inserted, the parent already exists, so the
+        // PartOfId is resolved at insert rather than via the backfill adoption path.
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var service = CreateService(scope);
+            await service.UpdateLocationMappingAsync(
+                facilityId,
+                new Location { Id = parentLocationId, Name = "Med-Surg Unit 3", ManagingOrganization = new ResourceReference(orgReference) },
+                cancellationToken: CancellationToken.None);
+            await service.UpdateLocationMappingAsync(
+                facilityId,
+                new Location
+                {
+                    Id = childLocationId,
+                    Name = "Bed 12",
+                    ManagingOrganization = new ResourceReference(orgReference),
+                    PartOf = new ResourceReference($"Location/{parentLocationId}")
+                },
+                cancellationToken: CancellationToken.None);
+        }
+
+        using var verifyScope = _fixture.ServiceProvider.CreateScope();
+        var queries = verifyScope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var parent = await queries.GetByFacilityIdAndLocationIdAsync(facilityId, parentLocationId);
+        var child = await queries.GetByFacilityIdAndLocationIdAsync(facilityId, childLocationId);
+
+        Assert.NotNull(parent);
+        Assert.NotNull(child);
+        Assert.Equal(parentLocationId, child.PartOfValue);
+        Assert.Equal(parent.LocationMappingId, child.PartOfId);
+    }
+
+    [Fact]
+    public async Task UpdateLocationMappingAsync_DistinctLocations_InsertsOneRowEach()
+    {
+        var facilityId = NewFacilityId("MultiLoc");
+        var orgReference = "Organization/org-1";
+        await SeedActiveConfigAsync(facilityId, orgReference);
+
+        var locationIdA = NewLocationId("LocA");
+        var locationIdB = NewLocationId("LocB");
+
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var service = CreateService(scope);
+            await service.UpdateLocationMappingAsync(
+                facilityId,
+                new Location { Id = locationIdA, Name = "Location A", ManagingOrganization = new ResourceReference(orgReference) },
+                cancellationToken: CancellationToken.None);
+            await service.UpdateLocationMappingAsync(
+                facilityId,
+                new Location { Id = locationIdB, Name = "Location B", ManagingOrganization = new ResourceReference("Organization/other") },
+                cancellationToken: CancellationToken.None);
+        }
+
+        using var verifyScope = _fixture.ServiceProvider.CreateScope();
+        var queries = verifyScope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var rows = await queries.GetByFacilityIdAsync(facilityId);
+
+        Assert.Equal(2, rows.Count);
+        Assert.Contains(rows, r => r.LocationId == locationIdA && r.IsOrgLocation);
+        // Location B's managingOrganization did not match the condition, so it is not an org-location,
+        // but it is still recorded in the mapping table.
+        Assert.Contains(rows, r => r.LocationId == locationIdB && !r.IsOrgLocation);
+    }
+}

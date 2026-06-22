@@ -80,6 +80,7 @@ public class LocationMappingServiceIntegrationTests
         var facilityId = NewId("Fac");
         var locationId = NewId("Loc");
 
+        // Create a real mapping in the database for the row we are about to insert
         int seededId;
         using (var seedScope = _fixture.ServiceProvider.CreateScope())
         {
@@ -98,6 +99,9 @@ public class LocationMappingServiceIntegrationTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
 
+        // Fake two results in sequence to the GetByFacilityIdandLoactionID
+        // - first returns null
+        // - second returns a record (that was created above)
         var mockQueries = new Mock<IOrganizationLocationMappingQueries>();
         mockQueries
             .SetupSequence(q => q.GetByFacilityIdAndLocationIdAsync(facilityId, locationId))
@@ -117,11 +121,20 @@ public class LocationMappingServiceIntegrationTests
             .Setup(q => q.GetByFacilityIdAsync(It.IsAny<string>()))
             .ReturnsAsync(new List<OrganizationLocationConfigurationModel>());
 
+        // The facility must have at least one active condition, otherwise UpdateLocationMappingAsync
+        // short-circuits with NotFoundException before reaching the race-recovery path under test.
+        // The FhirPath deliberately doesn't match the bare test Location, so it stays a non-org location.
         var mockCache = new Mock<ICacheService>();
         mockCache
             .Setup(c => c.Get<List<OrganizationLocationConditionModel>>(It.IsAny<string>()))
-            .Returns(new List<OrganizationLocationConditionModel>());
+            .Returns(new List<OrganizationLocationConditionModel>
+            {
+                new() { FhirPath = "managingOrganization.reference = 'Organization/never'", Priority = 1 }
+            });
 
+        // Make the real call, the code checks if the records exists and the mock returns nothing
+        // then it does an add which fails because a record does exist.  So it gets the 
+        // record and does an update instead.
         var service = new LocationMappingService(
             manager,
             mockQueries.Object,
