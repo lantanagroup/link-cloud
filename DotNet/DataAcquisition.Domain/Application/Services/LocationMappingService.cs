@@ -287,11 +287,16 @@ public class LocationMappingService(
             var results = compiled(element, new EvaluationContext()).ToList();
 
             if (results.Count == 0)
-                return false; // empty result → no match
+            {
+                // empty result → no match
+                return false; 
+            }
 
             // Boolean predicate (e.g. "...exists()"): honor the returned boolean.
-            if (results.Count == 1 && results[0].Value is bool b)
-                return b;
+            if (results.Count == 1 && results[0].Value is bool isMatch)
+            {
+                return isMatch;
+            }
 
             // Node-selecting expression (e.g. "identifier.where(system=...)"): non-empty → match.
             return true;
