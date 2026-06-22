@@ -122,10 +122,15 @@ public class LocationMappingService(
     private async Task<OrganizationLocationMappingModel> UpdateMapping(Location location, bool isOrgLocation,
         OrganizationLocationMappingModel locationMapping, OrganizationLocationMappingModel? partOf)
     {
+        var incomingAlias = location.Alias?.FirstOrDefault();
+
+        // Only treat the alias as changed when the resource actually carries one that differs.
+        // A missing alias is preserved (UpdateByIdAsync ignores a null alias), so comparing the
+        // stored alias against null would otherwise fire a redundant update on every re-acquire.
         if (locationMapping.LocationName != location.Name ||
             locationMapping.PartOfValue != location.PartOf?.Reference?.SplitReference() ||
             locationMapping.PartOfId != partOf?.LocationMappingId ||
-            locationMapping.LocationAlias != location.Alias?.FirstOrDefault() ||
+            (incomingAlias != null && locationMapping.LocationAlias != incomingAlias) ||
             locationMapping.IsOrgLocation != isOrgLocation)
         {
             // Something changed, update the record
@@ -133,7 +138,7 @@ public class LocationMappingService(
             {
                 IsActive = locationMapping.IsActive,
                 IsOrgLocation = isOrgLocation,
-                LocationAlias = location.Alias?.FirstOrDefault(),
+                LocationAlias = incomingAlias,
                 LocationName = location.Name,
                 PartOfValue = location.PartOf?.Reference?.SplitReference(),
                 PartOfId = partOf?.LocationMappingId
