@@ -131,7 +131,7 @@
                                         }
                                         else if (!isSkipped && ep.LastResult is { Passed: false } && !string.IsNullOrWhiteSpace(ep.LastResult.ErrorMessage))
                                         {
-                                            <small class="text-danger">@ep.LastResult.ErrorMessage</small>
+                                            <small class="text-danger au-error-lines">@ep.LastResult.ErrorMessage</small>
                                         }
                                         else
                                         {
@@ -436,7 +436,7 @@
             ? (result.skipReason ? `<small class="text-muted">${escapeHtml(result.skipReason)}</small>` : `<span class="text-muted">${placeholderText}</span>`)
             : (() => {
                 const msg = normalizeText(result.errorMessage);
-                return !passed && msg ? `<small class="text-danger">${escapeHtml(msg)}</small>` : `<span class="text-muted">${placeholderText}</span>`;
+                return !passed && msg ? `<small class="text-danger au-error-lines">${escapeHtml(msg)}</small>` : `<span class="text-muted">${placeholderText}</span>`;
             })();
         row.querySelector('.cell-duration').innerHTML = skipped ? `<span class="text-muted">${placeholderText}</span>` : `<small>${result.durationMs}ms</small>`;
 
@@ -958,6 +958,7 @@
     .row-detail pre { white-space: pre-wrap; word-wrap: break-word; word-break: break-all; }
     .row-detail code { word-break: break-all; }
     .row-group-header td { background: #f8f9fa; font-size: .8rem; padding: .35rem .75rem; border-bottom: 1px solid #dee2e6; color: #555; letter-spacing: .02em; }
+    .au-error-lines { white-space: pre-line; }
     tr[data-endpoint-key][data-informational="false"] { cursor: pointer; }
     tr[data-endpoint-key][data-informational="false"]:hover { background: rgba(0,0,0,.03) !important; }
     .cursor-pointer { cursor: pointer; }

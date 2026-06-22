@@ -304,7 +304,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         if (!string.IsNullOrWhiteSpace(traceId))
             parts.Add($"Trace ID: {traceId}");
 
-        return string.Join(" ", parts);
+        return string.Join(Environment.NewLine, parts);
     }
 
     private static string? ExtractApiResponseMessage(string? rawBody)

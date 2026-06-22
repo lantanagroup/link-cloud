@@ -314,7 +314,7 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
             if (!string.IsNullOrWhiteSpace(traceId))
                 parts.Add($"Trace ID: {traceId}");
 
-            return string.Join(" ", parts);
+            return string.Join(Environment.NewLine, parts);
         }
 
         if (includeBodyForNon500 && !string.IsNullOrWhiteSpace(rawBody))
