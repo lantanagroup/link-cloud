@@ -46,6 +46,8 @@ public class FhirApiService : IFhirApiService
     private readonly ISearchFhirCommand _searchFhirCommand;
     private readonly ILogger<FhirApiService> _logger;
     private readonly IResourceCache _resourceCache;
+    private readonly IEncounterMappingQueries _encounterMappingQueries;
+    private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries;
 
     public FhirApiService(
         IReferenceResourcesManager referenceResourceManager,
@@ -53,7 +55,9 @@ public class FhirApiService : IFhirApiService
         ISearchFhirCommand searchFhirCommand,
         IReadFhirCommand readFhirCommand,
         ILogger<FhirApiService> logger,
-        IResourceCache resourceCache)
+        IResourceCache resourceCache,
+        IEncounterMappingQueries encounterMappingQueries,
+        IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries)
     {
         _referenceResourceManager = referenceResourceManager;
         _referenceResourcesQueries = referenceResourcesQueries;
@@ -61,6 +65,8 @@ public class FhirApiService : IFhirApiService
         _readFhirCommand = readFhirCommand;
         _logger = logger;
         _resourceCache = resourceCache;
+        _encounterMappingQueries = encounterMappingQueries;
+        _organizationLocationConfigurationQueries = organizationLocationConfigurationQueries;
     }
 
     #region Interface Implementation
@@ -110,6 +116,16 @@ public class FhirApiService : IFhirApiService
                                                 log.ReportTrackingId),
                                             cancellationToken);
 
+            var filteredResources = await FilterResourcesByEncounterMappingAsync(
+                log,
+                [resource],
+                cancellationToken);
+
+            if (filteredResources.Count == 0)
+            {
+                return resourceIds;
+            }
+
             resourceIds.Add($"{resourceType}/{resource.Id}");
 
             InsertDateExtension(resource);
@@ -122,7 +138,13 @@ public class FhirApiService : IFhirApiService
             // failure) and a separate audit-only Completed log for cache hits.
             if (referenceAccumulator != null)
             {
-                var refResources = ReferenceResourceBundleExtractor.Extract(resource, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
+                var validResourceTypes = fhirQuery.ResourceReferenceTypes
+                    .Select(x => x.ResourceType)
+                    .Where(resourceReferenceType => !string.IsNullOrWhiteSpace(resourceReferenceType))
+                    .Select(resourceReferenceType => resourceReferenceType!)
+                    .ToList();
+
+                var refResources = ReferenceResourceBundleExtractor.Extract(resource, validResourceTypes);
                 AccumulateDiscoveredReferences(refResources, referenceAccumulator);
             }
 
@@ -229,15 +251,6 @@ public class FhirApiService : IFhirApiService
                             log.ReportTrackingId),
                             cancellationToken))
             {
-                // Reference discovery: collect ref ids from this bundle into the per-
-                // execution accumulator. Drained at end of primary log execution by
-                // ReferenceResourceService.FetchAndPersistAsync.
-                if (referenceAccumulator != null)
-                {
-                    var refResources = ReferenceResourceBundleExtractor.Extract(bundle, fhirQuery.ResourceReferenceTypes.Select(x => x.ResourceType).ToList());
-                    AccumulateDiscoveredReferences(refResources, referenceAccumulator);
-                }
-
                 var resources = bundle.Entry
                     .Where(e => e.Resource != null && e.Resource.TypeName != "OperationOutcome")
                     .Select(e => e.Resource)
@@ -258,6 +271,28 @@ public class FhirApiService : IFhirApiService
                         string outcomeDetail = JsonSerializer.Serialize(outcome, _options);
                         _logger.LogInformation("OperationOutcome found in successful search bundle for log {LogId}: {outcomeDetail}", log.Id, outcomeDetail);
                     }
+                }
+
+                resources = await FilterResourcesByEncounterMappingAsync(
+                    log,
+                    resources,
+                    cancellationToken);
+
+                // Reference discovery: collect ref ids from filtered resources into the per-
+                // execution accumulator. Drained at end of primary log execution by
+                // ReferenceResourceService.FetchAndPersistAsync.
+                if (referenceAccumulator != null)
+                {
+                    var validResourceTypes = fhirQuery.ResourceReferenceTypes
+                        .Select(x => x.ResourceType)
+                        .Where(resourceReferenceType => !string.IsNullOrWhiteSpace(resourceReferenceType))
+                        .Select(resourceReferenceType => resourceReferenceType!)
+                        .ToList();
+
+                    var refResources = resources
+                        .SelectMany(resource => ReferenceResourceBundleExtractor.Extract(resource, validResourceTypes))
+                        .ToList();
+                    AccumulateDiscoveredReferences(refResources, referenceAccumulator);
                 }
 
                 resourceIds.AddRange(resources.Select(r => $"{r.TypeName}/{r.Id}"));
@@ -362,6 +397,108 @@ public class FhirApiService : IFhirApiService
             searchParams.Add(splitParams[0], splitParams[1]);
         }
         return searchParams;
+    }
+
+    private async Task<List<Resource>> FilterResourcesByEncounterMappingAsync(
+        DataAcquisitionLogModel log,
+        IReadOnlyCollection<Resource> resources,
+        CancellationToken cancellationToken)
+    {
+        if (resources.Count == 0)
+        {
+            return resources.ToList();
+        }
+
+        var resourceEncounterIds = resources
+            .Select(resource => new
+            {
+                Resource = resource,
+                EncounterIds = GetEncounterReferenceIds(resource)
+            })
+            .ToList();
+
+        var encounterIds = resourceEncounterIds
+            .SelectMany(x => x.EncounterIds)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (encounterIds.Count == 0)
+        {
+            return resources.ToList();
+        }
+
+        var organizationLocationMappingIsConfigured = await _organizationLocationConfigurationQueries
+            .HasActiveByFacilityIdAsync(log.FacilityId, cancellationToken);
+
+        if (!organizationLocationMappingIsConfigured)
+        {
+            return resources.ToList();
+        }
+
+        var encounterMappings = await _encounterMappingQueries.GetByFacilityIdAndEncounterIdsAsync(
+            log.FacilityId,
+            encounterIds,
+            cancellationToken);
+
+        var mappedEncounterIds = encounterMappings
+            .Where(mapping => mapping.MappedToOrg)
+            .Select(mapping => mapping.EncounterId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var filteredResources = resourceEncounterIds
+            .Where(x => x.EncounterIds.Count == 0 || x.EncounterIds.Any(mappedEncounterIds.Contains))
+            .Select(x => x.Resource)
+            .ToList();
+
+        var removedCount = resources.Count - filteredResources.Count;
+        if (removedCount > 0)
+        {
+            _logger.LogDebug(
+                "Removed {RemovedCount} resource(s) without mapped encounter organization for facility {FacilityId}.",
+                removedCount,
+                log.FacilityId);
+        }
+
+        return filteredResources;
+    }
+
+    private static List<string> GetEncounterReferenceIds(Resource resource)
+    {
+        return ReferenceResourceBundleExtractor
+            .Extract(resource, [ResourceType.Encounter.ToString()])
+            .Select(GetEncounterReferenceId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string? GetEncounterReferenceId(ResourceReference reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference.Reference))
+        {
+            return null;
+        }
+
+        try
+        {
+            var identity = new ResourceIdentity(reference.Reference);
+            if (string.Equals(identity.ResourceType, ResourceType.Encounter.ToString(), StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(identity.Id))
+            {
+                return identity.Id;
+            }
+        }
+        catch (Exception)
+        {
+        }
+
+        if (string.Equals(reference.Type.SplitReference(), ResourceType.Encounter.ToString(), StringComparison.OrdinalIgnoreCase))
+        {
+            return reference.Reference.SplitReference();
+        }
+
+        return null;
     }
 
     private void AddResourceToCache(ResourceAcquired resourceAcquired, string correlationId)
