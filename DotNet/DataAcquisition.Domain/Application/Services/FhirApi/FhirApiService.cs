@@ -151,10 +151,12 @@ public class FhirApiService : IFhirApiService
                 AccumulateDiscoveredReferences(refResources, referenceAccumulator);
             }
 
-            if (resource is Location location && fhirQueryConfiguration.EnableLocationResolutionMapping)
+            if (resource is Location location && 
+                await _locationMappingService.IsConfigured(log.FacilityId, cancellationToken))
             {
                 await _locationMappingService.UpdateLocationMappingAsync(
-                    log.FacilityId, location,
+                    log.FacilityId, 
+                    location,
                     cancellationToken: cancellationToken);
             }
 
@@ -319,7 +321,8 @@ public class FhirApiService : IFhirApiService
                 {
                     InsertDateExtension((DomainResource)resource);
 
-                    if (resource is Location location && fhirQueryConfiguration.EnableLocationResolutionMapping)
+                    if (resource is Location location &&
+                        await _locationMappingService.IsConfigured(log.FacilityId, cancellationToken))
                     {
                         await _locationMappingService.UpdateLocationMappingAsync(
                             log.FacilityId, location,

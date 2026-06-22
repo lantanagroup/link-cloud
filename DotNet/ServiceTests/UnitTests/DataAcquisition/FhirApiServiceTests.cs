@@ -749,11 +749,13 @@ public class FhirApiServiceTests
     }
 
     [Fact]
-    public async Task ExecuteSearch_LocationResource_WhenResolutionMappingEnabled_CallsLocationMappingService()
+    public async Task ExecuteSearch_LocationResource_WhenFacilityConfigured_CallsLocationMappingService()
     {
         // Arrange
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var locationMappingService = new Mock<ILocationMappingService>();
+        locationMappingService.Setup(s => s.IsConfigured("fac-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
@@ -776,7 +778,7 @@ public class FhirApiServiceTests
 
         var log = new DataAcquisitionLogModel { FacilityId = "fac-1", CorrelationId = "c1", ScheduledReport = new ScheduledReport(), ReportableEvent = ReportableEvent.Adhoc };
         var fhirQuery = new FhirQueryModel { IsReference = false, ResourceReferenceTypes = new List<ResourceReferenceTypeModel>() };
-        var config = new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test", EnableLocationResolutionMapping = true };
+        var config = new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" };
 
         // Act
         await service.ExecuteSearch(log, fhirQuery, config, ResourceType.Location);
@@ -817,8 +819,7 @@ public class FhirApiServiceTests
 
         var log = new DataAcquisitionLogModel { FacilityId = "fac-1", CorrelationId = "c1", ScheduledReport = new ScheduledReport(), ReportableEvent = ReportableEvent.Adhoc };
         var fhirQuery = new FhirQueryModel { IsReference = false, ResourceReferenceTypes = new List<ResourceReferenceTypeModel>() };
-        // Even with resolution mapping enabled, a non-Location resource must not reach the service.
-        var config = new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test", EnableLocationResolutionMapping = true };
+        var config = new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" };
 
         // Act
         await service.ExecuteSearch(log, fhirQuery, config, ResourceType.Patient);
@@ -829,11 +830,13 @@ public class FhirApiServiceTests
     }
 
     [Fact]
-    public async Task ExecuteSearch_LocationResource_WhenResolutionMappingDisabled_DoesNotCallLocationMappingService()
+    public async Task ExecuteSearch_LocationResource_WhenFacilityNotConfigured_DoesNotCallLocationMappingService()
     {
         // Arrange
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var locationMappingService = new Mock<ILocationMappingService>();
+        locationMappingService.Setup(s => s.IsConfigured(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
@@ -856,7 +859,7 @@ public class FhirApiServiceTests
 
         var log = new DataAcquisitionLogModel { FacilityId = "fac-1", CorrelationId = "c1", ScheduledReport = new ScheduledReport(), ReportableEvent = ReportableEvent.Adhoc };
         var fhirQuery = new FhirQueryModel { IsReference = false, ResourceReferenceTypes = new List<ResourceReferenceTypeModel>() };
-        var config = new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test", EnableLocationResolutionMapping = false };
+        var config = new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" };
 
         // Act
         await service.ExecuteSearch(log, fhirQuery, config, ResourceType.Location);
@@ -867,11 +870,13 @@ public class FhirApiServiceTests
     }
 
     [Fact]
-    public async Task ExecuteRead_LocationResource_WhenResolutionMappingEnabled_CallsLocationMappingService()
+    public async Task ExecuteRead_LocationResource_WhenFacilityConfigured_CallsLocationMappingService()
     {
         // Arrange
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var locationMappingService = new Mock<ILocationMappingService>();
+        locationMappingService.Setup(s => s.IsConfigured("fac-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
@@ -879,6 +884,8 @@ public class FhirApiServiceTests
             readFhirCommand.Object,
             new Mock<ILogger<FhirApiService>>().Object,
             new Mock<IResourceCache>().Object,
+            new Mock<IEncounterMappingQueries>().Object,
+            new Mock<IOrganizationLocationConfigurationQueries>().Object,
             locationMappingService.Object
         );
 
@@ -888,7 +895,7 @@ public class FhirApiServiceTests
 
         var log = new DataAcquisitionLogModel { FacilityId = "fac-1", ResourceId = "loc-1", CorrelationId = "c1", ScheduledReport = new ScheduledReport(), ReportableEvent = ReportableEvent.Adhoc };
         var fhirQuery = new FhirQueryModel { IsReference = false, ResourceReferenceTypes = new List<ResourceReferenceTypeModel>() };
-        var config = new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test", EnableLocationResolutionMapping = true };
+        var config = new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" };
 
         // Act
         await service.ExecuteRead(log, fhirQuery, ResourceType.Location, config);
@@ -902,11 +909,13 @@ public class FhirApiServiceTests
     }
 
     [Fact]
-    public async Task ExecuteRead_LocationResource_WhenResolutionMappingDisabled_DoesNotCallLocationMappingService()
+    public async Task ExecuteRead_LocationResource_WhenFacilityNotConfigured_DoesNotCallLocationMappingService()
     {
         // Arrange
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var locationMappingService = new Mock<ILocationMappingService>();
+        locationMappingService.Setup(s => s.IsConfigured(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
@@ -914,6 +923,8 @@ public class FhirApiServiceTests
             readFhirCommand.Object,
             new Mock<ILogger<FhirApiService>>().Object,
             new Mock<IResourceCache>().Object,
+            new Mock<IEncounterMappingQueries>().Object,
+            new Mock<IOrganizationLocationConfigurationQueries>().Object,
             locationMappingService.Object
         );
 
@@ -923,7 +934,7 @@ public class FhirApiServiceTests
 
         var log = new DataAcquisitionLogModel { FacilityId = "fac-1", ResourceId = "loc-1", CorrelationId = "c1", ScheduledReport = new ScheduledReport(), ReportableEvent = ReportableEvent.Adhoc };
         var fhirQuery = new FhirQueryModel { IsReference = false, ResourceReferenceTypes = new List<ResourceReferenceTypeModel>() };
-        var config = new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test", EnableLocationResolutionMapping = false };
+        var config = new FhirQueryConfigurationModel { FhirServerBaseUrl = "http://test" };
 
         // Act
         await service.ExecuteRead(log, fhirQuery, ResourceType.Location, config);

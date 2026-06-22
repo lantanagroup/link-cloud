@@ -1,5 +1,6 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -22,6 +23,13 @@ public class LocationMappingServiceTests
     private readonly Mock<IOrganizationLocationConfigurationQueries> _mockConfigQueries = new();
     private readonly Mock<ICacheService> _mockCache = new();
     private readonly Mock<ILogger<LocationMappingService>> _mockLogger = new();
+
+    // Stateful conditions-cache backing field. Seeded with a non-matching condition so the facility
+    // reads as "configured" (non-empty) while generic test locations are not org locations.
+    private List<OrganizationLocationConditionModel>? _cachedConditions =
+    [
+        new() { ConditionId = 99, Priority = 1, FhirPath = "Location.name = 'ORG-THAT-DOES-NOT-MATCH'" }
+    ];
 
     private readonly LocationMappingService _service;
 
@@ -68,11 +76,16 @@ public class LocationMappingServiceTests
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
 
-        // Default: conditions cache hit with an empty list → IsOrgLocation evaluates to false
-        // without touching the config queries.
+        // Stateful cache: Get returns the last Set value (seeded above with a non-matching
+        // condition so the facility is "configured" but generic locations are not org locations).
         _mockCache
             .Setup(c => c.Get<List<OrganizationLocationConditionModel>>(It.IsAny<string>()))
-            .Returns(new List<OrganizationLocationConditionModel>());
+            .Returns(() => _cachedConditions);
+        _mockCache
+            .Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<OrganizationLocationConditionModel>>(),
+                It.IsAny<TimeSpan>(), It.IsAny<ExpirationType>()))
+            .Callback<string, List<OrganizationLocationConditionModel>, TimeSpan, ExpirationType>(
+                (_, value, _, _) => _cachedConditions = value);
 
         _service = new LocationMappingService(
             _mockManager.Object,
@@ -263,12 +276,10 @@ public class LocationMappingServiceTests
     {
         // Arrange
         var location = NewLocation("loc-1", name: "University Hospital");
-        _mockCache
-            .Setup(c => c.Get<List<OrganizationLocationConditionModel>>(It.IsAny<string>()))
-            .Returns(new List<OrganizationLocationConditionModel>
-            {
-                new() { ConditionId = 1, Priority = 1, FhirPath = "Location.name = 'University Hospital'" }
-            });
+        _cachedConditions =
+        [
+            new() { ConditionId = 1, Priority = 1, FhirPath = "Location.name = 'University Hospital'" }
+        ];
 
         // Act
         await _service.UpdateLocationMappingAsync(FacilityId, location);
@@ -283,12 +294,10 @@ public class LocationMappingServiceTests
     {
         // Arrange
         var location = NewLocation("loc-1", name: "Some Ward");
-        _mockCache
-            .Setup(c => c.Get<List<OrganizationLocationConditionModel>>(It.IsAny<string>()))
-            .Returns(new List<OrganizationLocationConditionModel>
-            {
-                new() { ConditionId = 1, Priority = 1, FhirPath = "Location.name = 'University Hospital'" }
-            });
+        _cachedConditions =
+        [
+            new() { ConditionId = 1, Priority = 1, FhirPath = "Location.name = 'University Hospital'" }
+        ];
 
         // Act
         await _service.UpdateLocationMappingAsync(FacilityId, location);
@@ -299,18 +308,17 @@ public class LocationMappingServiceTests
     }
 
     [Fact]
-    public async Task UpdateLocationMappingAsync_HonorsConditionPriority_FirstMatchWins()
+    public async Task UpdateLocationMappingAsync_WhenAnyConditionMatches_MarksAsOrgLocation()
     {
         // Arrange
-        // Higher-priority (1) condition matches; a malformed lower-priority condition must never run.
+        // OR semantics: one matching condition is enough; evaluation short-circuits on the first
+        // match, so a malformed sibling condition is never reached.
         var location = NewLocation("loc-1", name: "University Hospital");
-        _mockCache
-            .Setup(c => c.Get<List<OrganizationLocationConditionModel>>(It.IsAny<string>()))
-            .Returns(new List<OrganizationLocationConditionModel>
-            {
-                new() { ConditionId = 1, Priority = 1, FhirPath = "Location.name = 'University Hospital'" },
-                new() { ConditionId = 2, Priority = 2, FhirPath = "this.is.not.valid.fhirpath(" }
-            });
+        _cachedConditions =
+        [
+            new() { ConditionId = 1, Priority = 1, FhirPath = "Location.name = 'University Hospital'" },
+            new() { ConditionId = 2, Priority = 2, FhirPath = "this.is.not.valid.fhirpath(" }
+        ];
 
         // Act
         await _service.UpdateLocationMappingAsync(FacilityId, location);
@@ -327,9 +335,7 @@ public class LocationMappingServiceTests
         var location = NewLocation("loc-1", name: "University Hospital");
 
         // Cache miss → must load config and re-cache.
-        _mockCache
-            .Setup(c => c.Get<List<OrganizationLocationConditionModel>>(It.IsAny<string>()))
-            .Returns((List<OrganizationLocationConditionModel>?)null);
+        _cachedConditions = null;
 
         _mockConfigQueries
             .Setup(q => q.GetByFacilityIdAsync(FacilityId))
@@ -387,5 +393,46 @@ public class LocationMappingServiceTests
             Times.Never);
         _mockManager.Verify(m => m.SetPartOfIdForChildrenAsync(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task IsConfigured_WhenFacilityHasActiveConditions_ReturnsTrue()
+    {
+        // Arrange — the default cache is seeded with one active condition.
+
+        // Act
+        var configured = await _service.IsConfigured(FacilityId, CancellationToken.None);
+
+        // Assert
+        Assert.True(configured);
+    }
+
+    [Fact]
+    public async Task IsConfigured_WhenFacilityHasNoActiveConditions_ReturnsFalse()
+    {
+        // Arrange
+        _cachedConditions = [];
+
+        // Act
+        var configured = await _service.IsConfigured(FacilityId, CancellationToken.None);
+
+        // Assert
+        Assert.False(configured);
+    }
+
+    [Fact]
+    public async Task UpdateLocationMappingAsync_WhenFacilityNotConfigured_ThrowsNotFound()
+    {
+        // Arrange — no active conditions → the facility is not configured for location mapping.
+        _cachedConditions = [];
+        var location = NewLocation("loc-1", name: "ICU");
+
+        // Act & Assert
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            _service.UpdateLocationMappingAsync(FacilityId, location));
+
+        _mockManager.Verify(m => m.CreateAsync(It.IsAny<CreateOrganizationLocationMappingModel>()), Times.Never);
+        _mockManager.Verify(m => m.UpdateByIdAsync(It.IsAny<int>(), It.IsAny<UpdateOrganizationLocationMappingModel>()),
+            Times.Never);
     }
 }

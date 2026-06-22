@@ -4,6 +4,7 @@ using Hl7.Fhir.Model;
 using Hl7.FhirPath;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -21,6 +22,14 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 public interface ILocationMappingService
 {
     /// <summary>
+    /// Checks to see if this facility has any active location mappings
+    /// </summary>
+    /// <param name="facilityId">The facility ID that the mapping is for</param>
+    /// <param name="cancellationToken">Used to signal a cancellation in the request</param>
+    /// <returns>True if the facility has location mappings</returns>
+    Task<bool> IsConfigured(string facilityId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Updates or adds the location mapping for a given facility and location. This method is called when a new location resource is acquired from the FHIR API, and is responsible for updating the mapping between the facility and the location in the database.
     /// </summary>
     /// <param name="facilityId">The facility id that the mapping is for</param>
@@ -28,6 +37,7 @@ public interface ILocationMappingService
     /// <param name="locationAlias">An alias to use for the location</param>
     /// <param name="cancellationToken">Used to signal a cancellation in the request</param>
     /// <returns>The OrganizationLocationMappingModel for the mapping</returns>
+    /// <exception cref="NotFoundException">Thrown when the facility doesn't have any active mapping configurations</exception>
     Task<OrganizationLocationMappingModel> UpdateLocationMappingAsync(string facilityId, Location location, string? locationAlias = null, CancellationToken cancellationToken = default);
 }
 
@@ -37,15 +47,17 @@ public class LocationMappingService(
     IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
     ICacheService cacheService,
     ILogger<LocationMappingService> logger) : ILocationMappingService
-    
+
 {
-    private readonly IOrganizationLocationMappingManager _organizationLocationMappingManager = 
+    private readonly IOrganizationLocationMappingManager _organizationLocationMappingManager =
         organizationLocationMappingManager;
-    private readonly IOrganizationLocationMappingQueries _organizationLocationMappingQueries = 
+
+    private readonly IOrganizationLocationMappingQueries _organizationLocationMappingQueries =
         organizationLocationMappingQueries;
-    private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries = 
+
+    private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries =
         organizationLocationConfigurationQueries;
-    
+
     private readonly ICacheService _cacheService = cacheService;
     private readonly ILogger<LocationMappingService> _logger = logger;
 
@@ -53,16 +65,22 @@ public class LocationMappingService(
     // facility, so caching the compiled expression avoids recompiling per Location in the acquire loop.
     private static readonly ConcurrentDictionary<string, CompiledExpression> CompiledFhirPaths = new();
 
-    
+
     private const string OrgLocationConditionsCacheKeyPrefix = "org-location-conditions:";
     private static readonly TimeSpan OrgLocationConditionsTtl = TimeSpan.FromHours(1);
 
     public async Task<OrganizationLocationMappingModel> UpdateLocationMappingAsync(string facilityId, Location location,
         string? locationAlias = null, CancellationToken cancellationToken = default)
     {
+        var conditions = await GetActiveConditionsForFacility(facilityId);
+        if (conditions.Count == 0)
+        {
+            throw new NotFoundException($"FacilityId {facilityId} does not have any location mappings configured");
+        }
+
         var locationMapping =
             await _organizationLocationMappingQueries.GetByFacilityIdAndLocationIdAsync(
-                facilityId: facilityId, 
+                facilityId: facilityId,
                 locationId: location.Id);
 
         // See if the PartOf has an record already so we can set the Id on the location mapping
@@ -79,10 +97,10 @@ public class LocationMappingService(
         if (locationMapping is null)
         {
             locationMapping = await AddMapping(
-                facilityId, 
-                location, 
-                isOrgLocation, 
-                locationAlias, 
+                facilityId,
+                location,
+                isOrgLocation,
+                locationAlias,
                 partOf,
                 cancellationToken);
         }
@@ -94,7 +112,15 @@ public class LocationMappingService(
         return locationMapping;
     }
 
-    private async Task<OrganizationLocationMappingModel> UpdateMapping(Location location, bool isOrgLocation, OrganizationLocationMappingModel locationMapping, OrganizationLocationMappingModel? partOf)
+    public async Task<bool> IsConfigured(string facilityId, CancellationToken cancellationToken)
+    {
+        var mappings = await GetActiveConditionsForFacility(facilityId);
+
+        return mappings.Count != 0;
+    }
+
+    private async Task<OrganizationLocationMappingModel> UpdateMapping(Location location, bool isOrgLocation,
+        OrganizationLocationMappingModel locationMapping, OrganizationLocationMappingModel? partOf)
     {
         if (locationMapping.LocationName != location.Name ||
             locationMapping.PartOfValue != location.PartOf?.Reference?.SplitReference() ||
@@ -123,10 +149,10 @@ public class LocationMappingService(
     }
 
     private async Task<OrganizationLocationMappingModel> AddMapping(
-        string facilityId, 
+        string facilityId,
         Location location,
         bool isOrgLocation,
-        string? locationAlias, 
+        string? locationAlias,
         OrganizationLocationMappingModel? partOf,
         CancellationToken cancellationToken)
     {
@@ -157,7 +183,7 @@ public class LocationMappingService(
             if (existing is null)
             {
                 // not a duplicate — a real failure, rethrow
-                throw; 
+                throw;
             }
 
             locationMapping = await UpdateMapping(location, isOrgLocation, existing, partOf);
@@ -168,7 +194,7 @@ public class LocationMappingService(
             location.Id,
             locationMapping.LocationMappingId,
             cancellationToken: cancellationToken);
-        
+
         return locationMapping;
     }
 
@@ -191,7 +217,7 @@ public class LocationMappingService(
     }
 
     private async Task<bool> IsOrgLocationAsync(
-        string facilityId, 
+        string facilityId,
         Location? location)
     {
         if (location is null)
@@ -199,41 +225,18 @@ public class LocationMappingService(
             return false;
         }
 
-        var cacheKey = OrgLocationConditionsCacheKeyPrefix + facilityId;
+        var conditions = await GetActiveConditionsForFacility(facilityId);
 
-        var conditions = _cacheService.Get<List<OrganizationLocationConditionModel>>(cacheKey);
-
-        if (conditions is null)
-        {
-            var configs = await _organizationLocationConfigurationQueries.GetByFacilityIdAsync(facilityId);
-
-            conditions = configs
-                .Where(c => c.IsActive)
-                .SelectMany(c => c.Conditions)
-                .Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
-                .OrderBy(c => c.Priority)
-                .ToList();
-
-            _cacheService.Set(cacheKey, conditions, OrgLocationConditionsTtl, ExpirationType.Absolute);
-        }
-
-        return IsOrgLocation(location, conditions); 
-    }
-
-    private bool IsOrgLocation(Location? location, IReadOnlyList<OrganizationLocationConditionModel>? conditions)
-    {
-        if (location is null || conditions is null || conditions.Count == 0)
+        if (conditions.Count == 0)
         {
             return false;
         }
 
         var element = location.ToTypedElement();
 
-        // Conditions arrive ordered by Priority (ascending). First-match-wins: evaluate in priority
-        // order; the first condition that matches marks the location as an org location and stops.
-        // NOTE: with positive-only FhirPath matchers this produces the same boolean as "any match".
-        // Priority becomes truly decisive only if a condition can carry a verdict (include vs
-        // exclude), which the current schema can't express — pending architecture confirmation.
+        // A location is an org location if it matches
+        // ANY active condition. Priority is not decisive — it only affects evaluation order, so we
+        // stop at the first match.
         foreach (var condition in conditions)
         {
             if (!EvaluatesTrue(element, condition.FhirPath!))
@@ -249,6 +252,31 @@ public class LocationMappingService(
         }
 
         return false;
+    }
+
+    private async Task<List<OrganizationLocationConditionModel>> GetActiveConditionsForFacility(string facilityId)
+    {
+        var cacheKey = OrgLocationConditionsCacheKeyPrefix + facilityId;
+
+        var conditions = _cacheService.Get<List<OrganizationLocationConditionModel>?>(cacheKey);
+
+        if (conditions is not null)
+        {
+            return conditions;
+        }
+
+        var configs = await _organizationLocationConfigurationQueries.GetByFacilityIdAsync(facilityId);
+
+        conditions = configs
+            .Where(c => c.IsActive)
+            .SelectMany(c => c.Conditions)
+            .Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
+            .OrderBy(c => c.Priority)
+            .ToList();
+
+        _cacheService.Set(cacheKey, conditions, OrgLocationConditionsTtl, ExpirationType.Absolute);
+
+        return conditions;
     }
 
     private bool EvaluatesTrue(ITypedElement element, string fhirPath)
@@ -268,7 +296,7 @@ public class LocationMappingService(
             // Node-selecting expression (e.g. "identifier.where(system=...)"): non-empty → match.
             return true;
         }
-        catch(Exception exception)
+        catch (Exception exception)
         {
             // Conditions are syntax-validated when the config is saved, so a runtime failure here
             // means the expression didn't fit this resource shape — treat as no-match, not fatal.
