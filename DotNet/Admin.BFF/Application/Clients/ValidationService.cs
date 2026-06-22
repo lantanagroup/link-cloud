@@ -15,6 +15,7 @@ public class ValidationService
     private readonly HttpClient _client;
     private readonly IOptions<ServiceRegistry> _serviceRegistry;
     private const string HealthUp = "UP";
+    private static readonly TimeSpan HealthCheckTimeout = TimeSpan.FromSeconds(5);
 
 
     public ValidationService(ILogger<ValidationService> logger, HttpClient client, IOptions<ServiceRegistry> serviceRegistry)
@@ -42,6 +43,9 @@ public class ValidationService
 
     public async Task<LinkServiceHealthReport> LinkServiceHealthCheck(CancellationToken cancellationToken)
     {
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeoutCts.CancelAfter(HealthCheckTimeout);
+
         // HTTP GET
 
         var report = new LinkServiceHealthReport
@@ -51,7 +55,7 @@ public class ValidationService
 
         try
         {
-            var response = await _client.GetAsync($"health", cancellationToken);
+            var response = await _client.GetAsync($"health", timeoutCts.Token);
 
             var content = await response.Content.ReadAsStringAsync();
 
@@ -82,7 +86,14 @@ public class ValidationService
             {
                 foreach (var component in health.Components)
                 {
-                    var key = component.Key == "db" ? "Database" : ToPascalCase(component.Key);
+                    // Spring names the Mongo component "db" and the auto-configured Redis
+                    // component "redis"; map them to the Database/Cache entries the UI expects.
+                    var key = component.Key switch
+                    {
+                        var k when k.Equals("db", StringComparison.OrdinalIgnoreCase) => "Database",
+                        var k when k.Equals("redis", StringComparison.OrdinalIgnoreCase) => "Cache",
+                        _ => ToPascalCase(component.Key)
+                    };
 
                     var componentStatus = component.Value?.Status?.ToUpperInvariant() == HealthUp
                         ? HealthStatus.Healthy

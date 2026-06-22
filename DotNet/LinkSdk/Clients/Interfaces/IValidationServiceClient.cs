@@ -1,11 +1,14 @@
-﻿namespace LantanaGroup.Link.Sdk.Clients;
+﻿using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Validation;
+
+namespace LantanaGroup.Link.Sdk.Clients;
 
 public interface IValidationServiceClient
 {
-    Task<bool> HasArtifactsAsync(CancellationToken cancellationToken = default);
-    Task<bool> HasCategoriesAsync(CancellationToken cancellationToken = default);
-    Task InitializeArtifactsAsync(CancellationToken cancellationToken = default);
-    Task InitializeCategoriesAsync(CancellationToken cancellationToken = default);
-    Task UpsertResourceArtifactAsync(string artifactId, string resourceJson, CancellationToken cancellationToken = default);
-    Task<string?> GetValidationResultsAsync(string facilityId, string reportId, string severity = "WARNING", CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<List<ValidationArtifactApiModel>>> GetArtifactsAsync(CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<List<ValidationCategoryApiModel>>> GetCategoriesAsync(CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> InitializeArtifactsAsync(CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> InitializeCategoriesAsync(CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> UpsertResourceArtifactAsync(string artifactId, string resourceJson, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse<string>> GetValidationResultsAsync(string facilityId, string reportId, string severity = "WARNING", CancellationToken cancellationToken = default);
 }

@@ -6,11 +6,11 @@ namespace LantanaGroup.Automation.Generation.ResourceFactories;
 public static class LocationFactory
 {
     /// <summary>Generate a Location using well-known type codes (HOSP, ICU, ER, HU).</summary>
-    public static Location Generate(string id, string typeCode, string name, string managingOrgId) =>
-        Create(id, typeCode, name, managingOrgId);
+    public static Location Generate(string id, string typeCode, string name, string managingOrgId, string? partOfId = null) =>
+        Create(id, typeCode, name, managingOrgId, partOfId);
 
     /// <summary>Create a Location with caller-supplied values.</summary>
-    public static Location Create(string id, string typeCode, string name, string managingOrgId)
+    public static Location Create(string id, string typeCode, string name, string managingOrgId, string? partOfId = null)
     {
         // Map v3-RoleCode to CDC HSLOC codes used by NHSN "Inpatient, Emergency, and Observation Locations" value set
         var (hslocCode, hslocDisplay) = typeCode switch
@@ -44,7 +44,8 @@ public static class LocationFactory
                 }
             ],
             ManagingOrganization = Ref($"Organization/{managingOrgId}"),
-            PhysicalType = CC("http://terminology.hl7.org/CodeSystem/location-physical-type", "wa", "Ward")
+            PhysicalType = CC("http://terminology.hl7.org/CodeSystem/location-physical-type", "wa", "Ward"),
+            PartOf = partOfId is not null ? Ref($"Location/{partOfId}") : null
         };
     }
 }

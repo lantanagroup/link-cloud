@@ -2,10 +2,12 @@
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Factories;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ReferenceQuery;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
@@ -50,6 +52,7 @@ public interface IReferenceResourceService
 
     Task<PreparedReferenceLogExecutionModel> PrepareReferenceLogExecutionAsync(
         DataAcquisitionLogModel log,
+        DiscoveredReferenceAccumulator? accumulator = null,
         CancellationToken cancellationToken = default);
 }
 
@@ -98,8 +101,7 @@ public class ReferenceResourceService : IReferenceResourceService
         }
 
         var validReferenceResources =
-            referenceQueryFactoryResult
-            .ReferenceIds
+            (referenceQueryFactoryResult.ReferenceIds ?? Enumerable.Empty<ResourceReference>())
             .Where(x => x.TypeName == referenceQueryConfig.ResourceType || x.Reference.StartsWith(referenceQueryConfig.ResourceType, StringComparison.InvariantCultureIgnoreCase))
             .ToList();
 
@@ -204,12 +206,22 @@ public class ReferenceResourceService : IReferenceResourceService
                 parsedResourceType,
                 refConfig,
                 requestedIds,
+                new List<CreateResourceReferenceTypeModel>
+                {
+                    new CreateResourceReferenceTypeModel
+                    {
+                        FacilityId = primaryLog.FacilityId,
+                        QueryPhase = primaryLog.QueryPhase.GetValueOrDefault(),
+                        ResourceType = resourceType,
+                    }
+                },
                 cancellationToken);
         }
     }
 
     public async Task<PreparedReferenceLogExecutionModel> PrepareReferenceLogExecutionAsync(
         DataAcquisitionLogModel log,
+        DiscoveredReferenceAccumulator? accumulator = null,
         CancellationToken cancellationToken = default)
     {
         if (log == null) throw new ArgumentNullException(nameof(log));
@@ -297,6 +309,20 @@ public class ReferenceResourceService : IReferenceResourceService
 
             resourceIds.Add($"{resource.TypeName}/{resource.Id}");
             AddResourceToCache(log, resource);
+
+            // Extract and accumulate nested references from cached resources
+            if (accumulator != null && log.FhirQuery.Any())
+            {
+                var referenceTypes = log.FhirQuery
+                    .SelectMany(q => q.ResourceReferenceTypes.Select(rt => rt.ResourceType))
+                    .Distinct()
+                    .ToList();
+                var refResources = ReferenceResourceBundleExtractor.Extract(resource, referenceTypes);
+                if (refResources.Any())
+                {
+                    AccumulateDiscoveredReferences(refResources, accumulator);
+                }
+            }
         }
 
         var missingIds = outstandingIds.Where(id => !cachedById.ContainsKey(id)).ToList();
@@ -333,6 +359,7 @@ public class ReferenceResourceService : IReferenceResourceService
         ResourceType resourceType,
         ReferenceQueryConfig refConfig,
         List<string> resourceIds,
+        List<CreateResourceReferenceTypeModel> resourceReferenceTypes,
         CancellationToken cancellationToken)
     {
         bool created = false;
@@ -395,7 +422,8 @@ public class ReferenceResourceService : IReferenceResourceService
                                 QueryType = fhirQueryType,
                                 Paged = pageSize,
                                 ResourceTypes = new List<ResourceType> { resourceType },
-                                QueryParameters = new List<string>()
+                                QueryParameters = new List<string>(),
+                                ResourceReferenceTypes = resourceReferenceTypes ?? new List<CreateResourceReferenceTypeModel>()
                             }
                         }
                     }, ct);
@@ -607,6 +635,26 @@ public class ReferenceResourceService : IReferenceResourceService
         }
 
         return null;
+    }
+
+    private void AccumulateDiscoveredReferences(
+        IReadOnlyList<ResourceReference> refResources,
+        DiscoveredReferenceAccumulator accumulator)
+    {
+        if (refResources == null || refResources.Count == 0)
+            return;
+
+        foreach (var rr in refResources)
+        {
+            if (string.IsNullOrWhiteSpace(rr?.Reference))
+                continue;
+
+            var identity = new ResourceIdentity(rr.Reference);
+            if (string.IsNullOrWhiteSpace(identity.ResourceType) || string.IsNullOrWhiteSpace(identity.Id))
+                continue;
+
+            accumulator.Add(identity.ResourceType, identity.Id);
+        }
     }
 
     private static bool TryFindReferenceConfig(

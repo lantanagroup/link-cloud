@@ -30,19 +30,72 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private string GetBlobKey(string key) =>
             string.IsNullOrEmpty(_settings.BlobRoot) ? key : $"{_settings.BlobRoot}/{key}";
 
+        private string GetBlobIdsKey(string key) =>
+            GetBlobKey(key) + "_ids";
+
         public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType)
         {
             string blobName = GetBlobKey(correlationId);
+            string idsBlobName = GetBlobIdsKey(correlationId);
+            
+            //First read the existing blob to get the list of resource references that are already in the cache. 
+            // This is necessary because we want to append new resources to the existing blob, 
+            // and we don't want to write duplicate resource references if there are multiple 
+            // resources of the same type in the same batch.
+            List<string> existingIds = new List<string>();
+            var readBlobClient = _containerClient.GetBlobClient(idsBlobName);
+            if(readBlobClient.Exists())
+            {
+                using (Stream read_stream = readBlobClient.OpenRead())
+                using (StreamReader reader = new StreamReader(read_stream))
+                {
+                    while (reader.Peek() >= 0)
+                    {
+                        string? id = reader.ReadLine();
+                        if(!string.IsNullOrEmpty(id))
+                        {
+                            existingIds.Add(id);
+                        }
+                    }
+                }
+            }
+
+            var idsToWrite = new List<string>();
+            foreach(var resource in resources)
+            {
+                var referenceId = resource.TypeName + "/" + resource.Id;
+                if (!existingIds.Contains(referenceId, StringComparer.OrdinalIgnoreCase))
+                {
+                    idsToWrite.Add(referenceId);
+                }
+            }
+
+            if(!idsToWrite.Any())
+                return;
 
             AppendBlobClient writeBlobClient = _containerClient.GetAppendBlobClient(blobName);
+            AppendBlobClient writeIdsBlobClient = _containerClient.GetAppendBlobClient(idsBlobName);
             writeBlobClient.CreateIfNotExists();
+            writeIdsBlobClient.CreateIfNotExists();
 
+            using (Stream ids_write_stream = writeIdsBlobClient.OpenWrite(false))
+            using (StreamWriter ids_writer = new StreamWriter(ids_write_stream))
+            {
+                foreach(var id in idsToWrite)
+                {
+                    ids_writer.WriteLine(id);
+                }
+            }
+            
             using (Stream write_stream = writeBlobClient.OpenWrite(false))
             using (StreamWriter writer = new StreamWriter(write_stream)) 
             {
                 foreach (var resource in resources) 
                 {
-                    writer.WriteLine(resource.TypeName + "/" + resource.Id);
+                    var referenceId = resource.TypeName + "/" + resource.Id;
+                    if (existingIds.Contains(referenceId, StringComparer.OrdinalIgnoreCase))
+                        continue;
+                    writer.WriteLine(referenceId);
                     writer.WriteLine(resource.ToJson());
                 }
             }
@@ -155,6 +208,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             foreach (var cacheKey in cacheKeys)
             {
                 _containerClient.DeleteBlobIfExists(GetBlobKey(cacheKey));
+                _containerClient.DeleteBlobIfExists(GetBlobIdsKey(cacheKey));
             }
         }
     }
