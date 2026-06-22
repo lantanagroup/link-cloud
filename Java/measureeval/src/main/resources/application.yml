@@ -21,6 +21,12 @@ management:
       enabled: false
     mongo:
       enabled: false
+    redis:
+      enabled: false     # auto Redis indicator disabled; ResourceCacheHealthIndicator checks Redis + ABS
+    resource-cache:
+      timeout-ms: 3000   # backstop deadline for the combined Redis+ABS check; the 2s Redis command
+                         # timeout (spring.data.redis.timeout) reports DOWN sooner in the common case,
+                         # and this stays below the BFF's 5s health-check timeout
     kafka:
       enabled: true  # Ensures Kafka health is checked
 
@@ -59,6 +65,12 @@ spring:
     mongodb:
       uri: mongodb://localhost:27017/${spring.application.name}?serverSelectionTimeoutMS=4000
       database: ${spring.application.name}
+
+    redis:
+      timeout: 2000ms            # command timeout — bounds the health-check PING (default is 60s)
+      connect-timeout: 1000ms    # socket connect timeout — bounds the "Redis unreachable" case
+      lettuce:
+        shutdown-timeout: 100ms
 
   jackson:
     mapper:

@@ -160,6 +160,18 @@ export class AcquisitionLogViewComponent implements OnInit {
   createdBeforeFilter: string | null = null;
   statusChartExpanded: boolean = false;
   statusChartData: Record<string, number> = {};
+  statusChartColors: Record<string, string> = {
+    'Pending': '#bdbdbd',
+    'Ready': '#ff9800',
+    'Queued': '#0ea5e9',
+    'Processing': '#1f77b4',
+    'Completed': '#2ca02c',
+    'Failed': '#d62728',
+    'MaxRetriesReached': '#a10303ff',
+    'ConfigurationMissing': '#b45309',
+    'Skipped': '#9e9e9e',
+    'Cancelled': '#6b7280'
+  };
   statusChartLoading = false;
   statusChartReportId = '';
   statusChartPatientId = '';

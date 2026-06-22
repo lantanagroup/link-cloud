@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Net;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
@@ -126,8 +127,8 @@ public class PipelineDataReader
     {
         return GetOrFetchAsync($"schedule:{scheduleId}", async () =>
         {
-            var page = await _reportClient.SearchSchedulesAsync(scheduleId.ToString());
-            var record = page?.Records?.FirstOrDefault();
+            var response = await _reportClient.SearchSchedulesAsync(scheduleId.ToString());
+            var record = response.Body?.Records?.FirstOrDefault();
             if (record == null)
                 return null;
 
@@ -153,7 +154,8 @@ public class PipelineDataReader
     {
         var result = await GetOrFetchAsync($"entries:{scheduleId}", async () =>
         {
-            var entries = await _reportClient.GetEntriesByScheduleAsync(scheduleId.ToString());
+            var response = await _reportClient.GetEntriesByScheduleAsync(scheduleId.ToString());
+            var entries = response.Body;
             if (entries == null)
                 return new List<ReportEntryInfo>();
 
@@ -207,7 +209,8 @@ public class PipelineDataReader
     {
         var result = await GetOrFetchAsync($"populations:{scheduleId}:{facilityId}", async () =>
         {
-            var pops = await _reportClient.GetPopulationsByScheduleAsync(scheduleId.ToString());
+            var response = await _reportClient.GetPopulationsByScheduleAsync(scheduleId.ToString());
+            var pops = response.Body;
             if (pops == null)
                 return new List<ReportPopulationInfo>();
 
@@ -237,8 +240,20 @@ public class PipelineDataReader
         return await GetAcquisitionLogsCoreAsync(string.Empty, reportId);
     }
 
-    public Task<DataAcquisitionLogApiModel?> GetAcquisitionLogByIdAsync(long id)
-        => _dataAcqClient.GetAcquisitionLogByIdAsync(id);
+    public async Task<DataAcquisitionLogApiModel?> GetAcquisitionLogByIdAsync(long id)
+    {
+        var response = await _dataAcqClient.GetAcquisitionLogByIdAsync(id);
+
+        if (response.IsSuccessStatusCode)
+            return response.Body;
+
+        if (response.StatusCode == (int)HttpStatusCode.NotFound)
+            return null;
+
+        throw new InvalidOperationException(
+            $"Failed to get acquisition log {id}. HTTP {response.StatusCode}" +
+            (!string.IsNullOrWhiteSpace(response.RawBody) ? $": {response.RawBody}" : string.Empty));
+    }
 
     public async Task<bool> HasAnyFhirQueryRowsForReportAsync(string facilityId, string reportId)
     {
@@ -281,7 +296,8 @@ public class PipelineDataReader
 
         while (true)
         {
-            var page = await _dataAcqClient.SearchAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
+            var response = await _dataAcqClient.SearchAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
+            var page = response.Body;
             var records = page?.Records ?? [];
             if (records.Count == 0)
                 break;
@@ -321,7 +337,8 @@ public class PipelineDataReader
 
         while (true)
         {
-            var page = await _dataAcqClient.SearchAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
+            var response = await _dataAcqClient.SearchAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
+            var page = response.Body;
             var records = page?.Records ?? [];
             if (records.Count == 0)
                 break;
@@ -331,7 +348,7 @@ public class PipelineDataReader
 
             foreach (var record in records)
             {
-                var detailed = await _dataAcqClient.GetAcquisitionLogByIdAsync(record.Id);
+                var detailed = await GetAcquisitionLogByIdAsync(record.Id);
                 if (predicate(detailed))
                     return true;
             }
@@ -347,15 +364,19 @@ public class PipelineDataReader
         return false;
     }
 
-    public Task<bool> HasFhirQueryConfigurationAsync(string facilityId) =>
-        _dataAcqClient.HasFhirQueryConfigurationAsync(facilityId);
+    public async Task<bool> HasFhirQueryConfigurationAsync(string facilityId)
+    {
+        var response = await _dataAcqClient.GetFhirQueryConfigurationAsync(facilityId);
+        return response.IsSuccessStatusCode;
+    }
 
     public async Task<List<QueryPlanInfo>> GetQueryPlansAsync(string facilityId)
     {
         var list = new List<QueryPlanInfo>();
         foreach (var type in new[] { "Discharge", "Monthly" })
         {
-            if (await _dataAcqClient.HasQueryPlanAsync(facilityId, type))
+            var response = await _dataAcqClient.GetQueryPlanAsync(facilityId, type);
+            if (response.IsSuccessStatusCode)
                 list.Add(new QueryPlanInfo(type, null, 1, 1));
         }
 
@@ -394,7 +415,8 @@ public class PipelineDataReader
 
         while (true)
         {
-            var page = await _normalizationClient.SearchFacilityOperationsAsync(facilityId, includeDisabled: true, pageSize: pageSize, pageNumber: pageNumber);
+            var response = await _normalizationClient.SearchFacilityOperationsAsync(facilityId, includeDisabled: true, pageSize: pageSize, pageNumber: pageNumber);
+            var page = response.Body;
             if (page?.Records == null || page.Records.Count == 0)
                 break;
 
@@ -420,11 +442,11 @@ public class PipelineDataReader
 
     public async Task<List<OperationSequenceInfo>> GetOperationSequencesAsync(string facilityId)
     {
-        var sequences = await _normalizationClient.GetOperationSequencesAsync(facilityId);
-        if (sequences == null)
+        var response = await _normalizationClient.GetOperationSequencesAsync(facilityId);
+        if (!response.IsSuccessStatusCode || response.Body == null)
             return [];
 
-        return sequences.Select(s => new OperationSequenceInfo(
+        return response.Body.Select(s => new OperationSequenceInfo(
             s.Id.ToString(),
             s.Sequence,
             s.OperationResourceType?.Operation?.OperationType,
@@ -433,10 +455,11 @@ public class PipelineDataReader
 
     public async Task<FacilityInfo?> GetFacilityAsync(string facilityId)
     {
-        var facility = await _facilityClient.GetAsync(facilityId);
-        if (facility == null)
+        var response = await _facilityClient.GetAsync(facilityId);
+        if (!response.IsSuccessStatusCode || response.Body == null)
             return null;
 
+        var facility = response.Body;
         return new FacilityInfo(
             facility.FacilityId ?? facilityId,
             facility.FacilityName,
@@ -474,7 +497,8 @@ public class PipelineDataReader
 
         while (true)
         {
-            var page = await _dataAcqClient.SearchAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
+            var response = await _dataAcqClient.SearchAcquisitionLogsAsync(facilityId, reportId, pageSize: pageSize, pageNumber: pageNumber);
+            var page = response.Body;
             var records = page?.Records ?? [];
             if (records.Count == 0)
                 break;
@@ -484,7 +508,7 @@ public class PipelineDataReader
 
             foreach (var record in records)
             {
-                var detailed = await _dataAcqClient.GetAcquisitionLogByIdAsync(record.Id);
+                var detailed = await GetAcquisitionLogByIdAsync(record.Id);
                 if (string.IsNullOrWhiteSpace(detailed?.PatientId))
                     continue;
 
@@ -520,8 +544,8 @@ public class PipelineDataReader
 
     public async Task<List<StatusCountInfo>> GetDataAcquisitionStatusCountsAsync(string reportId)
     {
-        var stats = await _dataAcqClient.GetReportStatusCountsAsync(reportId);
-        return stats?.Statuses?
+        var response = await _dataAcqClient.GetReportStatusCountsAsync(reportId);
+        return response.Body?.Statuses?
             .Where(s => !string.IsNullOrWhiteSpace(s.Name))
             .Select(s => new StatusCountInfo(s.Name, s.Count))
             .ToList() ?? [];
@@ -529,7 +553,8 @@ public class PipelineDataReader
 
     public async Task<HashSet<string>> GetAcquiredResourceIdsForReportAsync(string facilityId, string reportId)
     {
-        var ids = await _dataAcqClient.GetAcquiredResourceIdsForReportAsync(facilityId, reportId);
+        var response = await _dataAcqClient.GetAcquiredResourceIdsForReportAsync(facilityId, reportId);
+        var ids = response.Body;
         var normalized = ids?
             .Where(x => !string.IsNullOrWhiteSpace(x) && x.Contains('/'))
             .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -537,8 +562,8 @@ public class PipelineDataReader
         if (normalized.Count > 0 || string.IsNullOrWhiteSpace(facilityId))
             return normalized;
 
-        ids = await _dataAcqClient.GetAcquiredResourceIdsForReportAsync(string.Empty, reportId);
-        return ids?
+        var fallback = await _dataAcqClient.GetAcquiredResourceIdsForReportAsync(string.Empty, reportId);
+        return fallback.Body?
             .Where(x => !string.IsNullOrWhiteSpace(x) && x.Contains('/'))
             .ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
@@ -562,7 +587,7 @@ public class PipelineDataReader
                         pageSize: pageSize,
                         pageNumber: pageNumber);
 
-                    var records = page?.Records ?? [];
+                    var records = page?.Body?.Records ?? [];
                     if (records.Count == 0)
                         break;
 
@@ -591,7 +616,8 @@ public class PipelineDataReader
     {
         return GetOrFetchAsync($"acqSummary:{reportId}", async () =>
         {
-            var summary = await _dataAcqClient.GetReportSummaryAsync(reportId);
+            var response = await _dataAcqClient.GetReportSummaryAsync(reportId);
+            var summary = response.Body;
             if (summary == null) return null;
 
             return new AcquisitionSummaryInfo(

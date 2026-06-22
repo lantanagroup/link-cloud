@@ -20,16 +20,12 @@ public class SubmissionServiceClient : LinkApiClientBase, ISubmissionServiceClie
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
-    public async Task<(byte[] Bytes, string? ContentType)> DownloadSubmissionAsync(
+    public Task<LinkApiResponse<byte[]>> DownloadSubmissionAsync(
         string facilityId,
         string reportId,
         bool external = true,
-        CancellationToken cancellationToken = default)
-    {
-        var response = await Request($"Submission/{facilityId}/{reportId}")
+        CancellationToken cancellationToken = default) =>
+        SendBytesAsync(() => Request($"Submission/{facilityId}/{reportId}")
             .SetQueryParam("external", external.ToString().ToLowerInvariant())
-            .GetAsync(cancellationToken: cancellationToken);
-
-        return (await response.GetBytesAsync(), response.ResponseMessage.Content.Headers.ContentType?.MediaType);
-    }
+            .GetAsync(cancellationToken: cancellationToken));
 }
