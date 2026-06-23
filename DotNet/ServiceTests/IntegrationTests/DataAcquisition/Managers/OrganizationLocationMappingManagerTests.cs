@@ -2,6 +2,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
@@ -21,7 +22,8 @@ public class OrganizationLocationMappingManagerTests
     private IOrganizationLocationMappingManager CreateManager(IServiceScope scope)
     {
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-        return new OrganizationLocationMappingManager(database);
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        return new OrganizationLocationMappingManager(database, dbContext);
     }
 
     private static string NewFacilityId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";

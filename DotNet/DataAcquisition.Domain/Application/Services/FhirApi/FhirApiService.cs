@@ -48,6 +48,7 @@ public class FhirApiService : IFhirApiService
     private readonly IResourceCache _resourceCache;
     private readonly IEncounterMappingQueries _encounterMappingQueries;
     private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries;
+    private readonly ILocationMappingService _locationMappingService;
 
     public FhirApiService(
         IReferenceResourcesManager referenceResourceManager,
@@ -57,7 +58,8 @@ public class FhirApiService : IFhirApiService
         ILogger<FhirApiService> logger,
         IResourceCache resourceCache,
         IEncounterMappingQueries encounterMappingQueries,
-        IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries)
+        IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
+        ILocationMappingService locationMappingService)
     {
         _referenceResourceManager = referenceResourceManager;
         _referenceResourcesQueries = referenceResourcesQueries;
@@ -67,6 +69,7 @@ public class FhirApiService : IFhirApiService
         _resourceCache = resourceCache;
         _encounterMappingQueries = encounterMappingQueries;
         _organizationLocationConfigurationQueries = organizationLocationConfigurationQueries;
+        _locationMappingService = locationMappingService;
     }
 
     #region Interface Implementation
@@ -80,7 +83,7 @@ public class FhirApiService : IFhirApiService
         activity?.SetTag(DiagnosticNames.ResourceType, resourceType.ToString());
 
         var resourceIds = new List<string>();
-        List<string> resourceIdsToAcquire =
+        var resourceIdsToAcquire =
             fhirQuery.IsReference.GetValueOrDefault()
             ? fhirQuery.IdQueryParameterValues.ToList()
             : [resourceType == ResourceType.Patient ? log.PatientId.SplitReference() : log.ResourceId];
@@ -146,6 +149,15 @@ public class FhirApiService : IFhirApiService
 
                 var refResources = ReferenceResourceBundleExtractor.Extract(resource, validResourceTypes);
                 AccumulateDiscoveredReferences(refResources, referenceAccumulator);
+            }
+
+            if (resource is Location location && 
+                await _locationMappingService.IsConfigured(log.FacilityId, cancellationToken))
+            {
+                await _locationMappingService.UpdateLocationMappingAsync(
+                    log.FacilityId, 
+                    location,
+                    cancellationToken: cancellationToken);
             }
 
             AddResourceToCache(new ResourceAcquired
@@ -305,10 +317,20 @@ public class FhirApiService : IFhirApiService
                     await PersistAcquiredReferenceResourcesAsync(log, resources, cancellationToken);
                 }
 
+                var locationMappingConfigured =
+                    await _locationMappingService.IsConfigured(log.FacilityId, cancellationToken);
+
                 foreach (var resource in resources)
                 {
                     InsertDateExtension((DomainResource)resource);
 
+                    if (locationMappingConfigured && resource is Location location)
+                    {
+                        await _locationMappingService.UpdateLocationMappingAsync(
+                            log.FacilityId, location,
+                            cancellationToken:cancellationToken);
+                    }
+                    
                     AddResourceToCache(new ResourceAcquired
                     {
                         Resource = resource,

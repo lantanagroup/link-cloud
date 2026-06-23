@@ -1,6 +1,8 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -12,15 +14,21 @@ public interface IOrganizationLocationMappingManager
     Task DeleteByIdAsync(int locationMappingId);
     Task DeleteByFacilityIdAsync(string facilityId);
     Task DeleteByFacilityIdAndLocationIdAsync(string facilityId, string locationId);
+
+    Task<int> SetPartOfIdForChildrenAsync(
+        string facilityId, string parentLocationId, int parentLocationMappingId,
+        CancellationToken cancellationToken = default);
 }
 
 public class OrganizationLocationMappingManager : IOrganizationLocationMappingManager
 {
     private readonly IDatabase _database;
+    private readonly DataAcquisitionDbContext _dbContext;
 
-    public OrganizationLocationMappingManager(IDatabase database)
+    public OrganizationLocationMappingManager(IDatabase database, DataAcquisitionDbContext dbContext)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
     public async Task<OrganizationLocationMappingModel> CreateAsync(CreateOrganizationLocationMappingModel model)
@@ -40,7 +48,20 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
         };
 
         await _database.LocationMappingRepository.AddAsync(entity);
-        await _database.SaveChangesAsync();
+
+        try
+        {
+            await _database.SaveChangesAsync();
+        }
+        catch
+        {
+            // A failed insert (e.g. a concurrent unique-constraint violation) otherwise leaves the
+            // entity tracked in Added state on this scoped DbContext, so the next SaveChangesAsync
+            // (e.g. the caller's recovery update) would retry the duplicate insert and fail again.
+            // Detach it so callers can cleanly recover via re-read + update.
+            _dbContext.Entry(entity).State = EntityState.Detached;
+            throw;
+        }
 
         return ProjectToModel(entity);
     }
@@ -107,6 +128,19 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
             await _database.SaveChangesAsync();
         }
     }
+
+    public async Task<int> SetPartOfIdForChildrenAsync(
+        string facilityId, string parentLocationId, int parentLocationMappingId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.OrganizationLocationMappings
+            .Where(m => m.FacilityId == facilityId
+                    && m.PartOfValue == parentLocationId
+                    && m.PartOfId == null)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(m => m.PartOfId, parentLocationMappingId)
+                .SetProperty(m => m.ModifiedDate, DateTime.UtcNow),
+            cancellationToken);
+    }    
 
     private void ApplyUpdate(OrganizationLocationMapping entity, UpdateOrganizationLocationMappingModel model)
     {

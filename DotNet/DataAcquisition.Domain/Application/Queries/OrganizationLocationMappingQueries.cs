@@ -8,7 +8,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 public interface IOrganizationLocationMappingQueries
 {
     Task<OrganizationLocationMappingModel> GetByIdAsync(int locationMappingId);
-    Task<OrganizationLocationMappingModel> GetByFacilityIdAndLocationIdAsync(string facilityId, string locationId);
+    Task<OrganizationLocationMappingModel?> GetByFacilityIdAndLocationIdAsync(string facilityId, string locationId);
     Task<List<OrganizationLocationMappingModel>> GetByFacilityIdAsync(string facilityId);
     Task<PagedConfigModel<OrganizationLocationMappingModel>> SearchAsync(
         OrganizationLocationMappingSearchModel search,
@@ -49,7 +49,7 @@ public class OrganizationLocationMappingQueries : IOrganizationLocationMappingQu
             .SingleAsync();
     }
 
-    public async Task<OrganizationLocationMappingModel> GetByFacilityIdAndLocationIdAsync(string facilityId, string locationId)
+    public async Task<OrganizationLocationMappingModel?> GetByFacilityIdAndLocationIdAsync(string facilityId, string locationId)
     {
         return await _context.OrganizationLocationMappings
             .Where(m => m.FacilityId == facilityId && m.LocationId == locationId)
