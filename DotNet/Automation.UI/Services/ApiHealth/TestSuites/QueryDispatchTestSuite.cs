@@ -159,7 +159,7 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
                 }, ct), ct: ct));
 
             // PUT → 201/204
-            results.Add(await RunStepAsync(StepNames.Put201Or204, async () =>
+            results.Add(await RunStepAsync(StepNames.Put201Or204, [201, 204], async () =>
             {
                 var config = new QueryDispatchConfigurationApiModel
                 {
@@ -175,8 +175,7 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
                 };
                 var resp = await _client.UpsertQueryDispatchConfigurationAsync(facilityId, config, ct);
                 if (resp.IsSuccessStatusCode) configCreated = true;
-                if (!resp.IsSuccessStatusCode)
-                    throw new InvalidOperationException($"Expected 201/204 but got {resp.StatusCode}. {resp.RawBody}");
+                return resp;
             }, ct: ct));
 
             // GET → 200
@@ -207,6 +206,8 @@ public sealed class QueryDispatchTestSuite : ServiceTestSuiteBase
                 ServiceName = ServiceName,
                 Passed = false,
                 ErrorMessage = $"Prerequisite failed: {ex.Message}",
+                RequestBody = "Request was not sent because prerequisite setup failed.",
+                ResponseBody = "Response was not received because prerequisite setup failed.",
                 ExecutedAt = DateTimeOffset.UtcNow
             });
         }
