@@ -2,6 +2,7 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 
@@ -25,16 +26,28 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 {
     private readonly IDatabase _database;
     private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries;
+    private readonly ILocationResolutionValidator _locationResolutionValidator;
 
-    public OrganizationLocationConfigurationManager(IDatabase database, IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries)
+    public OrganizationLocationConfigurationManager(
+        IDatabase database,
+        IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
+        ILocationResolutionValidator locationResolutionValidator)
     {
         _database = database;
         _organizationLocationConfigurationQueries = organizationLocationConfigurationQueries;
+        _locationResolutionValidator = locationResolutionValidator;
     }
 
     public async Task<OrganizationLocationConfigurationModel> CreateAsync(CreateOrganizationLocationConfigurationModel model)
     {
         ValidateConditions(model.Conditions.Select(c => c.FhirPath));
+
+        // Activating location resolution requires every frequency plan's initial queries to
+        // include both an Encounter and a Location query.
+        if (model.IsActive)
+        {
+            await _locationResolutionValidator.ValidateActivationAsync(model.FacilityId);
+        }
 
         var entity = new OrganizationLocationConfiguration
         {
@@ -72,6 +85,14 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
             if (entity == null)
                 throw new NotFoundException($"OrganizationLocationConfiguration with ConfigId {configId} not found.");
+
+            // Activating location resolution (either turning it on now, or keeping it on) requires
+            // every frequency plan's initial queries to include both an Encounter and a Location query.
+            var desiredIsActive = model.IsActive ?? entity.IsActive;
+            if (desiredIsActive)
+            {
+                await _locationResolutionValidator.ValidateActivationAsync(entity.FacilityId);
+            }
 
             entity.LocationConditions =
                 await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == configId);

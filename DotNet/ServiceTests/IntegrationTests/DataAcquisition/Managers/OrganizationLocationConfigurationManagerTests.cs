@@ -2,6 +2,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
@@ -23,7 +24,8 @@ public class OrganizationLocationConfigurationManagerTests
     {
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
-        return new OrganizationLocationConfigurationManager(database, queries);
+        var locationResolutionValidator = scope.ServiceProvider.GetRequiredService<ILocationResolutionValidator>();
+        return new OrganizationLocationConfigurationManager(database, queries, locationResolutionValidator);
     }
 
     private static string NewFacilityId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";

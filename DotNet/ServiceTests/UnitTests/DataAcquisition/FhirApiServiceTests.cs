@@ -552,8 +552,7 @@ public class FhirApiServiceTests
         };
         var fhirQueryConfiguration = new FhirQueryConfigurationModel
         {
-            FhirServerBaseUrl = "http://test",
-            EnableLocationResolutionMapping = true
+            FhirServerBaseUrl = "http://test"
         };
 
         // Act

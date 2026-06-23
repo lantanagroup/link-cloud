@@ -86,7 +86,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
 
       maxConcurrentRequests: new FormControl(1, [Validators.required, Validators.min(1), Validators.max(16)]),
       maxRetries: new FormControl<number | null>(null, [Validators.min(0), Validators.max(10)]),
-      enableLocationResolutionMapping: new FormControl(false),
 
       // Min acquisition pull time
       minAcqPull: this.createTimeGroup(),
@@ -135,8 +134,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       if (this.item.maxRetries !== undefined) {
         this.maxRetriesControl.setValue(this.item.maxRetries);
       }
-
-      this.enableLocationResolutionMappingControl.setValue(this.item.enableLocationResolutionMapping ?? false);
 
       this.isAuthEnabledControl.setValue(!!this.item.authentication?.authType);
       this.isAuthEnabledControl.updateValueAndValidity();
@@ -254,7 +251,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.setMaxAcqPull(this.item.maxAcquisitionPullTime ?? null);
       this.maxConcurrentRequestsControl.setValue(this.item.maxConcurrentRequests);
       this.maxRetriesControl.setValue(this.item.maxRetries ?? null);
-      this.enableLocationResolutionMappingControl.setValue(this.item.enableLocationResolutionMapping ?? false);
 
       this.isAuthEnabledControl.setValue(!!this.item.authentication?.authType);
       this.isAuthEnabledControl.updateValueAndValidity();
@@ -352,14 +348,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
     return this.configForm.get('maxRetries') as FormControl;
   }
 
-  get enableLocationResolutionMappingControl(): FormControl {
-    return this.configForm.get('enableLocationResolutionMapping') as FormControl;
-  }
-
-  get hasEncounterParameter(): boolean {
-    return this.item?.hasEncounterParameter ?? false;
-  }
-
   private parseTime(time: string | null): { hour: number; minute: number; second: number } {
     if (!time) return { hour: 0, minute: 0, second: 0 };
 
@@ -427,7 +415,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.passwordControl.disable();
       this.maxConcurrentRequestsControl.disable();
       this.maxRetriesControl.disable();
-      this.enableLocationResolutionMappingControl.disable();
       this.minAcqHoursControl.disable();
       this.minAcqMinutesControl.disable();
       this.minAcqSecondsControl.disable();
@@ -449,7 +436,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
       this.passwordControl.enable();
       this.maxConcurrentRequestsControl.enable();
       this.maxRetriesControl.enable();
-      this.enableLocationResolutionMappingControl.enable();
       this.minAcqHoursControl.enable();
       const enableMin = this.minAcqHoursControl.value !== null
       this.minAcqMinutesControl[enableMin ? 'enable' : 'disable']();
@@ -666,7 +652,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
           fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
           maxConcurrentRequests: this.maxConcurrentRequestsControl.value,
           maxRetries: this.maxRetriesControl.value,
-          enableLocationResolutionMapping: this.enableLocationResolutionMappingControl.value,
           ...(this.getAcqPull("minAcqPull") && { minAcquisitionPullTime: this.getAcqPull("minAcqPull") }),
           ...(this.getAcqPull("maxAcqPull") && { maxAcquisitionPullTime: this.getAcqPull("maxAcqPull") }),
           timeZone: this.item.timeZone,
@@ -695,7 +680,6 @@ export class DataAcquisitionFhirQueryConfigFormComponent implements OnInit, OnCh
             fhirServerBaseUrl: this.fhirServerBaseUrlControl.value,
             maxConcurrentRequests: this.maxConcurrentRequestsControl.value,
             maxRetries: this.maxRetriesControl.value,
-            enableLocationResolutionMapping: this.enableLocationResolutionMappingControl.value,
             ...(this.getAcqPull("minAcqPull") && { minAcquisitionPullTime: this.getAcqPull("minAcqPull") }),
             ...(this.getAcqPull("maxAcqPull") && { maxAcquisitionPullTime: this.getAcqPull("maxAcqPull") }),
             timeZone: this.item.timeZone,

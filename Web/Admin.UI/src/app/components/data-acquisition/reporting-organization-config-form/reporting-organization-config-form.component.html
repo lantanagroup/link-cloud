@@ -1,4 +1,13 @@
 <form [formGroup]="configForm" class="dialog-form">
+
+  @if (saveError) {
+    <div class="save-error" role="alert">{{ saveError }}</div>
+  }
+
+  @if (activationPrerequisiteError) {
+    <div class="save-error" role="alert">{{ activationPrerequisiteError }}</div>
+  }
+
   <div class="form-input">
     <mat-form-field appearance="outline" class="form-input">
       <mat-label>Facility Id</mat-label>
@@ -181,7 +190,4 @@
     </div>
   </div>
 
-  @if (saveError) {
-    <div class="save-error" role="alert">{{ saveError }}</div>
-  }
 </form>

@@ -125,7 +125,6 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
             FhirServerBaseUrl = model.FhirServerBaseUrl,
             MaxConcurrentRequests = model.MaxConcurrentRequests,
             MaxRetries = model.MaxRetries,
-            EnableLocationResolutionMapping = model.EnableLocationResolutionMapping,
             CreateDate = DateTime.UtcNow,
             ModifyDate = DateTime.UtcNow
         };
@@ -165,7 +164,6 @@ public class FhirQueryConfigurationManager : IFhirQueryConfigurationManager
         existingEntity.MaxRetries = model.MaxRetries;
         existingEntity.MinAcquisitionPullTime = model.MinAcquisitionPullTime;
         existingEntity.MaxAcquisitionPullTime = model.MaxAcquisitionPullTime;
-        existingEntity.EnableLocationResolutionMapping = model.EnableLocationResolutionMapping;
 
         await _database.FhirQueryConfigurationRepository.SaveChangesAsync();
 
