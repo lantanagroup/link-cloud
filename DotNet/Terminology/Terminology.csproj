@@ -30,7 +30,7 @@
 		<PackageReference Include="AWSSDK.Core" />
 		<PackageReference Include="CsvHelper" />
 		<PackageReference Include="Microsoft.Extensions.Caching.Memory" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection" VersionOverride="8.0.1" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
 		<PackageReference Include="Microsoft.Extensions.Primitives" />
 		<PackageReference Include="Quartz" />
