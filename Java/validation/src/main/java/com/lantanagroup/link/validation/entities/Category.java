@@ -80,6 +80,22 @@ public class Category {
     @Column(columnDefinition = "varchar(max)")
     private List<String> suppressMessageIds;
 
+    /**
+     * Optional path-narrowing for {@link #suppressMessageIds}. Regex patterns matched against the
+     * {@code path} argument that HAPI's validator passes to
+     * {@code CategoryBackedPolicyAdvisor.isSuppressMessageId(...)}. When non-empty, the rule only
+     * fires when at least one pattern matches the path — letting us suppress a globally-named
+     * message ID at specific elements only (e.g. {@code Reference_REF_NoDisplay} on
+     * {@code MedicationRequest.requester} but not on every Reference element in every resource).
+     *
+     * <p>When null or empty, the rule fires on any path that produces one of its
+     * {@link #suppressMessageIds} — Phase 4's default behaviour. Reuses
+     * {@link SuppressMessageIdsConverter} since the column shape is the same JSON-array-of-strings.</p>
+     */
+    @Convert(converter = SuppressMessageIdsConverter.class)
+    @Column(columnDefinition = "varchar(max)")
+    private List<String> suppressPathPatterns;
+
     @OneToMany(fetch = FetchType.EAGER, mappedBy = "category")
     @JsonIgnore
     private List<CategoryRule> rules;

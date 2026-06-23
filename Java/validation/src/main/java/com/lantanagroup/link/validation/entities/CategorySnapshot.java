@@ -28,6 +28,12 @@ public class CategorySnapshot {
      * {@link #strategy} — a rule can declare both SKIP scope and SUPPRESS message IDs.
      */
     private List<String> suppressMessageIds;
+    /**
+     * Optional path-narrowing for {@link #suppressMessageIds}. Regex patterns matched against the
+     * {@code path} argument of {@code isSuppressMessageId(...)}. When null or empty, the rule fires
+     * on any path; when non-empty, the rule fires only when at least one pattern matches.
+     */
+    private List<String> suppressPathPatterns;
     private Matcher matcher;
 
     public CategorySnapshot() {
@@ -42,6 +48,7 @@ public class CategorySnapshot {
         strategy = category.getStrategy() != null ? category.getStrategy() : CategoryStrategy.LABEL;
         scope = category.getScope();
         suppressMessageIds = category.getSuppressMessageIds();
+        suppressPathPatterns = category.getSuppressPathPatterns();
         CategoryRule latestRule = category.getLatestRule();
         if (latestRule != null) {
             matcher = latestRule.getMatcher();
@@ -61,6 +68,7 @@ public class CategorySnapshot {
         category.setStrategy(strategy != null ? strategy : CategoryStrategy.LABEL);
         category.setScope(scope);
         category.setSuppressMessageIds(suppressMessageIds);
+        category.setSuppressPathPatterns(suppressPathPatterns);
         return category;
     }
 
