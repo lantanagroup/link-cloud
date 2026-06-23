@@ -28,6 +28,12 @@ public class EncounterMappingManager : IEncounterMappingManager
 
     public async Task<EncounterMappingModel> CreateAsync(CreateEncounterMappingModel model)
     {
+        ArgumentNullException.ThrowIfNull(model);
+
+        ArgumentException.ThrowIfNullOrEmpty(model.FacilityId, nameof(model.FacilityId));
+        ArgumentException.ThrowIfNullOrEmpty(model.EncounterId, nameof(model.EncounterId));
+        ArgumentException.ThrowIfNullOrEmpty(model.PatientId, nameof(model.PatientId));
+
         var now = DateTime.UtcNow;
         var entity = new EncounterMapping
         {

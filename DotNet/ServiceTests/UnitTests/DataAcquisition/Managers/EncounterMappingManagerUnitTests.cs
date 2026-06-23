@@ -72,6 +72,54 @@ public class EncounterMappingManagerUnitTests
     }
 
     [Fact]
+    public async Task CreateAsync_NullFacilityId_ThrowsArgumentNullException()
+    {
+        var model = new CreateEncounterMappingModel { FacilityId = null!, EncounterId = "Enc1", PatientId = "Pat1" };
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => _manager.CreateAsync(model));
+    }
+
+    [Fact]
+    public async Task CreateAsync_EmptyFacilityId_ThrowsArgumentException()
+    {
+        var model = new CreateEncounterMappingModel { FacilityId = string.Empty, EncounterId = "Enc1", PatientId = "Pat1" };
+
+        await Assert.ThrowsAsync<ArgumentException>(() => _manager.CreateAsync(model));
+    }
+
+    [Fact]
+    public async Task CreateAsync_NullEncounterId_ThrowsArgumentNullException()
+    {
+        var model = new CreateEncounterMappingModel { FacilityId = "Fac1", EncounterId = null!, PatientId = "Pat1" };
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => _manager.CreateAsync(model));
+    }
+
+    [Fact]
+    public async Task CreateAsync_EmptyEncounterId_ThrowsArgumentException()
+    {
+        var model = new CreateEncounterMappingModel { FacilityId = "Fac1", EncounterId = string.Empty, PatientId = "Pat1" };
+
+        await Assert.ThrowsAsync<ArgumentException>(() => _manager.CreateAsync(model));
+    }
+
+    [Fact]
+    public async Task CreateAsync_NullPatientId_ThrowsArgumentNullException()
+    {
+        var model = new CreateEncounterMappingModel { FacilityId = "Fac1", EncounterId = "Enc1", PatientId = null! };
+
+        await Assert.ThrowsAsync<ArgumentNullException>(() => _manager.CreateAsync(model));
+    }
+
+    [Fact]
+    public async Task CreateAsync_EmptyPatientId_ThrowsArgumentException()
+    {
+        var model = new CreateEncounterMappingModel { FacilityId = "Fac1", EncounterId = "Enc1", PatientId = string.Empty };
+
+        await Assert.ThrowsAsync<ArgumentException>(() => _manager.CreateAsync(model));
+    }
+
+    [Fact]
     public async Task CreateAsync_DuplicateMapping_ThrowsEntityAlreadyExistsException()
     {
         // Arrange
