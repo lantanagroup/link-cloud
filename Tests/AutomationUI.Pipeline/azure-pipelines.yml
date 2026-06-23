@@ -73,6 +73,10 @@ variables:
   AUTOMATION_UI_BASE_URL_test: "https://test-automation.nhsnlink.org"
   # AUTOMATION_UI_BASE_URL_dev: "https://dev-automation.nhsnlink.org"
 
+  # Automation.UI API audience (App Registration expose API URI).
+  # The pipeline acquires an app-only token for "{audience}/.default".
+  AUTOMATION_UI_API_AUDIENCE: "api://b96013a1-a5fe-4dc5-b637-12d9aafba694"
+
   # System scenario IDs are deterministic and seeded by Automation.UI's
   # ScenarioSeedService -- same value in every environment.
   SCENARIO_ID_AdHocReport: "00000000-0000-0000-0000-000000000001"
@@ -187,9 +191,33 @@ stages:
                 Write-Host "##vso[task.setvariable variable=COMMIT_SHORT]$commitShort"
 
           # -------------------------------------------------------------
+          # Acquire an app-only AAD token for Automation.UI API.
+          # Uses the Azure DevOps service connection identity (service principal
+          # or workload identity federation) - no interactive sign-in.
+          # -------------------------------------------------------------
+          - task: AzureCLI@2
+            displayName: "Acquire Automation.UI API access token"
+            condition: and(succeeded(), ne(variables.SKIP_RUN, 'true'))
+            inputs:
+              azureSubscription: "$(AZURE_SERVICE_CONNECTION)"
+              scriptType: "pscore"
+              scriptLocation: "inlineScript"
+              inlineScript: |
+                $audience = "$(AUTOMATION_UI_API_AUDIENCE)"
+                if (-not $audience) { throw "AUTOMATION_UI_API_AUDIENCE is required." }
+
+                $scope = "$audience/.default"
+                $accessToken = az account get-access-token --scope $scope --query accessToken -o tsv
+                if (-not $accessToken) {
+                  throw "Failed to acquire access token for scope '$scope'."
+                }
+
+                Write-Host "Successfully acquired Automation.UI access token."
+                Write-Host "##vso[task.setvariable variable=AUTOMATION_UI_API_ACCESS_TOKEN;issecret=true]$accessToken"
+
+          # -------------------------------------------------------------
           # POST /api/runs/start - returns 202 with { runId }.
-          # No Authorization header is sent; Automation.UI does not require
-          # auth on /api/runs/* in this environment.
+          # Includes Authorization bearer token from App Registration.
           # -------------------------------------------------------------
           - task: PowerShell@2
             displayName: "Start Automation.UI run"
@@ -199,6 +227,13 @@ stages:
               script: |
                 $base = "$(AUTOMATION_UI_BASE_URL)".TrimEnd('/')
                 $url  = "$base/api/runs/start"
+                $token = "$(AUTOMATION_UI_API_ACCESS_TOKEN)"
+
+                if (-not $token) { Write-Error "AUTOMATION_UI_API_ACCESS_TOKEN is missing."; exit 1 }
+
+                $headers = @{
+                  Authorization = "Bearer $token"
+                }
 
                 $body = @{
                   scenarioId = "$(SCENARIO_ID)"
@@ -207,7 +242,7 @@ stages:
 
                 Write-Host "POST $url"
                 Write-Host "Body: $body"
-                $response = Invoke-RestMethod -Uri $url -Method Post -ContentType "application/json" -Body $body
+                $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -ContentType "application/json" -Body $body
                 $runId = $response.runId
                 if (-not $runId) { Write-Error "Start did not return a runId."; exit 1 }
                 Write-Host "Started runId=$runId"
@@ -224,6 +259,13 @@ stages:
               script: |
                 $base = "$(AUTOMATION_UI_BASE_URL)".TrimEnd('/')
                 $url  = "$base/api/runs/$(RUN_ID)/status"
+                $token = "$(AUTOMATION_UI_API_ACCESS_TOKEN)"
+
+                if (-not $token) { Write-Error "AUTOMATION_UI_API_ACCESS_TOKEN is missing."; exit 1 }
+
+                $headers = @{
+                  Authorization = "Bearer $token"
+                }
 
                 $deadline = (Get-Date).AddMinutes(${{ parameters.completionTimeoutMinutes }})
                 $finalStatus = "Unknown"
@@ -233,7 +275,7 @@ stages:
 
                 while ((Get-Date) -lt $deadline) {
                   try {
-                    $r = Invoke-RestMethod -Uri $url -Method Get
+                    $r = Invoke-RestMethod -Uri $url -Method Get -Headers $headers
                     Write-Host ("status={0} isTerminal={1}" -f $r.status, $r.isTerminal)
                     if ($r.isTerminal) {
                       $finalStatus = "$($r.status)"
