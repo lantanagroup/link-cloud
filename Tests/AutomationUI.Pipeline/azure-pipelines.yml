@@ -294,25 +294,20 @@ stages:
                 $contentType = $null
                 $rawBody = ""
 
-                $handler = New-Object System.Net.Http.HttpClientHandler
-                $handler.AllowAutoRedirect = $false
-                $client = New-Object System.Net.Http.HttpClient($handler)
-                $request = $null
-
                 try {
-                  $request = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Post, $url)
-                  $request.Headers.Authorization = New-Object System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", $token)
-                  $request.Content = New-Object System.Net.Http.StringContent($body, [System.Text.Encoding]::UTF8, "application/json")
+                  $resp = Invoke-WebRequest `
+                    -Uri $url `
+                    -Method Post `
+                    -Headers @{ Authorization = "Bearer $token" } `
+                    -ContentType "application/json" `
+                    -Body $body `
+                    -UseBasicParsing `
+                    -MaximumRedirection 0 `
+                    -ErrorAction Stop
 
-                  $resp = $client.SendAsync($request).GetAwaiter().GetResult()
                   $statusCode = [int]$resp.StatusCode
-
-                  if ($resp.Content -ne $null) {
-                    $rawBody = $resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
-                    if ($resp.Content.Headers.ContentType -ne $null) {
-                      $contentType = $resp.Content.Headers.ContentType.ToString()
-                    }
-                  }
+                  $contentType = $resp.Headers["Content-Type"]
+                  $rawBody = $resp.Content
 
                   Write-Host ("Start API HTTP status: {0}" -f $statusCode)
                   if ($contentType) { Write-Host ("Start API content-type: {0}" -f $contentType) }
@@ -329,12 +324,38 @@ stages:
                     exit 1
                   }
                 } catch {
+                  $webResp = $_.Exception.Response
+                  if ($webResp -ne $null) {
+                    try { $statusCode = [int]$webResp.StatusCode } catch { }
+                    try { $contentType = $webResp.Headers["Content-Type"] } catch { }
+                    try {
+                      $loc = $webResp.Headers["Location"]
+                      if ($loc) { Write-Host ("Start API redirect/location: {0}" -f $loc) }
+                    } catch { }
+
+                    try {
+                      $stream = $webResp.GetResponseStream()
+                      if ($stream) {
+                        $reader = New-Object System.IO.StreamReader($stream)
+                        $rawBody = $reader.ReadToEnd()
+                        $reader.Dispose()
+                        $stream.Dispose()
+                      }
+                    } catch { }
+
+                    if ($statusCode -ne $null) { Write-Host ("Start API HTTP status: {0}" -f $statusCode) }
+                    if ($contentType) { Write-Host ("Start API content-type: {0}" -f $contentType) }
+                    if ($rawBody) {
+                      Write-Host "Start API response preview:"
+                      Write-Host (Get-Preview -Value $rawBody)
+                    }
+
+                    Write-Error ("Start API call failed with HTTP {0}." -f $statusCode)
+                    exit 1
+                  }
+
                   Write-Error ("Start API call failed before an HTTP response was captured: {0}" -f $_.Exception.Message)
                   exit 1
-                } finally {
-                  if ($request -ne $null) { $request.Dispose() }
-                  if ($client -ne $null) { $client.Dispose() }
-                  if ($handler -ne $null) { $handler.Dispose() }
                 }
 
                 $response = $null
