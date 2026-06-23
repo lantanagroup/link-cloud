@@ -83,7 +83,14 @@
     "title": "Unresolved Code System",
     "severity": "ERROR",
     "acceptable": true,
-    "guidance": "Internal: This is an unrecognized code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code')",
+    "strategy": "SUPPRESS",
+    "suppressMessageIds": [
+      "Type_Specific_Checks_DT_URL_Resolve"
+    ],
+    "suppressPathPatterns": [
+      "\\.coding\\[[0-9]+\\]\\.system"
+    ],
+    "guidance": "Internal: This is an unrecognized code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code'). Phase 4 SUPPRESS migration: HAPI's Type_Specific_Checks_DT_URL_Resolve message ('No definition could be found for URL value X') is dropped via the policy advisor when the FHIR path narrows to a Coding.system element (\\.coding[N].system). Path narrowing keeps the suppression scoped to code-system URL contexts only — canonical URL resolution failures on profiles, ValueSets, etc. continue to validate normally. Note: the rule's matcher MESSAGE branch ('URL value X does not resolve') doesn't exactly match HAPI's modern template text ('No definition could be found for URL value X'); the team's intent ('we accept unresolved code system URLs') maps cleanly to Type_Specific_Checks_DT_URL_Resolve regardless. The matcher below remains as a defensive fallback for cold start.",
     "matcher": {
       "children": [
         {
