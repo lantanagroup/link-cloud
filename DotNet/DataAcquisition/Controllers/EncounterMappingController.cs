@@ -324,6 +324,13 @@ public class EncounterMappingController : Controller
             model.PatientId = model.PatientId.SanitizeAndRemove();
             model.EncounterId = model.EncounterId.SanitizeAndRemove();
 
+            // re-evaluate after sanitization
+            ModelState.Clear(); 
+            if (!TryValidateModel(model))
+            {
+                return ValidationProblem(ModelState);
+            }
+
             var created = await _manager.CreateAsync(model);
             return CreatedAtAction(nameof(GetByIdAsync), new { id = created.EncounterMappingId }, created);
         }
