@@ -282,10 +282,6 @@ stages:
                   Write-Host "Token diagnostics: unable to decode JWT payload."
                 }
 
-                $headers = @{
-                  Authorization = "Bearer $token"
-                }
-
                 $body = @{
                   scenarioId = "$(SCENARIO_ID)"
                   source     = "ADO pipeline ${{ parameters.targetEnvironment }} (commit $(COMMIT_SHORT))"
@@ -298,45 +294,47 @@ stages:
                 $contentType = $null
                 $rawBody = ""
 
+                $handler = New-Object System.Net.Http.HttpClientHandler
+                $handler.AllowAutoRedirect = $false
+                $client = New-Object System.Net.Http.HttpClient($handler)
+                $request = $null
+
                 try {
-                  $resp = Invoke-WebRequest -Uri $url -Method Post -Headers $headers -ContentType "application/json" -Body $body
+                  $request = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Post, $url)
+                  $request.Headers.Authorization = New-Object System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", $token)
+                  $request.Content = New-Object System.Net.Http.StringContent($body, [System.Text.Encoding]::UTF8, "application/json")
+
+                  $resp = $client.SendAsync($request).GetAwaiter().GetResult()
                   $statusCode = [int]$resp.StatusCode
-                  $contentType = $resp.Headers["Content-Type"]
-                  $rawBody = $resp.Content
-                } catch {
-                  if ($_.Exception.Response -ne $null) {
-                    $statusCode = [int]$_.Exception.Response.StatusCode
-                    $contentType = $_.Exception.Response.Headers["Content-Type"]
 
-                    try {
-                      $stream = $_.Exception.Response.GetResponseStream()
-                      if ($stream) {
-                        $reader = New-Object System.IO.StreamReader($stream)
-                        $rawBody = $reader.ReadToEnd()
-                        $reader.Dispose()
-                        $stream.Dispose()
-                      }
-                    } catch { }
-
-                    Write-Host ("Start API HTTP status: {0}" -f $statusCode)
-                    if ($contentType) { Write-Host ("Start API content-type: {0}" -f $contentType) }
-                    if ($rawBody) {
-                      Write-Host "Start API response preview:"
-                      Write-Host (Get-Preview -Value $rawBody)
+                  if ($resp.Content -ne $null) {
+                    $rawBody = $resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+                    if ($resp.Content.Headers.ContentType -ne $null) {
+                      $contentType = $resp.Content.Headers.ContentType.ToString()
                     }
+                  }
 
+                  Write-Host ("Start API HTTP status: {0}" -f $statusCode)
+                  if ($contentType) { Write-Host ("Start API content-type: {0}" -f $contentType) }
+                  if ($resp.Headers.Location -ne $null) {
+                    Write-Host ("Start API redirect/location: {0}" -f $resp.Headers.Location)
+                  }
+                  if ($rawBody) {
+                    Write-Host "Start API response preview:"
+                    Write-Host (Get-Preview -Value $rawBody)
+                  }
+
+                  if (-not $resp.IsSuccessStatusCode) {
                     Write-Error ("Start API call failed with HTTP {0}." -f $statusCode)
                     exit 1
                   }
-
-                  throw
-                }
-
-                Write-Host ("Start API HTTP status: {0}" -f $statusCode)
-                if ($contentType) { Write-Host ("Start API content-type: {0}" -f $contentType) }
-                if ($rawBody) {
-                  Write-Host "Start API response preview:"
-                  Write-Host (Get-Preview -Value $rawBody)
+                } catch {
+                  Write-Error ("Start API call failed before an HTTP response was captured: {0}" -f $_.Exception.Message)
+                  exit 1
+                } finally {
+                  if ($request -ne $null) { $request.Dispose() }
+                  if ($client -ne $null) { $client.Dispose() }
+                  if ($handler -ne $null) { $handler.Dispose() }
                 }
 
                 $response = $null
