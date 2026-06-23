@@ -267,7 +267,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
             result.DurationMs = sw.ElapsedMilliseconds;
             result.Passed = false;
             result.ErrorMessage = $"Unexpected error: {ex.Message}";
-            result.ResponseBody = Truncate(ex.ToString());
+            result.ResponseBody = ex.ToString();
             _logger.LogError(ex, "Admin BFF test failed for {Endpoint}", endpointName);
         }
 
