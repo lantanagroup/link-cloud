@@ -6,6 +6,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/QueryDispatch/QueryDispatch.csproj", "DotNet/QueryDispatch/"]
+COPY ["Directory.Packages.props", "./"]
 RUN dotnet restore "DotNet/QueryDispatch/QueryDispatch.csproj"
 COPY . .
 WORKDIR "/src/DotNet/QueryDispatch"

@@ -9,6 +9,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY . .
 WORKDIR "/src/DotNet/Automation.UI"
+COPY ["Directory.Packages.props", "./"]
 RUN dotnet restore "Automation.UI.csproj"
 RUN dotnet build "Automation.UI.csproj" -c $BUILD_CONFIGURATION -o /app/build
 

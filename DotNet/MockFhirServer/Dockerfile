@@ -8,6 +8,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY . .
 WORKDIR "/src/DotNet/MockFhirServer"
+COPY ["Directory.Packages.props", "./"]
 RUN dotnet restore "MockFhirServer.csproj"
 RUN dotnet build "MockFhirServer.csproj" -c $BUILD_CONFIGURATION -o /app/build
 

@@ -13,6 +13,7 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Notification/Notification.csproj", "DotNet/Notification/"]
+COPY ["Directory.Packages.props", "./"]
 RUN dotnet restore "DotNet/Notification/Notification.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Notification"

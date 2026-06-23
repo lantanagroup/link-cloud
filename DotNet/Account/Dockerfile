@@ -11,6 +11,7 @@ WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Account/Account.csproj", "DotNet/Account/"]
 COPY ["DotNet/Link.Authorization/Link.Authorization.csproj", "DotNet/Link.Authorization/"]
+COPY ["Directory.Packages.props", "./"]
 RUN dotnet restore "DotNet/Account/Account.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Account"
