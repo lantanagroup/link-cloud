@@ -543,7 +543,7 @@
             var badge = status === 'inside'
                 ? '<span class="badge bg-success-subtle text-success border border-success ms-1" title="Inside report period">&#10003; in period</span>'
                 : status === 'outside'
-                    ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1" title="Outside report period — measure-eval may filter resources">&#9888; outside period</span>'
+                    ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1" title="Outside report period â€” measure-eval may filter resources">&#9888; outside period</span>'
                     : '';
             cell.innerHTML = '<div>' + label + '</div>' + badge;
         }
@@ -588,10 +588,10 @@
                     row.dataset.autoDetect = 'true';
                     if (res.encounterStart) row.dataset.encounterStart = res.encounterStart;
                     if (res.encounterEnd) row.dataset.encounterEnd = res.encounterEnd;
-                    renderImportedEncounterCell(row);
                     if (res.encounterStart || res.encounterEnd) {
                         suggestPeriodFromEncounter(res.encounterStart, res.encounterEnd);
                     }
+                    renderImportedEncounterCell(row);
                     updateImportedSummary();
                 }
             } catch (err) {
@@ -647,7 +647,7 @@
         });
         importedRows.addEventListener('change', function (e) {
             if (e.target.classList.contains('imp-elig')) {
-                // User override — turn off auto-detect implicitly.
+                // User override â€” turn off auto-detect implicitly.
                 e.target.closest('tr').dataset.autoDetect = 'false';
                 updateImportedSummary();
             }
@@ -769,7 +769,7 @@
                             var pe = enc.period.end || enc.period.start;
                             if (pe && (!encE || pe > encE)) encE = pe;
                         });
-                    } catch (_) { /* ignore — sniffing is best-effort */ }
+                    } catch (_) { /* ignore â€” sniffing is best-effort */ }
                 }
                 addImportedRow({
                     source: 'Bundle',
@@ -830,7 +830,7 @@
             }
         }
 
-        // Public API — any page can open the editor via this global.
+        // Public API â€” any page can open the editor via this global.
         window.openScenarioEditor = function (id, mode) { return openEditor(id || null, mode || 'edit'); };
 
         // ---- Save ----

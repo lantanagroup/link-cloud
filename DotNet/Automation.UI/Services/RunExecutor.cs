@@ -353,27 +353,17 @@ internal sealed class RunExecutor
             }
 
             // Persist raw ABS file contents (NDJSON + serialized FHIR resources) so the
-            // diagnostics export can re-emit them later without a live re-download.
-            // Best-effort: a serialization or store-size failure must not abort the run.
+            // diagnostics export can locate and re-download ABS artifacts later without
+            // storing the full payload in snapshot storage.
+            // Best-effort: a persistence failure must not abort the run.
             try
             {
-                var absFiles = new Dictionary<string, string>(internalAbsResources.Count, StringComparer.OrdinalIgnoreCase);
-                var fhirSerializer = new Hl7.Fhir.Serialization.FhirJsonSerializer(
-                    new Hl7.Fhir.Serialization.SerializerSettings { Pretty = true });
-                foreach (var (key, value) in internalAbsResources)
-                {
-                    absFiles[key] = value switch
-                    {
-                        string s => s,
-                        Hl7.Fhir.Model.Resource r => fhirSerializer.SerializeToString(r),
-                        _ => value?.ToString() ?? string.Empty
-                    };
-                }
-                await _snapshotStore.SetDomainAsync(state.RunId, "absFiles", absFiles, cancellationToken);
+                var absExportLocator = AbsExportLocatorSnapshot.Build(facilityId, reportId, internalAbsResources);
+                await _snapshotStore.SetDomainAsync(state.RunId, "absExportLocator", absExportLocator, cancellationToken);
             }
             catch (Exception absFilesEx)
             {
-                output.WriteLine($"[WARN] Failed to persist raw ABS files for export: {absFilesEx.Message}");
+                output.WriteLine($"[WARN] Failed to persist ABS export locator metadata: {absFilesEx.Message}");
             }
 
             if (!downloadedResources.ContainsKey("manifest.ndjson"))

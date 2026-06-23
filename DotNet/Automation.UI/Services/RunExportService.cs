@@ -1,10 +1,9 @@
-﻿using System.Globalization;
+﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Link.Sdk.Clients;
+using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
-using LantanaGroup.Automation.Generation;
-using LantanaGroup.Link.Automation.Link.Helpers;
-using LantanaGroup.Link.Automation.Link.Models;
 
 namespace Automation.UI.Services;
 
@@ -27,15 +26,18 @@ public sealed class RunExportService : IRunExportService
 
     private readonly IAutomationRunManager _runManager;
     private readonly ISnapshotStore _snapshotStore;
+    private readonly ISubmissionServiceClient _submissionClient;
     private readonly ILogger<RunExportService> _logger;
 
     public RunExportService(
         IAutomationRunManager runManager,
         ISnapshotStore snapshotStore,
+        ISubmissionServiceClient submissionClient,
         ILogger<RunExportService> logger)
     {
         _runManager = runManager;
         _snapshotStore = snapshotStore;
+        _submissionClient = submissionClient;
         _logger = logger;
     }
 
@@ -83,7 +85,7 @@ public sealed class RunExportService : IRunExportService
                 () => Task.FromResult(BuildNormalizationSection(run.Logs, pipelineSnapshot)));
 
             await SafeWriteAsync(archive, "abs/_README.txt",
-                async () => await WriteAbsFilesAsync(archive, runId, cancellationToken));
+                async () => await WriteAbsFilesAsync(archive, run, cancellationToken));
         }
 
         return new RunExportPackage(
@@ -359,22 +361,108 @@ public sealed class RunExportService : IRunExportService
     /// Writes each persisted ABS file as its own zip entry under <c>abs/</c> and
     /// returns the body of the abs/_README.txt index file.
     /// </summary>
-    private async Task<string> WriteAbsFilesAsync(ZipArchive archive, Guid runId, CancellationToken ct)
+    private async Task<string> WriteAbsFilesAsync(ZipArchive archive, AutomationRunSummary run, CancellationToken ct)
     {
         var sb = new StringBuilder();
         WriteHeader(sb, "ABS FILES");
 
+        var runId = run.RunId;
+        var locator = (await _snapshotStore.GetDomainAsync<AbsExportLocatorSnapshot>(runId, "absExportLocator", ct))?.Data;
+
+        // Backward compatibility for older runs that persisted raw absFiles directly.
         var snap = await _snapshotStore.GetDomainAsync<Dictionary<string, string>>(runId, "absFiles", ct);
         var files = snap?.Data;
 
-        if (files == null || files.Count == 0)
+        if (files is { Count: > 0 })
         {
-            sb.AppendLine("(no ABS files persisted for this run — either the run did not");
-            sb.AppendLine("reach the report-download phase, or persistence was skipped due");
-            sb.AppendLine("to size or a serialization error)");
+            sb.AppendLine("Source: persisted snapshot domain 'absFiles' (legacy).\n");
+            AppendAbsLocatorDetails(sb, locator, run);
+            WriteAbsFilesToArchive(archive, files, sb);
             return sb.ToString();
         }
 
+        // Preferred path: re-download internal ABS at export time.
+        var downloaded = await TryDownloadInternalAbsAsync(run, ct);
+        if (downloaded is { Count: > 0 })
+        {
+            sb.AppendLine("Source: live download from Submission Service (external=false).\n");
+            AppendAbsLocatorDetails(sb, locator, run);
+            WriteAbsFilesToArchive(archive, downloaded, sb);
+            return sb.ToString();
+        }
+
+        // Final fallback: no raw ABS available; include lightweight summary metadata.
+        var absUpload = await _runManager.GetAbsUploadSnapshotAsync(runId);
+        sb.AppendLine("(raw ABS files unavailable for this export)");
+        sb.AppendLine();
+        AppendAbsLocatorDetails(sb, locator, run);
+
+        if (absUpload != null)
+        {
+            sb.AppendLine();
+            WriteSubHeader(sb, "Cached lightweight ABS summary");
+            sb.AppendLine($"  Patient count           : {absUpload.PatientIds.Count:N0}");
+            sb.AppendLine($"  Manifest resource count : {absUpload.ManifestResourceCount:N0}");
+            sb.AppendLine($"  Total resource count    : {absUpload.TotalResourceCount:N0}");
+
+            if (absUpload.TotalCountsByType.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("  Resource totals by type:");
+                foreach (var (type, count) in absUpload.TotalCountsByType.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase))
+                    sb.AppendLine($"    {type,-28} {count,8:N0}");
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private async Task<Dictionary<string, string>?> TryDownloadInternalAbsAsync(AutomationRunSummary run, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(run.FacilityId) || string.IsNullOrWhiteSpace(run.ReportId))
+            return null;
+
+        try
+        {
+            var response = await _submissionClient.DownloadSubmissionAsync(run.FacilityId, run.ReportId, external: false, cancellationToken: ct);
+            if (!response.IsSuccessStatusCode || response.Body == null || response.Body.Length < 4)
+                return null;
+
+            var bytes = response.Body;
+            var isZipPayload = bytes[0] == 0x50
+                               && bytes[1] == 0x4B
+                               && bytes[2] == 0x03
+                               && bytes[3] == 0x04;
+            if (!isZipPayload)
+                return null;
+
+            using var zipStream = new MemoryStream(bytes);
+            using var archive = new ZipArchive(zipStream, ZipArchiveMode.Read);
+
+            var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in archive.Entries)
+            {
+                if (entry.Length == 0)
+                    continue;
+
+                using var entryStream = entry.Open();
+                using var reader = new StreamReader(entryStream);
+                files[entry.FullName] = await reader.ReadToEndAsync(ct);
+            }
+
+            return files;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "[Export][{RunId}] Failed to live-download internal ABS artifacts for facility={FacilityId} report={ReportId}.",
+                run.RunId, run.FacilityId, run.ReportId);
+            return null;
+        }
+    }
+
+    private static void WriteAbsFilesToArchive(ZipArchive archive, IReadOnlyDictionary<string, string> files, StringBuilder sb)
+    {
         sb.AppendLine($"Total files: {files.Count:N0}");
         sb.AppendLine();
         foreach (var name in files.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase))
@@ -382,13 +470,33 @@ public sealed class RunExportService : IRunExportService
             var size = files[name]?.Length ?? 0;
             sb.AppendLine($"  {name}  ({size:N0} chars)");
 
-            // Each ABS file goes into its own entry under abs/.
             var entry = archive.CreateEntry($"abs/{name}", CompressionLevel.Optimal);
-            await using var s = entry.Open();
+            using var s = entry.Open();
             var bytes = Encoding.UTF8.GetBytes(files[name] ?? string.Empty);
-            await s.WriteAsync(bytes, ct);
+            s.Write(bytes, 0, bytes.Length);
         }
-        return sb.ToString();
+    }
+
+    private static void AppendAbsLocatorDetails(StringBuilder sb, AbsExportLocatorSnapshot? locator, AutomationRunSummary run)
+    {
+        WriteSubHeader(sb, "ABS location / retrieval details");
+        sb.AppendLine($"  Facility ID                 : {(locator?.FacilityId ?? run.FacilityId ?? "-")}");
+        sb.AppendLine($"  Report ID                   : {(locator?.ReportId ?? run.ReportId ?? "-")}");
+        sb.AppendLine($"  Submission mode             : {((locator?.External ?? false) ? "external=true" : "external=false")}");
+        if (locator != null)
+        {
+            sb.AppendLine($"  Captured at                 : {locator.CapturedAt:u}");
+            sb.AppendLine($"  Last seen file count        : {locator.FileCount:N0}");
+            sb.AppendLine($"  Last seen text size (chars) : {locator.ApproximateTextCharCount:N0}");
+
+            if (locator.FileNames.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("  Last seen file names:");
+                foreach (var name in locator.FileNames)
+                    sb.AppendLine($"    {name}");
+            }
+        }
     }
 
     // --- Helpers ---
