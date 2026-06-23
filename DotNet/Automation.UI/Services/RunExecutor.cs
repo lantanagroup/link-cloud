@@ -352,9 +352,9 @@ internal sealed class RunExecutor
                 output.WriteLine($"[WARN] Failed to build/store ABS upload snapshot: {absEx.Message}");
             }
 
-            // Persist raw ABS file contents (NDJSON + serialized FHIR resources) so the
-            // diagnostics export can locate and re-download ABS artifacts later without
-            // storing the full payload in snapshot storage.
+            // Persist ABS export locator snapshot metadata so diagnostics export can
+            // locate and re-download ABS artifacts later without storing raw ABS file
+            // contents or full payloads in snapshot storage.
             // Best-effort: a persistence failure must not abort the run.
             try
             {
