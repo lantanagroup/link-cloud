@@ -60,15 +60,22 @@ import java.util.regex.PatternSyntaxException;
  * {@code suppressMessageIds} list declares which stable HAPI message IDs (from
  * {@code org.hl7.fhir.utilities.i18n.I18nConstants}) the advisor should drop. The check still
  * runs — SUPPRESS saves no CPU — but the message is dropped before reaching the
- * {@code OperationOutcome}. Unlike SKIP, the advisor's current implementation does not
- * consider the {@code path} input: a listed message ID is suppressed globally regardless of
- * which element produced it. A {@code suppressPathPatterns} narrowing axis can be added
- * when a rule needs path-aware suppression.</p>
+ * {@code OperationOutcome}.</p>
  *
- * <p>A message ID claimed by multiple rules awards the {@code outcome=suppressed} counter
- * credit to the first rule iterated (insertion order from {@code categoryRepository.findAll()}).
- * Both rules wanted the message suppressed, so the user-visible outcome is identical; only
- * metric attribution is affected.</p>
+ * <p><b>Path narrowing.</b> A rule may also declare {@code suppressPathPatterns}: regex
+ * patterns matched against the {@code path} argument HAPI passes to {@code isSuppressMessageId}.
+ * When non-empty, the rule fires only when both its message ID matches AND at least one path
+ * pattern matches the path. This lets us migrate rules whose matcher narrows by FHIR element
+ * (e.g. {@code medicationrequest_requester_does_not_have_a_proper_reference} targets
+ * {@code Reference_REF_NoDisplay} but only on {@code MedicationRequest.requester} paths) without
+ * over-suppressing the message on every other element. When {@code suppressPathPatterns} is
+ * null or empty, the rule fires on any path — Phase 4's default behaviour and the shape
+ * {@code unknown_code_system} relies on.</p>
+ *
+ * <p>Multiple rules can register the same message ID. On a hook call we iterate the candidates
+ * in repository order and the first whose {@code suppressPathPatterns} match wins counter
+ * credit. The user-visible outcome (boolean suppress) is identical regardless of which rule
+ * wins; only metric attribution differs.</p>
  *
  * <p>Constructor-time validation drops malformed rules with a warning rather than failing
  * startup: a category with {@code strategy=SKIP} but {@code acceptable=false} is demoted (silently
@@ -90,17 +97,18 @@ public class CategoryBackedPolicyAdvisor extends FhirDefaultPolicyAdvisor {
     private final ValidationMetrics metrics;
     private final List<CompiledSkipRule> codeSystemSkipRules;
     /**
-     * Map from suppressible HAPI message ID to the rule ID that claimed it. Lookup at the hook
-     * is O(1) on the message ID. First claimer wins on collisions.
+     * Map from suppressible HAPI message ID to one or more rules that claimed it. O(1) on the
+     * message ID; rules are iterated in insertion order so first-match-wins is deterministic.
      */
-    private final Map<String, String> suppressMessageIdToRuleId;
+    private final Map<String, List<CompiledSuppressRule>> suppressRulesByMessageId;
 
     public CategoryBackedPolicyAdvisor(CategoryRepository categoryRepository, ValidationMetrics metrics) {
         this.metrics = metrics;
         this.codeSystemSkipRules = loadCodeSystemSkipRules(categoryRepository);
-        this.suppressMessageIdToRuleId = loadSuppressRules(categoryRepository);
-        logger.info("CategoryBackedPolicyAdvisor loaded with {} code-system SKIP rule(s) and {} SUPPRESS message ID(s) across the rule set",
-                codeSystemSkipRules.size(), suppressMessageIdToRuleId.size());
+        this.suppressRulesByMessageId = loadSuppressRules(categoryRepository);
+        long suppressEntryCount = suppressRulesByMessageId.values().stream().mapToLong(List::size).sum();
+        logger.info("CategoryBackedPolicyAdvisor loaded with {} code-system SKIP rule(s) and {} SUPPRESS registration(s) across {} distinct message ID(s)",
+                codeSystemSkipRules.size(), suppressEntryCount, suppressRulesByMessageId.size());
     }
 
     private static List<CompiledSkipRule> loadCodeSystemSkipRules(CategoryRepository categoryRepository) {
@@ -192,18 +200,23 @@ public class CategoryBackedPolicyAdvisor extends FhirDefaultPolicyAdvisor {
         if (messageId == null) {
             return false;
         }
-        String ruleId = suppressMessageIdToRuleId.get(messageId);
-        if (ruleId == null) {
+        List<CompiledSuppressRule> candidates = suppressRulesByMessageId.get(messageId);
+        if (candidates == null) {
             return false;
         }
-        metrics.incrementRuleOutcome(ruleId, ValidationMetrics.OUTCOME_SUPPRESSED);
-        return true;
+        for (CompiledSuppressRule rule : candidates) {
+            if (rule.matchesPath(path)) {
+                metrics.incrementRuleOutcome(rule.ruleId(), ValidationMetrics.OUTCOME_SUPPRESSED);
+                return true;
+            }
+        }
+        return false;
     }
 
-    private static Map<String, String> loadSuppressRules(CategoryRepository categoryRepository) {
-        // LinkedHashMap to preserve insertion order — makes "first claimer wins" deterministic
-        // when iterating, and keeps test/log output stable.
-        Map<String, String> result = new LinkedHashMap<>();
+    private static Map<String, List<CompiledSuppressRule>> loadSuppressRules(CategoryRepository categoryRepository) {
+        // LinkedHashMap to preserve insertion order — first-match-wins on hook calls becomes
+        // deterministic, and test/log output is stable.
+        Map<String, List<CompiledSuppressRule>> result = new LinkedHashMap<>();
         for (Category category : categoryRepository.findAll()) {
             List<String> messageIds = category.getSuppressMessageIds();
             if (messageIds == null || messageIds.isEmpty()) {
@@ -216,20 +229,48 @@ public class CategoryBackedPolicyAdvisor extends FhirDefaultPolicyAdvisor {
                         category.getId());
                 continue;
             }
+            List<Pattern> pathPatterns = compilePathPatterns(category);
+            CompiledSuppressRule compiled = new CompiledSuppressRule(category.getId(), pathPatterns);
             for (String id : messageIds) {
                 if (id == null || id.isBlank()) {
                     logger.warn("Category '{}' has a null/blank entry in suppressMessageIds; ignoring.",
                             category.getId());
                     continue;
                 }
-                String existing = result.putIfAbsent(id, category.getId());
-                if (existing != null) {
-                    logger.warn("Category '{}' wanted to suppress message ID '{}' but it's already claimed by rule '{}'; first-claimer wins for counter attribution.",
-                            category.getId(), id, existing);
-                }
+                result.computeIfAbsent(id, k -> new ArrayList<>()).add(compiled);
             }
         }
         return result;
+    }
+
+    private static List<Pattern> compilePathPatterns(Category category) {
+        List<String> raw = category.getSuppressPathPatterns();
+        if (raw == null || raw.isEmpty()) {
+            return null;
+        }
+        List<Pattern> patterns = new ArrayList<>();
+        for (String regex : raw) {
+            if (regex == null || regex.isBlank()) {
+                logger.warn("Category '{}' has a null/blank entry in suppressPathPatterns; ignoring.",
+                        category.getId());
+                continue;
+            }
+            try {
+                patterns.add(Pattern.compile(regex));
+            } catch (PatternSyntaxException e) {
+                logger.warn("Category '{}' has an invalid suppressPathPatterns regex: '{}' ({}); skipping that pattern.",
+                        category.getId(), regex, e.getMessage());
+            }
+        }
+        if (patterns.isEmpty()) {
+            // All patterns were invalid — fall back to "match any path" semantics would silently
+            // change scope from narrow to global. Demote by treating as if no path narrowing was
+            // configured but log loudly so the misconfiguration is visible.
+            logger.warn("Category '{}' has suppressPathPatterns but every pattern failed to compile; SUPPRESS will be skipped for this rule (it would otherwise widen to all paths, which the author did not request).",
+                    category.getId());
+            return List.of();  // sentinel: empty list means "rule loaded but never matches" — see CompiledSuppressRule.matchesPath
+        }
+        return patterns;
     }
 
     /**
@@ -240,10 +281,43 @@ public class CategoryBackedPolicyAdvisor extends FhirDefaultPolicyAdvisor {
     }
 
     /**
-     * Test/diagnostic accessor. Not part of the runtime contract.
+     * Test/diagnostic accessor — returns a snapshot of {@code messageId → list of rule IDs that
+     * registered it} so tests can verify load behaviour without exposing the compiled
+     * {@code CompiledSuppressRule}s. Not part of the runtime contract.
      */
-    Map<String, String> getLoadedSuppressMap() {
-        return suppressMessageIdToRuleId;
+    Map<String, List<String>> getLoadedSuppressMap() {
+        Map<String, List<String>> snapshot = new LinkedHashMap<>();
+        for (Map.Entry<String, List<CompiledSuppressRule>> entry : suppressRulesByMessageId.entrySet()) {
+            snapshot.put(entry.getKey(),
+                    entry.getValue().stream().map(CompiledSuppressRule::ruleId).toList());
+        }
+        return snapshot;
+    }
+
+    /**
+     * @param pathPatterns {@code null} means "no path narrowing — rule fires on any path"
+     *                     (Phase 4 default for rules without {@code suppressPathPatterns}).
+     *                     A non-null but empty list is the post-failure-demotion sentinel: the
+     *                     rule was authored with path patterns but every one failed to compile,
+     *                     so we register the rule but it never matches (treating it as if the
+     *                     SUPPRESS hook was uninstalled — preserves the load count but doesn't
+     *                     widen scope to all paths).
+     */
+    private record CompiledSuppressRule(String ruleId, List<Pattern> pathPatterns) {
+        boolean matchesPath(String path) {
+            if (pathPatterns == null) {
+                return true;
+            }
+            if (pathPatterns.isEmpty() || path == null) {
+                return false;
+            }
+            for (Pattern p : pathPatterns) {
+                if (p.matcher(path).find()) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     /**

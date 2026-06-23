@@ -451,6 +451,153 @@ class CategoryBackedPolicyAdvisorTest {
         assertTrue(advisor.isSuppressMessageId("Patient.gender", "Other_Valid_Id"));
     }
 
+    // --- suppressPathPatterns path-narrowing ---------------------------------------------------
+
+    private static Category suppressRuleWithPath(String id, List<String> messageIds, List<String> pathPatterns) {
+        Category c = suppressRule(id, true, messageIds);
+        c.setSuppressPathPatterns(pathPatterns);
+        return c;
+    }
+
+    @Test
+    void suppressPathPatterns_emptyOrNull_firesOnAnyPath() {
+        // Regression: this is the Phase 4 default that unknown_code_system relies on.
+        Category nullPaths = suppressRule("unscoped_paths", true, List.of("Some_Message"));
+        nullPaths.setSuppressPathPatterns(null);
+        Category emptyPaths = suppressRuleWithPath("empty_paths", List.of("Other_Message"), List.of());
+
+        when(categoryRepository.findAll()).thenReturn(List.of(nullPaths, emptyPaths));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        // Both null and empty pathPatterns should behave identically — "fire on any path."
+        assertTrue(advisor.isSuppressMessageId("Patient.gender", "Some_Message"));
+        assertTrue(advisor.isSuppressMessageId("Encounter.subject", "Some_Message"));
+        assertTrue(advisor.isSuppressMessageId("Patient.gender", "Other_Message"));
+    }
+
+    @Test
+    void suppressPathPatterns_matchingPath_fires() {
+        // Path pattern shape mirrors what the medicationrequest_requester_does_not_have_a_proper_reference
+        // rule's matcher uses against HAPI's actual expression text (Bundle.entry[N].resource.ofType(...)
+        // .where(id='...').requester). The pattern needs to bridge the .ofType(MedicationRequest) ...
+        // .requester structure since Pattern.find() looks for the verbatim substring.
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRuleWithPath("med_request_requester",
+                        List.of("Reference_REF_NoDisplay"),
+                        List.of("ofType\\(MedicationRequest\\).*\\.requester"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        assertTrue(advisor.isSuppressMessageId(
+                "Bundle.entry[3].resource.ofType(MedicationRequest).where(id='X').requester",
+                "Reference_REF_NoDisplay"));
+        verify(metrics, times(1))
+                .incrementRuleOutcome(eq("med_request_requester"), eq(ValidationMetrics.OUTCOME_SUPPRESSED));
+    }
+
+    @Test
+    void suppressPathPatterns_nonMatchingPath_doesNotFire() {
+        // The canonical over-suppress concern: a path-narrowed SUPPRESS rule must not silence
+        // the same message ID on unrelated paths.
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRuleWithPath("med_request_requester",
+                        List.of("Reference_REF_NoDisplay"),
+                        List.of("ofType\\(MedicationRequest\\).*\\.requester"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        assertFalse(advisor.isSuppressMessageId(
+                "Bundle.entry[3].resource.ofType(Encounter).subject",
+                "Reference_REF_NoDisplay"));
+        verify(metrics, never())
+                .incrementRuleOutcome(anyString(), eq(ValidationMetrics.OUTCOME_SUPPRESSED));
+    }
+
+    @Test
+    void suppressPathPatterns_nullPath_withPatternList_doesNotFire() {
+        // HAPI generally passes non-null paths, but defensive: if a path is null, a path-narrowed
+        // rule should not fire (we can't verify the narrowing). Only unscoped rules fire on null.
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRuleWithPath("narrow", List.of("Some_Message"),
+                        List.of("Patient\\.identifier"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        assertFalse(advisor.isSuppressMessageId(null, "Some_Message"));
+    }
+
+    @Test
+    void suppressPathPatterns_multiplePatternsOR() {
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRuleWithPath("multi",
+                        List.of("Some_Message"),
+                        List.of("Patient\\.identifier", "Encounter\\.identifier"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        // Either pattern matching is enough.
+        assertTrue(advisor.isSuppressMessageId("Patient.identifier[0].system", "Some_Message"));
+        assertTrue(advisor.isSuppressMessageId("Encounter.identifier[0].system", "Some_Message"));
+        assertFalse(advisor.isSuppressMessageId("Observation.identifier[0].system", "Some_Message"));
+    }
+
+    @Test
+    void suppressPathPatterns_invalidRegexPartial_otherPatternsStillLoad() {
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRuleWithPath("mixed_paths",
+                        List.of("Some_Message"),
+                        List.of("[unterminated", "Patient\\.identifier"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        // The valid pattern still loads; the invalid one is logged and dropped.
+        assertTrue(advisor.isSuppressMessageId("Patient.identifier[0].system", "Some_Message"));
+        assertFalse(advisor.isSuppressMessageId("Encounter.subject", "Some_Message"));
+    }
+
+    @Test
+    void suppressPathPatterns_allInvalidRegex_demotesNeverFires() {
+        // Critical: if every path pattern fails to compile, falling back to "fire on any path"
+        // would widen scope to global suppression — exactly the over-suppress the author was
+        // trying to avoid. The advisor logs and the rule never matches.
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRuleWithPath("all_bad_paths",
+                        List.of("Some_Message"),
+                        List.of("[unterminated", "(also-bad"))));
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        // Rule is still registered (counters and audit trail), but it never fires.
+        assertEquals(List.of("all_bad_paths"),
+                advisor.getLoadedSuppressMap().get("Some_Message"));
+        assertFalse(advisor.isSuppressMessageId("Patient.identifier[0].system", "Some_Message"));
+        assertFalse(advisor.isSuppressMessageId("Encounter.subject", "Some_Message"));
+        verify(metrics, never())
+                .incrementRuleOutcome(anyString(), eq(ValidationMetrics.OUTCOME_SUPPRESSED));
+    }
+
+    @Test
+    void suppressPathPatterns_narrowAndBroadRulesShareMessageId_eachWinsOnOwnPath() {
+        // Two rules registering the same message ID. The first (narrow, path-scoped) catches
+        // its specific path; the second (broad, unscoped) catches everything else. Both can
+        // coexist for the same messageId.
+        when(categoryRepository.findAll()).thenReturn(List.of(
+                suppressRuleWithPath("narrow",
+                        List.of("Shared_Message"),
+                        List.of("ofType\\(MedicationRequest\\).*\\.requester")),
+                suppressRule("broad", true, List.of("Shared_Message"))));  // null pathPatterns
+        CategoryBackedPolicyAdvisor advisor = new CategoryBackedPolicyAdvisor(categoryRepository, metrics);
+
+        // Both rules registered under the shared message ID.
+        assertEquals(List.of("narrow", "broad"),
+                advisor.getLoadedSuppressMap().get("Shared_Message"));
+
+        // On the narrow rule's path: it wins (iteration order = narrow first).
+        advisor.isSuppressMessageId("Bundle.entry[3].resource.ofType(MedicationRequest).where(id='X').requester",
+                "Shared_Message");
+        verify(metrics, times(1))
+                .incrementRuleOutcome(eq("narrow"), eq(ValidationMetrics.OUTCOME_SUPPRESSED));
+
+        // On a different path: narrow misses, broad fires.
+        advisor.isSuppressMessageId("Encounter.subject", "Shared_Message");
+        verify(metrics, times(1))
+                .incrementRuleOutcome(eq("broad"), eq(ValidationMetrics.OUTCOME_SUPPRESSED));
+    }
+
     @Test
     void isSuppressMessageId_ruleWithBothScopeAndSuppressMessageIds_loadsBothHooks() {
         // The unknown_code_system migration shape: scope.codeSystems handles the URL-specific
