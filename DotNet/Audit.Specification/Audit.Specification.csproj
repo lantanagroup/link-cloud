@@ -27,7 +27,7 @@
     <PackageReference Include="SpecFlow.NUnit" />
     <PackageReference Include="nunit" />
     <PackageReference Include="NUnit3TestAdapter" />
-    <PackageReference Include="FluentAssertions" VersionOverride="6.12.2" />
+    <PackageReference Include="FluentAssertions" />
   </ItemGroup>
 
   <ItemGroup>
