@@ -286,9 +286,6 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         ExecutedAt = DateTimeOffset.UtcNow
     };
 
-    private static string Truncate(string? value, int maxLength = 300) =>
-        value == null ? "" : (value.Length > maxLength ? value[..maxLength] : value);
-
     private static string BuildStatusMismatchMessage(int expectedStatus, int actualStatus, string? responseBody, string? traceId)
     {
         var baseMessage = $"Error: Expected HTTP {expectedStatus} but got {actualStatus}.";
@@ -312,7 +309,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         if (string.IsNullOrWhiteSpace(rawBody))
             return null;
 
-        var trimmed = Truncate(rawBody).Trim();
+        var trimmed = rawBody.Trim();
 
         try
         {

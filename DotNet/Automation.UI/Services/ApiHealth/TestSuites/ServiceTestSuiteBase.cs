@@ -328,7 +328,7 @@ public abstract class ServiceTestSuiteBase : IServiceTestSuite
         if (string.IsNullOrWhiteSpace(rawBody))
             return null;
 
-        var trimmed = Truncate(rawBody).Trim();
+        var trimmed = rawBody.Trim();
 
         try
         {
