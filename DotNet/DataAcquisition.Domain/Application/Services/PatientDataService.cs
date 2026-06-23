@@ -66,7 +66,7 @@ public class PatientDataService : IPatientDataService
     private readonly IReadFhirCommand _readFhirCommand;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
-    private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries;
+    private readonly ILocationMappingService _locationMappingService;
     private readonly IFhirApiService _fhirApiService;
     private readonly IReferenceResourceService _referenceResourceService;
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
@@ -84,7 +84,7 @@ public class PatientDataService : IPatientDataService
         IReadFhirCommand readFhirCommand,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
-        IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
+        ILocationMappingService locationMappingService,
         IFhirApiService fhirApiService,
         IReferenceResourceService referenceResourceService,
         IDistributedSemaphoreProvider distributedSemaphoreProvider,
@@ -110,8 +110,7 @@ public class PatientDataService : IPatientDataService
                                      throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
         _dataAcquisitionLogQueries = dataAcquisitionLogQueries ??
                                      throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
-        _organizationLocationConfigurationQueries = organizationLocationConfigurationQueries ??
-                                                throw new ArgumentNullException(nameof(organizationLocationConfigurationQueries));
+        _locationMappingService = locationMappingService ?? throw new ArgumentNullException(nameof(locationMappingService));
         _fhirApiService = fhirApiService ?? throw new ArgumentNullException(nameof(fhirApiService));
         _referenceResourceService = referenceResourceService ?? throw new ArgumentNullException(nameof(referenceResourceService));
         _scheduledReportManager = scheduledReportManager ?? throw new ArgumentNullException(nameof(scheduledReportManager));
@@ -249,7 +248,7 @@ public class PatientDataService : IPatientDataService
         }
 
         var isOrganizationLocationConfigurationEnabled =
-            await IsOrganizationLocationConfigurationEnabled(request.FacilityId, cancellationToken);
+            await _locationMappingService.IsConfigured(request.FacilityId, cancellationToken);
 
         var initialQueries =
             OrderInitialQueries(queryPlan.InitialQueries, isOrganizationLocationConfigurationEnabled);
@@ -371,12 +370,6 @@ public class PatientDataService : IPatientDataService
                 totalLogsCreated,
                 cancellationToken);
         }
-    }
-
-    private async Task<bool> IsOrganizationLocationConfigurationEnabled(string facilityId, CancellationToken cancellationToken)
-    {
-        var configurations = await _organizationLocationConfigurationQueries.GetByFacilityIdAsync(facilityId);
-        return configurations?.Any(x => x.IsActive) == true;
     }
 
     private static IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> OrderInitialQueries(
