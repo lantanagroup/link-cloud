@@ -1,4 +1,4 @@
-namespace Automation.UI.Models.ApiHealth;
+﻿namespace Automation.UI.Models.ApiHealth;
 
 /// <summary>
 /// View model for the API Health dashboard page.
@@ -6,6 +6,9 @@ namespace Automation.UI.Models.ApiHealth;
 public sealed class ApiHealthDashboardViewModel
 {
     public IReadOnlyList<ServiceEndpointGroup> Services { get; init; } = [];
+    public bool HasActiveRun { get; init; }
+    public string? LatestRunMode { get; init; }
+    public string? LatestRunServiceName { get; init; }
 }
 
 /// <summary>
@@ -14,6 +17,7 @@ public sealed class ApiHealthDashboardViewModel
 public sealed class ServiceEndpointGroup
 {
     public string ServiceName { get; init; } = string.Empty;
+    public bool IsIncludedInLatestRun { get; init; } = true;
     public IReadOnlyList<EndpointViewModel> Endpoints { get; init; } = [];
 }
 

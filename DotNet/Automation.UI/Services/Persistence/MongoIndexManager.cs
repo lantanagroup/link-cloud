@@ -1,4 +1,4 @@
-using MongoDB.Bson;
+ï»¿using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace Automation.UI.Services.Persistence;
@@ -26,11 +26,12 @@ public sealed class MongoIndexManager
 
     /// <summary>
     /// Ensures all indexes required by the Automation.UI stores exist.
-    /// Safe to call on every startup — idempotent.
+    /// Safe to call on every startup â€” idempotent.
     /// </summary>
     public void EnsureAllIndexes()
     {
         EnsureRunIndexes();
+        EnsureRunInputIndexes();
         EnsureSnapshotIndexes();
         EnsureScenarioIndexes();
         EnsureImportedBundleIndexes();
@@ -59,7 +60,7 @@ public sealed class MongoIndexManager
         //
         // Direction is intentionally ascending (1). Both Cosmos Mongo API and
         // native MongoDB can scan a single-field index in reverse, so one
-        // index serves both ASC and DESC for the same column — no need for a
+        // index serves both ASC and DESC for the same column â€” no need for a
         // mirrored "_desc" copy.
         //
         // BSON field names match the C# property casing (PascalCase) because
@@ -87,6 +88,13 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "Seed",         1 } }, unique: false, "idx_seed_asc");
         CreateIndexSafe(collection, new BsonDocument { { "Status",       1 } }, unique: false, "idx_status_asc");
         CreateIndexSafe(collection, new BsonDocument { { "FinishedAt",   1 } }, unique: false, "idx_finishedAt_asc");
+    }
+
+    private void EnsureRunInputIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("automation_run_inputs");
+
+        CreateIndexSafe(collection, new BsonDocument { { "UpdatedAt", -1 } }, unique: false, "idx_updatedAt_desc");
     }
 
     // --- automation_snapshots ---
@@ -144,8 +152,10 @@ public sealed class MongoIndexManager
     {
         var collection = _database.GetCollection<BsonDocument>("api_health_runs");
 
-        // Compound index for querying history by endpoint key, ordered by execution time.
-        CreateIndexSafe(collection, new BsonDocument { { "EndpointKey", 1 }, { "ExecutedAt", -1 } }, unique: false, "idx_endpointKey_executedAt");
+        CreateIndexSafe(collection, new BsonDocument { { "RunId", 1 }, { "ServiceName", 1 } }, unique: false, "idx_runId_serviceName");
+        CreateIndexSafe(collection, new BsonDocument { { "StartedAt", -1 } }, unique: false, "idx_startedAt_desc");
+        CreateIndexSafe(collection, new BsonDocument { { "ServiceName", 1 }, { "StartedAt", -1 } }, unique: false, "idx_serviceName_startedAt");
+        CreateIndexSafe(collection, new BsonDocument { { "EndpointResults.EndpointKey", 1 }, { "StartedAt", -1 } }, unique: false, "idx_endpoint_results_endpointKey_startedAt");
     }
 
     // --- api_health_execution_runs ---
@@ -165,7 +175,7 @@ public sealed class MongoIndexManager
         {
             if (HasIndexWithKeys(collection, keys))
             {
-                _logger.LogDebug("Index {IndexName} already exists on {Collection} — skipping.", name, collection.CollectionNamespace.CollectionName);
+                _logger.LogDebug("Index {IndexName} already exists on {Collection} â€” skipping.", name, collection.CollectionNamespace.CollectionName);
                 return;
             }
 

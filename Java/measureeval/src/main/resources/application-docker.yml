@@ -13,6 +13,10 @@ spring:
     redis:
       host: redis_cache
       port: 6379
+      timeout: 2000ms            # command timeout — bounds the health-check PING (default is 60s)
+      connect-timeout: 1000ms    # socket connect timeout — bounds the "Redis unreachable" case
+      lettuce:
+        shutdown-timeout: 100ms
 
   kafka:
     bootstrap-servers: kafka_b:9092
