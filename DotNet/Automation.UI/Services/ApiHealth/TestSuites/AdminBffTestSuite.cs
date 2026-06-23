@@ -68,7 +68,9 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
                 EndpointKey = $"{ServiceName}::{StepNames.HealthGet200}",
                 ServiceName = ServiceName,
                 Passed = false,
-                ErrorMessage = "AdminBffBase URL is not configured in Automation settings."
+                ErrorMessage = "AdminBffBase URL is not configured in Automation settings.",
+                RequestBody = "Request was not sent because the AdminBffBase URL is missing.",
+                ResponseBody = "Response was not received because the AdminBffBase URL is missing."
             });
             return results;
         }
@@ -205,7 +207,8 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
             ExpectedStatusCode = expectedStatus,
             ExecutedAt = DateTimeOffset.UtcNow,
             RequestUrl = url,
-            RequestMethod = method
+            RequestMethod = method,
+            RequestBody = $"No request body was sent ({method.ToUpperInvariant()})."
         };
 
         var sw = Stopwatch.StartNew();
@@ -228,11 +231,19 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
             try
             {
                 var body = await response.Content.ReadAsStringAsync(ct);
-                result.ResponseBody = body.Length > 500 ? body[..500] : body;
+                var capturedBody = body.Length > 500 ? body[..500] : body;
+                result.ResponseBody = string.IsNullOrWhiteSpace(capturedBody)
+                    ? $"No response body was returned (HTTP {result.ActualStatusCode})."
+                    : capturedBody;
                 if (!result.Passed)
-                    result.ErrorMessage = $"Expected {expectedStatus} but got {result.ActualStatusCode}.";
+                    result.ErrorMessage = BuildStatusMismatchMessage(expectedStatus, result.ActualStatusCode ?? 0, result.ResponseBody, result.TraceId);
             }
-            catch { /* ignore read failures */ }
+            catch
+            {
+                result.ResponseBody = $"Response body could not be read (HTTP {result.ActualStatusCode}).";
+                if (!result.Passed)
+                    result.ErrorMessage = BuildStatusMismatchMessage(expectedStatus, result.ActualStatusCode ?? 0, result.ResponseBody, result.TraceId);
+            }
         }
         catch (TaskCanceledException)
         {
@@ -240,6 +251,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
             result.DurationMs = sw.ElapsedMilliseconds;
             result.Passed = false;
             result.ErrorMessage = "Request timed out.";
+            result.ResponseBody = "No response body was received because the request timed out.";
         }
         catch (HttpRequestException ex)
         {
@@ -247,6 +259,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
             result.DurationMs = sw.ElapsedMilliseconds;
             result.Passed = false;
             result.ErrorMessage = $"HTTP error: {ex.Message}";
+            result.ResponseBody = "No response body was received because the HTTP request failed.";
         }
         catch (Exception ex)
         {
@@ -254,6 +267,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
             result.DurationMs = sw.ElapsedMilliseconds;
             result.Passed = false;
             result.ErrorMessage = $"Unexpected error: {ex.Message}";
+            result.ResponseBody = ex.ToString();
             _logger.LogError(ex, "Admin BFF test failed for {Endpoint}", endpointName);
         }
 
@@ -267,7 +281,58 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         EndpointName = endpointName,
         Passed = false,
         ErrorMessage = error,
+        RequestBody = "Request was not sent because prerequisite setup failed.",
+        ResponseBody = "Response was not received because prerequisite setup failed.",
         ExecutedAt = DateTimeOffset.UtcNow
     };
+
+    private static string BuildStatusMismatchMessage(int expectedStatus, int actualStatus, string? responseBody, string? traceId)
+    {
+        var baseMessage = $"Error: Expected HTTP {expectedStatus} but got {actualStatus}.";
+        if (actualStatus != 500)
+            return baseMessage;
+
+        var parts = new List<string> { baseMessage };
+
+        var apiResponse = ExtractApiResponseMessage(responseBody);
+        if (!string.IsNullOrWhiteSpace(apiResponse))
+            parts.Add($"Detail: {apiResponse}");
+
+        if (!string.IsNullOrWhiteSpace(traceId))
+            parts.Add($"Trace ID: {traceId}");
+
+        return string.Join(Environment.NewLine, parts);
+    }
+
+    private static string? ExtractApiResponseMessage(string? rawBody)
+    {
+        if (string.IsNullOrWhiteSpace(rawBody))
+            return null;
+
+        var trimmed = rawBody.Trim();
+
+        try
+        {
+            using var doc = JsonDocument.Parse(trimmed);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                return trimmed;
+
+            string? TryGet(string propertyName)
+                => doc.RootElement.TryGetProperty(propertyName, out var p) && p.ValueKind == JsonValueKind.String
+                    ? p.GetString()
+                    : null;
+
+            var message = TryGet("error")
+                ?? TryGet("message")
+                ?? TryGet("title")
+                ?? TryGet("detail");
+
+            return string.IsNullOrWhiteSpace(message) ? trimmed : message.Trim();
+        }
+        catch
+        {
+            return trimmed;
+        }
+    }
 
 }

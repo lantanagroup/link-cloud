@@ -277,7 +277,7 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
             // Some deployed environments may still run a Normalization build that throws 500
             // when the preset has already been removed as a side effect of operation cleanup.
             // Treat that specific legacy error body as success-equivalent delete behavior.
-            results.Add(await RunStepAsync(StepNames.PresetDelete204, async () =>
+            results.Add(await RunStepAsync(StepNames.PresetDelete204, [204, 500], async () =>
             {
                 var presets = await _client.GetVendorPresetsAsync(vendorName, cancellationToken: ct);
                 var toDelete = presets.Body?.FirstOrDefault(p => operationResourceTypeId == Guid.Empty || p.OperationResourceTypeId == operationResourceTypeId)?.Id
@@ -291,17 +291,17 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                 if (resp.StatusCode == 204)
                 {
                     presetId = null;
-                    return;
+                    return resp;
                 }
 
                 if (resp.StatusCode == 500 && (resp.RawBody?.Contains("No Vendor Operation Preset exists for the provided id", StringComparison.OrdinalIgnoreCase) ?? false))
                 {
                     presetId = null;
-                    return;
+                    return resp;
                 }
 
                 throw new InvalidOperationException($"Expected HTTP 204 but got {resp.StatusCode}.{(resp.RawBody != null ? $" Body: {resp.RawBody}" : "")}");
-            }, expectedStatusCode: 204, ct: ct));
+            }, ct: ct));
 
             // VENDOR DELETE → 204
             results.Add(await RunStepAsync(StepNames.VendorDelete204, 204, async () =>
