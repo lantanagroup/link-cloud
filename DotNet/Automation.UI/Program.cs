@@ -1,4 +1,4 @@
-using Automation.UI.Services;
+﻿using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -80,11 +81,54 @@ builder.Services.Configure<BackendAuthenticationServiceExtension.LinkBearerServi
 var allowAnonymousAccess = builder.Configuration
     .GetValue<bool>("Authentication:EnableAnonymousAccess");
 
+const string ApiBearerPolicyName = "ApiBearerPolicy";
+const string ApiBearerSchemeName = "ApiBearer";
+
+var apiBearerEnabled = builder.Configuration.GetValue<bool>("Authentication:ApiBearer:Enabled");
+var apiBearerAuthority = builder.Configuration["Authentication:ApiBearer:Authority"];
+var apiBearerAudience = builder.Configuration["Authentication:ApiBearer:Audience"];
+
+if (apiBearerEnabled)
+{
+    if (string.IsNullOrWhiteSpace(apiBearerAuthority) || string.IsNullOrWhiteSpace(apiBearerAudience))
+    {
+        throw new InvalidOperationException(
+            "Authentication:ApiBearer is enabled but Authority/Audience are not configured.");
+    }
+
+    builder.Services
+        .AddAuthentication()
+        .AddJwtBearer(ApiBearerSchemeName, options =>
+        {
+            options.Authority = apiBearerAuthority;
+            options.Audience = apiBearerAudience;
+            options.RequireHttpsMetadata = true;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidAudience = apiBearerAudience,
+            };
+        });
+}
+
 builder.Services.AddAuthorization(options =>
 {
     options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
         .RequireAssertion(_ => true)
         .Build();
+
+    if (apiBearerEnabled)
+    {
+        options.AddPolicy(ApiBearerPolicyName, policy =>
+        {
+            policy.AddAuthenticationSchemes(ApiBearerSchemeName);
+            policy.RequireAuthenticatedUser();
+        });
+    }
+    else
+    {
+        options.AddPolicy(ApiBearerPolicyName, policy => policy.RequireAssertion(_ => true));
+    }
 });
 
 // -- LinkSdk service clients (all resolve URLs from ServiceRegistry) --
@@ -258,6 +302,8 @@ if (!app.Environment.IsDevelopment())
 app.UseStaticFiles();
 
 app.UseRouting();
+
+app.UseAuthentication();
 
 app.UseAuthorization();
 
