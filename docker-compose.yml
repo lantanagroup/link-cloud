@@ -396,7 +396,9 @@ services:
       - link-nw
 
   rest-proxy:
-    image: confluentinc/cp-kafka-rest:latest
+    # Pinned to a 7.x release (aligns with the Kafka 3.4 broker and ships curl for the healthcheck);
+    # ':latest' drifted to Confluent Platform 8.x and broke the healthcheck.
+    image: confluentinc/cp-kafka-rest:7.4.0
     depends_on:
       kafka_b:
         condition: service_healthy
@@ -416,7 +418,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 30s
     networks:
       - link-nw
 
@@ -581,7 +583,7 @@ services:
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       Redis__Password: ${REDIS_PASS}
-      ResourceCache__CacheImplementation: ABS
+      ResourceCache__CacheImplementation: Hybrid
       ResourceCache__Redis__ConnectionString: redis_cache:6379
       ResourceCache__Redis__Password: ${REDIS_PASS}
       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
@@ -624,7 +626,7 @@ services:
        KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
        ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dataacquisition;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
        Redis__Password: ${REDIS_PASS}
-       ResourceCache__CacheImplementation: ABS
+       ResourceCache__CacheImplementation: Hybrid
        ResourceCache__Redis__ConnectionString: redis_cache:6379
        ResourceCache__Redis__Password: ${REDIS_PASS}
        ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
@@ -750,6 +752,7 @@ services:
       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ResourceCache__BlobStorage__BlobRoot: resource-cache
+      ResourceCache__CacheImplementation: Hybrid
     ports:
       - "8068:8068"
     build:

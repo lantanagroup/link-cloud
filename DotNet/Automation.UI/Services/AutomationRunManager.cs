@@ -1,8 +1,6 @@
 ﻿using Automation.UI.Models;
-using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation;
-using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
@@ -51,7 +49,7 @@ public class AutomationRunManager : IAutomationRunManager
             _logger);
     }
 
-    public Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
+    public async Task<Guid> StartAsync(StartScenarioRequest request, CancellationToken cancellationToken = default)
     {
         var runId = Guid.NewGuid();
         var options = StartScenarioRequestResolver.Resolve(request);
@@ -60,7 +58,9 @@ public class AutomationRunManager : IAutomationRunManager
         var state = new MutableRunState(runId, request.Scenario, options, runNameOverride, request.RunConfigurationJson);
         _runs[runId] = state;
 
-        _ = PersistRunSummaryAsync(state);
+        await PersistRunInputAsync(runId, request);
+
+        await PersistRunSummaryAsync(state);
 
         state.ExecutionTask = Task.Run(async () =>
         {
@@ -94,7 +94,35 @@ public class AutomationRunManager : IAutomationRunManager
             }
         }, CancellationToken.None);
 
-        return Task.FromResult(runId);
+        return runId;
+    }
+
+    private async Task PersistRunInputAsync(Guid runId, StartScenarioRequest request)
+    {
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var bundleIds = request.ImportedPatientBundles
+                ?.Where(b => b.UploadedBundleId.HasValue)
+                .Select(b => b.UploadedBundleId!.Value)
+                .Distinct()
+                .ToList() ?? [];
+
+            await _snapshotStore.UpsertRunInputAsync(new AutomationRunInputSnapshot
+            {
+                RunId = runId,
+                ScenarioId = request.ScenarioId,
+                ScenarioName = request.ScenarioName,
+                RunConfigurationJson = request.RunConfigurationJson,
+                ImportedBundleIds = bundleIds,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to persist run input snapshot for {RunId}.", runId);
+        }
     }
 
     public async Task<bool> CancelRunAsync(Guid runId, CancellationToken cancellationToken = default)
@@ -448,6 +476,7 @@ public class AutomationRunManager : IAutomationRunManager
                 reportId = state.ReportId;
             }
 
+            summary.RunConfigurationJson = null;
             await _snapshotStore.UpsertRunSummaryAsync(summary, facilityId, reportId);
         }
         catch (Exception ex)

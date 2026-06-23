@@ -26,6 +26,16 @@ public class AbsResourceService {
         this.blobRoot = blobRoot;
     }
 
+    /**
+     * Lightweight connectivity probe for health checks: issues a HEAD against the cache container to
+     * confirm the storage account is reachable and the container exists. Returns false (rather than
+     * throwing) so callers get a simple up/down signal; the caller is responsible for bounding the
+     * call since the Azure SDK applies its own retry/backoff when the account is unreachable.
+     */
+    public boolean isContainerAvailable() {
+        return Boolean.TRUE.equals(containerClient.exists());
+    }
+
     public List<Resource> readResources(String facilityId, String correlationId, String patientId, String cacheKey) {
         String blobName = buildPrefix(cacheKey);
         logger.debug("Reading blob '{}' for correlationId='{}'", blobName, correlationId);

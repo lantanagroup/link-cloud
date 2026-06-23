@@ -6,6 +6,8 @@ namespace Automation.UI.Models;
 
 public class StartScenarioRequest : IValidatableObject
 {
+    public Guid? ScenarioId { get; set; }
+
     [Required]
     public AutomationScenarioKind Scenario { get; set; }
 

@@ -1,0 +1,118 @@
+<h2 mat-dialog-title>Import Remove Extensions from CSV</h2>
+
+<mat-dialog-content class="csv-import-content">
+
+  @if (stage === 'upload') {
+    <p class="instruction">
+      Upload a two-column CSV: <strong>Resource Type</strong> (column 1) and <strong>Extension URL</strong>
+      (column 2). Each unique resource type creates a separate Remove Extensions operation.
+    </p>
+    <file-upload (fileChange)="onFileSelected($event)"></file-upload>
+    @if (parseError) {
+      <div class="parse-error">
+        <mat-icon>error_outline</mat-icon>
+        {{ parseError }}
+      </div>
+    }
+  }
+
+  @if (stage === 'preview') {
+    <p class="summary">
+      <strong>{{ groups.length }}</strong> operation(s) will be created from
+      <strong>{{ totalUrlCount }}</strong> URL(s).
+    </p>
+
+    @if (hasInvalidUrls) {
+      <div class="warning-banner">
+        <mat-icon>warning</mat-icon>
+        Some groups contain invalid URLs. Those operations will fail during creation.
+      </div>
+    }
+
+    <div class="group-list">
+      <div class="group-header">
+        <span>Resource Type</span>
+        <span class="col-center">URLs</span>
+        <span>Issues</span>
+      </div>
+      @for (group of groups; track group.resourceType) {
+        <details class="group-row" [class.has-issues]="group.invalidUrls.length > 0">
+          <summary class="group-summary">
+            <span class="resource-type">{{ group.resourceType }}</span>
+            <span class="col-center url-count">{{ group.urls.length }}</span>
+            <span class="issue-count">
+              @if (group.invalidUrls.length > 0) {
+                <mat-icon class="warn-icon">warning</mat-icon>
+                {{ group.invalidUrls.length }} invalid
+              } @else {
+                <mat-icon class="ok-icon">check_circle</mat-icon>
+              }
+            </span>
+          </summary>
+          <ul class="url-list">
+            @for (url of group.urls; track url) {
+              <li [class.invalid-url]="group.invalidUrls.includes(url)">
+                <span class="url-text">{{ url }}</span>
+                @if (group.invalidUrls.includes(url)) {
+                  <span class="invalid-label">invalid URL</span>
+                }
+              </li>
+            }
+          </ul>
+        </details>
+      }
+    </div>
+  }
+
+  @if (stage === 'submitting' || stage === 'results') {
+    @if (stage === 'submitting') {
+      <p class="summary">Creating operations&hellip; ({{ created + failed }} of {{ groups.length }} complete)</p>
+    } @else {
+      <p class="summary">
+        <strong>{{ created }}</strong> created,
+        <strong [class.has-failures]="failed > 0">{{ failed }}</strong> failed.
+      </p>
+    }
+
+    <div class="group-list">
+      @for (group of groups; track group.resourceType) {
+        <div class="result-row" [class.error-row]="group.status === 'error'">
+          <div class="result-main">
+            <span class="status-icon">
+              @if (group.status === 'submitting') {
+                <mat-spinner diameter="20"></mat-spinner>
+              } @else if (group.status === 'success') {
+                <mat-icon class="ok-icon">check_circle</mat-icon>
+              } @else if (group.status === 'error') {
+                <mat-icon class="error-icon">cancel</mat-icon>
+              } @else {
+                <mat-icon class="pending-icon">hourglass_empty</mat-icon>
+              }
+            </span>
+            <span class="resource-type">{{ group.resourceType }}</span>
+            <span class="url-count-label">{{ group.urls.length }} URL(s)</span>
+          </div>
+          @if (group.errorMessage) {
+            <div class="error-message">{{ group.errorMessage }}</div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  @if (stage === 'upload') {
+    <button mat-button (click)="close()">Cancel</button>
+  }
+  @if (stage === 'preview') {
+    <button mat-button (click)="back()">Back</button>
+    <button mat-flat-button color="primary" (click)="submitAll()">
+      Create {{ groups.length }} Operation(s)
+    </button>
+  }
+  @if (stage === 'results') {
+    <button mat-flat-button color="primary" (click)="close()">Close</button>
+  }
+</mat-dialog-actions>

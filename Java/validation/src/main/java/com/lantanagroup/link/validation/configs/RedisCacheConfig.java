@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import io.lettuce.core.ClientOptions;
+import io.lettuce.core.SocketOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -53,7 +55,19 @@ public class RedisCacheConfig {
             config.setPassword(RedisPassword.of(redisProperties.getPassword()));
         }
 
-        LettuceClientConfiguration.LettuceClientConfigurationBuilder clientBuilder = LettuceClientConfiguration.builder();
+        // Bound Redis commands and socket connects so cache ops (and the health indicator that uses
+        // this factory) fail fast when Redis is unreachable, instead of blocking on Lettuce's ~60s
+        // default. Keeps the BFF's 5s health-check window from timing out and showing every column N/A.
+        SocketOptions socketOptions = SocketOptions.builder()
+                .connectTimeout(Duration.ofSeconds(1))
+                .build();
+        ClientOptions clientOptions = ClientOptions.builder()
+                .socketOptions(socketOptions)
+                .build();
+
+        LettuceClientConfiguration.LettuceClientConfigurationBuilder clientBuilder = LettuceClientConfiguration.builder()
+                .commandTimeout(Duration.ofSeconds(2))
+                .clientOptions(clientOptions);
 
         if (redisProperties.getSsl() != null && redisProperties.getSsl().isEnabled()) {
             clientBuilder.useSsl();
