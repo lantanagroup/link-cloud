@@ -373,7 +373,14 @@
     "title": "MedicationRequest.requester Does Not Have a Proper Reference",
     "severity": "WARNING",
     "acceptable": true,
-    "guidance": "External: No identity or reference for requester (Provider). Safe to ignore when ordering provider is not needed.",
+    "strategy": "SUPPRESS",
+    "suppressMessageIds": [
+      "Reference_REF_NoDisplay"
+    ],
+    "suppressPathPatterns": [
+      "ofType\\(MedicationRequest\\).*\\.requester"
+    ],
+    "guidance": "External: No identity or reference for requester (Provider). Safe to ignore when ordering provider is not needed. Phase 4 SUPPRESS migration: HAPI's Reference_REF_NoDisplay message ('A Reference without an actual reference or identifier should have a display') is dropped via the policy advisor — but only when the FHIR path narrows to MedicationRequest.requester (suppressPathPatterns). Without the path narrowing this rule would silence Reference no-display warnings on every Reference in every resource, which the team has not classified as acceptable. The matcher below remains as a defensive fallback in case the advisor does not fire (e.g., during cold-start before categories load).",
     "matcher": {
       "children": [
         {
