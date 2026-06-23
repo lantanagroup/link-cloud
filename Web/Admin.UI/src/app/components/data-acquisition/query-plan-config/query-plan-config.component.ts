@@ -167,44 +167,110 @@ export class QueryPlanConfigFormComponent {
 
   dropInitial(event: CdkDragDrop<QueryConfigModel[]>) {
     if (this.viewOnly) return;
-    moveItemInArray(this.initialQueries, event.previousIndex, event.currentIndex);
-    this.initialQueries = [...this.initialQueries];
+    const reordered = [...this.initialQueries];
+    moveItemInArray(reordered, event.previousIndex, event.currentIndex);
+    if (!this.isValidOrder(reordered)) {
+      this.showOrderingError();
+      return;
+    }
+    this.initialQueries = reordered;
     this.formValueChanged.emit(this.planForm.invalid);
   }
 
   dropSupplemental(event: CdkDragDrop<QueryConfigModel[]>) {
     if (this.viewOnly) return;
-    moveItemInArray(this.supplementalQueries, event.previousIndex, event.currentIndex);
-    this.supplementalQueries = [...this.supplementalQueries];
+    const reordered = [...this.supplementalQueries];
+    moveItemInArray(reordered, event.previousIndex, event.currentIndex);
+    if (!this.isValidOrder(reordered)) {
+      this.showOrderingError();
+      return;
+    }
+    this.supplementalQueries = reordered;
     this.formValueChanged.emit(this.planForm.invalid);
+  }
+
+  // Mirrors the backend rule (QueryPlanValidator.ValidateQueryOrder): no
+  // Parameter query may appear after a Reference query.
+  private isValidOrder(queries: QueryConfigModel[]): boolean {
+    let seenReference = false;
+    for (const query of queries) {
+      if (query.queryConfigType === 'Reference') {
+        seenReference = true;
+      } else if (seenReference) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+
+  private normalizeOrder(queries: QueryConfigModel[]): QueryConfigModel[] {
+    const parameters = queries.filter(q => q.queryConfigType !== 'Reference');
+    const references = queries.filter(q => q.queryConfigType === 'Reference');
+    return [...parameters, ...references];
+  }
+
+  private showOrderingError(): void {
+    this.snackBar.open('Parameter queries must appear before Reference queries.', '', {
+      duration: 3500,
+      panelClass: 'error-snackbar',
+      horizontalPosition: 'end',
+      verticalPosition: 'top'
+    });
   }
 
   addInitialQuery() {
     this.openQueryEditDialog(null, (res) => {
-      this.initialQueries = [...this.initialQueries, res];
+      this.initialQueries = this.insertRespectingOrder(this.initialQueries, res);
       this.formValueChanged.emit(this.planForm.invalid);
     });
   }
 
   addSupplementalQuery() {
     this.openQueryEditDialog(null, (res) => {
-      this.supplementalQueries = [...this.supplementalQueries, res];
+      this.supplementalQueries = this.insertRespectingOrder(this.supplementalQueries, res);
       this.formValueChanged.emit(this.planForm.invalid);
     });
   }
 
+
+  private insertRespectingOrder(queries: QueryConfigModel[], res: QueryConfigModel): QueryConfigModel[] {
+    if (res.queryConfigType === 'Reference') {
+      return [...queries, res];
+    }
+    const firstReferenceIndex = queries.findIndex(q => q.queryConfigType === 'Reference');
+    if (firstReferenceIndex === -1) {
+      return [...queries, res];
+    }
+    return [
+      ...queries.slice(0, firstReferenceIndex),
+      res,
+      ...queries.slice(firstReferenceIndex)
+    ];
+  }
+
   editInitialQuery(index: number) {
     this.openQueryEditDialog(this.initialQueries[index], (res) => {
-      this.initialQueries[index] = res;
-      this.initialQueries = [...this.initialQueries];
+      const updated = [...this.initialQueries];
+      updated[index] = res;
+      if (!this.isValidOrder(updated)) {
+        this.showOrderingError();
+        return;
+      }
+      this.initialQueries = updated;
       this.formValueChanged.emit(this.planForm.invalid);
     });
   }
 
   editSupplementalQuery(index: number) {
     this.openQueryEditDialog(this.supplementalQueries[index], (res) => {
-      this.supplementalQueries[index] = res;
-      this.supplementalQueries = [...this.supplementalQueries];
+      const updated = [...this.supplementalQueries];
+      updated[index] = res;
+      if (!this.isValidOrder(updated)) {
+        this.showOrderingError();
+        return;
+      }
+      this.supplementalQueries = updated;
       this.formValueChanged.emit(this.planForm.invalid);
     });
   }
@@ -395,8 +461,8 @@ export class QueryPlanConfigFormComponent {
       FacilityId: this.facilityIdControl.value,
       EHRDescription: this.ehrDescriptionControl.value,
       LookBack: this.lookBackControl.value,
-      InitialQueries: this.arrayToRecord(this.initialQueries),
-      SupplementalQueries: this.arrayToRecord(this.supplementalQueries),
+      InitialQueries: this.arrayToRecord(this.normalizeOrder(this.initialQueries)),
+      SupplementalQueries: this.arrayToRecord(this.normalizeOrder(this.supplementalQueries)),
       Type: this.typeControl.value
     };
     return JSON.stringify(plan, null, 2);
@@ -451,8 +517,8 @@ export class QueryPlanConfigFormComponent {
             FacilityId: this.facilityIdControl.value,
             EHRDescription: this.ehrDescriptionControl.value,
             LookBack: this.lookBackControl.value,
-            InitialQueries: this.arrayToRecord(this.initialQueries),
-            SupplementalQueries: this.arrayToRecord(this.supplementalQueries),
+            InitialQueries: this.arrayToRecord(this.normalizeOrder(this.initialQueries)),
+            SupplementalQueries: this.arrayToRecord(this.normalizeOrder(this.supplementalQueries)),
             Type: this.typeControl.value
           } as any).subscribe({
             next: (response) => {
