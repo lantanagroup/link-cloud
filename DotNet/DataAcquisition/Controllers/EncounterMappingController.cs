@@ -316,7 +316,9 @@ public class EncounterMappingController : Controller
         try
         {
             if (model == null)
+            {
                 throw new BadRequestException("Request body is required.");
+            }
 
             model.FacilityId = model.FacilityId.SanitizeAndRemove();
             model.PatientId = model.PatientId.SanitizeAndRemove();
