@@ -37,34 +37,34 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
-		<PackageReference Include="AutoMapper" Version="13.*" />
-		<PackageReference Include="Azure.Identity" Version="1.*" />
-		<PackageReference Include="Azure.Storage.Blobs" Version="12.29.0" />
-		<PackageReference Include="Confluent.Kafka" Version="2.*" />
-		<PackageReference Include="LinqKit.Core" Version="1.*" />
-		<PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" Version="8.*" />
-       <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.28" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.28">
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" />
+		<PackageReference Include="AutoMapper" />
+		<PackageReference Include="Azure.Identity" />
+		<PackageReference Include="Azure.Storage.Blobs" />
+		<PackageReference Include="Confluent.Kafka" />
+		<PackageReference Include="LinqKit.Core" />
+		<PackageReference Include="Microsoft.AspNetCore.Grpc.JsonTranscoding" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-       <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.28">
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools">
 		  <PrivateAssets>all</PrivateAssets>
 		  <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
-		<PackageReference Include="Quartz" Version="3.*" />
-		<PackageReference Include="Quartz.Serialization.Json" Version="3.*" />
-		<PackageReference Include="Serilog.AspNetCore" Version="8.*" />
-		<PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
-		<PackageReference Include="Serilog.Exceptions" Version="8.*" />
-		<PackageReference Include="Serilog.Expressions" Version="4.*" />
-		<PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
-		<PackageReference Include="StackExchange.Redis.Extensions.Core" Version="11.*" />
-		<PackageReference Include="StackExchange.Redis.Extensions.System.Text.Json" Version="11.*" />
-		<PackageReference Include="StackExchange.Redis.Extensions.AspNetCore" Version="11.*" />
-		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
+		<PackageReference Include="Quartz" />
+		<PackageReference Include="Quartz.Serialization.Json" />
+		<PackageReference Include="Serilog.AspNetCore" />
+		<PackageReference Include="Serilog.Enrichers.Span" />
+		<PackageReference Include="Serilog.Exceptions" />
+		<PackageReference Include="Serilog.Expressions" />
+		<PackageReference Include="Serilog.Sinks.Grafana.Loki" />
+		<PackageReference Include="StackExchange.Redis.Extensions.Core" />
+		<PackageReference Include="StackExchange.Redis.Extensions.System.Text.Json" />
+		<PackageReference Include="StackExchange.Redis.Extensions.AspNetCore" />
+		<PackageReference Include="Swashbuckle.AspNetCore" />
 	</ItemGroup>
 
 	<ItemGroup>
