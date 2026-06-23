@@ -31,6 +31,7 @@ public sealed class MongoIndexManager
     public void EnsureAllIndexes()
     {
         EnsureRunIndexes();
+        EnsureRunInputIndexes();
         EnsureSnapshotIndexes();
         EnsureScenarioIndexes();
         EnsureImportedBundleIndexes();
@@ -87,6 +88,13 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "Seed",         1 } }, unique: false, "idx_seed_asc");
         CreateIndexSafe(collection, new BsonDocument { { "Status",       1 } }, unique: false, "idx_status_asc");
         CreateIndexSafe(collection, new BsonDocument { { "FinishedAt",   1 } }, unique: false, "idx_finishedAt_asc");
+    }
+
+    private void EnsureRunInputIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("automation_run_inputs");
+
+        CreateIndexSafe(collection, new BsonDocument { { "UpdatedAt", -1 } }, unique: false, "idx_updatedAt_desc");
     }
 
     // --- automation_snapshots ---

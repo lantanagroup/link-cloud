@@ -37,6 +37,15 @@ if (config.production || process.env.NODE_ENV === 'production') {
 
 app.use(apiLimiter);
 
+app.get('/{*any}', (req, res, next) => {
+  const p = req.path;
+  if (p.includes("//") || p.includes("/./") || p.includes("/../")) {
+    res.status(400).send();
+  } else {
+    next();
+  }
+});
+
 app.use(express.static(distFolder));
 
 app.get('/assets/app.config.local.json', (req, res) => {

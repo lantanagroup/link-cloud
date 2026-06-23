@@ -131,7 +131,7 @@
                                         }
                                         else if (!isSkipped && ep.LastResult is { Passed: false } && !string.IsNullOrWhiteSpace(ep.LastResult.ErrorMessage))
                                         {
-                                            <small class="text-danger">@ep.LastResult.ErrorMessage</small>
+                                            <small class="text-danger au-error-lines">@ep.LastResult.ErrorMessage</small>
                                         }
                                         else
                                         {
@@ -165,7 +165,7 @@
                                                 <dt class="col-sm-2 text-muted">Request</dt>
                                                 <dd class="col-sm-10"><code>@(ep.LastResult.RequestMethod ?? "N/A") @(ep.LastResult.RequestUrl ?? "N/A")</code></dd>
                                                 <dt class="col-sm-2 text-muted">Request Body</dt>
-                                                <dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">@(string.IsNullOrWhiteSpace(ep.LastResult.RequestBody) ? "N/A" : ep.LastResult.RequestBody)</pre></dd>
+                                                <dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">@(string.IsNullOrWhiteSpace(ep.LastResult.RequestBody) ? "No request body details were recorded for this run." : ep.LastResult.RequestBody)</pre></dd>
                                                 <dt class="col-sm-2 text-muted">Status</dt>
                                                 <dd class="col-sm-10">@(ep.LastResult.ActualStatusCode?.ToString() ?? "N/A") (expected @ep.LastResult.ExpectedStatusCode)</dd>
                                                 @if (!string.IsNullOrWhiteSpace(ep.LastResult.TraceId))
@@ -176,7 +176,7 @@
                                                     </dd>
                                                 }
                                                 <dt class="col-sm-2 text-muted">Response</dt>
-                                                <dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">@(string.IsNullOrWhiteSpace(ep.LastResult.ResponseBody) ? "N/A" : ep.LastResult.ResponseBody)</pre></dd>
+                                                <dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">@(string.IsNullOrWhiteSpace(ep.LastResult.ResponseBody) ? "No response body details were recorded for this run." : ep.LastResult.ResponseBody)</pre></dd>
                                                 @if (!string.IsNullOrWhiteSpace(ep.LastResult.ErrorMessage))
                                                 {
                                                     <dt class="col-sm-2 text-muted">Error</dt>
@@ -436,7 +436,7 @@
             ? (result.skipReason ? `<small class="text-muted">${escapeHtml(result.skipReason)}</small>` : `<span class="text-muted">${placeholderText}</span>`)
             : (() => {
                 const msg = normalizeText(result.errorMessage);
-                return !passed && msg ? `<small class="text-danger">${escapeHtml(msg)}</small>` : `<span class="text-muted">${placeholderText}</span>`;
+                return !passed && msg ? `<small class="text-danger au-error-lines">${escapeHtml(msg)}</small>` : `<span class="text-muted">${placeholderText}</span>`;
             })();
         row.querySelector('.cell-duration').innerHTML = skipped ? `<span class="text-muted">${placeholderText}</span>` : `<small>${result.durationMs}ms</small>`;
 
@@ -454,8 +454,8 @@
         detailRow.dataset.detailFor = result.endpointKey;
         detailRow.style.display = 'none';
         const traceHtml = result.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(result.traceId)}</code></dd>` : '';
-        const requestBodyHtml = `<dt class="col-sm-2 text-muted">Request Body</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.requestBody || 'N/A')}</pre></dd>`;
-        const responseHtml = `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.responseBody || 'N/A')}</pre></dd>`;
+        const requestBodyHtml = `<dt class="col-sm-2 text-muted">Request Body</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.requestBody || 'No request body details were recorded for this run.')}</pre></dd>`;
+        const responseHtml = `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.responseBody || 'No response body details were recorded for this run.')}</pre></dd>`;
         const normalizedError = normalizeText(result.errorMessage);
         const errorHtml = normalizedError ? `<dt class="col-sm-2 text-muted">Error</dt><dd class="col-sm-10 text-danger">${escapeHtml(normalizedError)}</dd>` : '';
         detailRow.innerHTML = `<td colspan="6" class="ps-4 py-2"><dl class="row mb-0 small">
@@ -893,8 +893,8 @@
                 html += `<tr class="cursor-pointer" data-toggle-detail="hist-${idx}"><td>${badge}</td><td><code>${r.actualStatusCode || 'N/A'} / ${r.expectedStatusCode}</code></td><td>${r.durationMs}ms</td><td><small>${new Date(r.executedAt).toLocaleString()}</small></td><td>${error}</td></tr>`;
                 // Expandable detail row
                 const traceHtml = r.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(r.traceId)}</code></dd>` : '';
-                const requestBodyHtml = `<dt class="col-sm-2 text-muted">Request Body</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.requestBody || 'N/A')}</pre></dd>`;
-                const responseHtml = `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.responseBody || 'N/A')}</pre></dd>`;
+                const requestBodyHtml = `<dt class="col-sm-2 text-muted">Request Body</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.requestBody || 'No request body details were recorded for this run.')}</pre></dd>`;
+                const responseHtml = `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.responseBody || 'No response body details were recorded for this run.')}</pre></dd>`;
                 html += `<tr class="row-detail" id="hist-${idx}" style="display:none;"><td colspan="5" class="ps-3 py-2"><dl class="row mb-0 small">
                     <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(r.requestMethod || 'N/A')} ${escapeHtml(r.requestUrl || 'N/A')}</code></dd>
                     ${requestBodyHtml}${traceHtml}${responseHtml}
@@ -958,6 +958,7 @@
     .row-detail pre { white-space: pre-wrap; word-wrap: break-word; word-break: break-all; }
     .row-detail code { word-break: break-all; }
     .row-group-header td { background: #f8f9fa; font-size: .8rem; padding: .35rem .75rem; border-bottom: 1px solid #dee2e6; color: #555; letter-spacing: .02em; }
+    .au-error-lines { white-space: pre-line; }
     tr[data-endpoint-key][data-informational="false"] { cursor: pointer; }
     tr[data-endpoint-key][data-informational="false"]:hover { background: rgba(0,0,0,.03) !important; }
     .cursor-pointer { cursor: pointer; }
