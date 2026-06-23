@@ -298,11 +298,10 @@ stages:
                   $resp = Invoke-WebRequest `
                     -Uri $url `
                     -Method Post `
-                    -Headers @{ Authorization = "Bearer $token" } `
+                    -Headers @{ Authorization = "Bearer $token"; Accept = "application/json" } `
                     -ContentType "application/json" `
                     -Body $body `
                     -UseBasicParsing `
-                    -MaximumRedirection 0 `
                     -ErrorAction Stop
 
                   $statusCode = [int]$resp.StatusCode
@@ -319,7 +318,7 @@ stages:
                     Write-Host (Get-Preview -Value $rawBody)
                   }
 
-                  if (-not $resp.IsSuccessStatusCode) {
+                  if ($statusCode -lt 200 -or $statusCode -ge 300) {
                     Write-Error ("Start API call failed with HTTP {0}." -f $statusCode)
                     exit 1
                   }
@@ -352,6 +351,15 @@ stages:
 
                     Write-Error ("Start API call failed with HTTP {0}." -f $statusCode)
                     exit 1
+                  }
+
+                  Write-Host ("Start API exception type: {0}" -f $_.Exception.GetType().FullName)
+                  if ($_.Exception.InnerException -ne $null) {
+                    Write-Host ("Start API inner exception: {0}" -f $_.Exception.InnerException.Message)
+                  }
+                  if ($_.ScriptStackTrace) {
+                    Write-Host "Start API script stack trace:"
+                    Write-Host $_.ScriptStackTrace
                   }
 
                   Write-Error ("Start API call failed before an HTTP response was captured: {0}" -f $_.Exception.Message)
