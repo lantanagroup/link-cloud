@@ -5,7 +5,12 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Models;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Controllers;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Moq.AutoMock;
 using System.Net;
@@ -19,6 +24,35 @@ public class EncounterMappingControllerTests
     private const string FacilityId = "test-facility-id";
     private const string EncounterId = "test-encounter-id";
     private const string PatientId = "test-patient-id";
+
+    // Real MVC services so CreateAsync's TryValidateModel/ValidationProblem run against the
+    // actual DataAnnotations validator and ProblemDetailsFactory instead of throwing NRE.
+    private static readonly IServiceProvider MvcServices = BuildMvcServices();
+
+    private static IServiceProvider BuildMvcServices()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddControllers();
+        return services.BuildServiceProvider();
+    }
+
+    /// <summary>
+    /// Builds a controller wired for the POST path: ControllerContext (for CreatedAtAction URL
+    /// generation), ObjectValidator (for TryValidateModel) and ProblemDetailsFactory (for ValidationProblem).
+    /// </summary>
+    private static EncounterMappingController CreatePostController(AutoMocker mocker)
+    {
+        var controller = mocker.CreateInstance<EncounterMappingController>();
+        controller.ControllerContext = new ControllerContext
+        {
+            ActionDescriptor = new ControllerActionDescriptor(),
+            HttpContext = new DefaultHttpContext { RequestServices = MvcServices }
+        };
+        controller.ObjectValidator = MvcServices.GetRequiredService<IObjectModelValidator>();
+        controller.ProblemDetailsFactory = MvcServices.GetRequiredService<ProblemDetailsFactory>();
+        return controller;
+    }
 
     #region GET /encounter-mappings/{id}
 
@@ -514,13 +548,7 @@ public class EncounterMappingControllerTests
             .Setup(m => m.CreateAsync(It.IsAny<CreateEncounterMappingModel>()))
             .ReturnsAsync(created);
 
-        var controller = mocker.CreateInstance<EncounterMappingController>();
-        // ControllerContext is needed for CreatedAtAction URL generation
-        controller.ControllerContext = new ControllerContext
-        {
-            ActionDescriptor = new Microsoft.AspNetCore.Mvc.Controllers.ControllerActionDescriptor(),
-            HttpContext = new Microsoft.AspNetCore.Http.DefaultHttpContext()
-        };
+        var controller = CreatePostController(mocker);
 
         var result = await controller.CreateAsync(new CreateEncounterMappingModel
         {
@@ -547,6 +575,61 @@ public class EncounterMappingControllerTests
         Assert.Equal((int)HttpStatusCode.BadRequest, objectResult.StatusCode);
     }
 
+    [Theory]
+    [InlineData("", EncounterId, PatientId)]   // FacilityId sanitizes to empty
+    [InlineData(FacilityId, "", PatientId)]    // EncounterId sanitizes to empty
+    [InlineData(FacilityId, EncounterId, "")]  // PatientId sanitizes to empty
+    public async Task CreateAsync_RequiredFieldEmptyAfterSanitization_ReturnsValidationProblem(
+        string facilityId, string encounterId, string patientId)
+    {
+        var mocker = new AutoMocker();
+        var controller = CreatePostController(mocker);
+
+        // "!!!" survives HTML sanitization but the [^a-zA-Z0-9-_. ] removal in SanitizeAndRemove
+        // strips it to an empty string, so the [Required(AllowEmptyStrings = false)] re-validation should reject it.
+        var result = await controller.CreateAsync(new CreateEncounterMappingModel
+        {
+            FacilityId = string.IsNullOrEmpty(facilityId) ? "!!!" : facilityId,
+            EncounterId = string.IsNullOrEmpty(encounterId) ? "!!!" : encounterId,
+            PatientId = string.IsNullOrEmpty(patientId) ? "!!!" : patientId
+        });
+
+        var objectResult = Assert.IsAssignableFrom<ObjectResult>(result);
+        Assert.Equal((int)HttpStatusCode.BadRequest, objectResult.StatusCode);
+        Assert.IsAssignableFrom<ValidationProblemDetails>(objectResult.Value);
+
+        // The manager must never be invoked when post-sanitization validation fails.
+        mocker.GetMock<IEncounterMappingManager>()
+            .Verify(m => m.CreateAsync(It.IsAny<CreateEncounterMappingModel>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_SanitizesFieldsBeforeCreating()
+    {
+        var mocker = new AutoMocker();
+        CreateEncounterMappingModel? captured = null;
+        mocker.GetMock<IEncounterMappingManager>()
+            .Setup(m => m.CreateAsync(It.IsAny<CreateEncounterMappingModel>()))
+            .Callback<CreateEncounterMappingModel>(m => captured = m)
+            .ReturnsAsync(new EncounterMappingModel { EncounterMappingId = 1 });
+
+        var controller = CreatePostController(mocker);
+
+        var result = await controller.CreateAsync(new CreateEncounterMappingModel
+        {
+            // Trailing disallowed characters are stripped; the alphanumeric/-_. remainder survives.
+            FacilityId = "facility-1!!!",
+            EncounterId = "encounter-1@@@",
+            PatientId = "patient-1###"
+        });
+
+        Assert.IsType<CreatedAtActionResult>(result);
+        Assert.NotNull(captured);
+        Assert.Equal("facility-1", captured!.FacilityId);
+        Assert.Equal("encounter-1", captured.EncounterId);
+        Assert.Equal("patient-1", captured.PatientId);
+    }
+
     [Fact]
     public async Task CreateAsync_GenericException_ReturnsInternalServerError()
     {
@@ -555,7 +638,7 @@ public class EncounterMappingControllerTests
             .Setup(m => m.CreateAsync(It.IsAny<CreateEncounterMappingModel>()))
             .ThrowsAsync(new Exception("boom"));
 
-        var controller = mocker.CreateInstance<EncounterMappingController>();
+        var controller = CreatePostController(mocker);
 
         var result = await controller.CreateAsync(new CreateEncounterMappingModel
         {
@@ -576,7 +659,7 @@ public class EncounterMappingControllerTests
             .Setup(m => m.CreateAsync(It.IsAny<CreateEncounterMappingModel>()))
             .ThrowsAsync(new EntityAlreadyExistsException());
 
-        var controller = mocker.CreateInstance<EncounterMappingController>();
+        var controller = CreatePostController(mocker);
 
         var result = await controller.CreateAsync(new CreateEncounterMappingModel
         {
