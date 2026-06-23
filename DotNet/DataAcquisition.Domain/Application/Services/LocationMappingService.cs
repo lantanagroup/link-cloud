@@ -1,10 +1,12 @@
 ﻿using System.Collections.Concurrent;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Rest;
 using Hl7.FhirPath;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -39,12 +41,18 @@ public interface ILocationMappingService
     /// <returns>The OrganizationLocationMappingModel for the mapping</returns>
     /// <exception cref="NotFoundException">Thrown when the facility doesn't have any active mapping configurations</exception>
     Task<OrganizationLocationMappingModel> UpdateLocationMappingAsync(string facilityId, Location location, string? locationAlias = null, CancellationToken cancellationToken = default);
+
+    Task<List<Resource>> FilterResourcesByEncounterMappingAsync(
+        string facilityId,
+        IReadOnlyCollection<Resource> resources,
+        CancellationToken cancellationToken);
 }
 
 public class LocationMappingService(
     IOrganizationLocationMappingManager organizationLocationMappingManager,
     IOrganizationLocationMappingQueries organizationLocationMappingQueries,
     IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
+    IEncounterMappingQueries encounterMappingQueries,
     ICacheService cacheService,
     ILogger<LocationMappingService> logger) : ILocationMappingService
 
@@ -58,6 +66,7 @@ public class LocationMappingService(
     private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries =
         organizationLocationConfigurationQueries;
 
+    private readonly IEncounterMappingQueries _encounterMappingQueries = encounterMappingQueries;
     private readonly ICacheService _cacheService = cacheService;
     private readonly ILogger<LocationMappingService> _logger = logger;
 
@@ -117,6 +126,69 @@ public class LocationMappingService(
         var mappings = await GetActiveConditionsForFacility(facilityId);
 
         return mappings.Count != 0;
+    }
+
+    public async Task<List<Resource>> FilterResourcesByEncounterMappingAsync(
+        string facilityId,
+        IReadOnlyCollection<Resource> resources,
+        CancellationToken cancellationToken)
+    {
+        if (resources.Count == 0)
+        {
+            return resources.ToList();
+        }
+
+        var resourceEncounterIds = resources
+            .Select(resource => new
+            {
+                Resource = resource,
+                EncounterIds = GetEncounterReferenceIds(resource)
+            })
+            .ToList();
+
+        var encounterIds = resourceEncounterIds
+            .SelectMany(x => x.EncounterIds)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (encounterIds.Count == 0)
+        {
+            return resources.ToList();
+        }
+
+        var organizationLocationMappingIsConfigured = await _organizationLocationConfigurationQueries
+            .HasActiveByFacilityIdAsync(facilityId, cancellationToken);
+
+        if (!organizationLocationMappingIsConfigured)
+        {
+            return resources.ToList();
+        }
+
+        var encounterMappings = await _encounterMappingQueries.GetByFacilityIdAndEncounterIdsAsync(
+            facilityId,
+            encounterIds,
+            cancellationToken);
+
+        var mappedEncounterIds = encounterMappings
+            .Where(mapping => mapping.MappedToOrg)
+            .Select(mapping => mapping.EncounterId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var filteredResources = resourceEncounterIds
+            .Where(x => x.EncounterIds.Count == 0 || x.EncounterIds.Any(mappedEncounterIds.Contains))
+            .Select(x => x.Resource)
+            .ToList();
+
+        var removedCount = resources.Count - filteredResources.Count;
+        if (removedCount > 0)
+        {
+            _logger.LogDebug(
+                "Removed {RemovedCount} resource(s) without mapped encounter organization for facility {FacilityId}.",
+                removedCount,
+                facilityId);
+        }
+
+        return filteredResources;
     }
 
     private async Task<OrganizationLocationMappingModel> UpdateMapping(Location location, bool isOrgLocation,
@@ -314,6 +386,45 @@ public class LocationMappingService(
             _logger.LogDebug("Error searching on fhirPath {FhirPath}:{Message}", fhirPath, exception.Message);
             return false;
         }
+    }
+
+    private static List<string> GetEncounterReferenceIds(Resource resource)
+    {
+        return ReferenceResourceBundleExtractor
+            .Extract(resource, [ResourceType.Encounter.ToString()])
+            .Select(GetEncounterReferenceId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static string? GetEncounterReferenceId(ResourceReference reference)
+    {
+        if (string.IsNullOrWhiteSpace(reference.Reference))
+        {
+            return null;
+        }
+
+        try
+        {
+            var identity = new ResourceIdentity(reference.Reference);
+            if (string.Equals(identity.ResourceType, ResourceType.Encounter.ToString(), StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(identity.Id))
+            {
+                return identity.Id;
+            }
+        }
+        catch (Exception)
+        {
+        }
+
+        if (string.Equals(reference.Type.SplitReference(), ResourceType.Encounter.ToString(), StringComparison.OrdinalIgnoreCase))
+        {
+            return reference.Reference.SplitReference();
+        }
+
+        return null;
     }
 
     // SQL Server: 2627 = unique constraint, 2601 = unique index

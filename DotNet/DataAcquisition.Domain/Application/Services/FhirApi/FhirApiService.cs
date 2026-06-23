@@ -46,8 +46,6 @@ public class FhirApiService : IFhirApiService
     private readonly ISearchFhirCommand _searchFhirCommand;
     private readonly ILogger<FhirApiService> _logger;
     private readonly IResourceCache _resourceCache;
-    private readonly IEncounterMappingQueries _encounterMappingQueries;
-    private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries;
     private readonly ILocationMappingService _locationMappingService;
 
     public FhirApiService(
@@ -57,8 +55,6 @@ public class FhirApiService : IFhirApiService
         IReadFhirCommand readFhirCommand,
         ILogger<FhirApiService> logger,
         IResourceCache resourceCache,
-        IEncounterMappingQueries encounterMappingQueries,
-        IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
         ILocationMappingService locationMappingService)
     {
         _referenceResourceManager = referenceResourceManager;
@@ -67,8 +63,6 @@ public class FhirApiService : IFhirApiService
         _readFhirCommand = readFhirCommand;
         _logger = logger;
         _resourceCache = resourceCache;
-        _encounterMappingQueries = encounterMappingQueries;
-        _organizationLocationConfigurationQueries = organizationLocationConfigurationQueries;
         _locationMappingService = locationMappingService;
     }
 
@@ -119,8 +113,8 @@ public class FhirApiService : IFhirApiService
                                                 log.ReportTrackingId),
                                             cancellationToken);
 
-            var filteredResources = await FilterResourcesByEncounterMappingAsync(
-                log,
+            var filteredResources = await _locationMappingService.FilterResourcesByEncounterMappingAsync(
+                log.FacilityId,
                 [resource],
                 cancellationToken);
 
@@ -285,8 +279,8 @@ public class FhirApiService : IFhirApiService
                     }
                 }
 
-                resources = await FilterResourcesByEncounterMappingAsync(
-                    log,
+                resources = await _locationMappingService.FilterResourcesByEncounterMappingAsync(
+                    log.FacilityId,
                     resources,
                     cancellationToken);
 
@@ -419,108 +413,6 @@ public class FhirApiService : IFhirApiService
             searchParams.Add(splitParams[0], splitParams[1]);
         }
         return searchParams;
-    }
-
-    private async Task<List<Resource>> FilterResourcesByEncounterMappingAsync(
-        DataAcquisitionLogModel log,
-        IReadOnlyCollection<Resource> resources,
-        CancellationToken cancellationToken)
-    {
-        if (resources.Count == 0)
-        {
-            return resources.ToList();
-        }
-
-        var resourceEncounterIds = resources
-            .Select(resource => new
-            {
-                Resource = resource,
-                EncounterIds = GetEncounterReferenceIds(resource)
-            })
-            .ToList();
-
-        var encounterIds = resourceEncounterIds
-            .SelectMany(x => x.EncounterIds)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (encounterIds.Count == 0)
-        {
-            return resources.ToList();
-        }
-
-        var organizationLocationMappingIsConfigured = await _organizationLocationConfigurationQueries
-            .HasActiveByFacilityIdAsync(log.FacilityId, cancellationToken);
-
-        if (!organizationLocationMappingIsConfigured)
-        {
-            return resources.ToList();
-        }
-
-        var encounterMappings = await _encounterMappingQueries.GetByFacilityIdAndEncounterIdsAsync(
-            log.FacilityId,
-            encounterIds,
-            cancellationToken);
-
-        var mappedEncounterIds = encounterMappings
-            .Where(mapping => mapping.MappedToOrg)
-            .Select(mapping => mapping.EncounterId)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var filteredResources = resourceEncounterIds
-            .Where(x => x.EncounterIds.Count == 0 || x.EncounterIds.Any(mappedEncounterIds.Contains))
-            .Select(x => x.Resource)
-            .ToList();
-
-        var removedCount = resources.Count - filteredResources.Count;
-        if (removedCount > 0)
-        {
-            _logger.LogDebug(
-                "Removed {RemovedCount} resource(s) without mapped encounter organization for facility {FacilityId}.",
-                removedCount,
-                log.FacilityId);
-        }
-
-        return filteredResources;
-    }
-
-    private static List<string> GetEncounterReferenceIds(Resource resource)
-    {
-        return ReferenceResourceBundleExtractor
-            .Extract(resource, [ResourceType.Encounter.ToString()])
-            .Select(GetEncounterReferenceId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Select(id => id!)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
-    private static string? GetEncounterReferenceId(ResourceReference reference)
-    {
-        if (string.IsNullOrWhiteSpace(reference.Reference))
-        {
-            return null;
-        }
-
-        try
-        {
-            var identity = new ResourceIdentity(reference.Reference);
-            if (string.Equals(identity.ResourceType, ResourceType.Encounter.ToString(), StringComparison.OrdinalIgnoreCase)
-                && !string.IsNullOrWhiteSpace(identity.Id))
-            {
-                return identity.Id;
-            }
-        }
-        catch (Exception)
-        {
-        }
-
-        if (string.Equals(reference.Type.SplitReference(), ResourceType.Encounter.ToString(), StringComparison.OrdinalIgnoreCase))
-        {
-            return reference.Reference.SplitReference();
-        }
-
-        return null;
     }
 
     private void AddResourceToCache(ResourceAcquired resourceAcquired, string correlationId)

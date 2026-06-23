@@ -139,6 +139,7 @@ public class LocationMappingServiceIntegrationTests
             manager,
             mockQueries.Object,
             mockConfigQueries.Object,
+            new Mock<IEncounterMappingQueries>().Object,
             mockCache.Object,
             new Mock<ILogger<LocationMappingService>>().Object);
 

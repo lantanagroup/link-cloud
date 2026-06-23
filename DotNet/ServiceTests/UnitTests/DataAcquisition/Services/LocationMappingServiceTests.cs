@@ -21,6 +21,7 @@ public class LocationMappingServiceTests
     private readonly Mock<IOrganizationLocationMappingManager> _mockManager = new();
     private readonly Mock<IOrganizationLocationMappingQueries> _mockQueries = new();
     private readonly Mock<IOrganizationLocationConfigurationQueries> _mockConfigQueries = new();
+    private readonly Mock<IEncounterMappingQueries> _mockEncounterMappingQueries = new();
     private readonly Mock<ICacheService> _mockCache = new();
     private readonly Mock<ILogger<LocationMappingService>> _mockLogger = new();
 
@@ -95,6 +96,7 @@ public class LocationMappingServiceTests
             _mockManager.Object,
             _mockQueries.Object,
             _mockConfigQueries.Object,
+            _mockEncounterMappingQueries.Object,
             _mockCache.Object,
             _mockLogger.Object);
     }
@@ -422,6 +424,129 @@ public class LocationMappingServiceTests
 
         // Assert
         Assert.False(configured);
+    }
+
+    [Fact]
+    public async Task FilterResourcesByEncounterMappingAsync_WhenConfigured_RemovesResourcesWithoutMappedEncounter()
+    {
+        // Arrange
+        var mappedObservation = new Observation
+        {
+            Id = "obs-mapped",
+            Encounter = new ResourceReference("Encounter/enc-mapped")
+        };
+        var unmappedObservation = new Observation
+        {
+            Id = "obs-unmapped",
+            Encounter = new ResourceReference("Encounter/enc-unmapped")
+        };
+        var noEncounterObservation = new Observation { Id = "obs-no-encounter" };
+
+        _mockConfigQueries
+            .Setup(x => x.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        _mockEncounterMappingQueries
+            .Setup(x => x.GetByFacilityIdAndEncounterIdsAsync(
+                FacilityId,
+                It.Is<IReadOnlyCollection<string>>(ids =>
+                    ids.Contains("enc-mapped") &&
+                    ids.Contains("enc-unmapped")),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EncounterMappingModel>
+            {
+                new()
+                {
+                    FacilityId = FacilityId,
+                    PatientId = "patient-1",
+                    EncounterId = "enc-mapped",
+                    MappedToOrg = true
+                },
+                new()
+                {
+                    FacilityId = FacilityId,
+                    PatientId = "patient-1",
+                    EncounterId = "enc-unmapped",
+                    MappedToOrg = false
+                }
+            });
+
+        // Act
+        var filtered = await _service.FilterResourcesByEncounterMappingAsync(
+            FacilityId,
+            [mappedObservation, unmappedObservation, noEncounterObservation],
+            CancellationToken.None);
+
+        // Assert
+        Assert.Equal(["obs-mapped", "obs-no-encounter"], filtered.Select(resource => resource.Id));
+    }
+
+    [Fact]
+    public async Task FilterResourcesByEncounterMappingAsync_WhenNotConfigured_DoesNotQueryEncounterMappings()
+    {
+        // Arrange
+        var observation = new Observation
+        {
+            Id = "obs-1",
+            Encounter = new ResourceReference("Encounter/enc-1")
+        };
+
+        _mockConfigQueries
+            .Setup(x => x.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        // Act
+        var filtered = await _service.FilterResourcesByEncounterMappingAsync(
+            FacilityId,
+            [observation],
+            CancellationToken.None);
+
+        // Assert
+        Assert.Equal(["obs-1"], filtered.Select(resource => resource.Id));
+        _mockEncounterMappingQueries.Verify(x => x.GetByFacilityIdAndEncounterIdsAsync(
+            It.IsAny<string>(),
+            It.IsAny<IReadOnlyCollection<string>>(),
+            It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task FilterResourcesByEncounterMappingAsync_WhenResourceEncounterIsUnmapped_RemovesResource()
+    {
+        // Arrange
+        var observation = new Observation
+        {
+            Id = "obs-unmapped",
+            Encounter = new ResourceReference("Encounter/enc-unmapped")
+        };
+
+        _mockConfigQueries
+            .Setup(x => x.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        _mockEncounterMappingQueries
+            .Setup(x => x.GetByFacilityIdAndEncounterIdsAsync(
+                FacilityId,
+                It.Is<IReadOnlyCollection<string>>(ids => ids.SequenceEqual(new[] { "enc-unmapped" })),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EncounterMappingModel>
+            {
+                new()
+                {
+                    FacilityId = FacilityId,
+                    PatientId = "patient-1",
+                    EncounterId = "enc-unmapped",
+                    MappedToOrg = false
+                }
+            });
+
+        // Act
+        var filtered = await _service.FilterResourcesByEncounterMappingAsync(
+            FacilityId,
+            [observation],
+            CancellationToken.None);
+
+        // Assert
+        Assert.Empty(filtered);
     }
 
     [Fact]
