@@ -19,6 +19,7 @@ public class EncounterMappingManagerUnitTests
     private readonly Mock<IDatabase> _mockDatabase;
     private readonly Mock<IEntityRepository<EncounterMapping>> _mockMappingRepo;
     private readonly Mock<IEntityRepository<EncounterLocation>> _mockLocationRepo;
+    private readonly Mock<IEntityRepository<OrganizationLocationMapping>> _mockOrgLocationRepo;
     private readonly EncounterMappingManager _manager;
 
     public EncounterMappingManagerUnitTests()
@@ -26,9 +27,11 @@ public class EncounterMappingManagerUnitTests
         _mockDatabase = new Mock<IDatabase>();
         _mockMappingRepo = new Mock<IEntityRepository<EncounterMapping>>();
         _mockLocationRepo = new Mock<IEntityRepository<EncounterLocation>>();
+        _mockOrgLocationRepo = new Mock<IEntityRepository<OrganizationLocationMapping>>();
 
         _mockDatabase.Setup(d => d.EncounterMappingRepository).Returns(_mockMappingRepo.Object);
         _mockDatabase.Setup(d => d.EncounterLocationRepository).Returns(_mockLocationRepo.Object);
+        _mockDatabase.Setup(d => d.LocationMappingRepository).Returns(_mockOrgLocationRepo.Object);
 
         _manager = new EncounterMappingManager(_mockDatabase.Object);
     }
@@ -117,6 +120,70 @@ public class EncounterMappingManagerUnitTests
         var model = new CreateEncounterMappingModel { FacilityId = "Fac1", EncounterId = "Enc1", PatientId = string.Empty };
 
         await Assert.ThrowsAsync<ArgumentException>(() => _manager.CreateAsync(model));
+    }
+
+    [Fact]
+    public async Task CreateAsync_NonExistentOrganizationLocationMappingId_ThrowsBadRequestException()
+    {
+        // Arrange: not a duplicate, but the insert trips the EncounterLocation -> OrganizationLocationMapping
+        // FK constraint because one of the requested location ids (99) does not exist. The catch re-checks
+        // which ids are missing and surfaces a BadRequestException (same re-check shape as the duplicate path).
+        var model = new CreateEncounterMappingModel
+        {
+            FacilityId = "Fac1",
+            EncounterId = "Enc1",
+            PatientId = "Pat1",
+            OrganizationLocationMappingIds = new List<int> { 5, 99 }
+        };
+
+        _mockMappingRepo.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>()))
+            .ReturnsAsync((EncounterMapping)null!);
+
+        _mockDatabase.Setup(d => d.SaveChangesAsync())
+            .ThrowsAsync(new DbUpdateException("FK violation", new Exception()));
+
+        // Re-check: only id 5 exists; 99 is the missing reference.
+        _mockOrgLocationRepo.Setup(r => r.FindAsync(It.IsAny<Expression<Func<OrganizationLocationMapping, bool>>>()))
+            .ReturnsAsync(new List<OrganizationLocationMapping>
+            {
+                new() { LocationMappingId = 5, FacilityId = "Fac1", LocationId = "Loc5" }
+            });
+
+        // Act
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => _manager.CreateAsync(model));
+        Assert.Contains("99", ex.Message);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ValidOrganizationLocationMappingIds_AddsEncounterLocations()
+    {
+        // Arrange: all requested location ids exist, so SaveChanges succeeds and no exception is translated.
+        var model = new CreateEncounterMappingModel
+        {
+            FacilityId = "Fac1",
+            EncounterId = "Enc1",
+            PatientId = "Pat1",
+            OrganizationLocationMappingIds = new List<int> { 5, 6 }
+        };
+
+        _mockMappingRepo.Setup(r => r.FirstOrDefaultAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>()))
+            .ReturnsAsync((EncounterMapping)null!);
+
+        EncounterMapping capturedEntity = null!;
+        _mockMappingRepo
+            .Setup(r => r.AddAsync(It.IsAny<EncounterMapping>()))
+            .Callback<EncounterMapping>(e => capturedEntity = e)
+            .ReturnsAsync((EncounterMapping e) => e);
+
+        // Act
+        await _manager.CreateAsync(model);
+
+        // Assert
+        Assert.NotNull(capturedEntity);
+        Assert.Equal(2, capturedEntity.EncounterLocations.Count);
+        Assert.Contains(capturedEntity.EncounterLocations, l => l.OrganizationLocationMappingId == 5);
+        Assert.Contains(capturedEntity.EncounterLocations, l => l.OrganizationLocationMappingId == 6);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Once);
     }
 
     [Fact]
