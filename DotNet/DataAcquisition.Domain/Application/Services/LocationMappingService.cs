@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
 using Hl7.FhirPath;
@@ -194,17 +194,18 @@ public class LocationMappingService(
             locationMapping = await UpdateMapping(location, isOrgLocation, existing, partOf);
         }
 
-        await UpdatePartOfIdsOnRecordsWithThisPartOfValue(
+        await UpdateParentOnRecordsWithThisPartOfValue(
             facilityId,
             location.Id,
             locationMapping.LocationMappingId,
+            isOrgLocation,
             cancellationToken: cancellationToken);
 
         return locationMapping;
     }
 
-    private async Task UpdatePartOfIdsOnRecordsWithThisPartOfValue(
-        string facilityId, string? locationId, int locationMappingId, CancellationToken cancellationToken)
+    private async Task UpdateParentOnRecordsWithThisPartOfValue(
+        string facilityId, string? locationId, int locationMappingId, bool isOrgLocation, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(locationId))
         {
@@ -212,7 +213,7 @@ public class LocationMappingService(
         }
 
         var adopted = await _organizationLocationMappingManager
-            .SetPartOfIdForChildrenAsync(facilityId, locationId, locationMappingId, cancellationToken);
+            .SetParentForChildrenAsync(facilityId, locationId, locationMappingId, isOrgLocation, cancellationToken);
 
         if (adopted > 0)
         {

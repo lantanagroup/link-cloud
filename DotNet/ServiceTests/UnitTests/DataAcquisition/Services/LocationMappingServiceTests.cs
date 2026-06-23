@@ -72,20 +72,24 @@ public class LocationMappingServiceTests
             });
 
         _mockManager
-            .Setup(m => m.SetPartOfIdForChildrenAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(),
+            .Setup(m => m.SetParentForChildrenAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<bool>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(0);
 
         // Stateful cache: Get returns the last Set value (seeded above with a non-matching
         // condition so the facility is "configured" but generic locations are not org locations).
         _mockCache
-            .Setup(c => c.Get<List<OrganizationLocationConditionModel>>(It.IsAny<string>()))
+            .Setup(c => c.Get<List<OrganizationLocationConditionModel>?>(It.IsAny<string>()))
             .Returns(() => _cachedConditions);
         _mockCache
             .Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<OrganizationLocationConditionModel>>(),
                 It.IsAny<TimeSpan>(), It.IsAny<ExpirationType>()))
             .Callback<string, List<OrganizationLocationConditionModel>, TimeSpan, ExpirationType>(
                 (_, value, _, _) => _cachedConditions = value);
+
+        _mockConfigQueries
+            .Setup(q => q.GetByFacilityIdAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<OrganizationLocationConfigurationModel>());
 
         _service = new LocationMappingService(
             _mockManager.Object,
@@ -186,8 +190,8 @@ public class LocationMappingServiceTests
 
         // Assert
         // Adopt orphans whose PartOfValue points at THIS location's id, under the new mapping id.
-        _mockManager.Verify(m => m.SetPartOfIdForChildrenAsync(
-            FacilityId, "hosp-1", NewMappingId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockManager.Verify(m => m.SetParentForChildrenAsync(
+            FacilityId, "hosp-1", NewMappingId, It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -391,8 +395,8 @@ public class LocationMappingServiceTests
 
         _mockManager.Verify(m => m.UpdateByIdAsync(It.IsAny<int>(), It.IsAny<UpdateOrganizationLocationMappingModel>()),
             Times.Never);
-        _mockManager.Verify(m => m.SetPartOfIdForChildrenAsync(
-            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockManager.Verify(m => m.SetParentForChildrenAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

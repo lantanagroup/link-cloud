@@ -15,8 +15,8 @@ public interface IOrganizationLocationMappingManager
     Task DeleteByFacilityIdAsync(string facilityId);
     Task DeleteByFacilityIdAndLocationIdAsync(string facilityId, string locationId);
 
-    Task<int> SetPartOfIdForChildrenAsync(
-        string facilityId, string parentLocationId, int parentLocationMappingId,
+    Task<int> SetParentForChildrenAsync(
+        string facilityId, string parentLocationId, int parentLocationMappingId, bool isOrgLocation,
         CancellationToken cancellationToken = default);
 }
 
@@ -129,8 +129,8 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
         }
     }
 
-    public async Task<int> SetPartOfIdForChildrenAsync(
-        string facilityId, string parentLocationId, int parentLocationMappingId, CancellationToken cancellationToken = default)
+    public async Task<int> SetParentForChildrenAsync(
+        string facilityId, string parentLocationId, int parentLocationMappingId, bool isOrgLocation, CancellationToken cancellationToken = default)
     {
         return await _dbContext.OrganizationLocationMappings
             .Where(m => m.FacilityId == facilityId
@@ -138,6 +138,7 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
                     && m.PartOfId == null)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(m => m.PartOfId, parentLocationMappingId)
+                .SetProperty(m => m.IsOrgLocation, m => m.IsOrgLocation || isOrgLocation) //do not demote a child if it is an org location but its parent is not
                 .SetProperty(m => m.ModifiedDate, DateTime.UtcNow),
             cancellationToken);
     }    
