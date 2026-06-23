@@ -75,6 +75,12 @@ public class EncounterMappingManagerUnitTests
     }
 
     [Fact]
+    public async Task CreateAsync_NullModel_ThrowsArgumentNullException()
+    {
+        await Assert.ThrowsAsync<ArgumentNullException>(() => _manager.CreateAsync(null!));
+    }
+
+    [Fact]
     public async Task CreateAsync_NullFacilityId_ThrowsArgumentNullException()
     {
         var model = new CreateEncounterMappingModel { FacilityId = null!, EncounterId = "Enc1", PatientId = "Pat1" };
