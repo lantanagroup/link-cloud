@@ -204,9 +204,11 @@ public class DataAcquisitionLogManagerTests
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
+        // Negative id is guaranteed absent: SQL Server identity values are always positive,
+        // so this stays "not found" regardless of how many logs prior tests left in the shared DB.
         var updateModel = new UpdateDataAcquisitionLogModel
         {
-            Id = 999,
+            Id = -1,
             Status = RequestStatus.Completed
         };
 
@@ -302,7 +304,9 @@ public class DataAcquisitionLogManagerTests
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
-        var logIds = new List<long> { 999 };
+        // Negative id is guaranteed absent: SQL Server identity values are always positive,
+        // so this stays "not found" regardless of how many logs prior tests left in the shared DB.
+        var logIds = new List<long> { -1 };
 
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() => manager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(logIds, "TestFacility", "TestCorr", Guid.NewGuid().ToString()));
