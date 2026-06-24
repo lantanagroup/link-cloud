@@ -140,7 +140,10 @@ public enum RequestStatus
     [StringValue("Cancelled")]
     Cancelled,
     [StringValue("Configuration Missing")]
-    ConfigurationMissing
+    ConfigurationMissing,
+    
+    [StringValue("Not Reportable")]
+    NotReportable
 }
 
 public enum QueryPhase
