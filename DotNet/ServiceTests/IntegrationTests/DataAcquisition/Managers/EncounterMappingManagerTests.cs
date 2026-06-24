@@ -24,7 +24,8 @@ public class EncounterMappingManagerTests
     private IEncounterMappingManager CreateManager(IServiceScope scope)
     {
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
-        return new EncounterMappingManager(database);
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        return new EncounterMappingManager(database, dbContext);
     }
 
     private IEncounterMappingQueries CreateQueries(IServiceScope scope)

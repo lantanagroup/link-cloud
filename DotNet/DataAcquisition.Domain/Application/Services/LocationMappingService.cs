@@ -10,6 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -41,6 +42,15 @@ public interface ILocationMappingService
     /// <returns>The OrganizationLocationMappingModel for the mapping</returns>
     /// <exception cref="NotFoundException">Thrown when the facility doesn't have any active mapping configurations</exception>
     Task<OrganizationLocationMappingModel> UpdateLocationMappingAsync(string facilityId, Location location, string? locationAlias = null, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Updates the encounter-location mapping for a given facility and encounter. This method is called when a new encounter resource is acquired from the FHIR API, and is responsible for updating the mapping between the facility and the encounter in the database.
+    /// </summary>
+    /// <param name="facilityId">The facility id that the mapping is for</param>
+    /// <param name="encounter">The encounter resource from the FHIR object</param>
+    /// <param name="cancellationToken">Used to signal a cancellation in the request</param>
+    /// <returns>The EncounterMappingModel for the mapping</returns>
+    Task<EncounterMappingModel?> UpdateEncounterLocationMappingAsync(string facilityId, Encounter encounter, CancellationToken cancellationToken = default);
 
     Task<List<Resource>> FilterResourcesByEncounterMappingAsync(
         string facilityId,
@@ -53,6 +63,7 @@ public class LocationMappingService(
     IOrganizationLocationMappingQueries organizationLocationMappingQueries,
     IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
     IEncounterMappingQueries encounterMappingQueries,
+    IEncounterMappingManager encounterMappingManager,
     ICacheService cacheService,
     ILogger<LocationMappingService> logger) : ILocationMappingService
 
@@ -67,6 +78,7 @@ public class LocationMappingService(
         organizationLocationConfigurationQueries;
 
     private readonly IEncounterMappingQueries _encounterMappingQueries = encounterMappingQueries;
+    private readonly IEncounterMappingManager _encounterMappingManager = encounterMappingManager;
     private readonly ICacheService _cacheService = cacheService;
     private readonly ILogger<LocationMappingService> _logger = logger;
 
@@ -189,6 +201,73 @@ public class LocationMappingService(
         }
 
         return filteredResources;
+    }
+
+    public async Task<EncounterMappingModel?> UpdateEncounterLocationMappingAsync(string facilityId, Encounter encounter, CancellationToken cancellationToken = default)
+    {
+        //if there is already an encounter mapping for this encounter, delete it and create a new one. 
+        // This is because the encounter may have changed its location references, so we need to re-evaluate the mapping.
+        _logger.LogDebug("Duplicate encounter mapping for encounter {EncounterId} in facility {FacilityId} detected. Deleting existing mapping and creating a new one.", encounter.Id.SanitizeForLog(), facilityId.SanitizeForLog());
+        await _encounterMappingManager.DeleteByEncounterIdAndFacilityIdAsync(encounter.Id, facilityId);
+
+        var locationIds = encounter.Location
+            .Select(locationComponent => locationComponent.Location?.Reference?.SplitReference())
+            .Where(locationId => !string.IsNullOrWhiteSpace(locationId))
+            .Select(locationId => locationId!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var patientId = encounter.Subject?.Reference?.SplitReference();
+        if(patientId is null)
+        {
+            _logger.LogWarning("Encounter {EncounterId} for facility {FacilityId} does not have a subject reference (patient ID), skipping mapping.", encounter.Id.SanitizeForLog(), facilityId.SanitizeForLog());
+            return null;
+        }
+
+        var mappedToOrg = false;
+        var organizationLocationMappingIds = new List<int>();
+        if(!locationIds.Any()) //encounter does not have any location references, so we have to assume it is part of the org by default
+        {
+            mappedToOrg = true;
+            _logger.LogDebug("Encounter {EncounterId} for facility {FacilityId} has no location references, assuming it is part of the organization.", encounter.Id.SanitizeForLog(), facilityId.SanitizeForLog());
+        }
+        else
+        {
+            //use the locationIds to get any existing location mappings and see if they are mapped to the org
+            var existingMappings = await organizationLocationMappingQueries.GetByFacilityIdAsync(facilityId);
+            foreach(var locationId in locationIds)
+            {
+                var existingMapping = existingMappings.FirstOrDefault(m => m.LocationId == locationId);
+                if(existingMapping is not null)
+                {
+                    mappedToOrg = existingMapping.IsOrgLocation;
+                    organizationLocationMappingIds.Add(existingMapping.LocationMappingId);
+                }
+                else
+                {
+                    // We haven't seen this location before, so we need to create a new mapping for it.
+                    // We'll assume it is not part of the org by default. This can change once the location is acquired and the conditions are evaluated.
+                    _logger.LogDebug("Encounter {EncounterId} for facility {FacilityId} has a location reference {LocationId} that does not have an existing mapping. Creating one...", encounter.Id.SanitizeForLog(), facilityId.SanitizeForLog(), locationId.SanitizeForLog());
+                    var newLocationMapping = await _organizationLocationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
+                    {
+                        FacilityId = facilityId,
+                        IsActive = true,
+                        IsOrgLocation = false,
+                        LocationId = locationId
+                    });
+                    organizationLocationMappingIds.Add(newLocationMapping.LocationMappingId);
+                }
+            }
+        }
+        
+        return await _encounterMappingManager.CreateAsync(new CreateEncounterMappingModel
+            {
+                FacilityId = facilityId,
+                PatientId = patientId,
+                EncounterId = encounter.Id,
+                MappedToOrg = mappedToOrg,
+                OrganizationLocationMappingIds = organizationLocationMappingIds
+            });
     }
 
     private async Task<OrganizationLocationMappingModel> UpdateMapping(Location location, bool isOrgLocation,

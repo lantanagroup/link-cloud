@@ -1,6 +1,7 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,19 +12,22 @@ public interface IEncounterMappingManager
     Task<EncounterMappingModel> CreateAsync(CreateEncounterMappingModel model);
     Task<EncounterMappingModel> UpdateByIdAsync(int id, UpdateEncounterMappingModel model);
     Task<EncounterMappingModel> UpdateByFacilityIdAndEncounterIdAsync(string facilityId, string encounterId, UpdateEncounterMappingModel model);
+    Task<int> UpdateMappedToOrgByOrganizationLocationMappingIdAsync(int organizationLocationMappingId, bool mappedToOrg, CancellationToken cancellationToken = default);
     Task DeleteByIdAsync(int id);
     Task DeleteByFacilityIdAsync(string facilityId);
     Task DeleteByPatientIdAsync(string patientId);
-    Task DeleteByEncounterIdAsync(string encounterId);
+    Task DeleteByEncounterIdAndFacilityIdAsync(string encounterId, string facilityId);
 }
 
 public class EncounterMappingManager : IEncounterMappingManager
 {
     private readonly IDatabase _database;
+    private readonly DataAcquisitionDbContext _dbContext;
 
-    public EncounterMappingManager(IDatabase database)
+    public EncounterMappingManager(IDatabase database, DataAcquisitionDbContext dbContext)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
     }
 
     public async Task<EncounterMappingModel> CreateAsync(CreateEncounterMappingModel model)
@@ -134,6 +138,20 @@ public class EncounterMappingManager : IEncounterMappingManager
         return await UpdateByIdAsync(entity.EncounterMappingId, model);
     }
 
+    public async Task<int> UpdateMappedToOrgByOrganizationLocationMappingIdAsync(
+        int organizationLocationMappingId,
+        bool mappedToOrg,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.EncounterMappings
+            .Where(mapping => mapping.EncounterLocations.Any(location =>
+                    location.OrganizationLocationMappingId == organizationLocationMappingId))
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(mapping => mapping.MappedToOrg, mappedToOrg)
+                .SetProperty(mapping => mapping.ModifiedDate, DateTime.UtcNow),
+            cancellationToken);
+    }
+
     public async Task DeleteByIdAsync(int id)
     {
         var entity = await _database.EncounterMappingRepository.GetAsync(id);
@@ -167,14 +185,16 @@ public class EncounterMappingManager : IEncounterMappingManager
         await _database.SaveChangesAsync();
     }
 
-    public async Task DeleteByEncounterIdAsync(string encounterId)
+    public async Task DeleteByEncounterIdAndFacilityIdAsync(string encounterId, string facilityId)
     {
-        var entities = await _database.EncounterMappingRepository.FindAsync(m => m.EncounterId == encounterId);
-        foreach (var entity in entities)
-        {
-            _database.EncounterMappingRepository.Remove(entity);
-        }
-        await _database.SaveChangesAsync();
+        await _dbContext.EncounterLocations
+            .Where(el => el.EncounterMapping.EncounterId == encounterId && el.EncounterMapping.FacilityId == facilityId)
+            .ExecuteDeleteAsync();
+        await _dbContext.EncounterMappings
+            .Where(em => em.EncounterId == encounterId && em.FacilityId == facilityId)
+            .ExecuteDeleteAsync();
+
+        await _dbContext.SaveChangesAsync();
     }
 
     private static EncounterMappingModel ProjectToModel(EncounterMapping entity)

@@ -145,13 +145,23 @@ public class FhirApiService : IFhirApiService
                 AccumulateDiscoveredReferences(refResources, referenceAccumulator);
             }
 
-            if (resource is Location location && 
-                await _locationMappingService.IsConfigured(log.FacilityId, cancellationToken))
+            var locationMappingConfigured = await _locationMappingService.IsConfigured(log.FacilityId, cancellationToken);
+            if(locationMappingConfigured)
             {
-                await _locationMappingService.UpdateLocationMappingAsync(
-                    log.FacilityId, 
-                    location,
-                    cancellationToken: cancellationToken);
+                if (resource is Location location)
+                {
+                    await _locationMappingService.UpdateLocationMappingAsync(
+                        log.FacilityId, 
+                        location,
+                        cancellationToken: cancellationToken);
+                }
+                else if(resource is Encounter encounter)
+                {
+                    await _locationMappingService.UpdateEncounterLocationMappingAsync(
+                        log.FacilityId,
+                        encounter,
+                        cancellationToken: cancellationToken);
+                }
             }
 
             AddResourceToCache(new ResourceAcquired
@@ -317,12 +327,20 @@ public class FhirApiService : IFhirApiService
                 foreach (var resource in resources)
                 {
                     InsertDateExtension((DomainResource)resource);
-
-                    if (locationMappingConfigured && resource is Location location)
+                    if(locationMappingConfigured)
                     {
-                        await _locationMappingService.UpdateLocationMappingAsync(
-                            log.FacilityId, location,
-                            cancellationToken:cancellationToken);
+                        if (resource is Location location)
+                        {
+                            await _locationMappingService.UpdateLocationMappingAsync(
+                                log.FacilityId, location,
+                                cancellationToken:cancellationToken);
+                        }
+                        else if(resource is Encounter encounter)
+                        {
+                            await _locationMappingService.UpdateEncounterLocationMappingAsync(
+                                log.FacilityId, encounter,
+                                cancellationToken:cancellationToken);
+                        }
                     }
                     
                     AddResourceToCache(new ResourceAcquired

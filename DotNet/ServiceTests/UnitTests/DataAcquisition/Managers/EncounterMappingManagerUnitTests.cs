@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,7 @@ public class EncounterMappingManagerUnitTests
     private readonly Mock<IDatabase> _mockDatabase;
     private readonly Mock<IEntityRepository<EncounterMapping>> _mockMappingRepo;
     private readonly Mock<IEntityRepository<EncounterLocation>> _mockLocationRepo;
+    private readonly DataAcquisitionDbContext _dbContext;
     private readonly EncounterMappingManager _manager;
 
     public EncounterMappingManagerUnitTests()
@@ -30,13 +32,18 @@ public class EncounterMappingManagerUnitTests
         _mockDatabase.Setup(d => d.EncounterMappingRepository).Returns(_mockMappingRepo.Object);
         _mockDatabase.Setup(d => d.EncounterLocationRepository).Returns(_mockLocationRepo.Object);
 
-        _manager = new EncounterMappingManager(_mockDatabase.Object);
+        var options = new DbContextOptionsBuilder<DataAcquisitionDbContext>()
+            .UseInMemoryDatabase($"EncounterMappingManagerUnitTests_{Guid.NewGuid():N}")
+            .Options;
+        _dbContext = new DataAcquisitionDbContext(options);
+
+        _manager = new EncounterMappingManager(_mockDatabase.Object, _dbContext);
     }
 
     [Fact]
     public void Constructor_NullDatabase_ThrowsArgumentNullException()
     {
-        Assert.Throws<ArgumentNullException>(() => new EncounterMappingManager(null!));
+        Assert.Throws<ArgumentNullException>(() => new EncounterMappingManager(null!, _dbContext));
     }
 
     [Fact]

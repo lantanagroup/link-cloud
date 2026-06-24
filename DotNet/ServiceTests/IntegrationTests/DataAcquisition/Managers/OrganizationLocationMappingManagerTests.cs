@@ -23,7 +23,8 @@ public class OrganizationLocationMappingManagerTests
     {
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
-        return new OrganizationLocationMappingManager(database, dbContext);
+        var encounterMappingManager = scope.ServiceProvider.GetRequiredService<IEncounterMappingManager>();
+        return new OrganizationLocationMappingManager(database, dbContext, encounterMappingManager);
     }
 
     private static string NewFacilityId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";

@@ -52,6 +52,7 @@ public class LocationMappingAcquisitionTests
             scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>(),
             scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>(),
             scope.ServiceProvider.GetRequiredService<IEncounterMappingQueries>(),
+            scope.ServiceProvider.GetRequiredService<IEncounterMappingManager>(),
             new InMemoryCacheService(new MemoryCache(new MemoryCacheOptions { SizeLimit = 1024 })),
             NullLogger<LocationMappingService>.Instance);
     }

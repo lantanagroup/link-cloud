@@ -24,11 +24,16 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
 {
     private readonly IDatabase _database;
     private readonly DataAcquisitionDbContext _dbContext;
+    private readonly IEncounterMappingManager _encounterMappingManager;
 
-    public OrganizationLocationMappingManager(IDatabase database, DataAcquisitionDbContext dbContext)
+    public OrganizationLocationMappingManager(
+        IDatabase database,
+        DataAcquisitionDbContext dbContext,
+        IEncounterMappingManager encounterMappingManager)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _encounterMappingManager = encounterMappingManager ?? throw new ArgumentNullException(nameof(encounterMappingManager));
     }
 
     public async Task<OrganizationLocationMappingModel> CreateAsync(CreateOrganizationLocationMappingModel model)
@@ -75,6 +80,13 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
         ApplyUpdate(entity, model);
         _database.LocationMappingRepository.Update(entity);
         await _database.SaveChangesAsync();
+
+        if (model.IsOrgLocation.HasValue)
+        {
+            await _encounterMappingManager.UpdateMappedToOrgByOrganizationLocationMappingIdAsync(
+                locationMappingId,
+                model.IsOrgLocation.Value);
+        }
 
         return ProjectToModel(entity);
     }
@@ -132,7 +144,7 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
     public async Task<int> SetParentForChildrenAsync(
         string facilityId, string parentLocationId, int parentLocationMappingId, bool isOrgLocation, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.OrganizationLocationMappings
+        var result = await _dbContext.OrganizationLocationMappings
             .Where(m => m.FacilityId == facilityId
                     && m.PartOfValue == parentLocationId
                     && m.PartOfId == null)
@@ -141,6 +153,20 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
                 .SetProperty(m => m.IsOrgLocation, m => m.IsOrgLocation || isOrgLocation) //do not demote a child if it is an org location but its parent is not
                 .SetProperty(m => m.ModifiedDate, DateTime.UtcNow),
             cancellationToken);
+
+            var updatedMappings = await _dbContext.OrganizationLocationMappings
+                .Where(m => m.PartOfId == parentLocationMappingId)
+                .Select(m => new { m.LocationMappingId, m.IsOrgLocation })
+                .ToListAsync(cancellationToken);
+            
+        foreach (var mapping in updatedMappings)
+        {
+            await _encounterMappingManager.UpdateMappedToOrgByOrganizationLocationMappingIdAsync(
+                mapping.LocationMappingId,
+                mapping.IsOrgLocation);
+        }
+
+        return result;
     }    
 
     private void ApplyUpdate(OrganizationLocationMapping entity, UpdateOrganizationLocationMappingModel model)
