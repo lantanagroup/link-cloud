@@ -566,4 +566,83 @@ public class LocationMappingServiceTests
         _mockManager.Verify(m => m.UpdateByIdAsync(It.IsAny<int>(), It.IsAny<UpdateOrganizationLocationMappingModel>()),
             Times.Never);
     }
+
+    [Fact]
+    public async Task IsPatientReportableAsync_WhenNotConfigured_ReturnsTrueWithoutQueryingEncounterMappings()
+    {
+        // Arrange — org-location mapping not active for the facility.
+        _mockConfigQueries
+            .Setup(x => x.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        // Act
+        var reportable = await _service.IsPatientReportableAsync(FacilityId, "patient-1", CancellationToken.None);
+
+        // Assert — reportable by default, and we never look at encounter mappings.
+        Assert.True(reportable);
+        _mockEncounterMappingQueries.Verify(x => x.GetByFacilityIdAndPatientIdAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task IsPatientReportableAsync_WhenNoEncounterMappings_ReturnsTrueFailOpen()
+    {
+        // Arrange — configured, but the patient has no encounter mappings recorded yet.
+        _mockConfigQueries
+            .Setup(x => x.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _mockEncounterMappingQueries
+            .Setup(x => x.GetByFacilityIdAndPatientIdAsync(FacilityId, "patient-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EncounterMappingModel>());
+
+        // Act
+        var reportable = await _service.IsPatientReportableAsync(FacilityId, "patient-1", CancellationToken.None);
+
+        // Assert — fail open: cannot conclude non-reportable, so keep acquiring.
+        Assert.True(reportable);
+    }
+
+    [Fact]
+    public async Task IsPatientReportableAsync_WhenAtLeastOneEncounterMappedToOrg_ReturnsTrue()
+    {
+        // Arrange — configured; one of the patient's encounters maps to the org.
+        _mockConfigQueries
+            .Setup(x => x.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _mockEncounterMappingQueries
+            .Setup(x => x.GetByFacilityIdAndPatientIdAsync(FacilityId, "patient-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EncounterMappingModel>
+            {
+                new() { FacilityId = FacilityId, PatientId = "patient-1", EncounterId = "enc-1", MappedToOrg = false },
+                new() { FacilityId = FacilityId, PatientId = "patient-1", EncounterId = "enc-2", MappedToOrg = true }
+            });
+
+        // Act
+        var reportable = await _service.IsPatientReportableAsync(FacilityId, "patient-1", CancellationToken.None);
+
+        // Assert
+        Assert.True(reportable);
+    }
+
+    [Fact]
+    public async Task IsPatientReportableAsync_WhenNoEncounterMappedToOrg_ReturnsFalse()
+    {
+        // Arrange — configured; the patient has encounter mappings but none map to the org.
+        _mockConfigQueries
+            .Setup(x => x.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _mockEncounterMappingQueries
+            .Setup(x => x.GetByFacilityIdAndPatientIdAsync(FacilityId, "patient-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EncounterMappingModel>
+            {
+                new() { FacilityId = FacilityId, PatientId = "patient-1", EncounterId = "enc-1", MappedToOrg = false },
+                new() { FacilityId = FacilityId, PatientId = "patient-1", EncounterId = "enc-2", MappedToOrg = false }
+            });
+
+        // Act
+        var reportable = await _service.IsPatientReportableAsync(FacilityId, "patient-1", CancellationToken.None);
+
+        // Assert — every encounter is non-org → patient is not reportable.
+        Assert.False(reportable);
+    }
 }

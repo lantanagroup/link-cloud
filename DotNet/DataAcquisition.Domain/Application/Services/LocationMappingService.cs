@@ -56,6 +56,22 @@ public interface ILocationMappingService
         string facilityId,
         IReadOnlyCollection<Resource> resources,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Determines whether a patient is reportable: i.e. has at least one encounter mapped to an
+    /// organization location. Used to preempt further acquisition for patients whose encounters are
+    /// all non-org (non-reportable).
+    /// </summary>
+    /// <param name="facilityId">The facility the patient belongs to.</param>
+    /// <param name="patientId">The patient to evaluate.</param>
+    /// <param name="cancellationToken">Used to signal a cancellation in the request.</param>
+    /// <returns>
+    /// True if the patient is reportable — org-location mapping is not active for the facility, the
+    /// patient's encounter mappings have not been recorded yet (fail-open), or at least one encounter
+    /// is mapped to the organization. False only when the patient has encounter mappings and none of
+    /// them map to the organization.
+    /// </returns>
+    Task<bool> IsPatientReportableAsync(string facilityId, string patientId, CancellationToken cancellationToken);
 }
 
 public class LocationMappingService(
@@ -201,6 +217,40 @@ public class LocationMappingService(
         }
 
         return filteredResources;
+    }
+
+    public async Task<bool> IsPatientReportableAsync(string facilityId, string patientId, CancellationToken cancellationToken)
+    {
+        // Reportability filtering only applies when org-location mapping is active for the facility;
+        // otherwise every patient is reportable and acquisition proceeds normally.
+        var organizationLocationMappingIsConfigured = await _organizationLocationConfigurationQueries
+            .HasActiveByFacilityIdAsync(facilityId, cancellationToken);
+
+        if (!organizationLocationMappingIsConfigured)
+        {
+            return true;
+        }
+
+        var encounterMappings = await _encounterMappingQueries
+            .GetByFacilityIdAndPatientIdAsync(facilityId, patientId, cancellationToken);
+
+        // Fail open: with no encounter mappings recorded yet we cannot conclude the patient is
+        // non-reportable (e.g. the encounters have not been acquired/mapped), so keep acquiring.
+        if (encounterMappings.Count == 0)
+        {
+            return true;
+        }
+
+        var reportable = encounterMappings.Any(mapping => mapping.MappedToOrg);
+
+        if (!reportable)
+        {
+            _logger.LogDebug(
+                "Patient {PatientId} for facility {FacilityId} has no encounters mapped to an organization location; treating as non-reportable.",
+                patientId.SanitizeForLog(), facilityId.SanitizeForLog());
+        }
+
+        return reportable;
     }
 
     public async Task<EncounterMappingModel?> UpdateEncounterLocationMappingAsync(string facilityId, Encounter encounter, CancellationToken cancellationToken = default)

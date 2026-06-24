@@ -260,7 +260,7 @@ public class EncounterMappingControllerTests
     {
         var mocker = new AutoMocker();
         mocker.GetMock<IEncounterMappingQueries>()
-            .Setup(q => q.GetByFacilityIdAndPatientIdAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Setup(q => q.GetByFacilityIdAndPatientIdAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<EncounterMappingModel>
             {
                 new() { EncounterMappingId = 1, FacilityId = FacilityId, PatientId = PatientId }
@@ -304,7 +304,7 @@ public class EncounterMappingControllerTests
     {
         var mocker = new AutoMocker();
         mocker.GetMock<IEncounterMappingQueries>()
-            .Setup(q => q.GetByFacilityIdAndPatientIdAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Setup(q => q.GetByFacilityIdAndPatientIdAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("boom"));
 
         var controller = mocker.CreateInstance<EncounterMappingController>();
