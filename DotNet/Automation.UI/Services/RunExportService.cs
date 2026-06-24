@@ -487,7 +487,6 @@ public sealed class RunExportService : IRunExportService
         {
             sb.AppendLine($"  Captured at                 : {locator.CapturedAt:u}");
             sb.AppendLine($"  Last seen file count        : {locator.FileCount:N0}");
-            sb.AppendLine($"  Last seen text size (chars) : {locator.ApproximateTextCharCount:N0}");
 
             if (locator.FileNames.Count > 0)
             {

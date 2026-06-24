@@ -11,7 +11,6 @@ public sealed class AbsExportLocatorSnapshot
     public bool External { get; init; }
     public DateTimeOffset CapturedAt { get; init; }
     public int FileCount { get; init; }
-    public long ApproximateTextCharCount { get; init; }
     public IReadOnlyList<string> FileNames { get; init; } = [];
 
     public static AbsExportLocatorSnapshot Build(string facilityId, string reportId, IDictionary<string, object> files, bool external = false)
@@ -20,16 +19,6 @@ public sealed class AbsExportLocatorSnapshot
             .OrderBy(k => k, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        long charCount = 0;
-        foreach (var value in files.Values)
-        {
-            charCount += value switch
-            {
-                string s => s.Length,
-                _ => value?.ToString()?.Length ?? 0
-            };
-        }
-
         return new AbsExportLocatorSnapshot
         {
             FacilityId = facilityId,
@@ -37,7 +26,6 @@ public sealed class AbsExportLocatorSnapshot
             External = external,
             CapturedAt = DateTimeOffset.UtcNow,
             FileCount = names.Count,
-            ApproximateTextCharCount = charCount,
             FileNames = names
         };
     }
