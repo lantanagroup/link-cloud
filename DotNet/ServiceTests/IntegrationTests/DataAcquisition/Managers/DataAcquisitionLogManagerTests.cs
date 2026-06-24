@@ -366,7 +366,9 @@ public class DataAcquisitionLogManagerTests
             new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Completed, CreateDate = DateTime.UtcNow.AddHours(-48) },
             new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.MaxRetriesReached, CreateDate = DateTime.UtcNow.AddHours(-48) },
             new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Skipped, CreateDate = DateTime.UtcNow.AddHours(-48) },
-            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Cancelled, CreateDate = DateTime.UtcNow.AddHours(-48) }
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Cancelled, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.ConfigurationMissing, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.NotReportable, CreateDate = DateTime.UtcNow.AddHours(-48) }
         };
         dbContext.DataAcquisitionLogs.AddRange(seeded);
         await dbContext.SaveChangesAsync();
@@ -681,7 +683,9 @@ public class DataAcquisitionLogManagerTests
 
         dbContext.DataAcquisitionLogs.AddRange(
             new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Completed, CreateDate = DateTime.UtcNow.AddHours(-48) },
-            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Cancelled, CreateDate = DateTime.UtcNow.AddHours(-48) }
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Cancelled, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.ConfigurationMissing, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.NotReportable, CreateDate = DateTime.UtcNow.AddHours(-48) }
         );
         await dbContext.SaveChangesAsync();
 
@@ -692,7 +696,7 @@ public class DataAcquisitionLogManagerTests
             new SearchDataAcquisitionLogRequest { FacilityId = facilityId }, 24);
 
         // Assert
-        Assert.Equal(2, requested);
+        Assert.Equal(4, requested);
         Assert.Equal(0, cancelled);
     }
 
