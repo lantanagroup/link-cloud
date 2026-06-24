@@ -39,10 +39,7 @@ services:
   ### FHIR Server (HAPI) - For testing
   ###########################################
   fhir_server:
-    build:
-      context: .
-      dockerfile: Dockerfile.hapi
-    image: link-fhir-server
+    image: hapiproject/hapi:v8.10.0-2
     container_name: fhir-server
     ports:
       - "6157:8080"
@@ -73,7 +70,7 @@ services:
     networks:
       - link-nw
     healthcheck:
-      test: ["CMD", "wget", "-q", "--timeout=5", "--tries=1", "--spider", "http://localhost:8080/fhir/metadata"]
+      test: ["CMD", "java", "-cp", "/app", "HealthCheck"]
       interval: 10s
       timeout: 5s
       retries: 5
