@@ -89,8 +89,13 @@ spring:
         max.request.size: 10485760
 
     retry:
-      maxAttempts: 3
-      retry-backoff-ms: 3000
+      consumer-retry-duration:
+        - PT20S
+        - PT60S
+        - PT120S
+      disable-retry-consumer: false
+      maxAttempts: 5
+      retry-backoff-ms: 60000
 
 link:
   info-route: /api/measureeval/info

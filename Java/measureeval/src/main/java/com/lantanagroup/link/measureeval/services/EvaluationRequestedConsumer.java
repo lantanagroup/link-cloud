@@ -7,7 +7,7 @@ import com.lantanagroup.link.measureeval.records.DataAcquisitionRequested;
 import com.lantanagroup.link.measureeval.records.EvaluationRequested;
 import com.lantanagroup.link.measureeval.repositories.PatientReportingEvaluationStatusRepository;
 import com.lantanagroup.link.measureeval.repositories.ResourceRepository;
-import com.lantanagroup.link.shared.kafka.SimpleAsyncListener;
+import com.lantanagroup.link.shared.kafka.AbstractAsyncConsumer;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
@@ -34,7 +34,7 @@ import java.util.function.Predicate;
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
 @Service
-public class EvaluationRequestedConsumer extends SimpleAsyncListener<String, EvaluationRequested> {
+public class EvaluationRequestedConsumer extends AbstractAsyncConsumer<String, EvaluationRequested> {
 
     private static final Logger logger = LoggerFactory.getLogger(EvaluationRequestedConsumer.class);
     private final PatientReportingEvaluationStatusRepository patientStatusRepository;

@@ -1,4 +1,4 @@
-package com.lantanagroup.link.measureeval.services;
+package com.lantanagroup.link.shared.kafka;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Headers;
@@ -10,18 +10,24 @@ import org.springframework.kafka.retrytopic.RetryTopicHeaders;
 
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
+import java.util.function.IntToLongFunction;
 
 public class RetryTopicRecoverer implements ConsumerRecordRecoverer {
 
     private static final Logger logger = LoggerFactory.getLogger(RetryTopicRecoverer.class);
 
     private final int maxAttempts;
-    private final long backoffMs;
+    private final IntToLongFunction backoffMsForAttempt;
     private final DeadLetterPublishingRecoverer delegate;
 
-    public RetryTopicRecoverer(int maxAttempts, long backoffMs, DeadLetterPublishingRecoverer delegate) {
+    /**
+     * @param maxAttempts         attempt at which a record is exhausted (used for logging)
+     * @param backoffMsForAttempt maps a 1-based attempt number to the backoff delay in millis
+     * @param delegate            publishes the record to the resolved {@code -Retry}/{@code -Error} topic
+     */
+    public RetryTopicRecoverer(int maxAttempts, IntToLongFunction backoffMsForAttempt, DeadLetterPublishingRecoverer delegate) {
         this.maxAttempts = maxAttempts;
-        this.backoffMs = backoffMs;
+        this.backoffMsForAttempt = backoffMsForAttempt;
         this.delegate = delegate;
     }
 
@@ -33,7 +39,7 @@ public class RetryTopicRecoverer implements ConsumerRecordRecoverer {
         headers.remove(RetryTopicHeaders.DEFAULT_HEADER_ATTEMPTS);
         headers.add(RetryTopicHeaders.DEFAULT_HEADER_ATTEMPTS, ByteBuffer.allocate(4).putInt(attempt).array());
 
-        long newBackoff = System.currentTimeMillis() + backoffMs;
+        long newBackoff = System.currentTimeMillis() + backoffMsForAttempt.applyAsLong(attempt);
         headers.remove(RetryTopicHeaders.DEFAULT_HEADER_BACKOFF_TIMESTAMP);
         headers.add(RetryTopicHeaders.DEFAULT_HEADER_BACKOFF_TIMESTAMP, BigInteger.valueOf(newBackoff).toByteArray());
         if (headers.lastHeader(RetryTopicHeaders.DEFAULT_HEADER_ORIGINAL_TIMESTAMP) == null) {

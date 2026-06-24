@@ -14,18 +14,18 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 
-public abstract class SimpleAsyncListener<K, T> {
+public abstract class AbstractAsyncConsumer<K, T> {
 
-    private static final Logger logger = LoggerFactory.getLogger(SimpleAsyncListener.class);
+    private static final Logger logger = LoggerFactory.getLogger(AbstractAsyncConsumer.class);
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final ConsumerRecordRecoverer recoverer;
 
-    protected SimpleAsyncListener(ConsumerRecordRecoverer recoverer) {
+    protected AbstractAsyncConsumer(ConsumerRecordRecoverer recoverer) {
         this.recoverer = recoverer;
     }
 
-    protected SimpleAsyncListener() {
+    protected AbstractAsyncConsumer() {
         this.recoverer = null;
     }
 

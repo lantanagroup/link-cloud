@@ -4,6 +4,7 @@ import ca.uhn.fhir.parser.DataFormatException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.exceptions.FhirParseException;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
+import com.lantanagroup.link.shared.kafka.RetryTopicRecovererFactory;
 import com.lantanagroup.link.shared.kafka.records.ResourceKey;
 import org.apache.kafka.common.serialization.Serializer;
 import org.junit.jupiter.api.Test;
@@ -13,8 +14,8 @@ import org.springframework.kafka.support.serializer.DeserializationException;
 import org.springframework.messaging.MessageHandlingException;
 import org.springframework.messaging.support.GenericMessage;
 
-import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -66,10 +67,16 @@ class KafkaConfigTest {
 
     // ---- isNonRetryable: poison classification used by the retry destination resolver ------------
 
-    private static boolean isNonRetryable(Throwable t) throws Exception {
-        Method m = KafkaConfig.class.getDeclaredMethod("isNonRetryable", Throwable.class);
-        m.setAccessible(true);
-        return (boolean) m.invoke(null, t);
+    // The classification moved to RetryTopicRecovererFactory (Phase 1); MeasureEval supplies this set.
+    private static final Set<Class<? extends Throwable>> NON_RETRYABLE = Set.of(
+            FhirParseException.class,
+            ValidationException.class,
+            MessageHandlingException.class,
+            DataFormatException.class,
+            DeserializationException.class);
+
+    private static boolean isNonRetryable(Throwable t) {
+        return RetryTopicRecovererFactory.isNonRetryable(t, NON_RETRYABLE);
     }
 
     @Test

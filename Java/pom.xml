@@ -25,6 +25,14 @@
         <kotlin.version>2.1.20</kotlin.version>
         <janino.version>2.7.8</janino.version>
         <jacoco.version>0.8.12</jacoco.version>
+        <!--
+          Pinned independently of the Spring Boot version (Boot 3.2.5 currently manages this same
+          3.1.4). RetryTopicRecoverer hand-stamps spring-kafka's INTERNAL retry_topic-* header
+          encodings (measureeval/docs/async-retry-design.md §6); a spring-kafka upgrade can change
+          how the backoff value is read and SILENTLY disable the retry delay (retries hot-loop with
+          no error). Bump only with RetryTopicBackoffDelayTest green.
+        -->
+        <spring-kafka.version>3.1.4</spring-kafka.version>
     </properties>
 
     <modules>
