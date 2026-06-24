@@ -32,6 +32,12 @@ public class EncounterMappingManager : IEncounterMappingManager
 
     public async Task<EncounterMappingModel> CreateAsync(CreateEncounterMappingModel model)
     {
+        ArgumentNullException.ThrowIfNull(model);
+
+        ArgumentException.ThrowIfNullOrEmpty(model.FacilityId, nameof(model.FacilityId));
+        ArgumentException.ThrowIfNullOrEmpty(model.EncounterId, nameof(model.EncounterId));
+        ArgumentException.ThrowIfNullOrEmpty(model.PatientId, nameof(model.PatientId));
+
         var now = DateTime.UtcNow;
         var entity = new EncounterMapping
         {
@@ -82,6 +88,23 @@ public class EncounterMappingManager : IEncounterMappingManager
             if (concurrent != null)
             {
                 throw new EntityAlreadyExistsException($"An EncounterMapping already exists for FacilityId {model.FacilityId} and EncounterId {model.EncounterId}");
+            }
+
+            // Not a duplicate. Check to see if it's a foreign key failure where the location id is invalid, if
+            // so, return the invalid ids
+            if (model.OrganizationLocationMappingIds is { Count: > 0 })
+            {
+                var requestedIds = model.OrganizationLocationMappingIds.Distinct().ToList();
+                var existingIds = (await _database.LocationMappingRepository
+                        .FindAsync(m => requestedIds.Contains(m.LocationMappingId)))
+                    .Select(m => m.LocationMappingId)
+                    .ToHashSet();
+
+                var missingIds = requestedIds.Where(id => !existingIds.Contains(id)).ToList();
+                if (missingIds.Count > 0)
+                {
+                    throw new BadRequestException($"Invalid OrganizationLocationMappingId(s): {string.Join(", ", missingIds)}");
+                }
             }
 
             throw;

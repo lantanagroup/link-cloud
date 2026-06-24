@@ -238,7 +238,7 @@ public class EncounterMappingManagerTests
     }
 
     [Fact]
-    public async Task CreateAsync_InvalidLocationMappingId_ThrowsException()
+    public async Task CreateAsync_InvalidLocationMappingId_ThrowsBadRequestException()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
@@ -250,7 +250,10 @@ public class EncounterMappingManagerTests
             OrganizationLocationMappingIds = new List<int> { int.MaxValue } // Non-existent ID
         };
 
-        await Assert.ThrowsAsync<Microsoft.EntityFrameworkCore.DbUpdateException>(() => manager.CreateAsync(model));
+        // The EncounterLocation -> OrganizationLocationMapping FK violation is translated into a
+        // BadRequestException that names the invalid id (rather than surfacing the raw DbUpdateException).
+        var ex = await Assert.ThrowsAsync<BadRequestException>(() => manager.CreateAsync(model));
+        Assert.Contains(int.MaxValue.ToString(), ex.Message);
     }
 
     [Fact]
