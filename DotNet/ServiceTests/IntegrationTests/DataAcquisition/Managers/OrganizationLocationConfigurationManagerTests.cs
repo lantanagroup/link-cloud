@@ -1,8 +1,11 @@
+using LantanaGroup.Link.DataAcquisition.Domain.Application;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
@@ -23,7 +26,8 @@ public class OrganizationLocationConfigurationManagerTests
     {
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
-        return new OrganizationLocationConfigurationManager(database, queries);
+        var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
+        return new OrganizationLocationConfigurationManager(database, queries, cacheService);
     }
 
     private static string NewFacilityId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";
@@ -82,6 +86,44 @@ public class OrganizationLocationConfigurationManagerTests
         Assert.Equal("New Description", result.Description);
         Assert.False(result.IsActive);
         Assert.Single(result.Conditions);
+    }
+
+    [Fact]
+    public async Task UpdateByIdAsync_InvalidatesConditionsCache()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
+        var manager = CreateManager(scope);
+
+        var facilityId = NewFacilityId("Cache-Invalidate");
+        var created = await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel
+        {
+            FacilityId = facilityId,
+            Description = "Initial",
+            Conditions = new List<CreateOrganizationLocationConditionModel>
+            {
+                new() { FhirPath = "Location.name = 'A'", Priority = 1 }
+            }
+        });
+
+        // Simulate the read side (LocationMappingService) having populated the conditions cache.
+        var cacheKey = OrgLocationCacheKeys.Conditions(facilityId);
+        cacheService.Set(cacheKey,
+            new List<OrganizationLocationConditionModel> { new() { ConditionId = 1, FhirPath = "Location.name = 'A'", Priority = 1 } },
+            TimeSpan.FromHours(1), ExpirationType.Absolute);
+        Assert.NotNull(cacheService.Get<List<OrganizationLocationConditionModel>?>(cacheKey));
+
+        // Act — editing the configuration must evict the cached conditions immediately.
+        await manager.UpdateByIdAsync(created.ConfigId, new UpdateOrganizationLocationConfigurationModel
+        {
+            Conditions = new List<UpdateOrganizationLocationConditionModel>
+            {
+                new() { FhirPath = "Location.name = 'B'", Priority = 1 }
+            }
+        });
+
+        // Assert — stale conditions are gone, so the next read repopulates from the database.
+        Assert.Null(cacheService.Get<List<OrganizationLocationConditionModel>?>(cacheKey));
     }
 
     [Fact]

@@ -10,6 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -178,6 +179,11 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IOrganizationLocationMappingQueries, OrganizationLocationMappingQueries>();
             builder.Services.AddScoped<IEncounterMappingManager, EncounterMappingManager>();
             builder.Services.AddScoped<IEncounterMappingQueries, EncounterMappingQueries>();
+
+            // In-memory cache used by LocationMappingService (read) and invalidated by
+            // OrganizationLocationConfigurationManager (write).
+            builder.Services.AddMemoryCache();
+            builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
 
             // Register queries
             builder.Services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();

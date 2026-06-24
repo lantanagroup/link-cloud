@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
@@ -25,12 +26,20 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 {
     private readonly IDatabase _database;
     private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries;
+    private readonly ICacheService _cacheService;
 
-    public OrganizationLocationConfigurationManager(IDatabase database, IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries)
+    public OrganizationLocationConfigurationManager(IDatabase database, IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries, ICacheService cacheService)
     {
         _database = database;
         _organizationLocationConfigurationQueries = organizationLocationConfigurationQueries;
+        _cacheService = cacheService;
     }
+
+    // The active-conditions read cache (populated by LocationMappingService) must be invalidated
+    // whenever a facility's configuration/conditions change, otherwise the acquire path keeps
+    // evaluating stale conditions for up to the cache TTL.
+    private void InvalidateConditionsCache(string facilityId) =>
+        _cacheService.Remove(OrgLocationCacheKeys.Conditions(facilityId));
 
     public async Task<OrganizationLocationConfigurationModel> CreateAsync(CreateOrganizationLocationConfigurationModel model)
     {
@@ -59,6 +68,8 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
         await _database.LocationConfigurationRepository.AddAsync(entity);
         await _database.SaveChangesAsync();
 
+        InvalidateConditionsCache(entity.FacilityId);
+
         return ProjectToModel(entity);
     }
 
@@ -80,6 +91,8 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
             _database.LocationConfigurationRepository.Update(entity);
 
             await _database.SaveChangesAsync();
+
+            InvalidateConditionsCache(entity.FacilityId);
 
             result = ProjectToModel(entity);
         });
@@ -122,6 +135,8 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
             _database.LocationConfigurationRepository.Remove(entity);
             await _database.SaveChangesAsync();
+
+            InvalidateConditionsCache(entity.FacilityId);
         });
     }
 

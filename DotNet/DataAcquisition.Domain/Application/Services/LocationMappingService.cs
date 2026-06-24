@@ -74,7 +74,8 @@ public interface ILocationMappingService
     Task<bool> IsPatientReportableAsync(string facilityId, string patientId, CancellationToken cancellationToken);
 }
 
-public class LocationMappingService(
+public class 
+    LocationMappingService(
     IOrganizationLocationMappingManager organizationLocationMappingManager,
     IOrganizationLocationMappingQueries organizationLocationMappingQueries,
     IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
@@ -103,7 +104,6 @@ public class LocationMappingService(
     private static readonly ConcurrentDictionary<string, CompiledExpression> CompiledFhirPaths = new();
 
 
-    private const string OrgLocationConditionsCacheKeyPrefix = "org-location-conditions:";
     private static readonly TimeSpan OrgLocationConditionsTtl = TimeSpan.FromHours(1);
 
     public async Task<OrganizationLocationMappingModel> UpdateLocationMappingAsync(string facilityId, Location location,
@@ -463,7 +463,7 @@ public class LocationMappingService(
 
     private async Task<List<OrganizationLocationConditionModel>> GetActiveConditionsForFacility(string facilityId)
     {
-        var cacheKey = OrgLocationConditionsCacheKeyPrefix + facilityId;
+        var cacheKey = OrgLocationCacheKeys.Conditions(facilityId);
 
         var conditions = _cacheService.Get<List<OrganizationLocationConditionModel>?>(cacheKey);
 
