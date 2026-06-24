@@ -1,4 +1,4 @@
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
+﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
@@ -22,6 +22,7 @@ public class LocationMappingServiceTests
     private readonly Mock<IOrganizationLocationMappingQueries> _mockQueries = new();
     private readonly Mock<IOrganizationLocationConfigurationQueries> _mockConfigQueries = new();
     private readonly Mock<IEncounterMappingQueries> _mockEncounterMappingQueries = new();
+    private readonly Mock<IEncounterMappingManager> _mockEncounterMappingManager = new();
     private readonly Mock<ICacheService> _mockCache = new();
     private readonly Mock<ILogger<LocationMappingService>> _mockLogger = new();
 
@@ -97,6 +98,7 @@ public class LocationMappingServiceTests
             _mockQueries.Object,
             _mockConfigQueries.Object,
             _mockEncounterMappingQueries.Object,
+            _mockEncounterMappingManager.Object,
             _mockCache.Object,
             _mockLogger.Object);
     }
