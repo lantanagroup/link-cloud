@@ -524,6 +524,9 @@ public class PatientDataService : IPatientDataService
                     $"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
             }
 
+            //log should not have the notes collection loaded from the database as the collection will be reused to add new notes during this execution.
+            log.Notes = new List<string>();
+
             //check if isCensus, if true, create scope for PatientCensusService and execute RetrieveListData
             if (log.IsCensus)
             {
@@ -745,6 +748,11 @@ public class PatientDataService : IPatientDataService
                     log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
                     log.CompletionDate = System.DateTime.UtcNow;
                     log.Status = skipFetch && !isReferenceLog ? RequestStatus.Skipped : RequestStatus.Completed;
+                }
+
+                if(log.Notes != null && log.Notes.Any())
+                {
+                    newNotes.AddRange(log.Notes);
                 }
 
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
