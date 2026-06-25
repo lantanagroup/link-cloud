@@ -645,4 +645,54 @@ public class LocationMappingServiceTests
         // Assert — every encounter is non-org → patient is not reportable.
         Assert.False(reportable);
     }
+
+    [Fact]
+    public async Task UpdateEncounterLocationMappingAsync_AnyReferencedLocationIsOrg_SetsMappedToOrgTrue()
+    {
+        // Arrange — the encounter references two locations: the first IS an org location, the
+        // second is not. "Mapped to org" should be true (any org location qualifies), independent
+        // of iteration order. With the location order [org, non-org] the value must not be
+        // overwritten by the trailing non-org location.
+        const string orgLocationId = "loc-org";
+        const string nonOrgLocationId = "loc-nonorg";
+
+        _mockQueries
+            .Setup(q => q.GetByFacilityIdAsync(FacilityId))
+            .ReturnsAsync(new List<OrganizationLocationMappingModel>
+            {
+                new() { LocationMappingId = 1, FacilityId = FacilityId, LocationId = orgLocationId, IsOrgLocation = true },
+                new() { LocationMappingId = 2, FacilityId = FacilityId, LocationId = nonOrgLocationId, IsOrgLocation = false }
+            });
+
+        CreateEncounterMappingModel? captured = null;
+        _mockEncounterMappingManager
+            .Setup(m => m.CreateAsync(It.IsAny<CreateEncounterMappingModel>()))
+            .Callback<CreateEncounterMappingModel>(m => captured = m)
+            .ReturnsAsync((CreateEncounterMappingModel m) => new EncounterMappingModel
+            {
+                EncounterMappingId = 1,
+                FacilityId = m.FacilityId,
+                PatientId = m.PatientId,
+                EncounterId = m.EncounterId,
+                MappedToOrg = m.MappedToOrg
+            });
+
+        var encounter = new Encounter
+        {
+            Id = "enc-1",
+            Subject = new ResourceReference("Patient/patient-1"),
+            Location = new List<Encounter.LocationComponent>
+            {
+                new() { Location = new ResourceReference($"Location/{orgLocationId}") },
+                new() { Location = new ResourceReference($"Location/{nonOrgLocationId}") }
+            }
+        };
+
+        // Act
+        await _service.UpdateEncounterLocationMappingAsync(FacilityId, encounter, CancellationToken.None);
+
+        // Assert — at least one referenced location is an org location → mapped to org.
+        Assert.NotNull(captured);
+        Assert.True(captured!.MappedToOrg);
+    }
 }

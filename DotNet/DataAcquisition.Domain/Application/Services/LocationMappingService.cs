@@ -74,8 +74,7 @@ public interface ILocationMappingService
     Task<bool> IsPatientReportableAsync(string facilityId, string patientId, CancellationToken cancellationToken);
 }
 
-public class 
-    LocationMappingService(
+public class LocationMappingService(
     IOrganizationLocationMappingManager organizationLocationMappingManager,
     IOrganizationLocationMappingQueries organizationLocationMappingQueries,
     IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
@@ -255,7 +254,7 @@ public class
 
     public async Task<EncounterMappingModel?> UpdateEncounterLocationMappingAsync(string facilityId, Encounter encounter, CancellationToken cancellationToken = default)
     {
-        //if there is already an encounter mapping for this encounter, delete it and create a new one. 
+        // if there is already an encounter mapping for this encounter, delete it and create a new one. 
         // This is because the encounter may have changed its location references, so we need to re-evaluate the mapping.
         _logger.LogDebug("Duplicate encounter mapping for encounter {EncounterId} in facility {FacilityId} detected. Deleting existing mapping and creating a new one.", encounter.Id.SanitizeForLog(), facilityId.SanitizeForLog());
         await _encounterMappingManager.DeleteByEncounterIdAndFacilityIdAsync(encounter.Id, facilityId);
@@ -290,7 +289,10 @@ public class
                 var existingMapping = existingMappings.FirstOrDefault(m => m.LocationId == locationId);
                 if(existingMapping is not null)
                 {
-                    mappedToOrg = existingMapping.IsOrgLocation;
+                    // OR-accumulate: the encounter is mapped to the org if ANY referenced location
+                    // is an org location. A plain assignment here would let a trailing non-org
+                    // location overwrite an earlier org match.
+                    mappedToOrg = mappedToOrg || existingMapping.IsOrgLocation;
                     organizationLocationMappingIds.Add(existingMapping.LocationMappingId);
                 }
                 else
