@@ -156,6 +156,10 @@ public class PayloadSubmittedListener(
             var transientException = new TransientException(exceptionMessage, ex);
             transientExceptionHandler.HandleException(result, transientException, facilityId);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             transientExceptionHandler.HandleException(result, ex, facilityId);

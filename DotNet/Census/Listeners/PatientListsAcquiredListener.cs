@@ -141,7 +141,7 @@ public class PatientListsAcquiredListener : BackgroundService
                                 }
                                 catch (Exception ex)
                                 {
-                                    if (ex is DeadLetterException || ex is TransientException)
+                                    if (ex is DeadLetterException || ex is TransientException || ex is OperationCanceledException)
                                         throw;
 
                                     throw new TransientException("Error processing message: " + ex.Message, ex);
@@ -158,6 +158,10 @@ public class PatientListsAcquiredListener : BackgroundService
                             _transientExceptionHandler.Topic = rawmessage?.Topic + "-Retry";
                             _transientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Key);
                         }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, $"Failed to process Patient Event.");
@@ -165,7 +169,8 @@ public class PatientListsAcquiredListener : BackgroundService
                         }
                         finally
                         {
-                            kafkaConsumer.Commit(rawmessage);
+                            if (!consumeCancellationToken.IsCancellationRequested)
+                                kafkaConsumer.Commit(rawmessage);
                         }
 
                     }), cancellationToken);
@@ -185,6 +190,10 @@ public class PatientListsAcquiredListener : BackgroundService
 
                     var offset = ex.ConsumerRecord?.TopicPartitionOffset;
                     kafkaConsumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {

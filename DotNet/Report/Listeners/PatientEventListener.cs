@@ -214,6 +214,10 @@ namespace LantanaGroup.Link.Report.Listeners
             {
                 _transientExceptionHandler.HandleException(result, ex, facilityId);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - PatientEvent Exception thrown: " + ex.Message), facilityId);

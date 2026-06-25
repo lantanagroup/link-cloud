@@ -86,6 +86,10 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         {
                             TransientExceptionHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
                         }
+                        catch (OperationCanceledException)
+                        {
+                            throw;
+                        }
                         catch (Exception ex)
                         {
                             Logger.LogError(ex,
@@ -96,7 +100,8 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         }
                         finally
                         {
-                            consumer.SafeCommit(consumeResult, Logger);
+                            if (!consumeCancellationToken.IsCancellationRequested)
+                                consumer.SafeCommit(consumeResult, Logger);
                         }
                     }, cancellationToken);
                 }

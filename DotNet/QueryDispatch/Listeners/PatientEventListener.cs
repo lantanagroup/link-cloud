@@ -166,6 +166,10 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     _transientExceptionHandler.HandleException(consumeResult, ex, HtmlInputSanitizer.Sanitize(consumeResult.Key));
                                     _patientEventConsumer.Commit(consumeResult);
                                 }
+                                catch (OperationCanceledException)
+                                {
+                                    throw;
+                                }
                                 catch (Exception ex)
                                 {
                                     _logger.LogError(ex, "Failed to process Patient Event");

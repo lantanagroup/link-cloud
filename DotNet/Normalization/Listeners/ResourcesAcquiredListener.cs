@@ -123,6 +123,10 @@ public class ResourcesAcquiredListener : BackgroundService
                     {
                         _transientExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
                     }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to process ResourceAcquired event for facility {FacilityId}.", result?.Message.Key?.FacilityId?.SanitizeForLog());
@@ -131,7 +135,8 @@ public class ResourcesAcquiredListener : BackgroundService
                     }
                     finally
                     {
-                        kafkaConsumer.Commit(result);
+                        if (!consumeCancellationToken.IsCancellationRequested)
+                            kafkaConsumer.Commit(result);
                     }
                 }, cancellationToken);
             }

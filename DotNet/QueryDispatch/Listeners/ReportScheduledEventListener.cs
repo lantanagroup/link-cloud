@@ -128,6 +128,10 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     _deadLetterExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key);
                                     _reportScheduledConsumer.Commit(consumeResult);
                                 }
+                                catch (OperationCanceledException)
+                                {
+                                    throw;
+                                }
                                 catch (Exception ex)
                                 {
                                     _logger.LogError(ex, "Failed to process Report Scheduled event");

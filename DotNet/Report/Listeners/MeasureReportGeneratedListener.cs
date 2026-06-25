@@ -99,13 +99,18 @@ namespace LantanaGroup.Link.Report.Listeners
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
                             catch (Exception ex)
                             {
                                 _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown", ex), facilityId);
                             }
                             finally
                             {
-                                consumer.SafeCommit(result, _logger);
+                                if (!consumeCancellationToken.IsCancellationRequested)
+                                    consumer.SafeCommit(result, _logger);
                             }
                         }, cancellationToken);
                     }

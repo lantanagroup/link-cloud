@@ -121,13 +121,18 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                 _deadLetterExceptionHandler.Topic = consumeResult.Topic.Replace("-Retry", "-Error");
                                 _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
                             }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
                             catch (Exception ex)
                             {
                                 _logger.LogError(ex, "Error in {ServiceName} retry consumer for topics: [{Topics}] at {Timestamp}", _serviceInformation.ServiceConfigName, string.Join(", ", consumer.Subscription), DateTime.UtcNow);
                             }
                             finally
                             {
-                                consumer.Commit(consumeResult);
+                                if (!consumeCancellationToken.IsCancellationRequested)
+                                    consumer.Commit(consumeResult);
                             }
 
                         }, cancellationToken);
