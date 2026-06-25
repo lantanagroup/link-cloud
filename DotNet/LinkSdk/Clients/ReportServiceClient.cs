@@ -23,25 +23,73 @@ public class ReportServiceClient : LinkApiClientBase, IReportServiceClient
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
-    public Task<ReportScheduleApiModel?> GetScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
-        GetOrDefaultAsync(() => Request($"/schedules/{reportId}").GetJsonAsync<ReportScheduleApiModel>(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse<ReportScheduleApiModel>> GetScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
+        SendAsync<ReportScheduleApiModel>(() => Request($"/schedules/{reportId}").GetAsync(cancellationToken: cancellationToken));
 
-    public Task<PagedConfigModel<ReportScheduleApiModel>> SearchSchedulesAsync(string reportId, CancellationToken cancellationToken = default) =>
-        Request("/schedules/search").SetQueryParam("id", reportId).SetQueryParam("pageSize", 10).SetQueryParam("pageNumber", 1).GetJsonAsync<PagedConfigModel<ReportScheduleApiModel>>(cancellationToken: cancellationToken);
+    public Task<LinkApiResponse<List<ReportScheduleApiModel>>> GetSchedulesByFacilityAsync(string facilityId, bool? active = null, bool blocking = false, bool includeDeleted = false, CancellationToken cancellationToken = default)
+    {
+        var r = Request($"/schedules/facilities/{facilityId}")
+            .SetQueryParam("blocking", blocking)
+            .SetQueryParam("includeDeleted", includeDeleted);
+        if (active.HasValue) r = r.SetQueryParam("active", active.Value);
+        return SendAsync<List<ReportScheduleApiModel>>(() => r.GetAsync(cancellationToken: cancellationToken));
+    }
 
-    public Task SoftDeleteScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
-        DeleteOrIgnoreAsync(() => Request($"/schedules/{reportId}").DeleteAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse<PagedConfigModel<ReportScheduleApiModel>>> SearchSchedulesAsync(string reportId, CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<ReportScheduleApiModel>>(() => Request("/schedules/search").SetQueryParam("id", reportId).SetQueryParam("pageSize", 10).SetQueryParam("pageNumber", 1).GetAsync(cancellationToken: cancellationToken));
 
-    public async Task<List<ReportEntryApiModel>> GetEntriesByScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
-        await GetOrDefaultAsync(() => Request($"/entries/schedules/{reportId}").GetJsonAsync<List<ReportEntryApiModel>>(cancellationToken: cancellationToken)) ?? [];
+    public Task<LinkApiResponse> SoftDeleteScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/schedules/{reportId}").DeleteAsync(cancellationToken: cancellationToken));
 
-    public Task<PagedConfigModel<ReportResourceApiModel>> SearchResourcesAsync(string facilityId, string reportId, int pageSize = 5000, int pageNumber = 1, CancellationToken cancellationToken = default) =>
-        Request("/resources/search").SetQueryParam("facilityId", facilityId).SetQueryParam("reportScheduleId", reportId).SetQueryParam("pageSize", pageSize).SetQueryParam("pageNumber", pageNumber).GetJsonAsync<PagedConfigModel<ReportResourceApiModel>>(cancellationToken: cancellationToken);
+    public Task<LinkApiResponse> RestoreScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/schedules/{reportId}/restore").PatchAsync(cancellationToken: cancellationToken));
 
-    public async Task<List<ReportPopulationApiModel>> GetPopulationsByScheduleAsync(string reportId, string? reportType = null, CancellationToken cancellationToken = default)
+    public Task<LinkApiResponse> SetReportsDeletedStatusForFacilityAsync(string facilityId, bool deleted, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"/schedules/facility/{facilityId}/status").SetQueryParam("deleted", deleted).PatchAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<ReportEntryApiModel>> GetEntryByIdAsync(string id, CancellationToken cancellationToken = default) =>
+        SendAsync<ReportEntryApiModel>(() => Request($"/entries/{id}").GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<ReportEntryApiModel>>> GetEntriesByScheduleAsync(string reportId, CancellationToken cancellationToken = default) =>
+        SendAsync<List<ReportEntryApiModel>>(() => Request($"/entries/schedules/{reportId}").GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<ReportEntryApiModel>>> GetEntriesByPatientAsync(string patientId, CancellationToken cancellationToken = default) =>
+        SendAsync<List<ReportEntryApiModel>>(() => Request($"/entries/patients/{patientId}").GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<int>> GetEntryCountByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
+        SendAsync<int>(() => Request($"/entries/schedules/{reportScheduleId}/count").GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<ReportEntrySummaryApiModel>> GetEntrySummaryByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
+        SendAsync<ReportEntrySummaryApiModel>(() => Request($"/entries/schedules/{reportScheduleId}/summary").GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<ReportEntryApiModel>> GetEntryByScheduleAndPatientAsync(string reportScheduleId, string patientId, CancellationToken cancellationToken = default) =>
+        SendAsync<ReportEntryApiModel>(() => Request($"/entries/schedules/{reportScheduleId}/patients/{patientId}").GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<ReportResourceApiModel>> GetResourceByIdAsync(string id, CancellationToken cancellationToken = default) =>
+        SendAsync<ReportResourceApiModel>(() => Request($"/resources/{id}").GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<ReportResourceApiModel>>> GetResourcesByScheduleAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
+        SendAsync<List<ReportResourceApiModel>>(() => Request($"/resources/schedules/{reportScheduleId}").GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<ReportResourceApiModel>>> GetResourcesByScheduleAndPatientAsync(string reportScheduleId, string patientId, CancellationToken cancellationToken = default) =>
+        SendAsync<List<ReportResourceApiModel>>(() => Request($"/resources/schedules/{reportScheduleId}/patients/{patientId}").GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<ReportResourceApiModel>>> GetResourcesByPatientAsync(string patientId, CancellationToken cancellationToken = default) =>
+        SendAsync<List<ReportResourceApiModel>>(() => Request($"/resources/patients/{patientId}").GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<PagedConfigModel<ReportResourceApiModel>>> SearchResourcesAsync(string facilityId, string reportId, int pageSize = 5000, int pageNumber = 1, CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<ReportResourceApiModel>>(() => Request("/resources/search").SetQueryParam("facilityId", facilityId).SetQueryParam("reportScheduleId", reportId).SetQueryParam("pageSize", pageSize).SetQueryParam("pageNumber", pageNumber).GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<ReportPopulationApiModel>> GetPopulationByIdAsync(string id, CancellationToken cancellationToken = default) =>
+        SendAsync<ReportPopulationApiModel>(() => Request($"/populations/{id}").GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<ReportPopulationApiModel>>> GetPopulationsByScheduleAsync(string reportId, string? reportType = null, CancellationToken cancellationToken = default)
     {
         var r = Request($"/populations/schedules/{reportId}");
         if (!string.IsNullOrWhiteSpace(reportType)) r = r.SetQueryParam("reportType", reportType);
-        return await GetOrDefaultAsync(() => r.GetJsonAsync<List<ReportPopulationApiModel>>(cancellationToken: cancellationToken)) ?? [];
+        return SendAsync<List<ReportPopulationApiModel>>(() => r.GetAsync(cancellationToken: cancellationToken));
     }
+
+    public Task<LinkApiResponse<int>> GetInitialPopulationCountAsync(string reportScheduleId, CancellationToken cancellationToken = default) =>
+        SendAsync<int>(() => Request($"/populations/schedules/{reportScheduleId}/initial-population-count").GetAsync(cancellationToken: cancellationToken));
 }

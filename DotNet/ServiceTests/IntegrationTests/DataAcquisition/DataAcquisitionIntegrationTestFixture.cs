@@ -10,6 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -52,12 +53,13 @@ namespace IntegrationTests.DataAcquisition
         private string? _serverConnectionString;
 
         public Mock<IProducer<long, ReadyToAcquire>> ReadyToAcquireProducerMock { get; private set; }
-        public Mock<IProducer<ResourceKey, ResourceAcquired>> ResourceAcquiredProducerMock { get; private set; }
+        public Mock<IProducer<ResourceKey, ResourcesAcquired>> ResourcesAcquiredProducerMock { get; private set; }
+        public Mock<IResourceCache> ResourceCacheMock { get; } = new Mock<IResourceCache>();
 
         public DataAcquisitionIntegrationTestFixture()
         {
             ReadyToAcquireProducerMock = new Mock<IProducer<long, ReadyToAcquire>>();
-            ResourceAcquiredProducerMock = new Mock<IProducer<ResourceKey, ResourceAcquired>>();
+            ResourcesAcquiredProducerMock = new Mock<IProducer<ResourceKey, ResourcesAcquired>>();
 
             if (string.IsNullOrWhiteSpace(ExternalConnectionString))
             {
@@ -168,7 +170,8 @@ namespace IntegrationTests.DataAcquisition
 
             // Mock Kafka producers for integration tests
             builder.Services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
-            builder.Services.AddSingleton<IProducer<ResourceKey, ResourceAcquired>>(ResourceAcquiredProducerMock.Object);
+            builder.Services.AddSingleton<IProducer<ResourceKey, ResourcesAcquired>>(ResourcesAcquiredProducerMock.Object);
+            builder.Services.AddSingleton<IResourceCache>(ResourceCacheMock.Object);
 
             builder.Services.Configure<ServiceRegistry>(options =>
             {

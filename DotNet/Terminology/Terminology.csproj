@@ -7,6 +7,7 @@
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 		<RootNamespace>LantanaGroup.Link.Terminology</RootNamespace>
 		<Version>0.6.0</Version>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 	</PropertyGroup>
 
 	<PropertyGroup>
@@ -25,23 +26,23 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
-		<PackageReference Include="AWSSDK.Core" Version="4.*" />
-		<PackageReference Include="CsvHelper" Version="33.*" />
-		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.*" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.*" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.2" />
-		<PackageReference Include="Microsoft.Extensions.Primitives" Version="10.0.3" />
-		<PackageReference Include="Quartz" Version="3.*" />
-		<PackageReference Include="Serilog" Version="4.*" />
-		<PackageReference Include="Serilog.AspNetCore" Version="8.*" />
-		<PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
-		<PackageReference Include="Serilog.Exceptions" Version="8.*" />
-		<PackageReference Include="Serilog.Expressions" Version="4.*" />
-		<PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
-		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
-		<PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="6.*" />
-		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="9.*" />
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" />
+		<PackageReference Include="AWSSDK.Core" />
+		<PackageReference Include="CsvHelper" />
+		<PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+		<PackageReference Include="Microsoft.Extensions.Primitives" />
+		<PackageReference Include="Quartz" />
+		<PackageReference Include="Serilog" />
+		<PackageReference Include="Serilog.AspNetCore" />
+		<PackageReference Include="Serilog.Enrichers.Span" />
+		<PackageReference Include="Serilog.Exceptions" />
+		<PackageReference Include="Serilog.Expressions" />
+		<PackageReference Include="Serilog.Sinks.Grafana.Loki" />
+		<PackageReference Include="Swashbuckle.AspNetCore" />
+		<PackageReference Include="Swashbuckle.AspNetCore.Annotations" />
+		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" />
 	</ItemGroup>
 
 	<ItemGroup>

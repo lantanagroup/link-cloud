@@ -48,12 +48,16 @@ public class SearchFhirCommandTests
     private sealed class StubHttpMessageHandler : HttpMessageHandler
     {
         private readonly Queue<HttpResponseMessage> _queue = new();
+        private readonly List<HttpRequestMessage> _captured = new();
+
+        public IReadOnlyList<HttpRequestMessage> CapturedRequests => _captured;
 
         public void Enqueue(HttpResponseMessage response) => _queue.Enqueue(response);
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            _captured.Add(request);
             if (_queue.TryDequeue(out var response))
                 return Task.FromResult(response);
             throw new InvalidOperationException("StubHttpMessageHandler: no more queued responses.");
@@ -324,5 +328,28 @@ public class SearchFhirCommandTests
 
         Assert.Equal(2, results.Count);
         Assert.Equal(new[] { "acquired", "released", "acquired", "released" }, trace);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_QueryTypeSearchPost_SendsHttpPostRequest()
+    {
+        // SearchFhirCommand picks SearchUsingPostAsync vs SearchAsync purely on
+        // request.queryType. SearchUsingPostAsync issues POST [base]/[type]/_search;
+        // SearchAsync issues GET. Asserting the outgoing HTTP method proves the
+        // SearchPost branch ran. IsReference is a FhirApiService concern and
+        // never reaches this command, so it is not part of this assertion.
+        var stub = new StubHttpMessageHandler();
+        stub.Enqueue(OkBundleResponse(BundleWithNoNext("b1")));
+
+        var (semProvider, _, _) = SetupSemaphoreMocks();
+        var sut = BuildSut(stub, semProvider, SetupMetricsMock(), SetupNoAuthMock());
+
+        var request = CreateRequest() with { queryType = FhirQueryType.SearchPost };
+
+        await foreach (var _ in sut.ExecuteAsync(request)) { }
+
+        var captured = Assert.Single(stub.CapturedRequests);
+        Assert.Equal(HttpMethod.Post, captured.Method);
+        Assert.EndsWith("_search", captured.RequestUri!.AbsolutePath);
     }
 }

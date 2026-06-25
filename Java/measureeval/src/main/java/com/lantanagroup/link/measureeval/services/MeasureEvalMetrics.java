@@ -22,10 +22,11 @@ public class MeasureEvalMetrics {
     private final LongCounter measureEvaluatedCounter;
     private final LongCounter recordsReceivedCounter;
     private final LongHistogram evaluationDuration;
+    private final LongHistogram normalizedToReportGeneratedDuration;
 
     public MeasureEvalMetrics(OpenTelemetry openTelemetry) {
 
-        Meter meter = openTelemetry.getMeter("com.lantanagroup.link.measureeval.services.ResourceNormalizedConsumer");
+        Meter meter = openTelemetry.getMeter("com.lantanagroup.link.measureeval.services.ResourcesNormalizedConsumer");
 
         patientReportableCounter = meter
                 .counterBuilder("link_measureeval_patient_reportable_count")
@@ -46,6 +47,9 @@ public class MeasureEvalMetrics {
         evaluationDuration = meter.histogramBuilder("link_measureeval_eval_duration")
                 .ofLongs()
                 .setDescription("The duration of the evaluation of a measure").setUnit("ms").build();
+        normalizedToReportGeneratedDuration = meter.histogramBuilder("MeasureEval.normalized_to_report_generated.duration")
+                .ofLongs()
+                .setDescription("End-to-end duration from Kafka Normalized message ingestion to MeasureReportGenerated production").setUnit("ms").build();
     }
 
     public void IncrementPatientReportableCounter(Attributes attributes, boolean reportable) {
@@ -54,6 +58,14 @@ public class MeasureEvalMetrics {
         } else {
             patientNonReportableCounter.add(1, attributes);
         }
+    }
+
+    public void IncrementPatientReportableCounter(Attributes attributes) {
+        patientReportableCounter.add(1, attributes);
+    }
+
+    public void IncrementPatientNonReportableCounter(Attributes attributes) {
+        patientNonReportableCounter.add(1, attributes);
     }
 
     public void IncrementRecordsReceivedCounter(Attributes attributes) {
@@ -81,5 +93,9 @@ public class MeasureEvalMetrics {
         }
 
         return builder.build();
+    }
+
+    void recordNormalizedToReportGeneratedDuration(long elapsedTimeMs, Attributes attributes) {
+        normalizedToReportGeneratedDuration.record(elapsedTimeMs, attributes);
     }
 }

@@ -36,10 +36,27 @@ import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 import {RemoveExtensionsOperation} from "../../../../interfaces/normalization/remove-extensions-operation-interface";
+import {MatDialog} from "@angular/material/dialog";
+import {
+  CsvImportDialogData,
+  CsvImportDialogResult,
+  RemoveExtensionsCsvImportDialogComponent
+} from "./remove-extensions-csv-import-dialog/remove-extensions-csv-import-dialog.component";
 
 function noLeadingTrailingWhitespace(control: AbstractControl): {[key: string]: boolean} | null {
   const v = control.value as string;
   return v && v !== v.trim() ? {whitespace: true} : null;
+}
+
+function absoluteUrl(control: AbstractControl): {[key: string]: boolean} | null {
+  const v = control.value as string;
+  if (!v) return null;
+  try {
+    new URL(v);
+    return null;
+  } catch {
+    return {absoluteUrl: true};
+  }
 }
 
 @Component({
@@ -98,7 +115,7 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
   protected readonly FormMode = FormMode;
   destroy$ = new Subject<void>();
 
-  constructor(private fb: FormBuilder, private snackBar: MatSnackBar, private operationService: OperationService) {
+  constructor(private fb: FormBuilder, private snackBar: MatSnackBar, private operationService: OperationService, private dialog: MatDialog) {
     this.form = this.fb.group({
       selectedResourceTypes: new FormControl([], Validators.required),
       resourceType: new FormControl(''),
@@ -176,7 +193,7 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
       );
 
       (op?.ExtensionUrls ?? []).forEach(url => {
-        this.extensionUrlsArray.push(this.fb.control(url, [Validators.required, noLeadingTrailingWhitespace]));
+        this.extensionUrlsArray.push(this.fb.control(url, [Validators.required, noLeadingTrailingWhitespace, absoluteUrl]));
       });
     }
   }
@@ -186,7 +203,7 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
   }
 
   addExtensionUrl(): void {
-    this.extensionUrlsArray.push(this.fb.control('', [Validators.required, noLeadingTrailingWhitespace]));
+    this.extensionUrlsArray.push(this.fb.control('', [Validators.required, noLeadingTrailingWhitespace, absoluteUrl]));
   }
 
   removeExtensionUrl(index: number): void {
@@ -332,6 +349,27 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
       error: (err) => {
         const action = this.formMode === FormMode.Create ? 'creating' : 'updating';
         this.showError(`Error ${action} operation: ${err?.message ?? 'Unknown error'}`);
+      }
+    });
+  }
+
+  openCsvImportDialog(): void {
+    const dialogData: CsvImportDialogData = {
+      facilityId: this.operation.facilityId,
+      isVendorMode: this.isVendorMode,
+      vendorIds: this.selectedVendorControl.value ?? []
+    };
+
+    this.dialog.open(RemoveExtensionsCsvImportDialogComponent, {
+      data: dialogData,
+      width: '700px',
+      disableClose: false
+    }).afterClosed().subscribe((result: CsvImportDialogResult | null) => {
+      if (result && result.created > 0) {
+        const msg = result.failed > 0
+          ? `${result.created} operation(s) created. ${result.failed} failed.`
+          : `${result.created} operation(s) created successfully.`;
+        this.submittedConfiguration.emit({id: '', message: msg});
       }
     });
   }

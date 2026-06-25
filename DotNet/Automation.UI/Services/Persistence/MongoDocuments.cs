@@ -45,6 +45,29 @@ public sealed class AutomationRunDocument
     public string? Duration { get; set; }
 }
 
+/// <summary>MongoDB document for automation_run_inputs collection.</summary>
+public sealed class AutomationRunInputDocument
+{
+    [BsonId]
+    [BsonRepresentation(BsonType.String)]
+    public Guid RunId { get; set; }
+
+    [BsonRepresentation(BsonType.String)]
+    public Guid? ScenarioId { get; set; }
+
+    public string? ScenarioName { get; set; }
+    public string? RunConfigurationJson { get; set; }
+
+    [BsonRepresentation(BsonType.String)]
+    public List<Guid> ImportedBundleIds { get; set; } = [];
+
+    [BsonRepresentation(BsonType.DateTime)]
+    public DateTimeOffset CreatedAt { get; set; }
+
+    [BsonRepresentation(BsonType.DateTime)]
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
 /// <summary>MongoDB document for automation_run_snapshots collection (one per run+domain).</summary>
 public sealed class DomainSnapshotDocument
 {

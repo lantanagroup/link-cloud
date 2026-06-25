@@ -82,6 +82,7 @@ public static class DistributedLockSettingsExtensions
         {
             EndPoints = { distributedLockSettings.ConnectionString },
             AbortOnConnectFail = false,
+            AllowAdmin = true, // Required to access INFO command for memory checks.
             // Forces SE.Redis to resolve the hostname to a specific IP (preferring IPv4) and
             // bind to an IPEndPoint instead of a DnsEndPoint with AddressFamily.Unspecified.
             // Without this, on docker bridge networks the socket can pick an unreachable
@@ -104,6 +105,7 @@ public static class DistributedLockSettingsExtensions
         }
 
         var connectionMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(configOptions);
+        services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(connectionMultiplexer);
         services.AddSingleton<IDistributedSemaphoreProvider>(new RedisDistributedSynchronizationProvider(connectionMultiplexer.GetDatabase()));
     }
 }

@@ -8,6 +8,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
@@ -101,13 +102,15 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     private readonly IDatabase _database;
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly ILogger<DataAcquisitionLogQueries> _logger;
+    private readonly IResourceCache _resourceCache;
 
     public DataAcquisitionLogQueries(IDatabase database, DataAcquisitionDbContext dbContext,
-        ILogger<DataAcquisitionLogQueries> logger)
+        ILogger<DataAcquisitionLogQueries> logger, IResourceCache resourceCache)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
     }
 
     public async Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId,
@@ -395,22 +398,39 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
                 var first = groupLogs.First();
 
+                // Only include cache keys for resource types that had at least one resource actually acquired.
+                // ResourceId rows use the format "TypeName/id" (e.g. "Patient/abc-123"), so the type name
+                // is the substring before the first '/'.
+                var acquiredResourceTypes = await _dbContext.DataAcquisitionLogResourceIds
+                    .Join(_dbContext.DataAcquisitionLogs,
+                        rid => rid.DataAcquisitionLogId,
+                        l => l.Id,
+                        (rid, l) => new { rid, l })
+                    .Where(x => x.l.FacilityId == group.FacilityId
+                        && x.l.CorrelationId == group.CorrelationId
+                        && x.l.QueryPhase == group.QueryPhase)
+                    .Select(x => x.rid.ResourceId.Substring(0, x.rid.ResourceId.IndexOf('/')))
+                    .Distinct()
+                    .ToListAsync(cancellationToken);
+
                 results.Add(new TailingMessageModel
                 {
                     FacilityId = group.FacilityId ?? string.Empty,
                     CorrelationId = group.CorrelationId ?? string.Empty,
                     LogIds = groupLogs.Select(x => x.Id).ToList(),
                     TraceParentId = groupLogs.FirstOrDefault(x => x.TraceId != null)?.TraceId ?? string.Empty,
-                    ResourceAcquired = new ResourceAcquired
+                    ResourcesAcquired = new ResourcesAcquired
                     {
-                        PatientId = first.PatientId ?? string.Empty,
                         QueryType = QueryPhaseUtilities.ToWireQueryType(group.QueryPhase),
                         ReportableEvent = first.ReportableEvent ?? default,
-                        AcquisitionComplete = true,
-                        ScheduledReports = new List<ScheduledReport>
-                        {
-                            first.ScheduledReport
-                        }
+                        ScheduledReports = first.ScheduledReport != null
+                            ? new List<ScheduledReport> { first.ScheduledReport }
+                            : new List<ScheduledReport>(),
+                        CacheType = _resourceCache.GetCacheTypeForCorrelationId(group.CorrelationId ?? string.Empty),
+                        CacheKeys = acquiredResourceTypes
+                            .Select(rt => $"{group.CorrelationId}:{rt}")
+                            .Distinct()
+                            .ToList()
                     }
                 });
 

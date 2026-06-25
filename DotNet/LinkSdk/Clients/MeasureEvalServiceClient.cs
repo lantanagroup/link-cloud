@@ -20,9 +20,12 @@ public class MeasureEvalServiceClient : LinkApiClientBase, IMeasureEvalServiceCl
             bearerOptions, tokenServiceSettings, tokenService)
     { }
 
-    public Task PutMeasureDefinitionAsync(string bundleJson, CancellationToken cancellationToken = default) =>
-        Request("measureeval/measure-definition").WithHeader("Content-Type", "application/json").PutStringAsync(bundleJson, cancellationToken: cancellationToken);
+    public Task<LinkApiResponse> PutMeasureDefinitionAsync(string bundleJson, CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("measureeval/measure-definition").WithHeader("Content-Type", "application/json").PutStringAsync(bundleJson, cancellationToken: cancellationToken));
 
-    public Task<string?> GetMeasureDefinitionAsync(string measureId, CancellationToken cancellationToken = default) =>
-        GetOrDefaultAsync(() => Request($"measureeval/measure-definition/{measureId}").GetStringAsync(cancellationToken: cancellationToken));
+    public Task<LinkApiResponse<string>> GetMeasureDefinitionAsync(string measureId, CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request($"measureeval/measure-definition/{measureId}").GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<string>> GetAllMeasureDefinitionsAsync(CancellationToken cancellationToken = default) =>
+        SendStringAsync(() => Request("measureeval/measure-definition").GetAsync(cancellationToken: cancellationToken));
 }

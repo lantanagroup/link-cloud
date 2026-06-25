@@ -1,0 +1,967 @@
+@model ApiHealthDashboardViewModel
+@{
+    ViewData["Title"] = "API Health";
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-heart-pulse me-2"></i>API Health</h2>
+            <p class="text-muted mb-0">Exercises every annotated response path across all services. Each row is one test - one response code, one code path.</p>
+        </div>
+        <button type="button" class="btn btn-au-run" id="btnRunAll">
+            <i class="bi bi-play-fill me-1"></i> Run All
+        </button>
+    </div>
+
+    @* --- Summary bar --- *@
+    <div class="d-flex gap-3 mb-3 flex-wrap" id="summaryBar">
+        <span class="badge bg-secondary" id="sumTotal">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational)) tests</span>
+        <span class="badge au-badge-success" id="sumPass">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Passed == true)) passed</span>
+        <span class="badge au-badge-danger" id="sumFail">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Passed == false && e.LastResult?.Skipped != true)) failed</span>
+        <span class="badge au-badge-skip" id="sumSkip">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && s.IsIncludedInLatestRun && e.LastResult?.Skipped == true)) skipped</span>
+        <span class="badge bg-light text-dark border" id="sumPending">@Model.Services.Sum(s => s.Endpoints.Count(e => !e.Definition.IsInformational && (!s.IsIncludedInLatestRun || e.LastResult == null))) not run</span>
+    </div>
+
+    <div id="runPhaseBanner" class="alert alert-secondary py-2 px-3 mb-3" style="display:none;">
+        <strong id="runPhaseTitle">Phase</strong>
+        <span id="runPhaseMessage" class="ms-2">Preparing...</span>
+    </div>
+
+    <div id="seedRunCard" class="alert alert-light border py-2 px-3 mb-3" style="display:none;">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <strong>Seed Run</strong>
+                <span id="seedRunStatus" class="badge bg-secondary ms-2">Starting</span>
+                <div class="small text-muted" id="seedRunMeta"></div>
+            </div>
+            <a id="seedRunLink" class="btn btn-sm btn-outline-secondary" target="_blank" style="display:none;">
+                <i class="bi bi-box-arrow-up-right me-1"></i>Open Run
+            </a>
+        </div>
+    </div>
+
+    <div class="accordion" id="serviceAccordion">
+    @foreach (var service in Model.Services)
+    {
+        var passCount = service.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult?.Passed == true);
+        var failCount = service.Endpoints.Count(e => !e.Definition.IsInformational && e.LastResult?.Passed == false && e.LastResult?.Skipped != true);
+        var totalCount = service.Endpoints.Count(e => !e.Definition.IsInformational);
+        var staleOnly = !service.IsIncludedInLatestRun;
+        var serviceBadgeClass = failCount > 0
+            ? (staleOnly ? "border border-danger text-danger bg-transparent" : "au-badge-danger")
+            : (passCount == totalCount && totalCount > 0
+                ? (staleOnly ? "border border-success text-success bg-transparent" : "au-badge-success")
+                : (staleOnly ? "border border-secondary text-muted bg-transparent" : "bg-secondary"));
+
+        <div class="accordion-item au-health-accordion mb-2" id="svc-@service.ServiceName" data-service-included="@(service.IsIncludedInLatestRun ? "true" : "false")">
+            <h2 class="accordion-header au-health-header">
+                <div class="d-flex align-items-center w-100">
+                    <button class="accordion-button collapsed au-health-toggle flex-grow-1" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-@service.ServiceName" aria-expanded="false">
+                        <i class="bi bi-hdd-stack me-2"></i>
+                        <strong>@service.ServiceName</strong>
+                        <span class="badge svc-summary ms-2 @serviceBadgeClass" data-service="@service.ServiceName">@passCount/@totalCount</span>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-dark btn-run-service me-2" data-service="@service.ServiceName">
+                        <i class="bi bi-play-fill"></i>
+                    </button>
+                </div>
+            </h2>
+            <div id="collapse-@service.ServiceName" class="accordion-collapse collapse" data-bs-parent="#serviceAccordion">
+                <div class="accordion-body p-0">
+                    <table class="table au-health-table mb-0 table-sm">
+                        <thead>
+                            <tr>
+                                <th>Test</th>
+                                <th style="width:80px;">Result</th>
+                                <th style="width:100px;">Status</th>
+                                <th>Reason</th>
+                                <th style="width:80px;">Time</th>
+                                <th style="width:50px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{string? lastGroup = null;}
+                            @foreach (var ep in service.Endpoints)
+                            {
+                                var key = ep.Definition.Key;
+                                var hasPassed = ep.LastResult?.Passed;
+                                var isSkipped = ep.LastResult?.Skipped == true
+                                    || (ep.LastResult == null && ep.Definition.AlwaysSkipReason != null);
+                                var isStale = ep.LastResult != null && !service.IsIncludedInLatestRun;
+                                var skipReason = ep.LastResult?.SkipReason ?? ep.Definition.AlwaysSkipReason;
+                                var badgeClass = isStale
+                                    ? (isSkipped ? "border border-secondary text-muted bg-transparent" : (hasPassed == true ? "border border-success text-success bg-transparent" : "border border-danger text-danger bg-transparent"))
+                                    : (isSkipped ? "au-badge-skip" : (hasPassed == null ? "bg-secondary" : (hasPassed == true ? "au-badge-success" : "au-badge-danger")));
+                                var badgeText = isSkipped ? "SKIP" : (hasPassed == null ? "N/A" : (hasPassed == true ? "PASS" : "FAIL"));
+
+                                @if (ep.Definition.GroupName != null && ep.Definition.GroupName != lastGroup)
+                                {
+                                    lastGroup = ep.Definition.GroupName;
+                                    <tr class="row-group-header">
+                                        <td colspan="6"><strong>@ep.Definition.GroupName</strong></td>
+                                    </tr>
+                                }
+
+                                <tr data-endpoint-key="@key" data-informational="@(ep.Definition.IsInformational ? "true" : "false")" data-stale="@(isStale ? "true" : "false")" data-included="@(service.IsIncludedInLatestRun ? "true" : "false")">
+                                    <td class="@(ep.Definition.GroupName != null ? "ps-4" : "")">
+                                        <span>@ep.Definition.EndpointName</span>
+                                        @if (!string.IsNullOrWhiteSpace(ep.Definition.Description))
+                                        {
+                                            <br /><small class="text-muted">@ep.Definition.Description</small>
+                                        }
+                                    </td>
+                                    <td class="cell-result">
+                                        <span class="badge @badgeClass">@badgeText</span>
+                                    </td>
+                                    <td class="cell-status">
+                                        @if (!isSkipped && ep.LastResult != null)
+                                        {
+                                            <code class="small">@ep.LastResult.ActualStatusCode / @ep.LastResult.ExpectedStatusCode</code>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">N/A</span>
+                                        }
+                                    </td>
+                                    <td class="cell-reason">
+                                        @if (isSkipped && !string.IsNullOrWhiteSpace(skipReason))
+                                        {
+                                            <small class="text-muted">@skipReason</small>
+                                        }
+                                        else if (!isSkipped && ep.LastResult is { Passed: false } && !string.IsNullOrWhiteSpace(ep.LastResult.ErrorMessage))
+                                        {
+                                            <small class="text-danger au-error-lines">@ep.LastResult.ErrorMessage</small>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">N/A</span>
+                                        }
+                                    </td>
+                                    <td class="cell-duration">
+                                        @if (!isSkipped && ep.LastResult != null)
+                                        {
+                                            <small>@(ep.LastResult.DurationMs)ms</small>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">N/A</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!ep.Definition.IsInformational)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-history" data-key="@key" title="History">
+                                                <i class="bi bi-clock-history"></i>
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                                @if (ep.LastResult != null && !ep.Definition.IsInformational)
+                                {
+                                    <tr class="row-detail" data-detail-for="@key" style="display:none;">
+                                        <td colspan="6" class="ps-4 py-2">
+                                            <dl class="row mb-0 small">
+                                                <dt class="col-sm-2 text-muted">Request</dt>
+                                                <dd class="col-sm-10"><code>@(ep.LastResult.RequestMethod ?? "N/A") @(ep.LastResult.RequestUrl ?? "N/A")</code></dd>
+                                                <dt class="col-sm-2 text-muted">Request Body</dt>
+                                                <dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">@(string.IsNullOrWhiteSpace(ep.LastResult.RequestBody) ? "No request body details were recorded for this run." : ep.LastResult.RequestBody)</pre></dd>
+                                                <dt class="col-sm-2 text-muted">Status</dt>
+                                                <dd class="col-sm-10">@(ep.LastResult.ActualStatusCode?.ToString() ?? "N/A") (expected @ep.LastResult.ExpectedStatusCode)</dd>
+                                                @if (!string.IsNullOrWhiteSpace(ep.LastResult.TraceId))
+                                                {
+                                                    <dt class="col-sm-2 text-muted">Trace</dt>
+                                                    <dd class="col-sm-10">
+                                                        <code class="user-select-all">@ep.LastResult.TraceId</code>
+                                                    </dd>
+                                                }
+                                                <dt class="col-sm-2 text-muted">Response</dt>
+                                                <dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">@(string.IsNullOrWhiteSpace(ep.LastResult.ResponseBody) ? "No response body details were recorded for this run." : ep.LastResult.ResponseBody)</pre></dd>
+                                                @if (!string.IsNullOrWhiteSpace(ep.LastResult.ErrorMessage))
+                                                {
+                                                    <dt class="col-sm-2 text-muted">Error</dt>
+                                                    <dd class="col-sm-10 text-danger">@ep.LastResult.ErrorMessage</dd>
+                                                }
+                                                <dt class="col-sm-2 text-muted">Time</dt>
+                                                <dd class="col-sm-10">@ep.LastResult.ExecutedAt.ToString("yyyy-MM-dd HH:mm:ss.fff") UTC | @(ep.LastResult.DurationMs)ms</dd>
+                                            </dl>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    </div>
+</div>
+
+@* ========== History Modal ========== *@
+<div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="historyModalLabel">Run History</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="historyContent">
+                    <p class="text-muted text-center">Loading...</p>
+                </div>
+                <nav id="historyPager" class="d-flex justify-content-center mt-3" style="display:none!important;"></nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+
+    function postJson(url, body) {
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': antiForgeryToken || '' },
+            body: JSON.stringify(body)
+        }).then(async r => {
+            if (!r.ok) { const t = await r.text(); throw new Error(`Server ${r.status}: ${t.substring(0, 200)}`); }
+            return r.json();
+        });
+    }
+
+    function getJson(url) {
+        return fetch(url).then(async r => {
+            if (!r.ok) { const t = await r.text(); throw new Error(`Server ${r.status}: ${t.substring(0, 200)}`); }
+            return r.json();
+        });
+    }
+
+    function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+    function normalizeText(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/\uFFFD/g, '—')
+            .replace(/â€”/g, '—')
+            .trim();
+    }
+    const runnableRowSelector = 'tr[data-endpoint-key][data-informational="false"]';
+    const initialRunMode = '@(Model.LatestRunMode ?? "")';
+    const initialRunServiceName = '@(Model.LatestRunServiceName ?? "")';
+    let latestRunContext = {
+        mode: initialRunMode || null,
+        serviceName: initialRunServiceName || null
+    };
+    let seedRunPollTimer = null;
+    let seedRunTickerTimer = null;
+    let seedRunDiscoveryTimer = null;
+    let currentSeedRunId = null;
+    let currentSeedRunStartedAt = null;
+
+    function setSeedRunStatusBadge(status) {
+        const badge = document.getElementById('seedRunStatus');
+        if (!badge) return;
+        const s = String(status || '').toLowerCase();
+        badge.textContent = status || 'Unknown';
+        badge.className = `badge ms-2 ${s === 'succeeded' ? 'au-badge-success' : s === 'failed' || s === 'cancelled' ? 'au-badge-danger' : 'bg-secondary'}`;
+    }
+
+    function clearSeedRunPoll() {
+        if (seedRunPollTimer) {
+            clearInterval(seedRunPollTimer);
+            seedRunPollTimer = null;
+        }
+    }
+
+    function clearSeedRunTicker() {
+        if (seedRunTickerTimer) {
+            clearInterval(seedRunTickerTimer);
+            seedRunTickerTimer = null;
+        }
+    }
+
+    function clearSeedRunDiscovery() {
+        if (seedRunDiscoveryTimer) {
+            clearInterval(seedRunDiscoveryTimer);
+            seedRunDiscoveryTimer = null;
+        }
+    }
+
+    function resetSeedRunDisplay() {
+        clearSeedRunPoll();
+        clearSeedRunTicker();
+        clearSeedRunDiscovery();
+        currentSeedRunId = null;
+        currentSeedRunStartedAt = null;
+
+        const card = document.getElementById('seedRunCard');
+        const link = document.getElementById('seedRunLink');
+        const meta = document.getElementById('seedRunMeta');
+        const badge = document.getElementById('seedRunStatus');
+        if (card) card.style.display = 'none';
+        if (link) {
+            link.style.display = 'none';
+            link.removeAttribute('href');
+        }
+        if (meta) {
+            meta.textContent = '';
+            delete meta.dataset.baseText;
+        }
+        if (badge) {
+            badge.textContent = 'Starting';
+            badge.className = 'badge bg-secondary ms-2';
+        }
+    }
+
+    function formatElapsed(ms) {
+        const total = Math.max(0, Math.floor(ms / 1000));
+        const h = Math.floor(total / 3600);
+        const m = Math.floor((total % 3600) / 60);
+        const s = total % 60;
+        if (h > 0) return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function updateSeedRunElapsed() {
+        const meta = document.getElementById('seedRunMeta');
+        if (!meta || !currentSeedRunId || !currentSeedRunStartedAt) return;
+        const elapsed = formatElapsed(Date.now() - currentSeedRunStartedAt.getTime());
+        const base = meta.dataset.baseText || '';
+        meta.textContent = `${base} | elapsed ${elapsed}`;
+    }
+
+    function bindSeedRun(seedRunId, seedRunName) {
+        if (!seedRunId) return;
+        if (currentSeedRunId && currentSeedRunId !== seedRunId) {
+            clearSeedRunPoll();
+            clearSeedRunTicker();
+        }
+
+        currentSeedRunId = seedRunId;
+        clearSeedRunDiscovery();
+
+        const card = document.getElementById('seedRunCard');
+        const link = document.getElementById('seedRunLink');
+        const meta = document.getElementById('seedRunMeta');
+        if (!card || !link || !meta) return;
+
+        card.style.display = '';
+        link.style.display = '';
+        link.href = `/Runs/Details/${encodeURIComponent(seedRunId)}`;
+        meta.dataset.baseText = `${seedRunName || 'ApiHealthScenario'} | ${seedRunId}`;
+        if (!currentSeedRunStartedAt) {
+            currentSeedRunStartedAt = new Date();
+        }
+        updateSeedRunElapsed();
+        clearSeedRunTicker();
+        seedRunTickerTimer = setInterval(updateSeedRunElapsed, 1000);
+
+        const refreshStatus = async () => {
+            try {
+                const s = await getJson(`/api/runs/${encodeURIComponent(seedRunId)}/status`);
+                setSeedRunStatusBadge(s.status || 'Unknown');
+                const started = s.startedAt || s.createdAt;
+                if (started) {
+                    const parsed = new Date(started);
+                    if (!Number.isNaN(parsed.getTime())) {
+                        currentSeedRunStartedAt = parsed;
+                        updateSeedRunElapsed();
+                    }
+                }
+                if (s.isTerminal === true) {
+                    clearSeedRunPoll();
+                    clearSeedRunTicker();
+                }
+            } catch {
+                // best effort
+            }
+        };
+
+        clearSeedRunPoll();
+        refreshStatus();
+        seedRunPollTimer = setInterval(refreshStatus, 3000);
+    }
+
+    async function discoverActiveSeedRun() {
+        if (currentSeedRunId) return;
+        try {
+            const data = await getJson('/Runs/DashboardStats?pageNumber=1&pageSize=20&sortBy=createdAt&sortDir=desc');
+            const activeRuns = data.activeRuns || [];
+            const seedRun = activeRuns.find(r => String(r.runName || '').toLowerCase() === 'apihealthscenario');
+            if (!seedRun || !seedRun.runId) return;
+
+            if (seedRun.createdAt) {
+                const parsed = new Date(seedRun.createdAt);
+                if (!Number.isNaN(parsed.getTime())) currentSeedRunStartedAt = parsed;
+            }
+            bindSeedRun(seedRun.runId, seedRun.runName || 'ApiHealthScenario');
+            setSeedRunStatusBadge(seedRun.status || 'Running');
+        } catch {
+            // best effort
+        }
+    }
+
+    function ensureSeedRunDiscovery() {
+        if (currentSeedRunId || seedRunDiscoveryTimer) return;
+        discoverActiveSeedRun();
+        seedRunDiscoveryTimer = setInterval(discoverActiveSeedRun, 3000);
+    }
+
+    // --- Update a single row from a result object ---
+    function updateRowFromResult(result) {
+        const row = document.querySelector(`tr[data-endpoint-key="${CSS.escape(result.endpointKey)}"]`);
+        if (!row) return;
+        if (row.dataset.informational === 'true') return;
+
+        const placeholderText = 'N/A';
+        const skipped = result.skipped === true;
+        const passed = result.passed;
+        const badgeClass = skipped ? 'au-badge-skip' : (passed ? 'au-badge-success' : 'au-badge-danger');
+        const badgeText  = skipped ? 'SKIP' : (passed ? 'PASS' : 'FAIL');
+        const serviceName = getServiceNameForRow(row);
+        const included = isIncludedService(serviceName);
+
+        row.classList.remove('row-running');
+        row.dataset.included = included ? 'true' : 'false';
+        row.dataset.stale = included ? 'false' : 'true';
+        row.querySelector('.cell-result').innerHTML = `<span class="badge ${badgeClass}">${badgeText}</span>`;
+        if (!included) {
+            const badge = row.querySelector('.cell-result .badge');
+            if (badge) toHollowBadgeClass(badge);
+        }
+        row.querySelector('.cell-status').innerHTML = skipped ? `<span class="text-muted">${placeholderText}</span>` : `<code class="small">${result.actualStatusCode || placeholderText} / ${result.expectedStatusCode}</code>`;
+        row.querySelector('.cell-reason').innerHTML = skipped
+            ? (result.skipReason ? `<small class="text-muted">${escapeHtml(result.skipReason)}</small>` : `<span class="text-muted">${placeholderText}</span>`)
+            : (() => {
+                const msg = normalizeText(result.errorMessage);
+                return !passed && msg ? `<small class="text-danger au-error-lines">${escapeHtml(msg)}</small>` : `<span class="text-muted">${placeholderText}</span>`;
+            })();
+        row.querySelector('.cell-duration').innerHTML = skipped ? `<span class="text-muted">${placeholderText}</span>` : `<small>${result.durationMs}ms</small>`;
+
+        // Remove old error, skip, and detail rows
+        let sibling = row.nextElementSibling;
+        while (sibling && (sibling.classList.contains('row-error') || sibling.classList.contains('row-skip') || sibling.classList.contains('row-detail'))) {
+            const next = sibling.nextElementSibling;
+            sibling.remove();
+            sibling = next;
+        }
+
+        // Add detail row (hidden by default, toggled on click)
+        const detailRow = document.createElement('tr');
+        detailRow.className = 'row-detail';
+        detailRow.dataset.detailFor = result.endpointKey;
+        detailRow.style.display = 'none';
+        const traceHtml = result.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(result.traceId)}</code></dd>` : '';
+        const requestBodyHtml = `<dt class="col-sm-2 text-muted">Request Body</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.requestBody || 'No request body details were recorded for this run.')}</pre></dd>`;
+        const responseHtml = `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:120px;overflow:auto;">${escapeHtml(result.responseBody || 'No response body details were recorded for this run.')}</pre></dd>`;
+        const normalizedError = normalizeText(result.errorMessage);
+        const errorHtml = normalizedError ? `<dt class="col-sm-2 text-muted">Error</dt><dd class="col-sm-10 text-danger">${escapeHtml(normalizedError)}</dd>` : '';
+        detailRow.innerHTML = `<td colspan="6" class="ps-4 py-2"><dl class="row mb-0 small">
+            <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(result.requestMethod || 'N/A')} ${escapeHtml(result.requestUrl || 'N/A')}</code></dd>
+            ${requestBodyHtml}
+            <dt class="col-sm-2 text-muted">Status</dt><dd class="col-sm-10">${result.actualStatusCode || 'N/A'} (expected ${result.expectedStatusCode})</dd>
+            ${traceHtml}${responseHtml}${errorHtml}
+            <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10">${new Date(result.executedAt).toISOString().replace('T',' ').substring(0,23)} UTC | ${result.durationMs}ms</dd>
+        </dl></td>`;
+
+        // Insert after error row if it exists, otherwise after main row
+        row.after(detailRow);
+
+        updateSummary();
+    }
+
+    // --- Mark rows as "running" (spinner in result cell) ---
+    function clearRowTransientRows(row) {
+        const key = row.dataset.endpointKey;
+        let next = row.nextElementSibling;
+        while (next) {
+            const isTransient = next.classList.contains('row-error')
+                || next.classList.contains('row-skip')
+                || (next.classList.contains('row-detail') && next.dataset.detailFor === key);
+            if (!isTransient) break;
+            const remove = next;
+            next = next.nextElementSibling;
+            remove.remove();
+        }
+    }
+
+    function isIncludedService(serviceName) {
+        const mode = (latestRunContext.mode || '').toLowerCase();
+        if (!mode) return true;
+        if (mode === 'all') return true;
+        if (mode === 'single') return (latestRunContext.serviceName || '').toLowerCase() === (serviceName || '').toLowerCase();
+        return true;
+    }
+
+    function getServiceNameForRow(row) {
+        const card = row.closest('.accordion-item.au-health-accordion');
+        return card && card.id && card.id.startsWith('svc-') ? card.id.substring(4) : '';
+    }
+
+    function toSolidBadgeClass(badge) {
+        if (badge.classList.contains('border-success')) {
+            badge.className = 'badge au-badge-success';
+            return;
+        }
+        if (badge.classList.contains('border-danger')) {
+            badge.className = 'badge au-badge-danger';
+            return;
+        }
+        if (badge.classList.contains('border-secondary')) {
+            badge.className = 'badge au-badge-skip';
+        }
+    }
+
+    function toHollowBadgeClass(badge) {
+        if (badge.classList.contains('au-badge-success')) {
+            badge.className = 'badge border border-success text-success bg-transparent';
+            return;
+        }
+        if (badge.classList.contains('au-badge-danger')) {
+            badge.className = 'badge border border-danger text-danger bg-transparent';
+            return;
+        }
+        if (badge.classList.contains('au-badge-skip')) {
+            badge.className = 'badge border border-secondary text-muted bg-transparent';
+        }
+    }
+
+    function setRowInclusion(row, included) {
+        row.dataset.included = included ? 'true' : 'false';
+        row.dataset.stale = included ? 'false' : 'true';
+        const badge = row.querySelector('.cell-result .badge');
+        if (!badge) return;
+        if (badge.classList.contains('bg-secondary')) return;
+        if (included) toSolidBadgeClass(badge);
+        else toHollowBadgeClass(badge);
+    }
+
+    function setServiceInclusion(serviceName, included) {
+        const card = document.getElementById(`svc-${serviceName}`);
+        if (!card) return;
+        card.dataset.serviceIncluded = included ? 'true' : 'false';
+        card.querySelectorAll(runnableRowSelector).forEach(row => setRowInclusion(row, included));
+    }
+
+    function applyLatestRunContext(mode, serviceName) {
+        latestRunContext = {
+            mode: mode || null,
+            serviceName: serviceName || null
+        };
+
+        document.querySelectorAll('.accordion-item.au-health-accordion').forEach(card => {
+            const name = card.id && card.id.startsWith('svc-') ? card.id.substring(4) : '';
+            if (!name) return;
+            setServiceInclusion(name, isIncludedService(name));
+        });
+
+        updateSummary();
+    }
+
+    function resetRowToPending(row) {
+        row.classList.remove('row-running');
+        setRowInclusion(row, row.dataset.included !== 'false');
+        row.querySelector('.cell-result').innerHTML = '<span class="badge bg-secondary">N/A</span>';
+        row.querySelector('.cell-status').innerHTML = '<span class="text-muted">N/A</span>';
+        row.querySelector('.cell-reason').innerHTML = '<span class="text-muted">N/A</span>';
+        row.querySelector('.cell-duration').innerHTML = '<span class="text-muted">N/A</span>';
+        clearRowTransientRows(row);
+    }
+
+    function resetServiceRows(serviceName) {
+        const card = document.getElementById(`svc-${serviceName}`);
+        if (!card) return;
+        card.querySelectorAll(runnableRowSelector).forEach(resetRowToPending);
+        updateSummary();
+    }
+
+    function resetAllRows() {
+        document.querySelectorAll(runnableRowSelector).forEach(resetRowToPending);
+        updateSummary();
+    }
+
+    function markServiceRunning(serviceName) {
+        const card = document.getElementById(`svc-${serviceName}`);
+        if (!card) return;
+        card.querySelectorAll(runnableRowSelector).forEach(row => {
+            if (row.dataset.included === 'false') return;
+            row.classList.add('row-running');
+            row.querySelector('.cell-result').innerHTML = '<span class="spinner-border spinner-border-sm text-primary"></span>';
+        });
+    }
+
+    // --- Update summary badges ---
+    function updateSummary() {
+        let pass = 0, fail = 0, skip = 0, pending = 0;
+        document.querySelectorAll(runnableRowSelector).forEach(row => {
+            if (row.dataset.included === 'false') {
+                pending++;
+                return;
+            }
+            const badge = row.querySelector('.cell-result .badge');
+            if (!badge) { pending++; return; }
+            if (badge.classList.contains('au-badge-success')) pass++;
+            else if (badge.classList.contains('au-badge-skip')) skip++;
+            else if (badge.classList.contains('au-badge-danger')) fail++;
+            else pending++;
+        });
+        const total = pass + fail + skip + pending;
+        document.getElementById('sumTotal').textContent = `${total} tests`;
+        document.getElementById('sumPass').textContent = `${pass} passed`;
+        document.getElementById('sumFail').textContent = `${fail} failed`;
+        const skipEl = document.getElementById('sumSkip');
+        if (skipEl) skipEl.textContent = `${skip} skipped`;
+        document.getElementById('sumPending').textContent = `${pending} not run`;
+
+        // Update per-service accordion badges
+        document.querySelectorAll('.svc-summary').forEach(badge => {
+            const svc = badge.dataset.service;
+            const card = document.getElementById(`svc-${svc}`);
+            if (!card) return;
+            let sp = 0, sf = 0, st = 0;
+            const included = card.dataset.serviceIncluded !== 'false';
+            card.querySelectorAll(runnableRowSelector).forEach(row => {
+                st++;
+                const b = row.querySelector('.cell-result .badge');
+                if (!b) return;
+
+                const isPass = b.classList.contains('au-badge-success') || b.classList.contains('border-success');
+                const isFail = b.classList.contains('au-badge-danger') || b.classList.contains('border-danger');
+
+                if (isPass) {
+                    sp++;
+                }
+                else if (isFail) {
+                    sf++;
+                }
+            });
+
+            badge.textContent = `${sp}/${st}`;
+            const cls = sf > 0
+                ? (!included ? 'border border-danger text-danger bg-transparent' : 'au-badge-danger')
+                : (sp === st && st > 0
+                    ? (!included ? 'border border-success text-success bg-transparent' : 'au-badge-success')
+                    : (!included ? 'border border-secondary text-muted bg-transparent' : 'bg-secondary'));
+            badge.className = `badge svc-summary ms-2 ${cls}`;
+        });
+    }
+
+    function setButtonLoading(btn, loading) {
+        if (loading) { btn.disabled = true; btn.dataset.origHtml = btn.innerHTML; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>'; }
+        else { btn.disabled = false; btn.innerHTML = btn.dataset.origHtml || btn.innerHTML; }
+    }
+
+    function setRunButtonsDisabled(disabled) {
+        document.querySelectorAll('.btn-run-service').forEach(b => b.disabled = disabled);
+        document.getElementById('btnRunAll').disabled = disabled;
+    }
+
+    function setRunPhaseFromActive(active) {
+        const banner = document.getElementById('runPhaseBanner');
+        const title = document.getElementById('runPhaseTitle');
+        const msg = document.getElementById('runPhaseMessage');
+        if (!banner || !title || !msg || !active) return;
+
+        banner.style.display = '';
+        banner.className = `alert ${active.isError ? 'alert-danger' : 'alert-secondary'} py-2 px-3 mb-3`;
+        const phase = active.phase || 'Running';
+        title.textContent = `${active.scope}${active.serviceName ? ` - ${active.serviceName}` : ''} - ${phase}`;
+        msg.textContent = active.message || 'Run in progress...';
+    }
+
+    function pollRemoteActiveRun(runId) {
+        const timer = setInterval(async () => {
+            try {
+                const latest = await getJson('/ApiHealth/ActiveRun');
+                if (!latest || latest.runId !== runId) {
+                    clearInterval(timer);
+                    setRunButtonsDisabled(false);
+                    return;
+                }
+
+                setRunPhaseFromActive(latest);
+            } catch {
+                // best effort
+            }
+        }, 3000);
+    }
+
+    function attachToActiveRun(active) {
+        if (!active || !active.runId) return;
+
+        applyLatestRunContext(active.scope === 'All' ? 'All' : 'Single', active.serviceName || null);
+
+        setRunPhaseFromActive(active);
+        setRunButtonsDisabled(true);
+
+        if (active.isAttachable !== true) {
+            pollRemoteActiveRun(active.runId);
+            return;
+        }
+
+        runViaSSE(`/ApiHealth/RunStream?runId=${encodeURIComponent(active.runId)}`, {
+            onResult: updateRowFromResult,
+            onDone: () => {
+                setRunButtonsDisabled(false);
+            },
+            onError: () => {
+                // Connection drops are expected across refresh/navigation and some
+                // reverse proxies. Keep the run in background and fall back to
+                // status polling instead of surfacing a hard failure banner.
+                pollRemoteActiveRun(active.runId);
+            }
+        });
+    }
+
+    // --- SSE streaming helper ---
+    function runViaSSE(url, { onResult, onDone, onError }) {
+        const es = new EventSource(url);
+        es.addEventListener('phase', (e) => {
+            try {
+                const p = JSON.parse(e.data);
+                const banner = document.getElementById('runPhaseBanner');
+                const title = document.getElementById('runPhaseTitle');
+                const msg = document.getElementById('runPhaseMessage');
+                banner.style.display = '';
+                banner.className = `alert ${p.isError ? 'alert-danger' : 'alert-secondary'} py-2 px-3 mb-3`;
+                title.textContent = `${p.scope}${p.serviceName ? ` - ${p.serviceName}` : ''} - ${p.phase}`;
+                msg.textContent = p.message || '';
+
+                if (p.seedRunId) {
+                    bindSeedRun(p.seedRunId, p.seedRunName);
+                } else if (p.phase === 'Seeding') {
+                    ensureSeedRunDiscovery();
+                }
+
+                if (p.phase === 'Testing') {
+                    if (p.scope === 'Service' && p.serviceName) {
+                        applyLatestRunContext('Single', p.serviceName);
+                        markServiceRunning(p.serviceName);
+                    } else if (p.scope === 'All') {
+                        applyLatestRunContext('All', null);
+                        document.querySelectorAll(runnableRowSelector).forEach(row => {
+                            row.classList.add('row-running');
+                            row.querySelector('.cell-result').innerHTML = '<span class="spinner-border spinner-border-sm text-primary"></span>';
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('SSE phase parse error', err);
+            }
+        });
+        es.addEventListener('result', (e) => {
+            try { const r = JSON.parse(e.data); onResult(r); } catch (err) { console.error('SSE parse error', err); }
+        });
+        es.addEventListener('done', () => { es.close(); onDone(); });
+        es.onerror = (e) => { es.close(); onError(e); };
+    }
+
+    // --- Run single endpoint (still POST, instant) ---
+    document.querySelectorAll('.btn-run-endpoint').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            // This button was removed from the compact layout, but kept for history modal
+        });
+    });
+
+    // --- Run service (SSE streaming) ---
+    document.querySelectorAll('.btn-run-service').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const svc = btn.dataset.service;
+            resetSeedRunDisplay();
+            applyLatestRunContext('Single', svc);
+            resetServiceRows(svc);
+            setRunButtonsDisabled(true);
+            setButtonLoading(btn, true);
+            document.getElementById('runPhaseBanner').style.display = '';
+
+            // Expand the accordion panel
+            const panel = document.getElementById(`collapse-${svc}`);
+            if (panel && !panel.classList.contains('show')) {
+                new bootstrap.Collapse(panel, { toggle: true });
+            }
+
+            runViaSSE(`/ApiHealth/RunServiceStream?serviceName=${encodeURIComponent(svc)}`, {
+                onResult: updateRowFromResult,
+                onDone: () => {
+                    setButtonLoading(btn, false);
+                    setRunButtonsDisabled(false);
+                },
+                onError: async () => {
+                    setButtonLoading(btn, false);
+                    try {
+                        const active = await getJson('/ApiHealth/ActiveRun');
+                        if (active?.runId) {
+                            attachToActiveRun(active);
+                            return;
+                        }
+                    } catch {
+                        // best effort fallback below
+                    }
+                    setRunButtonsDisabled(false);
+                }
+            });
+        });
+    });
+
+    // --- Run all (SSE streaming) ---
+    document.getElementById('btnRunAll').addEventListener('click', function () {
+        const btn = this;
+        resetSeedRunDisplay();
+        applyLatestRunContext('All', null);
+        resetAllRows();
+        setRunButtonsDisabled(true);
+        setButtonLoading(btn, true);
+        document.getElementById('runPhaseBanner').style.display = '';
+
+        runViaSSE('/ApiHealth/RunAllStream', {
+            onResult: updateRowFromResult,
+            onDone: () => {
+                setButtonLoading(btn, false);
+                setRunButtonsDisabled(false);
+            },
+            onError: async () => {
+                setButtonLoading(btn, false);
+                try {
+                    const active = await getJson('/ApiHealth/ActiveRun');
+                    if (active?.runId) {
+                        attachToActiveRun(active);
+                        return;
+                    }
+                } catch {
+                    // best effort fallback below
+                }
+                setRunButtonsDisabled(false);
+            }
+        });
+    });
+
+    // --- Resume active fire-and-forget run after navigation/refresh ---
+    (async function resumeActiveRun() {
+        try {
+            const active = await getJson('/ApiHealth/ActiveRun');
+            if (!active || !active.runId) return;
+            attachToActiveRun(active);
+        } catch {
+            // No active run or transient fetch failure.
+        }
+    })();
+
+    updateSummary();
+
+    // --- History modal ---
+    const historyModal = new bootstrap.Modal(document.getElementById('historyModal'));
+    let currentHistoryKey = '';
+
+    document.querySelectorAll('.btn-history').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentHistoryKey = btn.dataset.key;
+            loadHistory(currentHistoryKey, 1);
+            historyModal.show();
+        });
+    });
+
+    // --- Toggle detail row on endpoint row click ---
+    document.addEventListener('click', (e) => {
+        const row = e.target.closest(runnableRowSelector);
+        if (!row) return;
+        // Don't toggle if clicking a button
+        if (e.target.closest('button')) return;
+        const key = row.dataset.endpointKey;
+        const detailRow = document.querySelector(`tr.row-detail[data-detail-for="${CSS.escape(key)}"]`);
+        if (detailRow) {
+            detailRow.style.display = detailRow.style.display === 'none' ? '' : 'none';
+        }
+    });
+
+    async function loadHistory(key, page) {
+        const content = document.getElementById('historyContent');
+        const pager = document.getElementById('historyPager');
+        content.innerHTML = '<p class="text-muted text-center">Loading...</p>';
+        pager.style.display = 'none';
+
+        try {
+            const data = await getJson(`/ApiHealth/History?endpointKey=${encodeURIComponent(key)}&pageNumber=${page}&pageSize=15`);
+            if (data.runs.length === 0) { content.innerHTML = '<p class="text-muted text-center">No history yet.</p>'; return; }
+
+            let html = '<table class="table table-sm au-table"><thead><tr><th>Result</th><th>Status</th><th>Duration</th><th>Time</th><th>Error</th></tr></thead><tbody>';
+            data.runs.forEach((r, idx) => {
+                const badge = r.passed ? '<span class="badge au-badge-success">PASS</span>' : '<span class="badge au-badge-danger">FAIL</span>';
+                const normalizedError = normalizeText(r.errorMessage);
+                const error = normalizedError ? `<small class="text-danger">${escapeHtml(normalizedError)}</small>` : 'N/A';
+                html += `<tr class="cursor-pointer" data-toggle-detail="hist-${idx}"><td>${badge}</td><td><code>${r.actualStatusCode || 'N/A'} / ${r.expectedStatusCode}</code></td><td>${r.durationMs}ms</td><td><small>${new Date(r.executedAt).toLocaleString()}</small></td><td>${error}</td></tr>`;
+                // Expandable detail row
+                const traceHtml = r.traceId ? `<dt class="col-sm-2 text-muted">Trace</dt><dd class="col-sm-10"><code class="user-select-all">${escapeHtml(r.traceId)}</code></dd>` : '';
+                const requestBodyHtml = `<dt class="col-sm-2 text-muted">Request Body</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.requestBody || 'No request body details were recorded for this run.')}</pre></dd>`;
+                const responseHtml = `<dt class="col-sm-2 text-muted">Response</dt><dd class="col-sm-10"><pre class="mb-0 p-2 bg-light rounded small" style="max-height:100px;overflow:auto;">${escapeHtml(r.responseBody || 'No response body details were recorded for this run.')}</pre></dd>`;
+                html += `<tr class="row-detail" id="hist-${idx}" style="display:none;"><td colspan="5" class="ps-3 py-2"><dl class="row mb-0 small">
+                    <dt class="col-sm-2 text-muted">Request</dt><dd class="col-sm-10"><code>${escapeHtml(r.requestMethod || 'N/A')} ${escapeHtml(r.requestUrl || 'N/A')}</code></dd>
+                    ${requestBodyHtml}${traceHtml}${responseHtml}
+                    <dt class="col-sm-2 text-muted">Time</dt><dd class="col-sm-10">${new Date(r.executedAt).toISOString().replace('T',' ').substring(0,23)} UTC | ${r.durationMs}ms</dd>
+                </dl></td></tr>`;
+            });
+            html += '</tbody></table>';
+            content.innerHTML = html;
+
+            // Toggle detail on row click in history
+            content.querySelectorAll('tr[data-toggle-detail]').forEach(tr => {
+                tr.addEventListener('click', () => {
+                    const target = document.getElementById(tr.dataset.toggleDetail);
+                    if (target) target.style.display = target.style.display === 'none' ? '' : 'none';
+                });
+            });
+
+            if (data.totalPages > 1) {
+                let ph = '<ul class="pagination pagination-sm mb-0">';
+                for (let p = 1; p <= data.totalPages; p++) {
+                    ph += `<li class="page-item${p === data.pageNumber ? ' active' : ''}"><a class="page-link" href="#" data-page="${p}">${p}</a></li>`;
+                }
+                ph += '</ul>';
+                pager.innerHTML = ph;
+                pager.style.display = 'flex';
+                pager.querySelectorAll('a[data-page]').forEach(a => {
+                    a.addEventListener('click', (e) => { e.preventDefault(); loadHistory(currentHistoryKey, parseInt(a.dataset.page)); });
+                });
+            }
+        } catch (e) {
+            content.innerHTML = '<p class="text-danger text-center">Failed to load history.</p>';
+        }
+    }
+})();
+</script>
+<style>
+    /* --- API Health accordion --- */
+    .au-health-accordion { border: none; border-radius: var(--au-radius, .5rem); overflow: hidden; box-shadow: var(--au-card-shadow, 0 2px 8px rgba(0,0,0,.10)); }
+    .au-health-header { background: #fff; padding: 0; }
+    .au-health-header .d-flex { padding: 0; }
+    .au-health-toggle { background: #fff !important; color: #111 !important; font-weight: 600; border: none; box-shadow: none !important; padding: .65rem 1rem; }
+    .au-health-toggle:not(.collapsed) { background: #fff !important; color: #111 !important; }
+    .au-health-toggle .badge { font-size: .7rem; }
+
+    /* Table inside accordion */
+    .au-health-table { font-size: .875rem; }
+    .au-health-table thead th {
+        background: var(--au-dark, #111);
+        color: #fff;
+        font-weight: 600;
+        border: none;
+        white-space: nowrap;
+        padding: .5rem .75rem;
+    }
+    .au-health-table tbody td { vertical-align: middle; padding: .45rem .75rem; }
+    .au-health-table tbody tr:hover { background: rgba(0,0,0,.02); }
+
+    .row-running td { opacity: 0.5; }
+    .row-error td { border-top: none; }
+    .row-detail td { border-top: none; background: #f8fafb; }
+    .row-detail pre { white-space: pre-wrap; word-wrap: break-word; word-break: break-all; }
+    .row-detail code { word-break: break-all; }
+    .row-group-header td { background: #f8f9fa; font-size: .8rem; padding: .35rem .75rem; border-bottom: 1px solid #dee2e6; color: #555; letter-spacing: .02em; }
+    .au-error-lines { white-space: pre-line; }
+    tr[data-endpoint-key][data-informational="false"] { cursor: pointer; }
+    tr[data-endpoint-key][data-informational="false"]:hover { background: rgba(0,0,0,.03) !important; }
+    .cursor-pointer { cursor: pointer; }
+    .cursor-pointer:hover { background: rgba(0,0,0,.03); }
+</style>
+}

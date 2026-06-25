@@ -176,694 +176,714 @@
 <div id="scenarioModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
 
 <script>
-(function () {
-    var clinicalScenarioCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
-        clinicalScenarios,
-        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+    (function () {
+        var clinicalScenarioCatalog = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                        clinicalScenarios,
+                        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
 
-    var QUALIFYING = 'Qualifying', NON_QUALIFYING = 'NonQualifying';
-    var modal = document.getElementById('scenarioModal');
-    var backdrop = document.getElementById('scenarioModalBackdrop');
-    var modalTitle = document.getElementById('modalTitle');
-    var btnSave = document.getElementById('btnModalSave');
-    var overlay = document.getElementById('systemOverlay');
-    var idInput = document.getElementById('ScenarioId');
-    var isSystemInput = document.getElementById('IsSystemScenario');
-    var cohortRows = document.getElementById('cohortRows');
-    var cohortActions = document.getElementById('cohortActions');
+        var QUALIFYING = 'Qualifying', NON_QUALIFYING = 'NonQualifying';
+        var modal = document.getElementById('scenarioModal');
+        var backdrop = document.getElementById('scenarioModalBackdrop');
+        var modalTitle = document.getElementById('modalTitle');
+        var btnSave = document.getElementById('btnModalSave');
+        var overlay = document.getElementById('systemOverlay');
+        var idInput = document.getElementById('ScenarioId');
+        var isSystemInput = document.getElementById('IsSystemScenario');
+        var cohortRows = document.getElementById('cohortRows');
+        var cohortActions = document.getElementById('cohortActions');
 
-    var saveUrl = '@Url.Action("SaveInline", "Scenarios")';
-    var deleteUrl = '@Url.Action("DeleteInline", "Scenarios")';
-    var cloneUrl = '@Url.Action("CloneInline", "Scenarios")';
-    var getJsonUrl = '@Url.Action("GetJson", "Scenarios")';
-    var classifyImportedUrl = '@Url.Action("ClassifyImported", "Scenarios")';
+        var saveUrl = '@Url.Action("SaveInline", "Scenarios")';
+        var deleteUrl = '@Url.Action("DeleteInline", "Scenarios")';
+        var cloneUrl = '@Url.Action("CloneInline", "Scenarios")';
+        var getJsonUrl = '@Url.Action("GetJson", "Scenarios")';
+        var classifyImportedUrl = '@Url.Action("ClassifyImported", "Scenarios")';
+        var uploadImportedBundleUrl = '@Url.Action("UploadImportedBundle", "Scenarios")';
 
-    function notifyChanged(action, id, name) {
-        document.dispatchEvent(new CustomEvent('scenario-editor:changed', {
-            detail: { action: action, id: id, name: name }
-        }));
-    }
-
-    function af() { var t = document.querySelector('input[name="__RequestVerificationToken"]'); return t ? t.value : ''; }
-    function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-    function openModal() { modal.style.display = ''; backdrop.style.display = ''; }
-    function closeModal() { modal.style.display = 'none'; backdrop.style.display = 'none'; }
-    document.getElementById('btnModalClose').addEventListener('click', closeModal);
-    backdrop.addEventListener('click', closeModal);
-
-    function setEditable(e) {
-        overlay.style.display = e ? 'none' : '';
-        cohortActions.style.display = e ? '' : 'none';
-        var ia = document.getElementById('importedActions');
-        if (ia) ia.style.display = e ? '' : 'none';
-        btnSave.style.display = e ? '' : 'none';
-    }
-
-    // ---- Error display ----
-    var formErrors = document.getElementById('formErrors');
-    function showError(msg) { formErrors.textContent = msg; formErrors.style.display = ''; }
-    function clearErrors() { formErrors.style.display = 'none'; formErrors.textContent = ''; clearFieldErrors(); }
-    function markFieldError(id, msg) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        el.classList.add('is-invalid');
-        var fb = el.parentElement.querySelector('.invalid-feedback');
-        if (!fb) { fb = document.createElement('div'); fb.className = 'invalid-feedback'; el.parentElement.appendChild(fb); }
-        fb.textContent = msg; fb.style.display = 'block';
-    }
-    function clearFieldErrors() {
-        document.querySelectorAll('#scenarioConfigArea .is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
-        document.querySelectorAll('#scenarioConfigArea .invalid-feedback').forEach(function (el) { el.style.display = 'none'; });
-    }
-
-    // ---- AJAX helper ----
-    async function postJson(url, body) {
-        var res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': af() },
-            body: JSON.stringify(body)
-        });
-        if (!res.ok) {
-            var errText = '';
-            try { errText = await res.text(); } catch (_) {}
-            throw new Error(errText || ('Server returned ' + res.status));
+        function notifyChanged(action, id, name) {
+            document.dispatchEvent(new CustomEvent('scenario-editor:changed', {
+                detail: { action: action, id: id, name: name }
+            }));
         }
-        var ct = res.headers.get('content-type') || '';
-        return ct.indexOf('json') >= 0 ? res.json() : null;
-    }
 
-    // ---- Measure helpers ----
-    function selectedMeasureTypes() { return Array.prototype.map.call(document.querySelectorAll('.measure-checkbox:checked'), function (cb) { return cb.value; }); }
-    function sid(v) { return String(v || '').toLowerCase(); }
+        function af() { var t = document.querySelector('input[name="__RequestVerificationToken"]'); return t ? t.value : ''; }
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+        }
+        function escAttr(s) {
+            return esc(s)
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        function openModal() { modal.style.display = ''; backdrop.style.display = ''; }
+        function closeModal() { modal.style.display = 'none'; backdrop.style.display = 'none'; }
+        function ensureScenarioId() {
+            if (!idInput.value) idInput.value = crypto.randomUUID();
+            return idInput.value;
+        }
+        document.getElementById('btnModalClose').addEventListener('click', closeModal);
+        backdrop.addEventListener('click', closeModal);
 
-    function defaultElig(isQ) {
-        var m = {}; selectedMeasureTypes().forEach(function (t) { m[t] = isQ ? QUALIFYING : NON_QUALIFYING; }); return m;
-    }
-    function normElig(raw) {
-        var n = {};
-        selectedMeasureTypes().forEach(function (m) {
-            if (!raw || !Object.prototype.hasOwnProperty.call(raw, m)) { n[m] = QUALIFYING; return; }
-            var v = raw[m]; n[m] = (v === QUALIFYING || v === 0 || v === '0') ? QUALIFYING : NON_QUALIFYING;
-        });
-        return n;
-    }
-    function cohortMatchesScenario(sc, elig) {
-        return selectedMeasureTypes().every(function (m) {
-            var d = Object.prototype.hasOwnProperty.call(elig, m) ? elig[m] : QUALIFYING;
-            var q = (sc.qualifiesForMeasureTypes || []).indexOf(m) >= 0;
-            return d === QUALIFYING ? q : !q;
-        });
-    }
-    function eligIds(elig) {
-        var n = normElig(elig);
-        return clinicalScenarioCatalog.filter(function (sc) { return cohortMatchesScenario(sc, n); }).map(function (sc) { return sid(sc.scenarioId); });
-    }
+        function setEditable(e) {
+            overlay.style.display = e ? 'none' : '';
+            cohortActions.style.display = e ? '' : 'none';
+            var ia = document.getElementById('importedActions');
+            if (ia) ia.style.display = e ? '' : 'none';
+            btnSave.style.display = e ? '' : 'none';
+        }
 
-    // ---- Cohort row builders ----
-    function buildEligEditor(elig) {
-        var sel = selectedMeasureTypes();
-        if (!sel.length) return '<span class="text-muted small">Select measures</span>';
-        return sel.map(function (m) {
-            var cb = document.querySelector('.measure-checkbox[value="' + m + '"]');
-            var lbl = cb ? (document.querySelector('label[for="' + cb.id + '"]') || { textContent: m }).textContent : m;
-            var cur = (Object.prototype.hasOwnProperty.call(elig, m) ? elig[m] : QUALIFYING);
-            return '<div class="form-check form-check-inline me-2 mb-1"><input class="form-check-input cohort-measure-eligibility" type="checkbox" data-measure="' + m + '" ' + (cur === QUALIFYING ? 'checked' : '') + ' /><label class="form-check-label small">' + esc(lbl) + '</label></div>';
-        }).join('');
-    }
-    function buildScenarioSelect(ids) {
-        var set = new Set((ids || []).map(sid)); var all = set.size === 0;
-        var opts = clinicalScenarioCatalog.map(function (sc) {
-            var id = sid(sc.scenarioId), lbl = sc.primaryDiagnosis + ' (' + sc.icdCode + ')';
-            return '<div class="form-check mb-1 cohort-scenario-item"><label class="form-check-label small"><input class="form-check-input cohort-scenario-option me-1" type="checkbox" value="' + id + '" ' + ((all || set.has(id)) ? 'checked' : '') + ' />' + esc(lbl) + '</label></div>';
-        }).join('');
-        return '<div class="dropdown cohort-scenarios-dropdown"><button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start cohort-scenarios-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside">All</button><div class="dropdown-menu p-2 w-100" style="max-height:200px;overflow:auto;">' + opts + '</div></div>';
-    }
+        // ---- Error display ----
+        var formErrors = document.getElementById('formErrors');
+        function showError(msg) { formErrors.textContent = msg; formErrors.style.display = ''; }
+        function clearErrors() { formErrors.style.display = 'none'; formErrors.textContent = ''; clearFieldErrors(); }
+        function markFieldError(id, msg) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.classList.add('is-invalid');
+            var fb = el.parentElement.querySelector('.invalid-feedback');
+            if (!fb) { fb = document.createElement('div'); fb.className = 'invalid-feedback'; el.parentElement.appendChild(fb); }
+            fb.textContent = msg; fb.style.display = 'block';
+        }
+        function clearFieldErrors() {
+            document.querySelectorAll('#scenarioConfigArea .is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
+            document.querySelectorAll('#scenarioConfigArea .invalid-feedback').forEach(function (el) { el.style.display = 'none'; });
+        }
 
-    function addCohortRow(count, elig, scenarios, rMin, rMax) {
-        var idx = cohortRows.children.length, ne = normElig(elig);
-        var sel = (scenarios && scenarios.length > 0) ? scenarios : eligIds(ne);
-        var tr = document.createElement('tr');
-        tr.innerHTML = '<td class="text-center align-middle">' + (idx + 1) + '</td>' +
-            '<td><input type="number" class="form-control form-control-sm cohort-count" min="1" value="' + (count || 1) + '" /></td>' +
-            '<td><div class="cohort-measure-editor">' + buildEligEditor(ne) + '</div></td>' +
-            '<td><input type="number" class="form-control form-control-sm cohort-min" min="1" value="' + (rMin || 50) + '" /></td>' +
-            '<td><input type="number" class="form-control form-control-sm cohort-max" min="1" value="' + (rMax || rMin || 100) + '" /></td>' +
-            '<td>' + buildScenarioSelect(sel) + '</td>' +
-            '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-cohort">&times;</button></td>';
-        cohortRows.appendChild(tr);
-        enforceDeps(tr); applyFilter(tr, readElig(tr)); updateSummary(tr); reindex(); syncCount();
-    }
-    function addDefault(count, isQ, rMin, rMax) { addCohortRow(count, defaultElig(!!isQ), null, rMin, rMax); }
-
-    function readElig(row) {
-        var v = {}; row.querySelectorAll('.cohort-measure-eligibility').forEach(function (cb) { v[cb.getAttribute('data-measure')] = cb.checked ? QUALIFYING : NON_QUALIFYING; });
-        return normElig(v);
-    }
-    function enforceDeps(row, ch) {
-        var hypo = row.querySelector('.cohort-measure-eligibility[data-measure="NhsnGlycemicControlHypoglycemicInitialPopulation"]');
-        var ach = row.querySelector('.cohort-measure-eligibility[data-measure="NhsnAcuteCareHospitalMonthlyInitialPopulation"]');
-        if (!hypo || !ach) return;
-        if (ch === 'NhsnGlycemicControlHypoglycemicInitialPopulation' && hypo.checked && !ach.checked) { ach.checked = true; return; }
-        if (ch === 'NhsnAcuteCareHospitalMonthlyInitialPopulation' && !ach.checked && hypo.checked) { hypo.checked = false; return; }
-        if (hypo.checked && !ach.checked) ach.checked = true;
-    }
-    function rerenderEditor(row) {
-        var ed = row.querySelector('.cohort-measure-editor'); if (!ed) return;
-        ed.innerHTML = buildEligEditor(readElig(row)); enforceDeps(row); applyFilter(row, readElig(row));
-    }
-    function applyFilter(row, elig) {
-        var allowed = new Set(eligIds(elig)), dd = row.querySelector('.cohort-scenarios-dropdown');
-        dd.querySelectorAll('.cohort-scenario-option').forEach(function (o) {
-            var ok = allowed.has(sid(o.value)); o.disabled = !ok;
-            var w = o.closest('.cohort-scenario-item'); if (w) w.style.display = ok ? '' : 'none';
-            if (!ok) o.checked = false;
-        });
-        if (!dd.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)').length)
-            dd.querySelectorAll('.cohort-scenario-option:not(:disabled)').forEach(function (o) { o.checked = true; });
-        updateSummary(row);
-    }
-    function updateSummary(row) {
-        var dd = row.querySelector('.cohort-scenarios-dropdown'); if (!dd) return;
-        var toggle = dd.querySelector('.cohort-scenarios-toggle');
-        var all = dd.querySelectorAll('.cohort-scenario-option:not(:disabled)');
-        var sel = dd.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)');
-        toggle.textContent = !all.length ? 'None' : sel.length === all.length ? 'All' : sel.length + ' selected';
-    }
-    function reindex() { Array.prototype.forEach.call(cohortRows.children, function (r, i) { r.querySelector('td:first-child').textContent = i + 1; }); }
-    function syncCount() {
-        var t = getCohorts().reduce(function (s, c) { return s + (c.patientCount || 0); }, 0);
-        var importedCount = importedRows ? importedRows.children.length : 0;
-        document.getElementById('PatientCount').value = (t + importedCount) > 0 ? (t + importedCount) : 0;
-    }
-    function getCohorts() {
-        return Array.prototype.map.call(cohortRows.children, function (row) {
-            var min = parseInt(row.querySelector('.cohort-min').value || '50', 10);
-            var max = parseInt(row.querySelector('.cohort-max').value || String(min), 10);
-            if (max < min) { max = min; row.querySelector('.cohort-max').value = String(max); }
-            return {
-                patientCount: parseInt(row.querySelector('.cohort-count').value || '0', 10),
-                measureEligibilities: readElig(row),
-                eligibleClinicalScenarioIds: Array.prototype.map.call(row.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)'), function (cb) { return sid(cb.value); }).filter(Boolean),
-                resourcesPerPatientMin: min, resourcesPerPatientMax: max
-            };
-        }).filter(function (c) { return c.patientCount > 0; });
-    }
-
-    // ---- Cohort event handlers ----
-    document.getElementById('addQualifyingCohort').addEventListener('click', function () { addDefault(10, true, 50, 100); });
-    document.getElementById('addNonQualifyingCohort').addEventListener('click', function () { addDefault(10, false, 50, 100); });
-    cohortRows.addEventListener('click', function (e) { if (e.target.closest('.btn-remove-cohort')) { e.target.closest('tr').remove(); reindex(); syncCount(); } });
-    cohortRows.addEventListener('change', function (e) {
-        if (e.target.classList.contains('cohort-measure-eligibility')) { var r = e.target.closest('tr'); enforceDeps(r, e.target.getAttribute('data-measure')); applyFilter(r, readElig(r)); }
-        if (e.target.classList.contains('cohort-scenario-option')) updateSummary(e.target.closest('tr'));
-        if (e.target.classList.contains('cohort-count')) syncCount();
-    });
-    cohortRows.addEventListener('input', function () { syncCount(); });
-    document.querySelectorAll('.measure-checkbox').forEach(function (cb) {
-        cb.addEventListener('change', function () { Array.prototype.forEach.call(cohortRows.children, function (r) { rerenderEditor(r); }); });
-    });
-
-    // ---- Imported Patients ----
-    var importedRows = document.getElementById('importedRows');
-    var importedSummary = document.getElementById('importedSummary');
-
-    // Auto-suggest a Report Period that encloses the supplied encounter dates, but only
-    // when the period inputs are currently empty (never overwrite a user-set value).
-    function suggestPeriodFromEncounter(encStartIso, encEndIso) {
-        var startEl = document.getElementById('ReportPeriodStart');
-        var endEl = document.getElementById('ReportPeriodEnd');
-        if (!startEl || !endEl) return;
-        var hasStart = !!(startEl.value || '').trim();
-        var hasEnd = !!(endEl.value || '').trim();
-        if (hasStart && hasEnd) return;
-
-        var s = encStartIso ? new Date(encStartIso) : null;
-        var e = encEndIso ? new Date(encEndIso) : s;
-        if (!s && !e) return;
-        if (!s) s = e;
-        if (!e) e = s;
-
-        // Snap to the calendar-month containing the encounter window.
-        var monthStart = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1));
-        var monthEnd = new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth() + 1, 0));
-
-        function pad(n) { return n < 10 ? '0' + n : '' + n; }
-        function iso(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
-
-        if (!hasStart) startEl.value = iso(monthStart);
-        if (!hasEnd) endEl.value = iso(monthEnd);
-    }
-
-    function importedRowEligEditor(elig) {
-        var sel = selectedMeasureTypes();
-        if (!sel.length) return '<span class="text-muted small">Select measures</span>';
-        return sel.map(function (m) {
-            var cb = document.querySelector('.measure-checkbox[value="' + m + '"]');
-            var lbl = cb ? (document.querySelector('label[for="' + cb.id + '"]') || { textContent: m }).textContent : m;
-            var cur = (elig && Object.prototype.hasOwnProperty.call(elig, m)) ? elig[m] : NON_QUALIFYING;
-            return '<div class="form-check form-check-inline me-2 mb-1"><input class="form-check-input imp-elig" type="checkbox" data-measure="' + m + '" ' + (cur === QUALIFYING ? 'checked' : '') + ' /><label class="form-check-label small">' + esc(lbl) + '</label></div>';
-        }).join('');
-    }
-    function readImportedElig(row) {
-        var v = {};
-        row.querySelectorAll('.imp-elig').forEach(function (cb) {
-            v[cb.getAttribute('data-measure')] = cb.checked ? QUALIFYING : NON_QUALIFYING;
-        });
-        // Make sure every selected measure has an explicit entry.
-        selectedMeasureTypes().forEach(function (m) { if (!Object.prototype.hasOwnProperty.call(v, m)) v[m] = NON_QUALIFYING; });
-        return v;
-    }
-    function updateImportedSummary() {
-        var rows = importedRows.children;
-        if (!rows.length) {
-            importedSummary.textContent = '';
-        } else {
-            var qCount = 0;
-            Array.prototype.forEach.call(rows, function (r) {
-                var elig = readImportedElig(r);
-                var any = selectedMeasureTypes().some(function (m) { return elig[m] === QUALIFYING; });
-                if (any) qCount++;
+        // ---- AJAX helper ----
+        async function postJson(url, body) {
+            var res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': af() },
+                body: JSON.stringify(body)
             });
-            importedSummary.textContent = '(' + rows.length + ' total, ' + qCount + ' Q / ' + (rows.length - qCount) + ' NQ)';
+            if (!res.ok) {
+                var errText = '';
+                try { errText = await res.text(); } catch (_) {}
+                throw new Error(errText || ('Server returned ' + res.status));
+            }
+            var ct = res.headers.get('content-type') || '';
+            return ct.indexOf('json') >= 0 ? res.json() : null;
         }
-        // Imported rows feed the total Patient Count alongside cohort sums, so any change
-        // to the imported list must re-sync the read-only Patient Count field.
-        syncCount();
-    }
-    function reindexImported() {
-        Array.prototype.forEach.call(importedRows.children, function (r, i) { r.querySelector('td:first-child').textContent = i + 1; });
-    }
-    function rerenderImportedEligEditors() {
-        Array.prototype.forEach.call(importedRows.children, function (r) {
-            var elig = readImportedElig(r);
-            var ed = r.querySelector('.imp-elig-editor');
-            if (ed) ed.innerHTML = importedRowEligEditor(elig);
+        async function postForm(url, formData) {
+            var res = await fetch(url, {
+                method: 'POST',
+                headers: { 'RequestVerificationToken': af() },
+                body: formData
+            });
+            if (!res.ok) {
+                var errText = '';
+                try { errText = await res.text(); } catch (_) { }
+                throw new Error(errText || ('Server returned ' + res.status));
+            }
+            var ct = res.headers.get('content-type') || '';
+            return ct.indexOf('json') >= 0 ? res.json() : null;
+        }
+
+        // ---- Measure helpers ----
+        function selectedMeasureTypes() { return Array.prototype.map.call(document.querySelectorAll('.measure-checkbox:checked'), function (cb) { return cb.value; }); }
+        function sid(v) { return String(v || '').toLowerCase(); }
+
+        function defaultElig(isQ) {
+            var m = {}; selectedMeasureTypes().forEach(function (t) { m[t] = isQ ? QUALIFYING : NON_QUALIFYING; }); return m;
+        }
+        function normElig(raw) {
+            var n = {};
+            selectedMeasureTypes().forEach(function (m) {
+                if (!raw || !Object.prototype.hasOwnProperty.call(raw, m)) { n[m] = QUALIFYING; return; }
+                var v = raw[m]; n[m] = (v === QUALIFYING || v === 0 || v === '0') ? QUALIFYING : NON_QUALIFYING;
+            });
+            return n;
+        }
+        function cohortMatchesScenario(sc, elig) {
+            return selectedMeasureTypes().every(function (m) {
+                var d = Object.prototype.hasOwnProperty.call(elig, m) ? elig[m] : QUALIFYING;
+                var q = (sc.qualifiesForMeasureTypes || []).indexOf(m) >= 0;
+                return d === QUALIFYING ? q : !q;
+            });
+        }
+        function eligIds(elig) {
+            var n = normElig(elig);
+            return clinicalScenarioCatalog.filter(function (sc) { return cohortMatchesScenario(sc, n); }).map(function (sc) { return sid(sc.scenarioId); });
+        }
+
+        // ---- Cohort row builders ----
+        function buildEligEditor(elig) {
+            var sel = selectedMeasureTypes();
+            if (!sel.length) return '<span class="text-muted small">Select measures</span>';
+            return sel.map(function (m) {
+                var cb = document.querySelector('.measure-checkbox[value="' + m + '"]');
+                var lbl = cb ? (document.querySelector('label[for="' + cb.id + '"]') || { textContent: m }).textContent : m;
+                var cur = (Object.prototype.hasOwnProperty.call(elig, m) ? elig[m] : QUALIFYING);
+                return '<div class="form-check form-check-inline me-2 mb-1"><input class="form-check-input cohort-measure-eligibility" type="checkbox" data-measure="' + m + '" ' + (cur === QUALIFYING ? 'checked' : '') + ' /><label class="form-check-label small">' + esc(lbl) + '</label></div>';
+            }).join('');
+        }
+        function buildScenarioSelect(ids) {
+            var set = new Set((ids || []).map(sid)); var all = set.size === 0;
+            var opts = clinicalScenarioCatalog.map(function (sc) {
+                var id = sid(sc.scenarioId), lbl = sc.primaryDiagnosis + ' (' + sc.icdCode + ')';
+                return '<div class="form-check mb-1 cohort-scenario-item"><label class="form-check-label small"><input class="form-check-input cohort-scenario-option me-1" type="checkbox" value="' + id + '" ' + ((all || set.has(id)) ? 'checked' : '') + ' />' + esc(lbl) + '</label></div>';
+            }).join('');
+            return '<div class="dropdown cohort-scenarios-dropdown"><button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle w-100 text-start cohort-scenarios-toggle" data-bs-toggle="dropdown" data-bs-auto-close="outside">All</button><div class="dropdown-menu p-2 w-100" style="max-height:200px;overflow:auto;">' + opts + '</div></div>';
+        }
+
+        function addCohortRow(count, elig, scenarios, rMin, rMax) {
+            var idx = cohortRows.children.length, ne = normElig(elig);
+            var sel = (scenarios && scenarios.length > 0) ? scenarios : eligIds(ne);
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td class="text-center align-middle">' + (idx + 1) + '</td>' +
+                '<td><input type="number" class="form-control form-control-sm cohort-count" min="1" value="' + (count || 1) + '" /></td>' +
+                '<td><div class="cohort-measure-editor">' + buildEligEditor(ne) + '</div></td>' +
+                '<td><input type="number" class="form-control form-control-sm cohort-min" min="1" value="' + (rMin || 50) + '" /></td>' +
+                '<td><input type="number" class="form-control form-control-sm cohort-max" min="1" value="' + (rMax || rMin || 100) + '" /></td>' +
+                '<td>' + buildScenarioSelect(sel) + '</td>' +
+                '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-cohort">&times;</button></td>';
+            cohortRows.appendChild(tr);
+            enforceDeps(tr); applyFilter(tr, readElig(tr)); updateSummary(tr); reindex(); syncCount();
+        }
+        function addDefault(count, isQ, rMin, rMax) { addCohortRow(count, defaultElig(!!isQ), null, rMin, rMax); }
+
+        function readElig(row) {
+            var v = {}; row.querySelectorAll('.cohort-measure-eligibility').forEach(function (cb) { v[cb.getAttribute('data-measure')] = cb.checked ? QUALIFYING : NON_QUALIFYING; });
+            return normElig(v);
+        }
+        function enforceDeps(row, ch) {
+            var hypo = row.querySelector('.cohort-measure-eligibility[data-measure="NhsnGlycemicControlHypoglycemicInitialPopulation"]');
+            var ach = row.querySelector('.cohort-measure-eligibility[data-measure="NhsnAcuteCareHospitalMonthlyInitialPopulation"]');
+            if (!hypo || !ach) return;
+            if (ch === 'NhsnGlycemicControlHypoglycemicInitialPopulation' && hypo.checked && !ach.checked) { ach.checked = true; return; }
+            if (ch === 'NhsnAcuteCareHospitalMonthlyInitialPopulation' && !ach.checked && hypo.checked) { hypo.checked = false; return; }
+            if (hypo.checked && !ach.checked) ach.checked = true;
+        }
+        function rerenderEditor(row) {
+            var ed = row.querySelector('.cohort-measure-editor'); if (!ed) return;
+            ed.innerHTML = buildEligEditor(readElig(row)); enforceDeps(row); applyFilter(row, readElig(row));
+        }
+        function applyFilter(row, elig) {
+            var allowed = new Set(eligIds(elig)), dd = row.querySelector('.cohort-scenarios-dropdown');
+            dd.querySelectorAll('.cohort-scenario-option').forEach(function (o) {
+                var ok = allowed.has(sid(o.value)); o.disabled = !ok;
+                var w = o.closest('.cohort-scenario-item'); if (w) w.style.display = ok ? '' : 'none';
+                if (!ok) o.checked = false;
+            });
+            if (!dd.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)').length)
+                dd.querySelectorAll('.cohort-scenario-option:not(:disabled)').forEach(function (o) { o.checked = true; });
+            updateSummary(row);
+        }
+        function updateSummary(row) {
+            var dd = row.querySelector('.cohort-scenarios-dropdown'); if (!dd) return;
+            var toggle = dd.querySelector('.cohort-scenarios-toggle');
+            var all = dd.querySelectorAll('.cohort-scenario-option:not(:disabled)');
+            var sel = dd.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)');
+            toggle.textContent = !all.length ? 'None' : sel.length === all.length ? 'All' : sel.length + ' selected';
+        }
+        function reindex() { Array.prototype.forEach.call(cohortRows.children, function (r, i) { r.querySelector('td:first-child').textContent = i + 1; }); }
+        function syncCount() {
+            var t = getCohorts().reduce(function (s, c) { return s + (c.patientCount || 0); }, 0);
+            var importedCount = importedRows ? importedRows.children.length : 0;
+            document.getElementById('PatientCount').value = (t + importedCount) > 0 ? (t + importedCount) : 0;
+        }
+        function getCohorts() {
+            return Array.prototype.map.call(cohortRows.children, function (row) {
+                var min = parseInt(row.querySelector('.cohort-min').value || '50', 10);
+                var max = parseInt(row.querySelector('.cohort-max').value || String(min), 10);
+                if (max < min) { max = min; row.querySelector('.cohort-max').value = String(max); }
+                return {
+                    patientCount: parseInt(row.querySelector('.cohort-count').value || '0', 10),
+                    measureEligibilities: readElig(row),
+                    eligibleClinicalScenarioIds: Array.prototype.map.call(row.querySelectorAll('.cohort-scenario-option:checked:not(:disabled)'), function (cb) { return sid(cb.value); }).filter(Boolean),
+                    resourcesPerPatientMin: min, resourcesPerPatientMax: max
+                };
+            }).filter(function (c) { return c.patientCount > 0; });
+        }
+
+        // ---- Cohort event handlers ----
+        document.getElementById('addQualifyingCohort').addEventListener('click', function () { addDefault(10, true, 50, 100); });
+        document.getElementById('addNonQualifyingCohort').addEventListener('click', function () { addDefault(10, false, 50, 100); });
+        cohortRows.addEventListener('click', function (e) { if (e.target.closest('.btn-remove-cohort')) { e.target.closest('tr').remove(); reindex(); syncCount(); } });
+        cohortRows.addEventListener('change', function (e) {
+            if (e.target.classList.contains('cohort-measure-eligibility')) { var r = e.target.closest('tr'); enforceDeps(r, e.target.getAttribute('data-measure')); applyFilter(r, readElig(r)); }
+            if (e.target.classList.contains('cohort-scenario-option')) updateSummary(e.target.closest('tr'));
+            if (e.target.classList.contains('cohort-count')) syncCount();
         });
-        updateImportedSummary();
-    }
-    function addImportedRow(row) {
-        // row = { source, patientId, fileName, bundleJson, autoDetect, measureEligibilities, detectedClinicalScenarioId, encounterStart, encounterEnd }
-        var elig = row.measureEligibilities || {};
-        var sourceLabel = row.source === 'Bundle'
-            ? '<span class="badge bg-info text-dark"><i class="bi bi-file-earmark-arrow-up me-1"></i>Bundle</span>'
-            : '<span class="badge bg-secondary"><i class="bi bi-cloud-arrow-down me-1"></i>By ID</span>';
-        var fileLabel = row.source === 'Bundle' && row.fileName ? '<div class="small text-muted">' + esc(row.fileName) + '</div>' : '';
-        var detectBtn = '<button type="button" class="btn btn-sm btn-outline-secondary btn-detect-imported" title="Re-run auto-detection"><i class="bi bi-magic"></i></button>';
-        var tr = document.createElement('tr');
-        tr.dataset.source = row.source || 'ExistingId';
-        tr.dataset.bundleJson = row.bundleJson || '';
-        tr.dataset.fileName = row.fileName || '';
-        tr.dataset.detectedClinicalScenarioId = row.detectedClinicalScenarioId || '';
-        tr.dataset.autoDetect = String(row.autoDetect !== false);
-        tr.dataset.encounterStart = row.encounterStart || '';
-        tr.dataset.encounterEnd = row.encounterEnd || '';
-        tr.innerHTML =
-            '<td class="text-center align-middle">' + (importedRows.children.length + 1) + '</td>' +
-            '<td class="align-middle">' + sourceLabel + '</td>' +
-            '<td class="align-middle"><input type="text" class="form-control form-control-sm imp-pid" maxlength="128" value="' + esc(row.patientId || '') + '" ' + (row.source === 'Bundle' ? 'readonly' : '') + ' />' + fileLabel + '</td>' +
-            '<td><div class="imp-elig-editor">' + importedRowEligEditor(elig) + '</div></td>' +
-            '<td class="imp-encounter-cell align-middle small"></td>' +
-            '<td class="align-middle text-center">' + detectBtn + '</td>' +
-            '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-imported">&times;</button></td>';
-        importedRows.appendChild(tr);
-        renderImportedEncounterCell(tr);
-        reindexImported();
-        updateImportedSummary();
-    }
+        cohortRows.addEventListener('input', function () { syncCount(); });
+        document.querySelectorAll('.measure-checkbox').forEach(function (cb) {
+            cb.addEventListener('change', function () { Array.prototype.forEach.call(cohortRows.children, function (r) { rerenderEditor(r); }); });
+        });
 
-    // Renders the encounter-dates cell with an in/out-of-period indicator. Called whenever
-    // the row's encounter dates change OR the Report Period inputs change.
-    function renderImportedEncounterCell(row) {
-        var cell = row.querySelector('.imp-encounter-cell');
-        if (!cell) return;
-        var s = row.dataset.encounterStart || '';
-        var e = row.dataset.encounterEnd || '';
-        if (!s && !e) { cell.innerHTML = '<span class="text-muted">unknown</span>'; return; }
+        // ---- Imported Patients ----
+        var importedRows = document.getElementById('importedRows');
+        var importedSummary = document.getElementById('importedSummary');
 
-        function fmt(iso) {
-            if (!iso) return '?';
-            var d = new Date(iso);
-            if (isNaN(d.getTime())) return iso;
+        // Auto-suggest a Report Period that encloses the supplied encounter dates, but only
+        // when the period inputs are currently empty (never overwrite a user-set value).
+        function suggestPeriodFromEncounter(encStartIso, encEndIso) {
+            var startEl = document.getElementById('ReportPeriodStart');
+            var endEl = document.getElementById('ReportPeriodEnd');
+            if (!startEl || !endEl) return;
+            var hasStart = !!(startEl.value || '').trim();
+            var hasEnd = !!(endEl.value || '').trim();
+            if (hasStart && hasEnd) return;
+
+            var s = encStartIso ? new Date(encStartIso) : null;
+            var e = encEndIso ? new Date(encEndIso) : s;
+            if (!s && !e) return;
+            if (!s) s = e;
+            if (!e) e = s;
+
+            // Snap to the calendar-month containing the encounter window.
+            var monthStart = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1));
+            var monthEnd = new Date(Date.UTC(e.getUTCFullYear(), e.getUTCMonth() + 1, 0));
+
             function pad(n) { return n < 10 ? '0' + n : '' + n; }
-            return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+            function iso(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
+
+            if (!hasStart) startEl.value = iso(monthStart);
+            if (!hasEnd) endEl.value = iso(monthEnd);
         }
 
-        var label = fmt(s) + (e && e !== s ? ' &rarr; ' + fmt(e) : '');
-        var status = compareEncounterToPeriod(s, e);
-        var badge = status === 'inside'
-            ? '<span class="badge bg-success-subtle text-success border border-success ms-1" title="Inside report period">&#10003; in period</span>'
-            : status === 'outside'
-                ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1" title="Outside report period — measure-eval may filter resources">&#9888; outside period</span>'
-                : '';
-        cell.innerHTML = '<div>' + label + '</div>' + badge;
-    }
+        function importedRowEligEditor(elig) {
+            var sel = selectedMeasureTypes();
+            if (!sel.length) return '<span class="text-muted small">Select measures</span>';
+            return sel.map(function (m) {
+                var cb = document.querySelector('.measure-checkbox[value="' + m + '"]');
+                var lbl = cb ? (document.querySelector('label[for="' + cb.id + '"]') || { textContent: m }).textContent : m;
+                var cur = (elig && Object.prototype.hasOwnProperty.call(elig, m)) ? elig[m] : NON_QUALIFYING;
+                return '<div class="form-check form-check-inline me-2 mb-1"><input class="form-check-input imp-elig" type="checkbox" data-measure="' + m + '" ' + (cur === QUALIFYING ? 'checked' : '') + ' /><label class="form-check-label small">' + esc(lbl) + '</label></div>';
+            }).join('');
+        }
+        function readImportedElig(row) {
+            var v = {};
+            row.querySelectorAll('.imp-elig').forEach(function (cb) {
+                v[cb.getAttribute('data-measure')] = cb.checked ? QUALIFYING : NON_QUALIFYING;
+            });
+            // Make sure every selected measure has an explicit entry.
+            selectedMeasureTypes().forEach(function (m) { if (!Object.prototype.hasOwnProperty.call(v, m)) v[m] = NON_QUALIFYING; });
+            return v;
+        }
+        function updateImportedSummary() {
+            var rows = importedRows.children;
+            if (!rows.length) {
+                importedSummary.textContent = '';
+            } else {
+                var qCount = 0;
+                Array.prototype.forEach.call(rows, function (r) {
+                    var elig = readImportedElig(r);
+                    var any = selectedMeasureTypes().some(function (m) { return elig[m] === QUALIFYING; });
+                    if (any) qCount++;
+                });
+                importedSummary.textContent = '(' + rows.length + ' total, ' + qCount + ' Q / ' + (rows.length - qCount) + ' NQ)';
+            }
+            // Imported rows feed the total Patient Count alongside cohort sums, so any change
+            // to the imported list must re-sync the read-only Patient Count field.
+            syncCount();
+        }
+        function reindexImported() {
+            Array.prototype.forEach.call(importedRows.children, function (r, i) { r.querySelector('td:first-child').textContent = i + 1; });
+        }
+        function rerenderImportedEligEditors() {
+            Array.prototype.forEach.call(importedRows.children, function (r) {
+                var elig = readImportedElig(r);
+                var ed = r.querySelector('.imp-elig-editor');
+                if (ed) ed.innerHTML = importedRowEligEditor(elig);
+            });
+            updateImportedSummary();
+        }
+        function addImportedRow(row) {
+            // row = { source, patientId, fileName, bundleJson, autoDetect, measureEligibilities, detectedClinicalScenarioId, encounterStart, encounterEnd }
+            var elig = row.measureEligibilities || {};
+            var sourceLabel = row.source === 'Bundle'
+                ? '<span class="badge bg-info text-dark"><i class="bi bi-file-earmark-arrow-up me-1"></i>Bundle</span>'
+                : '<span class="badge bg-secondary"><i class="bi bi-cloud-arrow-down me-1"></i>By ID</span>';
+            var fileLabel = row.source === 'Bundle' && row.fileName ? '<div class="small text-muted">' + esc(row.fileName) + '</div>' : '';
+            var detectBtn = '<button type="button" class="btn btn-sm btn-outline-secondary btn-detect-imported" title="Re-run auto-detection"><i class="bi bi-magic"></i></button>';
+            var tr = document.createElement('tr');
+            tr.dataset.source = row.source || 'ExistingId';
+            tr.dataset.uploadedBundleId = row.uploadedBundleId || '';
+            tr.dataset.bundleJson = row.bundleJson || '';
+            tr.dataset.fileName = row.fileName || '';
+            tr.dataset.detectedClinicalScenarioId = row.detectedClinicalScenarioId || '';
+            tr.dataset.autoDetect = String(row.autoDetect !== false);
+            tr.dataset.encounterStart = row.encounterStart || '';
+            tr.dataset.encounterEnd = row.encounterEnd || '';
+            tr.innerHTML =
+                '<td class="text-center align-middle">' + (importedRows.children.length + 1) + '</td>' +
+                '<td class="align-middle">' + sourceLabel + '</td>' +
+                '<td class="align-middle"><input type="text" class="form-control form-control-sm imp-pid" maxlength="128" value="' + escAttr(row.patientId || '') + '" ' + (row.source === 'Bundle' ? 'readonly' : '') + ' />' + fileLabel + '</td>' +
+                '<td><div class="imp-elig-editor">' + importedRowEligEditor(elig) + '</div></td>' +
+                '<td class="imp-encounter-cell align-middle small"></td>' +
+                '<td class="align-middle text-center">' + detectBtn + '</td>' +
+                '<td class="text-center align-middle"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-imported">&times;</button></td>';
+            importedRows.appendChild(tr);
+            renderImportedEncounterCell(tr);
+            reindexImported();
+            updateImportedSummary();
+        }
 
-    function compareEncounterToPeriod(encStartIso, encEndIso) {
-        var ps = (document.getElementById('ReportPeriodStart').value || '').trim();
-        var pe = (document.getElementById('ReportPeriodEnd').value || '').trim();
-        if (!ps && !pe) return 'unknown';
-        var encS = encStartIso ? new Date(encStartIso) : null;
-        var encE = encEndIso ? new Date(encEndIso) : encS;
-        if (!encS) return 'unknown';
-        var pStart = ps ? new Date(ps + 'T00:00:00Z') : null;
-        var pEnd = pe ? new Date(pe + 'T23:59:59Z') : null;
-        if (pStart && encS < pStart) return 'outside';
-        if (pEnd && (encE || encS) > pEnd) return 'outside';
-        return 'inside';
-    }
+        // Renders the encounter-dates cell with an in/out-of-period indicator. Called whenever
+        // the row's encounter dates change OR the Report Period inputs change.
+        function renderImportedEncounterCell(row) {
+            var cell = row.querySelector('.imp-encounter-cell');
+            if (!cell) return;
+            var s = row.dataset.encounterStart || '';
+            var e = row.dataset.encounterEnd || '';
+            if (!s && !e) { cell.innerHTML = '<span class="text-muted">unknown</span>'; return; }
 
-    function rerenderImportedEncounterCells() {
-        Array.prototype.forEach.call(importedRows.children, function (r) { renderImportedEncounterCell(r); });
-    }
+            function fmt(iso) {
+                if (!iso) return '?';
+                var d = new Date(iso);
+                if (isNaN(d.getTime())) return iso;
+                function pad(n) { return n < 10 ? '0' + n : '' + n; }
+                return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+            }
 
-    async function classifyImportedRow(row) {
-        var pid = (row.querySelector('.imp-pid').value || '').trim();
-        var src = row.dataset.source;
-        if (src === 'ExistingId' && !pid) { showError('Patient ID is required to classify.'); return; }
-        try {
-            var body = {
-                source: src,
-                patientId: pid,
-                bundleJson: src === 'Bundle' ? row.dataset.bundleJson : null,
-                measures: selectedMeasureTypes()
-            };
-            var res = await postJson(classifyImportedUrl, body);
-            if (res && res.measureEligibilities) {
-                // Rebuild the eligibility editor with returned values.
-                var ed = row.querySelector('.imp-elig-editor');
-                ed.innerHTML = importedRowEligEditor(res.measureEligibilities);
-                if (res.detectedClinicalScenarioId) row.dataset.detectedClinicalScenarioId = res.detectedClinicalScenarioId;
-                if (src === 'ExistingId' && res.patientId && !pid) row.querySelector('.imp-pid').value = res.patientId;
-                row.dataset.autoDetect = 'true';
-                if (res.encounterStart) row.dataset.encounterStart = res.encounterStart;
-                if (res.encounterEnd) row.dataset.encounterEnd = res.encounterEnd;
-                renderImportedEncounterCell(row);
-                if (res.encounterStart || res.encounterEnd) {
-                    suggestPeriodFromEncounter(res.encounterStart, res.encounterEnd);
+            var label = fmt(s) + (e && e !== s ? ' &rarr; ' + fmt(e) : '');
+            var status = compareEncounterToPeriod(s, e);
+            var badge = status === 'inside'
+                ? '<span class="badge bg-success-subtle text-success border border-success ms-1" title="Inside report period">&#10003; in period</span>'
+                : status === 'outside'
+                    ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1" title="Outside report period — measure-eval may filter resources">&#9888; outside period</span>'
+                    : '';
+            cell.innerHTML = '<div>' + label + '</div>' + badge;
+        }
+
+        function compareEncounterToPeriod(encStartIso, encEndIso) {
+            var ps = (document.getElementById('ReportPeriodStart').value || '').trim();
+            var pe = (document.getElementById('ReportPeriodEnd').value || '').trim();
+            if (!ps && !pe) return 'unknown';
+            var encS = encStartIso ? new Date(encStartIso) : null;
+            var encE = encEndIso ? new Date(encEndIso) : encS;
+            if (!encS) return 'unknown';
+            var pStart = ps ? new Date(ps + 'T00:00:00Z') : null;
+            var pEnd = pe ? new Date(pe + 'T23:59:59Z') : null;
+            if (pStart && encS < pStart) return 'outside';
+            if (pEnd && (encE || encS) > pEnd) return 'outside';
+            return 'inside';
+        }
+
+        function rerenderImportedEncounterCells() {
+            Array.prototype.forEach.call(importedRows.children, function (r) { renderImportedEncounterCell(r); });
+        }
+
+        async function classifyImportedRow(row) {
+            var pid = (row.querySelector('.imp-pid').value || '').trim();
+            var src = row.dataset.source;
+            if (src === 'ExistingId' && !pid) { showError('Patient ID is required to classify.'); return; }
+            try {
+                var body = {
+                    source: src,
+                    patientId: pid,
+                    bundleJson: src === 'Bundle' && !row.dataset.uploadedBundleId ? row.dataset.bundleJson : null,
+                    uploadedBundleId: src === 'Bundle' && row.dataset.uploadedBundleId ? row.dataset.uploadedBundleId : null,
+                    measures: selectedMeasureTypes()
+                };
+                var res = await postJson(classifyImportedUrl, body);
+                if (res && res.measureEligibilities) {
+                    // Rebuild the eligibility editor with returned values.
+                    var ed = row.querySelector('.imp-elig-editor');
+                    ed.innerHTML = importedRowEligEditor(res.measureEligibilities);
+                    if (res.detectedClinicalScenarioId) row.dataset.detectedClinicalScenarioId = res.detectedClinicalScenarioId;
+                    if (src === 'ExistingId' && res.patientId && !pid) row.querySelector('.imp-pid').value = res.patientId;
+                    row.dataset.autoDetect = 'true';
+                    if (res.encounterStart) row.dataset.encounterStart = res.encounterStart;
+                    if (res.encounterEnd) row.dataset.encounterEnd = res.encounterEnd;
+                    if (res.encounterStart || res.encounterEnd) {
+                        suggestPeriodFromEncounter(res.encounterStart, res.encounterEnd);
+                    }
+                    renderImportedEncounterCell(row);
+                    updateImportedSummary();
                 }
+            } catch (err) {
+                showError('Classification failed: ' + (err.message || 'Unknown error'));
+            }
+        }
+
+        document.getElementById('btnAddImportedById').addEventListener('click', async function () {
+            var input = document.getElementById('newImportedPatientId');
+            var pid = (input.value || '').trim();
+            if (!pid) { showError('Enter a Patient ID first.'); return; }
+            addImportedRow({ source: 'ExistingId', patientId: pid, autoDetect: true, measureEligibilities: {} });
+            input.value = '';
+            // Best-effort auto-classify the new row.
+            var row = importedRows.lastElementChild;
+            if (row) await classifyImportedRow(row);
+        });
+
+        document.getElementById('importedBundleFile').addEventListener('change', async function (ev) {
+            var files = Array.prototype.slice.call(ev.target.files || []);
+            for (var i = 0; i < files.length; i++) {
+                var file = files[i];
+                try {
+                    var fd = new FormData();
+                    fd.append('file', file);
+                    var uploaded = await postForm(uploadImportedBundleUrl, fd);
+
+                    addImportedRow({
+                        source: 'Bundle',
+                        patientId: uploaded && uploaded.patientId ? uploaded.patientId : '',
+                        fileName: uploaded && uploaded.fileName ? uploaded.fileName : file.name,
+                        uploadedBundleId: uploaded && uploaded.bundleId ? uploaded.bundleId : null,
+                        bundleJson: null,
+                        autoDetect: true,
+                        measureEligibilities: {},
+                        encounterStart: null,
+                        encounterEnd: null
+                    });
+                    var row = importedRows.lastElementChild;
+                    if (row) await classifyImportedRow(row);
+                } catch (err) {
+                    showError('Failed to read "' + file.name + '": ' + (err.message || 'Unknown error'));
+                }
+            }
+            ev.target.value = '';
+        });
+
+        importedRows.addEventListener('click', function (e) {
+            var rm = e.target.closest('.btn-remove-imported');
+            if (rm) { rm.closest('tr').remove(); reindexImported(); updateImportedSummary(); return; }
+            var det = e.target.closest('.btn-detect-imported');
+            if (det) { classifyImportedRow(det.closest('tr')); return; }
+        });
+        importedRows.addEventListener('change', function (e) {
+            if (e.target.classList.contains('imp-elig')) {
+                // User override — turn off auto-detect implicitly.
+                e.target.closest('tr').dataset.autoDetect = 'false';
                 updateImportedSummary();
             }
-        } catch (err) {
-            showError('Classification failed: ' + (err.message || 'Unknown error'));
+        });
+
+        function getImportedPatients() {
+            return Array.prototype.map.call(importedRows.children, function (r) {
+                return {
+                    source: r.dataset.source || 'ExistingId',
+                    patientId: (r.querySelector('.imp-pid').value || '').trim(),
+                    fileName: r.dataset.fileName || null,
+                    uploadedBundleId: r.dataset.source === 'Bundle' ? (r.dataset.uploadedBundleId || null) : null,
+                    bundleJson: r.dataset.source === 'Bundle' && !r.dataset.uploadedBundleId ? (r.dataset.bundleJson || null) : null,
+                    autoDetect: r.dataset.autoDetect !== 'false',
+                    measureEligibilities: readImportedElig(r),
+                    detectedClinicalScenarioId: r.dataset.detectedClinicalScenarioId || null
+                };
+            });
         }
-    }
 
-    document.getElementById('btnAddImportedById').addEventListener('click', async function () {
-        var input = document.getElementById('newImportedPatientId');
-        var pid = (input.value || '').trim();
-        if (!pid) { showError('Enter a Patient ID first.'); return; }
-        addImportedRow({ source: 'ExistingId', patientId: pid, autoDetect: true, measureEligibilities: {} });
-        input.value = '';
-        // Best-effort auto-classify the new row.
-        var row = importedRows.lastElementChild;
-        if (row) await classifyImportedRow(row);
-    });
+        // Re-render imported eligibility editors when measure selection changes (parallels cohorts).
+        document.querySelectorAll('.measure-checkbox').forEach(function (cb) {
+            cb.addEventListener('change', rerenderImportedEligEditors);
+        });
 
-    document.getElementById('importedBundleFile').addEventListener('change', async function (ev) {
-        var files = Array.prototype.slice.call(ev.target.files || []);
-        for (var i = 0; i < files.length; i++) {
-            var file = files[i];
-            try {
-                var text = await file.text();
-                var parsed; try { parsed = JSON.parse(text); } catch (_) { showError('Bundle "' + file.name + '" is not valid JSON.'); continue; }
-                var patientEntry = (parsed && parsed.entry || []).find(function (e) { return e && e.resource && e.resource.resourceType === 'Patient'; });
-                if (!patientEntry || !patientEntry.resource.id) { showError('Bundle "' + file.name + '" must contain a Patient resource with an id.'); continue; }
+        // Recompute the in/out-of-period indicator on every imported row whenever the
+        // Report Period inputs change (so the user gets immediate feedback when adjusting it).
+        ['ReportPeriodStart', 'ReportPeriodEnd'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('change', rerenderImportedEncounterCells);
+        });
 
-                // Best-effort encounter-date sniffing for period auto-suggest. Server-side
-                // classification will overwrite with a more accurate range when it returns.
-                var encEntries = (parsed && parsed.entry || []).map(function (e) { return e && e.resource; }).filter(function (r) { return r && r.resourceType === 'Encounter' && r.period; });
-                var minS = null, maxE = null;
-                if (encEntries.length) {
-                    encEntries.forEach(function (enc) {
-                        if (enc.period.start && (!minS || enc.period.start < minS)) minS = enc.period.start;
-                        var pe = enc.period.end || enc.period.start;
-                        if (pe && (!maxE || pe > maxE)) maxE = pe;
-                    });
-                    if (minS || maxE) suggestPeriodFromEncounter(minS, maxE);
+        // ---- Collect form into JSON payload ----
+        function collectModel() {
+            var cohorts = getCohorts();
+            var mins = cohorts.map(function (c) { return c.resourcesPerPatientMin || 50; });
+            var maxes = cohorts.map(function (c) { return c.resourcesPerPatientMax || 100; });
+            var imported = getImportedPatients();
+            var importedIds = imported.filter(function (p) { return p.source === 'ExistingId'; });
+            var importedBundles = imported.filter(function (p) { return p.source === 'Bundle'; });
+            return {
+                id: idInput.value || null,
+                name: document.getElementById('ScenarioName').value,
+                description: document.getElementById('ScenarioDescription').value,
+                isSystemScenario: false,
+                reportMethod: document.getElementById('ReportMethod').value,
+                selectedMeasures: selectedMeasureTypes(),
+                seed: parseInt(document.getElementById('Seed').value || '20260329', 10),
+                // Submit the cohort-only sum (NOT the displayed total). The runtime uses
+                // patientCount as a fallback cohort-generation target when no cohorts are
+                // configured; including imported patients here would inflate that fallback.
+                patientCount: cohorts.reduce(function (s, c) { return s + (c.patientCount || 0); }, 0),
+                resourcesPerPatientMin: mins.length > 0 ? Math.min.apply(null, mins) : 50,
+                resourcesPerPatientMax: maxes.length > 0 ? Math.max.apply(null, maxes) : 100,
+                patientCohorts: cohorts,
+                cleanupServiceData: document.getElementById('CleanupServiceData').checked,
+                cleanupFhirData: document.getElementById('CleanupFhirData').checked,
+                queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null,
+                reportPeriodStart: (document.getElementById('ReportPeriodStart').value || '').trim() ? (document.getElementById('ReportPeriodStart').value + 'T00:00:00Z') : null,
+                reportPeriodEnd: (document.getElementById('ReportPeriodEnd').value || '').trim() ? (document.getElementById('ReportPeriodEnd').value + 'T23:59:59Z') : null,
+                importedPatientIds: importedIds,
+                importedPatientBundles: importedBundles
+            };
+        }
+
+        // ---- Populate form from JSON ----
+        function populate(data) {
+            idInput.value = data.id || '';
+            isSystemInput.value = data.isSystemScenario ? 'true' : 'false';
+            document.getElementById('ScenarioName').value = data.name || '';
+            document.getElementById('ScenarioDescription').value = data.description || '';
+            document.getElementById('ReportMethod').value = data.reportMethod || 'Adhoc';
+            document.getElementById('Seed').value = data.seed || 20260329;
+            document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
+            document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;
+            // Report Period (yyyy-MM-dd from any ISO-ish input the server returns).
+            function isoToDateValue(s) {
+                if (!s) return '';
+                var d = new Date(s);
+                if (isNaN(d.getTime())) return '';
+                function pad(n) { return n < 10 ? '0' + n : '' + n; }
+                return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+            }
+            document.getElementById('ReportPeriodStart').value = isoToDateValue(data.reportPeriodStart);
+            document.getElementById('ReportPeriodEnd').value = isoToDateValue(data.reportPeriodEnd);
+            var qp = document.getElementById('QueryPlanTemplate');
+            if (data.queryPlanTemplateId) qp.value = data.queryPlanTemplateId;
+            else { var d = qp.querySelector('[data-is-default="true"]'); if (d) qp.value = d.value; }
+            document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
+            var mMap = { 'NhsnAcuteCareHospitalMonthlyInitialPopulation': 'measure_monthly', 'NhsnAcuteCareHospitalDailyInitialPopulation': 'measure_daily', 'NhsnGlycemicControlHypoglycemicInitialPopulation': 'measure_hypo' };
+            (data.selectedMeasures || []).forEach(function (m) { var cb = document.getElementById(mMap[String(m)]); if (cb) cb.checked = true; });
+            cohortRows.innerHTML = '';
+            if (data.patientCohorts && data.patientCohorts.length > 0) {
+                data.patientCohorts.forEach(function (c) { addCohortRow(c.patientCount, c.measureEligibilities || defaultElig(true), c.eligibleClinicalScenarioIds || [], c.resourcesPerPatientMin || data.resourcesPerPatientMin || 50, c.resourcesPerPatientMax || data.resourcesPerPatientMax || 100); });
+            } else {
+                addDefault(data.patientCount || 10, true, data.resourcesPerPatientMin || 50, data.resourcesPerPatientMax || 100);
+            }
+            // Imported patients
+            importedRows.innerHTML = '';
+            (data.importedPatientIds || []).forEach(function (p) {
+                addImportedRow({
+                    source: 'ExistingId',
+                    patientId: p.patientId || '',
+                    autoDetect: p.autoDetect !== false,
+                    measureEligibilities: p.measureEligibilities || {},
+                    detectedClinicalScenarioId: p.detectedClinicalScenarioId || null
+                });
+            });
+            (data.importedPatientBundles || []).forEach(function (p) {
+                // Sniff encounter dates from the saved bundle JSON for the in/out-of-period
+                // indicator (best effort; classifier will refresh on Detect).
+                var encS = null, encE = null;
+                if (p.bundleJson) {
+                    try {
+                        var parsed = JSON.parse(p.bundleJson);
+                        var encs = (parsed && parsed.entry || []).map(function (e) { return e && e.resource; }).filter(function (r) { return r && r.resourceType === 'Encounter' && r.period; });
+                        encs.forEach(function (enc) {
+                            if (enc.period.start && (!encS || enc.period.start < encS)) encS = enc.period.start;
+                            var pe = enc.period.end || enc.period.start;
+                            if (pe && (!encE || pe > encE)) encE = pe;
+                        });
+                    } catch (_) { /* ignore — sniffing is best-effort */ }
                 }
-
                 addImportedRow({
                     source: 'Bundle',
-                    patientId: patientEntry.resource.id,
-                    fileName: file.name,
-                    bundleJson: text,
-                    autoDetect: true,
-                    measureEligibilities: {},
-                    encounterStart: minS,
-                    encounterEnd: maxE
+                    patientId: p.patientId || '',
+                    fileName: p.fileName || null,
+                    uploadedBundleId: p.uploadedBundleId || null,
+                    bundleJson: p.bundleJson || '',
+                    autoDetect: p.autoDetect !== false,
+                    measureEligibilities: p.measureEligibilities || {},
+                    detectedClinicalScenarioId: p.detectedClinicalScenarioId || null,
+                    encounterStart: encS,
+                    encounterEnd: encE
                 });
-                var row = importedRows.lastElementChild;
-                if (row) await classifyImportedRow(row);
-            } catch (err) {
-                showError('Failed to read "' + file.name + '": ' + (err.message || 'Unknown error'));
-            }
-        }
-        ev.target.value = '';
-    });
-
-    importedRows.addEventListener('click', function (e) {
-        var rm = e.target.closest('.btn-remove-imported');
-        if (rm) { rm.closest('tr').remove(); reindexImported(); updateImportedSummary(); return; }
-        var det = e.target.closest('.btn-detect-imported');
-        if (det) { classifyImportedRow(det.closest('tr')); return; }
-    });
-    importedRows.addEventListener('change', function (e) {
-        if (e.target.classList.contains('imp-elig')) {
-            // User override — turn off auto-detect implicitly.
-            e.target.closest('tr').dataset.autoDetect = 'false';
-            updateImportedSummary();
-        }
-    });
-
-    function getImportedPatients() {
-        return Array.prototype.map.call(importedRows.children, function (r) {
-            return {
-                source: r.dataset.source || 'ExistingId',
-                patientId: (r.querySelector('.imp-pid').value || '').trim(),
-                fileName: r.dataset.fileName || null,
-                bundleJson: r.dataset.source === 'Bundle' ? (r.dataset.bundleJson || null) : null,
-                autoDetect: r.dataset.autoDetect !== 'false',
-                measureEligibilities: readImportedElig(r),
-                detectedClinicalScenarioId: r.dataset.detectedClinicalScenarioId || null
-            };
-        });
-    }
-
-    // Re-render imported eligibility editors when measure selection changes (parallels cohorts).
-    document.querySelectorAll('.measure-checkbox').forEach(function (cb) {
-        cb.addEventListener('change', rerenderImportedEligEditors);
-    });
-
-    // Recompute the in/out-of-period indicator on every imported row whenever the
-    // Report Period inputs change (so the user gets immediate feedback when adjusting it).
-    ['ReportPeriodStart', 'ReportPeriodEnd'].forEach(function (id) {
-        var el = document.getElementById(id);
-        if (el) el.addEventListener('change', rerenderImportedEncounterCells);
-    });
-
-    // ---- Collect form into JSON payload ----
-    function collectModel() {
-        var cohorts = getCohorts();
-        var mins = cohorts.map(function (c) { return c.resourcesPerPatientMin || 50; });
-        var maxes = cohorts.map(function (c) { return c.resourcesPerPatientMax || 100; });
-        var imported = getImportedPatients();
-        var importedIds = imported.filter(function (p) { return p.source === 'ExistingId'; });
-        var importedBundles = imported.filter(function (p) { return p.source === 'Bundle'; });
-        return {
-            id: idInput.value || null,
-            name: document.getElementById('ScenarioName').value,
-            description: document.getElementById('ScenarioDescription').value,
-            isSystemScenario: false,
-            reportMethod: document.getElementById('ReportMethod').value,
-            selectedMeasures: selectedMeasureTypes(),
-            seed: parseInt(document.getElementById('Seed').value || '20260329', 10),
-            // Submit the cohort-only sum (NOT the displayed total). The runtime uses
-            // patientCount as a fallback cohort-generation target when no cohorts are
-            // configured; including imported patients here would inflate that fallback.
-            patientCount: cohorts.reduce(function (s, c) { return s + (c.patientCount || 0); }, 0),
-            resourcesPerPatientMin: mins.length > 0 ? Math.min.apply(null, mins) : 50,
-            resourcesPerPatientMax: maxes.length > 0 ? Math.max.apply(null, maxes) : 100,
-            patientCohorts: cohorts,
-            cleanupServiceData: document.getElementById('CleanupServiceData').checked,
-            cleanupFhirData: document.getElementById('CleanupFhirData').checked,
-            queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null,
-            reportPeriodStart: (document.getElementById('ReportPeriodStart').value || '').trim() ? (document.getElementById('ReportPeriodStart').value + 'T00:00:00Z') : null,
-            reportPeriodEnd: (document.getElementById('ReportPeriodEnd').value || '').trim() ? (document.getElementById('ReportPeriodEnd').value + 'T23:59:59Z') : null,
-            importedPatientIds: importedIds,
-            importedPatientBundles: importedBundles
-        };
-    }
-
-    // ---- Populate form from JSON ----
-    function populate(data) {
-        idInput.value = data.id || '';
-        isSystemInput.value = data.isSystemScenario ? 'true' : 'false';
-        document.getElementById('ScenarioName').value = data.name || '';
-        document.getElementById('ScenarioDescription').value = data.description || '';
-        document.getElementById('ReportMethod').value = data.reportMethod || 'Adhoc';
-        document.getElementById('Seed').value = data.seed || 20260329;
-        document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
-        document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;
-        // Report Period (yyyy-MM-dd from any ISO-ish input the server returns).
-        function isoToDateValue(s) {
-            if (!s) return '';
-            var d = new Date(s);
-            if (isNaN(d.getTime())) return '';
-            function pad(n) { return n < 10 ? '0' + n : '' + n; }
-            return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
-        }
-        document.getElementById('ReportPeriodStart').value = isoToDateValue(data.reportPeriodStart);
-        document.getElementById('ReportPeriodEnd').value = isoToDateValue(data.reportPeriodEnd);
-        var qp = document.getElementById('QueryPlanTemplate');
-        if (data.queryPlanTemplateId) qp.value = data.queryPlanTemplateId;
-        else { var d = qp.querySelector('[data-is-default="true"]'); if (d) qp.value = d.value; }
-        document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
-        var mMap = { 'NhsnAcuteCareHospitalMonthlyInitialPopulation': 'measure_monthly', 'NhsnAcuteCareHospitalDailyInitialPopulation': 'measure_daily', 'NhsnGlycemicControlHypoglycemicInitialPopulation': 'measure_hypo' };
-        (data.selectedMeasures || []).forEach(function (m) { var cb = document.getElementById(mMap[String(m)]); if (cb) cb.checked = true; });
-        cohortRows.innerHTML = '';
-        if (data.patientCohorts && data.patientCohorts.length > 0) {
-            data.patientCohorts.forEach(function (c) { addCohortRow(c.patientCount, c.measureEligibilities || defaultElig(true), c.eligibleClinicalScenarioIds || [], c.resourcesPerPatientMin || data.resourcesPerPatientMin || 50, c.resourcesPerPatientMax || data.resourcesPerPatientMax || 100); });
-        } else {
-            addDefault(data.patientCount || 10, true, data.resourcesPerPatientMin || 50, data.resourcesPerPatientMax || 100);
-        }
-        // Imported patients
-        importedRows.innerHTML = '';
-        (data.importedPatientIds || []).forEach(function (p) {
-            addImportedRow({
-                source: 'ExistingId',
-                patientId: p.patientId || '',
-                autoDetect: p.autoDetect !== false,
-                measureEligibilities: p.measureEligibilities || {},
-                detectedClinicalScenarioId: p.detectedClinicalScenarioId || null
             });
-        });
-        (data.importedPatientBundles || []).forEach(function (p) {
-            // Sniff encounter dates from the saved bundle JSON for the in/out-of-period
-            // indicator (best effort; classifier will refresh on Detect).
-            var encS = null, encE = null;
-            if (p.bundleJson) {
-                try {
-                    var parsed = JSON.parse(p.bundleJson);
-                    var encs = (parsed && parsed.entry || []).map(function (e) { return e && e.resource; }).filter(function (r) { return r && r.resourceType === 'Encounter' && r.period; });
-                    encs.forEach(function (enc) {
-                        if (enc.period.start && (!encS || enc.period.start < encS)) encS = enc.period.start;
-                        var pe = enc.period.end || enc.period.start;
-                        if (pe && (!encE || pe > encE)) encE = pe;
-                    });
-                } catch (_) { /* ignore — sniffing is best-effort */ }
-            }
-            addImportedRow({
-                source: 'Bundle',
-                patientId: p.patientId || '',
-                fileName: p.fileName || null,
-                bundleJson: p.bundleJson || '',
-                autoDetect: p.autoDetect !== false,
-                measureEligibilities: p.measureEligibilities || {},
-                detectedClinicalScenarioId: p.detectedClinicalScenarioId || null,
-                encounterStart: encS,
-                encounterEnd: encE
-            });
-        });
-        updateImportedSummary();
-        syncCount();
-    }
-
-    // ---- Open modal ----
-    async function openEditor(id, mode) {
-        clearErrors();
-        if (id) {
-            try {
-                var res = await fetch(getJsonUrl + '?id=' + encodeURIComponent(id));
-                if (!res.ok) throw new Error('Server returned ' + res.status);
-                var data = await res.json();
-                populate(data);
-                var isSystem = data.isSystemScenario === true;
-                var isView = mode === 'view' || isSystem;
-                modalTitle.innerHTML = '<i class="bi bi-' + (isView ? 'eye' : 'pencil-square') + ' me-2"></i>' + (isView ? 'View' : 'Edit') + ': ' + esc(data.name || 'Scenario') + (isSystem ? ' <span class="badge bg-secondary ms-2">System</span>' : '');
-                setEditable(!isView);
-                openModal();
-            } catch (err) {
-                showError('Failed to load scenario: ' + (err.message || 'Unknown error'));
-                openModal();
-            }
-        } else {
-            idInput.value = '';
-            isSystemInput.value = 'false';
-            modalTitle.innerHTML = '<i class="bi bi-plus-lg me-2"></i>New Scenario';
-            setEditable(true);
-            document.getElementById('ScenarioName').value = '';
-            document.getElementById('ScenarioDescription').value = '';
-            document.getElementById('ReportMethod').value = 'Adhoc';
-            document.getElementById('Seed').value = 20260329;
-            document.getElementById('CleanupFhirData').checked = true;
-            document.getElementById('CleanupServiceData').checked = false;
-            document.getElementById('ReportPeriodStart').value = '';
-            document.getElementById('ReportPeriodEnd').value = '';
-            document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
-            document.getElementById('measure_monthly').checked = true;
-            cohortRows.innerHTML = '';
-            addDefault(10, true, 50, 100);
-            importedRows.innerHTML = '';
             updateImportedSummary();
             syncCount();
-            openModal();
         }
-    }
 
-    // Public API — any page can open the editor via this global.
-    window.openScenarioEditor = function (id, mode) { return openEditor(id || null, mode || 'edit'); };
-
-    // ---- Save ----
-    btnSave.addEventListener('click', async function () {
-        clearErrors();
-        var model = collectModel();
-        var valid = true;
-        if (!(model.name || '').trim()) { markFieldError('ScenarioName', 'Name is required.'); valid = false; }
-        if (!model.selectedMeasures.length) { showError('At least one measure must be selected.'); valid = false; }
-        var hasImported = (model.importedPatientIds && model.importedPatientIds.length > 0)
-            || (model.importedPatientBundles && model.importedPatientBundles.length > 0);
-        if (!model.patientCohorts.length && !hasImported) { showError('At least one cohort with patients > 0 (or one imported patient) is required.'); valid = false; }
-        // Imported-by-ID rows must have a non-empty patient id.
-        var badId = (model.importedPatientIds || []).find(function (p) { return !(p.patientId || '').trim(); });
-        if (badId) { showError('Every imported-by-ID row must have a Patient ID.'); valid = false; }
-        if (!valid) return;
-        model.id = idInput.value || crypto.randomUUID();
-        try {
-            await postJson(saveUrl, model);
-            closeModal();
-            notifyChanged('saved', model.id, model.name);
-        } catch (err) {
-            showError('Save failed: ' + (err.message || 'Unknown error'));
+        // ---- Open modal ----
+        async function openEditor(id, mode) {
+            clearErrors();
+            if (id) {
+                try {
+                    var res = await fetch(getJsonUrl + '?id=' + encodeURIComponent(id));
+                    if (!res.ok) throw new Error('Server returned ' + res.status);
+                    var data = await res.json();
+                    populate(data);
+                    var isSystem = data.isSystemScenario === true;
+                    var isView = mode === 'view' || isSystem;
+                    modalTitle.innerHTML = '<i class="bi bi-' + (isView ? 'eye' : 'pencil-square') + ' me-2"></i>' + (isView ? 'View' : 'Edit') + ': ' + esc(data.name || 'Scenario') + (isSystem ? ' <span class="badge bg-secondary ms-2">System</span>' : '');
+                    setEditable(!isView);
+                    openModal();
+                } catch (err) {
+                    showError('Failed to load scenario: ' + (err.message || 'Unknown error'));
+                    openModal();
+                }
+            } else {
+                idInput.value = '';
+                isSystemInput.value = 'false';
+                modalTitle.innerHTML = '<i class="bi bi-plus-lg me-2"></i>New Scenario';
+                setEditable(true);
+                document.getElementById('ScenarioName').value = '';
+                document.getElementById('ScenarioDescription').value = '';
+                document.getElementById('ReportMethod').value = 'Adhoc';
+                document.getElementById('Seed').value = 20260329;
+                document.getElementById('CleanupFhirData').checked = true;
+                document.getElementById('CleanupServiceData').checked = false;
+                document.getElementById('ReportPeriodStart').value = '';
+                document.getElementById('ReportPeriodEnd').value = '';
+                document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
+                document.getElementById('measure_monthly').checked = true;
+                cohortRows.innerHTML = '';
+                addDefault(10, true, 50, 100);
+                importedRows.innerHTML = '';
+                updateImportedSummary();
+                syncCount();
+                openModal();
+            }
         }
-    });
 
-    // ---- Table button handlers (only present on the Scenarios list page) ----
-    var btnNew = document.getElementById('btnNewScenario');
-    if (btnNew) btnNew.addEventListener('click', function () { openEditor(null, 'edit'); });
+        // Public API — any page can open the editor via this global.
+        window.openScenarioEditor = function (id, mode) { return openEditor(id || null, mode || 'edit'); };
 
-    document.querySelectorAll('.btn-scenario-open').forEach(function (btn) {
-        btn.addEventListener('click', function () { openEditor(btn.getAttribute('data-id'), btn.getAttribute('data-mode')); });
-    });
-
-    document.querySelectorAll('.btn-scenario-clone').forEach(function (btn) {
-        btn.addEventListener('click', async function () {
+        // ---- Save ----
+        btnSave.addEventListener('click', async function () {
+            clearErrors();
+            var model = collectModel();
+            var valid = true;
+            if (!(model.name || '').trim()) { markFieldError('ScenarioName', 'Name is required.'); valid = false; }
+            if (!model.selectedMeasures.length) { showError('At least one measure must be selected.'); valid = false; }
+            var hasImported = (model.importedPatientIds && model.importedPatientIds.length > 0)
+                || (model.importedPatientBundles && model.importedPatientBundles.length > 0);
+            if (!model.patientCohorts.length && !hasImported) { showError('At least one cohort with patients > 0 (or one imported patient) is required.'); valid = false; }
+            // Imported-by-ID rows must have a non-empty patient id.
+            var badId = (model.importedPatientIds || []).find(function (p) { return !(p.patientId || '').trim(); });
+            if (badId) { showError('Every imported-by-ID row must have a Patient ID.'); valid = false; }
+            if (!valid) return;
+            model.id = idInput.value || crypto.randomUUID();
             try {
-                var res = await postJson(cloneUrl, { id: btn.getAttribute('data-id') });
-                notifyChanged('cloned', res && res.id, null);
+                await postJson(saveUrl, model);
+                closeModal();
+                notifyChanged('saved', model.id, model.name);
+            } catch (err) {
+                showError('Save failed: ' + (err.message || 'Unknown error'));
             }
-            catch (err) { showError('Clone failed: ' + (err.message || 'Unknown error')); }
         });
-    });
 
-    document.querySelectorAll('.btn-scenario-delete').forEach(function (btn) {
-        btn.addEventListener('click', async function () {
-            if (!confirm('Delete this scenario?')) return;
-            try {
-                await postJson(deleteUrl, { id: btn.getAttribute('data-id') });
-                notifyChanged('deleted', btn.getAttribute('data-id'), null);
-            }
-            catch (err) { showError('Delete failed: ' + (err.message || 'Unknown error')); }
+        // ---- Table button handlers (only present on the Scenarios list page) ----
+        var btnNew = document.getElementById('btnNewScenario');
+        if (btnNew) btnNew.addEventListener('click', function () { openEditor(null, 'edit'); });
+
+        document.querySelectorAll('.btn-scenario-open').forEach(function (btn) {
+            btn.addEventListener('click', function () { openEditor(btn.getAttribute('data-id'), btn.getAttribute('data-mode')); });
         });
-    });
-})();
+
+        document.querySelectorAll('.btn-scenario-clone').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                try {
+                    var res = await postJson(cloneUrl, { id: btn.getAttribute('data-id') });
+                    notifyChanged('cloned', res && res.id, null);
+                }
+                catch (err) { showError('Clone failed: ' + (err.message || 'Unknown error')); }
+            });
+        });
+
+        document.querySelectorAll('.btn-scenario-delete').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                if (!confirm('Delete this scenario?')) return;
+                try {
+                    await postJson(deleteUrl, { id: btn.getAttribute('data-id') });
+                    notifyChanged('deleted', btn.getAttribute('data-id'), null);
+                }
+                catch (err) { showError('Delete failed: ' + (err.message || 'Unknown error')); }
+            });
+        });
+    })();
 </script>

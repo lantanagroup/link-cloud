@@ -22,6 +22,7 @@ public sealed class ScenarioSeedService : IHostedService
     private static readonly Guid RegenerateReportId = new("00000000-0000-0000-0000-000000000005");
     private static readonly Guid MultiMeasureId = new("00000000-0000-0000-0000-000000000006");
     private static readonly Guid MegaMultiPatientId = new("00000000-0000-0000-0000-000000000007");
+    private static readonly Guid ApiHealthScenarioId = new("00000000-0000-0000-0000-000000000008");
 
     private static readonly List<ProfiledMeasureType> DefaultMeasures =
         [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation];
@@ -86,6 +87,34 @@ public sealed class ScenarioSeedService : IHostedService
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
                     ResourcesPerPatientMin = 1000,
                     ResourcesPerPatientMax = 1000
+                }
+            ],
+            CleanupServiceData = false,
+            CleanupFhirData = true,
+        },
+
+        // --- API Health Scenario (scheduled seed workflow used by API Health tests) ---
+        new TestScenarioDefinition
+        {
+            Id = ApiHealthScenarioId,
+            Name = "ApiHealthScenario",
+            Description = "System scenario for API Health stateful seeding and diagnostics.",
+            IsSystemScenario = true,
+            ReportMethod = ReportMethod.Adhoc,
+            SelectedMeasures = [..DefaultMeasures],
+            Seed = 20260501,
+            PatientCount = 1,
+            ResourcesPerPatientMin = 15,
+            ResourcesPerPatientMax = 15,
+            PatientCohorts =
+            [
+                new PatientCohortDefinition
+                {
+                    PatientCount = 1,
+                    MeasureEligibilities = new(DefaultQualifyingEligibilities),
+                    EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
+                    ResourcesPerPatientMin = 15,
+                    ResourcesPerPatientMax = 15
                 }
             ],
             CleanupServiceData = false,

@@ -90,7 +90,9 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 .au-badge-success  { background: var(--au-success) !important; }
 .au-badge-danger   { background: var(--au-danger)  !important; }
 .au-badge-warning  { background: var(--au-warning) !important; color: #111 !important; }
+.au-badge-active   { background: var(--au-accent)  !important; }
 .au-badge-muted    { background: var(--au-muted)   !important; }
+.au-badge-skip     { background: #6c757d !important; color: #fff !important; }
 
 /* ===================================================================
    Tables

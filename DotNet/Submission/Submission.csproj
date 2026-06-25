@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -8,6 +8,7 @@
 		<UserSecretsId>950e25dd-d402-4ddc-be72-3b7a0942d7c0</UserSecretsId>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 		<Version>0.6.0</Version>
+		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 	</PropertyGroup>
 	<PropertyGroup>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
@@ -26,23 +27,23 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
-		<PackageReference Include="Azure.Identity" Version="1.*" />
-		<PackageReference Include="Azure.Storage.Blobs" Version="12.26.0" />
-		<PackageReference Include="Confluent.Kafka" Version="2.*" />
-		<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" Version="0.*" />
-		<PackageReference Include="MediatR" Version="12.*" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.3" />
-		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
-		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />
-		<PackageReference Include="Quartz" Version="3.*" />
-		<PackageReference Include="Serilog.AspNetCore" Version="8.*" />
-		<PackageReference Include="Serilog.Enrichers.Span" Version="3.*" />
-		<PackageReference Include="Serilog.Exceptions" Version="8.*" />
-		<PackageReference Include="Serilog.Expressions" Version="4.*" />
-		<PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.*" />
-		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
-		<PackageReference Include="System.ServiceModel.Primitives" Version="8.*" />
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" />
+		<PackageReference Include="Azure.Identity" />
+		<PackageReference Include="Azure.Storage.Blobs" />
+		<PackageReference Include="Confluent.Kafka" />
+		<PackageReference Include="Confluent.Kafka.Extensions.OpenTelemetry" />
+		<PackageReference Include="MediatR" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
+		<PackageReference Include="Quartz" />
+		<PackageReference Include="Serilog.AspNetCore" />
+		<PackageReference Include="Serilog.Enrichers.Span" />
+		<PackageReference Include="Serilog.Exceptions" />
+		<PackageReference Include="Serilog.Expressions" />
+		<PackageReference Include="Serilog.Sinks.Grafana.Loki" />
+		<PackageReference Include="Swashbuckle.AspNetCore" />
+		<PackageReference Include="System.ServiceModel.Primitives" />
 	</ItemGroup>
 
 	<ItemGroup>

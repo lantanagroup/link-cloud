@@ -7,7 +7,6 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Requests;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory.ReferenceQuery;
-using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -18,18 +17,19 @@ using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
-using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
+using System.Data;
 using FhirQueryType = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.FhirQueryType;
 using IsolationLevel = System.Data.IsolationLevel;
 using RequestStatus = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.RequestStatus;
 using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 
@@ -61,7 +61,7 @@ public class ReferenceResourceService : IReferenceResourceService
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IQueryPlanQueries _queryPlanQueries;
     private readonly DataAcquisitionDbContext _dbContext;
-    private readonly IProducer<ResourceKey, ResourceAcquired> _kafkaProducer;
+    private readonly IResourceCache _resourceCache;
 
     private const int LockTimeoutMs = 30000;
 
@@ -72,7 +72,7 @@ public class ReferenceResourceService : IReferenceResourceService
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IQueryPlanQueries queryPlanQueries,
         DataAcquisitionDbContext dbContext,
-        IProducer<ResourceKey, ResourceAcquired> kafkaProducer)
+        IResourceCache resourceCache)
     {
         _logger = logger;
         _referenceResourcesQueries = referenceResourcesQueries;
@@ -80,7 +80,7 @@ public class ReferenceResourceService : IReferenceResourceService
         _dataAcquisitionLogManager = dataAcquisitionLogManager;
         _queryPlanQueries = queryPlanQueries;
         _dbContext = dbContext;
-        _kafkaProducer = kafkaProducer;
+        _resourceCache = resourceCache;
     }
 
     public async Task<List<Resource>> FetchReferenceResources(
@@ -296,7 +296,7 @@ public class ReferenceResourceService : IReferenceResourceService
                 continue;
 
             resourceIds.Add($"{resource.TypeName}/{resource.Id}");
-            await PublishResourceAcquiredAsync(log, resource, cancellationToken);
+            AddResourceToCache(log, resource);
         }
 
         var missingIds = outstandingIds.Where(id => !cachedById.ContainsKey(id)).ToList();
@@ -483,41 +483,16 @@ public class ReferenceResourceService : IReferenceResourceService
         }
     }
 
-    private async Task PublishResourceAcquiredAsync(
+    private void AddResourceToCache(
         DataAcquisitionLogModel primaryLog,
-        Resource resource,
-        CancellationToken cancellationToken)
+        Resource resource)
     {
-        var headers = new Headers
+        if (resource is DomainResource domainResource
+            && !string.IsNullOrWhiteSpace(resource.TypeName)
+            && Enum.TryParse<ResourceType>(resource.TypeName, out var resourceType))
         {
-            new Header(DataAcquisitionConstants.HeaderNames.CorrelationId,
-                Encoding.UTF8.GetBytes(primaryLog.CorrelationId!))
-        };
-
-        await _kafkaProducer.ProduceAsync(
-            KafkaTopic.ResourceAcquired.ToString(),
-            new Message<ResourceKey, ResourceAcquired>
-            {
-                Key = new ResourceKey
-                {
-                    FacilityId = primaryLog.FacilityId,
-                    CorrelationId = primaryLog.CorrelationId
-                },
-                Headers = headers,
-                Value = new ResourceAcquired
-                {
-                    Resource = resource,
-                    ResourceType = resource.TypeName,
-                    ScheduledReports = primaryLog.ScheduledReport != null
-                        ? new List<ScheduledReport> { primaryLog.ScheduledReport }
-                        : new List<ScheduledReport>(),
-                    PatientId = null,
-                    QueryType = QueryPhaseUtilities.ToWireQueryType(primaryLog.QueryPhase),
-                    ReportableEvent = primaryLog.ReportableEvent
-                        ?? throw new ArgumentNullException(nameof(primaryLog.ReportableEvent))
-                }
-            },
-            cancellationToken);
+            _resourceCache.UpdateCorrelationCache($"{primaryLog.CorrelationId}:{resourceType}", new List<DomainResource> { domainResource }, resourceType);
+        }
     }
 
     private async Task PersistReferenceQueryParametersAsync(

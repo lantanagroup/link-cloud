@@ -114,6 +114,14 @@ internal sealed class RunExecutor
 
             await fhirDataLoader.WaitForServerAsync(output);
 
+            // Resolve the query plan template early so the acquisition simulator uses the
+            // same plan the scenario is configured with (not always the built-in default).
+            var queryPlanResolution = await _queryPlanResolver.ResolveAsync(state.Options.QueryPlanTemplateId, cancellationToken);
+            var queryPlanInput = queryPlanResolution.Input;
+            var effectiveQueryPlan = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
+            if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
+                output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
+
             if (state.Options.PatientProfiles is { Count: > 0 }
                 || state.Options.ImportedPatientIds.Count > 0
                 || state.Options.ImportedPatientBundles.Count > 0)
@@ -178,7 +186,7 @@ internal sealed class RunExecutor
                     generationConfig,
                     acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
                     {
-                        QueryPlan = QueryPlanDefaults.GetDefaultAsInput(),
+                        QueryPlan = effectiveQueryPlan,
                         ClinicalPeriodStart = scenarioConfig.StartDate,
                         ClinicalPeriodEnd = scenarioConfig.EndDate
                     },
@@ -224,19 +232,12 @@ internal sealed class RunExecutor
             var facilityId = state.RunId.ToString();
             state.FacilityId = facilityId;
 
-            // Resolve the query plan template (null = use built-in defaults).
-            var queryPlanResolution = await _queryPlanResolver.ResolveAsync(state.Options.QueryPlanTemplateId, cancellationToken);
-            var queryPlanInput = queryPlanResolution.Input;
-            if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
-                output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
-
             // Finalize manifest metadata now that we have measure IDs and query plan.
             if (generationManifest != null)
             {
                 generationManifest.MeasureIds = measureIds;
-                var effectiveQueryPlanInput = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
-                generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlanInput);
-                generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlanInput);
+                generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlan);
+                generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlan);
                 generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
 
                 // Persist a lightweight manifest snapshot for the UI.
@@ -351,28 +352,18 @@ internal sealed class RunExecutor
                 output.WriteLine($"[WARN] Failed to build/store ABS upload snapshot: {absEx.Message}");
             }
 
-            // Persist raw ABS file contents (NDJSON + serialized FHIR resources) so the
-            // diagnostics export can re-emit them later without a live re-download.
-            // Best-effort: a serialization or store-size failure must not abort the run.
+            // Persist ABS export locator snapshot metadata so diagnostics export can
+            // locate and re-download ABS artifacts later without storing raw ABS file
+            // contents or full payloads in snapshot storage.
+            // Best-effort: a persistence failure must not abort the run.
             try
             {
-                var absFiles = new Dictionary<string, string>(internalAbsResources.Count, StringComparer.OrdinalIgnoreCase);
-                var fhirSerializer = new Hl7.Fhir.Serialization.FhirJsonSerializer(
-                    new Hl7.Fhir.Serialization.SerializerSettings { Pretty = true });
-                foreach (var (key, value) in internalAbsResources)
-                {
-                    absFiles[key] = value switch
-                    {
-                        string s => s,
-                        Hl7.Fhir.Model.Resource r => fhirSerializer.SerializeToString(r),
-                        _ => value?.ToString() ?? string.Empty
-                    };
-                }
-                await _snapshotStore.SetDomainAsync(state.RunId, "absFiles", absFiles, cancellationToken);
+                var absExportLocator = AbsExportLocatorSnapshot.Build(facilityId, reportId, internalAbsResources);
+                await _snapshotStore.SetDomainAsync(state.RunId, "absExportLocator", absExportLocator, cancellationToken);
             }
             catch (Exception absFilesEx)
             {
-                output.WriteLine($"[WARN] Failed to persist raw ABS files for export: {absFilesEx.Message}");
+                output.WriteLine($"[WARN] Failed to persist ABS export locator metadata: {absFilesEx.Message}");
             }
 
             if (!downloadedResources.ContainsKey("manifest.ndjson"))

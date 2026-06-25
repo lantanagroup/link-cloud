@@ -31,10 +31,13 @@ public sealed class MongoIndexManager
     public void EnsureAllIndexes()
     {
         EnsureRunIndexes();
+        EnsureRunInputIndexes();
         EnsureSnapshotIndexes();
         EnsureScenarioIndexes();
         EnsureImportedBundleIndexes();
         EnsureQueryPlanTemplateIndexes();
+        EnsureApiHealthRunIndexes();
+        EnsureApiHealthExecutionRunIndexes();
     }
 
     // --- automation_runs ---
@@ -87,6 +90,13 @@ public sealed class MongoIndexManager
         CreateIndexSafe(collection, new BsonDocument { { "FinishedAt",   1 } }, unique: false, "idx_finishedAt_asc");
     }
 
+    private void EnsureRunInputIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("automation_run_inputs");
+
+        CreateIndexSafe(collection, new BsonDocument { { "UpdatedAt", -1 } }, unique: false, "idx_updatedAt_desc");
+    }
+
     // --- automation_snapshots ---
 
     private void EnsureSnapshotIndexes()
@@ -134,6 +144,27 @@ public sealed class MongoIndexManager
 
         // Sort index for GetAllAsync (ORDER BY Name ASC).
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+    }
+
+    // --- api_health_runs ---
+
+    private void EnsureApiHealthRunIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("api_health_runs");
+
+        CreateIndexSafe(collection, new BsonDocument { { "RunId", 1 }, { "ServiceName", 1 } }, unique: false, "idx_runId_serviceName");
+        CreateIndexSafe(collection, new BsonDocument { { "StartedAt", -1 } }, unique: false, "idx_startedAt_desc");
+        CreateIndexSafe(collection, new BsonDocument { { "ServiceName", 1 }, { "StartedAt", -1 } }, unique: false, "idx_serviceName_startedAt");
+        CreateIndexSafe(collection, new BsonDocument { { "EndpointResults.EndpointKey", 1 }, { "StartedAt", -1 } }, unique: false, "idx_endpoint_results_endpointKey_startedAt");
+    }
+
+    // --- api_health_execution_runs ---
+
+    private void EnsureApiHealthExecutionRunIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("api_health_execution_runs");
+
+        CreateIndexSafe(collection, new BsonDocument { { "IsCompleted", 1 }, { "StartedAt", -1 } }, unique: false, "idx_isCompleted_startedAt");
     }
 
     // --- Helpers ---
