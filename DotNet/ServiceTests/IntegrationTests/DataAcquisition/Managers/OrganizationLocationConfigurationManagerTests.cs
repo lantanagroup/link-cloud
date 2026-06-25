@@ -1,12 +1,20 @@
+using System.Text.Json;
+using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.DependencyInjection;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
+using ResourceType = Hl7.Fhir.Model.ResourceType;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Managers;
@@ -27,7 +35,8 @@ public class OrganizationLocationConfigurationManagerTests
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
         var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>();
         var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
-        return new OrganizationLocationConfigurationManager(database, queries, cacheService);
+        var locationMappingService = scope.ServiceProvider.GetRequiredService<ILocationMappingService>();
+        return new OrganizationLocationConfigurationManager(database, queries, cacheService, locationMappingService);
     }
 
     private static string NewFacilityId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";
@@ -179,5 +188,91 @@ public class OrganizationLocationConfigurationManagerTests
 
         await Assert.ThrowsAsync<NotFoundException>(() =>
             manager.UpdateByIdAsync(99999, new UpdateOrganizationLocationConfigurationModel()));
+    }
+
+    [Fact]
+    public async Task CreateAsync_ReevaluatesCachedLocations_FlippingIsOrgLocationAndMappedToOrg()
+    {
+        var facilityId = NewFacilityId("Cfg-Reeval");
+        var orgReference = "Organization/org-1";
+        var locationId = $"Loc_{Guid.NewGuid():N}";
+
+        var location = new Location
+        {
+            Id = locationId,
+            Name = "ICU",
+            ManagingOrganization = new ResourceReference(orgReference)
+        };
+
+        // Arrange: a cached Location body, a mapping currently flagged NON-org, and an encounter
+        // mapping linked to it that is therefore NOT mapped to org.
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+            var locationMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+            var encounterMappingManager = scope.ServiceProvider.GetRequiredService<IEncounterMappingManager>();
+
+            dbContext.ReferenceResources.Add(new ReferenceResources
+            {
+                Id = Guid.NewGuid(),
+                FacilityId = facilityId,
+                ResourceId = locationId,
+                ResourceType = ResourceType.Location.ToString(),
+                QueryPhase = QueryPhase.Initial,
+                ReferenceResource = JsonSerializer.Serialize<Resource>(location, LinkFhirSerializerOptions.ForFhirLenientSerialization)
+            });
+            await dbContext.SaveChangesAsync();
+
+            var mapping = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = locationId,
+                LocationName = "ICU",
+                IsOrgLocation = false,
+                IsActive = true
+            });
+            await dbContext.SaveChangesAsync();
+
+            await encounterMappingManager.CreateAsync(new CreateEncounterMappingModel
+            {
+                FacilityId = facilityId,
+                PatientId = "P1",
+                EncounterId = "E1",
+                MappedToOrg = false,
+                OrganizationLocationMappingIds = new List<int> { mapping.LocationMappingId }
+            });
+        }
+
+        // Act: create a configuration whose condition matches the cached Location. This must trigger
+        // re-evaluation of the facility's already-cached Locations.
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var manager = CreateManager(scope);
+            await manager.CreateAsync(new CreateOrganizationLocationConfigurationModel
+            {
+                FacilityId = facilityId,
+                Description = "Now matches the cached Location",
+                IsActive = true,
+                Conditions = new List<CreateOrganizationLocationConditionModel>
+                {
+                    new() { FhirPath = $"managingOrganization.reference = '{orgReference}'", Priority = 1 }
+                }
+            });
+        }
+
+        // Assert in a fresh scope.
+        using (var verify = _fixture.ServiceProvider.CreateScope())
+        {
+            var locationQueries = verify.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+            var encounterQueries = verify.ServiceProvider.GetRequiredService<IEncounterMappingQueries>();
+
+            var updatedMapping = await locationQueries.GetByFacilityIdAndLocationIdAsync(facilityId, locationId);
+            Assert.NotNull(updatedMapping);
+            Assert.True(updatedMapping!.IsOrgLocation);
+
+            var updatedEncounter = await encounterQueries.GetByFacilityIdAndEncounterIdAsync(facilityId, "E1");
+            Assert.NotNull(updatedEncounter);
+            Assert.True(updatedEncounter!.MappedToOrg);
+        }
     }
 }

@@ -179,6 +179,7 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IOrganizationLocationMappingQueries, OrganizationLocationMappingQueries>();
             builder.Services.AddScoped<IEncounterMappingManager, EncounterMappingManager>();
             builder.Services.AddScoped<IEncounterMappingQueries, EncounterMappingQueries>();
+            builder.Services.AddTransient<ILocationMappingService, LocationMappingService>();
 
             // In-memory cache used by LocationMappingService (read) and invalidated by
             // OrganizationLocationConfigurationManager (write).

@@ -203,7 +203,7 @@ public class OrganizationLocationConfigurationControllerTests
         var mocker = new AutoMocker();
         var created = new OrganizationLocationConfigurationModel { ConfigId = 42, FacilityId = FacilityId };
         mocker.GetMock<IOrganizationLocationConfigurationManager>()
-            .Setup(m => m.CreateAsync(It.IsAny<CreateOrganizationLocationConfigurationModel>()))
+            .Setup(m => m.CreateAsync(It.IsAny<CreateOrganizationLocationConfigurationModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(created);
 
         var controller = mocker.CreateInstance<OrganizationLocationConfigurationController>();
@@ -254,7 +254,7 @@ public class OrganizationLocationConfigurationControllerTests
     {
         var mocker = new AutoMocker();
         mocker.GetMock<IOrganizationLocationConfigurationManager>()
-            .Setup(m => m.CreateAsync(It.IsAny<CreateOrganizationLocationConfigurationModel>()))
+            .Setup(m => m.CreateAsync(It.IsAny<CreateOrganizationLocationConfigurationModel>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("boom"));
 
         var controller = mocker.CreateInstance<OrganizationLocationConfigurationController>();
@@ -274,7 +274,7 @@ public class OrganizationLocationConfigurationControllerTests
     {
         var mocker = new AutoMocker();
         mocker.GetMock<IOrganizationLocationConfigurationManager>()
-            .Setup(m => m.UpdateByIdAsync(It.IsAny<int>(), It.IsAny<UpdateOrganizationLocationConfigurationModel>()))
+            .Setup(m => m.UpdateByIdAsync(It.IsAny<int>(), It.IsAny<UpdateOrganizationLocationConfigurationModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new OrganizationLocationConfigurationModel { ConfigId = 1, FacilityId = FacilityId });
 
         var controller = mocker.CreateInstance<OrganizationLocationConfigurationController>();
@@ -301,7 +301,7 @@ public class OrganizationLocationConfigurationControllerTests
     {
         var mocker = new AutoMocker();
         mocker.GetMock<IOrganizationLocationConfigurationManager>()
-            .Setup(m => m.UpdateByIdAsync(It.IsAny<int>(), It.IsAny<UpdateOrganizationLocationConfigurationModel>()))
+            .Setup(m => m.UpdateByIdAsync(It.IsAny<int>(), It.IsAny<UpdateOrganizationLocationConfigurationModel>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new NotFoundException("OrganizationLocationConfiguration with id 9999 not found."));
 
         var controller = mocker.CreateInstance<OrganizationLocationConfigurationController>();
@@ -317,7 +317,7 @@ public class OrganizationLocationConfigurationControllerTests
     {
         var mocker = new AutoMocker();
         mocker.GetMock<IOrganizationLocationConfigurationManager>()
-            .Setup(m => m.UpdateByIdAsync(It.IsAny<int>(), It.IsAny<UpdateOrganizationLocationConfigurationModel>()))
+            .Setup(m => m.UpdateByIdAsync(It.IsAny<int>(), It.IsAny<UpdateOrganizationLocationConfigurationModel>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("boom"));
 
         var controller = mocker.CreateInstance<OrganizationLocationConfigurationController>();
@@ -337,7 +337,7 @@ public class OrganizationLocationConfigurationControllerTests
     {
         var mocker = new AutoMocker();
         mocker.GetMock<IOrganizationLocationConfigurationManager>()
-            .Setup(m => m.UpdateByFacilityIdAsync(It.IsAny<string>(), It.IsAny<UpdateOrganizationLocationConfigurationModel>()))
+            .Setup(m => m.UpdateByFacilityIdAsync(It.IsAny<string>(), It.IsAny<UpdateOrganizationLocationConfigurationModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<OrganizationLocationConfigurationModel> { new() { ConfigId = 1, FacilityId = FacilityId } });
 
         var controller = mocker.CreateInstance<OrganizationLocationConfigurationController>();
@@ -384,7 +384,7 @@ public class OrganizationLocationConfigurationControllerTests
         var result = await controller.DeleteByIdAsync(1);
 
         Assert.IsType<AcceptedResult>(result);
-        mocker.GetMock<IOrganizationLocationConfigurationManager>().Verify(m => m.DeleteByIdAsync(1), Times.Once);
+        mocker.GetMock<IOrganizationLocationConfigurationManager>().Verify(m => m.DeleteByIdAsync(1, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -392,7 +392,7 @@ public class OrganizationLocationConfigurationControllerTests
     {
         var mocker = new AutoMocker();
         mocker.GetMock<IOrganizationLocationConfigurationManager>()
-            .Setup(m => m.DeleteByIdAsync(It.IsAny<int>()))
+            .Setup(m => m.DeleteByIdAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("boom"));
 
         var controller = mocker.CreateInstance<OrganizationLocationConfigurationController>();
@@ -416,7 +416,7 @@ public class OrganizationLocationConfigurationControllerTests
         var result = await controller.DeleteByFacilityIdAsync(FacilityId);
 
         Assert.IsType<AcceptedResult>(result);
-        mocker.GetMock<IOrganizationLocationConfigurationManager>().Verify(m => m.DeleteByFacilityIdAsync(It.IsAny<string>()), Times.Once);
+        mocker.GetMock<IOrganizationLocationConfigurationManager>().Verify(m => m.DeleteByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -436,7 +436,7 @@ public class OrganizationLocationConfigurationControllerTests
     {
         var mocker = new AutoMocker();
         mocker.GetMock<IOrganizationLocationConfigurationManager>()
-            .Setup(m => m.DeleteByFacilityIdAsync(It.IsAny<string>()))
+            .Setup(m => m.DeleteByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("boom"));
 
         var controller = mocker.CreateInstance<OrganizationLocationConfigurationController>();
