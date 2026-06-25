@@ -195,7 +195,7 @@ public class ResourcesAcquiredListener : BackgroundService
                 {
                     FacilityId = result.Message.Key.FacilityId,
                     ResourceType = resourceType.ToString(),
-                });
+                }, cancellationToken: cancellationToken);
 
                 if (sequences == null || sequences.Count == 0)
                 {
@@ -225,11 +225,11 @@ public class ResourcesAcquiredListener : BackgroundService
 
                         var operationResult = operation.OperationType switch
                         {
-                            OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource),
-                            OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource),
-                            OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource),
-                            OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource),
-                            OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, resource),
+                            OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource, cancellationToken),
+                            OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource, cancellationToken),
+                            OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource, cancellationToken),
+                            OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource, cancellationToken),
+                            OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, resource, cancellationToken),
                             _ => null
                         };
 
@@ -262,7 +262,7 @@ public class ResourcesAcquiredListener : BackgroundService
                 resourceCache.UpdateCorrelationCache(correlationId, resources, resourceType);
             }
 
-            await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId);
+            await ProduceResourcesNormalizedMessage(result, result.Message.Key.FacilityId, correlationId, cancellationToken);
 
             resourceCache.Delete(result.Message.Value.CacheKeys);
         }
@@ -304,7 +304,7 @@ public class ResourcesAcquiredListener : BackgroundService
         }
     }
 
-    private async Task ProduceResourcesNormalizedMessage(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, string facilityId, string correlationId)
+    private async Task ProduceResourcesNormalizedMessage(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, string facilityId, string correlationId, CancellationToken cancellationToken = default)
     {
         var headers = new Headers
         {
@@ -328,7 +328,7 @@ public class ResourcesAcquiredListener : BackgroundService
 
         try
         {
-            await _producer.ProduceAsync(KafkaTopic.ResourcesNormalized.ToString(), produceMessage);
+            await _producer.ProduceAsync(KafkaTopic.ResourcesNormalized.ToString(), produceMessage, cancellationToken);
         }
         catch (ProduceException<ResourceKey, ResourcesNormalizedValue> ex)
         {

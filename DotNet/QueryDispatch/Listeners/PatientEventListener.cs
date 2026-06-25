@@ -152,7 +152,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                         throw new TransientException($"No active scheduled report periods found for facility {HtmlInputSanitizer.Sanitize(consumeResult.Message.Key)}");
                                     }
 
-                                    await patientDispatchMgr.createPatientDispatch(patientDispatch);
+                                    await patientDispatchMgr.createPatientDispatch(patientDispatch, consumeCancellationToken);
 
                                     _patientEventConsumer.Commit(consumeResult);
                                 }

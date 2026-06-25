@@ -88,7 +88,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                             {                                                
                                                 foreach (var recipient in messageValue.Recipients)
                                                 {
-                                                    bool isValid = await _validateEmailAddressCommand.Execute(recipient);
+                                                    bool isValid = await _validateEmailAddressCommand.Execute(recipient, consumeCancellationToken);
                                                     if (!isValid)
                                                     {
                                                         _logger.LogNotificationRequestedInvalidEmailAddress(recipient);
@@ -104,7 +104,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                             {
                                                 foreach (var recipient in messageValue.Bcc)
                                                 {
-                                                    bool isValid = await _validateEmailAddressCommand.Execute(recipient);
+                                                    bool isValid = await _validateEmailAddressCommand.Execute(recipient, consumeCancellationToken);
                                                     if (!isValid)
                                                     {
                                                         _logger.LogNotificationRequestedInvalidEmailAddress(recipient);
@@ -135,7 +135,7 @@ namespace LantanaGroup.Link.Notification.Listeners
                                         }
 
                                         //asynchrounously send the email
-                                        _ = Task.Run(() => _sendNotificationCommand.Execute(sendModel), consumeCancellationToken);
+                                        _ = Task.Run(() => _sendNotificationCommand.Execute(sendModel, consumeCancellationToken), consumeCancellationToken);
                                     }                                    
 
                                     //consume the result and offset

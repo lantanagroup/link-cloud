@@ -103,7 +103,7 @@ public class PayloadSubmittedListener(
 
         var correlationId = Encoding.UTF8.GetString(headerValue);
 
-        var scope = serviceScopeFactory.CreateScope();
+        using var scope = serviceScopeFactory.CreateScope();
         var reportScheduledManager = scope.ServiceProvider.GetRequiredService<IReportScheduledManager>();
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
         var reportManifestProducer = scope.ServiceProvider.GetRequiredService<ReportManifestProducer>();
@@ -119,7 +119,7 @@ public class PayloadSubmittedListener(
 
             if (result.Message.Value.PayloadType == PayloadType.MeasureReportSubmissionEntry)
             {
-                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == reportTrackingId);
+                var reportEntry = await database.ReportEntryRepository.FirstAsync(e => e.PatientId == result.Message.Value.PatientId && e.ReportScheduleId == reportTrackingId, cancellationToken);
 
                 reportEntry.SubmissionStatus = SubmissionStatus.Submitted;
                 reportEntry.SubmitReportDateTime = DateTime.UtcNow;
@@ -127,7 +127,7 @@ public class PayloadSubmittedListener(
                 database.ReportEntryRepository.Update(reportEntry);
                 await database.SaveChangesAsync(cancellationToken);
 
-                await reportManifestProducer.Produce(reportSchedule, correlationId);
+                await reportManifestProducer.Produce(reportSchedule, correlationId, cancellationToken);
             }
             else if (result.Message.Value.PayloadType == PayloadType.ReportSchedule)
             {

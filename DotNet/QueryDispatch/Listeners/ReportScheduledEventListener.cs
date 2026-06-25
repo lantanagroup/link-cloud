@@ -105,19 +105,19 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
 
                                     _logger.LogInformation("Consumed Event for: Facility '{FacilityId}' has a report type of '{ReportType}' with a report period of {startDate} to {endDate}", key, value.ReportTypes, startDate, endDate);
 
-                                    var existingRecord = await scheduledReportRepo.FirstOrDefaultAsync(x => x.FacilityId == key);
+                                    var existingRecord = await scheduledReportRepo.FirstOrDefaultAsync(x => x.FacilityId == key, consumeCancellationToken);
 
                                     if (existingRecord != null)
                                     {
                                         _logger.LogInformation("Facility {facilityId} found", key);
 
                                         ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
-                                        await scheduledReportMgr.UpdateScheduledReport(existingRecord, scheduledReport);
+                                        await scheduledReportMgr.UpdateScheduledReport(existingRecord, scheduledReport, consumeCancellationToken);
                                     }
                                     else
                                     {
                                         ScheduledReportEntity scheduledReport = _queryDispatchFactory.CreateScheduledReport(key, value.ReportTypes, frequency, startDate, endDate, reportTrackingId);
-                                        await scheduledReportMgr.createScheduledReport(scheduledReport);
+                                        await scheduledReportMgr.createScheduledReport(scheduledReport, consumeCancellationToken);
                                     }
 
                                     _reportScheduledConsumer.Commit(consumeResult);

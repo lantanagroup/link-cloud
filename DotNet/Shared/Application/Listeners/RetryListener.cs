@@ -113,7 +113,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                                 _logger.LogInformation("Scheduling retry for {Topic}-{Id} at {ScheduledTrigger}, Retry Count: {RetryCount}", retryModel.Topic, retryModel.Id, retryModel.ScheduledTrigger, retryModel.RetryCount);
 
-                                await RetryScheduleService.CreateJobAndTrigger(retryModel, scheduler);
+                                await RetryScheduleService.CreateJobAndTrigger(retryModel, scheduler, consumeCancellationToken);
                             }
                             catch (DeadLetterException ex)
                             {
