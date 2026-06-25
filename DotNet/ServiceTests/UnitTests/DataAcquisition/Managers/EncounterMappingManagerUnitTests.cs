@@ -22,6 +22,8 @@ public class EncounterMappingManagerUnitTests
     private readonly Mock<IEntityRepository<EncounterLocation>> _mockLocationRepo;
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly Mock<IEntityRepository<OrganizationLocationMapping>> _mockOrgLocationRepo;
+    private readonly Mock<IEntityRepository<FhirQueryConfiguration>> _mockFhirQueryConfigRepo;
+    private readonly Mock<IEntityRepository<DataAcquisitionLog>> _mockDataAcqLogRepo;
     private readonly EncounterMappingManager _manager;
 
     public EncounterMappingManagerUnitTests()
@@ -30,10 +32,24 @@ public class EncounterMappingManagerUnitTests
         _mockMappingRepo = new Mock<IEntityRepository<EncounterMapping>>();
         _mockLocationRepo = new Mock<IEntityRepository<EncounterLocation>>();
         _mockOrgLocationRepo = new Mock<IEntityRepository<OrganizationLocationMapping>>();
+        _mockFhirQueryConfigRepo = new Mock<IEntityRepository<FhirQueryConfiguration>>();
+        _mockDataAcqLogRepo = new Mock<IEntityRepository<DataAcquisitionLog>>();
 
         _mockDatabase.Setup(d => d.EncounterMappingRepository).Returns(_mockMappingRepo.Object);
         _mockDatabase.Setup(d => d.EncounterLocationRepository).Returns(_mockLocationRepo.Object);
         _mockDatabase.Setup(d => d.LocationMappingRepository).Returns(_mockOrgLocationRepo.Object);
+        _mockDatabase.Setup(d => d.FhirQueryConfigurationRepository).Returns(_mockFhirQueryConfigRepo.Object);
+        _mockDatabase.Setup(d => d.DataAcquisitionLogRepository).Returns(_mockDataAcqLogRepo.Object);
+
+        // CreateAsync validates the facility/patient before anything else. Default both checks to
+        // "valid" so the existing create tests exercise their own scenarios; the validation-failure
+        // tests below override these per case.
+        _mockFhirQueryConfigRepo
+            .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<FhirQueryConfiguration, bool>>>()))
+            .ReturnsAsync(true);
+        _mockDataAcqLogRepo
+            .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<DataAcquisitionLog, bool>>>()))
+            .ReturnsAsync(true);
 
         var options = new DbContextOptionsBuilder<DataAcquisitionDbContext>()
             .UseInMemoryDatabase($"EncounterMappingManagerUnitTests_{Guid.NewGuid():N}")
@@ -133,6 +149,46 @@ public class EncounterMappingManagerUnitTests
         var model = new CreateEncounterMappingModel { FacilityId = "Fac1", EncounterId = "Enc1", PatientId = string.Empty };
 
         await Assert.ThrowsAsync<ArgumentException>(() => _manager.CreateAsync(model));
+    }
+
+    [Fact]
+    public async Task CreateAsync_UnknownFacility_ThrowsNotFoundException()
+    {
+        // Arrange: the FacilityId isn't a configured facility (no FhirQueryConfiguration).
+        var model = new CreateEncounterMappingModel { FacilityId = "blahblahblah", EncounterId = "Enc1", PatientId = "Pat1" };
+
+        _mockFhirQueryConfigRepo
+            .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<FhirQueryConfiguration, bool>>>()))
+            .ReturnsAsync(false);
+
+        // Act
+        var ex = await Assert.ThrowsAsync<NotFoundException>(() => _manager.CreateAsync(model));
+
+        // Assert
+        Assert.Contains("blahblahblah", ex.Message);
+        _mockMappingRepo.Verify(r => r.AddAsync(It.IsAny<EncounterMapping>()), Times.Never);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_PatientNotAssociatedWithFacility_ThrowsNotFoundException()
+    {
+        // Arrange: facility is valid, but the patientId belongs to a different facility (no
+        // DataAcquisitionLog ties this patient to this facility). Mirrors TestRail 9137.
+        var model = new CreateEncounterMappingModel { FacilityId = "Fac1", EncounterId = "Enc1", PatientId = "Pat-from-Fac2" };
+
+        _mockDataAcqLogRepo
+            .Setup(r => r.AnyAsync(It.IsAny<Expression<Func<DataAcquisitionLog, bool>>>()))
+            .ReturnsAsync(false);
+
+        // Act
+        var ex = await Assert.ThrowsAsync<NotFoundException>(() => _manager.CreateAsync(model));
+
+        // Assert
+        Assert.Contains("Pat-from-Fac2", ex.Message);
+        Assert.Contains("Fac1", ex.Message);
+        _mockMappingRepo.Verify(r => r.AddAsync(It.IsAny<EncounterMapping>()), Times.Never);
+        _mockDatabase.Verify(d => d.SaveChangesAsync(), Times.Never);
     }
 
     [Fact]

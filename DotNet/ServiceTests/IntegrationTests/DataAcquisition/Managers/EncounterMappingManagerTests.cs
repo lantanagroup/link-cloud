@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
@@ -36,12 +37,41 @@ public class EncounterMappingManagerTests
 
     private static string NewFacilityId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";
 
+    /// <summary>
+    /// CreateAsync rejects a facility that isn't configured and a patient that wasn't acquired for it.
+    /// Seed the minimal rows those checks read: a FhirQueryConfiguration for the facility and a
+    /// DataAcquisitionLog per (facility, patient).
+    /// </summary>
+    private static async Task SeedFacilityAndPatientsAsync(IServiceScope scope, string facilityId, params string[] patientIds)
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        dbContext.Set<FhirQueryConfiguration>().Add(new FhirQueryConfiguration
+        {
+            Id = Guid.NewGuid(),
+            FacilityId = facilityId,
+            FhirServerBaseUrl = "https://example.org/fhir"
+        });
+
+        foreach (var patientId in patientIds)
+        {
+            dbContext.Set<DataAcquisitionLog>().Add(new DataAcquisitionLog
+            {
+                FacilityId = facilityId,
+                PatientId = patientId
+            });
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
     [Fact]
     public async Task CreateAsync_ValidModel_ReturnsModel()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var facilityId = NewFacilityId("Facility-ABC");
+        await SeedFacilityAndPatientsAsync(scope, facilityId, "Patient-123");
 
         var locationMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
         var loc1 = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
@@ -89,6 +119,7 @@ public class EncounterMappingManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var facilityId = NewFacilityId("Test-Fac");
+        await SeedFacilityAndPatientsAsync(scope, facilityId, "Test-Pat");
 
         var locationMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
         var loc10 = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
@@ -136,6 +167,8 @@ public class EncounterMappingManagerTests
         var queries = CreateQueries(scope);
         var fac1 = NewFacilityId("Fac-1");
         var fac2 = NewFacilityId("Fac-2");
+        await SeedFacilityAndPatientsAsync(scope, fac1, "Pat-1", "Pat-2");
+        await SeedFacilityAndPatientsAsync(scope, fac2, "Pat-3");
 
         await manager.CreateAsync(new CreateEncounterMappingModel
         {
@@ -165,6 +198,8 @@ public class EncounterMappingManagerTests
         var queries = CreateQueries(scope);
         var deleteFac = NewFacilityId("Delete-Fac");
         var otherFac = NewFacilityId("Other-Fac");
+        await SeedFacilityAndPatientsAsync(scope, deleteFac, "P1", "P2");
+        await SeedFacilityAndPatientsAsync(scope, otherFac, "P3");
 
         await manager.CreateAsync(new CreateEncounterMappingModel
         {
@@ -193,9 +228,11 @@ public class EncounterMappingManagerTests
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
+        var facilityId = NewFacilityId("Fac-1");
+        await SeedFacilityAndPatientsAsync(scope, facilityId, "Pat-1");
         var model = new CreateEncounterMappingModel
         {
-            FacilityId = NewFacilityId("Fac-1"), EncounterId = "Enc-1", PatientId = "Pat-1"
+            FacilityId = facilityId, EncounterId = "Enc-1", PatientId = "Pat-1"
         };
 
         await manager.CreateAsync(model);
@@ -223,6 +260,8 @@ public class EncounterMappingManagerTests
         var fac2 = NewFacilityId("F2");
         var targetPatient = $"Target-Pat-{Guid.NewGuid():N}";
         var otherPatient = $"Other-Pat-{Guid.NewGuid():N}";
+        await SeedFacilityAndPatientsAsync(scope, fac1, targetPatient, otherPatient);
+        await SeedFacilityAndPatientsAsync(scope, fac2, targetPatient);
 
         await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = fac1, EncounterId = "E1", PatientId = targetPatient });
         await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = fac2, EncounterId = "E2", PatientId = targetPatient });
@@ -242,9 +281,11 @@ public class EncounterMappingManagerTests
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
+        var facilityId = NewFacilityId("F1");
+        await SeedFacilityAndPatientsAsync(scope, facilityId, "P1");
         var model = new CreateEncounterMappingModel
         {
-            FacilityId = NewFacilityId("F1"),
+            FacilityId = facilityId,
             EncounterId = "E1",
             PatientId = "P1",
             OrganizationLocationMappingIds = new List<int> { int.MaxValue } // Non-existent ID
@@ -262,6 +303,7 @@ public class EncounterMappingManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var facilityId = NewFacilityId("F1");
+        await SeedFacilityAndPatientsAsync(scope, facilityId, "P1");
 
         var locMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
         var loc1 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "L1" });
@@ -287,6 +329,7 @@ public class EncounterMappingManagerTests
         var manager = CreateManager(scope);
         var queries = CreateQueries(scope);
         var facilityId = NewFacilityId("F1");
+        await SeedFacilityAndPatientsAsync(scope, facilityId, "P1");
 
         await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = facilityId, EncounterId = "E1", PatientId = "P1" });
 
@@ -303,6 +346,7 @@ public class EncounterMappingManagerTests
         using var scope = _fixture.ServiceProvider.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
         var facilityId = NewFacilityId("F1");
+        await SeedFacilityAndPatientsAsync(scope, facilityId, "P1");
 
         var locMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
         var loc1 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "L1" });
@@ -326,6 +370,7 @@ public class EncounterMappingManagerTests
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
         var facilityId = NewFacilityId("F1");
+        await SeedFacilityAndPatientsAsync(scope, facilityId, "P1");
 
         var locMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
         var loc1 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "L1" });

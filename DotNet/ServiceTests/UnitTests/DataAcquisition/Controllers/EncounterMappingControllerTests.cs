@@ -652,6 +652,29 @@ public class EncounterMappingControllerTests
     }
 
     [Fact]
+    public async Task CreateAsync_FacilityOrPatientNotFound_ReturnsNotFound()
+    {
+        // The manager rejects an invalid facility or a patient not associated with the facility
+        // by throwing NotFoundException, which the controller maps to 404.
+        var mocker = new AutoMocker();
+        mocker.GetMock<IEncounterMappingManager>()
+            .Setup(m => m.CreateAsync(It.IsAny<CreateEncounterMappingModel>()))
+            .ThrowsAsync(new NotFoundException("PatientId patient-46869 is not associated with FacilityId 10566."));
+
+        var controller = CreatePostController(mocker);
+
+        var result = await controller.CreateAsync(new CreateEncounterMappingModel
+        {
+            FacilityId = FacilityId,
+            EncounterId = EncounterId,
+            PatientId = PatientId
+        });
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal((int)HttpStatusCode.NotFound, objectResult.StatusCode);
+    }
+
+    [Fact]
     public async Task CreateAsync_MappingAlreadyExists_ReturnsConflict()
     {
         var mocker = new AutoMocker();

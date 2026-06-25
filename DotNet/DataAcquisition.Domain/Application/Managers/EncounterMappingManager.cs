@@ -38,6 +38,29 @@ public class EncounterMappingManager : IEncounterMappingManager
         ArgumentException.ThrowIfNullOrEmpty(model.EncounterId, nameof(model.EncounterId));
         ArgumentException.ThrowIfNullOrEmpty(model.PatientId, nameof(model.PatientId));
 
+        // EncounterMapping rows are normally written by the acquisition pipeline, where the
+        // (FacilityId, PatientId) pair is always internally consistent. A manual create can supply
+        // arbitrary values, so guard the two integrity cases the pipeline itself can never produce:
+        //   1. a FacilityId that isn't a configured facility, and
+        //   2. a PatientId that was never acquired for that facility (e.g. it belongs to a sibling
+        //      facility sharing the same FHIR endpoint).
+        // Both surface as NotFoundException -> 404, matching the DataAcquisition convention for a
+        // well-formed request that references a resource which doesn't exist.
+        var facilityIsKnown = await _database.FhirQueryConfigurationRepository
+            .AnyAsync(c => c.FacilityId == model.FacilityId);
+        if (!facilityIsKnown)
+        {
+            throw new NotFoundException($"FacilityId {model.FacilityId} is invalid.");
+        }
+
+        var patientBelongsToFacility = await _database.DataAcquisitionLogRepository
+            .AnyAsync(l => l.FacilityId == model.FacilityId && l.PatientId == model.PatientId);
+        if (!patientBelongsToFacility)
+        {
+            throw new NotFoundException(
+                $"PatientId {model.PatientId} is not associated with FacilityId {model.FacilityId}.");
+        }
+
         var now = DateTime.UtcNow;
         var entity = new EncounterMapping
         {
