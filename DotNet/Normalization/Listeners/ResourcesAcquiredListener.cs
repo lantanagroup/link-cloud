@@ -109,11 +109,11 @@ public class ResourcesAcquiredListener : BackgroundService
         {
             try
             {
-                await kafkaConsumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
+                await kafkaConsumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                 {
                     try
                     {
-                        await ProcessMessageAsync(result,  cancellationToken);
+                        await ProcessMessageAsync(result,  consumeCancellationToken);
                     }
                     catch (DeadLetterException ex)
                     {

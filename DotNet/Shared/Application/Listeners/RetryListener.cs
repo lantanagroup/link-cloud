@@ -78,7 +78,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                     try
                     {
-                        await consumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
+                        await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                         {
                             consumeResult = result;
 
@@ -109,7 +109,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
 
                                 var retryModel = _retryEntityFactory.CreateRetryModel(consumeResult, _consumerSettings.Value);
 
-                                var scheduler = await _schedulerFactory.GetScheduler(cancellationToken);
+                                var scheduler = await _schedulerFactory.GetScheduler(consumeCancellationToken);
 
                                 _logger.LogInformation("Scheduling retry for {Topic}-{Id} at {ScheduledTrigger}, Retry Count: {RetryCount}", retryModel.Topic, retryModel.Id, retryModel.ScheduledTrigger, retryModel.RetryCount);
 

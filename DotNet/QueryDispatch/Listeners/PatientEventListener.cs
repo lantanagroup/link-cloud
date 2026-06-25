@@ -81,7 +81,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                         ConsumeResult<string, PatientEventValue>? consumeResult;
                         try
                         {
-                            await _patientEventConsumer.ConsumeWithInstrumentation(async (result, cancellationToken) =>
+                            await _patientEventConsumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                             {
                                 consumeResult = result;
 
@@ -120,7 +120,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     _logger.LogInformation("Consumed Patient Event for: Facility '{FacilityId}'. PatientId '{PatientId}' with a event type of {EventType}", HtmlInputSanitizer.Sanitize(consumeResult.Message.Key), HtmlInputSanitizer.Sanitize(value.PatientId), HtmlInputSanitizer.Sanitize(value.EventType));
 
                                     //ScheduledReportEntity scheduledReport = getScheduledReportQuery.Execute(consumeResult.Message.Key);
-                                    var scheduledReport = await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key, cancellationToken);
+                                    var scheduledReport = await scheduledReportRepository.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key, consumeCancellationToken);
 
                                     if (scheduledReport == null)
                                     {
@@ -131,7 +131,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     scheduledReport.ReportPeriods = scheduledReport.ReportPeriods.Where(r => r.StartDate <= now && r.EndDate >= now).ToList();
 
                                     // QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationQuery.Execute(consumeResult.Message.Key);
-                                    QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationRepo.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key, cancellationToken);
+                                    QueryDispatchConfigurationEntity dispatchSchedule = await queryDispatchConfigurationRepo.FirstOrDefaultAsync(x => x.FacilityId == consumeResult.Message.Key, consumeCancellationToken);
 
                                     if (dispatchSchedule == null)
                                     {
