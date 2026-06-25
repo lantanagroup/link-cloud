@@ -51,7 +51,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public virtual async Task<List<Resource>> Generate(ReportScheduleModel schedule, CancellationToken cancellationToken = default)
         {
-            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
+            using var scope = _serviceScopeFactory.CreateScope();
+            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
             var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
 
             var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, cancellationToken);
