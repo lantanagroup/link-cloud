@@ -32,16 +32,18 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             public required string? PayloadUri { get; set; }
         }
 
-        public async Task Produce(List<ProduceValidationModel> needValidation)
+        public async Task Produce(List<ProduceValidationModel> needValidation, CancellationToken cancellationToken = default)
         {
             foreach (var entry in needValidation)
             {
-                await Produce(entry.ReportScheduleId, entry.ReportTypes, entry.FacilityId, entry.PatientId, entry.PayloadUri, Guid.NewGuid().ToString());
+                await Produce(entry.ReportScheduleId, entry.ReportTypes, entry.FacilityId, entry.PatientId, entry.PayloadUri, Guid.NewGuid().ToString(), cancellationToken);
             }
         }
 
-        public async Task Produce(Guid scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId)
+        public async Task Produce(Guid scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             _logger.LogDebug("Producing ReadyForValidation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId.SanitizeForLog(), patientId.SanitizeForLog(), scheduleId.SanitizeForLog());
 
             _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
@@ -68,7 +70,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _readyForValidationProducer.Flush();
 
             var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
-            var entry = await reportEntryManager.GetEntry(scheduleId, patientId);
+            var entry = await reportEntryManager.GetEntry(scheduleId, patientId, CancellationToken.None);
 
             if (entry == null)
             {

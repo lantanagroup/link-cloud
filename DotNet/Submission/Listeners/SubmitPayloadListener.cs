@@ -175,11 +175,15 @@ namespace LantanaGroup.Link.Submission.Listeners
                     {
                         content = await _blobStorageService.DownloadFromInternalAsync(value, cancellationToken);
                     }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to download from internal blob storage.");
                         await ProduceAuditEventAsync(facilityId, correlationId, $"Failed to download from internal blob storage: {ex}", cancellationToken);
-                        
+
                         throw new TransientException("Failed to download from internal blob storage.");
                     }
                 }
@@ -197,6 +201,10 @@ namespace LantanaGroup.Link.Submission.Listeners
                     _metrics.RecordUploadDuration(uploadStopwatch.Elapsed.TotalMilliseconds, metricTags);
                     _metrics.RecordUploadSize(content.LongLength, metricTags);
                     uploaded = true;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -224,13 +232,18 @@ namespace LantanaGroup.Link.Submission.Listeners
             {
                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId!);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId!);
             }
             finally
             {
-                _consumer.Commit(result);
+                if (!cancellationToken.IsCancellationRequested)
+                    _consumer.Commit(result);
             }
         }
 

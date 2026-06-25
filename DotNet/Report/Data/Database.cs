@@ -26,7 +26,7 @@ namespace LantanaGroup.Link.Report.Data
         /// </summary>
         Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
 
-        Task SaveChangesAsync();
+        Task SaveChangesAsync(CancellationToken cancellationToken = default);
     }
 
     public class Database : IDatabase
@@ -82,9 +82,9 @@ namespace LantanaGroup.Link.Report.Data
             await DbContext.Database.RollbackTransactionAsync(cancellationToken);
         }
 
-        public async Task SaveChangesAsync()
+        public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
         {
-            await DbContext.SaveChangesAsync();
+            await DbContext.SaveChangesAsync(cancellationToken);
         }
     }
 }
