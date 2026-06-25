@@ -42,6 +42,8 @@ namespace LantanaGroup.Link.Report.KafkaProducers
 
         public async Task Produce(Guid scheduleId, List<string> reportTypes, string facilityId, string patientId, string? payloadUri, string correlationId, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             _logger.LogDebug("Producing ReadyForValidation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", facilityId.SanitizeForLog(), patientId.SanitizeForLog(), scheduleId.SanitizeForLog());
 
             _readyForValidationProducer.Produce(nameof(KafkaTopic.ReadyForValidation),
@@ -68,7 +70,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _readyForValidationProducer.Flush();
 
             var reportEntryManager = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IReportEntryManager>();
-            var entry = await reportEntryManager.GetEntry(scheduleId, patientId, cancellationToken);
+            var entry = await reportEntryManager.GetEntry(scheduleId, patientId, CancellationToken.None);
 
             if (entry == null)
             {
@@ -78,7 +80,7 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             entry.ReportingStatus = ReportingStatus.PendingValidation;
             entry.SubmissionStatus = SubmissionStatus.PendingValidation;
 
-            await reportEntryManager.UpdateAsync(entry, cancellationToken);
+            await reportEntryManager.UpdateAsync(entry, CancellationToken.None);
         }
     }
 }
