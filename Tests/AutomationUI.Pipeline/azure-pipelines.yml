@@ -204,15 +204,68 @@ stages:
               scriptLocation: "inlineScript"
               inlineScript: |
                 $audience = "$(AUTOMATION_UI_API_AUDIENCE)"
-                if (-not $audience) { throw "AUTOMATION_UI_API_AUDIENCE is required." }
-
-                $scope = "$audience/.default"
-                $accessToken = az account get-access-token --scope $scope --query accessToken -o tsv
-                if (-not $accessToken) {
-                  throw "Failed to acquire access token for scope '$scope'."
+                if (-not $audience) {
+                  Write-Error "AUTOMATION_UI_API_AUDIENCE variable is not set or empty."
+                  exit 1
                 }
 
+                $scope = "$audience/.default"
+                Write-Host "Requesting access token for scope: $scope using service connection '$(AZURE_SERVICE_CONNECTION)'"
+
+                $rawOutput = az account get-access-token --scope $scope --query accessToken -o tsv 2>&1
+                $exitCode = $LASTEXITCODE
+
+                if ($exitCode -ne 0 -or -not $rawOutput) {
+                  Write-Error "Failed to acquire access token (exit code: $exitCode)"
+                  Write-Host "az output: $rawOutput"
+                  exit 1
+                }
+
+                $accessToken = $rawOutput.Trim()
                 Write-Host "Successfully acquired Automation.UI access token."
+
+                # --- Immediate verification & diagnostics ---
+                function Get-JwtPayloadObject {
+                  param([Parameter(Mandatory=$true)][string]$Jwt)
+                  $parts = $Jwt.Split('.')
+                  if ($parts.Length -lt 2) { return $null }
+                  $payload = $parts[1].Replace('-', '+').Replace('_', '/')
+                  switch ($payload.Length % 4) {
+                    2 { $payload += '==' }
+                    3 { $payload += '=' }
+                    0 { }
+                    default { return $null }
+                  }
+                  try {
+                    $bytes = [System.Convert]::FromBase64String($payload)
+                    $json  = [System.Text.Encoding]::UTF8.GetString($bytes)
+                    return ($json | ConvertFrom-Json)
+                  } catch {
+                    return $null
+                  }
+                }
+
+                $claims = Get-JwtPayloadObject -Jwt $accessToken
+                if ($claims) {
+                  Write-Host "Token diagnostics:"
+                  Write-Host ("  aud   : {0}" -f $claims.aud)
+                  Write-Host ("  iss   : {0}" -f $claims.iss)
+                  Write-Host ("  tid   : {0}" -f $claims.tid)
+                  Write-Host ("  azp   : {0}" -f $claims.azp)
+                  Write-Host ("  oid   : {0}" -f $claims.oid)
+                  if ($claims.exp) {
+                    try {
+                      $expUtc = [DateTimeOffset]::FromUnixTimeSeconds([long]$claims.exp).UtcDateTime
+                      $remainingMin = [math]::Round(($expUtc - (Get-Date).ToUniversalTime()).TotalMinutes, 1)
+                      Write-Host ("  exp   : {0} UTC  (≈ {1} minutes remaining)" -f $expUtc.ToString("yyyy-MM-dd HH:mm:ss"), $remainingMin)
+                    } catch {
+                      Write-Host ("  exp   : {0}" -f $claims.exp)
+                    }
+                  }
+                } else {
+                  Write-Warning "Acquired token but could not decode JWT payload for diagnostics."
+                }
+
                 Write-Host "##vso[task.setvariable variable=AUTOMATION_UI_API_ACCESS_TOKEN;issecret=true]$accessToken"
 
           # -------------------------------------------------------------
