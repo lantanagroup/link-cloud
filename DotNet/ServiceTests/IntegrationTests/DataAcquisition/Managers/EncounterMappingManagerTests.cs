@@ -351,4 +351,49 @@ public class EncounterMappingManagerTests
         Assert.Contains(updated.EncounterLocations, l => l.OrganizationLocationMappingId == loc3.LocationMappingId);
         Assert.DoesNotContain(updated.EncounterLocations, l => l.OrganizationLocationMappingId == loc1.LocationMappingId);
     }
+
+    [Fact]
+    public async Task LocationMappingUpdate_CascadesMappedToOrg_UsingAnyOrgSemanticsForMultiLocationEncounter()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var locationMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        var encounterMappingManager = CreateManager(scope);
+
+        var facilityId = NewFacilityId("Cascade-OR");
+
+        // Location A is an org location; Location B is not.
+        var locOrg = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
+        { FacilityId = facilityId, LocationId = "Loc-Org", IsOrgLocation = true, IsActive = true });
+        await dbContext.SaveChangesAsync();
+        var locNonOrg = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
+        { FacilityId = facilityId, LocationId = "Loc-NonOrg", IsOrgLocation = false, IsActive = true });
+        await dbContext.SaveChangesAsync();
+
+        // The encounter references BOTH locations and is mapped to org because A is an org location.
+        await encounterMappingManager.CreateAsync(new CreateEncounterMappingModel
+        {
+            FacilityId = facilityId,
+            PatientId = "P1",
+            EncounterId = "E1",
+            MappedToOrg = true,
+            OrganizationLocationMappingIds = new List<int> { locOrg.LocationMappingId, locNonOrg.LocationMappingId }
+        });
+
+        // Act — touch the NON-org location (it stays non-org), which fires the location->encounter cascade.
+        await locationMappingManager.UpdateByIdAsync(locNonOrg.LocationMappingId,
+            new UpdateOrganizationLocationMappingModel { IsOrgLocation = false });
+
+        // Assert in a fresh scope — the cascade writes via ExecuteUpdateAsync, which bypasses the
+        // change tracker, so a read on the same context would return the stale tracked entity. A new
+        // scope reads DB truth (as a later report correlation would).
+        using var verifyScope = _fixture.ServiceProvider.CreateScope();
+        var verifyQueries = CreateQueries(verifyScope);
+
+        // MappedToOrg must remain TRUE: the encounter still references an org location.
+        // The old overwrite-cascade would have cleared it to the non-org location's value.
+        var updated = await verifyQueries.GetByFacilityIdAndEncounterIdAsync(facilityId, "E1");
+        Assert.NotNull(updated);
+        Assert.True(updated!.MappedToOrg);
+    }
 }

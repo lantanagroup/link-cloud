@@ -83,9 +83,7 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
 
         if (model.IsOrgLocation.HasValue)
         {
-            await _encounterMappingManager.UpdateMappedToOrgByOrganizationLocationMappingIdAsync(
-                locationMappingId,
-                model.IsOrgLocation.Value);
+            await _encounterMappingManager.RecomputeMappedToOrgForLocationMappingAsync(locationMappingId);
         }
 
         return ProjectToModel(entity);
@@ -161,9 +159,9 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
             
         foreach (var mapping in updatedMappings)
         {
-            await _encounterMappingManager.UpdateMappedToOrgByOrganizationLocationMappingIdAsync(
+            await _encounterMappingManager.RecomputeMappedToOrgForLocationMappingAsync(
                 mapping.LocationMappingId,
-                mapping.IsOrgLocation);
+                cancellationToken);
         }
 
         return result;
