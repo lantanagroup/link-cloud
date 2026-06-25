@@ -71,7 +71,7 @@ variables:
 
   # Automation.UI API audience (App Registration expose API URI).
   # The pipeline acquires an app-only token for "{audience}/.default".
-  AUTOMATION_UI_API_AUDIENCE: "api://b96013a1-a5fe-4dc5-b637-12d9aafba694"
+  AUTOMATION_UI_API_AUDIENCE: "api://4250b90e-2740-41e1-b6e4-b90ccc2bed5a"
 
   # System scenario IDs are deterministic and seeded by Automation.UI's
   # ScenarioSeedService -- same value in every environment.
