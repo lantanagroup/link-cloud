@@ -27,7 +27,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
         Task<ReportEntryModel?> SingleOrDefaultAsync(Expression<Func<ReportEntry, bool>> predicate,
             CancellationToken cancellationToken = default);
 
-        Task<ReportEntryModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue);
+        Task<ReportEntryModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue, CancellationToken cancellationToken = default);
 
         Task<ReportEntryModel> UpdateAsyncWithAggregateResult(ReportEntryModel model, AggregateResult aggregateResult,
             CancellationToken cancellationToken = default);
@@ -367,10 +367,10 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             }
         }
 
-        public async Task<ReportEntryModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue)
+        public async Task<ReportEntryModel> UpdateAsyncWithConsumerResult(MeasureReportGeneratedValue consumerValue, CancellationToken cancellationToken = default)
         {
             var scheduleId = Guid.Parse(consumerValue.ReportTrackingId);
-            var model = await GetEntry(scheduleId, consumerValue.PatientId);
+            var model = await GetEntry(scheduleId, consumerValue.PatientId, cancellationToken);
 
             // It's possible to receive a MeasureReportGenerated event for a
             // (schedule, patient) combination that does not yet have a
@@ -390,7 +390,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
                     MeasureReports = new List<EntryMeasureReportModel>()
                 };
 
-                await AddAsync(model, CancellationToken.None);
+                await AddAsync(model, cancellationToken);
             }
 
             var measureEntry = model.MeasureReports.FirstOrDefault(x => x.ReportType == consumerValue.ReportType);
@@ -413,7 +413,7 @@ namespace LantanaGroup.Link.Report.Domain.Managers
             else
                 measureEntry.Status = MeasureReportStatus.NotReportable;
 
-            return await UpdateAsync(model, CancellationToken.None);
+            return await UpdateAsync(model, cancellationToken);
         }
 
         public async Task<ReportEntryModel> UpdateAsyncWithAggregateResult(ReportEntryModel model,

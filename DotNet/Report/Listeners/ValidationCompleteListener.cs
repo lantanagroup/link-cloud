@@ -114,6 +114,10 @@ namespace LantanaGroup.Link.Report.Listeners
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                                 consumer.SafeCommit(result, _logger);
                             }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
                             catch (Exception ex)
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
