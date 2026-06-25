@@ -257,6 +257,9 @@ services:
     - key: "EnhancedQueryLoggingSettings:EnableEnhancedQueryLogging"
       description: "Boolean flag to enable detailed logging of database queries."
       required: true
+    - key: "PatientAggregator:IncludeOrganizationResource"
+      description: "Whether to include the submitting Organization in patient bundles."
+      required: false
   Submission:
     - key: "SubmissionServiceConfig:SubmissionDirectory"
       description: "The local or network path where submission files are stored."
