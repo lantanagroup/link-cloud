@@ -74,6 +74,10 @@ namespace QueryDispatch.Domain.Managers
 
                 return patientDispatch.FacilityId;
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Create patient dispatch exception for patient id {PatientId} in facility {FacilityId}", HtmlInputSanitizer.Sanitize(patientDispatch.PatientId), HtmlInputSanitizer.Sanitize(patientDispatch.FacilityId));
