@@ -51,6 +51,10 @@
 		<ProjectReference Include="..\Submission.Data\Submission.Data.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="ServiceTests" />
+	</ItemGroup>
+
 
 </Project>
 

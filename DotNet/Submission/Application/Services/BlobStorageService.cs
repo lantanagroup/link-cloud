@@ -29,6 +29,11 @@ namespace LantanaGroup.Link.Submission.Application.Services
             return new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
         }
 
+        internal static string GetExternalBlobName(string? blobRoot, string reportName, string bundleName, bool flatten) =>
+            flatten
+                ? GetBlobName(blobRoot, $"{reportName}_{bundleName}")
+                : GetBlobName(blobRoot, reportName, bundleName);
+
         private static string GetBlobName(string? blobRoot, params string[] segments)
         {
             IEnumerable<string> enumerable = segments;
@@ -113,7 +118,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
                     PayloadType.ReportSchedule => "manifest.ndjson",
                     _ => $"{Guid.NewGuid()}.ndjson"
                 };
-                blobName = GetBlobName(_externalSettings.BlobRoot, reportName, bundleName);
+                blobName = GetExternalBlobName(_externalSettings.BlobRoot, reportName, bundleName, _externalSettings.FlattenHierarchy);
             }
             else
             {
