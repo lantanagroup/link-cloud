@@ -9,6 +9,9 @@ using LantanaGroup.Link.Report.Domain.Enums;
 using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
+using LantanaGroup.Link.Report.Settings;
+using LantanaGroup.Link.Shared.Application.Services;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
 using System.Text;
 
@@ -21,16 +24,22 @@ namespace LantanaGroup.Link.Report.Application.Core
         private readonly BlobStorageService _blobStorageService;
         private readonly BlobContainerClient _containerClient;
         private readonly BlobStorageSettings _settings;
+        private readonly ITenantApiService _tenantApiService;
+        private readonly PatientAggregatorSettings _aggregatorSettings;
 
         public PatientAggregator(
             IReportServiceMetrics metrics,
             IReportEntryManager reportEntryManager,
             BlobStorageService blobStorageService,
-            IOptions<BlobStorageSettings> settings)
+            IOptions<BlobStorageSettings> settings,
+            ITenantApiService tenantApiService,
+            IOptions<PatientAggregatorSettings> aggregatorSettings)
         {
             _metrics = metrics ?? throw new ArgumentException(nameof(metrics));
             _reportEntryManager = reportEntryManager;
             _blobStorageService = blobStorageService;
+            _tenantApiService = tenantApiService;
+            _aggregatorSettings = aggregatorSettings.Value;
 
             _settings = settings.Value;
             _containerClient = new BlobContainerClient(_settings.ConnectionString, _settings.BlobContainerName);
@@ -137,6 +146,24 @@ namespace LantanaGroup.Link.Report.Application.Core
                                 new KeyValuePair<string, object?>("measure", measureReport.Measure)
                             });
                         }
+                    }
+                }
+
+                if (_aggregatorSettings.IncludeOrganizationResource)
+                {
+                    var facilityConfig = await _tenantApiService.GetFacilityConfig(reportSchedule.FacilityId);
+                    if (facilityConfig != null)
+                    {
+                        var organization = FhirHelperMethods.CreateOrganization(
+                            facilityConfig.FacilityName,
+                            reportSchedule.FacilityId,
+                            ReportConstants.BundleSettings.SubmittingOrganizationProfile,
+                            ReportConstants.BundleSettings.OrganizationTypeSystem,
+                            ReportConstants.BundleSettings.CdcOrgIdSystem,
+                            ReportConstants.BundleSettings.DataAbsentReasonExtensionUrl,
+                            ReportConstants.BundleSettings.DataAbsentReasonUnknownCode);
+                        var serializer = new FhirJsonSerializer();
+                        writer.WriteLine(serializer.SerializeToString(organization));
                     }
                 }
             }

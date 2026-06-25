@@ -11,10 +11,12 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Interfaces;
 using LantanaGroup.Link.Submission.Application.Services;
 using LantanaGroup.Link.Submission.KafkaProducers;
 using LantanaGroup.Link.Submission.Settings;
+using Microsoft.Extensions.Options;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -34,6 +36,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly ISubmissionServiceMetrics _metrics;
         private readonly PayloadSubmittedProducer _payloadSubmittedProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
+        private readonly ExternalBlobStorageSettings _externalBlobStorageSettings;
 
         public SubmitPayloadListener(
             ILogger<SubmitPayloadListener> logger,
@@ -43,7 +46,8 @@ namespace LantanaGroup.Link.Submission.Listeners
             IStorageService blobStorageService,
             ISubmissionServiceMetrics metrics,
             PayloadSubmittedProducer payloadSubmittedProducer,
-            AuditableEventOccurredProducer auditableEventOccurredProducer)
+            AuditableEventOccurredProducer auditableEventOccurredProducer,
+            IOptions<ExternalBlobStorageSettings> externalBlobStorageSettings)
         {
             _logger = logger;
 
@@ -66,6 +70,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             _payloadSubmittedProducer = payloadSubmittedProducer;
 
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
+            _externalBlobStorageSettings = externalBlobStorageSettings.Value;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -149,6 +154,17 @@ namespace LantanaGroup.Link.Submission.Listeners
                 if (value.ReportTypes == null || value.ReportTypes.Count == 0)
                 {
                     throw new DeadLetterException("Measure IDs not specified.");
+                }
+
+                if (_externalBlobStorageSettings.SuppressManifest && value.PayloadType == PayloadType.ReportSchedule)
+                {
+                    _payloadSubmittedProducer.Produce(
+                        correlationId,
+                        facilityId,
+                        key.ReportScheduleId,
+                        value.PayloadType,
+                        value.PatientId);
+                    return;
                 }
 
                 byte[]? content = null;
