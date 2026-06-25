@@ -83,17 +83,18 @@ var allowAnonymousAccess = builder.Configuration
 
 const string ApiBearerPolicyName = "ApiBearerPolicy";
 const string ApiBearerSchemeName = "ApiBearer";
+const string ApiBearerConfigSection = "Authentication:ApiBearer";
 
-var apiBearerEnabled = builder.Configuration.GetValue<bool>("Authentication:ApiBearer:Enabled");
-var apiBearerAuthority = builder.Configuration["Authentication:ApiBearer:Authority"];
-var apiBearerAudience = builder.Configuration["Authentication:ApiBearer:Audience"];
+var apiBearerEnabled = builder.Configuration.GetValue<bool>($"{ApiBearerConfigSection}:Enabled");
+var apiBearerAuthority = builder.Configuration[$"{ApiBearerConfigSection}:Authority"];
+var apiBearerAudience = builder.Configuration[$"{ApiBearerConfigSection}:Audience"];
 
 if (apiBearerEnabled)
 {
     if (string.IsNullOrWhiteSpace(apiBearerAuthority) || string.IsNullOrWhiteSpace(apiBearerAudience))
     {
         throw new InvalidOperationException(
-            "Authentication:ApiBearer is enabled but Authority/Audience are not configured.");
+            $"{ApiBearerConfigSection} is enabled but {ApiBearerConfigSection}:Authority/{ApiBearerConfigSection}:Audience are not configured.");
     }
 
     builder.Services

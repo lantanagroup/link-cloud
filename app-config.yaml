@@ -34,6 +34,7 @@ global:
   # every non-/health request is returned as 503 before bearer-token validation can run.
   # To make ApiBearer-protected endpoints reachable, EnableAnonymousAccess and
   # Authentication:ApiBearer:Enabled must be configured together for the target environment.
+  # Canonical key path is Authentication:ApiBearer:* (not top-level ApiBearer:*).
   - key: "Authentication:Schemas:LinkBearer:Authority"
     description: "The OIDC authority URL used for validating bearer tokens."
     required: true
