@@ -62,6 +62,14 @@ namespace LantanaGroup.Link.Submission.Application.Services
             {
                 blobName = blobName.Substring(_internalSettings.BlobRoot.Length);
             }
+            if (_externalSettings.FlattenHierarchy)
+            {
+                int index = blobName.LastIndexOf('/');
+                if (index != -1)
+                {
+                    blobName = $"{blobName[..index]}_{blobName[(index + 1)..]}";
+                }
+            }
             return GetBlobName(_externalSettings.BlobRoot, blobName);
         }
 
