@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
@@ -8,6 +9,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Factory;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Serializers;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security;
@@ -72,6 +74,22 @@ public interface ILocationMappingService
     /// them map to the organization.
     /// </returns>
     Task<bool> IsPatientReportableAsync(string facilityId, string patientId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Evaluates and upserts a batch of Location resources for a facility — the shared routine used by
+    /// both acquisition and re-evaluation. Each Location's IsOrgLocation is recomputed against the
+    /// active conditions and its mapping is added/updated, cascading MappedToOrg to linked encounter
+    /// mappings. Does not require active conditions (none → every Location evaluates as non-org).
+    /// </summary>
+    Task UpdateLocationMappingsAsync(string facilityId, IReadOnlyCollection<Location> locations, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Re-evaluates the facility's existing Location mappings against the current conditions using the
+    /// Location bodies cached in ReferenceResources. Called when a facility's org-location configuration
+    /// changes so already-acquired Locations don't keep a stale IsOrgLocation/MappedToOrg. Mappings with
+    /// no cached body are left untouched and re-evaluated fresh on their next acquisition.
+    /// </summary>
+    Task ReevaluateLocationMappingsAsync(string facilityId, CancellationToken cancellationToken);
 }
 
 public class LocationMappingService(
@@ -80,6 +98,7 @@ public class LocationMappingService(
     IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
     IEncounterMappingQueries encounterMappingQueries,
     IEncounterMappingManager encounterMappingManager,
+    IReferenceResourcesQueries referenceResourcesQueries,
     ICacheService cacheService,
     ILogger<LocationMappingService> logger) : ILocationMappingService
 
@@ -95,6 +114,7 @@ public class LocationMappingService(
 
     private readonly IEncounterMappingQueries _encounterMappingQueries = encounterMappingQueries;
     private readonly IEncounterMappingManager _encounterMappingManager = encounterMappingManager;
+    private readonly IReferenceResourcesQueries _referenceResourcesQueries = referenceResourcesQueries;
     private readonly ICacheService _cacheService = cacheService;
     private readonly ILogger<LocationMappingService> _logger = logger;
 
@@ -114,6 +134,89 @@ public class LocationMappingService(
             throw new NotFoundException($"FacilityId {facilityId} does not have any location mappings configured");
         }
 
+        return await UpsertLocationMappingAsync(facilityId, location, locationAlias, cancellationToken);
+    }
+
+    public async Task UpdateLocationMappingsAsync(string facilityId, IReadOnlyCollection<Location> locations,
+        CancellationToken cancellationToken)
+    {
+        foreach (var location in locations)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await UpsertLocationMappingAsync(facilityId, location, locationAlias: null, cancellationToken);
+        }
+    }
+
+    public async Task ReevaluateLocationMappingsAsync(string facilityId, CancellationToken cancellationToken)
+    {
+        var mappings = await _organizationLocationMappingQueries.GetByFacilityIdAsync(facilityId);
+        if (mappings.Count == 0)
+        {
+            return;
+        }
+
+        var locationIds = mappings
+            .Select(m => m.LocationId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (locationIds.Count == 0)
+        {
+            return;
+        }
+
+        // Re-evaluation only touches Locations whose bodies were cached during acquisition; mappings
+        // without a cached body are left as-is and get evaluated fresh on their next acquisition.
+        var cachedRecords = (await _referenceResourcesQueries.SearchAsync(new SearchReferenceResourcesModel
+        {
+            FacilityId = facilityId,
+            ResourceType = ResourceType.Location.ToString(),
+            ResourceIds = locationIds,
+            PageSize = int.MaxValue
+        }, cancellationToken)).Records;
+
+        var locations = new List<Location>();
+        foreach (var record in cachedRecords)
+        {
+            try
+            {
+                if (FhirResourceDeserializer.DeserializeFhirResource(record) is Location location)
+                {
+                    locations.Add(location);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "ReevaluateLocationMappingsAsync: failed to deserialize cached Location {ResourceId} for facility {FacilityId}; skipping.",
+                    record.ResourceId.SanitizeForLog(), facilityId.SanitizeForLog());
+            }
+        }
+
+        if (locations.Count == 0)
+        {
+            return;
+        }
+
+        await UpdateLocationMappingsAsync(facilityId, locations, cancellationToken);
+
+        _logger.LogDebug(
+            "Re-evaluated {Count} cached Location(s) for facility {FacilityId} after a configuration change.",
+            locations.Count, facilityId.SanitizeForLog());
+    }
+
+    /// <summary>
+    /// Core evaluate-and-upsert for a single Location: resolves any existing mapping and PartOf parent,
+    /// re-evaluates IsOrgLocation against the active conditions, and adds or updates the mapping (the
+    /// update path cascades MappedToOrg to linked encounter mappings). Unlike the public
+    /// <see cref="UpdateLocationMappingAsync"/>, this does NOT require active conditions — with none,
+    /// IsOrgLocationAsync returns false, which correctly demotes the location to non-org.
+    /// </summary>
+    private async Task<OrganizationLocationMappingModel> UpsertLocationMappingAsync(string facilityId, Location location,
+        string? locationAlias, CancellationToken cancellationToken)
+    {
         var locationMapping =
             await _organizationLocationMappingQueries.GetByFacilityIdAndLocationIdAsync(
                 facilityId: facilityId,

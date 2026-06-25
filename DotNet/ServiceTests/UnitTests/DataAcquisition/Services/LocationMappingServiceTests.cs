@@ -23,6 +23,7 @@ public class LocationMappingServiceTests
     private readonly Mock<IOrganizationLocationConfigurationQueries> _mockConfigQueries = new();
     private readonly Mock<IEncounterMappingQueries> _mockEncounterMappingQueries = new();
     private readonly Mock<IEncounterMappingManager> _mockEncounterMappingManager = new();
+    private readonly Mock<IReferenceResourcesQueries> _mockReferenceResourcesQueries = new();
     private readonly Mock<ICacheService> _mockCache = new();
     private readonly Mock<ILogger<LocationMappingService>> _mockLogger = new();
 
@@ -99,6 +100,7 @@ public class LocationMappingServiceTests
             _mockConfigQueries.Object,
             _mockEncounterMappingQueries.Object,
             _mockEncounterMappingManager.Object,
+            _mockReferenceResourcesQueries.Object,
             _mockCache.Object,
             _mockLogger.Object);
     }
