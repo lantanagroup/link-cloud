@@ -640,6 +640,7 @@ public class PatientDataService : IPatientDataService
                 // single durable same-phase reference log per (correlation, type).
                 var isReferenceLog = log.FhirQuery.Any(q => q.IsReference.GetValueOrDefault());
                 var referenceAccumulator = new DiscoveredReferenceAccumulator();
+                var pendingReferenceIdsAdded = 0;
 
                 if (isReferenceLog)
                 {
@@ -731,16 +732,16 @@ public class PatientDataService : IPatientDataService
                 // reference log per (correlation, type) before this primary goes terminal.
                 if (referenceAccumulator != null && referenceAccumulator.HasAny)
                 {
-                    await _referenceResourceService.FetchAndPersistAsync(
+                    pendingReferenceIdsAdded = await _referenceResourceService.FetchAndPersistAsync(
                         log, referenceAccumulator, cancellationToken);
                 }
 
                 // Stop timer and persist the terminal state for this execution.
                 stopwatch.Stop();
 
-                if (isReferenceLog && referenceAccumulator != null && referenceAccumulator.HasAny)
+                if (isReferenceLog && pendingReferenceIdsAdded > 0)
                 {
-                    newNotes.Add($"[{DateTime.UtcNow}] Reference log discovered {referenceAccumulator.Count} more references during execution. Setting status back to Pending for re-execution.");
+                    newNotes.Add($"[{DateTime.UtcNow}] Reference log discovered {pendingReferenceIdsAdded} new reference(s) during execution. Setting status back to Pending for re-execution.");
                     log.Status = RequestStatus.Pending;
                 }
                 else
