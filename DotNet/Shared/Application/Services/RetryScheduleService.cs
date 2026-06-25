@@ -40,13 +40,13 @@ public class RetryScheduleService : BackgroundService
         await base.StopAsync(cancellationToken);
     }
 
-    public static async Task CreateJobAndTrigger(RetryModel model, IScheduler scheduler)
+    public static async Task CreateJobAndTrigger(RetryModel model, IScheduler scheduler, CancellationToken cancellationToken = default)
     {
         IJobDetail job = CreateJob(model);
-        await scheduler.AddJob(job, true);  // 'true' replaces if exists
+        await scheduler.AddJob(job, true, cancellationToken);  // 'true' replaces if exists
 
         ITrigger trigger = CreateTrigger(model, job.Key);
-        await scheduler.ScheduleJob(trigger);
+        await scheduler.ScheduleJob(trigger, cancellationToken);
     }
 
     public static IJobDetail CreateJob(RetryModel model)

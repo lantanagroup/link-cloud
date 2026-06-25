@@ -387,6 +387,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 var transientException = new TransientException(exceptionMessage, ex);
                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _transientExceptionHandler.HandleException(result, ex, facilityId);

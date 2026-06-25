@@ -36,7 +36,7 @@ namespace LantanaGroup.Link.Report.Application.Core
             _containerClient = new BlobContainerClient(_settings.ConnectionString, _settings.BlobContainerName);
         }
 
-        public async Task<AggregateResult> AggregateToABS(string patientId, ReportScheduleModel reportSchedule)
+        public async Task<AggregateResult> AggregateToABS(string patientId, ReportScheduleModel reportSchedule, CancellationToken cancellationToken = default)
         {
             if (_containerClient == null)
             {
@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Report.Application.Core
 
             AggregateResult aggregateResult = new AggregateResult();
 
-            var entry = await _reportEntryManager.SingleOrDefaultAsync(x => x.ReportScheduleId == reportSchedule.Id && x.PatientId == patientId);
+            var entry = await _reportEntryManager.SingleOrDefaultAsync(x => x.ReportScheduleId == reportSchedule.Id && x.PatientId == patientId, cancellationToken);
 
             if (entry == null)
             {
@@ -65,7 +65,7 @@ namespace LantanaGroup.Link.Report.Application.Core
             aggregateResult.Uri = writeBlobClient.Uri;
             aggregateResult.BlobName = blobName;
 
-            using (Stream write_stream = await writeBlobClient.OpenWriteAsync(true))
+            using (Stream write_stream = await writeBlobClient.OpenWriteAsync(true, cancellationToken: cancellationToken))
             using (StreamWriter writer = new StreamWriter(write_stream))
             {
                 foreach (var measureReportEntry in entry.MeasureReports.Where(x => x.Status == MeasureReportStatus.ReadyForValidation))
@@ -73,7 +73,7 @@ namespace LantanaGroup.Link.Report.Application.Core
                     BlockBlobClient readBlobClient = _containerClient.GetBlockBlobClient(measureReportEntry.MeasureReportFileName);
                     var aggregateMeasureReport = new AggregateMeasureReportResult() { ReportType = measureReportEntry.ReportType };
 
-                    using (Stream read_stream = await readBlobClient.OpenReadAsync(true))
+                    using (Stream read_stream = await readBlobClient.OpenReadAsync(cancellationToken: cancellationToken))
                     using (StreamReader reader = new StreamReader(read_stream))
                     {
                         while (reader.Peek() >= 0)
