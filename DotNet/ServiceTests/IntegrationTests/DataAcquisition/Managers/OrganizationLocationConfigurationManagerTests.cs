@@ -212,6 +212,16 @@ public class OrganizationLocationConfigurationManagerTests
             var locationMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
             var encounterMappingManager = scope.ServiceProvider.GetRequiredService<IEncounterMappingManager>();
 
+            // EncounterMappingManager.CreateAsync validates the facility is configured and the patient
+            // was acquired for it, so seed the rows those checks read.
+            dbContext.Set<FhirQueryConfiguration>().Add(new FhirQueryConfiguration
+            {
+                Id = Guid.NewGuid(),
+                FacilityId = facilityId,
+                FhirServerBaseUrl = "https://example.org/fhir"
+            });
+            dbContext.Set<DataAcquisitionLog>().Add(new DataAcquisitionLog { FacilityId = facilityId, PatientId = "P1" });
+
             dbContext.ReferenceResources.Add(new ReferenceResources
             {
                 Id = Guid.NewGuid(),

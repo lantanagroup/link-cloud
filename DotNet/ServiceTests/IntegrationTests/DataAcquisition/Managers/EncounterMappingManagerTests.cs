@@ -406,6 +406,7 @@ public class EncounterMappingManagerTests
         var encounterMappingManager = CreateManager(scope);
 
         var facilityId = NewFacilityId("Cascade-OR");
+        await SeedFacilityAndPatientsAsync(scope, facilityId, "P1");
 
         // Location A is an org location; Location B is not.
         var locOrg = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
