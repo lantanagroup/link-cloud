@@ -200,6 +200,13 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddSingleton<IProducer<ResourceKey, ResourcesAcquired>>(ResourcesAcquiredProducerMock.Object);
             builder.Services.AddSingleton<IResourceCache>(ResourceCacheMock.Object);
 
+            // AcquisitionProcessorBackgroundService dependencies: the real dependency checker exercises
+            // the reportability gate end-to-end; the patient-data service and ReadyToAcquire producer
+            // factory only need to resolve (the NotReportable path never invokes them).
+            builder.Services.AddScoped<IAcquisitionDependencyChecker, AcquisitionDependencyChecker>();
+            builder.Services.AddScoped<IPatientDataService>(_ => new Mock<IPatientDataService>().Object);
+            builder.Services.AddSingleton<IKafkaProducerFactory<long, ReadyToAcquire>>(_ => new Mock<IKafkaProducerFactory<long, ReadyToAcquire>>().Object);
+
             builder.Services.Configure<ServiceRegistry>(options =>
             {
                 options.TenantService = new TenantServiceRegistration

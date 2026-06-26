@@ -154,6 +154,27 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
 
                 return;
             }
+
+            if (!depResult.IsPatientReportable)
+            {
+                // Dependencies are satisfied but the patient has no org-mapped encounters, so this
+                // dependent log is preempted: mark it NotReportable (terminal) without acquiring, and
+                // still fire the tail. The Patient/Encounter/Location logs are NOT gated, so the patient
+                // bundle still reaches MeasureEval as a non-reportable outcome.
+                _logger.LogInformation(
+                    "Log {LogId} preempted: patient not reportable (no org-mapped encounters). Marking NotReportable.",
+                    log.Id.SanitizeForLog());
+
+                await logManager.TrySetLogStatusAsync(
+                    log.Id,
+                    [RequestStatus.Queued],
+                    RequestStatus.NotReportable,
+                    note: $"[{DateTime.UtcNow:O}] Patient not reportable (no org-mapped encounters); acquisition skipped.",
+                    cancellationToken: ct);
+
+                await TryProduceTailMessageAsync(scope.ServiceProvider, logManager, log.Id, ct);
+                return;
+            }
         }
         catch (OperationCanceledException)
         {
