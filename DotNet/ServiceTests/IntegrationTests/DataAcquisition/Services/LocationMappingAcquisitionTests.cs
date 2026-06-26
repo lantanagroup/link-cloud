@@ -12,6 +12,7 @@ using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using Task = System.Threading.Tasks.Task;
 
@@ -60,6 +61,7 @@ public class LocationMappingAcquisitionTests
             scope.ServiceProvider.GetRequiredService<IEncounterMappingManager>(),
             scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>(),
             new InMemoryCacheService(new MemoryCache(new MemoryCacheOptions { SizeLimit = 1024 })),
+            new Mock<IResourceCache>().Object,
             NullLogger<LocationMappingService>.Instance);
     }
 

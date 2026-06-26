@@ -76,6 +76,22 @@ public interface ILocationMappingService
     Task<bool> IsPatientReportableAsync(string facilityId, string patientId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Removes non-org encounters (EncounterMapping.MappedToOrg == false) from the correlation's
+    /// acquired-resource cache before the tail's ResourcesAcquired event is produced. The Encounter is
+    /// fetched and cached by its own (ungated) primary log, so marking a dependent log NotReportable does
+    /// not keep the non-org encounter out of MeasureEval; this strip does. A patient whose encounters are
+    /// all non-org ends up with no cached encounter — MeasureEval evaluates no qualifying encounter and
+    /// produces a non-reportable outcome — while a patient with a mix keeps only the org encounters.
+    /// No-op when org-location mapping is not active for the facility.
+    /// </summary>
+    /// <param name="facilityId">The facility the correlation belongs to.</param>
+    /// <param name="correlationId">The acquisition correlation whose cached encounters to filter.</param>
+    /// <param name="patientId">The patient whose encounter mappings determine org membership.</param>
+    /// <param name="cancellationToken">Used to signal a cancellation in the request.</param>
+    /// <returns>The number of non-org encounters stripped from the cache.</returns>
+    Task<int> StripNonOrgEncountersFromCacheAsync(string facilityId, string correlationId, string patientId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Evaluates and upserts a batch of Location resources for a facility — the shared routine used by
     /// both acquisition and re-evaluation. Each Location's IsOrgLocation is recomputed against the
     /// active conditions and its mapping is added/updated, cascading MappedToOrg to linked encounter
@@ -100,6 +116,7 @@ public class LocationMappingService(
     IEncounterMappingManager encounterMappingManager,
     IReferenceResourcesQueries referenceResourcesQueries,
     ICacheService cacheService,
+    IResourceCache resourceCache,
     ILogger<LocationMappingService> logger) : ILocationMappingService
 
 {
@@ -116,6 +133,7 @@ public class LocationMappingService(
     private readonly IEncounterMappingManager _encounterMappingManager = encounterMappingManager;
     private readonly IReferenceResourcesQueries _referenceResourcesQueries = referenceResourcesQueries;
     private readonly ICacheService _cacheService = cacheService;
+    private readonly IResourceCache _resourceCache = resourceCache;
     private readonly ILogger<LocationMappingService> _logger = logger;
 
     // FhirPath strings are validated (compiled) at config-write time and are low-cardinality per
@@ -353,6 +371,67 @@ public class LocationMappingService(
         }
 
         return reportable;
+    }
+
+    public async Task<int> StripNonOrgEncountersFromCacheAsync(string facilityId, string correlationId, string patientId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(correlationId) || string.IsNullOrWhiteSpace(patientId))
+        {
+            return 0;
+        }
+
+        // Stripping only applies when org-location mapping is active; otherwise every encounter is
+        // reportable and the cache must be left intact.
+        var organizationLocationMappingIsConfigured = await _organizationLocationConfigurationQueries
+            .HasActiveByFacilityIdAsync(facilityId, cancellationToken);
+        if (!organizationLocationMappingIsConfigured)
+        {
+            return 0;
+        }
+
+        var cacheKey = $"{correlationId}:{ResourceType.Encounter}";
+        var cachedEncounters = _resourceCache.Get(cacheKey);
+        if (cachedEncounters.Count == 0)
+        {
+            return 0;
+        }
+
+        var encounterMappings = await _encounterMappingQueries
+            .GetByFacilityIdAndPatientIdAsync(facilityId, patientId, cancellationToken);
+
+        var nonOrgEncounterIds = encounterMappings
+            .Where(mapping => !mapping.MappedToOrg)
+            .Select(mapping => mapping.EncounterId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (nonOrgEncounterIds.Count == 0)
+        {
+            return 0;
+        }
+
+        var orgEncounters = cachedEncounters
+            .Where(encounter => !nonOrgEncounterIds.Contains(encounter.Id))
+            .ToList();
+
+        var strippedCount = cachedEncounters.Count - orgEncounters.Count;
+        if (strippedCount == 0)
+        {
+            return 0;
+        }
+
+        // UpdateCorrelationCache is an additive HashSet, so removing entries requires deleting the key
+        // and rewriting it with only the org encounters. When none remain the key is left empty, so
+        // Normalization/MeasureEval rehydrate no qualifying encounter for this correlation.
+        _resourceCache.Delete([cacheKey]);
+        if (orgEncounters.Count > 0)
+        {
+            _resourceCache.UpdateCorrelationCache(cacheKey, orgEncounters, ResourceType.Encounter);
+        }
+
+        _logger.LogInformation(
+            "Stripped {StrippedCount} non-org encounter(s) from cache key {CacheKey} for facility {FacilityId} (patient {PatientId}); {RemainingCount} org encounter(s) remain.",
+            strippedCount, cacheKey.SanitizeForLog(), facilityId.SanitizeForLog(), patientId.SanitizeForLog(), orgEncounters.Count);
+
+        return strippedCount;
     }
 
     public async Task<EncounterMappingModel?> UpdateEncounterLocationMappingAsync(string facilityId, Encounter encounter, CancellationToken cancellationToken = default)
