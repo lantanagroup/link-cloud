@@ -524,6 +524,9 @@ public class PatientDataService : IPatientDataService
                     $"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
             }
 
+            //log should not have the notes collection loaded from the database as the collection will be reused to add new notes during this execution.
+            log.Notes = new List<string>();
+
             //check if isCensus, if true, create scope for PatientCensusService and execute RetrieveListData
             if (log.IsCensus)
             {
@@ -637,6 +640,7 @@ public class PatientDataService : IPatientDataService
                 // single durable same-phase reference log per (correlation, type).
                 var isReferenceLog = log.FhirQuery.Any(q => q.IsReference.GetValueOrDefault());
                 var referenceAccumulator = new DiscoveredReferenceAccumulator();
+                var pendingReferenceIdsAdded = 0;
 
                 if (isReferenceLog)
                 {
@@ -728,16 +732,16 @@ public class PatientDataService : IPatientDataService
                 // reference log per (correlation, type) before this primary goes terminal.
                 if (referenceAccumulator != null && referenceAccumulator.HasAny)
                 {
-                    await _referenceResourceService.FetchAndPersistAsync(
+                    pendingReferenceIdsAdded = await _referenceResourceService.FetchAndPersistAsync(
                         log, referenceAccumulator, cancellationToken);
                 }
 
                 // Stop timer and persist the terminal state for this execution.
                 stopwatch.Stop();
 
-                if (isReferenceLog && referenceAccumulator != null && referenceAccumulator.HasAny)
+                if (isReferenceLog && pendingReferenceIdsAdded > 0)
                 {
-                    newNotes.Add($"[{DateTime.UtcNow}] Reference log discovered {referenceAccumulator.Count} more references during execution. Setting status back to Pending for re-execution.");
+                    newNotes.Add($"[{DateTime.UtcNow}] Reference log discovered {pendingReferenceIdsAdded} new reference(s) during execution. Setting status back to Pending for re-execution.");
                     log.Status = RequestStatus.Pending;
                 }
                 else
@@ -745,6 +749,11 @@ public class PatientDataService : IPatientDataService
                     log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
                     log.CompletionDate = System.DateTime.UtcNow;
                     log.Status = skipFetch && !isReferenceLog ? RequestStatus.Skipped : RequestStatus.Completed;
+                }
+
+                if(log.Notes != null && log.Notes.Any())
+                {
+                    newNotes.AddRange(log.Notes);
                 }
 
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel
