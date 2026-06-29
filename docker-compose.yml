@@ -870,6 +870,7 @@ services:
       InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ExternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       ExternalBlobStorage__BlobContainerName: ${EXTERNAL_BLOB_CONTAINER_NAME}
+      ExternalBlobStorage__FlattenHierarchy: "true"
     ports:
       - "8073:8073"
     build:
