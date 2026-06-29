@@ -56,6 +56,7 @@ namespace IntegrationTests.DataAcquisition
         public Mock<IProducer<long, ReadyToAcquire>> ReadyToAcquireProducerMock { get; private set; }
         public Mock<IProducer<ResourceKey, ResourcesAcquired>> ResourcesAcquiredProducerMock { get; private set; }
         public Mock<IResourceCache> ResourceCacheMock { get; } = new Mock<IResourceCache>();
+        public Mock<IPatientDataService> PatientDataServiceMock { get; } = new Mock<IPatientDataService>();
 
         public DataAcquisitionIntegrationTestFixture()
         {
@@ -201,10 +202,11 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddSingleton<IResourceCache>(ResourceCacheMock.Object);
 
             // AcquisitionProcessorBackgroundService dependencies: the real dependency checker exercises
-            // the reportability gate end-to-end; the patient-data service and ReadyToAcquire producer
-            // factory only need to resolve (the NotReportable path never invokes them).
+            // the reportability gate end-to-end; the patient-data service is a shared mock (exposed as
+            // PatientDataServiceMock) so tests can assert it is NOT invoked on the NotReportable path; the
+            // ReadyToAcquire producer factory only needs to resolve.
             builder.Services.AddScoped<IAcquisitionDependencyChecker, AcquisitionDependencyChecker>();
-            builder.Services.AddScoped<IPatientDataService>(_ => new Mock<IPatientDataService>().Object);
+            builder.Services.AddScoped<IPatientDataService>(_ => PatientDataServiceMock.Object);
             builder.Services.AddSingleton<IKafkaProducerFactory<long, ReadyToAcquire>>(_ => new Mock<IKafkaProducerFactory<long, ReadyToAcquire>>().Object);
 
             builder.Services.Configure<ServiceRegistry>(options =>
