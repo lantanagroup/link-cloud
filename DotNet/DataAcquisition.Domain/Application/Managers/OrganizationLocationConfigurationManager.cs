@@ -168,12 +168,46 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
     public async Task DeleteByFacilityIdAsync(string facilityId, CancellationToken cancellationToken = default)
     {
-        var entities = await _database.LocationConfigurationRepository
-            .FindAsync(c => c.FacilityId == facilityId);
+        // Delete every config for the facility in a single unit of work, then invalidate and
+        // re-evaluate mappings once — not once per config (ReevaluateLocationMappingsAsync reloads
+        // all of the facility's Location mappings + cached bodies, so per-row re-evaluation is wasteful).
+        var deleted = false;
 
-        foreach (var entity in entities)
+        await _database.ExecuteInTransactionAsync(async () =>
         {
-            await DeleteByIdAsync(entity.ConfigId, cancellationToken);
+            var entities = await _database.LocationConfigurationRepository
+                .FindAsync(c => c.FacilityId == facilityId, cancellationToken);
+
+            if (entities.Count == 0)
+            {
+                return;
+            }
+
+            var configIds = entities.Select(e => e.ConfigId).ToList();
+            var conditions = await _database.LocationConditionRepository
+                .FindAsync(c => configIds.Contains(c.ConfigId), cancellationToken);
+
+            foreach (var condition in conditions)
+            {
+                _database.LocationConditionRepository.Remove(condition);
+            }
+
+            foreach (var entity in entities)
+            {
+                _database.LocationConfigurationRepository.Remove(entity);
+            }
+
+            await _database.SaveChangesAsync();
+
+            InvalidateConditionsCache(facilityId);
+            deleted = true;
+        }, cancellationToken);
+
+        // Re-evaluate after the batch delete commits — removing the facility's active conditions
+        // demotes its cached Locations to non-org (IsOrgLocationAsync returns false with no conditions).
+        if (deleted)
+        {
+            await _locationMappingService.ReevaluateLocationMappingsAsync(facilityId, cancellationToken);
         }
     }
 
