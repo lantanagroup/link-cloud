@@ -1,10 +1,8 @@
 ﻿using Automation.UI.Models;
-using Automation.UI.Services.Persistence;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
-using LantanaGroup.Link.Automation.Link.Models;
 using LantanaGroup.Link.Automation.Link.Services;
 using LantanaGroup.Link.Automation.Link.Validation;
 using LantanaGroup.Link.Sdk.Clients;
@@ -36,6 +34,7 @@ internal sealed class RunExecutor
     private readonly ISnapshotStore _snapshotStore;
     private readonly RunSnapshotOrchestrator _orchestrator;
     private readonly QueryPlanTemplateResolver _queryPlanResolver;
+    private readonly bool _suppressExternalManifest;
     private readonly ILogger _logger;
 
     public RunExecutor(
@@ -44,6 +43,7 @@ internal sealed class RunExecutor
         ISnapshotStore snapshotStore,
         RunSnapshotOrchestrator orchestrator,
         QueryPlanTemplateResolver queryPlanResolver,
+        IConfiguration configuration,
         ILogger logger)
     {
         _automationConfig = automationConfig;
@@ -51,6 +51,7 @@ internal sealed class RunExecutor
         _snapshotStore = snapshotStore;
         _orchestrator = orchestrator;
         _queryPlanResolver = queryPlanResolver;
+        _suppressExternalManifest = configuration.GetValue<bool>("ExternalBlobStorage:SuppressManifest");
         _logger = logger;
     }
 
@@ -341,6 +342,8 @@ internal sealed class RunExecutor
             var downloadedResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig);
             var internalAbsResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig, external: false);
 
+            output.WriteLine($"External manifest suppression (ExternalBlobStorage:SuppressManifest) = {_suppressExternalManifest}.");
+
             // Capture a lightweight ABS upload snapshot for the manifest detail page.
             try
             {
@@ -366,13 +369,44 @@ internal sealed class RunExecutor
                 output.WriteLine($"[WARN] Failed to persist ABS export locator metadata: {absFilesEx.Message}");
             }
 
-            if (!downloadedResources.ContainsKey("manifest.ndjson"))
-                throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
+            static bool HasExternalFile(IReadOnlyDictionary<string, object> files, string expectedFileName, out string? matchedKey)
+            {
+                if (files.ContainsKey(expectedFileName))
+                {
+                    matchedKey = expectedFileName;
+                    return true;
+                }
+
+                var suffix = "_" + expectedFileName;
+                matchedKey = files.Keys.FirstOrDefault(k =>
+                    k.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
+                return matchedKey != null;
+            }
+
+            if (!HasExternalFile(downloadedResources, "manifest.ndjson", out var manifestKey))
+            {
+                if (_suppressExternalManifest)
+                {
+                    output.WriteLine("manifest.ndjson is not present in external submission package because ExternalBlobStorage:SuppressManifest=true; continuing.");
+                }
+                else
+                {
+                    throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
+                }
+            }
+            else if (!string.Equals(manifestKey, "manifest.ndjson", StringComparison.Ordinal))
+            {
+                output.WriteLine($"Found external manifest using flattened name '{manifestKey}'.");
+            }
 
             foreach (var patientId in expectedSubmittedPatientIds)
             {
-                if (!downloadedResources.ContainsKey($"patient-{patientId}.ndjson"))
+                var expectedPatientFile = $"patient-{patientId}.ndjson";
+                if (!HasExternalFile(downloadedResources, expectedPatientFile, out var patientFileKey))
                     throw new InvalidOperationException($"Expected report to include patient-{patientId}.ndjson but it was not");
+
+                if (!string.Equals(patientFileKey, expectedPatientFile, StringComparison.Ordinal))
+                    output.WriteLine($"Found external patient file using flattened name '{patientFileKey}'.");
             }
 
             // Flush stale cache from diagnostics polling so validators read authoritative data.

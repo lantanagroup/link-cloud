@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-using System.Text.Json;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -13,10 +11,11 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Interfaces;
-using LantanaGroup.Link.Submission.Application.Services;
 using LantanaGroup.Link.Submission.KafkaProducers;
 using LantanaGroup.Link.Submission.Settings;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
+using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -158,6 +157,11 @@ namespace LantanaGroup.Link.Submission.Listeners
 
                 if (_externalBlobStorageSettings.SuppressManifest && value.PayloadType == PayloadType.ReportSchedule)
                 {
+                    _logger.LogInformation(
+                        "Skipping external manifest upload for ReportScheduleId={ReportScheduleId}, FacilityId={FacilityId} because ExternalBlobStorage:SuppressManifest=true.",
+                        key.ReportScheduleId,
+                        facilityId);
+
                     _payloadSubmittedProducer.Produce(
                         correlationId,
                         facilityId,
