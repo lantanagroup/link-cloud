@@ -28,6 +28,7 @@ public class AutomationRunManager : IAutomationRunManager
         IOptions<AutomationConfig> automationConfig,
         ILogger<AutomationRunManager> logger,
         IServiceProvider hostServices,
+        IConfiguration configuration,
         RunSnapshotOrchestrator orchestrator,
         ISnapshotStore snapshotStore,
         IQueryPlanTemplateStore queryPlanTemplateStore)
@@ -46,6 +47,7 @@ public class AutomationRunManager : IAutomationRunManager
             _snapshotStore,
             _orchestrator,
             _queryPlanResolver,
+            configuration,
             _logger);
     }
 

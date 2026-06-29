@@ -1,4 +1,4 @@
-﻿$schema: "https://json-schema.org/draft/2020-12/schema"
+$schema: "https://json-schema.org/draft/2020-12/schema"
 title: "Link App Configuration Registry"
 description: "Enumerates all required application configuration keys needed to run the system in any deployed environment."
 type: "object"
@@ -28,8 +28,27 @@ global:
   - key: "ConnectionStrings:DatabaseConnection"
     description: "The connection string for the primary service database."
     required: true
+  # Automation.UI inbound-auth coordination note:
+  # In Automation.UI Program.cs, the anonymous-access short-circuit middleware runs
+  # before UseAuthentication(). When Authentication:EnableAnonymousAccess is false,
+  # every non-/health request is returned as 503 before bearer-token validation can run.
+  # To make ApiBearer-protected endpoints reachable, EnableAnonymousAccess and
+  # Authentication:ApiBearer:Enabled must be configured together for the target environment.
+  # Canonical key path is Authentication:ApiBearer:* (not top-level ApiBearer:*).
   - key: "Authentication:Schemas:LinkBearer:Authority"
     description: "The OIDC authority URL used for validating bearer tokens."
+    required: true
+  - key: "Authentication:EnableAnonymousAccess"
+    description: "Controls whether Automation.UI serves non-health traffic. Must be true for requests to reach UseAuthentication()/ApiBearer policy evaluation."
+    required: true
+  - key: "Authentication:ApiBearer:Enabled"
+    description: "Boolean flag that enables inbound API bearer-token validation in Automation.UI for /api/runs endpoints."
+    required: true
+  - key: "Authentication:ApiBearer:Authority"
+    description: "OIDC authority URL for validating inbound Automation.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true."
+    required: true
+  - key: "Authentication:ApiBearer:Audience"
+    description: "Expected audience for inbound Automation.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true."
     required: true
   - key: "LinkTokenService:Authority"
     description: "The authority URL used by the LinkTokenService for internal token generation and validation."
