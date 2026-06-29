@@ -416,7 +416,7 @@ public class OrganizationLocationConfigurationControllerTests
         var result = await controller.DeleteByFacilityIdAsync(FacilityId);
 
         Assert.IsType<AcceptedResult>(result);
-        mocker.GetMock<IOrganizationLocationConfigurationManager>().Verify(m => m.DeleteByFacilityIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        mocker.GetMock<IOrganizationLocationConfigurationManager>().Verify(m => m.DeleteByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
