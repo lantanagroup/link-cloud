@@ -121,19 +121,40 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
     public async Task<List<OrganizationLocationConfigurationModel>> UpdateByFacilityIdAsync(string facilityId, UpdateOrganizationLocationConfigurationModel model, CancellationToken cancellationToken = default)
     {
-        var entities = await _database.LocationConfigurationRepository
-            .FindAsync(c => c.FacilityId == facilityId);
-
-        if (entities.Count == 0)
-            throw new KeyNotFoundException($"No OrganizationLocationConfiguration found for FacilityId {facilityId}");
-
         var updatedEntities = new List<OrganizationLocationConfigurationModel>();
-        foreach (var entity in entities)
-        {
-            var updated = await UpdateByIdAsync(entity.ConfigId, model, cancellationToken);
 
-            updatedEntities.Add(updated);
-        }
+        // Update every config for the facility in a single transaction, then invalidate and re-evaluate
+        // once — not per config. Per-item reevaluation (via UpdateByIdAsync) would expose partially
+        // updated mappings and repeat the full mapping scan for each config.
+        await _database.ExecuteInTransactionAsync(async () =>
+        {
+            var entities = await _database.LocationConfigurationRepository
+                .FindAsync(c => c.FacilityId == facilityId, cancellationToken);
+
+            if (entities.Count == 0)
+                throw new KeyNotFoundException($"No OrganizationLocationConfiguration found for FacilityId {facilityId}");
+
+            foreach (var entity in entities)
+            {
+                entity.LocationConditions =
+                    await _database.LocationConditionRepository.FindAsync(c => c.ConfigId == entity.ConfigId, cancellationToken);
+
+                await ApplyUpdateToEntity(entity, model);
+                _database.LocationConfigurationRepository.Update(entity);
+            }
+
+            await _database.SaveChangesAsync();
+
+            updatedEntities.Clear();
+            updatedEntities.AddRange(entities.Select(ProjectToModel));
+
+            InvalidateConditionsCache(facilityId);
+        }, cancellationToken);
+
+        // Re-evaluate once after the full facility update commits. CancellationToken.None: the update is
+        // committed, so a caller cancelling now must not skip the refresh and leave
+        // IsOrgLocation/MappedToOrg stale.
+        await _locationMappingService.ReevaluateLocationMappingsAsync(facilityId, CancellationToken.None);
 
         return updatedEntities;
     }
