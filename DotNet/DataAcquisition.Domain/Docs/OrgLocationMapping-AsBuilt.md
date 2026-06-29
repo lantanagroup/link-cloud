@@ -38,88 +38,110 @@ to be encounters/locations to map.
 ## End-to-end flow
 
 ```mermaid
+%%{init: {"flowchart": {"curve": "linear"}}}%%
 flowchart TD
-    %% ---------- Configuration (prerequisite) ----------
+    %% ---------- Stores (declared top-level so no edge crosses a subgraph cluster) ----------
+    T_CFG[("OrganizationLocationConfiguration")]
+    T_CON[("OrganizationLocationCondition")]
+    T_MAP[("OrganizationLocationMapping")]
+    T_EM[("EncounterMapping.MappedToOrg")]
+    T_EL[("EncounterLocation")]
+    T_LOG[("DataAcquisitionLog")]
+    T_RID[("DataAcquisitionLogResourceId")]
+    RC[("Resource cache<br/>correlationId:Encounter")]
+    MONGO[("Mongo: Resource,<br/>PatientReportingEvaluationStatus")]
+    T_RPT[("link-report: ReportEntry,<br/>EntryMeasureReport")]
+
+    %% ---------- Configuration ----------
     subgraph CFG["Configuration (admin, one-time / on change)"]
         A1["Admin sets org-location config + conditions<br/>(FHIRPath per condition)<br/>active config + conditions = IsConfigured"]
-        A1 -->|write| T_CFG[("OrganizationLocationConfiguration")]
-        A1 -->|write| T_CON[("OrganizationLocationCondition")]
-        A1 --> RECalc["On save: invalidate conditions cache<br/>+ ReevaluateLocationMappingsAsync<br/>(re-score already-cached Locations)"]
-        RECalc -->|update| T_MAP[("OrganizationLocationMapping")]
-        RECalc -->|cascade| T_EM[("EncounterMapping.MappedToOrg")]
+        RECalc["On save: invalidate conditions cache<br/>+ ReevaluateLocationMappingsAsync<br/>(re-score already-cached Locations)"]
+        A1 --> RECalc
     end
+    A1 -->|write| T_CFG
+    A1 -->|write| T_CON
+    RECalc -->|update| T_MAP
+    RECalc -->|cascade| T_EM
 
     %% ---------- Trigger ----------
     subgraph TRIG["Report trigger"]
         B1["Ad-hoc: Tenant.FacilityController → GenerateReportRequested<br/>Scheduled: Census PatientEvent → QueryDispatch"]
-        B1 --> B2["DataAcquisitionRequested (per patient)"]
+        B2["DataAcquisitionRequested (per patient)"]
+        B1 --> B2
     end
-    CFG --> TRIG
 
-    %% ---------- Acquisition (worker) ----------
+    %% ---------- Acquisition ----------
     subgraph ACQ["DataAcquisition.AcquisitionWorker — per (facility, correlationId)"]
         C0["Scaffold query-plan logs:<br/>Patient(Read), Encounter(Param), Location(Reference), Condition/dependents"]
-        C0 -->|insert rows| T_LOG[("DataAcquisitionLog")]
-
         C1["AcquisitionDependencyChecker.CheckDependenciesAsync"]
-        C0 --> C1
-        C1 --> Cdep{"Org-location active?<br/>Dependent Initial log?"}
-        Cdep -->|yes| Cgate["Gate behind Encounter + Location,<br/>then reportability"]
-        Cdep -->|no| Crun["Run normally"]
-
-        %% Primary acquisitions
+        Cdep{"Org-location active?<br/>Dependent Initial log?"}
+        Crun["Run normally"]
+        Cgate["Gate behind Encounter + Location,<br/>then reportability"]
         P_ENC["Acquire Encounter (Search)<br/>FhirApiService"]
         P_LOC["Acquire Location (Reference,<br/>discovered from Encounter.location)"]
+        F1["FilterResourcesByEncounterMappingAsync<br/>(drop resources tied to non-org encounters)"]
+        H_ENC["UpdateEncounterLocationMappingAsync"]
+        H_LOC["UpdateLocationMappingAsync → IsOrgLocationAsync<br/>(evaluate conditions via cache)"]
+        PARENT["Resolve PartOf + SetParentForChildrenAsync<br/>(children inherit IsOrgLocation)"]
+        REP{"IsPatientReportableAsync:<br/>any EncounterMapping.MappedToOrg = true?"}
+        DEP_OK["Acquire dependent resources<br/>(Condition, Observation, ...)"]
+        PRE["Preempt dependent logs:<br/>status NotReportable"]
+        C0 --> C1
+        C1 --> Cdep
+        Cdep -->|no| Crun
+        Cdep -->|yes| Cgate
         Crun --> P_ENC
         Cgate --> P_ENC
-
-        P_ENC --> F1["FilterResourcesByEncounterMappingAsync<br/>(drop resources tied to non-org encounters)"]
-        F1 --> H_ENC["UpdateEncounterLocationMappingAsync"]
-        H_ENC -->|insert| T_EM
-        H_ENC -->|insert junction| T_EL[("EncounterLocation")]
-        H_ENC -->|placeholder if location unseen| T_MAP
-        P_ENC -->|cache bodies| RC[("Resource cache<br/>correlationId:Encounter")]
-        P_ENC -->|acquired ids| T_RID[("DataAcquisitionLogResourceId")]
-
-        P_LOC --> H_LOC["UpdateLocationMappingAsync → IsOrgLocationAsync<br/>(evaluate conditions via cache)"]
-        H_LOC -->|set IsOrgLocation| T_MAP
-        H_LOC --> PARENT["Resolve PartOf + SetParentForChildrenAsync<br/>(children inherit IsOrgLocation)"]
-        PARENT -->|cascade RecomputeMappedToOrg| T_EM
-        P_LOC -->|cache bodies| RC
-
-        %% Reportability gate
-        REP{"IsPatientReportableAsync:<br/>any EncounterMapping.MappedToOrg = true?"}
-        H_LOC --> REP
+        P_ENC --> F1
+        F1 --> H_ENC
+        P_ENC --> P_LOC
+        P_LOC --> H_LOC
+        H_LOC --> PARENT
         H_ENC --> REP
-        REP -->|reportable| DEP_OK["Acquire dependent resources<br/>(Condition, Observation, ...)"]
-        REP -->|NOT reportable| PRE["Preempt dependent logs:<br/>status NotReportable"]
-        DEP_OK -->|update status| T_LOG
-        PRE -->|update status| T_LOG
-        DEP_OK -->|cache bodies| RC
+        H_LOC --> REP
+        REP -->|reportable| DEP_OK
+        REP -->|NOT reportable| PRE
     end
-    TRIG --> ACQ
+
+    %% trigger -> acquisition, and config conditions feed the evaluation
+    B2 --> C0
+    T_CON -.->|conditions read by IsConfigured / IsOrgLocation| H_LOC
+    %% acquisition writes
+    C0 -->|insert rows| T_LOG
+    P_ENC -->|cache bodies| RC
+    P_ENC -->|acquired ids| T_RID
+    H_ENC -->|insert| T_EM
+    H_ENC -->|insert junction| T_EL
+    H_ENC -->|placeholder if location unseen| T_MAP
+    H_LOC -->|set IsOrgLocation| T_MAP
+    PARENT -->|cascade RecomputeMappedToOrg| T_EM
+    DEP_OK -->|update status| T_LOG
+    PRE -->|update status| T_LOG
+    DEP_OK -->|cache bodies| RC
 
     %% ---------- Tail ----------
     subgraph TAIL["Tail (once all sibling logs terminal)"]
         TL1["TryCompleteTailAsync (distributed semaphore,<br/>claims TailSent)"]
         TL2["StripNonOrgEncountersFromCacheAsync<br/>(remove MappedToOrg=false encounters from cache)"]
         TL3["Produce ResourcesAcquired (CacheKeys = correlationId:type)"]
-        TL1 --> TL2 --> TL3
-        TL2 -->|delete + rewrite| RC
+        TL1 --> TL2
+        TL2 --> TL3
     end
-    REP --> TAIL
-    PRE --> TAIL
+    DEP_OK --> TL1
+    PRE --> TL1
+    TL2 -->|delete + rewrite| RC
 
     %% ---------- Downstream ----------
     subgraph DOWN["Downstream"]
         N1["Normalization: rehydrate cache, apply ops,<br/>write back → ResourcesNormalized"]
         M1["MeasureEval: build bundle from cache, run CQL.<br/>Non-org patient → no qualifying encounter → not reportable"]
         R1["Report: per-patient EntryMeasureReport"]
-        N1 --> M1 --> R1
-        M1 -->|upsert| MONGO[("Mongo: Resource,<br/>PatientReportingEvaluationStatus")]
-        R1 -->|reportingStatus| T_RPT[("link-report: ReportEntry,<br/>EntryMeasureReport")]
+        N1 --> M1
+        M1 --> R1
     end
-    TAIL --> DOWN
+    TL3 --> N1
+    M1 -->|upsert| MONGO
+    R1 -->|reportingStatus| T_RPT
 
     %% ---------- Color scheme ----------
     classDef store    fill:#e6e9ff,stroke:#3b4cca,stroke-width:1px,color:#1a1a4a;
@@ -158,41 +180,41 @@ sequenceDiagram
     participant W as AcquisitionWorker
     participant FA as FhirApiService
     participant LMS as LocationMappingService
-    participant DB as link-dataacquisition (SQL)
-    participant RC as Resource cache (Redis/ABS)
+    participant DB as SQL link-dataacquisition
+    participant RC as Resource cache
 
-    Note over W: Encounter (Search) log
-    W->>FA: ExecuteSearch(Encounter)
+    Note over W: Encounter Search log
+    W->>FA: ExecuteSearch Encounter
     FA->>LMS: FilterResourcesByEncounterMappingAsync
-    FA->>LMS: UpdateEncounterLocationMappingAsync(encounter)
-    LMS->>DB: insert EncounterMapping (+ EncounterLocation)
-    Note right of LMS: MappedToOrg derived from referenced<br/>OrganizationLocationMapping.IsOrgLocation<br/>(placeholder mapping if location not yet seen)
-    FA->>RC: UpdateCorrelationCache(correlationId:Encounter)
-    FA->>DB: record DataAcquisitionLogResourceId (Encounter/id)
+    FA->>LMS: UpdateEncounterLocationMappingAsync
+    LMS->>DB: insert EncounterMapping and EncounterLocation
+    Note over LMS: MappedToOrg from referenced OrganizationLocationMapping IsOrgLocation
+    FA->>RC: cache Encounter under correlationId Encounter
+    FA->>DB: record DataAcquisitionLogResourceId
 
-    Note over W: Location (Reference) log — discovered from Encounter.location
-    W->>FA: ExecuteSearch(Location, IsReference)
-    FA->>LMS: UpdateLocationMappingAsync(location)
-    LMS->>LMS: IsOrgLocationAsync (eval conditions, cached)
-    LMS->>DB: upsert OrganizationLocationMapping (IsOrgLocation, PartOf)
-    LMS->>DB: SetParentForChildrenAsync (children inherit IsOrgLocation)
-    LMS->>DB: RecomputeMappedToOrgForLocationMappingAsync (cascade to EncounterMapping)
-    FA->>RC: UpdateCorrelationCache(correlationId:Location)
+    Note over W: Location Reference log discovered from Encounter location
+    W->>FA: ExecuteSearch Location reference
+    FA->>LMS: UpdateLocationMappingAsync
+    LMS->>LMS: IsOrgLocationAsync evaluate conditions cached
+    LMS->>DB: upsert OrganizationLocationMapping IsOrgLocation and PartOf
+    LMS->>DB: SetParentForChildrenAsync children inherit IsOrgLocation
+    LMS->>DB: RecomputeMappedToOrgForLocationMappingAsync cascade to EncounterMapping
+    FA->>RC: cache Location
 
-    Note over W: Dependent log (Condition, ...)
-    W->>LMS: IsPatientReportableAsync(facility, patient)
-    alt patient reportable (one or more org encounters)
+    Note over W: Dependent log Condition and others
+    W->>LMS: IsPatientReportableAsync
+    alt patient reportable
         W->>FA: acquire dependent resource
-        FA->>RC: cache + DataAcquisitionLogResourceId
+        FA->>RC: cache and record resource id
     else not reportable
-        W->>DB: set dependent log status = NotReportable
+        W->>DB: set dependent log status NotReportable
     end
 
-    Note over W: Tail (all siblings terminal)
-    W->>DB: TryCompleteTailAsync (claim TailSent)
-    W->>LMS: StripNonOrgEncountersFromCacheAsync(correlationId, patient)
-    LMS->>RC: delete correlationId:Encounter, rewrite org-only (empty if all non-org)
-    W-->>W: Produce ResourcesAcquired (to Normalization, then MeasureEval)
+    Note over W: Tail all siblings terminal
+    W->>DB: TryCompleteTailAsync claim TailSent
+    W->>LMS: StripNonOrgEncountersFromCacheAsync
+    LMS->>RC: delete and rewrite org-only Encounters
+    W->>W: Produce ResourcesAcquired to Normalization then MeasureEval
 ```
 
 ---
