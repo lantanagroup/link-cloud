@@ -74,8 +74,9 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
         InvalidateConditionsCache(entity.FacilityId);
 
         // Re-classify the facility's already-cached Locations against the new conditions so the next
-        // report run doesn't reuse a stale IsOrgLocation/MappedToOrg.
-        await _locationMappingService.ReevaluateLocationMappingsAsync(entity.FacilityId, cancellationToken);
+        // report run doesn't reuse a stale IsOrgLocation/MappedToOrg. CancellationToken.None: the config
+        // is already committed, so a caller cancelling now must not skip this refresh and leave it stale.
+        await _locationMappingService.ReevaluateLocationMappingsAsync(entity.FacilityId, CancellationToken.None);
 
         return ProjectToModel(entity);
     }
@@ -108,9 +109,11 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
         // Re-evaluate AFTER the configuration transaction commits: re-evaluation reads the committed
         // conditions and performs its own writes, so it must not run inside that transaction.
+        // CancellationToken.None: the change is committed, so a caller cancelling now must not skip
+        // the refresh and leave IsOrgLocation/MappedToOrg stale.
         if (facilityId != null)
         {
-            await _locationMappingService.ReevaluateLocationMappingsAsync(facilityId, cancellationToken);
+            await _locationMappingService.ReevaluateLocationMappingsAsync(facilityId, CancellationToken.None);
         }
 
         return result;
@@ -160,9 +163,10 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
         // Re-evaluate after the delete commits — removing the last active condition demotes the
         // facility's cached Locations to non-org (IsOrgLocationAsync returns false with no conditions).
+        // CancellationToken.None: the delete is committed, so a caller cancelling now must not skip this.
         if (facilityId != null)
         {
-            await _locationMappingService.ReevaluateLocationMappingsAsync(facilityId, cancellationToken);
+            await _locationMappingService.ReevaluateLocationMappingsAsync(facilityId, CancellationToken.None);
         }
     }
 
@@ -205,9 +209,10 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
 
         // Re-evaluate after the batch delete commits — removing the facility's active conditions
         // demotes its cached Locations to non-org (IsOrgLocationAsync returns false with no conditions).
+        // CancellationToken.None: the deletes are committed, so a caller cancelling now must not skip this.
         if (deleted)
         {
-            await _locationMappingService.ReevaluateLocationMappingsAsync(facilityId, cancellationToken);
+            await _locationMappingService.ReevaluateLocationMappingsAsync(facilityId, CancellationToken.None);
         }
     }
 
