@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.Configuration;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Internal;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Kafka;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
@@ -10,7 +11,9 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Interfaces;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models.QueryConfig.Parameter;
+using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -153,29 +156,55 @@ public class AcquisitionProcessorBackgroundServiceTests
             });
         }
 
-        // Act — drive the worker.
+        // Act — drive the worker with the REAL tail producer so the NotReportable path's tail-message
+        // production is actually exercised (passing null would let TryProduceTailMessageAsync swallow
+        // failures and hide them). Signal when the tail is produced so we can wait for it without
+        // stopping the service mid-tail. The resource cache returns an empty encounter set so the
+        // non-org strip in the tail path runs without touching a real cache.
+        _fixture.ResourceCacheMock
+            .Setup(c => c.Get(It.IsAny<string>()))
+            .Returns(new List<Hl7.Fhir.Model.DomainResource>());
+
+        var tailProducedSignal = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _fixture.ResourcesAcquiredProducerMock.Reset();
+        _fixture.ResourcesAcquiredProducerMock
+            .Setup(p => p.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
+                It.IsAny<CancellationToken>()))
+            .Callback(() => tailProducedSignal.TrySetResult());
+
         var loggerMock = new Mock<ILogger<AcquisitionProcessorBackgroundService>>();
-        var service = new AcquisitionProcessorBackgroundService(loggerMock.Object, _fixture.ServiceProvider, null);
+        var service = new AcquisitionProcessorBackgroundService(
+            loggerMock.Object, _fixture.ServiceProvider, _fixture.ResourcesAcquiredProducerMock.Object);
         using var cts = new CancellationTokenSource();
         await service.StartAsync(cts.Token);
         await service.EnqueueAsync(new AcquisitionWorkItem(conditionLogId, facilityId), cts.Token);
 
-        // Poll until the log reaches a terminal status (or timeout).
-        RequestStatus? status = null;
-        for (var i = 0; i < 50; i++)
-        {
-            await Task.Delay(100);
-            using var pollScope = _fixture.ServiceProvider.CreateScope();
-            var logQueries = pollScope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
-            status = (await logQueries.GetAsync(conditionLogId))?.Status;
-            if (status == RequestStatus.NotReportable)
-                break;
-        }
+        // The tail is produced right after the log is set to NotReportable; wait for it before stopping
+        // so the service can't cancel the tail mid-flight.
+        var tailProduced = await Task.WhenAny(tailProducedSignal.Task, Task.Delay(TimeSpan.FromSeconds(10)))
+            == tailProducedSignal.Task;
 
         await service.StopAsync(CancellationToken.None);
 
-        // Assert — the dependent log was preempted to NotReportable (a terminal status), not acquired.
-        // Had acquisition run, the log would be Processing/Completed/Failed instead.
+        // Assert — the dependent log was preempted to NotReportable (a terminal status), not acquired
+        // (had acquisition run it would be Processing/Completed/Failed), AND the tail ResourcesAcquired
+        // message was produced so MeasureEval still receives the (non-reportable) patient bundle.
+        RequestStatus? status;
+        using (var pollScope = _fixture.ServiceProvider.CreateScope())
+        {
+            var logQueries = pollScope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+            status = (await logQueries.GetAsync(conditionLogId))?.Status;
+        }
+
         Assert.Equal(RequestStatus.NotReportable, status);
+        Assert.True(tailProduced, "Expected the tail ResourcesAcquired message to be produced.");
+        _fixture.ResourcesAcquiredProducerMock.Verify(
+            p => p.ProduceAsync(
+                It.IsAny<string>(),
+                It.IsAny<Message<ResourceKey, ResourcesAcquired>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 }
