@@ -13,6 +13,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Options;
 using System.Text;
 using System.Threading.Channels;
@@ -264,8 +265,11 @@ public class AcquisitionProcessorBackgroundService : BackgroundService
             // has no qualifying encounter (non-reportable outcome), and a mixed patient keeps only org
             // encounters. Runs before ProduceAsync so Normalization rehydrates the already-filtered cache.
             var locationMappingService = scopeProvider.GetRequiredService<ILocationMappingService>();
+            
+            // Normalize the patient id to the bare form (strip any "Patient/" prefix) so it matches the
+            // EncounterMapping.PatientId the strip looks up — mirrors AcquisitionDependencyChecker.
             await locationMappingService.StripNonOrgEncountersFromCacheAsync(
-                tailResult.FacilityId, tailResult.CorrelationId, tailResult.PatientId, ct);
+                tailResult.FacilityId, tailResult.CorrelationId, tailResult.PatientId.SplitReference(), ct);
 
             var headers = new Headers
             {
