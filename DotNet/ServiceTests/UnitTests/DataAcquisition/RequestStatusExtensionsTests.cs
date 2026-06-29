@@ -54,6 +54,24 @@ public class RequestStatusExtensionsTests
         Assert.True(both.Count == 0, $"Statuses marked both terminal and cancellable: {string.Join(", ", both)}");
     }
 
+    // Exhaustiveness guard: every RequestStatus must be classified on at least one axis. Fails if a
+    // future enum member is added without a [TerminalStatus]/[CancellableStatus] attribute, so a new
+    // status cannot slip through unclassified by both sets.
+    [Fact]
+    public void EveryStatusIsTerminalOrCancellable()
+    {
+        var classified = RequestStatusExtensions.TerminalStatuses
+            .Union(RequestStatusExtensions.CancellableStatuses)
+            .ToHashSet();
+
+        var unclassified = Enum.GetValues<RequestStatus>()
+            .Where(s => !classified.Contains(s))
+            .ToList();
+
+        Assert.True(unclassified.Count == 0,
+            $"RequestStatus values not classified as terminal or cancellable: {string.Join(", ", unclassified)}");
+    }
+
     [Theory]
     [InlineData(RequestStatus.Completed, true)]
     [InlineData(RequestStatus.MaxRetriesReached, true)]
