@@ -63,6 +63,7 @@
     <ProjectReference Include="..\QueryDispatch\QueryDispatch.csproj" />
     <ProjectReference Include="..\Report\Report.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
+    <ProjectReference Include="..\Submission\Submission.csproj" />
     <ProjectReference Include="..\Tenant\Tenant.csproj" />
     <ProjectReference Include="..\Terminology\Terminology.csproj" />
     <ProjectReference Include="..\LinkSdk\LinkSdk.csproj" />

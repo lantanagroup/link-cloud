@@ -447,6 +447,11 @@
         "resolved": "2.14.2",
         "contentHash": "8GRCTOKqCfwAyMSWmJ8c/wJc4PYm1lXAnRUWKQhaUtkz+JJUnDygxwtWPDqBMgS2YMxcrkaubFPTkhddt3RPOQ=="
       },
+      "MediatR.Contracts": {
+        "type": "Transitive",
+        "resolved": "2.0.1",
+        "contentHash": "FYv95bNT4UwcNA+G/J1oX5OpRiSUxteXaUt2BJbRSdRNiIUNbggJF69wy6mnk2wYToaanpdXZdCwVylt96MpwQ=="
+      },
       "Microsoft.AspNetCore.Authentication.Abstractions": {
         "type": "Transitive",
         "resolved": "2.3.0",
@@ -2254,6 +2259,11 @@
           "runtime.native.System.Security.Cryptography.OpenSsl": "4.3.0"
         }
       },
+      "System.Security.Cryptography.Pkcs": {
+        "type": "Transitive",
+        "resolved": "8.0.1",
+        "contentHash": "CoCRHFym33aUSf/NtWSVSZa99dkd0Hm7OCZUxORBjRB16LNhIEOf8THPqzIYlvKM0nNDAPTRBa1FxEECrgaxxA=="
+      },
       "System.Security.Cryptography.Primitives": {
         "type": "Transitive",
         "resolved": "4.3.0",
@@ -2303,6 +2313,14 @@
           "runtime.native.System": "4.3.0",
           "runtime.native.System.Net.Http": "4.3.0",
           "runtime.native.System.Security.Cryptography.OpenSsl": "4.3.0"
+        }
+      },
+      "System.Security.Cryptography.Xml": {
+        "type": "Transitive",
+        "resolved": "8.0.2",
+        "contentHash": "aDM/wm0ZGEZ6ZYJLzgqjp2FZdHbDHh6/OmpGfb7AdZ105zYmPn/83JRU2xLIbwgoNz9U1SLUTJN0v5th3qmvjA==",
+        "dependencies": {
+          "System.Security.Cryptography.Pkcs": "8.0.1"
         }
       },
       "System.Security.Principal.Windows": {
@@ -2779,6 +2797,37 @@
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },
+      "submission": {
+        "type": "Project",
+        "dependencies": {
+          "AspNetCore.HealthChecks.UI.Client": "[9.0.0, )",
+          "Azure.Identity": "[1.21.0, )",
+          "Azure.Storage.Blobs": "[12.29.0, )",
+          "Confluent.Kafka": "[2.14.2, )",
+          "Confluent.Kafka.Extensions.OpenTelemetry": "[0.4.0, )",
+          "MediatR": "[12.5.0, )",
+          "Microsoft.Extensions.DependencyInjection": "[10.0.3, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.3, )",
+          "Microsoft.VisualStudio.Azure.Containers.Tools.Targets": "[1.23.0, )",
+          "Quartz": "[3.18.1, )",
+          "Serilog.AspNetCore": "[8.0.3, )",
+          "Serilog.Enrichers.Span": "[3.1.0, )",
+          "Serilog.Exceptions": "[8.4.0, )",
+          "Serilog.Expressions": "[4.0.0, )",
+          "Serilog.Sinks.Grafana.Loki": "[8.3.2, )",
+          "Submission.Data": "[1.0.0, )",
+          "Swashbuckle.AspNetCore": "[6.9.0, )",
+          "System.ServiceModel.Primitives": "[8.1.2, )",
+          "com.lantanagroup.link.Shared": "[0.4.0, )"
+        }
+      },
+      "submission.data": {
+        "type": "Project",
+        "dependencies": {
+          "Quartz": "[3.18.1, )",
+          "com.lantanagroup.link.Shared": "[0.4.0, )"
+        }
+      },
       "tenant": {
         "type": "Project",
         "dependencies": {
@@ -3147,6 +3196,16 @@
         "requested": "[1.2.11, )",
         "resolved": "1.2.11",
         "contentHash": "jQXu7G9Ik6BDcS5506RV1CI184pG5eHwvqzrB5zEivciW7KiZ9iHM8ZTyu5o/TGt55woagJGUVsJYw4aBjRfEQ=="
+      },
+      "MediatR": {
+        "type": "CentralTransitive",
+        "requested": "[12.5.0, )",
+        "resolved": "12.5.0",
+        "contentHash": "vqm2H8/nqL5NAJHPhsG1JOPwfkmbVrPyh4svdoRzu+uZh6Ex7PRoHBGsLYC0/RWCEJFqD1ohHNpteQvql9OktA==",
+        "dependencies": {
+          "MediatR.Contracts": "[2.0.1, 3.0.0)",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.0"
+        }
       },
       "Microsoft.AspNetCore.Authentication.JwtBearer": {
         "type": "CentralTransitive",
@@ -3833,6 +3892,16 @@
         "dependencies": {
           "Microsoft.IdentityModel.JsonWebTokens": "7.7.1",
           "Microsoft.IdentityModel.Tokens": "7.7.1"
+        }
+      },
+      "System.ServiceModel.Primitives": {
+        "type": "CentralTransitive",
+        "requested": "[8.1.2, )",
+        "resolved": "8.1.2",
+        "contentHash": "xlJ07FAUSDjPL/GhvVY1/KVPWn2ce056X4nHPwqAa5rkNLiNN5rqh6VcgMUoF6J7ckwhkVJ1vVx/K/47nyyR9g==",
+        "dependencies": {
+          "Microsoft.Extensions.ObjectPool": "8.0.10",
+          "System.Security.Cryptography.Xml": "8.0.2"
         }
       },
       "System.Text.Encodings.Web": {
