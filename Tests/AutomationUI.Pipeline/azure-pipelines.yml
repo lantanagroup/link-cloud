@@ -16,11 +16,7 @@ trigger:
       - main
       - feature/*
 
-pr:
-  branches:
-    include:
-      - main
-      - feature/*
+pr: none
 
 schedules:
   - cron: "0 11 * * 1-5"   # 6AM CT
@@ -75,7 +71,7 @@ variables:
 
   # Automation.UI API audience (App Registration expose API URI).
   # The pipeline acquires an app-only token for "{audience}/.default".
-  AUTOMATION_UI_API_AUDIENCE: "api://b96013a1-a5fe-4dc5-b637-12d9aafba694"
+  AUTOMATION_UI_API_AUDIENCE: "api://4250b90e-2740-41e1-b6e4-b90ccc2bed5a" 
 
   # System scenario IDs are deterministic and seeded by Automation.UI's
   # ScenarioSeedService -- same value in every environment.
@@ -204,15 +200,68 @@ stages:
               scriptLocation: "inlineScript"
               inlineScript: |
                 $audience = "$(AUTOMATION_UI_API_AUDIENCE)"
-                if (-not $audience) { throw "AUTOMATION_UI_API_AUDIENCE is required." }
-
-                $scope = "$audience/.default"
-                $accessToken = az account get-access-token --scope $scope --query accessToken -o tsv
-                if (-not $accessToken) {
-                  throw "Failed to acquire access token for scope '$scope'."
+                if (-not $audience) {
+                  Write-Error "AUTOMATION_UI_API_AUDIENCE variable is not set or empty."
+                  exit 1
                 }
 
+                $scope = "$audience/.default"
+                Write-Host "Requesting access token for scope: $scope using service connection '$(AZURE_SERVICE_CONNECTION)'"
+
+                $rawOutput = az account get-access-token --scope $scope --query accessToken -o tsv 2>&1
+                $exitCode = $LASTEXITCODE
+
+                if ($exitCode -ne 0 -or -not $rawOutput) {
+                  Write-Error "Failed to acquire access token (exit code: $exitCode)"
+                  Write-Host "az output: $rawOutput"
+                  exit 1
+                }
+
+                $accessToken = $rawOutput.Trim()
                 Write-Host "Successfully acquired Automation.UI access token."
+
+                # --- Immediate verification & diagnostics ---
+                function Get-JwtPayloadObject {
+                  param([Parameter(Mandatory=$true)][string]$Jwt)
+                  $parts = $Jwt.Split('.')
+                  if ($parts.Length -lt 2) { return $null }
+                  $payload = $parts[1].Replace('-', '+').Replace('_', '/')
+                  switch ($payload.Length % 4) {
+                    2 { $payload += '==' }
+                    3 { $payload += '=' }
+                    0 { }
+                    default { return $null }
+                  }
+                  try {
+                    $bytes = [System.Convert]::FromBase64String($payload)
+                    $json  = [System.Text.Encoding]::UTF8.GetString($bytes)
+                    return ($json | ConvertFrom-Json)
+                  } catch {
+                    return $null
+                  }
+                }
+
+                $claims = Get-JwtPayloadObject -Jwt $accessToken
+                if ($claims) {
+                  Write-Host "Token diagnostics:"
+                  Write-Host ("  aud   : {0}" -f $claims.aud)
+                  Write-Host ("  iss   : {0}" -f $claims.iss)
+                  Write-Host ("  tid   : {0}" -f $claims.tid)
+                  Write-Host ("  azp   : {0}" -f $claims.azp)
+                  Write-Host ("  oid   : {0}" -f $claims.oid)
+                  if ($claims.exp) {
+                    try {
+                      $expUtc = [DateTimeOffset]::FromUnixTimeSeconds([long]$claims.exp).UtcDateTime
+                      $remainingMin = [math]::Round(($expUtc - (Get-Date).ToUniversalTime()).TotalMinutes, 1)
+                      Write-Host ("  exp   : {0} UTC  (? {1} minutes remaining)" -f $expUtc.ToString("yyyy-MM-dd HH:mm:ss"), $remainingMin)
+                    } catch {
+                      Write-Host ("  exp   : {0}" -f $claims.exp)
+                    }
+                  }
+                } else {
+                  Write-Warning "Acquired token but could not decode JWT payload for diagnostics."
+                }
+
                 Write-Host "##vso[task.setvariable variable=AUTOMATION_UI_API_ACCESS_TOKEN;issecret=true]$accessToken"
 
           # -------------------------------------------------------------
@@ -225,14 +274,61 @@ stages:
             inputs:
               targetType: "inline"
               script: |
+                function Get-JwtPayloadObject {
+                  param([Parameter(Mandatory=$true)][string]$Jwt)
+
+                  $parts = $Jwt.Split('.')
+                  if ($parts.Length -lt 2) { return $null }
+
+                  $payload = $parts[1].Replace('-', '+').Replace('_', '/')
+                  switch ($payload.Length % 4) {
+                    2 { $payload += '==' }
+                    3 { $payload += '=' }
+                    0 { }
+                    default { return $null }
+                  }
+
+                  try {
+                    $bytes = [System.Convert]::FromBase64String($payload)
+                    $json  = [System.Text.Encoding]::UTF8.GetString($bytes)
+                    return ($json | ConvertFrom-Json)
+                  } catch {
+                    return $null
+                  }
+                }
+
+                function Get-Preview {
+                  param([string]$Value, [int]$Max = 1200)
+                  if (-not $Value) { return "" }
+                  if ($Value.Length -le $Max) { return $Value }
+                  return $Value.Substring(0, $Max) + " ... [truncated]"
+                }
+
                 $base = "$(AUTOMATION_UI_BASE_URL)".TrimEnd('/')
                 $url  = "$base/api/runs/start"
                 $token = "$(AUTOMATION_UI_API_ACCESS_TOKEN)"
 
                 if (-not $token) { Write-Error "AUTOMATION_UI_API_ACCESS_TOKEN is missing."; exit 1 }
 
-                $headers = @{
-                  Authorization = "Bearer $token"
+                $claims = Get-JwtPayloadObject -Jwt $token
+                if ($claims -ne $null) {
+                  $expUtc = $null
+                  if ($claims.exp) {
+                    try { $expUtc = [DateTimeOffset]::FromUnixTimeSeconds([long]$claims.exp).UtcDateTime.ToString("o") } catch { }
+                  }
+
+                  Write-Host "Token diagnostics:"
+                  Write-Host ("  aud   : {0}" -f $claims.aud)
+                  Write-Host ("  iss   : {0}" -f $claims.iss)
+                  Write-Host ("  tid   : {0}" -f $claims.tid)
+                  Write-Host ("  appid : {0}" -f $claims.appid)
+                  Write-Host ("  azp   : {0}" -f $claims.azp)
+                  Write-Host ("  oid   : {0}" -f $claims.oid)
+                  Write-Host ("  roles : {0}" -f (($claims.roles -join ", ")))
+                  Write-Host ("  scp   : {0}" -f $claims.scp)
+                  Write-Host ("  exp   : {0}" -f $expUtc)
+                } else {
+                  Write-Host "Token diagnostics: unable to decode JWT payload."
                 }
 
                 $body = @{
@@ -242,9 +338,100 @@ stages:
 
                 Write-Host "POST $url"
                 Write-Host "Body: $body"
-                $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -ContentType "application/json" -Body $body
+
+                $statusCode = $null
+                $contentType = $null
+                $rawBody = ""
+
+                try {
+                  $resp = Invoke-WebRequest `
+                    -Uri $url `
+                    -Method Post `
+                    -Headers @{ Authorization = "Bearer $token"; Accept = "application/json" } `
+                    -ContentType "application/json" `
+                    -Body $body `
+                    -UseBasicParsing `
+                    -ErrorAction Stop
+
+                  $statusCode = [int]$resp.StatusCode
+                  $contentType = $resp.Headers["Content-Type"]
+                  $rawBody = $resp.Content
+
+                  Write-Host ("Start API HTTP status: {0}" -f $statusCode)
+                  if ($contentType) { Write-Host ("Start API content-type: {0}" -f $contentType) }
+                  if ($resp.Headers.Location -ne $null) {
+                    Write-Host ("Start API redirect/location: {0}" -f $resp.Headers.Location)
+                  }
+                  if ($rawBody) {
+                    Write-Host "Start API response preview:"
+                    Write-Host (Get-Preview -Value $rawBody)
+                  }
+
+                  if ($statusCode -lt 200 -or $statusCode -ge 300) {
+                    Write-Error ("Start API call failed with HTTP {0}." -f $statusCode)
+                    exit 1
+                  }
+                } catch {
+                  $webResp = $_.Exception.Response
+                  if ($webResp -ne $null) {
+                    try { $statusCode = [int]$webResp.StatusCode } catch { }
+                    try { $contentType = $webResp.Headers["Content-Type"] } catch { }
+                    try {
+                      $loc = $webResp.Headers["Location"]
+                      if ($loc) { Write-Host ("Start API redirect/location: {0}" -f $loc) }
+                    } catch { }
+
+                    try {
+                      $stream = $webResp.GetResponseStream()
+                      if ($stream) {
+                        $reader = New-Object System.IO.StreamReader($stream)
+                        $rawBody = $reader.ReadToEnd()
+                        $reader.Dispose()
+                        $stream.Dispose()
+                      }
+                    } catch { }
+
+                    if ($statusCode -ne $null) { Write-Host ("Start API HTTP status: {0}" -f $statusCode) }
+                    if ($contentType) { Write-Host ("Start API content-type: {0}" -f $contentType) }
+                    if ($rawBody) {
+                      Write-Host "Start API response preview:"
+                      Write-Host (Get-Preview -Value $rawBody)
+                    }
+
+                    Write-Error ("Start API call failed with HTTP {0}." -f $statusCode)
+                    exit 1
+                  }
+
+                  Write-Host ("Start API exception type: {0}" -f $_.Exception.GetType().FullName)
+                  if ($_.Exception.InnerException -ne $null) {
+                    Write-Host ("Start API inner exception: {0}" -f $_.Exception.InnerException.Message)
+                  }
+                  if ($_.ScriptStackTrace) {
+                    Write-Host "Start API script stack trace:"
+                    Write-Host $_.ScriptStackTrace
+                  }
+
+                  Write-Error ("Start API call failed before an HTTP response was captured: {0}" -f $_.Exception.Message)
+                  exit 1
+                }
+
+                $response = $null
+                try {
+                  if ($rawBody) {
+                    $response = $rawBody | ConvertFrom-Json -ErrorAction Stop
+                  }
+                } catch {
+                  Write-Error "Start API response body was not valid JSON."
+                  exit 1
+                }
+
                 $runId = $response.runId
-                if (-not $runId) { Write-Error "Start did not return a runId."; exit 1 }
+                if (-not $runId) {
+                  $props = if ($response) { ($response.PSObject.Properties.Name -join ", ") } else { "<none>" }
+                  Write-Error ("Start did not return a runId. JSON properties present: {0}" -f $props)
+                  exit 1
+                }
+
                 Write-Host "Started runId=$runId"
                 Write-Host "##vso[task.setvariable variable=RUN_ID]$runId"
 
@@ -262,6 +449,10 @@ stages:
                 $token = "$(AUTOMATION_UI_API_ACCESS_TOKEN)"
 
                 if (-not $token) { Write-Error "AUTOMATION_UI_API_ACCESS_TOKEN is missing."; exit 1 }
+
+                $headers = @{
+                  Authorization = "Bearer $token"
+                }
 
                 $headers = @{
                   Authorization = "Bearer $token"
