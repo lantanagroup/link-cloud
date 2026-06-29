@@ -427,7 +427,7 @@ public class LocationMappingService(
             _resourceCache.UpdateCorrelationCache(cacheKey, orgEncounters, ResourceType.Encounter);
         }
 
-        _logger.LogInformation(
+        _logger.LogDebug(
             "Stripped {StrippedCount} non-org encounter(s) from cache key {CacheKey} for facility {FacilityId} (patient {PatientId}); {RemainingCount} org encounter(s) remain.",
             strippedCount, cacheKey.SanitizeForLog(), facilityId.SanitizeForLog(), patientId.SanitizeForLog(), orgEncounters.Count);
 
