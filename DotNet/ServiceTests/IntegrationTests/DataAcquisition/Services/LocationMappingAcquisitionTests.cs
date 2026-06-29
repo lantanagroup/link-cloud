@@ -1,13 +1,19 @@
+using System.Text.Json;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.DataAcquisition.Services;
@@ -53,7 +59,9 @@ public class LocationMappingAcquisitionTests
             scope.ServiceProvider.GetRequiredService<IOrganizationLocationConfigurationQueries>(),
             scope.ServiceProvider.GetRequiredService<IEncounterMappingQueries>(),
             scope.ServiceProvider.GetRequiredService<IEncounterMappingManager>(),
+            scope.ServiceProvider.GetRequiredService<IReferenceResourcesQueries>(),
             new InMemoryCacheService(new MemoryCache(new MemoryCacheOptions { SizeLimit = 1024 })),
+            new Mock<IResourceCache>().Object,
             NullLogger<LocationMappingService>.Instance);
     }
 
@@ -311,5 +319,97 @@ public class LocationMappingAcquisitionTests
         // Location B's managingOrganization did not match the condition, so it is not an org-location,
         // but it is still recorded in the mapping table.
         Assert.Contains(rows, r => r.LocationId == locationIdB && !r.IsOrgLocation);
+    }
+
+    [Fact]
+    public async Task ReevaluateLocationMappingsAsync_WhenConditionsNowMatch_FlipsIsOrgLocationAndCascadesMappedToOrg()
+    {
+        var facilityId = NewFacilityId("Reeval");
+        var orgReference = "Organization/org-1";
+        var locationId = NewLocationId("Loc");
+
+        // The Location body cached during a prior acquisition; its managingOrganization points at the org.
+        var location = new Location
+        {
+            Id = locationId,
+            Name = "Med-Surg",
+            ManagingOrganization = new ResourceReference(orgReference)
+        };
+
+        // Arrange: a cached Location body, a mapping currently flagged NON-org (as if evaluated under
+        // old conditions), and an encounter mapping linked to it that is therefore NOT mapped to org.
+        int mappingId;
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+            var locationMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+            var encounterMappingManager = scope.ServiceProvider.GetRequiredService<IEncounterMappingManager>();
+
+            // EncounterMappingManager.CreateAsync validates the facility is configured and the patient
+            // was acquired for it, so seed the rows those checks read.
+            dbContext.Set<FhirQueryConfiguration>().Add(new FhirQueryConfiguration
+            {
+                Id = Guid.NewGuid(),
+                FacilityId = facilityId,
+                FhirServerBaseUrl = "https://example.org/fhir"
+            });
+            dbContext.Set<DataAcquisitionLog>().Add(new DataAcquisitionLog { FacilityId = facilityId, PatientId = "P1" });
+
+            dbContext.ReferenceResources.Add(new ReferenceResources
+            {
+                Id = Guid.NewGuid(),
+                FacilityId = facilityId,
+                ResourceId = locationId,
+                ResourceType = ResourceType.Location.ToString(),
+                QueryPhase = QueryPhase.Initial,
+                ReferenceResource = JsonSerializer.Serialize<Resource>(location, LinkFhirSerializerOptions.ForFhirLenientSerialization)
+            });
+            await dbContext.SaveChangesAsync();
+
+            var mapping = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = locationId,
+                LocationName = "Med-Surg",
+                IsOrgLocation = false,
+                IsActive = true
+            });
+            await dbContext.SaveChangesAsync();
+            mappingId = mapping.LocationMappingId;
+
+            await encounterMappingManager.CreateAsync(new CreateEncounterMappingModel
+            {
+                FacilityId = facilityId,
+                PatientId = "P1",
+                EncounterId = "E1",
+                MappedToOrg = false,
+                OrganizationLocationMappingIds = new List<int> { mappingId }
+            });
+        }
+
+        // A condition that NOW matches the cached Location is activated.
+        await SeedActiveConfigAsync(facilityId, orgReference);
+
+        // Act — re-evaluate the facility's cached Locations against the current conditions.
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var service = CreateService(scope);
+            await service.ReevaluateLocationMappingsAsync(facilityId, CancellationToken.None);
+        }
+
+        // Assert in a fresh scope (the cascade writes via ExecuteUpdateAsync, bypassing the tracker).
+        using (var verify = _fixture.ServiceProvider.CreateScope())
+        {
+            var locationQueries = verify.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+            var encounterQueries = verify.ServiceProvider.GetRequiredService<IEncounterMappingQueries>();
+
+            var updatedMapping = await locationQueries.GetByFacilityIdAndLocationIdAsync(facilityId, locationId);
+            Assert.NotNull(updatedMapping);
+            Assert.True(updatedMapping!.IsOrgLocation);
+
+            var updatedEncounter = await encounterQueries.GetByFacilityIdAndEncounterIdAsync(facilityId, "E1");
+            Assert.NotNull(updatedEncounter);
+            Assert.True(updatedEncounter!.MappedToOrg);
+        }
     }
 }

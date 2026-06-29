@@ -167,10 +167,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             return [];
         }
 
-        var terminalStatuses = new[]
-        {
-            RequestStatus.Completed, RequestStatus.Skipped, RequestStatus.MaxRetriesReached, RequestStatus.Cancelled
-        };
+        var terminalStatuses = RequestStatusExtensions.TerminalStatuses;
 
         // Parse supplied strings to the ResourceType enum. Anything that doesn't parse is skipped.
         var parsed = new List<(string Original, ResourceType Parsed)>();
@@ -306,8 +303,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<IEnumerable<TailingMessageModel>> GetTailingMessages(
         CancellationToken cancellationToken = default)
     {
-        var completedOrFailedStatuses = new[]
-            { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
+        var terminalStatuses = RequestStatusExtensions.TerminalStatuses;
 
         try
         {
@@ -324,7 +320,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             var candidateGroups = await _dbContext.DataAcquisitionLogs.AsNoTracking()
                 .Where(log =>
                     !log.TailSent &&
-                    log.Status != null && completedOrFailedStatuses.Contains(log.Status.Value) &&
+                    log.Status != null && terminalStatuses.Contains(log.Status.Value) &&
                     log.ReportTrackingId != null &&
                     log.CorrelationId != null)
                 .GroupBy(log => new
@@ -360,7 +356,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         log.CorrelationId == group.CorrelationId &&
                         log.ReportTrackingId == group.ReportTrackingId &&
                         log.QueryPhase == group.QueryPhase &&
-                        (log.Status == null || !completedOrFailedStatuses.Contains(log.Status.Value)),
+                        (log.Status == null || !terminalStatuses.Contains(log.Status.Value)),
                     cancellationToken);
 
                 if (hasIncomplete)
@@ -743,7 +739,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         statistics.TotalResourcesAcquired = statistics.ResourceTypeCounts.Values.Sum();
 
         // Distinct patients where ALL logs are terminal (Completed, MaxRetriesReached, Skipped, Cancelled)
-        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
+        var terminalStatuses = RequestStatusExtensions.TerminalStatuses;
         statistics.TotalCompletedPatients = await baseQuery
             .Where(l => l.PatientId != null)
             .GroupBy(l => l.PatientId)
@@ -1019,14 +1015,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
         CancellationToken cancellationToken = default)
     {
         designagtedExecutionTime ??= DateTime.UtcNow;
-        var terminalStatuses = new[]
-        {
-            RequestStatus.Completed,
-            RequestStatus.MaxRetriesReached,
-            RequestStatus.Skipped,
-            RequestStatus.Cancelled,
-            RequestStatus.ConfigurationMissing,
-        };
+        var terminalStatuses = RequestStatusExtensions.TerminalStatuses;
 
         var query = from log in _dbContext.DataAcquisitionLogs.AsNoTracking()
                     where log.FacilityId == facilityId
@@ -1108,7 +1097,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
 
     public async Task<List<long>> GetOrphanedTailLogIds(TimeSpan minAge, int maxResults = 50, CancellationToken cancellationToken = default)
     {
-        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
+        var terminalStatuses = RequestStatusExtensions.TerminalStatuses;
         var cutoff = DateTime.UtcNow.Subtract(minAge);
 
         // Find groups where:

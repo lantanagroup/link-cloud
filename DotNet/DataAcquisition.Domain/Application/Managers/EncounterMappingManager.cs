@@ -12,7 +12,7 @@ public interface IEncounterMappingManager
     Task<EncounterMappingModel> CreateAsync(CreateEncounterMappingModel model);
     Task<EncounterMappingModel> UpdateByIdAsync(int id, UpdateEncounterMappingModel model);
     Task<EncounterMappingModel> UpdateByFacilityIdAndEncounterIdAsync(string facilityId, string encounterId, UpdateEncounterMappingModel model);
-    Task<int> UpdateMappedToOrgByOrganizationLocationMappingIdAsync(int organizationLocationMappingId, bool mappedToOrg, CancellationToken cancellationToken = default);
+    Task<int> RecomputeMappedToOrgForLocationMappingAsync(int organizationLocationMappingId, CancellationToken cancellationToken = default);
     Task DeleteByIdAsync(int id);
     Task DeleteByFacilityIdAsync(string facilityId);
     Task DeleteByPatientIdAsync(string patientId);
@@ -184,18 +184,41 @@ public class EncounterMappingManager : IEncounterMappingManager
         return await UpdateByIdAsync(entity.EncounterMappingId, model);
     }
 
-    public async Task<int> UpdateMappedToOrgByOrganizationLocationMappingIdAsync(
+    public async Task<int> RecomputeMappedToOrgForLocationMappingAsync(
         int organizationLocationMappingId,
-        bool mappedToOrg,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.EncounterMappings
+        // Recompute (not overwrite): an encounter is mapped to the org if ANY of its referenced
+        // locations is an org location. Overwriting MappedToOrg with a single location's value would
+        // let a trailing non-org location clear the flag for a multi-location encounter.
+        var recomputed = await _dbContext.EncounterMappings
             .Where(mapping => mapping.EncounterLocations.Any(location =>
-                    location.OrganizationLocationMappingId == organizationLocationMappingId))
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(mapping => mapping.MappedToOrg, mappedToOrg)
-                .SetProperty(mapping => mapping.ModifiedDate, DateTime.UtcNow),
-            cancellationToken);
+                location.OrganizationLocationMappingId == organizationLocationMappingId))
+            .Select(mapping => new
+            {
+                mapping.EncounterMappingId,
+                AnyOrg = mapping.EncounterLocations.Any(location => location.OrganizationLocationMapping.IsOrgLocation)
+            })
+            .ToListAsync(cancellationToken);
+
+        if (recomputed.Count == 0)
+            return 0;
+
+        var now = DateTime.UtcNow;
+        var total = 0;
+
+        foreach (var group in recomputed.GroupBy(x => x.AnyOrg))
+        {
+            var ids = group.Select(x => x.EncounterMappingId).ToList();
+            total += await _dbContext.EncounterMappings
+                .Where(mapping => ids.Contains(mapping.EncounterMappingId))
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(mapping => mapping.MappedToOrg, group.Key)
+                    .SetProperty(mapping => mapping.ModifiedDate, now),
+                    cancellationToken);
+        }
+
+        return total;
     }
 
     public async Task DeleteByIdAsync(int id)

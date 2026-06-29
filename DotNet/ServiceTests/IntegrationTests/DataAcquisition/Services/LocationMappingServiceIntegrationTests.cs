@@ -141,7 +141,9 @@ public class LocationMappingServiceIntegrationTests
             mockConfigQueries.Object,
             new Mock<IEncounterMappingQueries>().Object,
             new Mock<IEncounterMappingManager>().Object,
+            new Mock<IReferenceResourcesQueries>().Object,
             mockCache.Object,
+            new Mock<IResourceCache>().Object,
             new Mock<ILogger<LocationMappingService>>().Object);
 
         var location = new Location { Id = locationId, Name = "Updated Name" };
