@@ -1,18 +1,25 @@
-﻿using Azure.Storage.Blobs.Specialized;
+﻿using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Specialized;
 using LantanaGroup.Link.Report.Application.Core;
+using LantanaGroup.Link.Report.Application.Interfaces;
+using LantanaGroup.Link.Report.Application.Options;
 using LantanaGroup.Link.Report.Data;
 using LantanaGroup.Link.Report.Data.Entities;
 using LantanaGroup.Link.Report.Domain.Enums;
+using LantanaGroup.Link.Report.Domain.Managers;
 using LantanaGroup.Link.Report.Models;
 using LantanaGroup.Link.Report.Services;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using ReportingStatus = LantanaGroup.Link.Report.Domain.Enums.ReportingStatus;
 using SubmissionStatus = LantanaGroup.Link.Report.Domain.Enums.SubmissionStatus;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Moq;
 using System.Text;
-using SystemTask = System.Threading.Tasks.Task;
+using Task = System.Threading.Tasks.Task;
 
 namespace IntegrationTests.Report.Core
 {
@@ -46,7 +53,7 @@ namespace IntegrationTests.Report.Core
             };
         }
 
-        private static async SystemTask SeedScheduleAsync(ReportDbContext context, ReportScheduleModel schedule)
+        private static async Task SeedScheduleAsync(ReportDbContext context, ReportScheduleModel schedule)
         {
             var entity = new ReportSchedule
             {
@@ -69,7 +76,7 @@ namespace IntegrationTests.Report.Core
             context.ChangeTracker.Clear();
         }
 
-        private static async SystemTask SeedReportEntryAsync(
+        private static async Task SeedReportEntryAsync(
             ReportDbContext context,
             Guid reportScheduleId,
             string facilityId,
@@ -108,7 +115,7 @@ namespace IntegrationTests.Report.Core
         /// line 1 = resource reference (e.g. "MeasureReport/abc-123"),
         /// line 2 = serialized FHIR JSON.
         /// </summary>
-        private async SystemTask UploadPatientBlobAsync(
+        private async Task UploadPatientBlobAsync(
             string blobName,
             params (string resourceReference, string fhirJson)[] lines)
         {
@@ -137,11 +144,188 @@ namespace IntegrationTests.Report.Core
         }
 
         // ------------------------------------------------------------------ //
+        //  Helpers — IncludeOrganizationResource tests
+        // ------------------------------------------------------------------ //
+
+        private PatientAggregator BuildAggregator(IServiceScope scope, bool includeOrganization)
+        {
+            var metrics = scope.ServiceProvider.GetRequiredService<IReportServiceMetrics>();
+            var reportEntryManager = scope.ServiceProvider.GetRequiredService<IReportEntryManager>();
+            var blobService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
+            var blobSettings = scope.ServiceProvider.GetRequiredService<IOptions<BlobStorageSettings>>();
+            var aggregatorSettings = Options.Create(new PatientAggregatorSettings { IncludeOrganizationResource = includeOrganization });
+            return new PatientAggregator(metrics, reportEntryManager, blobService, blobSettings, _fixture.TenantApiServiceMock.Object, aggregatorSettings);
+        }
+
+        private static Hl7.Fhir.Model.MeasureReport BuildMeasureReport() => new()
+        {
+            Id = Guid.NewGuid().ToString(),
+            Measure = "http://example.com/Measure/DE-111",
+            Status = Hl7.Fhir.Model.MeasureReport.MeasureReportStatus.Complete,
+            Type = Hl7.Fhir.Model.MeasureReport.MeasureReportType.Individual,
+            Group =
+            {
+                new Hl7.Fhir.Model.MeasureReport.GroupComponent
+                {
+                    Population =
+                    {
+                        new Hl7.Fhir.Model.MeasureReport.PopulationComponent
+                        {
+                            ElementId = "initial-population",
+                            Code = new CodeableConcept("http://terminology.hl7.org/CodeSystem/measure-population", "initial-population"),
+                            Count = 1
+                        }
+                    }
+                }
+            }
+        };
+
+        private async Task<string[]> ReadOutputBlobLinesAsync(string blobName)
+        {
+            var containerClient = new BlobContainerClient(_fixture.AzuriteConnectionString, "report-test-container");
+            var response = await containerClient.GetBlobClient(blobName).DownloadAsync();
+            using var reader = new StreamReader(response.Value.Content);
+            var content = await reader.ReadToEndAsync();
+            return content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        // ------------------------------------------------------------------ //
+        //  IncludeOrganizationResource = false → no Organization in blob
+        // ------------------------------------------------------------------ //
+
+        [Fact]
+        public async Task AggregateToABS_IncludeOrganizationResource_False_DoesNotWriteOrganizationToBlob()
+        {
+            _fixture.TenantApiServiceMock.Reset();
+
+            using var scope = _fixture.ScopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+            var blobService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
+
+            var facilityId = "pat-agg-facility-006";
+            var patientId = "patient-006";
+            var schedule = BuildSchedule(facilityId);
+            await SeedScheduleAsync(context, schedule);
+
+            var measureReport = BuildMeasureReport();
+            var mrJson = new FhirJsonSerializer().SerializeToString(measureReport);
+            var reportName = blobService.GetReportName(schedule);
+            var entryBlobName = blobService.GetBlobName(reportName, $"patient-{patientId}-DE-111.mr");
+            await UploadPatientBlobAsync(entryBlobName, ($"MeasureReport/{measureReport.Id}", mrJson));
+            await SeedReportEntryAsync(context, schedule.Id, facilityId, patientId,
+                ("DE-111", MeasureReportStatus.ReadyForValidation, measureReport.Id, entryBlobName));
+
+            var aggregator = BuildAggregator(scope, includeOrganization: false);
+            var result = await aggregator.AggregateToABS(patientId, schedule);
+
+            var parser = new FhirJsonParser();
+            var lines = await ReadOutputBlobLinesAsync(result.BlobName);
+            var hasOrganization = lines.Any(line =>
+            {
+                try { return parser.Parse<Resource>(line) is Organization; }
+                catch { return false; }
+            });
+            Assert.False(hasOrganization);
+        }
+
+        // ------------------------------------------------------------------ //
+        //  IncludeOrganizationResource = true → Organization appended
+        // ------------------------------------------------------------------ //
+
+        [Fact]
+        public async Task AggregateToABS_IncludeOrganizationResource_True_AppendsOrganizationToBlob()
+        {
+            _fixture.TenantApiServiceMock.Reset();
+
+            var facilityId = "pat-agg-facility-007";
+            var patientId = "patient-007";
+            var facilityName = "Test Hospital";
+
+            _fixture.TenantApiServiceMock
+                .Setup(x => x.GetFacilityConfig(facilityId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new FacilityModel { FacilityName = facilityName, FacilityId = facilityId });
+
+            using var scope = _fixture.ScopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+            var blobService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
+
+            var schedule = BuildSchedule(facilityId);
+            await SeedScheduleAsync(context, schedule);
+
+            var measureReport = BuildMeasureReport();
+            var mrJson = new FhirJsonSerializer().SerializeToString(measureReport);
+            var reportName = blobService.GetReportName(schedule);
+            var entryBlobName = blobService.GetBlobName(reportName, $"patient-{patientId}-DE-111.mr");
+            await UploadPatientBlobAsync(entryBlobName, ($"MeasureReport/{measureReport.Id}", mrJson));
+            await SeedReportEntryAsync(context, schedule.Id, facilityId, patientId,
+                ("DE-111", MeasureReportStatus.ReadyForValidation, measureReport.Id, entryBlobName));
+
+            var aggregator = BuildAggregator(scope, includeOrganization: true);
+            var result = await aggregator.AggregateToABS(patientId, schedule);
+
+            var parser = new FhirJsonParser();
+            var lines = await ReadOutputBlobLinesAsync(result.BlobName);
+            var orgLine = lines.FirstOrDefault(line =>
+            {
+                try { return parser.Parse<Resource>(line) is Organization; }
+                catch { return false; }
+            });
+            Assert.NotNull(orgLine);
+            var org = parser.Parse<Organization>(orgLine);
+            Assert.Equal(facilityName, org.Name);
+            Assert.Equal(facilityId, org.Identifier.First().Value);
+        }
+
+        // ------------------------------------------------------------------ //
+        //  IncludeOrganizationResource = true, null facility config → no Organization
+        // ------------------------------------------------------------------ //
+
+        [Fact]
+        public async Task AggregateToABS_IncludeOrganizationResource_True_NullFacilityConfig_DoesNotAppendOrganization()
+        {
+            _fixture.TenantApiServiceMock.Reset();
+
+            var facilityId = "pat-agg-facility-008";
+            var patientId = "patient-008";
+
+            _fixture.TenantApiServiceMock
+                .Setup(x => x.GetFacilityConfig(facilityId, It.IsAny<CancellationToken>()))
+                .ReturnsAsync((FacilityModel?)null);
+
+            using var scope = _fixture.ScopeFactory.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
+            var blobService = scope.ServiceProvider.GetRequiredService<BlobStorageService>();
+
+            var schedule = BuildSchedule(facilityId);
+            await SeedScheduleAsync(context, schedule);
+
+            var measureReport = BuildMeasureReport();
+            var mrJson = new FhirJsonSerializer().SerializeToString(measureReport);
+            var reportName = blobService.GetReportName(schedule);
+            var entryBlobName = blobService.GetBlobName(reportName, $"patient-{patientId}-DE-111.mr");
+            await UploadPatientBlobAsync(entryBlobName, ($"MeasureReport/{measureReport.Id}", mrJson));
+            await SeedReportEntryAsync(context, schedule.Id, facilityId, patientId,
+                ("DE-111", MeasureReportStatus.ReadyForValidation, measureReport.Id, entryBlobName));
+
+            var aggregator = BuildAggregator(scope, includeOrganization: true);
+            var result = await aggregator.AggregateToABS(patientId, schedule);
+
+            var parser = new FhirJsonParser();
+            var lines = await ReadOutputBlobLinesAsync(result.BlobName);
+            var hasOrganization = lines.Any(line =>
+            {
+                try { return parser.Parse<Resource>(line) is Organization; }
+                catch { return false; }
+            });
+            Assert.False(hasOrganization);
+        }
+
+        // ------------------------------------------------------------------ //
         //  No entry found ? throws
         // ------------------------------------------------------------------ //
 
         [Fact]
-        public async SystemTask AggregateToABS_EntryMissing_ThrowsException()
+        public async Task AggregateToABS_EntryMissing_ThrowsException()
         {
             using var scope = _fixture.ScopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
@@ -163,7 +347,7 @@ namespace IntegrationTests.Report.Core
         // ------------------------------------------------------------------ //
 
         [Fact]
-        public async SystemTask AggregateToABS_NoReadyForValidationMeasureReports_ReturnsEmptyResults()
+        public async Task AggregateToABS_NoReadyForValidationMeasureReports_ReturnsEmptyResults()
         {
             using var scope = _fixture.ScopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
@@ -190,7 +374,7 @@ namespace IntegrationTests.Report.Core
         // ------------------------------------------------------------------ //
 
         [Fact]
-        public async SystemTask AggregateToABS_SingleReadyMeasureReport_AggregatesCorrectly()
+        public async Task AggregateToABS_SingleReadyMeasureReport_AggregatesCorrectly()
         {
             using var scope = _fixture.ScopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
@@ -259,7 +443,7 @@ namespace IntegrationTests.Report.Core
         // ------------------------------------------------------------------ //
 
         [Fact]
-        public async SystemTask AggregateToABS_DuplicateResources_AreSkipped()
+        public async Task AggregateToABS_DuplicateResources_AreSkipped()
         {
             using var scope = _fixture.ScopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();
@@ -331,7 +515,7 @@ namespace IntegrationTests.Report.Core
         // ------------------------------------------------------------------ //
 
         [Fact]
-        public async SystemTask AggregateToABS_MixedStatuses_OnlyProcessesReadyForValidation()
+        public async Task AggregateToABS_MixedStatuses_OnlyProcessesReadyForValidation()
         {
             using var scope = _fixture.ScopeFactory.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<ReportDbContext>();

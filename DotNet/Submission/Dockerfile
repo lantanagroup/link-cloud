@@ -14,6 +14,7 @@ COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Submission/Submission.csproj", "DotNet/Submission/"]
 COPY ["DotNet/Link.Authorization/Link.Authorization.csproj", "DotNet/Link.Authorization/"]
 COPY ["DotNet/Submission.Data/Submission.Data.csproj", "DotNet/Submission.Data/"]
+COPY ["Directory.Packages.props", "./"]
 RUN dotnet restore "DotNet/Submission/Submission.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Submission"
