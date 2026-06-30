@@ -167,6 +167,7 @@ export class RemoveExtensionsCsvImportDialogComponent {
       }
     }
 
+    const matchedPairs = new Set<string>();
     for (const op of existing) {
       const parsedOp = op.parsedOperationJson as RemoveExtensionsOperation;
       const resourceTypes = op.operationResourceTypes
@@ -176,7 +177,9 @@ export class RemoveExtensionsCsvImportDialogComponent {
 
       for (const rt of resourceTypes) {
         for (const url of urls) {
-          if (csvPairs.has(`${rt}::${url}`)) {
+          const pairKey = `${rt}::${url}`;
+          if (csvPairs.has(pairKey) && !matchedPairs.has(pairKey)) {
+            matchedPairs.add(pairKey);
             conflicts.push({resourceType: rt, url});
           }
         }
