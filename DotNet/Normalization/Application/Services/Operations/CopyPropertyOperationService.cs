@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             _logger = logger;
         }
 
-        protected override async Task<OperationResult> ExecuteOperation(CopyPropertyOperation operation, DomainResource resource)
+        protected override async Task<OperationResult> ExecuteOperation(CopyPropertyOperation operation, DomainResource resource, CancellationToken cancellationToken = default)
         {
             var result = await CopyFhirPathValue(resource, operation.SourceFhirPath, operation.TargetFhirPath);
 

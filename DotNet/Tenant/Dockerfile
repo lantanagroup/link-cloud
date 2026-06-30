@@ -6,6 +6,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Tenant/Tenant.csproj", "DotNet/Tenant/"]
+COPY ["Directory.Packages.props", "./"]
 RUN dotnet restore "DotNet/Tenant/Tenant.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Tenant"
