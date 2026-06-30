@@ -40,6 +40,7 @@ import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -232,34 +233,20 @@ public class KafkaConfig {
 
     // Delay + termination are driven by the custom recoverer; this config only provisions
     // the backoff-aware retry listener. Do not rely on Spring's own retry/DLT routing here.
+    //
+    // Both retried topics (ResourcesNormalized and EvaluationRequested) share one
+    // RetryTopicConfiguration. Spring Kafka 3.1.x does not reliably bootstrap multiple
+    // RetryTopicConfiguration beans — only one listener's containers get provisioned and the
+    // other @KafkaListener is silently dropped (no error). A single config with includeTopics
+    // covers both deterministically. The settings are identical across the two topics, so there
+    // is no behavioral difference vs. the previous per-topic beans.
     @Bean
     @ConditionalOnProperty(prefix = "spring.kafka.retry", name = "disable-retry-consumer", havingValue = "false", matchIfMissing = true)
-    public RetryTopicConfiguration resourceNormalizedRetryTopic(@Qualifier("compressedKafkaTemplate") KafkaTemplate<String, ResourcesNormalized> template) {
+    public RetryTopicConfiguration measureEvalRetryTopics(@Qualifier("compressedKafkaTemplate") KafkaTemplate<String, Object> template) {
         return RetryTopicConfigurationBuilder
                 .newInstance()
                 .concurrency(1)
-                .includeTopic(Topics.RESOURCES_NORMALIZED)
-                .retryTopicSuffix("-Retry")
-                .dltSuffix("-Error")
-                // Container-thread poison (malformed payload / deserialization) never succeeds on retry,
-                // so route it straight to -Error. Mirrors the NON_RETRYABLE set (RetryTopicRecovererFactory)
-                // used on the async path.
-                .notRetryOn(DeserializationException.class)
-                .useSingleTopicForSameIntervals()
-                .doNotAutoCreateRetryTopics()
-                .create(template);
-    }
-
-
-    // Delay + termination are driven by the custom recoverer; this config only provisions
-    // the backoff-aware retry listener. Do not rely on Spring's own retry/DLT routing here.
-    @Bean
-    @ConditionalOnProperty(prefix = "spring.kafka.retry", name = "disable-retry-consumer", havingValue = "false", matchIfMissing = true)
-    public RetryTopicConfiguration evaluationRequestedRetryTopic(@Qualifier("compressedKafkaTemplate") KafkaTemplate<String, EvaluationRequested> template) {
-        return RetryTopicConfigurationBuilder
-                .newInstance()
-                .concurrency(1)
-                .includeTopic(Topics.EVALUATION_REQUESTED)
+                .includeTopics(List.of(Topics.RESOURCES_NORMALIZED, Topics.EVALUATION_REQUESTED))
                 .retryTopicSuffix("-Retry")
                 .dltSuffix("-Error")
                 // Container-thread poison (malformed payload / deserialization) never succeeds on retry,
@@ -275,8 +262,11 @@ public class KafkaConfig {
      * Exceptions that can never succeed on retry (malformed content / deserialization); routed
      * straight to the error topic. Supplied to the shared {@link RetryTopicRecovererFactory} — the
      * FHIR/HAPI types live on this module's classpath, not in shared.
+     *
+     * <p>Package-private (not {@code private}) so {@code KafkaConfigTest} exercises the resolver and
+     * classifier against this exact production set rather than a copy that can silently drift.</p>
      */
-    private static final Set<Class<? extends Throwable>> NON_RETRYABLE = Set.of(
+    static final Set<Class<? extends Throwable>> NON_RETRYABLE = Set.of(
             FhirParseException.class,
             ValidationException.class,
             MessageHandlingException.class,

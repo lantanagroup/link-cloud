@@ -112,16 +112,15 @@ separate container-thread handler is required.
       retry:
         consumer-retry-duration: [PT20S, PT60S, PT120S]   # N entries => N retries, then -Error
         disable-retry-consumer: false                      # true => straight to -Error; listener not provisioned
-        maxAttempts: 5            # flat fallback (array empty)
-        retry-backoff-ms: 60000   # flat fallback (array empty)
 
-  - Array-driven mode (consumer-retry-duration set) is the single source of
-    truth: ISO-8601 entry K-1 is the delay before retry K, and the attempt count
+  - consumer-retry-duration is the single source of truth for retry depth and
+    timing: ISO-8601 entry K-1 is the delay before retry K, and the attempt count
     is derived (effectiveMaxAttempts = size + 1). Matches .NET's
     ConsumerRetryDuration[retryCount-1] + count > Count() termination.
+  - An empty list disables retries (the first failure is dead-lettered); the
+    default is two 3-second delays (3 attempts).
   - Disable routes everything to -Error AND (via @ConditionalOnProperty) skips
     provisioning the -Retry listener.
-  - Flat fallback preserves the prior single-delay behavior when no array is set.
 
 Changing retry depth/timing or turning retries off is a CONFIG change, not a
 code change.

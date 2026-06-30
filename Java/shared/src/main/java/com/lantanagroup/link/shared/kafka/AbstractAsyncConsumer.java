@@ -18,6 +18,10 @@ public abstract class AbstractAsyncConsumer<K, T> {
 
     private static final Logger logger = LoggerFactory.getLogger(AbstractAsyncConsumer.class);
 
+    // Bounded drain window on shutdown: long enough for an in-flight evaluation to finish, but never
+    // unbounded — a single hung task must not block service shutdown.
+    private static final long SHUTDOWN_GRACE_SECONDS = 30;
+
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final ConsumerRecordRecoverer recoverer;
 
@@ -34,17 +38,30 @@ public abstract class AbstractAsyncConsumer<K, T> {
             final String MDC_KEY = "record";
             try {
                 MDC.put(MDC_KEY, KafkaUtils.format(record));
-                this.process(record);
-            } catch (Exception e) {
-                if (recoverer != null) {
-                    recoverer.accept(record, e);
-                } else {
-                    logger.error("No recoverer configured; acking and dropping failed record from topic={} partition={} offset={}",
-                            record.topic(), record.partition(), record.offset(), e);
+                try {
+                    this.process(record);
+                } catch (Exception processError) {
+                    if (recoverer == null) {
+                        // No recovery path configured: intentionally ack-and-drop the failed record.
+                        logger.error("No recoverer configured; acking and dropping failed record from topic={} partition={} offset={}",
+                                record.topic(), record.partition(), record.offset(), processError);
+                    } else {
+                        // Route to -Retry/-Error. If this throws (e.g. the broker is unavailable), let it
+                        // propagate so the ack below is skipped — an uncommitted offset makes Kafka
+                        // redeliver the record instead of silently losing a failure that was neither
+                        // retried nor dead-lettered.
+                        recoverer.accept(record, processError);
+                    }
                 }
-            }
-            finally {
+                // Reached only when process() succeeded, recovery published successfully, or we
+                // intentionally dropped (no recoverer): the record is accounted for, so commit the offset.
                 ack.acknowledge();
+            } catch (Exception unrecovered) {
+                // process() failed AND recovery (or the ack itself) failed. Do NOT commit the offset:
+                // leaving it uncommitted preserves at-least-once delivery so the record is redelivered.
+                logger.error("Failed to recover or acknowledge record from topic={} partition={} offset={}; leaving offset uncommitted for redelivery",
+                        record.topic(), record.partition(), record.offset(), unrecovered);
+            } finally {
                 MDC.remove(MDC_KEY);
             }
         });
@@ -54,10 +71,12 @@ public abstract class AbstractAsyncConsumer<K, T> {
 
     @PreDestroy
     public void close() {
-        // Stop accepting new work, then let in-flight evaluations drain before forcing shutdown.
+        // Stop accepting new work, then let in-flight evaluations drain within a bounded window before
+        // forcing shutdown — a single hung task must not block service shutdown indefinitely.
         executor.shutdown();
         try {
-            if (!executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS)) {
+            if (!executor.awaitTermination(SHUTDOWN_GRACE_SECONDS, TimeUnit.SECONDS)) {
+                logger.warn("Timed out waiting for async consumer executor to drain; forcing shutdown.");
                 executor.shutdownNow();
             }
         } catch (InterruptedException e) {

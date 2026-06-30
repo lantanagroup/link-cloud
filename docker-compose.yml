@@ -717,7 +717,7 @@ services:
     container_name: link-measureeval
     environment:
       SPRING_PROFILES_ACTIVE: docker
-      spring.main.lazy-initialization: "true"
+      spring.main.lazy-initialization: "false"
       spring.kafka.properties.sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_SASL_CLIENT_USER}" password="${KAFKA_SASL_CLIENT_PASSWORD}";
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
       internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}

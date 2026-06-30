@@ -260,6 +260,12 @@ services:
     - key: "resource-cache.blob-storage.blob-root"
       description: "Root path/prefix within the blob container under which cached resources are stored for the ABS resource cache. Required only when the ABS resource-cache backend is used."
       required: false
+    - key: "spring.kafka.retry.consumer-retry-duration"
+      description: "List of ISO 8601 durations defining the Kafka consumer retry schedule — the single source of truth for retry depth and timing. Entry K-1 is the delay before retry K, and the total attempt count is the list size + 1, after which the record is routed to the -Error topic. An empty list disables retries (first failure is dead-lettered). Defaults to two 3-second delays (3 attempts)."
+      required: false
+    - key: "spring.kafka.retry.disable-retry-consumer"
+      description: "Boolean flag that disables the backoff-aware retry consumer. When true, failed records are routed straight to the -Error topic and the -Retry listener is not provisioned. Defaults to false."
+      required: false
   Normalization: []
   Notification:
     - key: "SmtpConnection:Host"

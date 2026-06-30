@@ -89,13 +89,13 @@ spring:
         max.request.size: 10485760
 
     retry:
+      # consumer-retry-duration is the single source of truth for retry depth and timing: each entry is
+      # the delay before that retry, and the attempt count is the list size + 1 (then dead-lettered).
       consumer-retry-duration:
         - PT20S
         - PT60S
         - PT120S
       disable-retry-consumer: false
-      maxAttempts: 5
-      retry-backoff-ms: 60000
 
 link:
   info-route: /api/measureeval/info
