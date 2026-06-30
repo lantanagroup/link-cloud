@@ -183,7 +183,8 @@ public class MeasureDefinitionController {
 
         if (!debug.isEmpty()) {
             _logger.info("Measure evaluation requested with debug sections {} for measure {}",
-                    debug, id);
+                    StringEscapeUtils.escapeJava(String.valueOf(debug)),
+                    StringEscapeUtils.escapeJava(id));
         }
 
         try {

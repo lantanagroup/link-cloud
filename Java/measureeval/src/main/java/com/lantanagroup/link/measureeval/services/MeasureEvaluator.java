@@ -216,7 +216,9 @@ public class MeasureEvaluator {
                     MeasureEvaluationResult.PopulationInfo popInfo = new MeasureEvaluationResult.PopulationInfo();
                     popInfo.setType(pop.type().toCode());
                     popInfo.setCount(pop.getCount());
-                    popInfo.setSubjects(new ArrayList<>(pop.getSubjects()));
+                    popInfo.setSubjects(pop.getSubjects() == null
+                            ? new ArrayList<>()
+                            : new ArrayList<>(pop.getSubjects()));
                     populationInfos.add(popInfo);
                 }
                 groupInfo.setPopulations(populationInfos);

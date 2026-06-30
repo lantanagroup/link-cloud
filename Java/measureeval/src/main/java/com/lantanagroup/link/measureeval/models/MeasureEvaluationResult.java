@@ -10,6 +10,7 @@ import java.util.Map;
  * Response DTO that wraps a standard FHIR MeasureReport along with optional debug/evaluation data.
  * When debug mode is enabled, the {@code debugInfo} field is populated with detailed evaluation information.
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class MeasureEvaluationResult {
 
     private MeasureReport measureReport;
