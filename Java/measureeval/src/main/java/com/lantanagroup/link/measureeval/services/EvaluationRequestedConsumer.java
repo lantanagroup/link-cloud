@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
@@ -34,6 +35,7 @@ import java.util.function.Predicate;
 import static io.opentelemetry.api.common.AttributeKey.stringKey;
 
 @Service
+@Lazy(false)
 public class EvaluationRequestedConsumer extends AbstractAsyncConsumer<String, EvaluationRequested> {
 
     private static final Logger logger = LoggerFactory.getLogger(EvaluationRequestedConsumer.class);
