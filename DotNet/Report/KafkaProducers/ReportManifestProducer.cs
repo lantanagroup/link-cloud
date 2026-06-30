@@ -49,12 +49,13 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             _reportEntryManager = reportEntryManager;
         }
 
-        public virtual async Task<List<Resource>> Generate(ReportScheduleModel schedule)
+        public virtual async Task<List<Resource>> Generate(ReportScheduleModel schedule, CancellationToken cancellationToken = default)
         {
-            var database = _serviceScopeFactory.CreateScope().ServiceProvider.GetRequiredService<IDatabase>();
-            var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id);
+            using var scope = _serviceScopeFactory.CreateScope();
+            var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
+            var reportEntries = await database.ReportEntryRepository.FindAsync(x => x.ReportScheduleId == schedule.Id, cancellationToken);
 
-            var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, CancellationToken.None);
+            var facilityConfig = await _tenantApiService.GetFacilityConfig(schedule.FacilityId, cancellationToken);
 
             if (facilityConfig == null)
             {
@@ -96,9 +97,9 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return manifestResources;
         }
 
-        public virtual async Task<Bundle> GenerateAsBundle(ReportScheduleModel schedule)
+        public virtual async Task<Bundle> GenerateAsBundle(ReportScheduleModel schedule, CancellationToken cancellationToken = default)
         {
-            List<Resource> resources = await Generate(schedule);
+            List<Resource> resources = await Generate(schedule, cancellationToken);
             Bundle bundle = new()
             {
                 Type = Bundle.BundleType.Collection
@@ -112,19 +113,19 @@ namespace LantanaGroup.Link.Report.KafkaProducers
             return bundle;
         }
 
-        public virtual async Task<bool> Produce(ReportScheduleModel schedule, string correlationId = null)
+        public virtual async Task<bool> Produce(ReportScheduleModel schedule, string correlationId = null, CancellationToken cancellationToken = default)
         {
             if (!schedule.EndOfReportPeriodJobHasRun)
             {
                 return false;
             }
 
-            if (!await _reportEntryManager.AreAllEntriesCompleteAsync(schedule.FacilityId, schedule.Id))
+            if (!await _reportEntryManager.AreAllEntriesCompleteAsync(schedule.FacilityId, schedule.Id, cancellationToken))
             {
                 return false;
             }
 
-            List<Resource> manifestResources = await Generate(schedule);
+            List<Resource> manifestResources = await Generate(schedule, cancellationToken);
 
             Uri? payloadUri;
             try
