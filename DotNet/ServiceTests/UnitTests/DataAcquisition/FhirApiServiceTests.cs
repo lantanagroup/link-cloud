@@ -156,8 +156,6 @@ public class FhirApiServiceTests
             readFhirCommand.Object,
             logger.Object,
             resourceCache.Object,
-            new Mock<IEncounterMappingQueries>().Object,
-            new Mock<IOrganizationLocationConfigurationQueries>().Object,
             locationMappingService.Object
         );
 
@@ -198,9 +196,6 @@ public class FhirApiServiceTests
             readFhirCommand.Object,
             logger.Object,
             resourceCache.Object,
-            new Mock<IEncounterMappingQueries>().Object,
-            new Mock<IOrganizationLocationConfigurationQueries>().Object,
-            new Mock<ILocationMappingService>().Object
             CreateLocationMappingService()
         );
 
@@ -255,9 +250,6 @@ public class FhirApiServiceTests
             readFhirCommand.Object,
             logger.Object,
             resourceCache.Object,
-            new Mock<IEncounterMappingQueries>().Object,
-            new Mock<IOrganizationLocationConfigurationQueries>().Object,
-            new Mock<ILocationMappingService>().Object,
             CreateLocationMappingService()
         );
 
@@ -304,9 +296,6 @@ public class FhirApiServiceTests
             readFhirCommand.Object,
             new Mock<ILogger<FhirApiService>>().Object,
             new Mock<IResourceCache>().Object,
-            new Mock<IEncounterMappingQueries>().Object,
-            new Mock<IOrganizationLocationConfigurationQueries>().Object,
-            new Mock<ILocationMappingService>().Object,
             CreateLocationMappingService()
         );
 
@@ -336,9 +325,6 @@ public class FhirApiServiceTests
             new Mock<IReadFhirCommand>().Object,
             new Mock<ILogger<FhirApiService>>().Object,
             new Mock<IResourceCache>().Object,
-            new Mock<IEncounterMappingQueries>().Object,
-            new Mock<IOrganizationLocationConfigurationQueries>().Object,
-            new Mock<ILocationMappingService>().Object,
             CreateLocationMappingService()
         );
 
@@ -369,9 +355,6 @@ public class FhirApiServiceTests
             new Mock<IReadFhirCommand>().Object,
             new Mock<ILogger<FhirApiService>>().Object,
             resourceCache.Object,
-            new Mock<IEncounterMappingQueries>().Object,
-            new Mock<IOrganizationLocationConfigurationQueries>().Object,
-            new Mock<ILocationMappingService>().Object,
             CreateLocationMappingService()
         );
 
@@ -527,8 +510,6 @@ public class FhirApiServiceTests
             new Mock<IReadFhirCommand>().Object,
             new Mock<ILogger<FhirApiService>>().Object,
             new Mock<IResourceCache>().Object,
-            encounterMappingQueries.Object,
-            organizationLocationConfigurationQueries.Object,
             new Mock<ILocationMappingService>().Object
         );
 
@@ -692,9 +673,6 @@ public class FhirApiServiceTests
             readFhirCommand.Object,
             logger.Object,
             resourceCache.Object,
-            new Mock<IEncounterMappingQueries>().Object,
-            new Mock<IOrganizationLocationConfigurationQueries>().Object,
-            new Mock<ILocationMappingService>().Object,
             CreateLocationMappingService()
         );
 
@@ -785,8 +763,6 @@ public class FhirApiServiceTests
             new Mock<IReadFhirCommand>().Object,
             new Mock<ILogger<FhirApiService>>().Object,
             new Mock<IResourceCache>().Object,
-            new Mock<IEncounterMappingQueries>().Object,
-            new Mock<IOrganizationLocationConfigurationQueries>().Object,
             locationMappingService.Object
         );
 
@@ -826,10 +802,6 @@ public class FhirApiServiceTests
             new Mock<IReadFhirCommand>().Object,
             new Mock<ILogger<FhirApiService>>().Object,
             new Mock<IResourceCache>().Object,
-            new Mock<IEncounterMappingQueries>().Object,
-            new Mock<IOrganizationLocationConfigurationQueries>().Object,
-            new Mock<IEncounterMappingQueries>().Object,
-            new Mock<IOrganizationLocationConfigurationQueries>().Object,
             locationMappingService.Object
         );
 
@@ -869,8 +841,6 @@ public class FhirApiServiceTests
             readFhirCommand.Object,
             new Mock<ILogger<FhirApiService>>().Object,
             new Mock<IResourceCache>().Object,
-            new Mock<IEncounterMappingQueries>().Object,
-            new Mock<IOrganizationLocationConfigurationQueries>().Object,
             locationMappingService.Object
         );
 
@@ -909,8 +879,6 @@ public class FhirApiServiceTests
             readFhirCommand.Object,
             new Mock<ILogger<FhirApiService>>().Object,
             new Mock<IResourceCache>().Object,
-            new Mock<IEncounterMappingQueries>().Object,
-            new Mock<IOrganizationLocationConfigurationQueries>().Object,
             locationMappingService.Object
         );
 

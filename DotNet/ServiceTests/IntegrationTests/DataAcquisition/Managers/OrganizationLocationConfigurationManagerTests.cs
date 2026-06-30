@@ -1,8 +1,18 @@
+using System.Text.Json;
+using LantanaGroup.Link.DataAcquisition.Domain.Application;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Interfaces;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
 
@@ -26,7 +36,7 @@ public class OrganizationLocationConfigurationManagerTests
            var cacheService = scope.ServiceProvider.GetRequiredService<ICacheService>();
            var locationMappingService = scope.ServiceProvider.GetRequiredService<ILocationMappingService>();
            var locationResolutionValidator = scope.ServiceProvider.GetRequiredService<ILocationResolutionValidator>();
-           return new OrganizationLocationConfigurationManager(database, queries, cacheService, locationMappingService);
+           return new OrganizationLocationConfigurationManager(database, queries, locationResolutionValidator, cacheService, locationMappingService);
        }
 
     private static string NewFacilityId(string prefix) => $"{prefix}_{Guid.NewGuid():N}";

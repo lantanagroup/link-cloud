@@ -2,23 +2,26 @@
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Validators;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Interfaces;
 
 namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 
 public interface IOrganizationLocationConfigurationManager
 {
-    Task<OrganizationLocationConfigurationModel> CreateAsync(CreateOrganizationLocationConfigurationModel model);
+    Task<OrganizationLocationConfigurationModel> CreateAsync(CreateOrganizationLocationConfigurationModel model, CancellationToken cancellationToken = default);
 
-    Task<OrganizationLocationConfigurationModel> UpdateByIdAsync(int configId, UpdateOrganizationLocationConfigurationModel model);
+    Task<OrganizationLocationConfigurationModel> UpdateByIdAsync(int configId, UpdateOrganizationLocationConfigurationModel model, CancellationToken cancellationToken = default);
 
-    Task<List<OrganizationLocationConfigurationModel>> UpdateByFacilityIdAsync(string facilityId, UpdateOrganizationLocationConfigurationModel model);
-    
+    Task<List<OrganizationLocationConfigurationModel>> UpdateByFacilityIdAsync(string facilityId, UpdateOrganizationLocationConfigurationModel model, CancellationToken cancellationToken = default);
 
-    Task DeleteByIdAsync(int configId);
 
-    Task DeleteByFacilityIdAsync(string facilityId);
+    Task DeleteByIdAsync(int configId, CancellationToken cancellationToken = default);
+
+    Task DeleteByFacilityIdAsync(string facilityId, CancellationToken cancellationToken = default);
 }
 
 public class OrganizationLocationConfigurationManager : IOrganizationLocationConfigurationManager
@@ -29,7 +32,7 @@ public class OrganizationLocationConfigurationManager : IOrganizationLocationCon
     private readonly ICacheService _cacheService;
     private readonly ILocationMappingService _locationMappingService;
 
-    public OrganizationLocationConfigurationManager(IDatabase database, IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries, ICacheService cacheService, ILocationMappingService locationMappingService)
+    public OrganizationLocationConfigurationManager(IDatabase database, IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries, ILocationResolutionValidator locationResolutionValidator, ICacheService cacheService, ILocationMappingService locationMappingService)
     {
         _database = database;
         _organizationLocationConfigurationQueries = organizationLocationConfigurationQueries;
