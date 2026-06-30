@@ -8,7 +8,7 @@ import {OperationService} from '../../../../../services/gateway/normalization/op
 import {ISaveOperationModel} from '../../../../../interfaces/normalization/operation-save-model.interface';
 import {OperationType} from '../../../../../interfaces/normalization/operation-type-enumeration';
 import {RemoveExtensionsOperation} from '../../../../../interfaces/normalization/remove-extensions-operation-interface';
-import {firstValueFrom, forkJoin, map} from 'rxjs';
+import {firstValueFrom, map} from 'rxjs';
 import {IOperationModel} from '../../../../../interfaces/normalization/operation-get-model.interface';
 import * as Papa from 'papaparse';
 
@@ -189,29 +189,46 @@ export class RemoveExtensionsCsvImportDialogComponent {
     return conflicts;
   }
 
-  private fetchExistingOperations(): Promise<IOperationModel[]> {
+  private async fetchExistingOperations(): Promise<IOperationModel[]> {
     if (!this.data.isVendorMode) {
-      return firstValueFrom(
-        this.operationService.searchGlobalOperations(
-          this.data.facilityId ?? null,
-          OperationType.RemoveExtensions,
-          null, null, null, null, null, null, 1000, 0
-        ).pipe(map(r => r.records))
-      );
+      return this.fetchAllOperationPages(this.data.facilityId ?? null, null);
     }
 
-    if (!this.data.vendorIds?.length) return Promise.resolve([]);
+    if (!this.data.vendorIds?.length) return [];
 
-    return firstValueFrom(
-      forkJoin(
-        this.data.vendorIds.map(vendorId =>
-          this.operationService.searchGlobalOperations(
-            null, OperationType.RemoveExtensions,
-            null, null, null, vendorId, null, null, 1000, 0
-          ).pipe(map(r => r.records))
-        )
-      ).pipe(map(results => results.flat()))
+    const results = await Promise.all(
+      this.data.vendorIds.map(vendorId => this.fetchAllOperationPages(null, vendorId))
     );
+    return results.flat();
+  }
+
+  private async fetchAllOperationPages(facilityId: string | null, vendorId: string | null): Promise<IOperationModel[]> {
+    const pageSize = 1000;
+    const firstPage = await firstValueFrom(
+      this.operationService.searchGlobalOperations(
+        facilityId, OperationType.RemoveExtensions,
+        null, null, null, vendorId, null, null, pageSize, 0
+      )
+    );
+
+    const records = [...firstPage.records];
+    const totalPages = firstPage.metadata?.totalPages ?? 1;
+
+    if (totalPages > 1) {
+      const remainingPages = await Promise.all(
+        Array.from({length: totalPages - 1}, (_, i) =>
+          firstValueFrom(
+            this.operationService.searchGlobalOperations(
+              facilityId, OperationType.RemoveExtensions,
+              null, null, null, vendorId, null, null, pageSize, i + 1
+            ).pipe(map(r => r.records))
+          )
+        )
+      );
+      records.push(...remainingPages.flat());
+    }
+
+    return records;
   }
 
   back(): void {
