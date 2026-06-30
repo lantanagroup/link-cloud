@@ -8,10 +8,37 @@
       (column 2). Each unique resource type creates a separate Remove Extensions operation.
     </p>
     <file-upload (fileChange)="onFileSelected($event)"></file-upload>
+    @if (isChecking) {
+      <div class="checking-indicator">
+        <mat-spinner diameter="20"></mat-spinner>
+        Checking for existing operations&hellip;
+      </div>
+    }
     @if (parseError) {
       <div class="parse-error">
         <mat-icon>error_outline</mat-icon>
         {{ parseError }}
+      </div>
+    }
+    @if (conflicts.length > 0) {
+      <div class="conflict-error">
+        <div class="conflict-header">
+          <mat-icon>block</mat-icon>
+          Import rejected &mdash; {{ conflicts.length }} duplicate(s) found. The following
+          resource type / URL combination(s) already exist:
+        </div>
+        <div class="conflict-groups">
+          @for (group of conflictGroups; track group.resourceType) {
+            <div class="conflict-group">
+              <strong>{{ group.resourceType }}</strong>
+              <ul>
+                @for (url of group.urls; track url) {
+                  <li>{{ url }}</li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
       </div>
     }
   }
