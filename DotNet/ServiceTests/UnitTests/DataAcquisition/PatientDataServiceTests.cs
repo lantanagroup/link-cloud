@@ -59,7 +59,7 @@ public class PatientDataServiceTests
     private readonly Mock<IScheduledReportManager> _mockScheduledReportManager;
     private readonly Mock<IDataAcquisitionServiceMetrics> _mockMetrics;
     private readonly Mock<IOptionsMonitor<TelemetrySettings>> _mockTelemetrySettings;
-    private readonly Mock<IOrganizationLocationConfigurationQueries> _mockOrganizationLocationConfigurationQueries;
+    private readonly Mock<ILocationMappingService> _mockLocationMappingService;
 
     private readonly PatientDataService _service;
 
@@ -86,15 +86,15 @@ public class PatientDataServiceTests
         _mockScheduledReportManager = new Mock<IScheduledReportManager>();
         _mockMetrics = new Mock<IDataAcquisitionServiceMetrics>();
         _mockTelemetrySettings = new Mock<IOptionsMonitor<TelemetrySettings>>();
-        _mockOrganizationLocationConfigurationQueries = new Mock<IOrganizationLocationConfigurationQueries>();
+        _mockLocationMappingService = new Mock<ILocationMappingService>();
 
         _mockTelemetrySettings
             .SetupGet(x => x.CurrentValue)
             .Returns(new TelemetrySettings { PatientTags = false });
 
-        _mockOrganizationLocationConfigurationQueries
-            .Setup(x => x.GetByFacilityIdAsync(It.IsAny<string>()))
-            .ReturnsAsync(new List<OrganizationLocationConfigurationModel>());
+        _mockLocationMappingService
+            .Setup(x => x.IsConfigured(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
 
         // Mock the semaphore and handle
         var mockSemaphore = new Mock<IDistributedSemaphore>();
@@ -119,7 +119,7 @@ public class PatientDataServiceTests
             _mockReadFhirCommand.Object,
             _mockLogManager.Object,
             _mockLogQueries.Object,
-            _mockOrganizationLocationConfigurationQueries.Object,
+            _mockLocationMappingService.Object,
             _mockFhirApiService.Object,
             _mockRefService.Object,
             _mockDistributedSemaphoreProvider.Object,
@@ -392,9 +392,9 @@ public class PatientDataServiceTests
             .Setup(manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(new DataAcquisitionLogModel());
 
-        _mockOrganizationLocationConfigurationQueries
-            .Setup(x => x.GetByFacilityIdAsync("facility-1"))
-            .ReturnsAsync([new OrganizationLocationConfigurationModel { FacilityId = "facility-1", IsActive = true }]);
+        _mockLocationMappingService
+            .Setup(x => x.IsConfigured("facility-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
 
         List<string> orderedResourceTypes = [];
         _mockQueryListProcessor

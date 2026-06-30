@@ -10,6 +10,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
 using LantanaGroup.Link.DataAcquisition.Domain.Settings;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Extensions.Caching;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -55,6 +56,7 @@ namespace IntegrationTests.DataAcquisition
         public Mock<IProducer<long, ReadyToAcquire>> ReadyToAcquireProducerMock { get; private set; }
         public Mock<IProducer<ResourceKey, ResourcesAcquired>> ResourcesAcquiredProducerMock { get; private set; }
         public Mock<IResourceCache> ResourceCacheMock { get; } = new Mock<IResourceCache>();
+        public Mock<IPatientDataService> PatientDataServiceMock { get; } = new Mock<IPatientDataService>();
 
         public DataAcquisitionIntegrationTestFixture()
         {
@@ -178,6 +180,12 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IOrganizationLocationMappingQueries, OrganizationLocationMappingQueries>();
             builder.Services.AddScoped<IEncounterMappingManager, EncounterMappingManager>();
             builder.Services.AddScoped<IEncounterMappingQueries, EncounterMappingQueries>();
+            builder.Services.AddTransient<ILocationMappingService, LocationMappingService>();
+
+            // In-memory cache used by LocationMappingService (read) and invalidated by
+            // OrganizationLocationConfigurationManager (write).
+            builder.Services.AddMemoryCache();
+            builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
 
             // Register queries
             builder.Services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
@@ -192,6 +200,14 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddSingleton<IProducer<long, ReadyToAcquire>>(ReadyToAcquireProducerMock.Object);
             builder.Services.AddSingleton<IProducer<ResourceKey, ResourcesAcquired>>(ResourcesAcquiredProducerMock.Object);
             builder.Services.AddSingleton<IResourceCache>(ResourceCacheMock.Object);
+
+            // AcquisitionProcessorBackgroundService dependencies: the real dependency checker exercises
+            // the reportability gate end-to-end; the patient-data service is a shared mock (exposed as
+            // PatientDataServiceMock) so tests can assert it is NOT invoked on the NotReportable path; the
+            // ReadyToAcquire producer factory only needs to resolve.
+            builder.Services.AddScoped<IAcquisitionDependencyChecker, AcquisitionDependencyChecker>();
+            builder.Services.AddScoped<IPatientDataService>(_ => PatientDataServiceMock.Object);
+            builder.Services.AddSingleton<IKafkaProducerFactory<long, ReadyToAcquire>>(_ => new Mock<IKafkaProducerFactory<long, ReadyToAcquire>>().Object);
 
             builder.Services.Configure<ServiceRegistry>(options =>
             {

@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Models;
 using Hl7.Fhir.Rest;
@@ -34,6 +34,23 @@ namespace UnitTests.DataAcquisition;
 [Trait("Category", "UnitTests")]
 public class FhirApiServiceTests
 {
+    private static ILocationMappingService CreateLocationMappingService()
+    {
+        var locationMappingService = new Mock<ILocationMappingService>();
+        ConfigureDefaultLocationMappingFilter(locationMappingService);
+        return locationMappingService.Object;
+    }
+
+    private static void ConfigureDefaultLocationMappingFilter(Mock<ILocationMappingService> locationMappingService)
+    {
+        locationMappingService
+            .Setup(x => x.FilterResourcesByEncounterMappingAsync(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyCollection<Resource>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string _, IReadOnlyCollection<Resource> resources, CancellationToken _) => resources.ToList());
+    }
+
     [Fact]
     public void FhirQueryModel_IdQueryParameterValues_StaysInSyncWithQueryParameters()
     {
@@ -130,6 +147,7 @@ public class FhirApiServiceTests
         var logger = new Mock<ILogger<FhirApiService>>();
         var resourceCache = new Mock<IResourceCache>();
         var locationMappingService = new Mock<ILocationMappingService>();
+        ConfigureDefaultLocationMappingFilter(locationMappingService);
 
         var service = new FhirApiService(
             referenceResourceManager.Object,
@@ -183,6 +201,7 @@ public class FhirApiServiceTests
             new Mock<IEncounterMappingQueries>().Object,
             new Mock<IOrganizationLocationConfigurationQueries>().Object,
             new Mock<ILocationMappingService>().Object
+            CreateLocationMappingService()
         );
 
         var resource = new Patient();
@@ -238,7 +257,8 @@ public class FhirApiServiceTests
             resourceCache.Object,
             new Mock<IEncounterMappingQueries>().Object,
             new Mock<IOrganizationLocationConfigurationQueries>().Object,
-            new Mock<ILocationMappingService>().Object
+            new Mock<ILocationMappingService>().Object,
+            CreateLocationMappingService()
         );
 
         var log = new DataAcquisitionLogModel
@@ -286,7 +306,8 @@ public class FhirApiServiceTests
             new Mock<IResourceCache>().Object,
             new Mock<IEncounterMappingQueries>().Object,
             new Mock<IOrganizationLocationConfigurationQueries>().Object,
-            new Mock<ILocationMappingService>().Object
+            new Mock<ILocationMappingService>().Object,
+            CreateLocationMappingService()
         );
 
         var log = new DataAcquisitionLogModel { FacilityId = "123", ResourceId = "res-1" };
@@ -317,7 +338,8 @@ public class FhirApiServiceTests
             new Mock<IResourceCache>().Object,
             new Mock<IEncounterMappingQueries>().Object,
             new Mock<IOrganizationLocationConfigurationQueries>().Object,
-            new Mock<ILocationMappingService>().Object
+            new Mock<ILocationMappingService>().Object,
+            CreateLocationMappingService()
         );
 
         var log = new DataAcquisitionLogModel { FacilityId = "123", CorrelationId = "c-1" };
@@ -349,7 +371,8 @@ public class FhirApiServiceTests
             resourceCache.Object,
             new Mock<IEncounterMappingQueries>().Object,
             new Mock<IOrganizationLocationConfigurationQueries>().Object,
-            new Mock<ILocationMappingService>().Object
+            new Mock<ILocationMappingService>().Object,
+            CreateLocationMappingService()
         );
 
         var patient = new Patient { Id = "p1" };
@@ -391,33 +414,31 @@ public class FhirApiServiceTests
     }
 
     [Fact]
-    public async Task ExecuteSearch_ActiveOrganizationLocationConfiguration_RemovesResourcesWithoutMappedEncounter()
+    public async Task ExecuteSearch_UsesLocationMappingServiceEncounterFilter()
     {
         // Arrange
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var resourceCache = new Mock<IResourceCache>();
-        var encounterMappingQueries = new Mock<IEncounterMappingQueries>();
-        var organizationLocationConfigurationQueries = new Mock<IOrganizationLocationConfigurationQueries>();
+        var locationMappingService = new Mock<ILocationMappingService>();
+        ConfigureDefaultLocationMappingFilter(locationMappingService);
 
-        var mappedObservation = new Observation
+        var keptObservation = new Observation
         {
-            Id = "obs-mapped",
-            Encounter = new ResourceReference("Encounter/enc-mapped")
+            Id = "obs-kept",
+            Encounter = new ResourceReference("Encounter/enc-kept")
         };
-        var unmappedObservation = new Observation
+        var removedObservation = new Observation
         {
-            Id = "obs-unmapped",
-            Encounter = new ResourceReference("Encounter/enc-unmapped")
+            Id = "obs-removed",
+            Encounter = new ResourceReference("Encounter/enc-removed")
         };
-        var noEncounterObservation = new Observation { Id = "obs-no-encounter" };
 
         var bundle = new Bundle
         {
             Entry =
             [
-                new Bundle.EntryComponent { Resource = mappedObservation },
-                new Bundle.EntryComponent { Resource = unmappedObservation },
-                new Bundle.EntryComponent { Resource = noEncounterObservation }
+                new Bundle.EntryComponent { Resource = keptObservation },
+                new Bundle.EntryComponent { Resource = removedObservation }
             ]
         };
 
@@ -425,34 +446,12 @@ public class FhirApiServiceTests
             .Setup(x => x.ExecuteAsync(It.IsAny<SearchFhirCommandRequest>(), It.IsAny<CancellationToken>()))
             .Returns(GetBundleAsync(bundle));
 
-        encounterMappingQueries
-            .Setup(x => x.GetByFacilityIdAndEncounterIdsAsync(
+        locationMappingService
+            .Setup(x => x.FilterResourcesByEncounterMappingAsync(
                 "fac-1",
-                It.Is<IReadOnlyCollection<string>>(ids =>
-                    ids.Contains("enc-mapped") &&
-                    ids.Contains("enc-unmapped")),
+                It.Is<IReadOnlyCollection<Resource>>(resources => resources.Count == 2),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<EncounterMappingModel>
-            {
-                new()
-                {
-                    FacilityId = "fac-1",
-                    PatientId = "patient-1",
-                    EncounterId = "enc-mapped",
-                    MappedToOrg = true
-                },
-                new()
-                {
-                    FacilityId = "fac-1",
-                    PatientId = "patient-1",
-                    EncounterId = "enc-unmapped",
-                    MappedToOrg = false
-                }
-            });
-
-        organizationLocationConfigurationQueries
-            .Setup(x => x.HasActiveByFacilityIdAsync("fac-1", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+            .ReturnsAsync([keptObservation]);
 
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
@@ -461,9 +460,7 @@ public class FhirApiServiceTests
             new Mock<IReadFhirCommand>().Object,
             new Mock<ILogger<FhirApiService>>().Object,
             resourceCache.Object,
-            encounterMappingQueries.Object,
-            organizationLocationConfigurationQueries.Object,
-            new Mock<ILocationMappingService>().Object
+            locationMappingService.Object
         );
 
         var log = new DataAcquisitionLogModel
@@ -489,11 +486,10 @@ public class FhirApiServiceTests
         var ids = await service.ExecuteSearch(log, fhirQuery, fhirQueryConfiguration, ResourceType.Observation);
 
         // Assert
-        Assert.Equal(["Observation/obs-mapped", "Observation/obs-no-encounter"], ids);
-
+        Assert.Equal(["Observation/obs-kept"], ids);
         resourceCache.Verify(x => x.UpdateCorrelationCache(
             It.IsAny<string>(),
-            It.Is<List<DomainResource>>(resources => resources.Single().Id == "obs-unmapped"),
+            It.Is<List<DomainResource>>(resources => resources.Single().Id == "obs-removed"),
             ResourceType.Observation), Times.Never);
     }
 
@@ -567,82 +563,67 @@ public class FhirApiServiceTests
     }
 
     [Fact]
-    public async Task ExecuteRead_ActiveOrganizationLocationConfiguration_RemovesResourceWithoutMappedEncounter()
+    public async Task ExecuteRead_UsesLocationMappingServiceEncounterFilter()
     {
-        // Arrange
-        var readFhirCommand = new Mock<IReadFhirCommand>();
-        var resourceCache = new Mock<IResourceCache>();
-        var encounterMappingQueries = new Mock<IEncounterMappingQueries>();
-        var organizationLocationConfigurationQueries = new Mock<IOrganizationLocationConfigurationQueries>();
+           // Arrange
+           var readFhirCommand = new Mock<IReadFhirCommand>();
+           var resourceCache = new Mock<IResourceCache>();
+           var locationMappingService = new Mock<ILocationMappingService>();
+           ConfigureDefaultLocationMappingFilter(locationMappingService);
 
-        var observation = new Observation
-        {
-            Id = "obs-unmapped",
-            Encounter = new ResourceReference("Encounter/enc-unmapped")
-        };
+           var observation = new Observation
+           {
+               Id = "obs-removed",
+               Encounter = new ResourceReference("Encounter/enc-removed")
+           };
 
-        readFhirCommand
-            .Setup(x => x.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(observation);
+           readFhirCommand
+               .Setup(x => x.ExecuteAsync(It.IsAny<ReadFhirCommandRequest>(), It.IsAny<CancellationToken>()))
+               .ReturnsAsync(observation);
 
-        encounterMappingQueries
-            .Setup(x => x.GetByFacilityIdAndEncounterIdsAsync(
-                "fac-1",
-                It.Is<IReadOnlyCollection<string>>(ids => ids.SequenceEqual(new[] { "enc-unmapped" })),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<EncounterMappingModel>
-            {
-                new()
-                {
-                    FacilityId = "fac-1",
-                    PatientId = "patient-1",
-                    EncounterId = "enc-unmapped",
-                    MappedToOrg = false
-                }
-            });
+           locationMappingService
+               .Setup(x => x.FilterResourcesByEncounterMappingAsync(
+                   "fac-1",
+                   It.Is<IReadOnlyCollection<Resource>>(resources => resources.Single().Id == "obs-removed"),
+                   It.IsAny<CancellationToken>()))
+               .ReturnsAsync([]);
 
-        organizationLocationConfigurationQueries
-            .Setup(x => x.HasActiveByFacilityIdAsync("fac-1", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+           var service = new FhirApiService(
+               new Mock<IReferenceResourcesManager>().Object,
+               new Mock<IReferenceResourcesQueries>().Object,
+               new Mock<ISearchFhirCommand>().Object,
+               readFhirCommand.Object,
+               new Mock<ILogger<FhirApiService>>().Object,
+               resourceCache.Object,
+               locationMappingService.Object
+           );
 
-        var service = new FhirApiService(
-            new Mock<IReferenceResourcesManager>().Object,
-            new Mock<IReferenceResourcesQueries>().Object,
-            new Mock<ISearchFhirCommand>().Object,
-            readFhirCommand.Object,
-            new Mock<ILogger<FhirApiService>>().Object,
-            resourceCache.Object,
-            encounterMappingQueries.Object,
-            organizationLocationConfigurationQueries.Object,
-            new Mock<ILocationMappingService>().Object
-        );
+           var log = new DataAcquisitionLogModel
+           {
+               FacilityId = "fac-1",
+               CorrelationId = "corr-1",
+               PatientId = "Patient/patient-1",
+               ResourceId = "obs-removed"
+           };
+           var fhirQuery = new FhirQueryModel
+           {
+               IsReference = false,
+               ResourceReferenceTypes = new List<ResourceReferenceTypeModel>()
+           };
+           var fhirQueryConfiguration = new FhirQueryConfigurationModel
+           {
+               FhirServerBaseUrl = "http://test"
+           };
 
-        var log = new DataAcquisitionLogModel
-        {
-            FacilityId = "fac-1",
-            CorrelationId = "corr-1",
-            PatientId = "Patient/patient-1",
-            ResourceId = "obs-unmapped"
-        };
-        var fhirQuery = new FhirQueryModel
-        {
-            IsReference = false,
-            ResourceReferenceTypes = new List<ResourceReferenceTypeModel>()
-        };
-        var fhirQueryConfiguration = new FhirQueryConfigurationModel
-        {
-            FhirServerBaseUrl = "http://test"
-        };
+           // Act
+           var ids = await service.ExecuteRead(log, fhirQuery, ResourceType.Observation, fhirQueryConfiguration);
 
-        // Act
-        var ids = await service.ExecuteRead(log, fhirQuery, ResourceType.Observation, fhirQueryConfiguration);
-
-        // Assert
-        Assert.Empty(ids);
-        resourceCache.Verify(x => x.UpdateCorrelationCache(
-            It.IsAny<string>(),
-            It.IsAny<List<DomainResource>>(),
-            It.IsAny<ResourceType>()), Times.Never);
+           // Assert
+           Assert.Empty(ids);
+           resourceCache.Verify(x => x.UpdateCorrelationCache(
+               It.IsAny<string>(),
+               It.IsAny<List<DomainResource>>(),
+               It.IsAny<ResourceType>()), Times.Never);
     }
 
     private async IAsyncEnumerable<Bundle> GetExceptionBundleAsync(Exception ex)
@@ -713,7 +694,8 @@ public class FhirApiServiceTests
             resourceCache.Object,
             new Mock<IEncounterMappingQueries>().Object,
             new Mock<IOrganizationLocationConfigurationQueries>().Object,
-            new Mock<ILocationMappingService>().Object
+            new Mock<ILocationMappingService>().Object,
+            CreateLocationMappingService()
         );
 
         var log = new DataAcquisitionLogModel
@@ -753,6 +735,7 @@ public class FhirApiServiceTests
         // Arrange
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var locationMappingService = new Mock<ILocationMappingService>();
+        ConfigureDefaultLocationMappingFilter(locationMappingService);
         locationMappingService.Setup(s => s.IsConfigured("fac-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         var service = new FhirApiService(
@@ -762,8 +745,6 @@ public class FhirApiServiceTests
             new Mock<IReadFhirCommand>().Object,
             new Mock<ILogger<FhirApiService>>().Object,
             new Mock<IResourceCache>().Object,
-            new Mock<IEncounterMappingQueries>().Object,
-            new Mock<IOrganizationLocationConfigurationQueries>().Object,
             locationMappingService.Object
         );
 
@@ -796,6 +777,7 @@ public class FhirApiServiceTests
         // Arrange
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var locationMappingService = new Mock<ILocationMappingService>();
+        ConfigureDefaultLocationMappingFilter(locationMappingService);
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
@@ -834,6 +816,7 @@ public class FhirApiServiceTests
         // Arrange
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var locationMappingService = new Mock<ILocationMappingService>();
+        ConfigureDefaultLocationMappingFilter(locationMappingService);
         locationMappingService.Setup(s => s.IsConfigured(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
         var service = new FhirApiService(
@@ -843,6 +826,8 @@ public class FhirApiServiceTests
             new Mock<IReadFhirCommand>().Object,
             new Mock<ILogger<FhirApiService>>().Object,
             new Mock<IResourceCache>().Object,
+            new Mock<IEncounterMappingQueries>().Object,
+            new Mock<IOrganizationLocationConfigurationQueries>().Object,
             new Mock<IEncounterMappingQueries>().Object,
             new Mock<IOrganizationLocationConfigurationQueries>().Object,
             locationMappingService.Object
@@ -874,6 +859,7 @@ public class FhirApiServiceTests
         // Arrange
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var locationMappingService = new Mock<ILocationMappingService>();
+        ConfigureDefaultLocationMappingFilter(locationMappingService);
         locationMappingService.Setup(s => s.IsConfigured("fac-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         var service = new FhirApiService(
@@ -913,6 +899,7 @@ public class FhirApiServiceTests
         // Arrange
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var locationMappingService = new Mock<ILocationMappingService>();
+        ConfigureDefaultLocationMappingFilter(locationMappingService);
         locationMappingService.Setup(s => s.IsConfigured(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
         var service = new FhirApiService(

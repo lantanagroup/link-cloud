@@ -46,8 +46,6 @@ public class FhirApiService : IFhirApiService
     private readonly ISearchFhirCommand _searchFhirCommand;
     private readonly ILogger<FhirApiService> _logger;
     private readonly IResourceCache _resourceCache;
-    private readonly IEncounterMappingQueries _encounterMappingQueries;
-    private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries;
     private readonly ILocationMappingService _locationMappingService;
 
     public FhirApiService(
@@ -57,8 +55,6 @@ public class FhirApiService : IFhirApiService
         IReadFhirCommand readFhirCommand,
         ILogger<FhirApiService> logger,
         IResourceCache resourceCache,
-        IEncounterMappingQueries encounterMappingQueries,
-        IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
         ILocationMappingService locationMappingService)
     {
         _referenceResourceManager = referenceResourceManager;
@@ -67,8 +63,6 @@ public class FhirApiService : IFhirApiService
         _readFhirCommand = readFhirCommand;
         _logger = logger;
         _resourceCache = resourceCache;
-        _encounterMappingQueries = encounterMappingQueries;
-        _organizationLocationConfigurationQueries = organizationLocationConfigurationQueries;
         _locationMappingService = locationMappingService;
     }
 
@@ -119,13 +113,15 @@ public class FhirApiService : IFhirApiService
                                                 log.ReportTrackingId),
                                             cancellationToken);
 
-            var filteredResources = await FilterResourcesByEncounterMappingAsync(
-                log,
+            var filteredResources = await _locationMappingService.FilterResourcesByEncounterMappingAsync(
+                log.FacilityId,
                 [resource],
                 cancellationToken);
 
             if (filteredResources.Count == 0)
             {
+                string filterNote = $"[{DateTime.UtcNow}] Filtered out {resourceType}/{resource.Id} because it is not associated with the reporting organization.";
+                addNoteToLog(log, filterNote);
                 return resourceIds;
             }
 
@@ -148,16 +144,31 @@ public class FhirApiService : IFhirApiService
                     .ToList();
 
                 var refResources = ReferenceResourceBundleExtractor.Extract(resource, validResourceTypes);
+                if(refResources.Count > 0)
+                {
+                    addNoteToLog(log, $"[{DateTime.UtcNow}] Discovered {refResources.Count} reference(s) in read resource.");
+                }
                 AccumulateDiscoveredReferences(refResources, referenceAccumulator);
             }
 
-            if (resource is Location location && 
-                await _locationMappingService.IsConfigured(log.FacilityId, cancellationToken))
+            var locationMappingConfigured = await _locationMappingService.IsConfigured(log.FacilityId, cancellationToken);
+            if(locationMappingConfigured)
             {
-                await _locationMappingService.UpdateLocationMappingAsync(
-                    log.FacilityId, 
-                    location,
-                    cancellationToken: cancellationToken);
+                if (resource is Location location)
+                {
+                    var mappingResult = await _locationMappingService.UpdateLocationMappingAsync(
+                        log.FacilityId, 
+                        location,
+                        cancellationToken: cancellationToken);
+                    addNoteToLog(log, $"[{DateTime.UtcNow}] Location mapping updated for Location/{location?.Id}. Part of reporting organization: {mappingResult?.IsOrgLocation}");
+                }
+                else if(resource is Encounter encounter)
+                {
+                    await _locationMappingService.UpdateEncounterLocationMappingAsync(
+                        log.FacilityId,
+                        encounter,
+                        cancellationToken: cancellationToken);
+                }
             }
 
             AddResourceToCache(new ResourceAcquired
@@ -187,8 +198,7 @@ public class FhirApiService : IFhirApiService
             {
                 string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Read operation. See application logs for details.";
 
-                log.Notes ??= new List<string>();
-                log.Notes.Add(note);
+                addNoteToLog(log, note);
                 _logger.LogError(ex, "FhirOperationException for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
                 throw new OpOutcomeException(note, ex);
             }
@@ -275,9 +285,8 @@ public class FhirApiService : IFhirApiService
 
                 if (outcomes.Any())
                 {
-                    log.Notes ??= new List<string>();
                     string searchOutcomeNote = $"[{DateTime.UtcNow}] OperationOutcome(s) found in search bundle. See application logs for details.";
-                    log.Notes.Add(searchOutcomeNote);
+                    addNoteToLog(log, searchOutcomeNote);
                     foreach (var outcome in outcomes)
                     {
                         string outcomeDetail = JsonSerializer.Serialize(outcome, _options);
@@ -285,10 +294,17 @@ public class FhirApiService : IFhirApiService
                     }
                 }
 
-                resources = await FilterResourcesByEncounterMappingAsync(
-                    log,
+                var originalCount = resources.Count;
+                resources = await _locationMappingService.FilterResourcesByEncounterMappingAsync(
+                    log.FacilityId,
                     resources,
                     cancellationToken);
+                var filteredCount = resources.Count;
+                if (originalCount != filteredCount)
+                {
+                    string filterNote = $"[{DateTime.UtcNow}] Filtered out {originalCount - filteredCount} of {originalCount} resource(s) because they are not associated with the reporting organization.";
+                    addNoteToLog(log, filterNote);
+                }
 
                 // Reference discovery: collect ref ids from filtered resources into the per-
                 // execution accumulator. Drained at end of primary log execution by
@@ -304,6 +320,10 @@ public class FhirApiService : IFhirApiService
                     var refResources = resources
                         .SelectMany(resource => ReferenceResourceBundleExtractor.Extract(resource, validResourceTypes))
                         .ToList();
+                    if(refResources.Count > 0)
+                    {
+                        addNoteToLog(log, $"[{DateTime.UtcNow}] Discovered {refResources.Count} reference(s) in search bundle.");
+                    }
                     AccumulateDiscoveredReferences(refResources, referenceAccumulator);
                 }
 
@@ -323,12 +343,21 @@ public class FhirApiService : IFhirApiService
                 foreach (var resource in resources)
                 {
                     InsertDateExtension((DomainResource)resource);
-
-                    if (locationMappingConfigured && resource is Location location)
+                    if(locationMappingConfigured)
                     {
-                        await _locationMappingService.UpdateLocationMappingAsync(
-                            log.FacilityId, location,
-                            cancellationToken:cancellationToken);
+                        if (resource is Location location)
+                        {
+                            var mappingResult = await _locationMappingService.UpdateLocationMappingAsync(
+                                log.FacilityId, location,
+                                cancellationToken:cancellationToken);
+                            addNoteToLog(log, $"[{DateTime.UtcNow}] Location mapping updated for Location/{location?.Id}. Part of reporting organization: {mappingResult?.IsOrgLocation}");
+                        }
+                        else if(resource is Encounter encounter)
+                        {
+                            await _locationMappingService.UpdateEncounterLocationMappingAsync(
+                                log.FacilityId, encounter,
+                                cancellationToken:cancellationToken);
+                        }
                     }
                     
                     AddResourceToCache(new ResourceAcquired
@@ -354,9 +383,7 @@ public class FhirApiService : IFhirApiService
             if (ex.Status == HttpStatusCode.NotFound || ex.Status == HttpStatusCode.Gone || ex.Outcome != null)
             {
                 string note = $"[{DateTime.UtcNow}] HTTP {ex.Status} returned for Search operation. See application logs for details.";
-
-                log.Notes ??= new List<string>();
-                log.Notes.Add(note);
+                addNoteToLog(log, note);
                 _logger.LogWarning(ex, "Expected FHIR error encountered for search for log {LogId} with facility {FacilityId}: {note}", log.Id, log.FacilityId, note);
                 throw new OpOutcomeException(note, ex);
             }
@@ -421,108 +448,6 @@ public class FhirApiService : IFhirApiService
         return searchParams;
     }
 
-    private async Task<List<Resource>> FilterResourcesByEncounterMappingAsync(
-        DataAcquisitionLogModel log,
-        IReadOnlyCollection<Resource> resources,
-        CancellationToken cancellationToken)
-    {
-        if (resources.Count == 0)
-        {
-            return resources.ToList();
-        }
-
-        var resourceEncounterIds = resources
-            .Select(resource => new
-            {
-                Resource = resource,
-                EncounterIds = GetEncounterReferenceIds(resource)
-            })
-            .ToList();
-
-        var encounterIds = resourceEncounterIds
-            .SelectMany(x => x.EncounterIds)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (encounterIds.Count == 0)
-        {
-            return resources.ToList();
-        }
-
-        var organizationLocationMappingIsConfigured = await _organizationLocationConfigurationQueries
-            .HasActiveByFacilityIdAsync(log.FacilityId, cancellationToken);
-
-        if (!organizationLocationMappingIsConfigured)
-        {
-            return resources.ToList();
-        }
-
-        var encounterMappings = await _encounterMappingQueries.GetByFacilityIdAndEncounterIdsAsync(
-            log.FacilityId,
-            encounterIds,
-            cancellationToken);
-
-        var mappedEncounterIds = encounterMappings
-            .Where(mapping => mapping.MappedToOrg)
-            .Select(mapping => mapping.EncounterId)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var filteredResources = resourceEncounterIds
-            .Where(x => x.EncounterIds.Count == 0 || x.EncounterIds.Any(mappedEncounterIds.Contains))
-            .Select(x => x.Resource)
-            .ToList();
-
-        var removedCount = resources.Count - filteredResources.Count;
-        if (removedCount > 0)
-        {
-            _logger.LogDebug(
-                "Removed {RemovedCount} resource(s) without mapped encounter organization for facility {FacilityId}.",
-                removedCount,
-                log.FacilityId);
-        }
-
-        return filteredResources;
-    }
-
-    private static List<string> GetEncounterReferenceIds(Resource resource)
-    {
-        return ReferenceResourceBundleExtractor
-            .Extract(resource, [ResourceType.Encounter.ToString()])
-            .Select(GetEncounterReferenceId)
-            .Where(id => !string.IsNullOrWhiteSpace(id))
-            .Select(id => id!)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
-    private static string? GetEncounterReferenceId(ResourceReference reference)
-    {
-        if (string.IsNullOrWhiteSpace(reference.Reference))
-        {
-            return null;
-        }
-
-        try
-        {
-            var identity = new ResourceIdentity(reference.Reference);
-            if (string.Equals(identity.ResourceType, ResourceType.Encounter.ToString(), StringComparison.OrdinalIgnoreCase)
-                && !string.IsNullOrWhiteSpace(identity.Id))
-            {
-                return identity.Id;
-            }
-        }
-        catch (Exception)
-        {
-        }
-
-        if (string.Equals(reference.Type.SplitReference(), ResourceType.Encounter.ToString(), StringComparison.OrdinalIgnoreCase))
-        {
-            return reference.Reference.SplitReference();
-        }
-
-        return null;
-    }
-
     private void AddResourceToCache(ResourceAcquired resourceAcquired, string correlationId)
     {
         if (resourceAcquired.Resource is DomainResource domainResource
@@ -574,6 +499,15 @@ public class FhirApiService : IFhirApiService
 
             accumulator.Add(identity.ResourceType, identity.Id);
         }
+    }
+
+    private void addNoteToLog(DataAcquisitionLogModel log, string note)
+    {
+        if (log.Notes == null)
+        {
+            log.Notes = new List<string>();
+        }
+        log.Notes.Add(note);
     }
     #endregion
 }

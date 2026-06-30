@@ -120,27 +120,42 @@ public class DataAcquisitionLogStatusCountApiModel
 public enum RequestStatus
 {
     [StringValue("Pending")]
+    [CancellableStatus]
     Pending,
     [StringValue("Ready")]
+    [CancellableStatus]
     Ready,
     [StringValue("Queued")]
+    [CancellableStatus]
     Queued,
     [StringValue("Processing")]
+    [CancellableStatus]
     Processing,
     [StringValue("Completed")]
+    [TerminalStatus]
     Completed,
     [StringValue("Failed")]
+    [CancellableStatus]
     Failed,
     [StringValue("Max Retries Reached")]
+    [TerminalStatus]
     MaxRetriesReached,
     [StringValue("Skipped")]
+    [TerminalStatus]
     Skipped,
     [StringValue("Configuration Required")]
+    [CancellableStatus]
     ConfigurationRequired,
     [StringValue("Cancelled")]
+    [TerminalStatus]
     Cancelled,
     [StringValue("Configuration Missing")]
-    ConfigurationMissing
+    [TerminalStatus]
+    ConfigurationMissing,
+
+    [StringValue("Not Reportable")]
+    [TerminalStatus]
+    NotReportable
 }
 
 public enum QueryPhase

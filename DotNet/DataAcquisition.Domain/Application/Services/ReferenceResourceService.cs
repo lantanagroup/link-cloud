@@ -45,7 +45,7 @@ public interface IReferenceResourceService
         string queryPlanType,
         CancellationToken cancellationToken = default);
 
-    Task FetchAndPersistAsync(
+    Task<int> FetchAndPersistAsync(
         DataAcquisitionLogModel primaryLog,
         DiscoveredReferenceAccumulator accumulator,
         CancellationToken cancellationToken = default);
@@ -118,7 +118,7 @@ public class ReferenceResourceService : IReferenceResourceService
         return resources;
     }
 
-    public async Task FetchAndPersistAsync(
+    public async Task<int> FetchAndPersistAsync(
         DataAcquisitionLogModel primaryLog,
         DiscoveredReferenceAccumulator accumulator,
         CancellationToken cancellationToken = default)
@@ -137,7 +137,7 @@ public class ReferenceResourceService : IReferenceResourceService
             throw new ArgumentException("Primary log is missing a ReportableEvent.", nameof(primaryLog));
 
         if (!accumulator.HasAny)
-            return;
+            return 0;
 
         activity?.SetTag(DiagnosticNames.FacilityId, primaryLog.FacilityId);
         activity?.SetTag(DiagnosticNames.CorrelationId, primaryLog.CorrelationId);
@@ -156,7 +156,7 @@ public class ReferenceResourceService : IReferenceResourceService
             _logger.LogWarning(ex,
                 "FetchAndPersistAsync: cannot map ReportableEvent {ReportableEvent} to a Frequency for facility {FacilityId} correlation {CorrelationId}; dropping {Count} discovered reference type(s).",
                 primaryLog.ReportableEvent.SanitizeForLog(), primaryLog.FacilityId.SanitizeForLog(), primaryLog.CorrelationId.SanitizeForLog(), accumulator.ByType.Count.SanitizeForLog());
-            return;
+            return 0;
         }
 
         var queryPlan = await _queryPlanQueries.GetAsync(primaryLog.FacilityId, planFrequency, cancellationToken);
@@ -165,8 +165,10 @@ public class ReferenceResourceService : IReferenceResourceService
             _logger.LogWarning(
                 "FetchAndPersistAsync: no query plan found for facility {FacilityId} frequency {Frequency}; dropping {Count} discovered reference type(s).",
                 primaryLog.FacilityId.SanitizeForLog(), planFrequency.SanitizeForLog(), accumulator.ByType.Count.SanitizeForLog());
-            return;
+            return 0;
         }
+
+        var pendingReferenceIdsAdded = 0;
 
         foreach (var (resourceType, idSet) in accumulator.ByType)
         {
@@ -201,7 +203,7 @@ public class ReferenceResourceService : IReferenceResourceService
             if (requestedIds.Count == 0)
                 continue;
 
-            await GetOrCreateAndAppendAsync(
+            pendingReferenceIdsAdded += await GetOrCreateAndAppendAsync(
                 primaryLog,
                 parsedResourceType,
                 refConfig,
@@ -217,6 +219,8 @@ public class ReferenceResourceService : IReferenceResourceService
                 },
                 cancellationToken);
         }
+
+        return pendingReferenceIdsAdded;
     }
 
     public async Task<PreparedReferenceLogExecutionModel> PrepareReferenceLogExecutionAsync(
@@ -354,7 +358,7 @@ public class ReferenceResourceService : IReferenceResourceService
         };
     }
 
-    private async Task GetOrCreateAndAppendAsync(
+    private async Task<int> GetOrCreateAndAppendAsync(
         DataAcquisitionLogModel primaryLog,
         ResourceType resourceType,
         ReferenceQueryConfig refConfig,
@@ -364,12 +368,14 @@ public class ReferenceResourceService : IReferenceResourceService
     {
         bool created = false;
         long referenceLogId = 0;
+        var pendingReferenceIdsAdded = 0;
 
         var strategy = _dbContext.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async (ct) =>
         {
             _dbContext.ChangeTracker.Clear();
             created = false;
+            pendingReferenceIdsAdded = 0;
 
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted, ct);
             await AcquireLockAsync(primaryLog, resourceType, ct);
@@ -492,6 +498,7 @@ public class ReferenceResourceService : IReferenceResourceService
                 {
                     _dbContext.PendingReferenceIds.AddRange(toInsert);
                     await _dbContext.SaveChangesAsync(ct);
+                    pendingReferenceIdsAdded = toInsert.Count;
                 }
 
                 await transaction.CommitAsync(ct);
@@ -509,6 +516,8 @@ public class ReferenceResourceService : IReferenceResourceService
                 "FetchAndPersistAsync: created reference log {ReferenceLogId} for {FacilityId}/{CorrelationId}/{QueryPhase}/{ResourceType}.",
                 referenceLogId.SanitizeForLog(), primaryLog.FacilityId.SanitizeForLog(), primaryLog.CorrelationId.SanitizeForLog(), primaryLog.QueryPhase.SanitizeForLog(), resourceType.SanitizeForLog());
         }
+
+        return pendingReferenceIdsAdded;
     }
 
     private void AddResourceToCache(

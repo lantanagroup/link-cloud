@@ -66,7 +66,7 @@ public class PatientDataService : IPatientDataService
     private readonly IReadFhirCommand _readFhirCommand;
     private readonly IDataAcquisitionLogManager _dataAcquisitionLogManager;
     private readonly IDataAcquisitionLogQueries _dataAcquisitionLogQueries;
-    private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries;
+    private readonly ILocationMappingService _locationMappingService;
     private readonly IFhirApiService _fhirApiService;
     private readonly IReferenceResourceService _referenceResourceService;
     private readonly IDistributedSemaphoreProvider _distributedSemaphoreProvider;
@@ -84,7 +84,7 @@ public class PatientDataService : IPatientDataService
         IReadFhirCommand readFhirCommand,
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IDataAcquisitionLogQueries dataAcquisitionLogQueries,
-        IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
+        ILocationMappingService locationMappingService,
         IFhirApiService fhirApiService,
         IReferenceResourceService referenceResourceService,
         IDistributedSemaphoreProvider distributedSemaphoreProvider,
@@ -110,8 +110,7 @@ public class PatientDataService : IPatientDataService
                                      throw new ArgumentNullException(nameof(dataAcquisitionLogManager));
         _dataAcquisitionLogQueries = dataAcquisitionLogQueries ??
                                      throw new ArgumentNullException(nameof(dataAcquisitionLogQueries));
-        _organizationLocationConfigurationQueries = organizationLocationConfigurationQueries ??
-                                                throw new ArgumentNullException(nameof(organizationLocationConfigurationQueries));
+        _locationMappingService = locationMappingService ?? throw new ArgumentNullException(nameof(locationMappingService));
         _fhirApiService = fhirApiService ?? throw new ArgumentNullException(nameof(fhirApiService));
         _referenceResourceService = referenceResourceService ?? throw new ArgumentNullException(nameof(referenceResourceService));
         _scheduledReportManager = scheduledReportManager ?? throw new ArgumentNullException(nameof(scheduledReportManager));
@@ -249,7 +248,7 @@ public class PatientDataService : IPatientDataService
         }
 
         var isOrganizationLocationConfigurationEnabled =
-            await IsOrganizationLocationConfigurationEnabled(request.FacilityId, cancellationToken);
+            await _locationMappingService.IsConfigured(request.FacilityId, cancellationToken);
 
         var initialQueries =
             OrderInitialQueries(queryPlan.InitialQueries, isOrganizationLocationConfigurationEnabled);
@@ -371,12 +370,6 @@ public class PatientDataService : IPatientDataService
                 totalLogsCreated,
                 cancellationToken);
         }
-    }
-
-    private async Task<bool> IsOrganizationLocationConfigurationEnabled(string facilityId, CancellationToken cancellationToken)
-    {
-        var configurations = await _organizationLocationConfigurationQueries.GetByFacilityIdAsync(facilityId);
-        return configurations?.Any(x => x.IsActive) == true;
     }
 
     private static IOrderedEnumerable<KeyValuePair<string, IQueryConfig>> OrderInitialQueries(
@@ -531,6 +524,9 @@ public class PatientDataService : IPatientDataService
                     $"Log with ID {log.Id} has a FHIR query of type 'Search' without any query parameters defined.");
             }
 
+            //log should not have the notes collection loaded from the database as the collection will be reused to add new notes during this execution.
+            log.Notes = new List<string>();
+
             //check if isCensus, if true, create scope for PatientCensusService and execute RetrieveListData
             if (log.IsCensus)
             {
@@ -644,6 +640,7 @@ public class PatientDataService : IPatientDataService
                 // single durable same-phase reference log per (correlation, type).
                 var isReferenceLog = log.FhirQuery.Any(q => q.IsReference.GetValueOrDefault());
                 var referenceAccumulator = new DiscoveredReferenceAccumulator();
+                var pendingReferenceIdsAdded = 0;
 
                 if (isReferenceLog)
                 {
@@ -735,16 +732,16 @@ public class PatientDataService : IPatientDataService
                 // reference log per (correlation, type) before this primary goes terminal.
                 if (referenceAccumulator != null && referenceAccumulator.HasAny)
                 {
-                    await _referenceResourceService.FetchAndPersistAsync(
+                    pendingReferenceIdsAdded = await _referenceResourceService.FetchAndPersistAsync(
                         log, referenceAccumulator, cancellationToken);
                 }
 
                 // Stop timer and persist the terminal state for this execution.
                 stopwatch.Stop();
 
-                if (isReferenceLog && referenceAccumulator != null && referenceAccumulator.HasAny)
+                if (isReferenceLog && pendingReferenceIdsAdded > 0)
                 {
-                    newNotes.Add($"[{DateTime.UtcNow}] Reference log discovered {referenceAccumulator.Count} more references during execution. Setting status back to Pending for re-execution.");
+                    newNotes.Add($"[{DateTime.UtcNow}] Reference log discovered {pendingReferenceIdsAdded} new reference(s) during execution. Setting status back to Pending for re-execution.");
                     log.Status = RequestStatus.Pending;
                 }
                 else
@@ -752,6 +749,11 @@ public class PatientDataService : IPatientDataService
                     log.CompletionTimeMilliseconds = stopwatch.ElapsedMilliseconds;
                     log.CompletionDate = System.DateTime.UtcNow;
                     log.Status = skipFetch && !isReferenceLog ? RequestStatus.Skipped : RequestStatus.Completed;
+                }
+
+                if(log.Notes != null && log.Notes.Any())
+                {
+                    newNotes.AddRange(log.Notes);
                 }
 
                 await _dataAcquisitionLogManager.UpdateAsync(new UpdateDataAcquisitionLogModel

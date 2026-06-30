@@ -309,6 +309,7 @@ public class EncounterMappingController : Controller
     [ValidateAntiForgeryOrBearerToken]
     [ProducesResponseType(typeof(EncounterMappingModel), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> CreateAsync([FromBody] CreateEncounterMappingModel model)
@@ -316,11 +317,20 @@ public class EncounterMappingController : Controller
         try
         {
             if (model == null)
+            {
                 throw new BadRequestException("Request body is required.");
+            }
 
             model.FacilityId = model.FacilityId.SanitizeAndRemove();
             model.PatientId = model.PatientId.SanitizeAndRemove();
             model.EncounterId = model.EncounterId.SanitizeAndRemove();
+
+            // re-evaluate after sanitization
+            ModelState.Clear(); 
+            if (!TryValidateModel(model))
+            {
+                return ValidationProblem(ModelState);
+            }
 
             var created = await _manager.CreateAsync(model);
             return CreatedAtAction(nameof(GetByIdAsync), new { id = created.EncounterMappingId }, created);
@@ -331,6 +341,11 @@ public class EncounterMappingController : Controller
             return Problem(title: "Conflict",
                 detail: "The request could not be completed because it conflicts with the current state of the resource.",
                 statusCode: (int)HttpStatusCode.Conflict);
+        }
+        catch (NotFoundException ex)
+        {
+            _logger.LogError(ex, "NotFoundException occurred.");
+            return Problem(title: "Not Found", detail: ex.Message, statusCode: (int)HttpStatusCode.NotFound);
         }
         catch (BadRequestException ex)
         {

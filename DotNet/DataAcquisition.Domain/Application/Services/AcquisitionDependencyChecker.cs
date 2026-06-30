@@ -7,6 +7,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Models;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using Microsoft.Extensions.Logging;
 using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 
@@ -17,9 +18,15 @@ public interface IAcquisitionDependencyChecker
     Task<DependencyCheckResult> CheckDependenciesAsync(DataAcquisitionLogModel log, CancellationToken cancellationToken = default);
 }
 
-public record DependencyCheckResult(bool AreDependenciesMet, IReadOnlyList<string> BlockingResourceTypes)
+public record DependencyCheckResult(bool AreDependenciesMet, IReadOnlyList<string> BlockingResourceTypes, bool IsPatientReportable = true)
 {
     public static DependencyCheckResult Met { get; } = new(true, Array.Empty<string>());
+
+    /// <summary>
+    /// Dependencies are satisfied but the patient has no org-mapped encounters, so this dependent
+    /// log should be preempted (set to NotReportable) instead of acquired.
+    /// </summary>
+    public static DependencyCheckResult NotReportable { get; } = new(true, Array.Empty<string>(), IsPatientReportable: false);
 }
 
 public class AcquisitionDependencyChecker : IAcquisitionDependencyChecker
@@ -27,17 +34,20 @@ public class AcquisitionDependencyChecker : IAcquisitionDependencyChecker
     private readonly IQueryPlanQueries _queryPlanQueries;
     private readonly IDataAcquisitionLogQueries _logQueries;
     private readonly IOrganizationLocationConfigurationQueries _organizationLocationConfigurationQueries;
+    private readonly ILocationMappingService _locationMappingService;
     private readonly ILogger<AcquisitionDependencyChecker> _logger;
 
     public AcquisitionDependencyChecker(
         IQueryPlanQueries queryPlanQueries,
         IDataAcquisitionLogQueries logQueries,
         IOrganizationLocationConfigurationQueries organizationLocationConfigurationQueries,
+        ILocationMappingService locationMappingService,
         ILogger<AcquisitionDependencyChecker> logger)
     {
         _queryPlanQueries = queryPlanQueries ?? throw new ArgumentNullException(nameof(queryPlanQueries));
         _logQueries = logQueries ?? throw new ArgumentNullException(nameof(logQueries));
         _organizationLocationConfigurationQueries = organizationLocationConfigurationQueries ?? throw new ArgumentNullException(nameof(organizationLocationConfigurationQueries));
+        _locationMappingService = locationMappingService ?? throw new ArgumentNullException(nameof(locationMappingService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -123,13 +133,16 @@ public class AcquisitionDependencyChecker : IAcquisitionDependencyChecker
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        // If this is an initial query and the organization location configuration is enabled,
-        // we need to include the Encounter, Location, and Patient resource types as dependencies.
-        if (log.QueryPhase == QueryPhase.Initial
+        // If this is an initial query and the organization location configuration is enabled, this is
+        // an "org-location-gated" log: it must wait behind Encounter + Location, and once those are
+        // terminal we additionally gate it on whether the patient is reportable.
+        var orgLocationGated = log.QueryPhase == QueryPhase.Initial
             && !logResourceTypes.Contains(nameof(Hl7.Fhir.Model.ResourceType.Patient))
             && !logResourceTypes.Contains(nameof(Hl7.Fhir.Model.ResourceType.Encounter))
             && !logResourceTypes.Contains(nameof(Hl7.Fhir.Model.ResourceType.Location))
-            && await IsOrganizationLocationConfigurationEnabled(log.FacilityId))
+            && await IsOrganizationLocationConfigurationEnabled(log.FacilityId);
+
+        if (orgLocationGated)
         {
             var orderedDependencyTypes = phaseQueries
                 .Select(kvp => kvp.Value)
@@ -147,15 +160,34 @@ public class AcquisitionDependencyChecker : IAcquisitionDependencyChecker
         }
 
         if (dependencyResourceTypes.Count == 0)
-            return DependencyCheckResult.Met;
+            return await ApplyReportabilityGateAsync(log, orgLocationGated, cancellationToken);
 
         var blocking = await _logQueries.GetNonTerminalDependencyResourceTypes(
             log.CorrelationId, log.FacilityId, dependencyResourceTypes, cancellationToken);
 
         if (blocking.Count == 0)
-            return DependencyCheckResult.Met;
+            return await ApplyReportabilityGateAsync(log, orgLocationGated, cancellationToken);
 
         return new DependencyCheckResult(false, blocking);
+    }
+
+    /// <summary>
+    /// Once an org-location-gated log's Encounter/Location dependencies are terminal, decide whether
+    /// to proceed (Met) or preempt it (NotReportable) based on whether the patient has any encounter
+    /// mapped to an org location. Non-gated logs always proceed.
+    /// </summary>
+    private async Task<DependencyCheckResult> ApplyReportabilityGateAsync(DataAcquisitionLogModel log, bool orgLocationGated, CancellationToken cancellationToken)
+    {
+        if (!orgLocationGated)
+            return DependencyCheckResult.Met;
+
+        // log.PatientId may carry a "Patient/" prefix; EncounterMapping stores the bare id.
+        var patientId = log.PatientId?.SplitReference();
+        if (string.IsNullOrWhiteSpace(patientId))
+            return DependencyCheckResult.Met; // can't determine -> fail open (reportable)
+
+        var reportable = await _locationMappingService.IsPatientReportableAsync(log.FacilityId, patientId, cancellationToken);
+        return reportable ? DependencyCheckResult.Met : DependencyCheckResult.NotReportable;
     }
 
     private async Task<bool> IsOrganizationLocationConfigurationEnabled(string facilityId)
