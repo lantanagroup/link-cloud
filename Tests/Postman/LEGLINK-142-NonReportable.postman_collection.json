@@ -6,28 +6,8 @@
   },
   "variable": [
     {
-      "key": "adminbff",
-      "value": "http://localhost:8063",
-      "type": "string"
-    },
-    {
-      "key": "terminology",
-      "value": "http://localhost:8076",
-      "type": "string"
-    },
-    {
-      "key": "fhirHost",
-      "value": "http://localhost:6157/fhir",
-      "type": "string"
-    },
-    {
-      "key": "fhirInternal",
-      "value": "http://fhir-server:8080/fhir",
-      "type": "string"
-    },
-    {
       "key": "facilityId",
-      "value": "leglink142-postman",
+      "value": "{{facility-id}}",
       "type": "string"
     },
     {
@@ -60,7 +40,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{adminbff}}/api/measureeval/measure-definition",
+            "url": "{{link-admin-bff-base}}/api/measureeval/measure-definition",
             "description": "Loads the Measure + Libraries (embedded). A pre-request script fetches the 5 referenced NHSN ValueSets from the terminology service ({{terminology}}) and injects them before sending, so the CQL engine can evaluate Initial Population. ValueSets are sourced from terminology (network/ABS volume), not the repo. The patients' emergency (EMER) encounters satisfy Initial Population via the [Encounter: class ~ 'emergency'] arm. Measure definitions are global to MeasureEval.",
             "body": {
               "mode": "raw",
@@ -81,7 +61,7 @@
                   "// Enrich the measure bundle with its NHSN ValueSets fetched from the terminology service.",
                   "// Without these the CQL engine throws 'Unable to locate ValueSet' and Initial Population = 0.",
                   "var oids = [\"2.16.840.1.113762.1.4.1046.265\", \"2.16.840.1.113883.3.117.1.7.1.292\", \"2.16.840.1.113883.3.666.5.307\", \"2.16.840.1.113762.1.4.1111.143\", \"2.16.840.1.113762.1.4.1046.274\"];",
-                  "var base = pm.variables.replaceIn('{{terminology}}/api/terminology/fhir/ValueSet/');",
+                  "var base = pm.variables.replaceIn('{{terminology-api-base}}/api/terminology/fhir/ValueSet/');",
                   "var measure = JSON.parse(pm.request.body.raw);",
                   "var remaining = oids.length;",
                   "oids.forEach(function (oid) {",
@@ -115,7 +95,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{adminbff}}/api/Facility",
+            "url": "{{link-admin-bff-base}}/api/Facility",
             "description": "Creates the facility/tenant. Vendor is required (Epic).",
             "body": {
               "mode": "raw",
@@ -138,7 +118,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{adminbff}}/api/data/{{facilityId}}/QueryPlan",
+            "url": "{{link-admin-bff-base}}/api/data/{{facilityId}}/QueryPlan",
             "description": "INITIAL: Encounter (Parameter) + Condition (Parameter, depends on Encounter ids) + Location (Reference). SUPPLEMENTAL: a throwaway Observation (validator requires >=1). Parameter queries must precede Reference queries.",
             "body": {
               "mode": "raw",
@@ -161,7 +141,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{adminbff}}/api/data/fhirQueryConfiguration",
+            "url": "{{link-admin-bff-base}}/api/data/fhirQueryConfiguration",
             "description": "Points the facility at fhir-server:8080 and turns on EnableLocationResolutionMapping so encounter Locations are resolved and evaluated against the org-location conditions.",
             "body": {
               "mode": "raw",
@@ -189,7 +169,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{adminbff}}/api/data/location-config/facility/{{facilityId}}",
+            "url": "{{link-admin-bff-base}}/api/data/location-config/facility/{{facilityId}}",
             "description": "Active org-location config. FhirPath: a Location is an org location when its identifier (system 'http://hospital.example.org/locations') value is hosp-a or hosp-b. Children inherit org status through partOf.",
             "body": {
               "mode": "raw",
@@ -217,7 +197,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{fhirHost}}",
+            "url": "{{fhir-base}}/fhir",
             "description": "Transaction bundle: 6 identifier-bearing Locations (hosp-a/b/c + er-a/er-b partOf hosp-a + er-c partOf hosp-c) and 3 Patients, each with an Encounter at hosp-a/hosp-b/hosp-c respectively plus a Condition. Loaded to HAPI on the host.",
             "body": {
               "mode": "raw",
@@ -245,7 +225,7 @@
                 "value": "application/json"
               }
             ],
-            "url": "{{adminbff}}/api/Facility/{{facilityId}}/AdHocReport",
+            "url": "{{link-admin-bff-base}}/api/Facility/{{facilityId}}/AdHocReport",
             "description": "Kicks off one acquisition over all three patients. Wait ~60-90s before folder 5 so DataAcq + MeasureEval + Report settle.",
             "body": {
               "mode": "raw",
@@ -268,7 +248,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{adminbff}}/api/data/encounter-mappings/facilities/{{facilityId}}/patients/patient-a",
+            "url": "{{link-admin-bff-base}}/api/data/encounter-mappings/facilities/{{facilityId}}/patients/patient-a",
             "description": "Encounter at org location hosp-a -> mappedToOrg true."
           },
           "event": [
@@ -291,7 +271,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{adminbff}}/api/data/encounter-mappings/facilities/{{facilityId}}/patients/patient-b",
+            "url": "{{link-admin-bff-base}}/api/data/encounter-mappings/facilities/{{facilityId}}/patients/patient-b",
             "description": "Encounter at org location hosp-b -> mappedToOrg true."
           },
           "event": [
@@ -314,7 +294,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{adminbff}}/api/data/encounter-mappings/facilities/{{facilityId}}/patients/patient-c",
+            "url": "{{link-admin-bff-base}}/api/data/encounter-mappings/facilities/{{facilityId}}/patients/patient-c",
             "description": "Encounter at non-org location hosp-c -> mappedToOrg false."
           },
           "event": [
@@ -337,7 +317,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{adminbff}}/api/data/acquisition-logs/facility/{{facilityId}}/patient/patient-c",
+            "url": "{{link-admin-bff-base}}/api/data/acquisition-logs/facility/{{facilityId}}/patient/patient-c",
             "description": "Non-org patient: dependent Condition log is preempted (NotReportable)."
           },
           "event": [
@@ -359,7 +339,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{adminbff}}/api/entries/patients/patient-a",
+            "url": "{{link-admin-bff-base}}/api/entries/patients/patient-a",
             "description": "Reportable patient: a report entry exists with reportingStatus != NotReportable(1)."
           },
           "event": [
@@ -383,7 +363,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{adminbff}}/api/entries/patients/patient-b",
+            "url": "{{link-admin-bff-base}}/api/entries/patients/patient-b",
             "description": "Reportable patient: a report entry exists with reportingStatus != NotReportable(1)."
           },
           "event": [
@@ -407,7 +387,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": "{{adminbff}}/api/entries/patients/patient-c",
+            "url": "{{link-admin-bff-base}}/api/entries/patients/patient-c",
             "description": "Non-org patient: the non-org encounter is stripped before MeasureEval, so reportingStatus === NotReportable(1) and no aggregate report is produced."
           },
           "event": [

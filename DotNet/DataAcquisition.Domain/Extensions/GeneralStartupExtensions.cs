@@ -27,6 +27,7 @@ using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -59,6 +60,11 @@ using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
 {
+    // Shared (not per-service) Redis key prefix for ICacheService. The DataAcquisition service and the
+    // AcquisitionWorker must use the SAME value so their keys resolve identically for cross-process
+    // sharing; isolating it from other services on the same Redis instance is the goal.
+    private const string CacheKeyPrefix = "DataAcquisition:";
+
     public static void RegisterAll(
         this WebApplicationBuilder builder,
         string serviceName,
@@ -86,7 +92,7 @@ public static class GeneralStartupExtensions
 
         builder.Services.RegisterSecretManager(builder.Configuration);
 
-        builder.Services.RegisterInMemoryCache();
+        builder.RegisterCacheService();
         builder.Services.RegisterHittpClient();
         builder.Services.RegisterFhirAuthHandlers();
         builder.Services.RegisterExceptionHandlers();
@@ -182,6 +188,47 @@ public static class GeneralStartupExtensions
         //in-memory cache
         services.AddMemoryCache();
         services.AddSingleton<ICacheService, InMemoryCacheService>();
+    }
+
+    /// <summary>
+    /// Registers the <see cref="ICacheService"/> backend selected by the <c>Cache:Type</c> config key
+    /// (defaults to <c>InMemory</c>). Set <c>Cache:Type=Redis</c> to back it with the shared Redis cache
+    /// so that the DataAcquisition service and the AcquisitionWorker — separate processes — see each
+    /// other's writes/evictions (e.g. the org-location conditions cache invalidated on a config change),
+    /// instead of each keeping its own per-process copy until the entry's TTL expires.
+    /// </summary>
+    public static void RegisterCacheService(this WebApplicationBuilder builder)
+    {
+        var cacheType = builder.Configuration.GetValue<string>("Cache:Type") ?? "InMemory";
+
+        if (!string.Equals(cacheType, "Redis", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Services.RegisterInMemoryCache();
+            return;
+        }
+
+        builder.Services.AddRedisCache(options =>
+        {
+            options.Environment = builder.Environment;
+
+            var redisConnection = builder.Configuration
+                .GetConnectionString(ConfigurationConstants.DatabaseConnections.RedisConnection);
+            if (string.IsNullOrEmpty(redisConnection))
+                throw new InvalidOperationException(
+                    $"ConnectionStrings:{ConfigurationConstants.DatabaseConnections.RedisConnection} is required when Cache:Type is Redis.");
+
+            options.ConnectionString = redisConnection;
+            options.Password = builder.Configuration.GetValue<string>("Redis:Password");
+
+            // Namespace this service's ICacheService keys so they can't collide with other
+            // services sharing the same Redis instance (notably the bare "{facilityId}" auth-token
+            // key). This prefix is deliberately a single fixed value — NOT per-service — because the
+            // DataAcquisition service and the AcquisitionWorker must resolve to the same Redis keys
+            // for cross-process sharing (e.g. org-location conditions invalidation) to work.
+            options.InstanceName = CacheKeyPrefix;
+        });
+
+        builder.Services.AddSingleton<ICacheService, RedisCacheService>();
     }
 
     public static void RegisterHittpClient(this IServiceCollection services)
