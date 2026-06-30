@@ -8,7 +8,8 @@ import {OperationService} from '../../../../../services/gateway/normalization/op
 import {ISaveOperationModel} from '../../../../../interfaces/normalization/operation-save-model.interface';
 import {OperationType} from '../../../../../interfaces/normalization/operation-type-enumeration';
 import {RemoveExtensionsOperation} from '../../../../../interfaces/normalization/remove-extensions-operation-interface';
-import {firstValueFrom} from 'rxjs';
+import {firstValueFrom, forkJoin, map} from 'rxjs';
+import {IOperationModel} from '../../../../../interfaces/normalization/operation-get-model.interface';
 import * as Papa from 'papaparse';
 
 interface CsvOperationGroup {
@@ -17,6 +18,11 @@ interface CsvOperationGroup {
   invalidUrls: string[];
   status: 'pending' | 'submitting' | 'success' | 'error';
   errorMessage?: string;
+}
+
+interface ConflictInfo {
+  resourceType: string;
+  url: string;
 }
 
 export interface CsvImportDialogData {
@@ -41,6 +47,8 @@ export class RemoveExtensionsCsvImportDialogComponent {
 
   stage: 'upload' | 'preview' | 'submitting' | 'results' = 'upload';
   groups: CsvOperationGroup[] = [];
+  conflicts: ConflictInfo[] = [];
+  isChecking = false;
   parseError = '';
   created = 0;
   failed = 0;
@@ -60,10 +68,20 @@ export class RemoveExtensionsCsvImportDialogComponent {
     return this.groups.some(g => g.invalidUrls.length > 0);
   }
 
+  get conflictGroups(): {resourceType: string; urls: string[]}[] {
+    const grouped = new Map<string, string[]>();
+    for (const c of this.conflicts) {
+      if (!grouped.has(c.resourceType)) grouped.set(c.resourceType, []);
+      grouped.get(c.resourceType)!.push(c.url);
+    }
+    return Array.from(grouped.entries()).map(([resourceType, urls]) => ({resourceType, urls}));
+  }
+
   onFileSelected(file: File | null): void {
+    this.conflicts = [];
+    this.parseError = '';
     if (!file) {
       this.groups = [];
-      this.parseError = '';
       return;
     }
     if (!file.name.toLowerCase().endsWith('.csv')) {
@@ -71,7 +89,6 @@ export class RemoveExtensionsCsvImportDialogComponent {
       this.groups = [];
       return;
     }
-    this.parseError = '';
     const reader = new FileReader();
     reader.readAsText(file);
     reader.onload = () => {
@@ -106,10 +123,28 @@ export class RemoveExtensionsCsvImportDialogComponent {
 
     if (this.groups.length === 0) {
       this.parseError = 'No valid rows found. Ensure column 1 is the resource type and column 2 is the URL.';
-    } else {
-      this.stage = 'preview';
+      this.cdr.detectChanges();
+      return;
     }
+
+    this.isChecking = true;
     this.cdr.detectChanges();
+
+    this.checkForConflicts()
+      .then(conflicts => {
+        this.isChecking = false;
+        if (conflicts.length > 0) {
+          this.conflicts = conflicts;
+        } else {
+          this.stage = 'preview';
+        }
+        this.cdr.detectChanges();
+      })
+      .catch(() => {
+        this.isChecking = false;
+        this.parseError = 'Failed to check for existing operations. Please try again.';
+        this.cdr.detectChanges();
+      });
   }
 
   private isAbsoluteUrl(url: string): boolean {
@@ -121,9 +156,65 @@ export class RemoveExtensionsCsvImportDialogComponent {
     }
   }
 
+  private async checkForConflicts(): Promise<ConflictInfo[]> {
+    const existing = await this.fetchExistingOperations();
+    const conflicts: ConflictInfo[] = [];
+
+    const csvPairs = new Set<string>();
+    for (const group of this.groups) {
+      for (const url of group.urls) {
+        csvPairs.add(`${group.resourceType}::${url}`);
+      }
+    }
+
+    for (const op of existing) {
+      const parsedOp = op.parsedOperationJson as RemoveExtensionsOperation;
+      const resourceTypes = op.operationResourceTypes
+        ?.map(rt => rt.resource?.resourceName)
+        .filter((n): n is string => !!n) ?? [];
+      const urls = parsedOp?.ExtensionUrls ?? [];
+
+      for (const rt of resourceTypes) {
+        for (const url of urls) {
+          if (csvPairs.has(`${rt}::${url}`)) {
+            conflicts.push({resourceType: rt, url});
+          }
+        }
+      }
+    }
+
+    return conflicts;
+  }
+
+  private fetchExistingOperations(): Promise<IOperationModel[]> {
+    if (!this.data.isVendorMode) {
+      return firstValueFrom(
+        this.operationService.searchGlobalOperations(
+          this.data.facilityId ?? null,
+          OperationType.RemoveExtensions,
+          null, null, null, null, null, null, 1000, 0
+        ).pipe(map(r => r.records))
+      );
+    }
+
+    if (!this.data.vendorIds?.length) return Promise.resolve([]);
+
+    return firstValueFrom(
+      forkJoin(
+        this.data.vendorIds.map(vendorId =>
+          this.operationService.searchGlobalOperations(
+            null, OperationType.RemoveExtensions,
+            null, null, null, vendorId, null, null, 1000, 0
+          ).pipe(map(r => r.records))
+        )
+      ).pipe(map(results => results.flat()))
+    );
+  }
+
   back(): void {
     this.stage = 'upload';
     this.groups = [];
+    this.conflicts = [];
     this.parseError = '';
   }
 
