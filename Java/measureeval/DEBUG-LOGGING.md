@@ -36,15 +36,13 @@ Unknown tokens are silently ignored; the recognised ones around them still parse
 
 ## Response shape
 
-Without debug:
+Without debug — bare FHIR `MeasureReport`, unchanged from the pre-debug behaviour:
 
 ```json
-{
-  "measureReport": { "resourceType": "MeasureReport", ... }
-}
+{ "resourceType": "MeasureReport", ... }
 ```
 
-With debug:
+With debug — wrapper object carrying the report alongside the requested debug sections:
 
 ```json
 {
@@ -66,18 +64,17 @@ With debug:
 ```
 
 Sections that weren't requested (or that the engine didn't produce data for) are omitted
-from `debugInfo` rather than emitted as `null`. The `debugInfo` wrapper itself is omitted
-when no sections are requested.
+from `debugInfo` rather than emitted as `null`.
 
 The `truncated` flag is present and set to `true` only if a section had to be capped to
 protect the response from runaway memory use. Currently this only happens when the trace
 tree exceeds `MeasureEvaluator.MAX_TRACE_FRAMES` (10,000 frames).
 
-## Wire-format change notice
+## Wire-format compatibility
 
-Before this change, `$evaluate` returned the FHIR `MeasureReport` directly as the response
-body. It now returns a wrapper object — clients that previously deserialized the response
-as a `MeasureReport` need to read `response.measureReport` instead.
+The default response (no `debug` query parameter) is unchanged: clients continue to receive
+a bare FHIR `MeasureReport`. The wrapper envelope is only emitted when callers opt in by
+passing `debug=...`, so existing consumers do not need to migrate.
 
 ## Performance considerations
 

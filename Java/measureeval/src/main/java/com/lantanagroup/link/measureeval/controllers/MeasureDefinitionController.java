@@ -152,7 +152,7 @@ public class MeasureDefinitionController {
                     "Accepts `true`/`all` (every section), `false`/empty (no sections), " +
                     "or a comma-separated list of: groups, expressions, librarydebug, messages, traces, debuglog.",
             required = false)
-    public MeasureEvaluationResult evaluate(
+    public Object evaluate(
             @AuthenticationPrincipal PrincipalUser user,
             @PathVariable String id,
             @RequestBody Parameters parameters,
@@ -188,7 +188,12 @@ public class MeasureDefinitionController {
         }
 
         try {
-            return MeasureEvaluator.compileAndEvaluate(FhirContext.forR4(), evaluator.getBundle(), parameters, debug);
+            MeasureEvaluationResult result = MeasureEvaluator.compileAndEvaluate(
+                    FhirContext.forR4(), evaluator.getBundle(), parameters, debug);
+            // Preserve the original wire contract: when no debug sections are
+            // requested, return a bare MeasureReport. Only emit the wrapper for
+            // callers who opted in via the `debug` query parameter.
+            return debug.isEmpty() ? result.getMeasureReport() : result;
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage(), e);
         }
