@@ -28,7 +28,7 @@
         <!--
           Pinned independently of the Spring Boot version (Boot 3.2.5 currently manages this same
           3.1.4). RetryTopicRecoverer hand-stamps spring-kafka's INTERNAL retry_topic-* header
-          encodings (measureeval/docs/async-retry-design.md §6); a spring-kafka upgrade can change
+          encodings (measureeval/docs/kafka-retry-architecture.txt §7); a spring-kafka upgrade can change
           how the backoff value is read and SILENTLY disable the retry delay (retries hot-loop with
           no error). Bump only with RetryTopicBackoffDelayTest green.
         -->
