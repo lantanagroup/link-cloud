@@ -344,7 +344,12 @@ public class CodeGroupCacheService(
                 // Read the CSV file and extract "system", "code" and "display" values from each row
                 var csvContent = await ReadAllTextAsync(csvFilePath);
                 using var reader = new StringReader(csvContent);
-                var config = new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null };
+                var config = new CsvConfiguration(CultureInfo.InvariantCulture);
+
+                // CodeSystem CSVs have an optional trailing status column, so a missing field is
+                // tolerated there. ValueSet keeps strict missing-field validation.
+                if (codeGroup.Type == CodeGroup.CodeGroupTypes.CodeSystem)
+                    config.MissingFieldFound = null;
 
                 using var csv = new CsvReader(reader, config);
                 switch (codeGroup.Type)
