@@ -39,7 +39,7 @@ public class ConfigController(CodeGroupCacheService cacheService, ILogger<Config
     /// 200 with the matching code (value, display, status); 400 if <paramref name="id"/> or code is missing;
     /// 404 if the CodeSystem or code is not present in the cache.
     /// </returns>
-    [HttpGet("CodeSystem/{id}/code/{code}")]
+    [HttpGet("code-systems/{id}/codes/{code}")]
     [SwaggerOperation(Summary = "Get a code from a cached CodeSystem by its resource id.")]
     public ActionResult<Code> GetCodeSystemCode(
         [FromRoute] string id,
