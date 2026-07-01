@@ -445,6 +445,60 @@ public class FhirServiceTests
     }
 
     [Fact]
+    public void ValidateCodeInCodeSystem_WithInactiveCode_ReturnsInactiveIssueOutcome()
+    {
+        // Arrange
+        var codeSystemId = "test-cs-inactive";
+        var code = "inactive-code";
+        var system = "http://test.system";
+        var display = "Inactive Code";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Url = system,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    system,
+                    new List<Code>
+                    {
+                        new CodeSystemCode
+                        {
+                            Value = code,
+                            Display = display,
+                            Status = CodeStatus.Inactive
+                        }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.ValidateCodeInCodeSystem(null, codeSystemId, code, display, null);
+
+        // Assert
+        Assert.NotNull(result);
+        var resultParameter = result.GetSingleValue<FhirBoolean>("result");
+        Assert.NotNull(resultParameter);
+        Assert.True(resultParameter.Value);
+
+        var issuesParameter = result.Parameter.FirstOrDefault(p => p.Name == "issues");
+        Assert.NotNull(issuesParameter);
+
+        var outcome = Assert.IsType<OperationOutcome>(issuesParameter.Resource);
+        var issue = Assert.Single(outcome.Issue);
+        Assert.Equal(OperationOutcome.IssueSeverity.Warning, issue.Severity);
+        Assert.Equal(OperationOutcome.IssueType.BusinessRule, issue.Code);
+        Assert.Equal("Code is inactive.", issue.Details?.Text);
+    }
+
+    [Fact]
     public void ValidateCodeInCodeSystem_WithInvalidCode_ReturnsFalse()
     {
         // Arrange
