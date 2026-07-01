@@ -1,0 +1,26 @@
+import React from 'react';
+import {createRoot, Root} from 'react-dom/client';
+import {NHSNLink} from '../components/NHSNLink';
+
+class NhsnLinkElement extends HTMLElement {
+  private root?: Root;
+
+  connectedCallback() {
+    if (!this.root) {
+      this.root = createRoot(this);
+    }
+
+    this.root.render(<NHSNLink />);
+  }
+
+  disconnectedCallback() {
+    this.root?.unmount();
+    this.root = undefined;
+  }
+}
+
+if (!customElements.get('nhsn-link')) {
+  customElements.define('nhsn-link', NhsnLinkElement);
+}
+
+export { NHSNLink } from '../components/NHSNLink';

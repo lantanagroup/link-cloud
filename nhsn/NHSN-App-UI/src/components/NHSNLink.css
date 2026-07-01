@@ -1,0 +1,64 @@
+.nhsn-link {
+  font-family: Arial, sans-serif;
+  color: #12344d;
+  background: #f5f8fa;
+  min-height: 100vh;
+}
+
+.nhsn-link__header {
+  background: #005ea2;
+  color: white;
+  padding: 1rem 1.5rem;
+}
+
+.nhsn-link__title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.nhsn-link__subtitle {
+  margin-top: 0.25rem;
+  opacity: 0.9;
+}
+
+.nhsn-link__layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+.nhsn-link__nav,
+.nhsn-link__panel,
+.nhsn-link__content {
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.nhsn-link__nav ul,
+.nhsn-link__panel ul {
+  padding-left: 1.25rem;
+}
+
+.nhsn-link__state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  background: white;
+  margin: 2rem;
+  border-radius: 8px;
+}
+
+.nhsn-link__grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (max-width: 900px) {
+  .nhsn-link__layout {
+    grid-template-columns: 1fr;
+  }
+}
