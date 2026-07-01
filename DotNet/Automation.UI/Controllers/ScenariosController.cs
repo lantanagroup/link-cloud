@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation;
@@ -14,6 +14,7 @@ namespace Automation.UI.Controllers;
 public class ScenariosController(
     IScenarioStore scenarioStore,
     IQueryPlanTemplateStore queryPlanTemplateStore,
+    INormalizationStore normalizationStore,
     IOptions<AutomationConfig> automationConfig,
     IMongoDatabase database) : Controller
 {
@@ -25,6 +26,7 @@ public class ScenariosController(
     {
         var scenarios = await scenarioStore.GetAllAsync(ct);
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(ct);
+        ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(ct);
         return View(scenarios);
     }
 

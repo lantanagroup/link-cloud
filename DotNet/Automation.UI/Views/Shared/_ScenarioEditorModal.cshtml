@@ -12,6 +12,7 @@
 *@
 @{
     var queryPlanTemplates = (List<QueryPlanTemplate>?)ViewBag.QueryPlanTemplates ?? [];
+    var normalizationSuites = (List<NormalizationSuiteDefinition>?)ViewBag.NormalizationSuites ?? [];
     var clinicalScenarios = ClinicalScenarioInfo.GetAll(Enum.GetValues<ProfiledMeasureType>().ToList());
 }
 
@@ -75,6 +76,17 @@
                                     var defaultLabel = qp.IsDefault ? " (Default)" : "";
                                     var systemLabel = qp.IsSystem ? " [System]" : "";
                                     <option value="@qp.Id" data-name="@qp.Name" data-is-default="@qp.IsDefault.ToString().ToLower()">@qp.Name@defaultLabel@systemLabel</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="NormalizationSuite">Normalization Suite</label>
+                            <select class="form-select" id="NormalizationSuite">
+                                @foreach (var ns in normalizationSuites)
+                                {
+                                    var nsDefaultLabel = ns.IsDefault ? " (Default)" : "";
+                                    var nsSystemLabel = ns.IsSystem ? " [System]" : "";
+                                    <option value="@ns.Id" data-name="@ns.Name" data-is-default="@ns.IsDefault.ToString().ToLower()">@ns.Name@nsDefaultLabel@nsSystemLabel</option>
                                 }
                             </select>
                         </div>
@@ -706,6 +718,7 @@
                 cleanupServiceData: document.getElementById('CleanupServiceData').checked,
                 cleanupFhirData: document.getElementById('CleanupFhirData').checked,
                 queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null,
+                normalizationSuiteId: document.getElementById('NormalizationSuite').value || null,
                 reportPeriodStart: (document.getElementById('ReportPeriodStart').value || '').trim() ? (document.getElementById('ReportPeriodStart').value + 'T00:00:00Z') : null,
                 reportPeriodEnd: (document.getElementById('ReportPeriodEnd').value || '').trim() ? (document.getElementById('ReportPeriodEnd').value + 'T23:59:59Z') : null,
                 importedPatientIds: importedIds,
@@ -736,6 +749,9 @@
             var qp = document.getElementById('QueryPlanTemplate');
             if (data.queryPlanTemplateId) qp.value = data.queryPlanTemplateId;
             else { var d = qp.querySelector('[data-is-default="true"]'); if (d) qp.value = d.value; }
+            var ns = document.getElementById('NormalizationSuite');
+            if (data.normalizationSuiteId) ns.value = data.normalizationSuiteId;
+            else { var nd = ns.querySelector('[data-is-default="true"]'); if (nd) ns.value = nd.value; }
             document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
             var mMap = { 'NhsnAcuteCareHospitalMonthlyInitialPopulation': 'measure_monthly', 'NhsnAcuteCareHospitalDailyInitialPopulation': 'measure_daily', 'NhsnGlycemicControlHypoglycemicInitialPopulation': 'measure_hypo' };
             (data.selectedMeasures || []).forEach(function (m) { var cb = document.getElementById(mMap[String(m)]); if (cb) cb.checked = true; });

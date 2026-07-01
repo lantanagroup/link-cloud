@@ -36,6 +36,7 @@ public sealed class MongoIndexManager
         EnsureScenarioIndexes();
         EnsureImportedBundleIndexes();
         EnsureQueryPlanTemplateIndexes();
+        EnsureNormalizationIndexes();
         EnsureApiHealthRunIndexes();
         EnsureApiHealthExecutionRunIndexes();
     }
@@ -144,6 +145,21 @@ public sealed class MongoIndexManager
 
         // Sort index for GetAllAsync (ORDER BY Name ASC).
         CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+    }
+
+    // --- automation_normalization_* ---
+
+    private void EnsureNormalizationIndexes()
+    {
+        var operations = _database.GetCollection<BsonDocument>("automation_normalization_operations");
+        CreateIndexSafe(operations, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+
+        var sequences = _database.GetCollection<BsonDocument>("automation_normalization_sequences");
+        CreateIndexSafe(sequences, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+
+        var suites = _database.GetCollection<BsonDocument>("automation_normalization_suites");
+        CreateIndexSafe(suites, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+        CreateIndexSafe(suites, new BsonDocument { { "IsDefault", 1 } }, unique: false, "idx_isDefault");
     }
 
     // --- api_health_runs ---

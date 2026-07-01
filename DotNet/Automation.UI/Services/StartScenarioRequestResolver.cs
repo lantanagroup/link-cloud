@@ -81,6 +81,7 @@ public static class StartScenarioRequestResolver
             PatientCohorts = cohorts,
             ReportMethod = request.ReportMethod,
             QueryPlanTemplateId = request.QueryPlanTemplateId,
+            NormalizationSuiteId = request.NormalizationSuiteId,
             ImportedPatientIds = importedIds,
             ImportedPatientBundles = importedBundles,
             ReportPeriodStart = reportStart,

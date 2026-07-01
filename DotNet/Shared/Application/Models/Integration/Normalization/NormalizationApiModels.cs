@@ -26,8 +26,41 @@ public class CreateNormalizationOperationDetailsApiModel
     public string OperationType { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
+
+    // CopyProperty
     public string SourceFhirPath { get; set; } = string.Empty;
     public string TargetFhirPath { get; set; } = string.Empty;
+
+    // ConditionalTransform
+    public object? TargetValue { get; set; }
+    public List<CreateNormalizationConditionApiModel>? Conditions { get; set; }
+
+    // CodeMap
+    public string? FhirPath { get; set; }
+    public List<CreateNormalizationCodeSystemMapApiModel>? CodeSystemMaps { get; set; }
+
+    // RemoveExtensions
+    public List<string>? ExtensionUrls { get; set; }
+}
+
+public class CreateNormalizationConditionApiModel
+{
+    public string FhirPathSource { get; set; } = string.Empty;
+    public string Operator { get; set; } = "Equal";
+    public object? Value { get; set; }
+}
+
+public class CreateNormalizationCodeSystemMapApiModel
+{
+    public string SourceSystem { get; set; } = string.Empty;
+    public string TargetSystem { get; set; } = string.Empty;
+    public Dictionary<string, CreateNormalizationCodeMapEntryApiModel> CodeMaps { get; set; } = new();
+}
+
+public class CreateNormalizationCodeMapEntryApiModel
+{
+    public string Code { get; set; } = string.Empty;
+    public string Display { get; set; } = string.Empty;
 }
 
 public class NormalizationOperationResourceTypeApiModel

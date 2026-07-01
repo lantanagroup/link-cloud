@@ -10,6 +10,7 @@ using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using Microsoft.Extensions.Options;
 
 namespace Automation.UI.Services;
@@ -34,6 +35,7 @@ internal sealed class RunExecutor
     private readonly ISnapshotStore _snapshotStore;
     private readonly RunSnapshotOrchestrator _orchestrator;
     private readonly QueryPlanTemplateResolver _queryPlanResolver;
+    private readonly NormalizationSuiteResolver _normalizationSuiteResolver;
     private readonly bool _suppressExternalManifest;
     private readonly ILogger _logger;
 
@@ -43,6 +45,7 @@ internal sealed class RunExecutor
         ISnapshotStore snapshotStore,
         RunSnapshotOrchestrator orchestrator,
         QueryPlanTemplateResolver queryPlanResolver,
+        NormalizationSuiteResolver normalizationSuiteResolver,
         IConfiguration configuration,
         ILogger logger)
     {
@@ -51,6 +54,7 @@ internal sealed class RunExecutor
         _snapshotStore = snapshotStore;
         _orchestrator = orchestrator;
         _queryPlanResolver = queryPlanResolver;
+        _normalizationSuiteResolver = normalizationSuiteResolver;
         _suppressExternalManifest = configuration.GetValue<bool>("ExternalBlobStorage:SuppressManifest");
         _logger = logger;
     }
@@ -248,9 +252,9 @@ internal sealed class RunExecutor
             await FacilitySetupHelper.EnsureFacilityAsync(
                 services.GetRequiredService<IFacilityServiceClient>(),
                 output, facilityId, measureIds);
-            await FacilitySetupHelper.EnsureNormalizationConfigAsync(
+            await EnsureNormalizationFromSuiteAsync(
                 services.GetRequiredService<INormalizationServiceClient>(),
-                output, facilityId);
+                output, facilityId, state.Options.NormalizationSuiteId, cancellationToken);
             await FacilitySetupHelper.EnsureQueryPlansAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 output, facilityId, measureIds, "Epic", queryPlanInput);
@@ -612,5 +616,149 @@ internal sealed class RunExecutor
                 out var dto))
             return dto.UtcDateTime;
         return null;
+    }
+
+    /// <summary>
+    /// Resolves the normalization suite and creates the appropriate operations and sequences
+    /// via the Normalization API for the given facility. Replaces the legacy
+    /// <c>FacilitySetupHelper.EnsureNormalizationConfigAsync</c> which only created a single
+    /// hard-coded CopyProperty operation.
+    /// </summary>
+    private async Task EnsureNormalizationFromSuiteAsync(
+        INormalizationServiceClient normalizationClient,
+        IAutomationOutput output,
+        string facilityId,
+        Guid? suiteId,
+        CancellationToken cancellationToken)
+    {
+        // Check if the facility already has operations configured.
+        var existingResp = await normalizationClient.SearchFacilityOperationsAsync(facilityId);
+        if (existingResp.IsSuccessStatusCode && existingResp.Body?.Records?.Count > 0)
+        {
+            output.WriteLine($"Normalization config for facility '{facilityId}' already exists. Skipping create.");
+            return;
+        }
+
+        var resolution = await _normalizationSuiteResolver.ResolveAsync(suiteId, cancellationToken);
+        output.WriteLine($"Using normalization suite: {resolution.SuiteName} ({resolution.Operations.Count} operation(s))");
+
+        if (resolution.Operations.Count == 0)
+        {
+            output.WriteLine("Normalization suite has no operations — skipping normalization configuration.");
+            return;
+        }
+
+        // Track created operation IDs per resource type so we can build sequences.
+        var createdOpsByResourceType = new Dictionary<string, List<(Guid OpId, int Order)>>(StringComparer.OrdinalIgnoreCase);
+        int globalOrder = 0;
+
+        foreach (var opDef in resolution.Operations)
+        {
+            globalOrder++;
+            var apiOp = new CreateNormalizationOperationDetailsApiModel
+            {
+                OperationType = opDef.OperationType,
+                Name = opDef.Name,
+                Description = opDef.Description ?? string.Empty,
+                SourceFhirPath = opDef.SourceFhirPath ?? string.Empty,
+                TargetFhirPath = opDef.TargetFhirPath ?? string.Empty
+            };
+
+            // Populate type-specific fields.
+            switch (opDef.OperationType)
+            {
+                case "ConditionalTransform":
+                    apiOp.TargetFhirPath = opDef.ConditionTargetFhirPath ?? string.Empty;
+                    apiOp.TargetValue = opDef.ConditionTargetValue;
+                    apiOp.Conditions = opDef.Conditions.Select(c => new CreateNormalizationConditionApiModel
+                    {
+                        FhirPathSource = c.FhirPathSource,
+                        Operator = c.Operator,
+                        Value = c.Value
+                    }).ToList();
+                    break;
+                case "CodeMap":
+                    apiOp.FhirPath = opDef.CodeMapFhirPath;
+                    apiOp.CodeSystemMaps = opDef.CodeSystemMaps.Select(csm => new CreateNormalizationCodeSystemMapApiModel
+                    {
+                        SourceSystem = csm.SourceSystem,
+                        TargetSystem = csm.TargetSystem,
+                        CodeMaps = csm.CodeMaps.ToDictionary(
+                            kvp => kvp.Key,
+                            kvp => new CreateNormalizationCodeMapEntryApiModel { Code = kvp.Value.Code, Display = kvp.Value.Display })
+                    }).ToList();
+                    break;
+                case "RemoveExtensions":
+                    apiOp.ExtensionUrls = opDef.ExtensionUrls;
+                    break;
+            }
+
+            var createResp = await normalizationClient.CreateOperationAsync(new CreateNormalizationOperationRequestApiModel
+            {
+                ResourceTypes = opDef.ResourceTypes,
+                FacilityId = facilityId,
+                Operation = apiOp,
+                Description = opDef.Description ?? string.Empty,
+                VendorIds = []
+            }, cancellationToken);
+
+            if (!createResp.IsSuccessStatusCode)
+            {
+                output.WriteLine($"  WARNING: Failed to create normalization operation '{opDef.Name}': HTTP {createResp.StatusCode}");
+                continue;
+            }
+
+            output.WriteLine($"  Created operation: {opDef.Name} ({opDef.OperationType}) for [{string.Join(", ", opDef.ResourceTypes)}]");
+
+            // Track for sequence creation.
+            foreach (var rt in opDef.ResourceTypes)
+            {
+                if (!createdOpsByResourceType.ContainsKey(rt))
+                    createdOpsByResourceType[rt] = [];
+                createdOpsByResourceType[rt].Add((opDef.Id, globalOrder));
+            }
+        }
+
+        // Create sequences per resource type.
+        // We need to get operations back from the API since the create response may not give IDs directly.
+        // Instead, re-search to find newly created ops and build sequences.
+        var opsResp = await normalizationClient.SearchFacilityOperationsAsync(facilityId, pageSize: 100, cancellationToken: cancellationToken);
+        if (opsResp.IsSuccessStatusCode && opsResp.Body?.Records?.Count > 0)
+        {
+            // Group by resource type and create sequences in order.
+            var opsByResourceType = new Dictionary<string, List<(Guid OpId, int Seq)>>(StringComparer.OrdinalIgnoreCase);
+            int seq = 0;
+            foreach (var op in opsResp.Body.Records)
+            {
+                seq++;
+                foreach (var ort in op.OperationResourceTypes)
+                {
+                    var resourceName = ort.Resource?.ResourceName;
+                    if (string.IsNullOrEmpty(resourceName)) continue;
+
+                    if (!opsByResourceType.ContainsKey(resourceName))
+                        opsByResourceType[resourceName] = [];
+                    opsByResourceType[resourceName].Add((op.Id, seq));
+                }
+            }
+
+            foreach (var (resourceType, ops) in opsByResourceType)
+            {
+                var sequences = ops
+                    .OrderBy(o => o.Seq)
+                    .Select((o, idx) => new CreateNormalizationOperationSequenceApiModel
+                    {
+                        OperationId = o.OpId,
+                        Sequence = idx + 1
+                    })
+                    .ToList();
+
+                var seqResp = await normalizationClient.CreateOperationSequencesAsync(facilityId, resourceType, sequences, cancellationToken);
+                if (seqResp.IsSuccessStatusCode)
+                    output.WriteLine($"  Created operation sequence for resource type: {resourceType} ({sequences.Count} op(s))");
+                else
+                    output.WriteLine($"  WARNING: Failed to create sequence for {resourceType}: HTTP {seqResp.StatusCode}");
+            }
+        }
     }
 }
