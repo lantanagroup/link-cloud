@@ -1,6 +1,7 @@
 ﻿using Automation.UI.Models;
 using Automation.UI.Services;
 using Automation.UI.Services.Persistence;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automation.UI.Controllers.Api;
@@ -16,6 +17,7 @@ namespace Automation.UI.Controllers.Api;
 /// </summary>
 [ApiController]
 [Route("api/runs")]
+[Authorize(Policy = "ApiBearerPolicy")]
 public sealed class AutomationRunsApiController(
     IAutomationRunManager runManager,
     IScenarioStore scenarioStore,

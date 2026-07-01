@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-using System.Text.Json;
-using Confluent.Kafka;
+﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
@@ -11,10 +9,13 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Utilities;
+using LantanaGroup.Link.Submission.Application.Config;
 using LantanaGroup.Link.Submission.Application.Interfaces;
-using LantanaGroup.Link.Submission.Application.Services;
 using LantanaGroup.Link.Submission.KafkaProducers;
 using LantanaGroup.Link.Submission.Settings;
+using Microsoft.Extensions.Options;
+using System.Diagnostics;
+using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Submission.Listeners
@@ -34,6 +35,7 @@ namespace LantanaGroup.Link.Submission.Listeners
         private readonly ISubmissionServiceMetrics _metrics;
         private readonly PayloadSubmittedProducer _payloadSubmittedProducer;
         private readonly AuditableEventOccurredProducer _auditableEventOccurredProducer;
+        private readonly ExternalBlobStorageSettings _externalBlobStorageSettings;
 
         public SubmitPayloadListener(
             ILogger<SubmitPayloadListener> logger,
@@ -43,7 +45,8 @@ namespace LantanaGroup.Link.Submission.Listeners
             IStorageService blobStorageService,
             ISubmissionServiceMetrics metrics,
             PayloadSubmittedProducer payloadSubmittedProducer,
-            AuditableEventOccurredProducer auditableEventOccurredProducer)
+            AuditableEventOccurredProducer auditableEventOccurredProducer,
+            IOptions<ExternalBlobStorageSettings> externalBlobStorageSettings)
         {
             _logger = logger;
 
@@ -66,6 +69,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             _payloadSubmittedProducer = payloadSubmittedProducer;
 
             _auditableEventOccurredProducer = auditableEventOccurredProducer;
+            _externalBlobStorageSettings = externalBlobStorageSettings.Value;
         }
 
         protected override Task ExecuteAsync(CancellationToken stoppingToken)
@@ -151,6 +155,22 @@ namespace LantanaGroup.Link.Submission.Listeners
                     throw new DeadLetterException("Measure IDs not specified.");
                 }
 
+                if (_externalBlobStorageSettings.SuppressManifest && value.PayloadType == PayloadType.ReportSchedule)
+                {
+                    _logger.LogInformation(
+                        "Skipping external manifest upload for ReportScheduleId={ReportScheduleId}, FacilityId={FacilityId} because ExternalBlobStorage:SuppressManifest=true.",
+                        key.ReportScheduleId,
+                        facilityId);
+
+                    _payloadSubmittedProducer.Produce(
+                        correlationId,
+                        facilityId,
+                        key.ReportScheduleId,
+                        value.PayloadType,
+                        value.PatientId);
+                    return;
+                }
+
                 byte[]? content = null;
 
                 if (_blobStorageService.HasInternalClient())
@@ -159,11 +179,15 @@ namespace LantanaGroup.Link.Submission.Listeners
                     {
                         content = await _blobStorageService.DownloadFromInternalAsync(value, cancellationToken);
                     }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to download from internal blob storage.");
                         await ProduceAuditEventAsync(facilityId, correlationId, $"Failed to download from internal blob storage: {ex}", cancellationToken);
-                        
+
                         throw new TransientException("Failed to download from internal blob storage.");
                     }
                 }
@@ -181,6 +205,10 @@ namespace LantanaGroup.Link.Submission.Listeners
                     _metrics.RecordUploadDuration(uploadStopwatch.Elapsed.TotalMilliseconds, metricTags);
                     _metrics.RecordUploadSize(content.LongLength, metricTags);
                     uploaded = true;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -208,13 +236,18 @@ namespace LantanaGroup.Link.Submission.Listeners
             {
                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId!);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId!);
             }
             finally
             {
-                _consumer.Commit(result);
+                if (!cancellationToken.IsCancellationRequested)
+                    _consumer.Commit(result);
             }
         }
 

@@ -5,6 +5,7 @@ WORKDIR /src
 COPY ["DotNet/Shared/Shared.csproj", "DotNet/Shared/"]
 COPY ["DotNet/Terminology/Terminology.csproj", "DotNet/Terminology/"]
 COPY ["DotNet/Link.Authorization/Link.Authorization.csproj", "DotNet/Link.Authorization/"]
+COPY ["Directory.Packages.props", "./"]
 RUN dotnet restore "DotNet/Terminology/Terminology.csproj"
 COPY . .
 WORKDIR "/src/DotNet/Terminology"
