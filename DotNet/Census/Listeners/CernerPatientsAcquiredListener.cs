@@ -79,7 +79,7 @@ namespace LantanaGroup.Link.Census.Listeners
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
-                            catch (OperationCanceledException)
+                            catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
                                 throw;
                             }
@@ -108,7 +108,7 @@ namespace LantanaGroup.Link.Census.Listeners
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
                         consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                     }
-                    catch (OperationCanceledException)
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
                         throw;
                     }
