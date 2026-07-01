@@ -15,7 +15,7 @@
         "ASPNETCORE_ENVIRONMENT": "Docker",
         "ConnectionStrings__DatabaseConnection": "Server=tcp:localhost,1433;Initial Catalog=link-report;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;",
         "KafkaConnection__BootstrapServers__0": "localhost:9094",
-        "InternalBlobStorage__ConnectionString": "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://localhost:10000/devstoreaccount1",
+        "InternalBlobStorage__ConnectionString": "",
         "Serilog__WriteTo__0__Args__uri": "http://localhost:3100",
         "Telemetry__OtelCollectorEndpoint": "http://localhost:4317",
         "ServiceRegistry__TenantService__TenantServiceUrl": "http://localhost:8074",
