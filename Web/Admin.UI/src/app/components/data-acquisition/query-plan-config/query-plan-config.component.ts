@@ -87,6 +87,16 @@ export class QueryPlanConfigFormComponent {
   supplementalQueries: QueryConfigModel[] = [];
   displayedColumns: string[] = ['drag', 'resourceType', 'queryConfigType', 'details', 'actions'];
 
+  // Save error shown inline on the form. The backend returns RFC ProblemDetails, so a
+  // validation failure (e.g. missing Encounter/Location while location resolution is active)
+  // is surfaced here rather than silently closing the dialog.
+  saveError: string | null = null;
+
+  // True when the facility's parent-organization location resolution is active. When active,
+  // the plan's initial queries must include both an Encounter and a Location query. This drives
+  // client-side pre-validation (inline hint + disabled Save) on top of the backend guard.
+  locationResolutionActive = false;
+
   constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService, private fb: FormBuilder, private dialog: MatDialog) {
 
     //initialize form with fields based on IDataAcquisitionQueryConfigModel
@@ -108,14 +118,19 @@ export class QueryPlanConfigFormComponent {
       this.formMode = FormMode.Create;
     }
 
+    this.loadLocationResolutionState();
+
     this.planForm.valueChanges.subscribe(() => {
-      this.formValueChanged.emit(this.planForm.invalid);
+      this.emitFormValidity();
+      // Clear a stale save error once the user starts changing the form.
+      this.saveError = null;
     });
   }
 
   ngOnChanges(changes: SimpleChanges) {
     if (changes['item'] && changes['item'].currentValue) {
       this.setFormValues();
+      this.loadLocationResolutionState();
     }
     // toggle view
     this.toggleViewOnly(this.viewOnly);
@@ -174,7 +189,7 @@ export class QueryPlanConfigFormComponent {
       return;
     }
     this.initialQueries = reordered;
-    this.formValueChanged.emit(this.planForm.invalid);
+    this.emitFormValidity();
   }
 
   dropSupplemental(event: CdkDragDrop<QueryConfigModel[]>) {
@@ -186,7 +201,7 @@ export class QueryPlanConfigFormComponent {
       return;
     }
     this.supplementalQueries = reordered;
-    this.formValueChanged.emit(this.planForm.invalid);
+    this.emitFormValidity();
   }
 
   // Mirrors the backend rule (QueryPlanValidator.ValidateQueryOrder): no
@@ -222,14 +237,14 @@ export class QueryPlanConfigFormComponent {
   addInitialQuery() {
     this.openQueryEditDialog(null, (res) => {
       this.initialQueries = this.insertRespectingOrder(this.initialQueries, res);
-      this.formValueChanged.emit(this.planForm.invalid);
+      this.emitFormValidity();
     });
   }
 
   addSupplementalQuery() {
     this.openQueryEditDialog(null, (res) => {
       this.supplementalQueries = this.insertRespectingOrder(this.supplementalQueries, res);
-      this.formValueChanged.emit(this.planForm.invalid);
+      this.emitFormValidity();
     });
   }
 
@@ -258,7 +273,7 @@ export class QueryPlanConfigFormComponent {
         return;
       }
       this.initialQueries = updated;
-      this.formValueChanged.emit(this.planForm.invalid);
+      this.emitFormValidity();
     });
   }
 
@@ -271,20 +286,20 @@ export class QueryPlanConfigFormComponent {
         return;
       }
       this.supplementalQueries = updated;
-      this.formValueChanged.emit(this.planForm.invalid);
+      this.emitFormValidity();
     });
   }
 
   deleteInitialQuery(index: number) {
     this.initialQueries.splice(index, 1);
     this.initialQueries = [...this.initialQueries];
-    this.formValueChanged.emit(this.planForm.invalid);
+    this.emitFormValidity();
   }
 
   deleteSupplementalQuery(index: number) {
     this.supplementalQueries.splice(index, 1);
     this.supplementalQueries = [...this.supplementalQueries];
-    this.formValueChanged.emit(this.planForm.invalid);
+    this.emitFormValidity();
   }
 
   openQueryEditDialog(config: QueryConfigModel | null, callback: (res: QueryConfigModel) => void) {
@@ -504,12 +519,19 @@ export class QueryPlanConfigFormComponent {
     } as IQueryPlanModel;
 
     this.setFormValues();
-    this.formValueChanged.emit(this.planForm.invalid);
+    this.emitFormValidity();
 
     return null;
   }
 
   submitConfiguration(): void {
+    this.saveError = null;
+    // Client-side guard mirroring the backend rule: block save while location resolution is
+    // active and the initial queries are missing an Encounter and/or Location query. The inline
+    // message above Save already explains the requirement, so just stop here.
+    if (this.locationResolutionViolation) {
+      return;
+    }
     if (this.planForm.valid) {
         if (this.formMode == FormMode.Create) {
           this.dataAcquisitionService.createQueryPlanConfiguration(this.facilityIdControl.value, {
@@ -525,7 +547,7 @@ export class QueryPlanConfigFormComponent {
               this.submittedConfiguration.emit({id: '', message: `Created query plan`});
             },
             error: (err) => {
-              this.submittedConfiguration.emit({id: '', message: `Error Creating plan`});
+              this.setSaveError(err, 'create');
             }
           });
         } else if (this.formMode == FormMode.Edit) {
@@ -544,7 +566,7 @@ export class QueryPlanConfigFormComponent {
               this.submittedConfiguration.emit({id: '', message: `Updated query plan`});
             },
             error: (err) => {
-              this.submittedConfiguration.emit({id: '', message: `Error updating query plan`});
+              this.setSaveError(err, 'update');
             }
           });
         }
@@ -556,6 +578,70 @@ export class QueryPlanConfigFormComponent {
         verticalPosition: 'top'
       });
     }
+  }
+
+  // Surfaces a backend save failure inline on the form. The dialog is intentionally left
+  // open so the user can read the message and fix the plan (e.g. add an Encounter/Location
+  // query when location resolution is active).
+  private setSaveError(err: any, action: 'create' | 'update'): void {
+    // The backend returns RFC ProblemDetails, so the message is in err.error.detail.
+    // Fall back to title, a raw string body, or a default.
+    const problem = err?.error;
+    this.saveError =
+      (typeof problem === 'string' ? problem : (problem?.detail ?? problem?.title))
+      || `Failed to ${action} query plan.`;
+  }
+
+  // Fetches whether the facility's parent-organization location resolution is active so the
+  // form can pre-validate the Encounter/Location requirement before the user submits.
+  private loadLocationResolutionState(): void {
+    const facilityId = this.item?.facilityId ?? this.facilityIdControl.value;
+    if (!facilityId) {
+      return;
+    }
+
+    this.dataAcquisitionService.getLocationConfigurations(facilityId).subscribe({
+      next: (configs) => {
+        this.locationResolutionActive = (configs ?? []).some(c => c.isActive);
+        this.emitFormValidity();
+      },
+      error: () => {
+        // If the state can't be determined, don't block the user client-side — the backend
+        // still enforces the rule on save.
+        this.locationResolutionActive = false;
+        this.emitFormValidity();
+      }
+    });
+  }
+
+  private emitFormValidity(): void {
+    this.formValueChanged.emit(this.planForm.invalid || this.locationResolutionViolation);
+  }
+
+  get hasEncounterInitialQuery(): boolean {
+    return (this.initialQueries ?? []).some(q => (q?.resourceType || '').toLowerCase() === 'encounter');
+  }
+
+  get hasLocationInitialQuery(): boolean {
+    return (this.initialQueries ?? []).some(q => (q?.resourceType || '').toLowerCase() === 'location');
+  }
+
+  // True when location resolution is active but the initial queries don't yet satisfy the
+  // Encounter + Location requirement. Drives the inline hint and disables Save.
+  get locationResolutionViolation(): boolean {
+    return this.locationResolutionActive && !(this.hasEncounterInitialQuery && this.hasLocationInitialQuery);
+  }
+
+  get locationResolutionMessage(): string {
+    const missingEncounter = !this.hasEncounterInitialQuery;
+    const missingLocation = !this.hasLocationInitialQuery;
+    const requirement = (missingEncounter && missingLocation)
+      ? 'both an Encounter and a Location query'
+      : missingEncounter
+        ? 'an Encounter query'
+        : 'a Location query';
+    return `Location resolution (parent organization) is active for this facility, so the initial ` +
+      `queries must include ${requirement} before this plan can be saved.`;
   }
 
   getOperationTypeDisplay(op: number|string) {

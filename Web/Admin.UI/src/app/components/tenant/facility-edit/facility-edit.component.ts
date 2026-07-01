@@ -129,17 +129,7 @@ export class FacilityEditComponent implements OnInit {
   censusConfig!: ICensusConfiguration;
   queryDispatchConfig!: IQueryDispatchConfiguration;
 
-  // Backed by accessors so hasEncounterParameter is recomputed automatically
-  // whenever the query config or query plan is (re)assigned. See the getters/
-  // setters and updateHasEncounterParameter() below.
-  private _dataAcqFhirQueryConfig!: IDataAcquisitionQueryConfigModel;
-  get dataAcqFhirQueryConfig(): IDataAcquisitionQueryConfigModel {
-    return this._dataAcqFhirQueryConfig;
-  }
-  set dataAcqFhirQueryConfig(value: IDataAcquisitionQueryConfigModel) {
-    this._dataAcqFhirQueryConfig = value;
-    this.updateHasEncounterParameter();
-  }
+  dataAcqFhirQueryConfig!: IDataAcquisitionQueryConfigModel;
 
   dataAcqFhirListConfig!: IDataAcquisitionFhirListConfigModel;
 
@@ -166,14 +156,7 @@ export class FacilityEditComponent implements OnInit {
   noDataAcqQueryPlanConfigAlertMessage = 'No FHIR query plan found for this facility and type';
   showNoDataAcqQueryPlanConfigAlert: boolean = false;
 
-  private _dataAcqQueryPlanConfig!: IQueryPlanModel;
-  get dataAcqQueryPlanConfig(): IQueryPlanModel {
-    return this._dataAcqQueryPlanConfig;
-  }
-  set dataAcqQueryPlanConfig(value: IQueryPlanModel) {
-    this._dataAcqQueryPlanConfig = value;
-    this.updateHasEncounterParameter();
-  }
+  dataAcqQueryPlanConfig!: IQueryPlanModel;
 
   private _displayReportDashboard: boolean = false;
 
@@ -373,9 +356,6 @@ export class FacilityEditComponent implements OnInit {
   }
 
   showDataAcqFhirQueryDialog(): void {
-    // Ensure the hasEncounterParameter flag is current on the config object
-    // before it is handed to the dialog (loads may have resolved in any order).
-    this.updateHasEncounterParameter();
     this.dialog.open(DataAcquisitionFhirQueryConfigDialogComponent,
       {
         width: '75%',
@@ -1095,26 +1075,6 @@ export class FacilityEditComponent implements OnInit {
         });
       }
     });
-  }
-
-  updateHasEncounterParameter() {
-    if (!this.dataAcqFhirQueryConfig) {
-      return;
-    }
-
-    // Default to false so the flag is always a concrete boolean once the query
-    // config is loaded. If the query plan loads (or is reassigned) later, its
-    // setter re-runs this and flips the flag to true when an Encounter is found.
-    let hasEncounterParameter = false;
-
-    const initialQueries = this.dataAcqQueryPlanConfig?.initialQueries;
-    if (initialQueries) {
-      hasEncounterParameter = Object.values(initialQueries).some(query => {
-        return (query.resourceType || '').toLowerCase() === 'encounter';
-      });
-    }
-
-    this.dataAcqFhirQueryConfig.hasEncounterParameter = hasEncounterParameter;
   }
 
 }

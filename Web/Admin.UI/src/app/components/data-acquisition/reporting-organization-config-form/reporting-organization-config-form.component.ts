@@ -9,7 +9,7 @@ import {
   ValidationErrors,
   Validators
 } from '@angular/forms';
-import { Subject, Subscription, merge, of, catchError, debounceTime, distinctUntilChanged, map, switchMap } from 'rxjs';
+import { Subject, Subscription, forkJoin, merge, of, catchError, debounceTime, distinctUntilChanged, map, switchMap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -28,6 +28,7 @@ import {
   IOrganizationLocationConfigurationModel,
   IUpdateOrganizationLocationConfigurationModel
 } from '../../../interfaces/data-acquisition/organization-location-config-model.interface';
+import { IQueryPlanModel } from '../../../interfaces/data-acquisition/query-plan-model.interface';
 
 @Component({
   selector: 'app-reporting-organization-config-form',
@@ -71,6 +72,15 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
 
   // Save error shown inline at the bottom of the dialog (no snackbar / global toast).
   saveError: string | null = null;
+
+  // Frequency plans for this facility whose initial queries are missing an Encounter and/or
+  // Location query. While IsActive is on, activation is blocked until these are resolved.
+  // Populated client-side so the form can pre-validate before the user submits.
+  nonCompliantPlans: { type: string; missingEncounter: boolean; missingLocation: boolean }[] = [];
+  private fetchedPlansForFacility: string | null = null;
+
+  // Every frequency plan type a facility can have (mirrors the backend Frequency enum).
+  private static readonly FrequencyTypes = ['Discharge', 'Daily', 'Weekly', 'Monthly', 'Adhoc'];
 
   // FHIRPath validation findings shown inline under the expression.
   // Errors block save; warnings are advisory. (Validation is currently stubbed — see the service.)
@@ -166,10 +176,75 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
    */
   private get isSaveDisabled(): boolean {
     if (this.configForm.invalid) return true;
+    // Activation requires every frequency plan's initial queries to include Encounter + Location.
+    if (this.isActiveControl.value && this.nonCompliantPlans.length > 0) return true;
     if (this.setupMethodControl.value === 'manual') {
       return this.validatingFhirPath || this.fhirPathErrors.length > 0;
     }
     return false;
+  }
+
+  /**
+   * Message shown when the user has Active on but one or more frequency plans are missing the
+   * required Encounter/Location queries. Mirrors the backend activation validation wording.
+   * Returns null when activation is not blocked.
+   */
+  get activationPrerequisiteError(): string | null {
+    if (!this.isActiveControl.value || this.nonCompliantPlans.length === 0) return null;
+
+    if (this.nonCompliantPlans.length === 1) {
+      const plan = this.nonCompliantPlans[0];
+      const requirement = (plan.missingEncounter && plan.missingLocation)
+        ? 'must include both an Encounter and a Location query'
+        : plan.missingEncounter
+          ? 'must include an Encounter query'
+          : 'must include a Location query';
+      return `Cannot enable location resolution: the ${plan.type} query plan's initial queries ${requirement}.`;
+    }
+
+    const list = ReportingOrganizationConfigFormComponent.formatFrequencyList(
+      this.nonCompliantPlans.map(p => p.type));
+    return `Cannot enable location resolution: the ${list} query plans are missing required ` +
+      `Encounter/Location queries in their initial queries.`;
+  }
+
+  /**
+   * Loads the facility's frequency plans and records which are missing Encounter/Location so the
+   * form can block activation client-side. The backend remains the authority; failures here are
+   * non-blocking (the rule is still enforced on save).
+   */
+  private loadFacilityQueryPlans(): void {
+    const facilityId = this.item?.facilityId ?? this.facilityIdControl.value;
+    if (!facilityId || facilityId === this.fetchedPlansForFacility) return;
+    this.fetchedPlansForFacility = facilityId;
+
+    this.subscriptions.add(
+      forkJoin(
+        ReportingOrganizationConfigFormComponent.FrequencyTypes.map(type =>
+          this.dataAcquisitionService.getQueryPlanConfiguration(facilityId, type)
+            .pipe(catchError(() => of(null)))
+        )
+      ).subscribe(plans => {
+        this.nonCompliantPlans = plans
+          .filter((p): p is IQueryPlanModel => !!p)
+          .map(p => this.evaluatePlanCompliance(p))
+          .filter(r => r.missingEncounter || r.missingLocation);
+        this.emitValidity();
+      })
+    );
+  }
+
+  private evaluatePlanCompliance(plan: IQueryPlanModel): { type: string; missingEncounter: boolean; missingLocation: boolean } {
+    const queries = plan.initialQueries ? Object.values(plan.initialQueries) : [];
+    const hasEncounter = queries.some(q => (q?.resourceType || '').toLowerCase() === 'encounter');
+    const hasLocation = queries.some(q => (q?.resourceType || '').toLowerCase() === 'location');
+    return { type: plan.type, missingEncounter: !hasEncounter, missingLocation: !hasLocation };
+  }
+
+  private static formatFrequencyList(frequencies: string[]): string {
+    if (frequencies.length <= 1) return frequencies[0] ?? '';
+    if (frequencies.length === 2) return `${frequencies[0]} and ${frequencies[1]}`;
+    return `${frequencies.slice(0, -1).join(', ')}, and ${frequencies[frequencies.length - 1]}`;
   }
 
   /** Pushes the current save-disabled state out so the dialog's Save button stays in sync. */
@@ -306,6 +381,12 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
 
     this.wireSetupMethod();
     this.toggleViewOnly(this.viewOnly);
+
+    // Load the facility's frequency plans so activation can be pre-validated against the
+    // Encounter/Location requirement before the user toggles Active on and saves.
+    if (!this.viewOnly) {
+      this.loadFacilityQueryPlans();
+    }
 
     // Validate the expression a Custom-mode config loaded with (the value is set with
     // emitEvent: false, so nothing else triggers it). No-op for builder methods.
@@ -790,6 +871,13 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
     // Don't submit an expression we already know is invalid; warnings are advisory and don't block.
     if (this.fhirPathErrors.length > 0) {
       this.saveError = 'Resolve the FHIRPath errors before saving.';
+      return;
+    }
+
+    // Block activation client-side when a frequency plan is missing Encounter/Location, mirroring
+    // the backend rule (which still enforces it if this check was bypassed). The inline message
+    // above Save already explains the requirement, so just stop here.
+    if (this.activationPrerequisiteError) {
       return;
     }
 

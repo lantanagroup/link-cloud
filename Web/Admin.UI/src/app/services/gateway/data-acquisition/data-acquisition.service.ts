@@ -114,7 +114,8 @@ export class DataAcquisitionService {
           return response;
         }),
         catchError((error) => {
-          return this.errorHandler.handleError(error);
+          // Suppress the global toast; the query plan form shows the error inline.
+          return this.errorHandler.handleError(error, false);
         })
       )
   }
@@ -127,7 +128,8 @@ export class DataAcquisitionService {
           return response;
         }),
         catchError((error) => {
-          return this.errorHandler.handleError(error);
+          // Suppress the global toast; the query plan form shows the error inline.
+          return this.errorHandler.handleError(error, false);
         })
       )
   }
