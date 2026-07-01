@@ -1,4 +1,6 @@
-﻿using LantanaGroup.Link.Terminology.Services;
+﻿using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Terminology.Application.Models;
+using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 
@@ -24,5 +26,47 @@ public class ConfigController(CodeGroupCacheService cacheService, ILogger<Config
         cacheService.ClearCache();
         await cacheService.LoadCache();
         return NoContent();
+    }
+
+    /// <summary>
+    /// Test/diagnostic endpoint that returns a single code from the cached CodeSystem
+    /// identified by its resource <paramref name="id"/> (e.g. "v3-ActCode").
+    /// </summary>
+    /// <param name="id">The CodeSystem resource id.</param>
+    /// <param name="code">The code value to look up within the CodeSystem.</param>
+    /// <param name="version">Optional CodeSystem version; when omitted the latest cached version is used.</param>
+    /// <returns>
+    /// 200 with the matching code (value, display, status); 400 if <paramref name="id"/> or code is missing;
+    /// 404 if the CodeSystem or code is not present in the cache.
+    /// </returns>
+    [HttpGet("CodeSystem/{id}/code/{code}")]
+    [SwaggerOperation(Summary = "Get a code from a cached CodeSystem by its resource id.")]
+    public ActionResult<Code> GetCodeSystemCode(
+        [FromRoute] string id,
+        [FromRoute] string code,
+        [FromQuery] string? version = null)
+    {
+        var cleanId = id?.Sanitize();
+        var cleanCode = code?.Sanitize();
+        var cleanVersion = version?.Sanitize();
+
+        if (string.IsNullOrWhiteSpace(cleanId))
+            return BadRequest("A CodeSystem 'id' is required.");
+
+        if (string.IsNullOrWhiteSpace(cleanCode))
+            return BadRequest("A 'code' is required.");
+
+        var codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, cleanId, cleanVersion);
+        if (codeGroup == null)
+            return NotFound($"No CodeSystem found in the cache with id '{cleanId}'.");
+
+        var match = codeGroup.Codes.Values
+            .SelectMany(codes => codes)
+            .FirstOrDefault(c => string.Equals(c.Value, cleanCode, StringComparison.Ordinal));
+
+        if (match == null)
+            return NotFound($"Code '{cleanCode}' was not found in CodeSystem '{cleanId}'.");
+
+        return Ok(match);
     }
 }
