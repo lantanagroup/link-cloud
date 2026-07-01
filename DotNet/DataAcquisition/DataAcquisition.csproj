@@ -36,22 +36,22 @@
 
 	<ItemGroup>
     
-		<PackageReference Include="AspNetCore.HealthChecks.SqlServer" Version="8.*" />
-		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.*" />
-		<PackageReference Include="Azure.Identity" Version="1.*" />
-		<PackageReference Include="CompareNETObjects" Version="4.*" />
-		<PackageReference Include="Confluent.Kafka" Version="2.*" />
-		<PackageReference Include="Grpc.AspNetCore" Version="2.*" />
-		<PackageReference Include="Grpc.AspNetCore.Server.Reflection" Version="2.*" />
-		<PackageReference Include="Grpc.Net.Client" Version="2.*" />
-		<PackageReference Include="jose-jwt" Version="4.*" />
-		<PackageReference Include="JWT" Version="10.*" />
-		<PackageReference Include="LinqKit" Version="1.*" />
-		<PackageReference Include="Microsoft.AspNetCore.HeaderPropagation" Version="8.*" />
-		<PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="8.*" />
-		<PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="7.4.*" />
-		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.*" />		
-		<PackageReference Include="Swashbuckle.AspNetCore" Version="6.*" />
+		<PackageReference Include="AspNetCore.HealthChecks.SqlServer" />
+		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" />
+		<PackageReference Include="Azure.Identity" />
+		<PackageReference Include="CompareNETObjects" />
+		<PackageReference Include="Confluent.Kafka" />
+		<PackageReference Include="Grpc.AspNetCore" />
+		<PackageReference Include="Grpc.AspNetCore.Server.Reflection" />
+		<PackageReference Include="Grpc.Net.Client" />
+		<PackageReference Include="jose-jwt" />
+		<PackageReference Include="JWT" />
+		<PackageReference Include="LinqKit" />
+		<PackageReference Include="Microsoft.AspNetCore.HeaderPropagation" />
+		<PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
+		<PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />		
+		<PackageReference Include="Swashbuckle.AspNetCore" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -1,10 +1,10 @@
 {
-  "version": 1,
+  "version": 2,
   "dependencies": {
     "net8.0": {
       "Hl7.Fhir.R4": {
         "type": "Direct",
-        "requested": "[5.*, )",
+        "requested": "[5.13.4, )",
         "resolved": "5.13.4",
         "contentHash": "Nxw/zPtaVhAwpvyKnnvrQljUAL4BQ3HQ/VExDk9baLoIVvmBtmqiynEqYlyFt5kgM9umV8eWy/Tqn3J/cyOH4g==",
         "dependencies": {
@@ -13,7 +13,7 @@
       },
       "RestSharp": {
         "type": "Direct",
-        "requested": "[112.*, )",
+        "requested": "[112.1.0, )",
         "resolved": "112.1.0",
         "contentHash": "bOUGNZqhhv/QeCXHTKEUil846yBjwWXpzPKjO67kFvaAOoF361z7jLY5BMnuZ6WD2WQRA750sNMcK7MSPCQ5Mg=="
       },

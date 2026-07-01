@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             // This is necessary because we want to append new resources to the existing blob, 
             // and we don't want to write duplicate resource references if there are multiple 
             // resources of the same type in the same batch.
-            List<string> existingIds = new List<string>();
+            HashSet<string> existingIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var readBlobClient = _containerClient.GetBlobClient(idsBlobName);
             if(readBlobClient.Exists())
             {
@@ -60,43 +60,40 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 }
             }
 
-            var idsToWrite = new List<string>();
+            var resourcesToWrite = new Dictionary<string, DomainResource>();
             foreach(var resource in resources)
             {
                 var referenceId = resource.TypeName + "/" + resource.Id;
-                if (!existingIds.Contains(referenceId, StringComparer.OrdinalIgnoreCase))
+                if (!existingIds.Contains(referenceId))
                 {
-                    idsToWrite.Add(referenceId);
+                    resourcesToWrite[referenceId] = resource;
                 }
             }
 
-            if(!idsToWrite.Any())
+            if(!resourcesToWrite.Any())
                 return;
 
             AppendBlobClient writeBlobClient = _containerClient.GetAppendBlobClient(blobName);
             AppendBlobClient writeIdsBlobClient = _containerClient.GetAppendBlobClient(idsBlobName);
             writeBlobClient.CreateIfNotExists();
             writeIdsBlobClient.CreateIfNotExists();
-
-            using (Stream ids_write_stream = writeIdsBlobClient.OpenWrite(false))
-            using (StreamWriter ids_writer = new StreamWriter(ids_write_stream))
-            {
-                foreach(var id in idsToWrite)
-                {
-                    ids_writer.WriteLine(id);
-                }
-            }
             
             using (Stream write_stream = writeBlobClient.OpenWrite(false))
             using (StreamWriter writer = new StreamWriter(write_stream)) 
             {
-                foreach (var resource in resources) 
+                foreach (var resourceToWrite in resourcesToWrite)
                 {
-                    var referenceId = resource.TypeName + "/" + resource.Id;
-                    if (existingIds.Contains(referenceId, StringComparer.OrdinalIgnoreCase))
-                        continue;
-                    writer.WriteLine(referenceId);
-                    writer.WriteLine(resource.ToJson());
+                    writer.WriteLine(resourceToWrite.Key);
+                    writer.WriteLine(resourceToWrite.Value.ToJson());
+                }
+            }
+
+            using (Stream ids_write_stream = writeIdsBlobClient.OpenWrite(false))
+            using (StreamWriter ids_writer = new StreamWriter(ids_write_stream))
+            {
+                foreach(var id in resourcesToWrite.Keys)
+                {
+                    ids_writer.WriteLine(id);
                 }
             }
         }

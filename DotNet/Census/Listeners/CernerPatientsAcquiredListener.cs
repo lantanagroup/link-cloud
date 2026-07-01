@@ -69,7 +69,7 @@ namespace LantanaGroup.Link.Census.Listeners
                         {
                             try
                             {
-                                await ProcessMessageAsync(result, cancellationToken);
+                                await ProcessMessageAsync(result, consumeCancellationToken);
                             }
                             catch (DeadLetterException ex)
                             {
@@ -79,13 +79,18 @@ namespace LantanaGroup.Link.Census.Listeners
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
                             catch (Exception ex)
                             {
                                 _deadLetterExceptionHandler.HandleException(result, new DeadLetterException(ClassName + " Exception thrown: " + ex.Message), facilityId);
                             }
                             finally
                             {
-                                consumer.Commit(result);
+                                if (!consumeCancellationToken.IsCancellationRequested)
+                                    consumer.Commit(result);
                             }
                         }, cancellationToken);
                     }
@@ -102,6 +107,10 @@ namespace LantanaGroup.Link.Census.Listeners
 
                         var offset = ex.ConsumerRecord?.TopicPartitionOffset;
                         consumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
                     }
                     catch (Exception ex)
                     {
