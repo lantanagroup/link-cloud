@@ -41,6 +41,9 @@ public class ConfigController(CodeGroupCacheService cacheService, ILogger<Config
     /// </returns>
     [HttpGet("code-systems/{id}/codes/{code}")]
     [SwaggerOperation(Summary = "Get a code from a cached CodeSystem by its resource id.")]
+    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(Code))]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public ActionResult<Code> GetCodeSystemCode(
         [FromRoute] string id,
         [FromRoute] string code,
