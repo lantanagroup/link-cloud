@@ -1,0 +1,9 @@
+{
+  "name": "nhsn-app-ui-server",
+  "private": true,
+  "version": "0.1.0",
+  "dependencies": {
+    "http-proxy-middleware": "^3.0.3",
+    "express": "^4.21.2"
+  }
+}

@@ -1,0 +1,78 @@
+body {
+  margin: 0;
+  background: #eef3f8;
+  font-family: Arial, sans-serif;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  min-height: 100vh;
+}
+
+.shell__sidebar {
+  background: #0b2239;
+  color: white;
+  padding: 1.25rem;
+}
+
+.shell__sidebar h1 {
+  margin-top: 0;
+}
+
+.shell__content {
+  min-width: 0;
+}
+
+.shell__card {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.shell__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.shell__list button,
+.shell__card button,
+.shell__card form button {
+  width: 100%;
+  background: #005ea2;
+  color: white;
+  border: none;
+  padding: 0.65rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.shell__list button.active {
+  background: #00a0d2;
+}
+
+.shell__row {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.shell__row input {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #c5d3e0;
+}
+
+.shell__tagline {
+  color: #cce0f5;
+}
+
+@media (max-width: 960px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,21 @@
+# Build output
+/bin/
+/obj/
+
+# User-specific / IDE
+*.user
+*.rsuser
+*.suo
+*.DotSettings.user
+.vs/
+
+# Local-only config
+appsettings.Local.json
+appsettings.local.json
+
+# Logs / diagnostics
+*.log
+
+# Coverage / test artifacts
+coverage/
+TestResults/

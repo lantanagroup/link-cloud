@@ -8,3 +8,4 @@ IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-validation') CREAT
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-querydispatch') CREATE DATABASE [link-querydispatch];
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-account') CREATE DATABASE [link-account];
 IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-submission') CREATE DATABASE [link-submission];
+IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'link-nhsn-app-bff') CREATE DATABASE [link-nhsn-app-bff];

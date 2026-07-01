@@ -32,6 +32,8 @@ version: '3.4'
 ## tenant: 8074
 ## validation: 8075
 ## terminology: 8076
+## nhsn-app-bff: 8079
+## nhsn-app-ui: 8090
 
 services:
   
@@ -522,6 +524,45 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8063/api/health"]
+
+  nhsn-app-bff:
+    image: link-nhsn-app-bff
+    container_name: link-nhsn-app-bff
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-nhsn-app-bff;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+      Authentication__EnableAnonymousAccess: true
+    ports:
+      - "8079:8079"
+    build:
+      context: .
+      dockerfile: nhsn/NHSN-App-BFF/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
+    networks:
+      - link-nw
+    depends_on:
+      mssql_init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8079/health"]
+
+  nhsn-app-ui:
+    image: link-nhsn-app-ui
+    container_name: link-nhsn-app-ui
+    environment:
+      BFF_BASE_URL: http://nhsn-app-bff:8079/api
+      PORT: 8090
+    ports:
+      - "8090:8090"
+    build:
+      context: ./nhsn/NHSN-App-UI
+      dockerfile: Dockerfile
+    networks:
+      - link-nw
+    depends_on:
+      nhsn-app-bff:
+        condition: service_healthy
   
   audit:
     image: link-audit
