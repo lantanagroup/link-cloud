@@ -2,6 +2,7 @@ package com.lantanagroup.link.measureeval.configs;
 
 import ca.uhn.fhir.parser.DataFormatException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.measureeval.exceptions.ResourceCacheUnavailableException;
 import com.lantanagroup.link.shared.config.KafkaRetryConfig;
 import com.lantanagroup.link.shared.exceptions.FhirParseException;
 import com.lantanagroup.link.shared.exceptions.ValidationException;
@@ -16,6 +17,7 @@ import org.apache.kafka.common.serialization.Serializer;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.retrytopic.RetryTopicHeaders;
 import org.springframework.kafka.support.serializer.DelegatingByTypeSerializer;
@@ -136,6 +138,19 @@ class KafkaConfigTest {
     }
 
     @Test
+    void redisDown_isRetryable() {
+        // Redis outage during a cache read is transient — must be retried, not dead-lettered.
+        assertFalse(isNonRetryable(new RedisConnectionFailureException("redis unavailable")));
+    }
+
+    @Test
+    void resourceCacheUnavailable_isRetryable() {
+        // The explicit cache-outage error RedisResourceService now throws must also be retried, not poison.
+        assertFalse(isNonRetryable(
+                new ResourceCacheUnavailableException("cache down", new RedisConnectionFailureException("x"))));
+    }
+
+    @Test
     void nullThrowable_isRetryable() {
         assertFalse(isNonRetryable(null));
     }
@@ -192,6 +207,13 @@ class KafkaConfigTest {
     void transientFailure_withAttemptsRemaining_routesToRetry() {
         assertEquals(RETRY_TOPIC,
                 routedTopic(retryConfig(3, false), record(), new RuntimeException("transient boom")));
+    }
+
+    @Test
+    void redisDown_withAttemptsRemaining_routesToRetry() {
+        // A Redis outage must land in -Retry (transient), not -Error.
+        assertEquals(RETRY_TOPIC,
+                routedTopic(retryConfig(3, false), record(), new RedisConnectionFailureException("redis unavailable")));
     }
 
     @Test

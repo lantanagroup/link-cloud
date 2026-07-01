@@ -2,7 +2,9 @@ package com.lantanagroup.link.measureeval.services;
 
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
+import com.azure.storage.blob.models.BlobErrorCode;
 import com.azure.storage.blob.models.BlobItem;
+import com.azure.storage.blob.models.BlobStorageException;
 import com.azure.storage.blob.models.ListBlobsOptions;
 import com.lantanagroup.link.measureeval.entities.Resource;
 import org.hl7.fhir.r4.model.ResourceType;
@@ -65,10 +67,19 @@ public class AbsResourceService {
         try {
             BlobClient blobClient = containerClient.getBlobClient(blobName);
             contentBytes = blobClient.downloadContent().toBytes();
-        } catch (Exception e) {
-            logger.warn("Failed to download blob '{}' for correlationId='{}': {}.",
-                    blobName, correlationId, e.getMessage());
-            return resources;
+        } catch (BlobStorageException e) {
+            // A genuinely absent blob means the cache is empty for this correlationId — return empty.
+            // Anything else (5xx, throttling, auth, container missing) is an outage, NOT an empty cache:
+            // let it propagate so the async consumer routes the record to -Retry/-Error instead of
+            // silently producing a not-reportable report and acking. Connectivity/timeout failures are
+            // not BlobStorageException, so they are not caught here and propagate for the same reason.
+            if (BlobErrorCode.BLOB_NOT_FOUND.equals(e.getErrorCode())) {
+                logger.debug("Blob '{}' not found for correlationId='{}'; treating as empty cache", blobName, correlationId);
+                return resources;
+            }
+            logger.error("Failed to download blob '{}' for correlationId='{}' (errorCode={}); propagating for retry.",
+                    blobName, correlationId, e.getErrorCode());
+            throw e;
         }
 
         if (contentBytes.length == 0) {
