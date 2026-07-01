@@ -743,6 +743,45 @@ public class FhirServiceTests
 
     #endregion
 
+    #region ExpandValueSet Tests
+
+    [Fact]
+    public void ExpandValueSet_WithMultipleSystems_IncludesCodesFromAllSystems()
+    {
+        // Arrange
+        var valueSetId = "test-vs-expand";
+        var system1 = "http://test.system/1";
+        var system2 = "http://test.system/2";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Resource = new ValueSet { Id = valueSetId },
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system1, new List<Code> { new() { Value = "code-1", Display = "Code One" } } },
+                { system2, new List<Code> { new() { Value = "code-2", Display = "Code Two" } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.ExpandValueSet(valueSetId, null, null);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.Expansion);
+        Assert.Equal(2, result.Expansion.Contains.Count);
+        Assert.Contains(result.Expansion.Contains, c => c.System == system1 && c.Code == "code-1");
+        Assert.Contains(result.Expansion.Contains, c => c.System == system2 && c.Code == "code-2");
+    }
+
+    #endregion
+
     #region GetValueSets Tests
 
     [Fact]

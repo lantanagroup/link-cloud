@@ -149,10 +149,10 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
 
         valueSetCopy.Compose = null;
 
+        valueSetCopy.Expansion = new ValueSet.ExpansionComponent();
+
         foreach (var systemKey in codeGroup.Codes.Keys)
         {
-            valueSetCopy.Expansion = new ValueSet.ExpansionComponent();
-
             foreach (var code in codeGroup.Codes[systemKey])
             {
                 valueSetCopy.Expansion.Contains.Add(new ValueSet.ContainsComponent
