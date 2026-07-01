@@ -127,7 +127,8 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
 
         if (codeGroup == null)
         {
-            throw new KeyNotFoundException($"Value set not found with ID {id}");
+            var lookup = !string.IsNullOrEmpty(id) ? $"ID {id}" : $"URL {url}";
+            throw new KeyNotFoundException($"Value set not found with {lookup}");
         }
 
         var valueSet = codeGroup.Resource as ValueSet;
