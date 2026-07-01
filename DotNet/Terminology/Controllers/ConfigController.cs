@@ -48,7 +48,8 @@ public class ConfigController(CodeGroupCacheService cacheService, ILogger<Config
     {
         var cleanId = id?.Sanitize();
         var cleanCode = code?.Sanitize();
-        var cleanVersion = version?.Sanitize();
+        // Treat a blank/whitespace-only ?version= the same as omitting it (null == latest version).
+        var cleanVersion = string.IsNullOrWhiteSpace(version) ? null : version.Sanitize();
 
         if (string.IsNullOrWhiteSpace(cleanId))
             return BadRequest("A CodeSystem 'id' is required.");
