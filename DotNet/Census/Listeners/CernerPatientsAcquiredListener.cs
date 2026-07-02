@@ -83,6 +83,10 @@ namespace LantanaGroup.Link.Census.Listeners
                             {
                                 throw;
                             }
+                            catch (OperationCanceledException ex)
+                            {
+                                _transientExceptionHandler.HandleException(result, new TransientException("Operation canceled (non-shutdown): " + ex.Message, ex), facilityId);
+                            }
                             catch (Exception ex)
                             {
                                 _deadLetterExceptionHandler.HandleException(result, new DeadLetterException(ClassName + " Exception thrown: " + ex.Message), facilityId);
