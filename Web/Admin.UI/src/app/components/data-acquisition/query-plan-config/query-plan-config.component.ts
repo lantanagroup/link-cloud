@@ -97,6 +97,16 @@ export class QueryPlanConfigFormComponent {
   // client-side pre-validation (inline hint + disabled Save) on top of the backend guard.
   locationResolutionActive = false;
 
+  // Whether the user has interacted with the plan (edited a field, changed the initial/
+  // supplemental queries, imported a plan, or attempted to save). The location resolution
+  // requirement banner is deferred until this is true, so it doesn't appear pre-emptively
+  // when a plan is first loaded or selected from the dropdown.
+  formTouched = false;
+
+  // Set while the form is being populated programmatically (initial load, plan reload, view
+  // toggle) so those value changes aren't mistaken for genuine user interaction.
+  private populatingForm = false;
+
   constructor(private snackBar: MatSnackBar, private dataAcquisitionService: DataAcquisitionService, private fb: FormBuilder, private dialog: MatDialog) {
 
     //initialize form with fields based on IDataAcquisitionQueryConfigModel
@@ -121,6 +131,11 @@ export class QueryPlanConfigFormComponent {
     this.loadLocationResolutionState();
 
     this.planForm.valueChanges.subscribe(() => {
+      // Only genuine user edits mark the form touched: ignore programmatic population and
+      // view-only mode (where the Type dropdown is used to browse plans, not edit them).
+      if (!this.populatingForm && !this.viewOnly) {
+        this.formTouched = true;
+      }
       this.emitFormValidity();
       // Clear a stale save error once the user starts changing the form.
       this.saveError = null;
@@ -128,12 +143,14 @@ export class QueryPlanConfigFormComponent {
   }
 
   ngOnChanges(changes: SimpleChanges) {
+    this.populatingForm = true;
     if (changes['item'] && changes['item'].currentValue) {
       this.setFormValues();
       this.loadLocationResolutionState();
     }
     // toggle view
     this.toggleViewOnly(this.viewOnly);
+    this.populatingForm = false;
   }
 
   setFormValues() {
@@ -154,6 +171,18 @@ export class QueryPlanConfigFormComponent {
 
     this.initialQueries = this.recordToArray(this.item.initialQueries);
     this.supplementalQueries = this.recordToArray(this.item.supplementalQueries);
+
+    // A freshly loaded/selected plan is considered untouched, so the location resolution
+    // requirement banner stays hidden until the user actually starts editing the plan.
+    this.formTouched = false;
+  }
+
+  // Records a user edit to the initial/supplemental query lists and re-emits form validity.
+  // Marking the form touched reveals the location resolution requirement banner once the user
+  // starts editing (deferring it from the pre-emptive on-load state).
+  private onQueriesChanged(): void {
+    this.formTouched = true;
+    this.emitFormValidity();
   }
 
   recordToArray(record: Record<string, QueryConfigModel> | undefined | string): QueryConfigModel[] {
@@ -189,7 +218,7 @@ export class QueryPlanConfigFormComponent {
       return;
     }
     this.initialQueries = reordered;
-    this.emitFormValidity();
+    this.onQueriesChanged();
   }
 
   dropSupplemental(event: CdkDragDrop<QueryConfigModel[]>) {
@@ -201,7 +230,7 @@ export class QueryPlanConfigFormComponent {
       return;
     }
     this.supplementalQueries = reordered;
-    this.emitFormValidity();
+    this.onQueriesChanged();
   }
 
   // Mirrors the backend rule (QueryPlanValidator.ValidateQueryOrder): no
@@ -237,14 +266,14 @@ export class QueryPlanConfigFormComponent {
   addInitialQuery() {
     this.openQueryEditDialog(null, (res) => {
       this.initialQueries = this.insertRespectingOrder(this.initialQueries, res);
-      this.emitFormValidity();
+      this.onQueriesChanged();
     });
   }
 
   addSupplementalQuery() {
     this.openQueryEditDialog(null, (res) => {
       this.supplementalQueries = this.insertRespectingOrder(this.supplementalQueries, res);
-      this.emitFormValidity();
+      this.onQueriesChanged();
     });
   }
 
@@ -273,7 +302,7 @@ export class QueryPlanConfigFormComponent {
         return;
       }
       this.initialQueries = updated;
-      this.emitFormValidity();
+      this.onQueriesChanged();
     });
   }
 
@@ -286,20 +315,20 @@ export class QueryPlanConfigFormComponent {
         return;
       }
       this.supplementalQueries = updated;
-      this.emitFormValidity();
+      this.onQueriesChanged();
     });
   }
 
   deleteInitialQuery(index: number) {
     this.initialQueries.splice(index, 1);
     this.initialQueries = [...this.initialQueries];
-    this.emitFormValidity();
+    this.onQueriesChanged();
   }
 
   deleteSupplementalQuery(index: number) {
     this.supplementalQueries.splice(index, 1);
     this.supplementalQueries = [...this.supplementalQueries];
-    this.emitFormValidity();
+    this.onQueriesChanged();
   }
 
   openQueryEditDialog(config: QueryConfigModel | null, callback: (res: QueryConfigModel) => void) {
@@ -519,6 +548,9 @@ export class QueryPlanConfigFormComponent {
     } as IQueryPlanModel;
 
     this.setFormValues();
+    // Importing a plan is a user action, so reveal the requirement banner if it applies
+    // (setFormValues resets formTouched, so mark it after).
+    this.formTouched = true;
     this.emitFormValidity();
 
     return null;
@@ -527,9 +559,12 @@ export class QueryPlanConfigFormComponent {
   submitConfiguration(): void {
     this.saveError = null;
     // Client-side guard mirroring the backend rule: block save while location resolution is
-    // active and the initial queries are missing an Encounter and/or Location query. The inline
-    // message above Save already explains the requirement, so just stop here.
+    // active and the initial queries are missing an Encounter and/or Location query. Attempting
+    // to save counts as interacting with the form, so reveal the inline requirement message
+    // (and disable Save) rather than silently doing nothing.
     if (this.locationResolutionViolation) {
+      this.formTouched = true;
+      this.emitFormValidity();
       return;
     }
     if (this.planForm.valid) {
@@ -615,7 +650,7 @@ export class QueryPlanConfigFormComponent {
   }
 
   private emitFormValidity(): void {
-    this.formValueChanged.emit(this.planForm.invalid || this.locationResolutionViolation);
+    this.formValueChanged.emit(this.planForm.invalid || this.showLocationResolutionViolation);
   }
 
   get hasEncounterInitialQuery(): boolean {
@@ -627,9 +662,16 @@ export class QueryPlanConfigFormComponent {
   }
 
   // True when location resolution is active but the initial queries don't yet satisfy the
-  // Encounter + Location requirement. Drives the inline hint and disables Save.
+  // Encounter + Location requirement. This is the underlying rule (also checked on submit).
   get locationResolutionViolation(): boolean {
     return this.locationResolutionActive && !(this.hasEncounterInitialQuery && this.hasLocationInitialQuery);
+  }
+
+  // Drives the inline hint and disables Save. Deferred until the user has interacted with the
+  // form (see formTouched), so a freshly loaded or selected plan doesn't show a pre-emptive
+  // error before the user has entered or imported any data.
+  get showLocationResolutionViolation(): boolean {
+    return this.formTouched && this.locationResolutionViolation;
   }
 
   get locationResolutionMessage(): string {
