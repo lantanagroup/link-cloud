@@ -151,25 +151,7 @@ public class FhirApiService : IFhirApiService
                 AccumulateDiscoveredReferences(refResources, referenceAccumulator);
             }
 
-            var locationMappingConfigured = await _locationMappingService.IsConfigured(log.FacilityId, cancellationToken);
-            if(locationMappingConfigured)
-            {
-                if (resource is Location location)
-                {
-                    var mappingResult = await _locationMappingService.UpdateLocationMappingAsync(
-                        log.FacilityId, 
-                        location,
-                        cancellationToken: cancellationToken);
-                    addNoteToLog(log, $"[{DateTime.UtcNow}] Location mapping updated for Location/{location?.Id}. Part of reporting organization: {mappingResult?.IsOrgLocation}");
-                }
-                else if(resource is Encounter encounter)
-                {
-                    await _locationMappingService.UpdateEncounterLocationMappingAsync(
-                        log.FacilityId,
-                        encounter,
-                        cancellationToken: cancellationToken);
-                }
-            }
+            await UpdateResourceMappingsAsync(log, [resource], cancellationToken);
 
             AddResourceToCache(new ResourceAcquired
             {
@@ -337,29 +319,15 @@ public class FhirApiService : IFhirApiService
                     await PersistAcquiredReferenceResourcesAsync(log, resources, cancellationToken);
                 }
 
-                var locationMappingConfigured =
-                    await _locationMappingService.IsConfigured(log.FacilityId, cancellationToken);
-
                 foreach (var resource in resources)
                 {
                     InsertDateExtension((DomainResource)resource);
-                    if(locationMappingConfigured)
-                    {
-                        if (resource is Location location)
-                        {
-                            var mappingResult = await _locationMappingService.UpdateLocationMappingAsync(
-                                log.FacilityId, location,
-                                cancellationToken:cancellationToken);
-                            addNoteToLog(log, $"[{DateTime.UtcNow}] Location mapping updated for Location/{location?.Id}. Part of reporting organization: {mappingResult?.IsOrgLocation}");
-                        }
-                        else if(resource is Encounter encounter)
-                        {
-                            await _locationMappingService.UpdateEncounterLocationMappingAsync(
-                                log.FacilityId, encounter,
-                                cancellationToken:cancellationToken);
-                        }
-                    }
-                    
+                }
+
+                await UpdateResourceMappingsAsync(log, resources, cancellationToken);
+
+                foreach (var resource in resources)
+                {
                     AddResourceToCache(new ResourceAcquired
                     {
                         Resource = resource,
@@ -388,6 +356,23 @@ public class FhirApiService : IFhirApiService
                 throw new OpOutcomeException(note, ex);
             }
             throw;
+        }
+    }
+
+    private async Task UpdateResourceMappingsAsync(
+        DataAcquisitionLogModel log,
+        IReadOnlyCollection<Resource> resources,
+        CancellationToken cancellationToken)
+    {
+        var mappingResults = await _locationMappingService.UpdateResourceMappingsAsync(
+            log.FacilityId,
+            resources,
+            cancellationToken);
+
+        foreach (var mappingResult in mappingResults)
+        {
+            addNoteToLog(log,
+                $"[{DateTime.UtcNow}] Location mapping updated for Location/{mappingResult.LocationId}. Part of reporting organization: {mappingResult.IsOrgLocation}");
         }
     }
 

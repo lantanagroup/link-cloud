@@ -149,6 +149,7 @@ namespace IntegrationTests.DataAcquisition
             builder.Services.AddScoped<IDatabase, Database>();
 
             builder.Services.AddScoped<IQueryPlanValidator, QueryPlanValidator>();
+            builder.Services.AddScoped<ILocationResolutionValidator, LocationResolutionValidator>();
             builder.Services.AddTransient<IDataAcquisitionLogService, DataAcquisitionLogService>();
 
             // Register a mock IDistributedSemaphoreProvider that always grants the lock.

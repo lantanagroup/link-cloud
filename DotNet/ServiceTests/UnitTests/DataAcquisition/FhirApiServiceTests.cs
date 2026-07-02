@@ -49,6 +49,12 @@ public class FhirApiServiceTests
                 It.IsAny<IReadOnlyCollection<Resource>>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync((string _, IReadOnlyCollection<Resource> resources, CancellationToken _) => resources.ToList());
+        locationMappingService
+            .Setup(x => x.UpdateResourceMappingsAsync(
+                It.IsAny<string>(),
+                It.IsAny<IReadOnlyCollection<Resource>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OrganizationLocationMappingModel>());
     }
 
     [Fact]
@@ -503,6 +509,9 @@ public class FhirApiServiceTests
             .Setup(x => x.HasActiveByFacilityIdAsync("fac-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
+        var locationMappingService = new Mock<ILocationMappingService>();
+        ConfigureDefaultLocationMappingFilter(locationMappingService);
+
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
@@ -510,7 +519,7 @@ public class FhirApiServiceTests
             new Mock<IReadFhirCommand>().Object,
             new Mock<ILogger<FhirApiService>>().Object,
             new Mock<IResourceCache>().Object,
-            new Mock<ILocationMappingService>().Object
+            locationMappingService.Object
         );
 
         var log = new DataAcquisitionLogModel
@@ -714,8 +723,16 @@ public class FhirApiServiceTests
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var locationMappingService = new Mock<ILocationMappingService>();
         ConfigureDefaultLocationMappingFilter(locationMappingService);
-        locationMappingService.Setup(s => s.IsConfigured("fac-1", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+        locationMappingService
+            .Setup(s => s.UpdateResourceMappingsAsync(
+                "fac-1",
+                It.Is<IReadOnlyCollection<Resource>>(resources =>
+                    resources.OfType<Location>().Any(location => location.Id == "loc-1")),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OrganizationLocationMappingModel>
+            {
+                new() { FacilityId = "fac-1", LocationId = "loc-1", IsOrgLocation = true }
+            });
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
@@ -742,15 +759,15 @@ public class FhirApiServiceTests
         await service.ExecuteSearch(log, fhirQuery, config, ResourceType.Location);
 
         // Assert
-        locationMappingService.Verify(s => s.UpdateLocationMappingAsync(
+        locationMappingService.Verify(s => s.UpdateResourceMappingsAsync(
             "fac-1",
-            It.Is<Location>(l => l.Id == "loc-1"),
-            It.IsAny<string>(),
+            It.Is<IReadOnlyCollection<Resource>>(resources =>
+                resources.OfType<Location>().Any(location => location.Id == "loc-1")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task ExecuteSearch_NonLocationResource_DoesNotCallLocationMappingService()
+    public async Task ExecuteSearch_NonLocationResource_DelegatesResourceMappingBatch()
     {
         // Arrange
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
@@ -782,19 +799,20 @@ public class FhirApiServiceTests
         await service.ExecuteSearch(log, fhirQuery, config, ResourceType.Patient);
 
         // Assert
-        locationMappingService.Verify(s => s.UpdateLocationMappingAsync(
-            It.IsAny<string>(), It.IsAny<Location>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        locationMappingService.Verify(s => s.UpdateResourceMappingsAsync(
+            "fac-1",
+            It.Is<IReadOnlyCollection<Resource>>(resources =>
+                resources.OfType<Patient>().Any(patient => patient.Id == "p1")),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task ExecuteSearch_LocationResource_WhenFacilityNotConfigured_DoesNotCallLocationMappingService()
+    public async Task ExecuteSearch_LocationResource_DelegatesConfiguredCheckToLocationMappingService()
     {
         // Arrange
         var searchFhirCommand = new Mock<ISearchFhirCommand>();
         var locationMappingService = new Mock<ILocationMappingService>();
         ConfigureDefaultLocationMappingFilter(locationMappingService);
-        locationMappingService.Setup(s => s.IsConfigured(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
@@ -821,8 +839,11 @@ public class FhirApiServiceTests
         await service.ExecuteSearch(log, fhirQuery, config, ResourceType.Location);
 
         // Assert
-        locationMappingService.Verify(s => s.UpdateLocationMappingAsync(
-            It.IsAny<string>(), It.IsAny<Location>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        locationMappingService.Verify(s => s.UpdateResourceMappingsAsync(
+            "fac-1",
+            It.Is<IReadOnlyCollection<Resource>>(resources =>
+                resources.OfType<Location>().Any(location => location.Id == "loc-1")),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -832,8 +853,16 @@ public class FhirApiServiceTests
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var locationMappingService = new Mock<ILocationMappingService>();
         ConfigureDefaultLocationMappingFilter(locationMappingService);
-        locationMappingService.Setup(s => s.IsConfigured("fac-1", It.IsAny<CancellationToken>()))
-            .ReturnsAsync(true);
+        locationMappingService
+            .Setup(s => s.UpdateResourceMappingsAsync(
+                "fac-1",
+                It.Is<IReadOnlyCollection<Resource>>(resources =>
+                    resources.OfType<Location>().Any(location => location.Id == "loc-1")),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<OrganizationLocationMappingModel>
+            {
+                new() { FacilityId = "fac-1", LocationId = "loc-1", IsOrgLocation = true }
+            });
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
@@ -856,22 +885,20 @@ public class FhirApiServiceTests
         await service.ExecuteRead(log, fhirQuery, ResourceType.Location, config);
 
         // Assert
-        locationMappingService.Verify(s => s.UpdateLocationMappingAsync(
+        locationMappingService.Verify(s => s.UpdateResourceMappingsAsync(
             "fac-1",
-            It.Is<Location>(l => l.Id == "loc-1"),
-            It.IsAny<string>(),
+            It.Is<IReadOnlyCollection<Resource>>(resources =>
+                resources.OfType<Location>().Any(location => location.Id == "loc-1")),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task ExecuteRead_LocationResource_WhenFacilityNotConfigured_DoesNotCallLocationMappingService()
+    public async Task ExecuteRead_LocationResource_DelegatesConfiguredCheckToLocationMappingService()
     {
         // Arrange
         var readFhirCommand = new Mock<IReadFhirCommand>();
         var locationMappingService = new Mock<ILocationMappingService>();
         ConfigureDefaultLocationMappingFilter(locationMappingService);
-        locationMappingService.Setup(s => s.IsConfigured(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(false);
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
@@ -894,8 +921,11 @@ public class FhirApiServiceTests
         await service.ExecuteRead(log, fhirQuery, ResourceType.Location, config);
 
         // Assert
-        locationMappingService.Verify(s => s.UpdateLocationMappingAsync(
-            It.IsAny<string>(), It.IsAny<Location>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        locationMappingService.Verify(s => s.UpdateResourceMappingsAsync(
+            "fac-1",
+            It.Is<IReadOnlyCollection<Resource>>(resources =>
+                resources.OfType<Location>().Any(location => location.Id == "loc-1")),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static async IAsyncEnumerable<Bundle> GetBundleAsync(Bundle bundle)

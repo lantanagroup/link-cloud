@@ -70,6 +70,7 @@ public class AcquisitionProcessorBackgroundServiceTests
     {
         var facilityId = $"Reportable_{Guid.NewGuid():N}";
         var correlationId = Guid.NewGuid().ToString();
+        var reportTrackingId = Guid.NewGuid();
         const string patientId = "P1"; // bare id; matches the EncounterMapping and the log's PatientId
 
         long conditionLogId;
@@ -101,11 +102,13 @@ public class AcquisitionProcessorBackgroundServiceTests
                 Type = Frequency.Discharge,
                 InitialQueries = new Dictionary<string, IQueryConfig>
                 {
-                    { "1", new ParameterQueryConfig { ResourceType = "Condition", Parameters = new List<IParameter> { new LiteralParameter { Name = "id", Literal = "123" } } } }
+                    { "1", new ParameterQueryConfig { ResourceType = "Condition", Parameters = new List<IParameter> { new LiteralParameter { Name = "id", Literal = "123" } } } },
+                    { "2", new ParameterQueryConfig { ResourceType = "Encounter", Parameters = new List<IParameter> { new LiteralParameter { Name = "patient", Literal = patientId } } } },
+                    { "3", new ReferenceQueryConfig { ResourceType = "Location" } }
                 },
                 SupplementalQueries = new Dictionary<string, IQueryConfig>
                 {
-                    { "1", new ReferenceQueryConfig { ResourceType = "Encounter" } }
+                    { "1", new ReferenceQueryConfig { ResourceType = "Observation" } }
                 }
             });
 
@@ -125,10 +128,18 @@ public class AcquisitionProcessorBackgroundServiceTests
                 FacilityId = facilityId,
                 PatientId = patientId,
                 CorrelationId = correlationId,
+                ReportTrackingId = reportTrackingId,
                 Status = RequestStatus.Queued,
                 QueryPhase = QueryPhase.Initial,
                 ReportableEvent = ReportableEvent.Discharge,
-                SiblingCount = 1,
+                SiblingCount = 3,
+                ScheduledReportEntity = new ScheduledReportEntity
+                {
+                    ReportTrackingId = reportTrackingId,
+                    Frequency = Frequency.Discharge,
+                    StartDate = DateTime.UtcNow.AddDays(-1),
+                    EndDate = DateTime.UtcNow
+                },
                 FhirQueries = new List<FhirQuery>
                 {
                     new()
@@ -142,7 +153,61 @@ public class AcquisitionProcessorBackgroundServiceTests
                     }
                 }
             };
-            dbContext.DataAcquisitionLogs.Add(conditionLog);
+            var encounterLog = new DataAcquisitionLog
+            {
+                FacilityId = facilityId,
+                PatientId = patientId,
+                CorrelationId = correlationId,
+                ReportTrackingId = reportTrackingId,
+                Status = RequestStatus.Completed,
+                QueryPhase = QueryPhase.Initial,
+                ReportableEvent = ReportableEvent.Discharge,
+                SiblingCount = 3,
+                ResourceIds = new List<DataAcquisitionLogResourceId>
+                {
+                    new() { ResourceId = "Encounter/E1" }
+                },
+                FhirQueries = new List<FhirQuery>
+                {
+                    new()
+                    {
+                        FacilityId = facilityId,
+                        QueryType = FhirQueryType.Search,
+                        FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                        {
+                            new() { ResourceType = Hl7.Fhir.Model.ResourceType.Encounter }
+                        }
+                    }
+                }
+            };
+            var locationLog = new DataAcquisitionLog
+            {
+                FacilityId = facilityId,
+                PatientId = patientId,
+                CorrelationId = correlationId,
+                ReportTrackingId = reportTrackingId,
+                Status = RequestStatus.Completed,
+                QueryPhase = QueryPhase.Initial,
+                ReportableEvent = ReportableEvent.Discharge,
+                SiblingCount = 3,
+                ResourceIds = new List<DataAcquisitionLogResourceId>
+                {
+                    new() { ResourceId = "Location/L1" }
+                },
+                FhirQueries = new List<FhirQuery>
+                {
+                    new()
+                    {
+                        FacilityId = facilityId,
+                        QueryType = FhirQueryType.Search,
+                        FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                        {
+                            new() { ResourceType = Hl7.Fhir.Model.ResourceType.Location }
+                        }
+                    }
+                }
+            };
+            dbContext.DataAcquisitionLogs.AddRange(conditionLog, encounterLog, locationLog);
             await dbContext.SaveChangesAsync();
             conditionLogId = conditionLog.Id;
 

@@ -246,7 +246,9 @@ public class AcquisitionDependencyCheckerTests
     [Fact]
     public async Task CheckDependenciesAsync_OrgLocationEnabled_DepsMet_PatientNotReportable_ReturnsNotReportable()
     {
+        var reportTrackingId = Guid.NewGuid().ToString();
         var log = CreateLog(logResourceTypes: ResourceType.Condition);
+        log.ReportTrackingId = reportTrackingId;
         var plan = new QueryPlanModel
         {
             FacilityId = "facility-1",
@@ -273,10 +275,22 @@ public class AcquisitionDependencyCheckerTests
             .Setup(q => q.GetNonTerminalDependencyResourceTypes(
                 "corr-1", "facility-1", It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
+        _logQueries
+            .Setup(q => q.GetResourceIdsForReportPatient(
+                "corr-1",
+                "facility-1",
+                reportTrackingId,
+                ResourceType.Encounter.ToString(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["enc-current"]);
 
         // The patient has no org-mapped encounters. Note the bare id: log.PatientId is "Patient/patient-1".
         _locationMappingService
-            .Setup(s => s.IsPatientReportableAsync("facility-1", "patient-1", It.IsAny<CancellationToken>()))
+            .Setup(s => s.IsPatientReportableAsync(
+                "facility-1",
+                "patient-1",
+                It.Is<IReadOnlyCollection<string>>(ids => ids.SequenceEqual(new[] { "enc-current" })),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
         var result = await CreateChecker().CheckDependenciesAsync(log, CancellationToken.None);
@@ -288,7 +302,9 @@ public class AcquisitionDependencyCheckerTests
     [Fact]
     public async Task CheckDependenciesAsync_OrgLocationEnabled_DepsMet_PatientReportable_ReturnsMet()
     {
+        var reportTrackingId = Guid.NewGuid().ToString();
         var log = CreateLog(logResourceTypes: ResourceType.Condition);
+        log.ReportTrackingId = reportTrackingId;
         var plan = new QueryPlanModel
         {
             FacilityId = "facility-1",
@@ -314,10 +330,22 @@ public class AcquisitionDependencyCheckerTests
             .Setup(q => q.GetNonTerminalDependencyResourceTypes(
                 "corr-1", "facility-1", It.IsAny<List<string>>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync([]);
+        _logQueries
+            .Setup(q => q.GetResourceIdsForReportPatient(
+                "corr-1",
+                "facility-1",
+                reportTrackingId,
+                ResourceType.Encounter.ToString(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["enc-current"]);
 
         // The patient HAS an org-mapped encounter -> reportable -> must proceed, not be preempted.
         _locationMappingService
-            .Setup(s => s.IsPatientReportableAsync("facility-1", "patient-1", It.IsAny<CancellationToken>()))
+            .Setup(s => s.IsPatientReportableAsync(
+                "facility-1",
+                "patient-1",
+                It.Is<IReadOnlyCollection<string>>(ids => ids.SequenceEqual(new[] { "enc-current" })),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         var result = await CreateChecker().CheckDependenciesAsync(log, CancellationToken.None);
@@ -357,6 +385,8 @@ public class AcquisitionDependencyCheckerTests
         // The reportability gate must not even be consulted for the Encounter/Location logs themselves.
         _locationMappingService.Verify(s => s.IsPatientReportableAsync(
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _locationMappingService.Verify(s => s.IsPatientReportableAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Theory]

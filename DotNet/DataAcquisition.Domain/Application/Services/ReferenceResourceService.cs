@@ -65,6 +65,7 @@ public class ReferenceResourceService : IReferenceResourceService
     private readonly IQueryPlanQueries _queryPlanQueries;
     private readonly DataAcquisitionDbContext _dbContext;
     private readonly IResourceCache _resourceCache;
+    private readonly ILocationMappingService _locationMappingService;
 
     private const int LockTimeoutMs = 30000;
 
@@ -75,7 +76,8 @@ public class ReferenceResourceService : IReferenceResourceService
         IDataAcquisitionLogManager dataAcquisitionLogManager,
         IQueryPlanQueries queryPlanQueries,
         DataAcquisitionDbContext dbContext,
-        IResourceCache resourceCache)
+        IResourceCache resourceCache,
+        ILocationMappingService locationMappingService)
     {
         _logger = logger;
         _referenceResourcesQueries = referenceResourcesQueries;
@@ -84,6 +86,7 @@ public class ReferenceResourceService : IReferenceResourceService
         _queryPlanQueries = queryPlanQueries;
         _dbContext = dbContext;
         _resourceCache = resourceCache;
+        _locationMappingService = locationMappingService;
     }
 
     public async Task<List<Resource>> FetchReferenceResources(
@@ -293,6 +296,7 @@ public class ReferenceResourceService : IReferenceResourceService
         // Reference logs surface their own resources via ResourceAcquiredIds; the
         // junction is reserved for primary logs that depend on them.
         var resourceIds = new HashSet<string>(acquiredIds, StringComparer.Ordinal);
+        var cachedResources = new List<Resource>();
         foreach (var cached in cachedRows)
         {
             Resource? resource;
@@ -313,6 +317,7 @@ public class ReferenceResourceService : IReferenceResourceService
 
             resourceIds.Add($"{resource.TypeName}/{resource.Id}");
             AddResourceToCache(log, resource);
+            cachedResources.Add(resource);
 
             // Extract and accumulate nested references from cached resources
             if (accumulator != null && log.FhirQuery.Any())
@@ -327,6 +332,15 @@ public class ReferenceResourceService : IReferenceResourceService
                     AccumulateDiscoveredReferences(refResources, accumulator);
                 }
             }
+        }
+
+        if (string.Equals(resourceType, ResourceType.Location.ToString(), StringComparison.Ordinal)
+            && cachedResources.Count > 0)
+        {
+            await _locationMappingService.UpdateResourceMappingsAsync(
+                log.FacilityId,
+                cachedResources,
+                cancellationToken);
         }
 
         var missingIds = outstandingIds.Where(id => !cachedById.ContainsKey(id)).ToList();

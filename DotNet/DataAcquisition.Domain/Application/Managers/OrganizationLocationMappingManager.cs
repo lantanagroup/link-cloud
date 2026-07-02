@@ -145,17 +145,22 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
         var result = await _dbContext.OrganizationLocationMappings
             .Where(m => m.FacilityId == facilityId
                     && m.PartOfValue == parentLocationId
-                    && m.PartOfId == null)
+                    && (m.PartOfId != parentLocationMappingId || (isOrgLocation && !m.IsOrgLocation)))
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(m => m.PartOfId, parentLocationMappingId)
                 .SetProperty(m => m.IsOrgLocation, m => m.IsOrgLocation || isOrgLocation) //do not demote a child if it is an org location but its parent is not
                 .SetProperty(m => m.ModifiedDate, DateTime.UtcNow),
             cancellationToken);
 
-            var updatedMappings = await _dbContext.OrganizationLocationMappings
-                .Where(m => m.PartOfId == parentLocationMappingId)
-                .Select(m => new { m.LocationMappingId, m.IsOrgLocation })
-                .ToListAsync(cancellationToken);
+        if (result == 0)
+        {
+            return result;
+        }
+
+        var updatedMappings = await _dbContext.OrganizationLocationMappings
+            .Where(m => m.PartOfId == parentLocationMappingId)
+            .Select(m => new { m.LocationMappingId, m.IsOrgLocation })
+            .ToListAsync(cancellationToken);
             
         foreach (var mapping in updatedMappings)
         {

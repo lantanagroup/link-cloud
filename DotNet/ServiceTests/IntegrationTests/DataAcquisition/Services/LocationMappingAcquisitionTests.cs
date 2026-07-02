@@ -412,4 +412,189 @@ public class LocationMappingAcquisitionTests
             Assert.True(updatedEncounter!.MappedToOrg);
         }
     }
+
+    [Fact]
+    public async Task ReevaluateLocationMappingsAsync_WhenParentMatches_AppliesOrgLocationToAlreadyLinkedChild()
+    {
+        var facilityId = NewFacilityId("ReevalHierarchy");
+        var orgReference = "Organization/org-1";
+        var parentLocationId = NewLocationId("Parent");
+        var childLocationId = NewLocationId("Child");
+
+        await SeedActiveConfigAsync(facilityId, orgReference);
+
+        var parentLocation = new Location
+        {
+            Id = parentLocationId,
+            Name = "Hospital",
+            ManagingOrganization = new ResourceReference(orgReference)
+        };
+
+        var childLocation = new Location
+        {
+            Id = childLocationId,
+            Name = "Emergency Department",
+            ManagingOrganization = new ResourceReference("Organization/other"),
+            PartOf = new ResourceReference($"Location/{parentLocationId}")
+        };
+
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+            var locationMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+
+            dbContext.ReferenceResources.AddRange(
+                new ReferenceResources
+                {
+                    Id = Guid.NewGuid(),
+                    FacilityId = facilityId,
+                    ResourceId = parentLocationId,
+                    ResourceType = ResourceType.Location.ToString(),
+                    QueryPhase = QueryPhase.Initial,
+                    ReferenceResource = JsonSerializer.Serialize<Resource>(parentLocation, LinkFhirSerializerOptions.ForFhirLenientSerialization)
+                },
+                new ReferenceResources
+                {
+                    Id = Guid.NewGuid(),
+                    FacilityId = facilityId,
+                    ResourceId = childLocationId,
+                    ResourceType = ResourceType.Location.ToString(),
+                    QueryPhase = QueryPhase.Initial,
+                    ReferenceResource = JsonSerializer.Serialize<Resource>(childLocation, LinkFhirSerializerOptions.ForFhirLenientSerialization)
+                });
+            await dbContext.SaveChangesAsync();
+
+            var parentMapping = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = parentLocationId,
+                LocationName = "Hospital",
+                IsOrgLocation = false,
+                IsActive = true
+            });
+
+            await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = childLocationId,
+                LocationName = "Emergency Department",
+                PartOfValue = parentLocationId,
+                PartOfId = parentMapping.LocationMappingId,
+                IsOrgLocation = false,
+                IsActive = true
+            });
+        }
+
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var service = CreateService(scope);
+            await service.ReevaluateLocationMappingsAsync(facilityId, CancellationToken.None);
+        }
+
+        using (var verify = _fixture.ServiceProvider.CreateScope())
+        {
+            var locationQueries = verify.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+
+            var parent = await locationQueries.GetByFacilityIdAndLocationIdAsync(facilityId, parentLocationId);
+            var child = await locationQueries.GetByFacilityIdAndLocationIdAsync(facilityId, childLocationId);
+
+            Assert.NotNull(parent);
+            Assert.NotNull(child);
+            Assert.True(parent!.IsOrgLocation);
+            Assert.Equal(parent.LocationMappingId, child!.PartOfId);
+            Assert.True(child.IsOrgLocation);
+        }
+    }
+
+    [Fact]
+    public async Task ReevaluateLocationMappingsAsync_WhenParentNoLongerMatches_DemotesAlreadyLinkedChild()
+    {
+        var facilityId = NewFacilityId("ReevalDemoteHierarchy");
+        var parentLocationId = NewLocationId("Parent");
+        var childLocationId = NewLocationId("Child");
+
+        var parentLocation = new Location
+        {
+            Id = parentLocationId,
+            Name = "Hospital",
+            ManagingOrganization = new ResourceReference("Organization/old-org")
+        };
+
+        var childLocation = new Location
+        {
+            Id = childLocationId,
+            Name = "Emergency Department",
+            ManagingOrganization = new ResourceReference("Organization/old-org"),
+            PartOf = new ResourceReference($"Location/{parentLocationId}")
+        };
+
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+            var locationMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+
+            dbContext.ReferenceResources.AddRange(
+                new ReferenceResources
+                {
+                    Id = Guid.NewGuid(),
+                    FacilityId = facilityId,
+                    ResourceId = parentLocationId,
+                    ResourceType = ResourceType.Location.ToString(),
+                    QueryPhase = QueryPhase.Initial,
+                    ReferenceResource = JsonSerializer.Serialize<Resource>(parentLocation, LinkFhirSerializerOptions.ForFhirLenientSerialization)
+                },
+                new ReferenceResources
+                {
+                    Id = Guid.NewGuid(),
+                    FacilityId = facilityId,
+                    ResourceId = childLocationId,
+                    ResourceType = ResourceType.Location.ToString(),
+                    QueryPhase = QueryPhase.Initial,
+                    ReferenceResource = JsonSerializer.Serialize<Resource>(childLocation, LinkFhirSerializerOptions.ForFhirLenientSerialization)
+                });
+            await dbContext.SaveChangesAsync();
+
+            var parentMapping = await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = parentLocationId,
+                LocationName = "Hospital",
+                IsOrgLocation = true,
+                IsActive = true
+            });
+
+            await locationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
+            {
+                FacilityId = facilityId,
+                LocationId = childLocationId,
+                LocationName = "Emergency Department",
+                PartOfValue = parentLocationId,
+                PartOfId = parentMapping.LocationMappingId,
+                IsOrgLocation = true,
+                IsActive = true
+            });
+        }
+
+        await SeedActiveConfigAsync(facilityId, "Organization/new-org-that-does-not-match");
+
+        using (var scope = _fixture.ServiceProvider.CreateScope())
+        {
+            var service = CreateService(scope);
+            await service.ReevaluateLocationMappingsAsync(facilityId, CancellationToken.None);
+        }
+
+        using (var verify = _fixture.ServiceProvider.CreateScope())
+        {
+            var locationQueries = verify.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+
+            var parent = await locationQueries.GetByFacilityIdAndLocationIdAsync(facilityId, parentLocationId);
+            var child = await locationQueries.GetByFacilityIdAndLocationIdAsync(facilityId, childLocationId);
+
+            Assert.NotNull(parent);
+            Assert.NotNull(child);
+            Assert.False(parent!.IsOrgLocation);
+            Assert.Equal(parent.LocationMappingId, child!.PartOfId);
+            Assert.False(child.IsOrgLocation);
+        }
+    }
 }

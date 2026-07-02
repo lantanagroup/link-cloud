@@ -80,6 +80,9 @@ public interface IDataAcquisitionLogQueries
     Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string resourceType,
         CancellationToken cancellationToken = default);
 
+    Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId, string? reportTrackingId, string resourceType,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// For each resource type in <paramref name="resourceTypes"/>, returns the ones that still
     /// have at least one non-terminal DataAcquisitionLog for the given correlation + facility.
@@ -116,9 +119,21 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
     public async Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId,
         string resourceType, CancellationToken cancellationToken = default)
     {
+        return await GetResourceIdsForReportPatient(
+            correlationId,
+            facilityId,
+            reportTrackingId: null,
+            resourceType,
+            cancellationToken);
+    }
+
+    public async Task<List<string>> GetResourceIdsForReportPatient(string correlationId, string facilityId,
+        string? reportTrackingId, string resourceType, CancellationToken cancellationToken = default)
+    {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogQueries.GetResourceIdsForReportPatient");
         activity?.SetTag(DiagnosticNames.CorrelationId, correlationId);
         activity?.SetTag(DiagnosticNames.FacilityId, facilityId);
+        activity?.SetTag(DiagnosticNames.ReportTrackingId, reportTrackingId);
         activity?.SetTag(DiagnosticNames.ResourceType, resourceType);
 
         if (!Enum.TryParse<ResourceType>(resourceType, out var parsedResourceType))
@@ -127,11 +142,24 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             return new List<string>();
         }
 
+        Guid? reportTrackingGuid = null;
+        if (!string.IsNullOrWhiteSpace(reportTrackingId))
+        {
+            if (!Guid.TryParse(reportTrackingId, out var parsedReportTrackingGuid))
+            {
+                _logger.LogWarning("Failed to parse report tracking id: {ReportTrackingId}", reportTrackingId.SanitizeForLog());
+                return new List<string>();
+            }
+
+            reportTrackingGuid = parsedReportTrackingGuid;
+        }
+
         var logsWithResources = await (from log in _dbContext.DataAcquisitionLogs
                                        join query in _dbContext.FhirQueries on log.Id equals query.DataAcquisitionLogId
                                        join resourceTypeEntry in _dbContext.FhirQueryResourceTypes on query.Id equals resourceTypeEntry.FhirQueryId
                                        where query.FacilityId == facilityId
                                              && log.CorrelationId == correlationId
+                                             && (reportTrackingGuid == null || log.ReportTrackingId == reportTrackingGuid)
                                              && resourceTypeEntry.ResourceType == parsedResourceType
                                        select log.ResourceIds.Select(r => r.ResourceId).ToList()).ToListAsync(cancellationToken);
 
@@ -143,15 +171,37 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             if (resourceReferences != null)
             {
                 var filteredIds = resourceReferences
-                    .Where(r => r.StartsWith(resourceTypePrefix, StringComparison.OrdinalIgnoreCase))
-                    .Select(r => r.Substring(resourceTypePrefix.Length))
+                    .Select(r => NormalizeResourceId(r, resourceTypePrefix))
+                    .Where(r => !string.IsNullOrWhiteSpace(r))
+                    .Select(r => r!)
                     .ToList();
 
                 result.AddRange(filteredIds);
             }
         }
 
-        return result;
+        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static string? NormalizeResourceId(string? resourceId, string resourceTypePrefix)
+    {
+        if (string.IsNullOrWhiteSpace(resourceId))
+        {
+            return null;
+        }
+
+        if (resourceId.StartsWith(resourceTypePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return resourceId[resourceTypePrefix.Length..];
+        }
+
+        if (!resourceId.Contains('/', StringComparison.Ordinal))
+        {
+            return resourceId;
+        }
+
+        var segments = resourceId.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return segments.Length > 0 ? segments[^1] : null;
     }
 
     public async Task<List<string>> GetNonTerminalDependencyResourceTypes(string correlationId, string facilityId,

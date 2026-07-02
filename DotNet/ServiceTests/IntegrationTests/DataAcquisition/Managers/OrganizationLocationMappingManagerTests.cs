@@ -107,6 +107,51 @@ public class OrganizationLocationMappingManagerTests
     }
 
     [Fact]
+    public async Task SetParentForChildrenAsync_WhenChildAlreadyLinked_AppliesOrgParentValue()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var manager = CreateManager(scope);
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var facilityId = NewFacilityId("Linked-Child");
+        var parentLocationId = NewLocationId("Parent");
+        var childLocationId = NewLocationId("Child");
+
+        var parent = await manager.CreateAsync(new CreateOrganizationLocationMappingModel
+        {
+            FacilityId = facilityId,
+            LocationId = parentLocationId,
+            LocationName = "Hospital",
+            IsOrgLocation = true,
+            IsActive = true
+        });
+
+        await manager.CreateAsync(new CreateOrganizationLocationMappingModel
+        {
+            FacilityId = facilityId,
+            LocationId = childLocationId,
+            LocationName = "ED",
+            PartOfValue = parentLocationId,
+            PartOfId = parent.LocationMappingId,
+            IsOrgLocation = false,
+            IsActive = true
+        });
+
+        var updatedCount = await manager.SetParentForChildrenAsync(
+            facilityId,
+            parentLocationId,
+            parent.LocationMappingId,
+            isOrgLocation: true,
+            CancellationToken.None);
+
+        var child = await queries.GetByFacilityIdAndLocationIdAsync(facilityId, childLocationId);
+
+        Assert.Equal(1, updatedCount);
+        Assert.NotNull(child);
+        Assert.Equal(parent.LocationMappingId, child!.PartOfId);
+        Assert.True(child.IsOrgLocation);
+    }
+
+    [Fact]
     public async Task DeleteByIdAsync_Existing_DeletesRecord()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();
