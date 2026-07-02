@@ -1,13 +1,18 @@
 ﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+using System.Text.Json;
+using DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Services;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
+using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Moq;
+using QueryPhase = LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition.QueryPhase;
 using Task = System.Threading.Tasks.Task;
 
 namespace ServiceTests.UnitTests.DataAcquisition.Services;
@@ -188,6 +193,30 @@ public class LocationMappingServiceTests
     }
 
     [Fact]
+    public async Task UpdateLocationMappingAsync_WhenParentIsOrgLocation_AppliesParentValueToChild()
+    {
+        // Arrange
+        var location = NewLocation("ed-1", name: "ED", partOfReference: "Location/hosp-1");
+        _mockQueries
+            .Setup(q => q.GetByFacilityIdAndLocationIdAsync(FacilityId, "hosp-1"))
+            .ReturnsAsync(new OrganizationLocationMappingModel
+            {
+                LocationMappingId = 5,
+                LocationId = "hosp-1",
+                IsOrgLocation = true
+            });
+
+        // Act
+        await _service.UpdateLocationMappingAsync(FacilityId, location);
+
+        // Assert
+        _mockManager.Verify(m => m.CreateAsync(It.Is<CreateOrganizationLocationMappingModel>(c =>
+            c.LocationId == "ed-1" &&
+            c.PartOfId == 5 &&
+            c.IsOrgLocation)), Times.Once);
+    }
+
+    [Fact]
     public async Task UpdateLocationMappingAsync_AfterAdd_RunsChildBackfillWithOwnLocationId()
     {
         // Arrange
@@ -281,6 +310,84 @@ public class LocationMappingServiceTests
         // Assert
         _mockManager.Verify(m => m.UpdateByIdAsync(7, It.Is<UpdateOrganizationLocationMappingModel>(u =>
             u.LocationName == "ICU - Renamed")), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateLocationMappingAsync_WhenExistingPlaceholderHydrated_BackfillsWaitingChildren()
+    {
+        // Arrange
+        var location = NewLocation("parent-1", name: "Hospital", aliases: "HOSP");
+        _mockQueries
+            .Setup(q => q.GetByFacilityIdAndLocationIdAsync(FacilityId, "parent-1"))
+            .ReturnsAsync(new OrganizationLocationMappingModel
+            {
+                LocationMappingId = 7,
+                FacilityId = FacilityId,
+                LocationId = "parent-1",
+                LocationName = null,
+                LocationAlias = null,
+                PartOfValue = null,
+                PartOfId = null,
+                IsOrgLocation = false,
+                IsActive = true
+            });
+
+        // Act
+        await _service.UpdateLocationMappingAsync(FacilityId, location, cancellationToken: CancellationToken.None);
+
+        // Assert
+        _mockManager.Verify(m => m.UpdateByIdAsync(7, It.Is<UpdateOrganizationLocationMappingModel>(u =>
+            u.LocationName == "Hospital" &&
+            u.LocationAlias == "HOSP" &&
+            u.PartOfValue == null &&
+            u.PartOfId == null)), Times.Once);
+        _mockManager.Verify(m => m.SetParentForChildrenAsync(
+            FacilityId, "parent-1", 7, false, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ReevaluateLocationMappingsAsync_WhenNoMappingsExist_HydratesCachedLocations()
+    {
+        // Arrange
+        _mockQueries
+            .Setup(q => q.GetByFacilityIdAsync(FacilityId))
+            .ReturnsAsync(new List<OrganizationLocationMappingModel>());
+
+        var location = NewLocation("loc-cached", name: "Cached Unit");
+        var cachedLocation = new ReferenceResourcesModel
+        {
+            Id = Guid.NewGuid(),
+            FacilityId = FacilityId,
+            ResourceId = location.Id,
+            ResourceType = ResourceType.Location.ToString(),
+            QueryPhase = QueryPhase.Initial,
+            ReferenceResource = JsonSerializer.Serialize<Resource>(
+                location,
+                LinkFhirSerializerOptions.ForFhirLenientSerialization)
+        };
+
+        _mockReferenceResourcesQueries
+            .Setup(q => q.SearchAsync(
+                It.Is<SearchReferenceResourcesModel>(s =>
+                    s.FacilityId == FacilityId &&
+                    s.ResourceType == ResourceType.Location.ToString() &&
+                    s.PageSize == int.MaxValue &&
+                    (s.ResourceIds == null || s.ResourceIds.Count == 0)),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PagedConfigModel<ReferenceResourcesModel>
+            {
+                Records = [cachedLocation],
+                Metadata = new PaginationMetadata { PageNumber = 1, PageSize = 1, TotalCount = 1, TotalPages = 1 }
+            });
+
+        // Act
+        await _service.ReevaluateLocationMappingsAsync(FacilityId, CancellationToken.None);
+
+        // Assert
+        _mockManager.Verify(m => m.CreateAsync(It.Is<CreateOrganizationLocationMappingModel>(c =>
+            c.FacilityId == FacilityId &&
+            c.LocationId == "loc-cached" &&
+            c.LocationName == "Cached Unit")), Times.Once);
     }
 
     [Fact]
@@ -430,6 +537,49 @@ public class LocationMappingServiceTests
 
         // Assert
         Assert.False(configured);
+    }
+
+    [Fact]
+    public async Task UpdateResourceMappingsAsync_WhenConfigured_UpdatesLocationResources()
+    {
+        // Arrange
+        var location = NewLocation("loc-1", name: "ICU");
+        var patient = new Patient { Id = "patient-1" };
+
+        // Act
+        var results = await _service.UpdateResourceMappingsAsync(
+            FacilityId,
+            [location, patient],
+            CancellationToken.None);
+
+        // Assert
+        var result = Assert.Single(results);
+        Assert.Equal("loc-1", result.LocationId);
+        _mockManager.Verify(m => m.CreateAsync(It.Is<CreateOrganizationLocationMappingModel>(c =>
+            c.FacilityId == FacilityId &&
+            c.LocationId == "loc-1" &&
+            c.LocationName == "ICU")), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateResourceMappingsAsync_WhenNotConfigured_NoOps()
+    {
+        // Arrange
+        _cachedConditions = [];
+        var location = NewLocation("loc-1", name: "ICU");
+
+        // Act
+        var results = await _service.UpdateResourceMappingsAsync(
+            FacilityId,
+            [location],
+            CancellationToken.None);
+
+        // Assert
+        Assert.Empty(results);
+        _mockManager.Verify(m => m.CreateAsync(It.IsAny<CreateOrganizationLocationMappingModel>()), Times.Never);
+        _mockEncounterMappingManager.Verify(
+            m => m.CreateAsync(It.IsAny<CreateEncounterMappingModel>()),
+            Times.Never);
     }
 
     [Fact]

@@ -54,6 +54,16 @@ public interface ILocationMappingService
     /// <returns>The EncounterMappingModel for the mapping</returns>
     Task<EncounterMappingModel?> UpdateEncounterLocationMappingAsync(string facilityId, Encounter encounter, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Updates organization-location mapping state for acquired Location and Encounter resources when
+    /// location mapping is configured for the facility. Non-location/encounter resources are ignored.
+    /// </summary>
+    /// <returns>Location mapping updates produced for Location resources; Encounter updates do not return a mapping model.</returns>
+    Task<List<OrganizationLocationMappingModel>> UpdateResourceMappingsAsync(
+        string facilityId,
+        IReadOnlyCollection<Resource> resources,
+        CancellationToken cancellationToken = default);
+
     Task<List<Resource>> FilterResourcesByEncounterMappingAsync(
         string facilityId,
         IReadOnlyCollection<Resource> resources,
@@ -165,13 +175,43 @@ public class LocationMappingService(
         }
     }
 
+    public async Task<List<OrganizationLocationMappingModel>> UpdateResourceMappingsAsync(
+        string facilityId,
+        IReadOnlyCollection<Resource> resources,
+        CancellationToken cancellationToken = default)
+    {
+        var updatedLocationMappings = new List<OrganizationLocationMappingModel>();
+
+        if (resources.Count == 0 || !await IsConfigured(facilityId, cancellationToken))
+        {
+            return updatedLocationMappings;
+        }
+
+        foreach (var resource in resources)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            switch (resource)
+            {
+                case Location location:
+                    updatedLocationMappings.Add(await UpsertLocationMappingAsync(
+                        facilityId,
+                        location,
+                        locationAlias: null,
+                        cancellationToken));
+                    break;
+                case Encounter encounter:
+                    await UpdateEncounterLocationMappingAsync(facilityId, encounter, cancellationToken);
+                    break;
+            }
+        }
+
+        return updatedLocationMappings;
+    }
+
     public async Task ReevaluateLocationMappingsAsync(string facilityId, CancellationToken cancellationToken)
     {
         var mappings = await _organizationLocationMappingQueries.GetByFacilityIdAsync(facilityId);
-        if (mappings.Count == 0)
-        {
-            return;
-        }
 
         var locationIds = mappings
             .Select(m => m.LocationId)
@@ -180,20 +220,22 @@ public class LocationMappingService(
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
-        if (locationIds.Count == 0)
-        {
-            return;
-        }
-
-        // Re-evaluation only touches Locations whose bodies were cached during acquisition; mappings
-        // without a cached body are left as-is and get evaluated fresh on their next acquisition.
-        var cachedRecords = (await _referenceResourcesQueries.SearchAsync(new SearchReferenceResourcesModel
+        var search = new SearchReferenceResourcesModel
         {
             FacilityId = facilityId,
             ResourceType = ResourceType.Location.ToString(),
-            ResourceIds = locationIds,
             PageSize = int.MaxValue
-        }, cancellationToken)).Records;
+        };
+
+        if (locationIds.Count > 0)
+        {
+            search.ResourceIds = locationIds;
+        }
+
+        // Re-evaluation touches cached Location bodies. If no mapping rows exist yet (for example,
+        // mapping was disabled during the earlier acquisition), hydrate mappings from every cached
+        // Location for the facility instead of returning early.
+        var cachedRecords = (await _referenceResourcesQueries.SearchAsync(search, cancellationToken)).Records;
 
         var locations = new List<Location>();
         foreach (var record in cachedRecords)
@@ -219,6 +261,8 @@ public class LocationMappingService(
         }
 
         await UpdateLocationMappingsAsync(facilityId, locations, cancellationToken);
+        await RecomputeCachedLocationHierarchyAsync(facilityId, locations, cancellationToken);
+        await PropagateOrgLocationToDescendantsAsync(facilityId, cancellationToken);
 
         _logger.LogDebug(
             "Re-evaluated {Count} cached Location(s) for facility {FacilityId} after a configuration change.",
@@ -249,7 +293,7 @@ public class LocationMappingService(
                 locationId: location.PartOf.Reference.SplitReference());
         }
 
-        var isOrgLocation = await IsOrgLocationAsync(facilityId, location);
+        var isOrgLocation = await IsOrgLocationAsync(facilityId, location) || partOf?.IsOrgLocation == true;
 
         if (locationMapping is null)
         {
@@ -265,6 +309,13 @@ public class LocationMappingService(
         {
             locationMapping = await UpdateMapping(location, isOrgLocation, locationMapping, partOf);
         }
+
+        await UpdateParentOnRecordsWithThisPartOfValue(
+            facilityId,
+            location.Id,
+            locationMapping.LocationMappingId,
+            isOrgLocation,
+            cancellationToken: cancellationToken);
 
         return locationMapping;
     }
@@ -579,13 +630,6 @@ public class LocationMappingService(
             locationMapping = await UpdateMapping(location, isOrgLocation, existing, partOf);
         }
 
-        await UpdateParentOnRecordsWithThisPartOfValue(
-            facilityId,
-            location.Id,
-            locationMapping.LocationMappingId,
-            isOrgLocation,
-            cancellationToken: cancellationToken);
-
         return locationMapping;
     }
 
@@ -604,6 +648,123 @@ public class LocationMappingService(
         {
             _logger.LogDebug("Adopted {Count} child location(s) under mapping {LocationMappingId}", adopted,
                 locationMappingId);
+        }
+    }
+
+    private async Task PropagateOrgLocationToDescendantsAsync(string facilityId, CancellationToken cancellationToken)
+    {
+        var mappings = await _organizationLocationMappingQueries.GetByFacilityIdAsync(facilityId);
+        var maxPasses = mappings.Count;
+
+        for (var pass = 0; pass < maxPasses; pass++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var updates = 0;
+            var orgMappings = mappings
+                .Where(mapping => mapping.IsOrgLocation && !string.IsNullOrWhiteSpace(mapping.LocationId))
+                .ToList();
+
+            foreach (var mapping in orgMappings)
+            {
+                updates += await _organizationLocationMappingManager.SetParentForChildrenAsync(
+                    facilityId,
+                    mapping.LocationId!,
+                    mapping.LocationMappingId,
+                    mapping.IsOrgLocation,
+                    cancellationToken);
+            }
+
+            if (updates == 0)
+            {
+                return;
+            }
+
+            mappings = await _organizationLocationMappingQueries.GetByFacilityIdAsync(facilityId);
+        }
+    }
+
+    private async Task RecomputeCachedLocationHierarchyAsync(
+        string facilityId,
+        IReadOnlyCollection<Location> locations,
+        CancellationToken cancellationToken)
+    {
+        var cachedLocations = locations
+            .Where(location => !string.IsNullOrWhiteSpace(location.Id))
+            .GroupBy(location => location.Id, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+
+        if (cachedLocations.Count == 0)
+        {
+            return;
+        }
+
+        var directOrgById = new Dictionary<string, bool>(StringComparer.Ordinal);
+        var parentById = new Dictionary<string, string?>(StringComparer.Ordinal);
+
+        foreach (var location in cachedLocations.Values)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            directOrgById[location.Id] = await IsOrgLocationAsync(facilityId, location);
+            parentById[location.Id] = location.PartOf?.Reference?.SplitReference();
+        }
+
+        var effectiveOrgById = new Dictionary<string, bool>(StringComparer.Ordinal);
+
+        bool ResolveEffectiveOrg(string locationId, HashSet<string> visiting)
+        {
+            if (effectiveOrgById.TryGetValue(locationId, out var cachedValue))
+            {
+                return cachedValue;
+            }
+
+            if (!directOrgById.TryGetValue(locationId, out var isOrgLocation))
+            {
+                return false;
+            }
+
+            if (!visiting.Add(locationId))
+            {
+                return isOrgLocation;
+            }
+
+            if (parentById.TryGetValue(locationId, out var parentLocationId)
+                && !string.IsNullOrWhiteSpace(parentLocationId)
+                && ResolveEffectiveOrg(parentLocationId, visiting))
+            {
+                isOrgLocation = true;
+            }
+
+            visiting.Remove(locationId);
+            effectiveOrgById[locationId] = isOrgLocation;
+            return isOrgLocation;
+        }
+
+        foreach (var locationId in directOrgById.Keys)
+        {
+            ResolveEffectiveOrg(locationId, []);
+        }
+
+        var mappingsByLocationId = (await _organizationLocationMappingQueries.GetByFacilityIdAsync(facilityId))
+            .Where(mapping => !string.IsNullOrWhiteSpace(mapping.LocationId))
+            .ToDictionary(mapping => mapping.LocationId!, StringComparer.Ordinal);
+
+        foreach (var (locationId, isOrgLocation) in effectiveOrgById)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!mappingsByLocationId.TryGetValue(locationId, out var mapping)
+                || mapping.IsOrgLocation == isOrgLocation)
+            {
+                continue;
+            }
+
+            await _organizationLocationMappingManager.UpdateByIdAsync(
+                mapping.LocationMappingId,
+                new UpdateOrganizationLocationMappingModel
+                {
+                    IsOrgLocation = isOrgLocation
+                });
         }
     }
 
