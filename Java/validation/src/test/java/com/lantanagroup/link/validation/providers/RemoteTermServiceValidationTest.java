@@ -11,6 +11,8 @@ import ca.uhn.fhir.rest.gclient.IOperationUntypedWithInputAndPartialOutput;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import org.hl7.fhir.r4.model.BooleanType;
+import org.hl7.fhir.r4.model.CodeableConcept;
+import org.hl7.fhir.r4.model.OperationOutcome;
 import org.hl7.fhir.r4.model.Parameters;
 import org.hl7.fhir.r4.model.StringType;
 import org.junit.jupiter.api.Test;
@@ -182,5 +184,70 @@ class RemoteTermServiceValidationTest {
         ArgumentCaptor<String> resourceType = ArgumentCaptor.forClass(String.class);
         verify(operation).onType(resourceType.capture());
         assertEquals("ValueSet", resourceType.getValue());
+    }
+
+    @Test
+    void invokeRemoteValidateCode_inactiveCode_returnsWarningResult() {
+        RemoteTermServiceValidation subject = newSpy();
+
+        // Response the terminology service returns for a valid-but-inactive code:
+        // result=true plus an "issues" OperationOutcome carrying a warning.
+        Parameters response = new Parameters();
+        response.addParameter().setName("result").setValue(new BooleanType(true));
+        OperationOutcome outcome = new OperationOutcome();
+        outcome.addIssue()
+                .setSeverity(OperationOutcome.IssueSeverity.WARNING)
+                .setCode(OperationOutcome.IssueType.BUSINESSRULE)
+                .setDetails(new CodeableConcept().setText("Code is inactive."));
+        response.addParameter().setName("issues").setResource(outcome);
+        stubClientChain(subject, response, false);
+
+        CodeValidationResult result =
+                subject.invokeRemoteValidateCode(CODE_SYSTEM_URL, CODE, null, null, null);
+
+        assertNotNull(result);
+        assertEquals(CODE, result.getCode());
+        assertEquals(IssueSeverity.WARNING, result.getSeverity());
+        assertEquals("Code is inactive.", result.getMessage());
+    }
+
+    @Test
+    void invokeRemoteValidateCode_activeCode_returnsInformationResult() {
+        RemoteTermServiceValidation subject = newSpy();
+
+        // Response the terminology service returns for a valid code:
+        Parameters response = new Parameters();
+        response.addParameter().setName("result").setValue(new BooleanType(true));
+        stubClientChain(subject, response, false);
+
+        CodeValidationResult result = subject.invokeRemoteValidateCode(CODE_SYSTEM_URL, CODE, null, null, null);
+
+        assertNotNull(result);
+        assertEquals(CODE, result.getCode());
+        assertEquals(IssueSeverity.INFORMATION, result.getSeverity());
+    }
+
+    @Test
+    void invokeRemoteValidateCode_nonInactiveWarning_returnsInformationResult() {
+        RemoteTermServiceValidation subject = newSpy();
+
+        // A valid code carrying a business-rule warning whose text is NOT the inactive marker
+        // must stay INFORMATION -- only "Code is inactive." escalates to a WARNING.
+        Parameters response = new Parameters();
+        response.addParameter().setName("result").setValue(new BooleanType(true));
+        OperationOutcome outcome = new OperationOutcome();
+        outcome.addIssue()
+                .setSeverity(OperationOutcome.IssueSeverity.WARNING)
+                .setCode(OperationOutcome.IssueType.BUSINESSRULE)
+                .setDetails(new CodeableConcept().setText("Some other rule"));
+        response.addParameter().setName("issues").setResource(outcome);
+        stubClientChain(subject, response, false);
+
+        CodeValidationResult result =
+                subject.invokeRemoteValidateCode(CODE_SYSTEM_URL, CODE, null, null, null);
+
+        assertNotNull(result);
+        assertEquals(CODE, result.getCode());
+        assertEquals(IssueSeverity.INFORMATION, result.getSeverity());
     }
 }

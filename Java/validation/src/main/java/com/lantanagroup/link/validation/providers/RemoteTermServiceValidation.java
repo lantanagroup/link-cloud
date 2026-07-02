@@ -328,32 +328,98 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
                 return result;
             }
 
-            // The result parameter is true if the code is valid, otherwise false. If the code is not valid, the message parameter will contain a human-readable error message.
-            List<String> resultValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "result");
-            if (!resultValues.isEmpty() && !StringUtils.isBlank((CharSequence)resultValues.get(0))) {
-                Validate.isTrue(resultValues.size() == 1, "Response contained %d 'result' values", (long)resultValues.size());
-                boolean success = "true".equalsIgnoreCase((String)resultValues.get(0));
-                IValidationSupport.CodeValidationResult retVal = new IValidationSupport.CodeValidationResult();
-                if (success) {
-                    retVal.setSeverity(retVal.getSeverity() != null ? retVal.getSeverity() : IssueSeverity.INFORMATION);
-                    retVal.setCode(theCode);
-                    List<String> displayValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "display");
-                    if (!displayValues.isEmpty()) {
-                        retVal.setDisplay((String)displayValues.get(0));
-                    }
-                } else {
-                    retVal.setSeverity(IssueSeverity.ERROR);
-                    List<String> messageValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "message");
-                    if (!messageValues.isEmpty()) {
-                        retVal.setMessage((String)messageValues.get(0));
-                    }
-                }
+            CodeValidationResult codeResult = getCodeResult(output, theCode);
 
-                return retVal;
-            } else {
+            if (codeResult == null) {
                 return null;
             }
+
+            if (codeResult.getSeverity() != IssueSeverity.INFORMATION) {
+                // Invalid code
+                return codeResult;
+            } 
+
+            if (isInactiveIssue(output)) {
+                codeResult.setSeverity(IssueSeverity.WARNING);
+                codeResult.setMessage("Code is inactive.");
+            }
+
+            return codeResult;
         }
+    }
+
+    /**
+     * Checks if the output contains an issue indicating that the code is inactive.
+     *
+     * @param output the operation output
+     * 
+     * @return true if the code is inactive, false otherwise
+     */
+    protected Boolean isInactiveIssue(IBaseParameters output) {
+
+        if (!(output instanceof org.hl7.fhir.r4.model.Parameters parameters)) {
+            // Output is not an R4 Parameters resource, cannot evaluate for inactive code
+            return false;
+        }
+
+        org.hl7.fhir.r4.model.OperationOutcome outcome = parameters.getParameter().stream()
+                .filter(parameter -> "issues".equals(parameter.getName()))
+                .map(parameter -> parameter.getResource())              
+                .filter(org.hl7.fhir.r4.model.OperationOutcome.class::isInstance)
+                .map(org.hl7.fhir.r4.model.OperationOutcome.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (outcome == null) {
+            // no issues parameter
+            return false;   
+        }        
+
+        org.hl7.fhir.r4.model.OperationOutcome.OperationOutcomeIssueComponent issue = outcome.getIssueFirstRep();
+
+        String message = issue.getDetails() != null ? issue.getDetails().getText() : issue.getDiagnostics();
+
+        if (issue.getCode() == org.hl7.fhir.r4.model.OperationOutcome.IssueType.BUSINESSRULE && 
+            issue.getSeverity() == org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity.WARNING &&
+            message.equalsIgnoreCase("code is inactive.")) {
+                return true;
+            };
+
+        return false;
+    }
+
+    /**
+     * Parses the response of a $validate-code operation into a {@link IValidationSupport.CodeValidationResult}.
+     * The result parameter is true if the code is valid, otherwise false. If the code is not valid, the message
+     * parameter will contain a human-readable error message.
+     *
+     * @return the parsed validation result, or {@code null} if the response contained no usable 'result' value
+     */
+    protected IValidationSupport.CodeValidationResult getCodeResult(IBaseParameters output, String theCode) {
+        List<String> resultValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "result");
+        if (resultValues.isEmpty() || StringUtils.isBlank((CharSequence)resultValues.get(0))) {
+            return null;
+        }
+
+        Validate.isTrue(resultValues.size() == 1, "Response contained %d 'result' values", (long)resultValues.size());
+        boolean success = "true".equalsIgnoreCase((String)resultValues.get(0));
+        IValidationSupport.CodeValidationResult retVal = new IValidationSupport.CodeValidationResult();
+        if (success) {
+            retVal.setSeverity(retVal.getSeverity() != null ? retVal.getSeverity() : IssueSeverity.INFORMATION);
+            retVal.setCode(theCode);
+            List<String> displayValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "display");
+            if (!displayValues.isEmpty()) {
+                retVal.setDisplay((String)displayValues.get(0));
+            }
+        } else {
+            retVal.setSeverity(IssueSeverity.ERROR);
+            List<String> messageValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "message");
+            if (!messageValues.isEmpty()) {
+                retVal.setMessage((String)messageValues.get(0));
+            }
+        }
+
+        return retVal;
     }
 
     private String buildErrorMessage(String theCodeSystem, String theCode, String theValueSetUrl, IBaseResource theValueSet, String theServerUrl, String theServerMessage) {
