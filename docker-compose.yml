@@ -1,5 +1,3 @@
-version: '3.4'
-
 #### services and ports
 ## fhir_server: 6157
 ## mock-fhir-server: 6158
