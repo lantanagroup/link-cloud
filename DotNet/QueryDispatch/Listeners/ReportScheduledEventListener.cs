@@ -128,7 +128,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     _deadLetterExceptionHandler.HandleException(consumeResult, ex, consumeResult.Key);
                                     _reportScheduledConsumer.Commit(consumeResult);
                                 }
-                                catch (OperationCanceledException)
+                                catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                                 {
                                     throw;
                                 }

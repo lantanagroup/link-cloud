@@ -179,7 +179,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                     {
                         content = await _blobStorageService.DownloadFromInternalAsync(value, cancellationToken);
                     }
-                    catch (OperationCanceledException)
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                     {
                         throw;
                     }
@@ -206,7 +206,7 @@ namespace LantanaGroup.Link.Submission.Listeners
                     _metrics.RecordUploadSize(content.LongLength, metricTags);
                     uploaded = true;
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
                     throw;
                 }
@@ -236,7 +236,7 @@ namespace LantanaGroup.Link.Submission.Listeners
             {
                 _deadLetterExceptionHandler.HandleException(result, ex, facilityId!);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }
