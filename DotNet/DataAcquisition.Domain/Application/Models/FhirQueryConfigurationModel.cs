@@ -14,7 +14,6 @@ public class FhirQueryConfigurationModel
     public TimeSpan? MinAcquisitionPullTime { get; set; }
     public TimeSpan? MaxAcquisitionPullTime { get; set; }
     public int? MaxRetries { get; set; }
-    public bool EnableLocationResolutionMapping { get; set; } = false;
     public DateTime? CreateDate { get; set; }
     public DateTime? ModifyDate { get; set; }
 
@@ -33,7 +32,6 @@ public class FhirQueryConfigurationModel
             MinAcquisitionPullTime = entity.MinAcquisitionPullTime,
             MaxAcquisitionPullTime = entity.MaxAcquisitionPullTime,
             MaxRetries = entity.MaxRetries,
-            EnableLocationResolutionMapping = entity.EnableLocationResolutionMapping,
             CreateDate = entity.CreateDate,
             ModifyDate = entity.ModifyDate
         };

@@ -12,6 +12,5 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Api.QueryL
         public TimeSpan? MinAcquisitionPullTime { get; set; }
         public TimeSpan? MaxAcquisitionPullTime { get; set; }
         public int? MaxRetries { get; set; }
-        public bool EnableLocationResolutionMapping { get; set; } = false;
     }
 }
