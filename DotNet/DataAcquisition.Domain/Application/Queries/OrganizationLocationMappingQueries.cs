@@ -106,6 +106,16 @@ public class OrganizationLocationMappingQueries : IOrganizationLocationMappingQu
         if (!string.IsNullOrEmpty(search.LocationId))
             query = query.Where(m => m.LocationId == search.LocationId);
 
+        // Free-text (partial) matches on the searchable name fields.
+        if (!string.IsNullOrWhiteSpace(search.LocationName))
+            query = query.Where(m => m.LocationName != null && m.LocationName.Contains(search.LocationName));
+
+        if (!string.IsNullOrWhiteSpace(search.LocationAlias))
+            query = query.Where(m => m.LocationAlias != null && m.LocationAlias.Contains(search.LocationAlias));
+
+        if (!string.IsNullOrWhiteSpace(search.PartOfValue))
+            query = query.Where(m => m.PartOfValue != null && m.PartOfValue.Contains(search.PartOfValue));
+
         if (search.IsOrgLocation.HasValue)
             query = query.Where(m => m.IsOrgLocation == search.IsOrgLocation.Value);
 

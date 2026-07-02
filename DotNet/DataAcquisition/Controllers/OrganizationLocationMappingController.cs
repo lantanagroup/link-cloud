@@ -114,6 +114,9 @@ public class OrganizationLocationMappingController : Controller
             {
                 FacilityId = facilityId.SanitizeAndRemove(),
                 LocationId = searchParams.LocationId,
+                LocationName = searchParams.LocationName,
+                LocationAlias = searchParams.LocationAlias,
+                PartOfValue = searchParams.PartOfValue,
                 IsOrgLocation = searchParams.IsOrgLocation,
                 IsActive = searchParams.IsActive
             };
