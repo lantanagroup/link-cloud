@@ -74,7 +74,7 @@ namespace QueryDispatch.Domain.Managers
 
                 return patientDispatch.FacilityId;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 throw;
             }

@@ -123,7 +123,7 @@ public class ResourcesAcquiredListener : BackgroundService
                     {
                         _transientExceptionHandler.HandleException(result, ex, result.Message.Key?.FacilityId ?? string.Empty);
                     }
-                    catch (OperationCanceledException)
+                    catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                     {
                         throw;
                     }
