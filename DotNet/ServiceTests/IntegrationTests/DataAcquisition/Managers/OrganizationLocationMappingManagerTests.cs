@@ -152,6 +152,82 @@ public class OrganizationLocationMappingManagerTests
     }
 
     [Fact]
+    public async Task SetParentForChildrenAsync_WhenOrgParentArrivesLate_AppliesOrgLocationToAllDescendants()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var manager = CreateManager(scope);
+        var queries = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingQueries>();
+        var facilityId = NewFacilityId("Late-Parent");
+        var parentLocationId = NewLocationId("Parent");
+        var childLocationId = NewLocationId("Child");
+        var grandchildLocationId = NewLocationId("Grandchild");
+        var greatGrandchildLocationId = NewLocationId("GreatGrandchild");
+
+        var child = await manager.CreateAsync(new CreateOrganizationLocationMappingModel
+        {
+            FacilityId = facilityId,
+            LocationId = childLocationId,
+            LocationName = "ED",
+            PartOfValue = parentLocationId,
+            IsOrgLocation = false,
+            IsActive = true
+        });
+
+        var grandchild = await manager.CreateAsync(new CreateOrganizationLocationMappingModel
+        {
+            FacilityId = facilityId,
+            LocationId = grandchildLocationId,
+            LocationName = "ED Bed 1",
+            PartOfValue = childLocationId,
+            PartOfId = child.LocationMappingId,
+            IsOrgLocation = false,
+            IsActive = true
+        });
+
+        await manager.CreateAsync(new CreateOrganizationLocationMappingModel
+        {
+            FacilityId = facilityId,
+            LocationId = greatGrandchildLocationId,
+            LocationName = "ED Bed 1 Slot",
+            PartOfValue = grandchildLocationId,
+            PartOfId = grandchild.LocationMappingId,
+            IsOrgLocation = false,
+            IsActive = true
+        });
+
+        var parent = await manager.CreateAsync(new CreateOrganizationLocationMappingModel
+        {
+            FacilityId = facilityId,
+            LocationId = parentLocationId,
+            LocationName = "Hospital",
+            IsOrgLocation = true,
+            IsActive = true
+        });
+
+        var updatedCount = await manager.SetParentForChildrenAsync(
+            facilityId,
+            parentLocationId,
+            parent.LocationMappingId,
+            isOrgLocation: true,
+            CancellationToken.None);
+
+        var updatedChild = await queries.GetByFacilityIdAndLocationIdAsync(facilityId, childLocationId);
+        var updatedGrandchild = await queries.GetByFacilityIdAndLocationIdAsync(facilityId, grandchildLocationId);
+        var updatedGreatGrandchild = await queries.GetByFacilityIdAndLocationIdAsync(facilityId, greatGrandchildLocationId);
+
+        Assert.Equal(3, updatedCount);
+        Assert.NotNull(updatedChild);
+        Assert.NotNull(updatedGrandchild);
+        Assert.NotNull(updatedGreatGrandchild);
+        Assert.Equal(parent.LocationMappingId, updatedChild!.PartOfId);
+        Assert.Equal(child.LocationMappingId, updatedGrandchild!.PartOfId);
+        Assert.Equal(grandchild.LocationMappingId, updatedGreatGrandchild!.PartOfId);
+        Assert.True(updatedChild.IsOrgLocation);
+        Assert.True(updatedGrandchild.IsOrgLocation);
+        Assert.True(updatedGreatGrandchild.IsOrgLocation);
+    }
+
+    [Fact]
     public async Task DeleteByIdAsync_Existing_DeletesRecord()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();

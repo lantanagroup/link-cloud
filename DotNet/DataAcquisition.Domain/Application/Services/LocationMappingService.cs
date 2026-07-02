@@ -697,7 +697,7 @@ public class LocationMappingService(
 
         if (adopted > 0)
         {
-            _logger.LogDebug("Adopted {Count} child location(s) under mapping {LocationMappingId}", adopted,
+            _logger.LogDebug("Adopted {Count} descendant location(s) under mapping {LocationMappingId}", adopted,
                 locationMappingId);
         }
     }

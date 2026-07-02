@@ -142,6 +142,28 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
     public async Task<int> SetParentForChildrenAsync(
         string facilityId, string parentLocationId, int parentLocationMappingId, bool isOrgLocation, CancellationToken cancellationToken = default)
     {
+        return await SetParentForChildrenAsync(
+            facilityId,
+            parentLocationId,
+            parentLocationMappingId,
+            isOrgLocation,
+            visitedParentMappingIds: [],
+            cancellationToken);
+    }
+
+    private async Task<int> SetParentForChildrenAsync(
+        string facilityId,
+        string parentLocationId,
+        int parentLocationMappingId,
+        bool isOrgLocation,
+        HashSet<int> visitedParentMappingIds,
+        CancellationToken cancellationToken)
+    {
+        if (!visitedParentMappingIds.Add(parentLocationMappingId))
+        {
+            return 0;
+        }
+
         var result = await _dbContext.OrganizationLocationMappings
             .Where(m => m.FacilityId == facilityId
                     && m.PartOfValue == parentLocationId
@@ -152,20 +174,27 @@ public class OrganizationLocationMappingManager : IOrganizationLocationMappingMa
                 .SetProperty(m => m.ModifiedDate, DateTime.UtcNow),
             cancellationToken);
 
-        if (result == 0)
-        {
-            return result;
-        }
-
         var updatedMappings = await _dbContext.OrganizationLocationMappings
             .Where(m => m.PartOfId == parentLocationMappingId)
-            .Select(m => new { m.LocationMappingId, m.IsOrgLocation })
+            .Select(m => new { m.LocationMappingId, m.LocationId, m.IsOrgLocation })
             .ToListAsync(cancellationToken);
             
         foreach (var mapping in updatedMappings)
         {
             await _encounterMappingManager.RecomputeMappedToOrgForLocationMappingAsync(
                 mapping.LocationMappingId,
+                cancellationToken);
+        }
+
+        foreach (var mapping in updatedMappings.Where(mapping =>
+                     mapping.IsOrgLocation && !string.IsNullOrWhiteSpace(mapping.LocationId)))
+        {
+            result += await SetParentForChildrenAsync(
+                facilityId,
+                mapping.LocationId!,
+                mapping.LocationMappingId,
+                mapping.IsOrgLocation,
+                visitedParentMappingIds,
                 cancellationToken);
         }
 
