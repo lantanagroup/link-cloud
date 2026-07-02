@@ -86,6 +86,23 @@ public interface ILocationMappingService
     Task<bool> IsPatientReportableAsync(string facilityId, string patientId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Determines whether a patient is reportable for a specific report encounter set.
+    /// </summary>
+    /// <param name="facilityId">The facility the patient belongs to.</param>
+    /// <param name="patientId">The patient to evaluate.</param>
+    /// <param name="currentReportEncounterIds">Encounter ids acquired for the current report.</param>
+    /// <param name="cancellationToken">Used to signal a cancellation in the request.</param>
+    /// <returns>
+    /// True if the report has at least one org-mapped encounter, or if report encounter ids/mappings
+    /// are not available yet. False only when current-report encounter mappings exist and none are org-mapped.
+    /// </returns>
+    Task<bool> IsPatientReportableAsync(
+        string facilityId,
+        string patientId,
+        IReadOnlyCollection<string>? currentReportEncounterIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Removes non-org encounters (EncounterMapping.MappedToOrg == false) from the correlation's
     /// acquired-resource cache before the tail's ResourcesAcquired event is produced. The Encounter is
     /// fetched and cached by its own (ungated) primary log, so marking a dependent log NotReportable does
@@ -390,7 +407,14 @@ public class LocationMappingService(
         return filteredResources;
     }
 
-    public async Task<bool> IsPatientReportableAsync(string facilityId, string patientId, CancellationToken cancellationToken)
+    public Task<bool> IsPatientReportableAsync(string facilityId, string patientId, CancellationToken cancellationToken) =>
+        IsPatientReportableAsync(facilityId, patientId, currentReportEncounterIds: null, cancellationToken);
+
+    public async Task<bool> IsPatientReportableAsync(
+        string facilityId,
+        string patientId,
+        IReadOnlyCollection<string>? currentReportEncounterIds,
+        CancellationToken cancellationToken)
     {
         // Reportability filtering only applies when org-location mapping is active for the facility;
         // otherwise every patient is reportable and acquisition proceeds normally.
@@ -402,8 +426,35 @@ public class LocationMappingService(
             return true;
         }
 
-        var encounterMappings = await _encounterMappingQueries
-            .GetByFacilityIdAndPatientIdAsync(facilityId, patientId, cancellationToken);
+        List<EncounterMappingModel> encounterMappings;
+        if (currentReportEncounterIds is not null)
+        {
+            var currentReportEncounterIdSet = currentReportEncounterIds
+                .Select(NormalizeResourceId)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            // Fail open: without usable current-report encounter ids we cannot conclude the patient
+            // is non-reportable for this report.
+            if (currentReportEncounterIdSet.Count == 0)
+            {
+                return true;
+            }
+
+            encounterMappings = await _encounterMappingQueries
+                .GetByFacilityIdAndEncounterIdsAsync(facilityId, currentReportEncounterIdSet, cancellationToken);
+
+            encounterMappings = encounterMappings
+                .Where(mapping => string.Equals(mapping.PatientId, patientId, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+        else
+        {
+            encounterMappings = await _encounterMappingQueries
+                .GetByFacilityIdAndPatientIdAsync(facilityId, patientId, cancellationToken);
+        }
 
         // Fail open: with no encounter mappings recorded yet we cannot conclude the patient is
         // non-reportable (e.g. the encounters have not been acquired/mapped), so keep acquiring.
@@ -899,6 +950,16 @@ public class LocationMappingService(
         }
 
         return null;
+    }
+
+    private static string? NormalizeResourceId(string? resourceId)
+    {
+        if (string.IsNullOrWhiteSpace(resourceId))
+        {
+            return null;
+        }
+
+        return resourceId.SplitReference();
     }
 
     // SQL Server: 2627 = unique constraint, 2601 = unique index

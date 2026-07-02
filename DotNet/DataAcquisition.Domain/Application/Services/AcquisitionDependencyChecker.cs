@@ -186,7 +186,18 @@ public class AcquisitionDependencyChecker : IAcquisitionDependencyChecker
         if (string.IsNullOrWhiteSpace(patientId))
             return DependencyCheckResult.Met; // can't determine -> fail open (reportable)
 
-        var reportable = await _locationMappingService.IsPatientReportableAsync(log.FacilityId, patientId, cancellationToken);
+        var currentReportEncounterIds = await _logQueries.GetResourceIdsForReportPatient(
+            log.CorrelationId,
+            log.FacilityId,
+            log.ReportTrackingId,
+            nameof(Hl7.Fhir.Model.ResourceType.Encounter),
+            cancellationToken);
+
+        var reportable = await _locationMappingService.IsPatientReportableAsync(
+            log.FacilityId,
+            patientId,
+            currentReportEncounterIds,
+            cancellationToken);
         return reportable ? DependencyCheckResult.Met : DependencyCheckResult.NotReportable;
     }
 

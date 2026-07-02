@@ -801,6 +801,62 @@ public class LocationMappingServiceTests
     }
 
     [Fact]
+    public async Task IsPatientReportableAsync_WhenCurrentReportEncountersAreNonOrg_IgnoresHistoricalOrgEncounter()
+    {
+        // Arrange — configured; the patient has a historical org encounter, but the current report
+        // only acquired a non-org encounter.
+        _mockConfigQueries
+            .Setup(x => x.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        _mockEncounterMappingQueries
+            .Setup(x => x.GetByFacilityIdAndEncounterIdsAsync(
+                FacilityId,
+                It.Is<IReadOnlyCollection<string>>(ids => ids.SequenceEqual(new[] { "enc-current" })),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<EncounterMappingModel>
+            {
+                new() { FacilityId = FacilityId, PatientId = "patient-1", EncounterId = "enc-current", MappedToOrg = false }
+            });
+
+        // Act
+        var reportable = await _service.IsPatientReportableAsync(
+            FacilityId,
+            "patient-1",
+            ["Encounter/enc-current"],
+            CancellationToken.None);
+
+        // Assert — scoped reportability is false even though an unscoped historical lookup would
+        // have found an org encounter for the same patient.
+        Assert.False(reportable);
+        _mockEncounterMappingQueries.Verify(x => x.GetByFacilityIdAndPatientIdAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task IsPatientReportableAsync_WhenCurrentReportEncounterIdsAreEmpty_ReturnsTrueFailOpen()
+    {
+        // Arrange — configured, but no current-report Encounter ids were found.
+        _mockConfigQueries
+            .Setup(x => x.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        // Act
+        var reportable = await _service.IsPatientReportableAsync(
+            FacilityId,
+            "patient-1",
+            Array.Empty<string>(),
+            CancellationToken.None);
+
+        // Assert — fail open for this report; do not fall back to all historical patient encounters.
+        Assert.True(reportable);
+        _mockEncounterMappingQueries.Verify(x => x.GetByFacilityIdAndPatientIdAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockEncounterMappingQueries.Verify(x => x.GetByFacilityIdAndEncounterIdsAsync(
+            It.IsAny<string>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task UpdateEncounterLocationMappingAsync_AnyReferencedLocationIsOrg_SetsMappedToOrgTrue()
     {
         // Arrange — the encounter references two locations: the first IS an org location, the

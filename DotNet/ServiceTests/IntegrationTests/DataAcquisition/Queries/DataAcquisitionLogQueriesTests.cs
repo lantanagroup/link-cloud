@@ -26,6 +26,86 @@ public class DataAcquisitionLogQueriesTests
     }
 
     [Fact]
+    public async Task GetResourceIdsForReportPatient_WithReportTrackingId_ReturnsOnlyCurrentReportResourceIds()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var facilityId = $"ReportScopedIds_{Guid.NewGuid():N}";
+        var correlationId = Guid.NewGuid().ToString();
+        var currentReportTrackingId = Guid.NewGuid();
+        var otherReportTrackingId = Guid.NewGuid();
+
+        dbContext.DataAcquisitionLogs.AddRange(
+            new DataAcquisitionLog
+            {
+                FacilityId = facilityId,
+                CorrelationId = correlationId,
+                ReportTrackingId = currentReportTrackingId,
+                Status = RequestStatus.Completed,
+                QueryPhase = QueryPhase.Initial,
+                PatientId = "Patient/123",
+                ScheduledReportEntity = new ScheduledReportEntity
+                {
+                    ReportTrackingId = currentReportTrackingId,
+                    StartDate = DateTime.UtcNow.AddDays(-1),
+                    EndDate = DateTime.UtcNow
+                },
+                ResourceIds = new List<DataAcquisitionLogResourceId> { new() { ResourceId = "Encounter/current" } },
+                FhirQueries = new List<FhirQuery>
+                {
+                    new()
+                    {
+                        FacilityId = facilityId,
+                        FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                        {
+                            new() { ResourceType = Hl7.Fhir.Model.ResourceType.Encounter }
+                        }
+                    }
+                }
+            },
+            new DataAcquisitionLog
+            {
+                FacilityId = facilityId,
+                CorrelationId = correlationId,
+                ReportTrackingId = otherReportTrackingId,
+                Status = RequestStatus.Completed,
+                QueryPhase = QueryPhase.Initial,
+                PatientId = "Patient/123",
+                ScheduledReportEntity = new ScheduledReportEntity
+                {
+                    ReportTrackingId = otherReportTrackingId,
+                    StartDate = DateTime.UtcNow.AddDays(-1),
+                    EndDate = DateTime.UtcNow
+                },
+                ResourceIds = new List<DataAcquisitionLogResourceId> { new() { ResourceId = "Encounter/other-report" } },
+                FhirQueries = new List<FhirQuery>
+                {
+                    new()
+                    {
+                        FacilityId = facilityId,
+                        FhirQueryResourceTypes = new List<FhirQueryResourceType>
+                        {
+                            new() { ResourceType = Hl7.Fhir.Model.ResourceType.Encounter }
+                        }
+                    }
+                }
+            });
+
+        await dbContext.SaveChangesAsync();
+
+        var queries = scope.ServiceProvider.GetRequiredService<IDataAcquisitionLogQueries>();
+
+        var result = await queries.GetResourceIdsForReportPatient(
+            correlationId,
+            facilityId,
+            currentReportTrackingId.ToString(),
+            Hl7.Fhir.Model.ResourceType.Encounter.ToString());
+
+        Assert.Equal(["current"], result);
+    }
+
+    [Fact]
     public async Task GetPendingAndRetryableFailedRequests_ReturnsEligibleLogs()
     {
         using var scope = _fixture.ServiceProvider.CreateScope();

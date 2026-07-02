@@ -509,6 +509,9 @@ public class FhirApiServiceTests
             .Setup(x => x.HasActiveByFacilityIdAsync("fac-1", It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
+        var locationMappingService = new Mock<ILocationMappingService>();
+        ConfigureDefaultLocationMappingFilter(locationMappingService);
+
         var service = new FhirApiService(
             new Mock<IReferenceResourcesManager>().Object,
             new Mock<IReferenceResourcesQueries>().Object,
@@ -516,7 +519,7 @@ public class FhirApiServiceTests
             new Mock<IReadFhirCommand>().Object,
             new Mock<ILogger<FhirApiService>>().Object,
             new Mock<IResourceCache>().Object,
-            new Mock<ILocationMappingService>().Object
+            locationMappingService.Object
         );
 
         var log = new DataAcquisitionLogModel
