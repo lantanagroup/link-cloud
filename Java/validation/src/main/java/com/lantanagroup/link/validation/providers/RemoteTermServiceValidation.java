@@ -291,7 +291,7 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
         return RemoteTerminologyUtil.translateOutcomeToResults(fhirContext, outcome);
     }
 
-    private IGenericClient provideClient() {
+    protected IGenericClient provideClient() {
         IGenericClient retVal = this.myCtx.newRestfulGenericClient(this.myBaseUrl);
 
         for(Object next : this.myClientInterceptors) {
@@ -328,6 +328,7 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
                 return result;
             }
 
+            // The result parameter is true if the code is valid, otherwise false. If the code is not valid, the message parameter will contain a human-readable error message.
             List<String> resultValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "result");
             if (!resultValues.isEmpty() && !StringUtils.isBlank((CharSequence)resultValues.get(0))) {
                 Validate.isTrue(resultValues.size() == 1, "Response contained %d 'result' values", (long)resultValues.size());
