@@ -5,6 +5,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Task = System.Threading.Tasks.Task;
@@ -188,6 +189,61 @@ public class EncounterMappingManagerTests
 
         Assert.Equal(2, result.Metadata.TotalCount);
         Assert.Equal(2, result.Records.Count);
+    }
+
+    [Fact]
+    public async Task SearchAsync_ProjectsLocationIds_CommaJoinableAcrossMultipleLocations()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+        var manager = CreateManager(scope);
+        var queries = CreateQueries(scope);
+        var facilityId = NewFacilityId("Fac-Loc");
+        await SeedFacilityAndPatientsAsync(scope, facilityId, "Pat-1");
+
+        var locMappingManager = scope.ServiceProvider.GetRequiredService<IOrganizationLocationMappingManager>();
+        var loc1 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "Loc-A" });
+        var loc2 = await locMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel { FacilityId = facilityId, LocationId = "Loc-B" });
+        await dbContext.SaveChangesAsync();
+
+        await manager.CreateAsync(new CreateEncounterMappingModel
+        {
+            FacilityId = facilityId,
+            PatientId = "Pat-1",
+            EncounterId = "Enc-1",
+            MappedToOrg = true,
+            OrganizationLocationMappingIds = new List<int> { loc1.LocationMappingId, loc2.LocationMappingId }
+        });
+
+        var result = await queries.SearchAsync(new EncounterMappingSearchModel { FacilityId = facilityId }, 1, 10);
+
+        var record = Assert.Single(result.Records);
+        var locationIds = record.EncounterLocations.Select(l => l.LocationId).ToList();
+        Assert.Equal(2, locationIds.Count);
+        Assert.Contains("Loc-A", locationIds);
+        Assert.Contains("Loc-B", locationIds);
+    }
+
+    [Theory]
+    [InlineData(SortOrder.Ascending, new[] { "Enc-A", "Enc-B", "Enc-C" })]
+    [InlineData(SortOrder.Descending, new[] { "Enc-C", "Enc-B", "Enc-A" })]
+    public async Task SearchAsync_SortByEncounterId_OrdersResults(SortOrder sortOrder, string[] expectedOrder)
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var manager = CreateManager(scope);
+        var queries = CreateQueries(scope);
+        var facilityId = NewFacilityId("Fac-Sort");
+        await SeedFacilityAndPatientsAsync(scope, facilityId, "Pat-1");
+
+        // Insert out of order so the assertion reflects sorting, not insertion order.
+        await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = facilityId, PatientId = "Pat-1", EncounterId = "Enc-B" });
+        await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = facilityId, PatientId = "Pat-1", EncounterId = "Enc-A" });
+        await manager.CreateAsync(new CreateEncounterMappingModel { FacilityId = facilityId, PatientId = "Pat-1", EncounterId = "Enc-C" });
+
+        var result = await queries.SearchAsync(
+            new EncounterMappingSearchModel { FacilityId = facilityId }, 1, 10, "EncounterId", sortOrder);
+
+        Assert.Equal(expectedOrder, result.Records.Select(r => r.EncounterId).ToArray());
     }
 
     [Fact]

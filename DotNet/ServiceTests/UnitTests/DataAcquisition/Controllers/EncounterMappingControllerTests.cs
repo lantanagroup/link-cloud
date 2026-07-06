@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Models;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -327,7 +328,7 @@ public class EncounterMappingControllerTests
             new List<EncounterMappingModel> { new() { EncounterMappingId = 1, FacilityId = FacilityId } },
             new PaginationMetadata(10, 1, 1));
         mocker.GetMock<IEncounterMappingQueries>()
-            .Setup(q => q.SearchAsync(It.IsAny<EncounterMappingSearchModel>(), It.IsAny<int>(), It.IsAny<int>()))
+            .Setup(q => q.SearchAsync(It.IsAny<EncounterMappingSearchModel>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<SortOrder?>()))
             .ReturnsAsync(paged);
 
         var controller = mocker.CreateInstance<EncounterMappingController>();
@@ -340,21 +341,59 @@ public class EncounterMappingControllerTests
     }
 
     [Fact]
-    public async Task SearchAsync_NoResults_ReturnsNoContent()
+    public async Task SearchAsync_NoResults_ReturnsOkWithEmptyPagedResult()
     {
         var mocker = new AutoMocker();
         var paged = new PagedConfigModel<EncounterMappingModel>(
             new List<EncounterMappingModel>(),
             new PaginationMetadata(10, 1, 0));
         mocker.GetMock<IEncounterMappingQueries>()
-            .Setup(q => q.SearchAsync(It.IsAny<EncounterMappingSearchModel>(), It.IsAny<int>(), It.IsAny<int>()))
+            .Setup(q => q.SearchAsync(It.IsAny<EncounterMappingSearchModel>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<SortOrder?>()))
             .ReturnsAsync(paged);
 
         var controller = mocker.CreateInstance<EncounterMappingController>();
 
         var result = await controller.SearchAsync(FacilityId, new EncounterMappingSearchParameters());
 
-        Assert.IsType<NoContentResult>(result);
+        // Empty results still return 200 with valid paging metadata so the UI can render its empty state.
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var actual = Assert.IsAssignableFrom<PagedConfigModel<EncounterMappingModel>>(ok.Value);
+        Assert.Empty(actual.Records);
+    }
+
+    [Fact]
+    public async Task SearchAsync_InvalidSortBy_ReturnsBadRequest()
+    {
+        var mocker = new AutoMocker();
+        var controller = mocker.CreateInstance<EncounterMappingController>();
+
+        var result = await controller.SearchAsync(FacilityId, new EncounterMappingSearchParameters(), sortBy: "LocationId");
+
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal((int)HttpStatusCode.BadRequest, objectResult.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("EncounterId")]
+    [InlineData("patientid")]
+    public async Task SearchAsync_ValidSortBy_PassesSortThroughToQueries(string sortBy)
+    {
+        var mocker = new AutoMocker();
+        var paged = new PagedConfigModel<EncounterMappingModel>(
+            new List<EncounterMappingModel>(),
+            new PaginationMetadata(10, 1, 0));
+        mocker.GetMock<IEncounterMappingQueries>()
+            .Setup(q => q.SearchAsync(It.IsAny<EncounterMappingSearchModel>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<SortOrder?>()))
+            .ReturnsAsync(paged);
+
+        var controller = mocker.CreateInstance<EncounterMappingController>();
+
+        var result = await controller.SearchAsync(FacilityId, new EncounterMappingSearchParameters(), sortBy: sortBy, sortOrder: SortOrder.Ascending);
+
+        Assert.IsType<OkObjectResult>(result);
+        mocker.GetMock<IEncounterMappingQueries>().Verify(
+            q => q.SearchAsync(It.IsAny<EncounterMappingSearchModel>(), It.IsAny<int>(), It.IsAny<int>(), sortBy, SortOrder.Ascending),
+            Times.Once);
     }
 
     [Fact]
@@ -374,7 +413,7 @@ public class EncounterMappingControllerTests
     {
         var mocker = new AutoMocker();
         mocker.GetMock<IEncounterMappingQueries>()
-            .Setup(q => q.SearchAsync(It.IsAny<EncounterMappingSearchModel>(), It.IsAny<int>(), It.IsAny<int>()))
+            .Setup(q => q.SearchAsync(It.IsAny<EncounterMappingSearchModel>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<SortOrder?>()))
             .ThrowsAsync(new Exception("boom"));
 
         var controller = mocker.CreateInstance<EncounterMappingController>();

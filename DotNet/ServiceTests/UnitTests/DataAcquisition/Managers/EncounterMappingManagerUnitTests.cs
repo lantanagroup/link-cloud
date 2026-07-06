@@ -398,6 +398,12 @@ public class EncounterMappingManagerUnitTests
         _mockMappingRepo.Setup(r => r.SearchAsync(It.IsAny<Expression<Func<EncounterMapping, bool>>>(), It.IsAny<string>(), It.IsAny<LantanaGroup.Link.Shared.Application.Enums.SortOrder?>(), It.IsAny<int>(), It.IsAny<int>()))
             .ReturnsAsync((expectedResults, new LantanaGroup.Link.Shared.Application.Models.Responses.PaginationMetadata { TotalCount = 1, PageSize = 10, PageNumber = 1 }));
 
+        // SearchAsync resolves each mapping's locations (for LocationId) via a follow-up query; this
+        // mapping has none, so return an empty set.
+        _mockLocationRepo
+            .Setup(r => r.FindAsync(It.IsAny<Expression<Func<EncounterLocation, bool>>>()))
+            .ReturnsAsync(new List<EncounterLocation>());
+
         // Act
         var result = await mockQueries.SearchAsync(searchModel, 1, 10);
 
