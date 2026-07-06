@@ -89,6 +89,29 @@ var apiBearerEnabled = builder.Configuration.GetValue<bool>($"{ApiBearerConfigSe
 var apiBearerAuthority = builder.Configuration[$"{ApiBearerConfigSection}:Authority"];
 var apiBearerAudience = builder.Configuration[$"{ApiBearerConfigSection}:Audience"];
 
+static IReadOnlyCollection<string> BuildValidAudiences(string configuredAudience)
+{
+    var normalized = configuredAudience.Trim().TrimEnd('/');
+    var audiences = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        normalized
+    };
+
+    const string ApiUriPrefix = "api://";
+    if (normalized.StartsWith(ApiUriPrefix, StringComparison.OrdinalIgnoreCase))
+    {
+        var rawAudience = normalized[ApiUriPrefix.Length..].TrimEnd('/');
+        if (!string.IsNullOrWhiteSpace(rawAudience))
+            audiences.Add(rawAudience);
+    }
+    else
+    {
+        audiences.Add($"{ApiUriPrefix}{normalized}");
+    }
+
+    return audiences;
+}
+
 if (apiBearerEnabled)
 {
     if (string.IsNullOrWhiteSpace(apiBearerAuthority) || string.IsNullOrWhiteSpace(apiBearerAudience))
@@ -101,13 +124,16 @@ if (apiBearerEnabled)
         .AddAuthentication()
         .AddJwtBearer(ApiBearerSchemeName, options =>
         {
+            var validAudiences = BuildValidAudiences(apiBearerAudience);
+
             options.Authority = apiBearerAuthority;
             options.Audience = apiBearerAudience;
             options.RequireHttpsMetadata = true;
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
-                ValidAudience = apiBearerAudience,
+                ValidateAudience = true,
+                ValidAudiences = validAudiences,
             };
         });
 }
