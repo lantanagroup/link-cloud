@@ -42,6 +42,42 @@
   padding-left: 1.25rem;
 }
 
+.nhsn-link__nav ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.nhsn-link__nav li {
+  margin-bottom: 0.5rem;
+}
+
+.nhsn-link__nav-button {
+  width: 100%;
+  border: 1px solid #c5d3e0;
+  background: white;
+  color: #12344d;
+  border-radius: 4px;
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nhsn-link__nav-button--active {
+  background: #005ea2;
+  color: white;
+  border-color: #005ea2;
+}
+
+.nhsn-link__action-button {
+  border: none;
+  background: #005ea2;
+  color: white;
+  border-radius: 4px;
+  padding: 0.65rem 0.9rem;
+  cursor: pointer;
+}
+
 .nhsn-link__state {
   display: flex;
   align-items: center;
@@ -55,6 +91,53 @@
 .nhsn-link__grid {
   display: grid;
   gap: 1rem;
+}
+
+.notification-stack {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 1000;
+  width: min(360px, calc(100vw - 2rem));
+}
+
+.notification-stack__item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  color: white;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.notification-stack__item--success {
+  background: #2e8540;
+}
+
+.notification-stack__item--error {
+  background: #c52a2a;
+}
+
+.notification-stack__item--info {
+  background: #005ea2;
+}
+
+.notification-stack__message {
+  flex: 1;
+}
+
+.notification-stack__close {
+  border: none;
+  background: transparent;
+  color: white;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
 }
 
 @media (max-width: 900px) {
