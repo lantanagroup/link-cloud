@@ -1,6 +1,7 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {UserInfoService} from '../services/user-info-service';
 import {TestUserProfile, UserInfoResponse, UserRoleSummaryResponse} from '../shared/models';
+import {NavigationItem, NavigationRail} from './NavigationRail';
 import {OnboardingScreen} from './OnboardingScreen';
 import {SystemAdminUsersScreen} from './SystemAdminUsersScreen';
 import './NHSNLink.css';
@@ -54,7 +55,7 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
     };
   }, [activeTestUser, userInfoService]);
 
-  const navigation = useMemo(() => {
+  const navigation = useMemo<NavigationItem[]>(() => {
     if (!userInfo) {
       return [];
     }
@@ -115,7 +116,7 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
   }, [activeTestUser, userInfo?.IsSystemAdmin, userInfoService]);
 
   if (loading) {
-    return <div className="nhsn-link__state">Loading NHSNLink user contextâ€¦</div>;
+    return <div className="nhsn-link__state">Loading NHSNLink user context…</div>;
   }
 
   if (error) {
@@ -145,31 +146,13 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
   return (
     <div className="nhsn-link">
       <div className="nhsn-link__layout">
-        <aside className="nhsn-link__nav">
-          <div>
-            <h1 className="nhsn-link__nav-title">NHSNLink</h1>
-          </div>
-          <ul>
-            {navigation.map(item => (
-              <li key={item.key}>
-                <button
-                  type="button"
-                  className={`nhsn-link__nav-button${route === item.key ? ' nhsn-link__nav-button--active' : ''}`}
-                  onClick={() => setRoute(item.key)}>
-                  {item.label}
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          <div className="nhsn-link__nav-userinfo">
-            <p>
-              {userInfo.Name}
-              <br />
-              {userInfo.Email}
-            </p>
-          </div>
-        </aside>
+        <NavigationRail
+          title="NHSNLink"
+          items={navigation}
+          activeRoute={route}
+          onNavigate={setRoute}
+          userName={userInfo.Name}
+          userEmail={userInfo.Email} />
 
         <section className="nhsn-link__grid">
           {route === 'home' && (
