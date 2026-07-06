@@ -223,6 +223,11 @@ public static class ApiEndPointLibrary
         public const string FhirConfigGet200 = "FhirConfig GET → 200";
         public const string FhirConfigGet404 = "FhirConfig GET → 404";
         public const string FhirConfigDelete202 = "FhirConfig DELETE → 202";
+        public const string FhirListConfigPost200 = "FhirListConfig POST → 200";
+        public const string FhirListConfigGet200 = "FhirListConfig GET → 200";
+        public const string FhirListConfigPost409 = "FhirListConfig POST → 409";
+        public const string FhirListConfigDelete200 = "FhirListConfig DELETE → 200";
+        public const string FhirListConfigGet404 = "FhirListConfig GET → 404";
         public const string QueryPlanPost201 = "QueryPlan POST → 201";
         public const string QueryPlanPost409 = "QueryPlan POST → 409";
         public const string QueryPlanGet200 = "QueryPlan GET → 200";

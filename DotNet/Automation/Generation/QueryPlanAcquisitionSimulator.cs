@@ -177,6 +177,54 @@ public static class QueryPlanAcquisitionSimulator
                 if (bound == null)
                     continue;
 
+                // FHIR Observation/DiagnosticReport `date` matching may consider either
+                // effective[x] or issued, while our generic extractor returns only one range.
+                // Evaluate both shapes and accept if any candidate satisfies the bound.
+                if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                    && (string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var matchedAny = false;
+                    var recognizedAny = false;
+
+                    if (TryGetEffective(resource.Resource, out var effStart, out var effEnd))
+                    {
+                        recognizedAny = true;
+                        matchedAny |= isGe ? effEnd >= bound.Value : effStart <= bound.Value;
+                    }
+
+                    if (TryGetInstant(resource.Resource, "issued", out var issuedStart, out var issuedEnd))
+                    {
+                        recognizedAny = true;
+                        matchedAny |= isGe ? issuedEnd >= bound.Value : issuedStart <= bound.Value;
+                    }
+
+                    if (!recognizedAny)
+                    {
+                        if (HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                            continue;
+
+                        if (output != null && warnedKeys.Add(resource.Key))
+                        {
+                            output.WriteLine(
+                                $"  [simulator] WARNING: {resource.Key} has no recognized date field for the " +
+                                $"'{resource.ResourceType}' Parameter query '{p.Name}' filter; excluding from " +
+                                "predicted-acquired set (fail-closed). Extend TryGetResourceDateRangeForParam to model this shape.");
+                        }
+                        return false;
+                    }
+
+                    if (!matchedAny)
+                    {
+                        if (HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                            continue;
+
+                        return false;
+                    }
+
+                    continue;
+                }
+
                 // Only one bound is being checked per parameter. We need both ends of the
                 // resource's date range so we can compute correct FHIR overlap semantics:
                 //   ge{S}:  resource.End   >= S   (resource extends into [S, +inf))
@@ -185,6 +233,12 @@ public static class QueryPlanAcquisitionSimulator
                 if (!TryGetResourceDateRangeForParam(p.Name, resource.ResourceType, resource.Resource,
                         out var resourceStart, out var resourceEnd))
                 {
+                    if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                        && HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                    {
+                        continue;
+                    }
+
                     // Fail closed: the query has a date filter and we don't recognize the
                     // resource's date shape, so we can't honestly say it falls in-period.
                     // Drop it and warn once per resource key so unfamiliar shapes surface.
@@ -199,14 +253,55 @@ public static class QueryPlanAcquisitionSimulator
                 }
 
                 if (isGe && resourceEnd < bound.Value)
+                {
+                    if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                        && HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                    {
+                        continue;
+                    }
+
                     return false;
+                }
 
                 if (isLe && resourceStart > bound.Value)
+                {
+                    if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                        && HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                    {
+                        continue;
+                    }
+
                     return false;
+                }
             }
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Some DA query paths are encounter-anchored and can include resources linked to an
+    /// already-acquired encounter even when date predicate semantics differ from our strict
+    /// local interpretation (effective/issued boundary nuances). This targeted override is
+    /// restricted to date-filtered Observation/DiagnosticReport/Procedure resources and only
+    /// when their Encounter reference resolves to an acquired Encounter id.
+    /// </summary>
+    private static bool HasEncounterAnchoredDateOverride(
+        GeneratedResource resource,
+        Dictionary<string, HashSet<string>> acquiredByType)
+    {
+        if (!(string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
+              || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)
+              || string.Equals(resource.ResourceType, "Procedure", StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        if (!acquiredByType.TryGetValue("Encounter", out var encounterIds) || encounterIds.Count == 0)
+            return false;
+
+        return TryGetReferencedResourceId(resource.Resource, "Encounter", out var encounterId)
+               && encounterIds.Contains(encounterId);
     }
 
     private static HashSet<string> CollectReferencedIds(
