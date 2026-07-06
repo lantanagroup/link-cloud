@@ -546,6 +546,9 @@ services:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8079/health"]
+      start_period: 5s
+      interval: 5s
+      retries: 10
 
   nhsn-app-ui:
     image: link-nhsn-app-ui

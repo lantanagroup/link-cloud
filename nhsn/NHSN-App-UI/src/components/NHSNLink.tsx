@@ -9,13 +9,19 @@ import './NHSNLink.css';
 export interface NHSNLinkProps {
   activeTestUser?: TestUserProfile;
   userInfoService?: UserInfoService;
+  baseUrl?: string;
 }
 
 type RouteName = 'home' | 'users' | 'onboarding';
 
 const defaultService = new UserInfoService();
+const routePathMap: Record<RouteName, string> = {
+  home: '/',
+  users: '/admin/users',
+  onboarding: '/onboard'
+};
 
-export function NHSNLink({ activeTestUser, userInfoService = defaultService }: NHSNLinkProps) {
+export function NHSNLink({ activeTestUser, userInfoService = defaultService, baseUrl = '/' }: NHSNLinkProps) {
   const [userInfo, setUserInfo] = useState<UserInfoResponse | null>(null);
   const [users, setUsers] = useState<UserRoleSummaryResponse[]>([]);
   const [usersError, setUsersError] = useState<string | null>(null);
@@ -23,6 +29,17 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
   const [loading, setLoading] = useState(true);
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [route, setRoute] = useState<RouteName>('home');
+  const normalizedBaseUrl = useMemo(() => normalizeBaseUrl(baseUrl), [baseUrl]);
+
+  useEffect(() => {
+    const syncRoute = () => {
+      setRoute(resolveRoute(window.location.pathname, normalizedBaseUrl));
+    };
+
+    syncRoute();
+    window.addEventListener('popstate', syncRoute);
+    return () => window.removeEventListener('popstate', syncRoute);
+  }, [normalizedBaseUrl]);
 
   useEffect(() => {
     let mounted = true;
@@ -78,17 +95,21 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
   }, [userInfo]);
 
   useEffect(() => {
+    if (!userInfo) {
+      return;
+    }
+
     if (userInfo?.IsSystemAdmin) {
       if (route === 'onboarding') {
-        setRoute('home');
+        navigateTo('home');
       }
       return;
     }
 
     if (route === 'users') {
-      setRoute('home');
+      navigateTo('home');
     }
-  }, [route, userInfo?.IsSystemAdmin]);
+  }, [route, userInfo?.IsSystemAdmin, normalizedBaseUrl]);
 
   useEffect(() => {
     if (!activeTestUser || !userInfo?.IsSystemAdmin) {
@@ -116,7 +137,7 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
   }, [activeTestUser, userInfo?.IsSystemAdmin, userInfoService]);
 
   if (loading) {
-    return <div className="nhsn-link__state">Loading NHSNLink user context…</div>;
+    return <div className="nhsn-link__state">Loading NHSNLink user contextï¿½</div>;
   }
 
   if (error) {
@@ -143,6 +164,15 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
     );
   }
 
+  function navigateTo(nextRoute: RouteName) {
+    const targetPath = buildPath(nextRoute, normalizedBaseUrl);
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath);
+    }
+
+    setRoute(nextRoute);
+  }
+
   return (
     <div className="nhsn-link">
       <div className="nhsn-link__layout">
@@ -150,7 +180,7 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
           title="NHSNLink"
           items={navigation}
           activeRoute={route}
-          onNavigate={setRoute}
+          onNavigate={navigateTo}
           userName={userInfo.Name}
           userEmail={userInfo.Email} />
 
@@ -174,7 +204,7 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
                     <button
                       type="button"
                       className="nhsn-link__action-button"
-                      onClick={() => setRoute('onboarding')}>
+                      onClick={() => navigateTo('onboarding')}>
                       Begin Onboarding
                     </button>
                   </>
@@ -221,3 +251,45 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
 }
 
 export default NHSNLink;
+
+function normalizeBaseUrl(baseUrl: string): string {
+  if (!baseUrl || baseUrl === '/') {
+    return '/';
+  }
+
+  const withLeadingSlash = baseUrl.startsWith('/') ? baseUrl : `/${baseUrl}`;
+  return withLeadingSlash.endsWith('/') ? withLeadingSlash.slice(0, -1) : withLeadingSlash;
+}
+
+function buildPath(route: RouteName, baseUrl: string): string {
+  const normalizedBase = normalizeBaseUrl(baseUrl);
+  const routePath = routePathMap[route];
+
+  if (normalizedBase === '/') {
+    return routePath;
+  }
+
+  return routePath === '/'
+    ? normalizedBase
+    : `${normalizedBase}${routePath}`;
+}
+
+function resolveRoute(pathname: string, baseUrl: string): RouteName {
+  const normalizedBase = normalizeBaseUrl(baseUrl);
+  const strippedPath = normalizedBase === '/'
+    ? pathname || '/'
+    : pathname.startsWith(normalizedBase)
+      ? pathname.slice(normalizedBase.length) || '/'
+      : '/';
+
+  switch (strippedPath) {
+    case '/admin/users':
+      return 'users';
+    case '/onboard':
+      return 'onboarding';
+    case '/':
+    case '':
+    default:
+      return 'home';
+  }
+}

@@ -32,6 +32,21 @@ This is the same component used by:
 - the standalone lower-environment shell
 - the embeddable NHSN App integration package
 
+### Public component contract
+
+The component supports a configurable routing base via:
+
+- `baseUrl`
+
+Examples:
+
+```tsx
+<NHSNLink baseUrl="/" />
+<NHSNLink baseUrl="/nhsnlink" />
+```
+
+The standalone app host uses `/` while the embedded NHSN App scenario is expected to use `/nhsnlink`.
+
 ## How the UI initializes
 
 The UI does **not** take a JWT prop.
@@ -41,6 +56,13 @@ Instead, `NHSNLink` initializes by calling the BFF:
 - `GET /api/nhsn-app-bff/userinfo`
 
 The BFF resolves who the user is, what NHSNLink role they have, and whether they are in onboarding or maintenance mode.
+
+The `/userinfo` response also drives:
+
+- whether the user is active or disabled
+- whether onboarding is required
+- whether the user is a System Administrator
+- the navigation options that should be available
 
 ## Shell simulation model
 
@@ -78,8 +100,36 @@ The BFF only honors that header when its lower-environment simulation feature fl
 
 - onboarding navigation
 - maintenance/configuration navigation
+- system-administrator-specific navigation
 
 This is the initial framework/foundation behavior. It is intentionally light-weight but establishes the long-term UI shape.
+
+### Navigation component
+
+The navigation rail is implemented as its own component:
+
+- `src/components/NavigationRail.tsx`
+
+It is responsible for:
+
+- rendering the `NHSNLink` heading
+- rendering route-aware navigation buttons
+- highlighting the active route
+- rendering current-user identity at the bottom of the rail
+
+### Current routes
+
+The UI currently supports component-controlled routes relative to `baseUrl`:
+
+- `/` → Home
+- `/onboard` → Onboarding
+- `/admin/users` → System administrator user management
+
+Under an embedded base of `/nhsnlink`, those resolve as:
+
+- `/nhsnlink`
+- `/nhsnlink/onboard`
+- `/nhsnlink/admin/users`
 
 ## Project structure
 
@@ -88,6 +138,12 @@ Reusable UI components intended for the embeddable package.
 
 Important file:
 - `src/components/NHSNLink.tsx`
+
+Other key components:
+- `src/components/NavigationRail.tsx`
+- `src/components/OnboardingScreen.tsx`
+- `src/components/SystemAdminUsersScreen.tsx`
+- `src/components/notifications/NotificationProvider.tsx`
 
 ### `src/services`
 Client-side service layer.
@@ -100,6 +156,8 @@ Adapter layer for web-component registration and NHSN App hosting.
 
 Important file:
 - `src/web-component/register.ts`
+
+The custom element supports a `baseurl` attribute so the embedded host can control the routing base path.
 
 ### `src/app-shell`
 Standalone lower-environment shell.
@@ -120,7 +178,7 @@ Command:
 
 Output:
 
-- `dist/app-shell/...`
+- `dist/...`
 
 This output is what the Dockerfile publishes for lower/test environments.
 
@@ -146,6 +204,12 @@ npm start
 
 This starts the lower-environment shell on port `4300` and proxies `/api` requests to the BFF on `http://localhost:8079`.
 
+In the standalone shell, the app host renders:
+
+```tsx
+<NHSNLink baseUrl="/" />
+```
+
 ### Build both outputs
 
 ```bash
@@ -167,6 +231,51 @@ The Docker image is not the delivery mechanism for the embeddable webpack artifa
 When launched through `docker compose`, the shell is exposed on port `8090` so it does not conflict with the webpack development server port used locally.
 
 Inside Docker, the standalone shell runtime server proxies `/api` requests to the BFF using the `BFF_BASE_URL` environment variable. By default in compose this is set to `http://nhsn-app-bff:8079/api` so browser calls like `/api/nhsn-app-bff/userinfo` reach the BFF with the expected `/api/...` route prefix.
+
+The Docker-hosted shell also renders with a base URL of `/`, while the custom element wrapper defaults to `/nhsnlink` for embedded usage.
+
+## Notifications
+
+The UI includes a reusable notification provider:
+
+- `src/components/notifications/NotificationProvider.tsx`
+
+Behavior:
+
+- notifications appear in the bottom-right corner
+- multiple notifications stack vertically
+- success/info notifications auto-dismiss after 5 seconds
+- error notifications remain visible until explicitly dismissed
+- all notifications can be manually closed
+
+This notification system is used for real-time persisted updates such as system administrator role/status changes.
+
+## System administrator behavior
+
+System administrators have a separate route and screen:
+
+- `/admin/users`
+
+This screen allows them to:
+
+- view users
+- change user roles
+- enable/disable users
+
+Safeguards currently in place:
+
+- a system administrator cannot change their own role
+- a system administrator cannot disable their own account
+
+The UI prevents those actions and the BFF also enforces them server-side.
+
+## Disabled-user behavior
+
+If `/userinfo` indicates that the current user is disabled, the UI blocks normal usage and shows:
+
+- `Your account does not have access to NHSNLink. Submit a request to restore access`
+
+If the BFF provides an access-request URL, the user is shown a clickable `Submit a request` link.
 
 ## Why the shell exists
 
