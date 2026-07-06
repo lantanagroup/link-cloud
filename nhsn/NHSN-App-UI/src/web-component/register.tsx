@@ -7,21 +7,38 @@ import '../styles.scss';
 class NhsnLinkElement extends HTMLElement {
   private root?: Root;
 
+  static get observedAttributes() {
+    return ['baseurl'];
+  }
+
+  attributeChangedCallback() {
+    this.renderComponent();
+  }
+
   connectedCallback() {
     if (!this.root) {
       this.root = createRoot(this);
     }
 
-    this.root.render(
-      <NotificationProvider>
-        <NHSNLink />
-      </NotificationProvider>
-    );
+    this.renderComponent();
   }
 
   disconnectedCallback() {
     this.root?.unmount();
     this.root = undefined;
+  }
+
+  private renderComponent() {
+    if (!this.root) {
+      return;
+    }
+
+    const baseUrl = this.getAttribute('baseurl') || '/nhsnlink';
+    this.root.render(
+      <NotificationProvider>
+        <NHSNLink baseUrl={baseUrl} />
+      </NotificationProvider>
+    );
   }
 }
 
