@@ -208,7 +208,9 @@ class RemoteTermServiceValidationTest {
         assertNotNull(result);
         assertEquals(CODE, result.getCode());
         assertEquals(IssueSeverity.WARNING, result.getSeverity());
-        assertEquals("Code is inactive.", result.getMessage());
+        assertEquals(
+                "The concept '" + CODE + "' has a status of inactive and its use should be reviewed.",
+                result.getMessage());
     }
 
     @Test

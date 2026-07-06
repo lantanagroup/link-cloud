@@ -1,7 +1,9 @@
 package com.lantanagroup.link.validation.services;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.CategoryRule;
+import com.lantanagroup.link.validation.entities.CategorySnapshot;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.entities.ResultField;
 import com.lantanagroup.link.validation.matchers.CompositeMatcher;
@@ -13,7 +15,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -253,6 +258,60 @@ public class CategorizationServiceTest {
         categorizationService.categorize(List.of(result));
 
         assertFalse(result.getCategories().contains(category));
+    }
+
+    /**
+     * Loads the categories that actually ship in categories.json so the tests below exercise the real
+     * inactive_code matcher rather than a hand-copied regex (guards against drift between the shipped
+     * category and the message the validation service emits).
+     */
+    private List<Category> loadShippedCategories() throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        try (InputStream stream = Thread.currentThread().getContextClassLoader().getResourceAsStream("categories.json")) {
+            CategorySnapshot[] snapshots = mapper.readValue(stream, CategorySnapshot[].class);
+            return Arrays.stream(snapshots)
+                    .map(snapshot -> {
+                        Category category = snapshot.toCategory();
+                        category.setRules(List.of(snapshot.toCategoryRule(category)));
+                        return category;
+                    })
+                    .toList();
+        }
+    }
+
+    @Test
+    void categorizeAssignsInactiveCodeCategoryForInactiveMessage() throws IOException {
+        when(categoryRepository.findAll()).thenReturn(loadShippedCategories());
+
+        Result result = new Result();
+        // Exactly what RemoteTermServiceValidation emits for an inactive code, located on Encounter.type.
+        result.setMessage("The concept '423666004' has a status of inactive and its use should be reviewed.");
+        result.setExpression("Bundle.entry[0].resource.ofType(Encounter).type[0].coding[0]");
+
+        categorizationService.categorize(List.of(result));
+
+        // The composite matcher (inactive message AND Encounter.type expression) assigns this category ...
+        assertTrue(
+                result.getCategories().stream().anyMatch(category -> "missing_active_encounter_type_code".equals(category.getId())),
+                "An inactive Encounter.type code should be categorized as missing_active_encounter_type_code");
+        // ... and the expression discriminates it from other resources' inactive categories.
+        assertFalse(
+                result.getCategories().stream().anyMatch(category -> "missing_active_condition_code".equals(category.getId())),
+                "An Encounter.type expression must not match the Condition.code inactive category");
+    }
+
+    @Test
+    void categorizeDoesNotAssignInactiveCodeCategoryForOtherMessage() throws IOException {
+        when(categoryRepository.findAll()).thenReturn(loadShippedCategories());
+
+        Result result = new Result();
+        result.setMessage("Some other rule");
+
+        categorizationService.categorize(List.of(result));
+
+        assertFalse(
+                result.getCategories().stream().anyMatch(category -> "missing_active_encounter_type_code".equals(category.getId())),
+                "A non-inactive message must not be categorized as inactive_code");
     }
 }
 

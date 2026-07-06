@@ -341,7 +341,7 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
 
             if (isInactiveIssue(output)) {
                 codeResult.setSeverity(IssueSeverity.WARNING);
-                codeResult.setMessage("Code is inactive.");
+                codeResult.setMessage(String.format("The concept '%s' has a status of inactive and its use should be reviewed.", theCode));
             }
 
             return codeResult;
@@ -355,7 +355,7 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
      * 
      * @return true if the code is inactive, false otherwise
      */
-    protected Boolean isInactiveIssue(IBaseParameters output) {
+    protected boolean isInactiveIssue(IBaseParameters output) {
 
         if (!(output instanceof org.hl7.fhir.r4.model.Parameters parameters)) {
             // Output is not an R4 Parameters resource, cannot evaluate for inactive code
@@ -383,7 +383,7 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
             issue.getSeverity() == org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity.WARNING &&
             message.equalsIgnoreCase("code is inactive.")) {
                 return true;
-            };
+            }
 
         return false;
     }
