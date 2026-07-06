@@ -73,9 +73,11 @@ public class UserInfoService : IUserInfoService
             Roles = roleNames,
             IsSystemAdmin = isSystemAdmin,
             IsOnboarded = user.IsOnboarded,
+            IsActive = user.IsActive,
             FacilityId = user.FacilityId,
             Groups = SplitGroups(user.GroupsRaw),
-            AvailableNavigation = availableNavigation
+            AvailableNavigation = availableNavigation,
+            AccessRequestUrl = _jwtSettings.AccessRequestUrl
         };
     }
 

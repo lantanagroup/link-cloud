@@ -15,4 +15,5 @@ public class NhsnJwtSettings
     public string PublicCertificatePem { get; set; } = string.Empty;
     public bool AllowSimulatedJwtHeader { get; set; }
     public string SimulatedJwtHeaderName { get; set; } = "jwt";
+    public string AccessRequestUrl { get; set; } = string.Empty;
 }

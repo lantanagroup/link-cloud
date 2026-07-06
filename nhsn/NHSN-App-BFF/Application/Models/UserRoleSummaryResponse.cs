@@ -7,5 +7,6 @@ public class UserRoleSummaryResponse
     public string Name { get; set; } = string.Empty;
     public string? FacilityId { get; set; }
     public bool IsOnboarded { get; set; }
+    public bool IsActive { get; set; }
     public IReadOnlyCollection<string> Roles { get; set; } = [];
 }
