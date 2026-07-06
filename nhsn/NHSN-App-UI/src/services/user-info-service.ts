@@ -61,6 +61,21 @@ export class UserInfoService {
     return response.json() as Promise<UserRoleSummaryResponse>;
   }
 
+  async updateUserStatus(activeProfile: TestUserProfile, userId: string, isActive: boolean): Promise<UserRoleSummaryResponse> {
+    const response = await fetch(`/api/nhsn-app-bff/users/${userId}/status`, {
+      method: 'PUT',
+      headers: this.createHeaders(activeProfile),
+      credentials: 'include',
+      body: JSON.stringify({ isActive })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Unable to update user status (${response.status}).`);
+    }
+
+    return response.json() as Promise<UserRoleSummaryResponse>;
+  }
+
   private createHeaders(activeProfile?: TestUserProfile): Headers {
     const headers = new Headers();
     headers.set('Accept', 'application/json');

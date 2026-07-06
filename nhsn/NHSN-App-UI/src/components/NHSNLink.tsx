@@ -126,6 +126,22 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
     return <div className="nhsn-link__state">No user context was returned.</div>;
   }
 
+  if (!userInfo.IsActive) {
+    return (
+      <div className="nhsn-link__state">
+        <div style={{ maxWidth: '600px', textAlign: 'center', padding: '1rem' }}>
+          <h2>Your account does not have access to NHSNLink.</h2>
+          <p>Submit a request to restore access.</p>
+          {userInfo.AccessRequestUrl && (
+            <p>
+              <a href={userInfo.AccessRequestUrl} target="_blank" rel="noreferrer">Submit a request</a>
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="nhsn-link">
       <header className="nhsn-link__header">
@@ -203,6 +219,7 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
           {route === 'users' && activeTestUser && userInfo.IsSystemAdmin && (
             <SystemAdminUsersScreen
               activeTestUser={activeTestUser}
+              currentUserEmail={userInfo.Email}
               userInfoService={userInfoService}
               users={users}
               usersError={usersError}

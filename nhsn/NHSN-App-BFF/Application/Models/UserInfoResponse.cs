@@ -7,7 +7,9 @@ public class UserInfoResponse
     public IReadOnlyCollection<string> Roles { get; set; } = [];
     public bool IsSystemAdmin { get; set; }
     public bool IsOnboarded { get; set; }
+    public bool IsActive { get; set; }
     public string? FacilityId { get; set; }
     public IReadOnlyCollection<string> Groups { get; set; } = [];
     public IReadOnlyCollection<string> AvailableNavigation { get; set; } = [];
+    public string? AccessRequestUrl { get; set; }
 }
