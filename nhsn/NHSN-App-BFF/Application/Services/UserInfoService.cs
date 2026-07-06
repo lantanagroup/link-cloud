@@ -59,15 +59,19 @@ public class UserInfoService : IUserInfoService
         }
 
         var roleNames = user.UserRoles.Select(x => x.Role.Name).OrderBy(x => x).ToArray();
-        var availableNavigation = user.IsOnboarded
-            ? new[] { "maintenance", "configuration-overview", "configuration-changes" }
-            : new[] { "onboarding" };
+        var isSystemAdmin = roleNames.Contains(NhsnAppConstants.Roles.SystemAdmin, StringComparer.OrdinalIgnoreCase);
+        var availableNavigation = isSystemAdmin
+            ? new[] { "users" }
+            : user.IsOnboarded
+                ? new[] { "maintenance", "configuration-overview", "configuration-changes" }
+                : new[] { "onboarding" };
 
         return new UserInfoResponse
         {
             Email = user.Email,
             Name = user.Name,
             Roles = roleNames,
+            IsSystemAdmin = isSystemAdmin,
             IsOnboarded = user.IsOnboarded,
             FacilityId = user.FacilityId,
             Groups = SplitGroups(user.GroupsRaw),

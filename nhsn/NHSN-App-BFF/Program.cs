@@ -80,9 +80,11 @@ static void RegisterServices(WebApplicationBuilder builder)
     }
 
     builder.Services.AddScoped<IUserInfoService, UserInfoService>();
+    builder.Services.AddScoped<IUserAdministrationService, UserAdministrationService>();
 
     builder.Services.AddTransient<IApi, UserInfoEndpoints>();
     builder.Services.AddTransient<IApi, SimulationEndpoints>();
+    builder.Services.AddTransient<IApi, UserAdministrationEndpoints>();
 
     builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>("Database");
 

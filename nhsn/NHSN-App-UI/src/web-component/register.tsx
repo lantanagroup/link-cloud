@@ -1,6 +1,7 @@
 import React from 'react';
 import {createRoot, Root} from 'react-dom/client';
 import {NHSNLink} from '../components/NHSNLink';
+import {NotificationProvider} from '../components/notifications/NotificationProvider';
 
 class NhsnLinkElement extends HTMLElement {
   private root?: Root;
@@ -10,7 +11,11 @@ class NhsnLinkElement extends HTMLElement {
       this.root = createRoot(this);
     }
 
-    this.root.render(<NHSNLink />);
+    this.root.render(
+      <NotificationProvider>
+        <NHSNLink />
+      </NotificationProvider>
+    );
   }
 
   disconnectedCallback() {
