@@ -158,7 +158,7 @@ public class PatientListsAcquiredListener : BackgroundService
                             _transientExceptionHandler.Topic = rawmessage?.Topic + "-Retry";
                             _transientExceptionHandler.HandleException(rawmessage, ex, rawmessage.Key);
                         }
-                        catch (OperationCanceledException)
+                        catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                         {
                             throw;
                         }
@@ -191,7 +191,7 @@ public class PatientListsAcquiredListener : BackgroundService
                     var offset = ex.ConsumerRecord?.TopicPartitionOffset;
                     kafkaConsumer.Commit(offset == null ? new List<TopicPartitionOffset>() : new List<TopicPartitionOffset> { offset });
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
                     throw;
                 }
