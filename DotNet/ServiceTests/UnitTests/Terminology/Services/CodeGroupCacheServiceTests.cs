@@ -502,6 +502,48 @@ http://test.system,123,Test Display,Extra Value";
         Assert.All(codes, code => Assert.Equal(CodeStatus.Active, ((CodeSystemCode)code).Status));
     }
 
+    [Fact]
+    public async Task LoadCache_MixedCaseStatus_ParsesCaseInsensitively()
+    {
+        // Use a real memory cache and the real service (only the file-system seams are
+        // overridden) so LoadCache/ProcessCodeSystemCsv/SetCodeGroup are all exercised.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/cs"] = new[] { "cs.json", "cs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["cs.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
+                          "\"url\": \"http://test.codesystem\", \"version\": \"1.0\" }",
+            // Status values in varied casing must all parse and canonicalize to the enum.
+            ["cs.csv"] = "code,display,status\r\n" +
+                         "123,Test Display,active\r\n" +
+                         "456,Another Display,INACTIVE\r\n" +
+                         "789,Third Display,Inactive\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+
+        // Act
+        await service.LoadCache();
+
+        // Assert - lowercase/uppercase/mixed-case status all load and normalize correctly.
+        var codeGroup = service.GetCodeGroup(
+            CodeGroup.CodeGroupTypes.CodeSystem, "http://test.codesystem");
+
+        Assert.NotNull(codeGroup);
+        var codes = codeGroup.Codes["http://test.codesystem"];
+        Assert.Equal(3, codes.Count);
+        Assert.Equal(CodeStatus.Active, ((CodeSystemCode)codes[0]).Status);
+        Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[1]).Status);
+        Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[2]).Status);
+    }
+
     /// <summary>
     /// Real <see cref="CodeGroupCacheService"/> with only the file-system seams overridden,
     /// so LoadCache and everything it calls run against the actual implementation.

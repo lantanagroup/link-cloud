@@ -35,5 +35,6 @@ public class CsvCodeSystemRecord
     /// </summary>
     [Index(2)]
     [Default(CodeStatus.Active)]
+    [EnumIgnoreCase]
     public CodeStatus Status { get; set; } = CodeStatus.Active;
 }
