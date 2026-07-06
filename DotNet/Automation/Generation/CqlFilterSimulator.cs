@@ -465,7 +465,8 @@ public static class CqlFilterSimulator
             || measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation);
 
         protected override bool IncludeProcedure(ProcedureContext p, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows) =>
-            ipWindows.AnyOverlaps(p.PerformedStart, p.PerformedEnd);
+            ipWindows.AnyOverlaps(p.PerformedStart, p.PerformedEnd)
+            || ipWindows.AnyEncounterMatches(p.EncounterReference);
     }
 
     // ----- MedicationRequest profiles -----
