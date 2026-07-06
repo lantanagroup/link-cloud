@@ -86,7 +86,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         {
                             TransientExceptionHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
                         }
-                        catch (OperationCanceledException)
+                        catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                         {
                             throw;
                         }
