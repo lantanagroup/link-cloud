@@ -5,7 +5,7 @@ import com.azure.core.util.BinaryData;
 import com.azure.storage.blob.BlobUrlParts;
 import com.lantanagroup.link.shared.Timer;
 import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
-import com.lantanagroup.link.shared.kafka.AsyncListener;
+import com.lantanagroup.link.shared.kafka.AbstractAsyncConsumer;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.services.ReportClient;
@@ -22,15 +22,18 @@ import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.hl7.fhir.r4.model.Bundle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
-public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation.Key, ReadyForValidation> {
+public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForValidation.Key, ReadyForValidation> {
     private final Logger _logger = LoggerFactory.getLogger(ReadyForValidationConsumer.class);
     private final FhirContext fhirContext;
     private final ReportClient reportClient;
@@ -50,7 +53,7 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             KafkaTemplate<String, ValidationComplete> validationCompleteTemplate,
             ValidationMetrics validationMetrics,
             Optional<BlobStorageService> blobStorageService,
-            ConsumerRecordRecoverer recoverer) {
+            @Qualifier("readyForValidationRecoverer") ConsumerRecordRecoverer recoverer) {
         super(recoverer);
         this.fhirContext = fhirContext;
         this.reportClient = reportClient;
@@ -60,6 +63,13 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         this.validationCompleteTemplate = validationCompleteTemplate;
         this.validationMetrics = validationMetrics;
         this.blobStorageService = blobStorageService.orElse(null);
+    }
+
+    @KafkaListener(topics = Topics.READY_FOR_VALIDATION, containerFactory = "manualAckListenerContainerFactory")
+    public void consume(
+            ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record,
+            Acknowledgment acknowledgment) {
+        doConsume(record, acknowledgment);
     }
 
     @Override

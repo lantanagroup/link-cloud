@@ -8,7 +8,6 @@ import com.lantanagroup.link.shared.kafka.records.ResourceKey;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.hl7.fhir.r4.model.MeasureReport;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.data.mongodb.core.MongoOperations;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -19,7 +18,6 @@ import org.springframework.stereotype.Service;
 import java.util.function.Predicate;
 
 @Service
-@Lazy(false)
 public class ResourcesNormalizedConsumer extends AbstractResourceConsumer<ResourcesNormalized> {
   public ResourcesNormalizedConsumer (
           PatientReportingEvaluationStatusRepository patientStatusRepository,
