@@ -2,6 +2,7 @@ import React from 'react';
 import {createRoot, Root} from 'react-dom/client';
 import {NHSNLink} from '../components/NHSNLink';
 import {NotificationProvider} from '../components/notifications/NotificationProvider';
+import '../styles.scss';
 
 class NhsnLinkElement extends HTMLElement {
   private root?: Root;

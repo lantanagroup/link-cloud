@@ -19,3 +19,5 @@ yarn-error.log
 
 # Local-only config
 app.config.local.json
+
+packages/
