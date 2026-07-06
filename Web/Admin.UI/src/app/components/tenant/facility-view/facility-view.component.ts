@@ -35,6 +35,8 @@ import {MatSelectModule} from '@angular/material/select';
 import {MatDatepickerModule} from '@angular/material/datepicker';
 import {MatCheckbox} from '@angular/material/checkbox';
 import {MatTooltipModule} from '@angular/material/tooltip';
+import {MatTabsModule} from '@angular/material/tabs';
+import {LocationsListComponent} from './locations-list/locations-list.component';
 
 @Component({
   selector: 'app-facility-view',
@@ -56,7 +58,9 @@ import {MatTooltipModule} from '@angular/material/tooltip';
     MatSelectModule,
     MatDatepickerModule,
     MatCheckbox,
-    MatTooltipModule
+    MatTooltipModule,
+    MatTabsModule,
+    LocationsListComponent
   ],
   templateUrl: './facility-view.component.html',
   styleUrl: './facility-view.component.scss'

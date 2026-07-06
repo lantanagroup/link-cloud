@@ -1,4 +1,4 @@
-import {HttpClient} from '@angular/common/http';
+import {HttpClient, HttpParams} from '@angular/common/http';
 import {Injectable} from '@angular/core';
 import {ErrorHandlingService} from '../../error-handling.service';
 import {Observable, tap, map, catchError, throwError} from 'rxjs';
@@ -28,6 +28,7 @@ import {
   IUpdateOrganizationLocationConfigurationModel
 } from 'src/app/interfaces/data-acquisition/organization-location-config-model.interface';
 import {IFhirPathValidationResponse} from 'src/app/interfaces/data-acquisition/fhir-path-validation-response.interface';
+import {IPagedOrganizationLocationMapping} from 'src/app/interfaces/data-acquisition/organization-location-mapping-model.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -315,6 +316,58 @@ export class DataAcquisitionService {
           return this.errorHandler.handleError(error);
         })
       )
+  }
+
+  // Returns a paged, filterable list of the facility's location mappings. The DataAcquisition
+  // search endpoint is 1-based; callers pass a 0-based page index (matching MatPaginator) and
+  // the metadata is converted back to 0-based on the way out.
+  getLocationMappings(
+    facilityId: string,
+    pageNumber: number = 0,
+    pageSize: number = 10,
+    filters?: {
+      locationId?: string;
+      locationName?: string;
+      locationAlias?: string;
+      partOfValue?: string;
+      isOrgLocation?: boolean;
+      isActive?: boolean;
+    }
+  ): Observable<IPagedOrganizationLocationMapping> {
+    const url = `${this.appConfigService.config?.baseApiUrl}/data/location-mappings/facility/${facilityId}/search`;
+
+    let params = new HttpParams()
+      .set('pageNumber', (pageNumber + 1).toString())
+      .set('pageSize', pageSize.toString());
+
+    if (filters?.locationId) {
+      params = params.set('LocationId', filters.locationId);
+    }
+    if (filters?.locationName) {
+      params = params.set('LocationName', filters.locationName);
+    }
+    if (filters?.locationAlias) {
+      params = params.set('LocationAlias', filters.locationAlias);
+    }
+    if (filters?.partOfValue) {
+      params = params.set('PartOfValue', filters.partOfValue);
+    }
+    if (filters?.isOrgLocation !== undefined && filters?.isOrgLocation !== null) {
+      params = params.set('IsOrgLocation', filters.isOrgLocation.toString());
+    }
+    if (filters?.isActive !== undefined && filters?.isActive !== null) {
+      params = params.set('IsActive', filters.isActive.toString());
+    }
+
+    return this.http.get<IPagedOrganizationLocationMapping>(url, {params})
+      .pipe(
+        map((response: IPagedOrganizationLocationMapping) => {
+          response.metadata.pageNumber--;
+          return response;
+        }),
+        // Suppress the global toast; the Locations tab surfaces the error inline.
+        catchError((error) => this.errorHandler.handleError(error, false))
+      );
   }
 
   // Reporting Organization (Location Config) Methods
