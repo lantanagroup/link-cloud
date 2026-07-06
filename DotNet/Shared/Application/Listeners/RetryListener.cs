@@ -121,7 +121,7 @@ namespace LantanaGroup.Link.Shared.Application.Listeners
                                 _deadLetterExceptionHandler.Topic = consumeResult.Topic.Replace("-Retry", "-Error");
                                 _deadLetterExceptionHandler.HandleException(consumeResult, ex, facilityId);
                             }
-                            catch (OperationCanceledException)
+                            catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
                                 throw;
                             }
