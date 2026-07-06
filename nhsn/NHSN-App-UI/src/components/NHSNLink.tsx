@@ -144,16 +144,11 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
 
   return (
     <div className="nhsn-link">
-      <header className="nhsn-link__header">
-        <h1 className="nhsn-link__title">NHSNLink</h1>
-        <div className="nhsn-link__subtitle">
-          Signed in as <strong>{userInfo.Name}</strong> ({userInfo.Email})
-        </div>
-      </header>
-
       <div className="nhsn-link__layout">
         <aside className="nhsn-link__nav">
-          <h2>Navigation</h2>
+          <div>
+            <h1 className="nhsn-link__nav-title">NHSNLink</h1>
+          </div>
           <ul>
             {navigation.map(item => (
               <li key={item.key}>
@@ -166,6 +161,14 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService }: N
               </li>
             ))}
           </ul>
+
+          <div className="nhsn-link__nav-userinfo">
+            <p>
+              {userInfo.Name}
+              <br />
+              {userInfo.Email}
+            </p>
+          </div>
         </aside>
 
         <section className="nhsn-link__grid">

@@ -199,3 +199,66 @@ Future work can add:
 - configuration maintenance details
 - shared NHSN React core components once available
 - more sophisticated navigation and role-based experiences
+
+## Temporary `nhsn-react-core` package usage
+
+Until `nhsn-react-core` is published to a shared internal package location, this project can consume the package from a local `.tgz` placed inside the UI project.
+
+### Expected folder
+
+Create this folder locally:
+
+- `D:\Code\link-cloud\nhsn\NHSN-App-UI\packages\`
+
+Place the package there, for example:
+
+- `D:\Code\link-cloud\nhsn\NHSN-App-UI\packages\nhsn-react-core-1.2.3.tgz`
+
+The `packages/` folder should remain gitignored so the private package is never committed to the public repository.
+
+### Install pattern
+
+Install the package from the local file path inside the project:
+
+```bash
+npm install --save .\packages\nhsn-react-core-1.2.3.tgz
+```
+
+This allows npm to record a local file dependency while keeping the actual `.tgz` out of source control.
+
+### Local developer setup
+
+1. Obtain the private `nhsn-react-core` `.tgz`
+2. Copy it into:
+   - `D:\Code\link-cloud\nhsn\NHSN-App-UI\packages\`
+3. Run:
+
+```bash
+npm install --save .\packages\nhsn-react-core-1.2.3.tgz
+npm run build
+```
+
+### CI / secured build agent setup
+
+A build agent should:
+
+1. Download or copy the `.tgz` from a secure internal location
+2. Place it in:
+   - `D:\Code\link-cloud\nhsn\NHSN-App-UI\packages\`
+3. Run `npm install --save .\packages\nhsn-react-core-<version>.tgz`
+4. Run the normal build
+
+### Docker build implications
+
+This approach works better with Docker than a host-only environment variable path because the package is expected to live **inside the UI project build context**.
+
+As long as the `.tgz` has been placed in `packages/` before the Docker build starts, the Docker build can access it naturally.
+
+### Source-control safety
+
+The following are intentionally **not** committed:
+
+- the `packages/` contents
+- the private `.tgz` package itself
+
+This keeps the public repository free of private artifacts while still allowing local, CI, and Docker builds to consume the package temporarily.

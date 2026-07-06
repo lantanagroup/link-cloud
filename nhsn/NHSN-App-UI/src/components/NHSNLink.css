@@ -3,22 +3,7 @@
   color: #12344d;
   background: #f5f8fa;
   min-height: 100vh;
-}
-
-.nhsn-link__header {
-  background: #005ea2;
-  color: white;
-  padding: 1rem 1.5rem;
-}
-
-.nhsn-link__title {
-  margin: 0;
-  font-size: 1.5rem;
-}
-
-.nhsn-link__subtitle {
-  margin-top: 0.25rem;
-  opacity: 0.9;
+  display: flex;
 }
 
 .nhsn-link__layout {
@@ -26,6 +11,9 @@
   grid-template-columns: 260px 1fr;
   gap: 1.5rem;
   padding: 1.5rem;
+  box-sizing: border-box;
+  min-height: 100vh;
+  width: 100%;
 }
 
 .nhsn-link__nav,
@@ -35,6 +23,16 @@
   border-radius: 8px;
   padding: 1rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.nhsn-link__nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.nhsn-link__nav-title {
+  margin: 0 0 1rem 0;
+  font-size: 1.5rem;
 }
 
 .nhsn-link__nav ul,
@@ -50,6 +48,18 @@
 
 .nhsn-link__nav li {
   margin-bottom: 0.5rem;
+}
+
+.nhsn-link__nav-userinfo {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid #d9e2ec;
+  color: #486581;
+}
+
+.nhsn-link__nav-userinfo p {
+  margin: 0;
+  line-height: 1.5;
 }
 
 .nhsn-link__nav-button {
