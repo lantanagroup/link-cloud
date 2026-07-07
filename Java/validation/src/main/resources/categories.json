@@ -176,8 +176,17 @@
     "matcher": {
       "children": [
         {
-          "field": "MESSAGE",
-          "regex": "^Unknown Code '.*' in the system '.*'; The provided code .* is not in the value set '.*'"
+          "children": [
+            {
+              "field": "MESSAGE",
+              "regex": "^Unknown Code '.*' in the system '.*'; The provided code .* is not in the value set '.*'"
+            },
+            {
+              "field": "MESSAGE",
+              "regex": "Unknown code '.*' for in-memory expansion of ValueSet '.*'"
+            }
+          ],
+          "requiresAllChildren": false
         },
         {
           "field": "MESSAGE",
@@ -193,13 +202,9 @@
           "field": "MESSAGE",
           "regex": "Unknown code 'urn:oid:1\\.2\\.840\\.114350\\..*' for in-memory expansion of ValueSet",
           "inverted": true
-        },
-        {
-          "field": "MESSAGE",
-          "regex": "Unknown code '.*' for in-memory expansion of ValueSet '.*'"
         }
       ],
-      "requiresAllChildren": false
+      "requiresAllChildren": true
     }
   },
   {
@@ -434,24 +439,29 @@
     "matcher": {
       "children": [
         {
-          "field": "MESSAGE",
-          "regex": "None of the codings provided are in the value set '.*' \\(.*\\), and a coding should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
-        },
-        {
-          "field": "MESSAGE",
-          "regex": "The value provided \\('[^']*'\\) is not in the value set 'USPS Two Letter Alphabetic Codes' \\(http:\\/\\/hl7\\.org\\/fhir\\/us\\/core\\/ValueSet\\/us-core-usps-state\\|(?:\\d+\\.\\d+\\.\\d+)?\\), and a code should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
-        },
-        {
-          "field": "MESSAGE",
-          "regex": "Could not confirm that the codes provided are in the value set \\'.*\\' \\(http\\:\\/\\/terminology\\.hl7\\.org\\/ValueSet\\/.*\\)\\, and a code should come from this value set unless it has no suitable code .*"
-        },
-        {
-          "field": "MESSAGE",
-          "regex": "The Coding provided \\(.*\\) is not in the value set '.*' \\(.*\\), and a code should come from this value set unless it has no suitable code (note that the validator cannot judge what is suitable).*'http://terminology.hl7.org/ValueSet/v3-ActEncounterCode'"
-        },
-        {
-          "field": "MESSAGE",
-          "regex": "^None of the codings provided are in the value set '.*' .*, and a coding should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
+          "children": [
+            {
+              "field": "MESSAGE",
+              "regex": "None of the codings provided are in the value set '.*' \\(.*\\), and a coding should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
+            },
+            {
+              "field": "MESSAGE",
+              "regex": "The value provided \\('[^']*'\\) is not in the value set 'USPS Two Letter Alphabetic Codes' \\(http:\\/\\/hl7\\.org\\/fhir\\/us\\/core\\/ValueSet\\/us-core-usps-state\\|(?:\\d+\\.\\d+\\.\\d+)?\\), and a code should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
+            },
+            {
+              "field": "MESSAGE",
+              "regex": "Could not confirm that the codes provided are in the value set \\'.*\\' \\(http\\:\\/\\/terminology\\.hl7\\.org\\/ValueSet\\/.*\\)\\, and a code should come from this value set unless it has no suitable code .*"
+            },
+            {
+              "field": "MESSAGE",
+              "regex": "The Coding provided \\(.*\\) is not in the value set '.*' \\(.*\\), and a code should come from this value set unless it has no suitable code (note that the validator cannot judge what is suitable).*'http://terminology.hl7.org/ValueSet/v3-ActEncounterCode'"
+            },
+            {
+              "field": "MESSAGE",
+              "regex": "^None of the codings provided are in the value set '.*' .*, and a coding should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
+            }
+          ],
+          "requiresAllChildren": false
         },
         {
           "field": "MESSAGE",
@@ -459,7 +469,7 @@
           "inverted": true
         }
       ],
-      "requiresAllChildren": false
+      "requiresAllChildren": true
     }
   },
   {
