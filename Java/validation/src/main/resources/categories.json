@@ -454,7 +454,7 @@
             },
             {
               "field": "MESSAGE",
-              "regex": "The Coding provided \\(.*\\) is not in the value set '.*' \\(.*\\), and a code should come from this value set unless it has no suitable code (note that the validator cannot judge what is suitable).*'http://terminology.hl7.org/ValueSet/v3-ActEncounterCode'"
+              "regex": "The Coding provided \\(.*\\) is not in the value set '.*' \\(.*\\), and a code should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\).*'http://terminology.hl7.org/ValueSet/v3-ActEncounterCode'"
             },
             {
               "field": "MESSAGE",
