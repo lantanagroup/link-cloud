@@ -25,14 +25,22 @@ public class ReportApiHelper
     private readonly ISubmissionServiceClient _submissionClient;
     private readonly IAutomationOutput _output;
     private readonly AutomationConfig _automationConfig;
+    private readonly RestClient _adminBffClient;
 
-    public ReportApiHelper(IReportServiceClient reportClient, IFacilityServiceClient facilityClient, ISubmissionServiceClient submissionClient, IAutomationOutput output, AutomationConfig config)
+    public ReportApiHelper(
+        IReportServiceClient reportClient,
+        IFacilityServiceClient facilityClient,
+        ISubmissionServiceClient submissionClient,
+        IHttpClientFactory httpClientFactory,
+        IAutomationOutput output,
+        AutomationConfig config)
     {
         _reportClient = reportClient;
         _facilityClient = facilityClient;
         _submissionClient = submissionClient;
         _output = output;
         _automationConfig = config;
+        _adminBffClient = AdminBffClientFactory.Create(config, httpClientFactory);
     }
 
     public async Task<string> GenerateReportAsync(string facilityId, string measureId, TestScenarioConfig config)
@@ -102,7 +110,6 @@ public class ReportApiHelper
             : reportTrackingId.Trim();
 
         var delayMinutes = Math.Max(1, (int)Math.Ceiling(reportDuration.TotalMinutes));
-        var client = AdminBffClientFactory.Create(_automationConfig);
 
         var request = new RestRequest("integration/report-scheduled", Method.Post)
             .AddJsonBody(new
@@ -115,7 +122,7 @@ public class ReportApiHelper
                 reportTrackingId = trackingId
             });
 
-        var response = await client.ExecuteAsync(request);
+        var response = await _adminBffClient.ExecuteAsync(request);
         AutomationInvariant.Require(response.IsSuccessful,
             $"Failed to produce ReportScheduled event for report '{trackingId}'. HTTP {(int)response.StatusCode}: {response.Content}");
 
@@ -222,7 +229,6 @@ public class ReportApiHelper
             }
         };
 
-        var client = AdminBffClientFactory.Create(_automationConfig);
         var request = new RestRequest("integration/patient-list-acquired", Method.Post)
             .AddJsonBody(new
             {
@@ -231,7 +237,7 @@ public class ReportApiHelper
                 reportTrackingId = trackingGuid
             });
 
-        var response = await client.ExecuteAsync(request);
+        var response = await _adminBffClient.ExecuteAsync(request);
         AutomationInvariant.Require(response.IsSuccessful,
             $"Failed to produce PatientListAcquired event for report '{reportTrackingId}'. HTTP {(int)response.StatusCode}: {response.Content}");
 

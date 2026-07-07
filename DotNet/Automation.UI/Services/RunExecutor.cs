@@ -317,8 +317,11 @@ internal sealed class RunExecutor
                 output,
                 facilityId);
 
-            var reportId = state.Options.ReportMethod == ReportMethod.ScheduledReport
-                ? await ExecuteScheduledReportWorkflowAsync(
+            Frequency? scheduledRunFrequency = null;
+            string reportId;
+            if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+            {
+                var scheduledWorkflowState = await ExecuteScheduledReportWorkflowAsync(
                     reportHelper,
                     output,
                     facilityId,
@@ -327,8 +330,15 @@ internal sealed class RunExecutor
                     scenarioConfig,
                     patientIds,
                     state.Options.PatientProfiles,
-                    cancellationToken)
-                : await reportHelper.GenerateReportAsync(facilityId, measureIds, scenarioConfig);
+                    cancellationToken);
+
+                reportId = scheduledWorkflowState.ReportTrackingId;
+                scheduledRunFrequency = scheduledWorkflowState.Frequency;
+            }
+            else
+            {
+                reportId = await reportHelper.GenerateReportAsync(facilityId, measureIds, scenarioConfig);
+            }
             lock (state.Sync)
             {
                 state.ReportId = reportId;
@@ -583,7 +593,9 @@ internal sealed class RunExecutor
                     reportId,
                     measureIds,
                     expectedReportEntryPatientIds,
-                    expectedFrequency: state.Options.ReportMethod == ReportMethod.ScheduledReport ? Frequency.Monthly : Frequency.Adhoc,
+                    expectedFrequency: state.Options.ReportMethod == ReportMethod.ScheduledReport
+                        ? (scheduledRunFrequency ?? throw new InvalidOperationException("Scheduled run frequency was not captured from scheduled workflow state."))
+                        : Frequency.Adhoc,
                     expectedAdHocType: state.Options.ReportMethod == ReportMethod.ScheduledReport ? null : "Manual",
                     expectedSubmittedPatientIds: expectedSubmittedPatientIds,
                     manifest: generationManifest));
@@ -673,6 +685,7 @@ internal sealed class RunExecutor
         => value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
 
     private readonly record struct ScheduledReportWindow(DateTimeOffset Start, TimeSpan Duration);
+    private readonly record struct ScheduledWorkflowState(string ReportTrackingId, Frequency Frequency);
 
     // Keep scheduled test runtimes bounded while still allowing long clinical windows.
     // Admin.BFF computes EndDate using current-time + delay, so this controls how long
@@ -689,7 +702,7 @@ internal sealed class RunExecutor
         return new ScheduledReportWindow(start, duration);
     }
 
-    private static async Task<string> ExecuteScheduledReportWorkflowAsync(
+    private static async Task<ScheduledWorkflowState> ExecuteScheduledReportWorkflowAsync(
         ReportApiHelper reportHelper,
         IAutomationOutput output,
         string facilityId,
@@ -800,7 +813,7 @@ internal sealed class RunExecutor
         if (remainInpatient.Count > 0)
             output.WriteLine($"{remainInpatient.Count} patient(s) remain inpatient; they will be acquired by the end-of-report-period job.");
 
-        return reportTrackingId;
+        return new ScheduledWorkflowState(reportTrackingId, persistedSchedule.Frequency);
     }
 
     private static FhirGenerationConfig ResolveFhirGenerationConfig(AutomationConfig automationConfig)
@@ -832,6 +845,7 @@ internal sealed class RunExecutor
         services.AddSingleton(_hostServices.GetRequiredService<IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>>());
         services.AddSingleton(_hostServices.GetRequiredService<IOptions<LinkTokenServiceSettings>>());
         services.AddSingleton(_hostServices.GetRequiredService<ICreateSystemToken>());
+        services.AddHttpClient();
 
         services.AddLinkSdk();
 
