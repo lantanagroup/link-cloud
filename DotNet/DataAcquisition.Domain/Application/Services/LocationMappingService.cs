@@ -584,14 +584,34 @@ public class LocationMappingService(
                     // We haven't seen this location before, so we need to create a new mapping for it.
                     // We'll assume it is not part of the org by default. This can change once the location is acquired and the conditions are evaluated.
                     _logger.LogDebug("Encounter {EncounterId} for facility {FacilityId} has a location reference {LocationId} that does not have an existing mapping. Creating one...", encounter.Id.SanitizeForLog(), facilityId.SanitizeForLog(), locationId.SanitizeForLog());
-                    var newLocationMapping = await _organizationLocationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
+                    OrganizationLocationMappingModel newLocationMapping;
+                    try
                     {
-                        FacilityId = facilityId,
-                        IsActive = true,
-                        IsOrgLocation = false,
-                        LocationId = locationId
-                    });
+                        newLocationMapping = await _organizationLocationMappingManager.CreateAsync(new CreateOrganizationLocationMappingModel
+                        {
+                            FacilityId = facilityId,
+                            IsActive = true,
+                            IsOrgLocation = false,
+                            LocationId = locationId
+                        });
+                    }
+                    catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+                    {
+                        // Another worker may insert the same (facility, location) mapping concurrently.
+                        // Re-read and continue instead of failing the entire acquisition log.
+                        var existingAfterDuplicate = await _organizationLocationMappingQueries
+                            .GetByFacilityIdAndLocationIdAsync(facilityId, locationId);
+
+                        if (existingAfterDuplicate is null)
+                        {
+                            throw;
+                        }
+
+                        newLocationMapping = existingAfterDuplicate;
+                    }
+
                     organizationLocationMappingIds.Add(newLocationMapping.LocationMappingId);
+                    mappedToOrg = mappedToOrg || newLocationMapping.IsOrgLocation;
                 }
             }
         }
@@ -962,7 +982,22 @@ public class LocationMappingService(
         return resourceId.SplitReference();
     }
 
-    // SQL Server: 2627 = unique constraint, 2601 = unique index
-    private static bool IsUniqueConstraintViolation(DbUpdateException ex) =>
-        ex.InnerException is SqlException { Number: 2601 or 2627 };
+    // SQL Server: 2627 = unique constraint, 2601 = unique index.
+    // EF/database providers can wrap SqlException multiple levels deep, so walk the chain.
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        for (Exception? current = ex; current is not null; current = current.InnerException)
+        {
+            if (current is SqlException { Number: 2601 or 2627 })
+                return true;
+
+            if (current is SqlException sqlEx
+                && sqlEx.Message.Contains("UQ_LocationMapping_Facility_Location", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

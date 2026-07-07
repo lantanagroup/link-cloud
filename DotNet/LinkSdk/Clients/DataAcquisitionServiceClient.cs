@@ -214,4 +214,23 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"data/acquisition-logs/facility/{facilityId}/restore")
             .PatchJsonAsync(new { }, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<OrganizationLocationConfigurationApiModel>>> GetOrganizationLocationConfigurationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<List<OrganizationLocationConfigurationApiModel>>(() => Request($"data/location-config/facility/{facilityId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<OrganizationLocationConfigurationApiModel>> CreateOrganizationLocationConfigurationAsync(
+        string facilityId,
+        CreateOrganizationLocationConfigurationApiModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<OrganizationLocationConfigurationApiModel>(() => Request($"data/location-config/facility/{facilityId}")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<OrganizationLocationMappingApiModel>>> GetOrganizationLocationMappingsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<List<OrganizationLocationMappingApiModel>>(() => Request($"data/location-mappings/facility/{facilityId}")
+            .GetAsync(cancellationToken: cancellationToken));
 }

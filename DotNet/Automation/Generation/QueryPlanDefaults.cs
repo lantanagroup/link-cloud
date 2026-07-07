@@ -62,8 +62,8 @@ public static class QueryPlanDefaults
             VariableParam("date", 3, "le{0}")),
         ParameterQuery("MedicationRequest",
             VariableParam("patient", 0)),
-        ReferenceQuery("Location", 2, 100),
-        ReferenceQuery("Medication", 2, 100)
+        ReferenceQuery("Location", 1, 100),
+        ReferenceQuery("Medication", 1, 100)
     ];
 
     // ----- Default supplemental queries -----
@@ -91,8 +91,8 @@ public static class QueryPlanDefaults
         ParameterQuery("ServiceRequest",
             VariableParam("patient", 0),
             ResourceIdsParam("encounter", "Encounter", "100")),
-        ReferenceQuery("Device", 2, 100),
-        ReferenceQuery("Specimen", 2, 100)
+        ReferenceQuery("Device", 1, 100),
+        ReferenceQuery("Specimen", 1, 100)
     ];
 
     // ----- Entry builders -----

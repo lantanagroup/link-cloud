@@ -73,6 +73,11 @@ public class StartScenarioRequest : IValidatableObject
     public DateTimeOffset? ReportPeriodEnd { get; set; }
 
     /// <summary>
+    /// Configured NHSN reporting Organization ID for this run.
+    /// </summary>
+    public string? NhsnOrganizationId { get; set; }
+
+    /// <summary>
     /// Optional query plan template ID. When set, the run uses this template's
     /// query plan instead of the built-in defaults. When null, the system default is used.
     /// </summary>
@@ -112,6 +117,7 @@ public class StartScenarioRequest : IValidatableObject
         ImportedPatientBundles = scenario.ImportedPatientBundles,
         ReportPeriodStart = scenario.ReportPeriodStart,
         ReportPeriodEnd = scenario.ReportPeriodEnd,
+        NhsnOrganizationId = scenario.NhsnOrganizationId,
         QueryPlanTemplateId = scenario.QueryPlanTemplateId,
     };
 

@@ -68,7 +68,7 @@ public static class QueryPlanBuilder
         {
             var e = entries[i];
             obj[i.ToString()] = string.Equals(e.QueryConfigType, "Reference", StringComparison.OrdinalIgnoreCase)
-                ? BuildReferenceQuery(e.ResourceType, e.OperationType ?? 2, e.Paged ?? 100)
+                ? BuildReferenceQuery(e.ResourceType, e.OperationType ?? 1, e.Paged ?? 100)
                 : BuildParameterQuery(e.ResourceType, e.Parameters.Select(ConvertParameter).ToArray());
         }
         return obj;
