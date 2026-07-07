@@ -103,6 +103,16 @@ public sealed class GenerationManifest
         = new Dictionary<string, int>(StringComparer.Ordinal);
 
     /// <summary>
+    /// Optional explicit ABS scope: when populated, only these patients are expected
+    /// to produce patient-{id}.ndjson artifacts.
+    ///
+    /// This is used by scheduled workflows where a patient's profile may be
+    /// measure-qualifying in isolation, but report orchestration/terminal state resolves
+    /// a smaller submitted subset.
+    /// </summary>
+    public IReadOnlySet<string>? ExpectedAbsPatientIdsOverride { get; set; }
+
+    /// <summary>
     /// Every resource key (<c>ResourceType/ResourceId</c>) from the generated FHIR bundles,
     /// keyed per patient. Shared infrastructure resources are stored under the empty-string key.
     /// </summary>
@@ -247,6 +257,12 @@ public sealed class GenerationManifest
     {
         var filtered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        if (ExpectedAbsPatientIdsOverride is { Count: > 0 }
+            && !ExpectedAbsPatientIdsOverride.Contains(patientId))
+        {
+            return filtered;
+        }
+
         // Non-qualifying patients are never submitted by measure-eval, so PatientAggregator
         // never emits a patient-{id}.ndjson artifact for them and nothing about them
         // appears in ABS — even though their resources were uploaded to the FHIR server
@@ -294,6 +310,9 @@ public sealed class GenerationManifest
     /// </summary>
     private void AddPipelineDerivedExpectedCounts(string patientId, Dictionary<string, int> counts)
     {
+        if (!ShouldExpectAbsForPatient(patientId))
+            return;
+
         var qualifyingMeasureCount = CountQualifyingMeasuresForPatient(patientId);
         if (qualifyingMeasureCount > 0)
         {
@@ -322,6 +341,12 @@ public sealed class GenerationManifest
         var idx = PatientIds.ToList().IndexOf(patientId);
         if (idx < 0 || idx >= Profiles.Count) return false;
         return Profiles[idx].QualifiesForAny(SelectedMeasures);
+    }
+
+    private bool ShouldExpectAbsForPatient(string patientId)
+    {
+        return ExpectedAbsPatientIdsOverride is not { Count: > 0 }
+               || ExpectedAbsPatientIdsOverride.Contains(patientId);
     }
 
     /// <summary>
