@@ -1,4 +1,4 @@
-ï»¿using Automation.UI.Models;
+using Automation.UI.Models;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -9,6 +9,7 @@ using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.Options;
 
@@ -80,6 +81,29 @@ internal sealed class RunExecutor
         {
             var scenarioConfig = ScenarioConfigBuilder.Build(state.Scenario, state.Options);
 
+            // For scheduled-report, compute the active window immediately so generation
+            // uses the correct clinical period boundaries (scenarioConfig.StartDate/EndDate).
+            if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+            {
+                // Use a clinically meaningful report window for generation so scheduled
+                // inpatient patterns produce rich in-period evidence (not minute-scale data).
+                //
+                // End-of-period runtime is kept short separately in the scheduled workflow by
+                // publishing a small delay value to Admin.BFF (without changing Admin.BFF logic).
+                var now = DateTimeOffset.UtcNow;
+                var alignedNow = new DateTimeOffset(
+                    now.Year, now.Month, now.Day,
+                    now.Hour, now.Minute, 0,
+                    TimeSpan.Zero);
+                // 5-day clinical window gives scheduled inpatient patterns enough LOS
+                // for ACH monthly IP criteria while runtime remains bounded by the
+                // short scheduled delay sent to Admin.BFF.
+                var start = alignedNow.AddDays(-5);
+                var end = alignedNow.AddMinutes(2);
+                scenarioConfig.StartDate = ToZulu(start);
+                scenarioConfig.EndDate = ToZulu(end);
+            }
+
             using var services = BuildRunServiceProvider(output);
 
             var lokiScraper = services.GetRequiredService<LokiScraper>();
@@ -109,7 +133,7 @@ internal sealed class RunExecutor
             GenerationManifest? generationManifest = null;
 
             // Use the first measure for generation context (profile-driven generation picks
-            // the most restrictive measure â€” patients qualifying for all measures must meet
+            // the most restrictive measure — patients qualifying for all measures must meet
             // the criteria of each). For multi-measure, the pipeline handles the union.
             var primaryMeasure = state.Options.SelectedMeasures[0];
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
@@ -150,7 +174,7 @@ internal sealed class RunExecutor
                 importedPatients.AddRange(state.Options.ImportedPatientBundles);
 
                 // Pre-load imported patient FHIR data so the pipeline can reuse it without
-                // re-fetching, and surface â€” but do NOT enforce â€” whether each imported
+                // re-fetching, and surface — but do NOT enforce — whether each imported
                 // encounter sits inside the scenario's configured reporting period. A
                 // mismatched scenario is a legitimate test case (proper disqualification by
                 // measure-eval); the run continues either way.
@@ -210,6 +234,14 @@ internal sealed class RunExecutor
                     .Where((_, idx) => idx < generationManifest.Profiles.Count
                                        && generationManifest.Profiles[idx].QualifiesForAny(selectedMeasures))
                     .ToList();
+
+                if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+                {
+                    expectedSubmittedPatientIds = ComputeExpectedScheduledSubmittedPatientIds(
+                        generationManifest.PatientIds,
+                        generationManifest.Profiles,
+                        selectedMeasures);
+                }
             }
             else
             {
@@ -227,6 +259,8 @@ internal sealed class RunExecutor
                 scenarioConfig.PatientIds = patientIds;
 
             var expectedAllPatientIds = scenarioConfig.PatientIds;
+            var expectedReportEntryPatientIds = expectedAllPatientIds.ToList();
+            IReadOnlyCollection<string> expectedManifestPatientListIds = expectedAllPatientIds;
 
             await validationHelper.InitializeArtifactsAsync();
             await validationHelper.InitializeCategoriesAsync();
@@ -280,7 +314,48 @@ internal sealed class RunExecutor
                 facilityId,
                 cancellationToken);
 
-            var reportId = await reportHelper.GenerateReportAsync(facilityId, measureIds, scenarioConfig);
+            // Census config + FHIR list config are required so the Census service accepts the
+            // explicit PatientListsAcquired snapshots this workflow publishes (ProcessList
+            // rejects facilities without a census config). For scheduled reports we DISABLE the
+            // background census Quartz job: this run drives census entirely through explicit
+            // snapshots, and letting the cron-scheduled PatientCensusScheduled job fire would
+            // (a) attempt to read FHIR List resources that do not exist on the synthetic server
+            // — surfacing spurious "configuration missing" errors — and (b) publish empty
+            // snapshots that auto-discharge our still-admitted patients out of turn.
+            var enableBackgroundCensusJobs = state.Options.ReportMethod != ReportMethod.ScheduledReport;
+            await FacilitySetupHelper.EnsureCensusConfigAsync(
+                services.GetRequiredService<ICensusServiceClient>(),
+                output,
+                facilityId,
+                enabled: enableBackgroundCensusJobs);
+            await FacilitySetupHelper.EnsureFhirListConfigAsync(
+                services.GetRequiredService<IDataAcquisitionServiceClient>(),
+                services.GetRequiredService<AutomationConfig>(),
+                output,
+                facilityId);
+
+            Frequency? scheduledRunFrequency = null;
+            string reportId;
+            if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+            {
+                var scheduledWorkflowState = await ExecuteScheduledReportWorkflowAsync(
+                    reportHelper,
+                    output,
+                    facilityId,
+                    measureIds,
+                    state.Options.SelectedMeasures,
+                    scenarioConfig,
+                    patientIds,
+                    state.Options.PatientProfiles,
+                    cancellationToken);
+
+                reportId = scheduledWorkflowState.ReportTrackingId;
+                scheduledRunFrequency = scheduledWorkflowState.Frequency;
+            }
+            else
+            {
+                reportId = await reportHelper.GenerateReportAsync(facilityId, measureIds, scenarioConfig);
+            }
             lock (state.Sync)
             {
                 state.ReportId = reportId;
@@ -308,6 +383,35 @@ internal sealed class RunExecutor
 
                 if (!submitted)
                     throw new InvalidOperationException($"Expected report with id {reportId} to be submitted but it was not.");
+            }
+
+            if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+            {
+                // Scheduled runs can briefly report Submitted while entry-level state is still
+                // converging. Reconcile against terminal report truth (entries + submission
+                // statuses) so validators and artifact expectations are aligned with reality.
+                var terminalState = await reportHelper.WaitForTerminalReportStateAsync(reportId, cancellationToken: cancellationToken);
+
+                expectedReportEntryPatientIds = terminalState.EntryPatientIds;
+                expectedManifestPatientListIds = terminalState.EntryPatientIds;
+                expectedSubmittedPatientIds = terminalState.SubmittedPatientIds;
+
+                output.WriteLine(
+                    $"Scheduled expected sets reconciled from terminal report state: " +
+                    $"entry-patients={expectedReportEntryPatientIds.Count}, submitted-patients={expectedSubmittedPatientIds.Count}.");
+
+                // Refresh cached pipeline reads after terminal-state reconciliation so
+                // snapshots/validators use the same committed state we just polled.
+                services.GetRequiredService<PipelineDataReader>().InvalidateCache();
+            }
+
+            // Scope ABS prediction to the same submitted-patient truth used by validators.
+            // This prevents dashboard/manifest prediction from counting non-submitted
+            // patients (e.g., scheduled cohorts outside report inclusion).
+            if (generationManifest != null)
+            {
+                generationManifest.ExpectedAbsPatientIdsOverride =
+                    new HashSet<string>(expectedSubmittedPatientIds, StringComparer.Ordinal);
             }
 
             // RegenerateReport: the first report is just a prerequisite.
@@ -430,7 +534,7 @@ internal sealed class RunExecutor
             // Flush stale cache from diagnostics polling so validators read authoritative data.
             services.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
-            // Regeneration reuses prior data acquisition â€” no new DA logs exist for the regenerated report.
+            // Regeneration reuses prior data acquisition — no new DA logs exist for the regenerated report.
             var expectDataAcquisitionData = state.Options.ReportMethod != ReportMethod.RegenerateReport;
 
             // Pipeline-built manifest already has all metadata; no need to re-parse bundles.
@@ -486,12 +590,12 @@ internal sealed class RunExecutor
                     facilityId,
                     reportId,
                     generatedBundles: null,
-                    expectedManifestPatientListIds: expectedAllPatientIds,
+                    expectedManifestPatientListIds: expectedManifestPatientListIds,
                     expectDataAcquisitionData: expectDataAcquisitionData,
                     manifest: generationManifest));
 
             // The ABS manifest validator enriches the manifest with downstream-derived
-            // predictions that are not known at generation time â€” most notably the
+            // predictions that are not known at generation time — most notably the
             // per-patient OperationOutcome count (one OO is appended to the ABS blob for
             // every patient whose ReportingStatus is FailedValidation). Re-persist the
             // snapshot so the Runs dashboard shows the final, fully-enriched predictions
@@ -506,7 +610,11 @@ internal sealed class RunExecutor
                     facilityId,
                     reportId,
                     measureIds,
-                    expectedAllPatientIds,
+                    expectedReportEntryPatientIds,
+                    expectedFrequency: state.Options.ReportMethod == ReportMethod.ScheduledReport
+                        ? (scheduledRunFrequency ?? throw new InvalidOperationException("Scheduled run frequency was not captured from scheduled workflow state."))
+                        : Frequency.Adhoc,
+                    expectedAdHocType: state.Options.ReportMethod == ReportMethod.ScheduledReport ? null : "Manual",
                     expectedSubmittedPatientIds: expectedSubmittedPatientIds,
                     manifest: generationManifest));
 
@@ -570,6 +678,97 @@ internal sealed class RunExecutor
             output.WriteLine($"Run failed: {ex.Message}");
         }
     }
+
+    private static List<string> ComputeExpectedScheduledSubmittedPatientIds(
+        IReadOnlyList<string> patientIds,
+        IReadOnlyList<PatientProfile> profiles,
+        IReadOnlyList<ProfiledMeasureType> selectedMeasures)
+    {
+        var expected = new List<string>();
+        var count = Math.Min(patientIds.Count, profiles.Count);
+        for (var i = 0; i < count; i++)
+        {
+            var profile = profiles[i];
+            if (!profile.QualifiesForAny(selectedMeasures))
+                continue;
+
+            if (IsExpectedInScheduledReport(profile.ScheduledInpatientPattern))
+                expected.Add(patientIds[i]);
+        }
+
+        return expected;
+    }
+
+    private static bool IsExpectedInScheduledReport(ScheduledInpatientPattern? pattern)
+    {
+        var effective = pattern ?? ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod;
+        return effective.GetCensusBehavior().ExpectedInReport;
+    }
+
+    private static string ToZulu(DateTimeOffset value)
+        => value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
+
+    private readonly record struct ScheduledReportWindow(DateTimeOffset Start, TimeSpan Duration);
+    private readonly record struct ScheduledWorkflowState(string ReportTrackingId, Frequency Frequency);
+
+    // Keep scheduled test runtimes bounded while still allowing long clinical windows.
+    // Admin.BFF computes EndDate using current-time + delay, so this controls how long
+    // the run waits for end-of-period execution.
+    private static readonly TimeSpan ScheduledRuntimeDelay = TimeSpan.FromMinutes(4);
+
+    private static ScheduledReportWindow DeriveScheduledReportWindow(TestScenarioConfig scenarioConfig)
+    {
+        // scenarioConfig.StartDate/EndDate have already been set by RunExecutor early-phase.
+        // Parse them back and derive the duration for the scheduled workflow.
+        var start = DateTimeOffset.Parse(scenarioConfig.StartDate);
+        var end = DateTimeOffset.Parse(scenarioConfig.EndDate);
+        var duration = end - start;
+        return new ScheduledReportWindow(start, duration);
+    }
+
+    private static async Task<ScheduledWorkflowState> ExecuteScheduledReportWorkflowAsync(
+        ReportApiHelper reportHelper,
+        IAutomationOutput output,
+        string facilityId,
+        IReadOnlyList<string> measureIds,
+        IReadOnlyList<ProfiledMeasureType> selectedMeasures,
+        TestScenarioConfig scenarioConfig,
+        IReadOnlyList<string> patientIds,
+        IReadOnlyList<PatientProfile> profiles,
+        CancellationToken cancellationToken)
+    {
+        var window = DeriveScheduledReportWindow(scenarioConfig);
+
+        // Resolve each patient's census behavior from its scheduled inpatient pattern.
+        // ScheduledInpatientPattern.GetCensusBehavior() is the single source of truth shared
+        // with validation, so orchestration and expected-submission logic can never drift.
+        //   - admitDuringWindow:     every patient that participates in the report period.
+        //   - remainInpatient:       admitted and never discharged (captured by the
+        //                            End-of-Report-Period job at the window boundary).
+        //   - dischargeDuringWindow: admitted then discharged inside the window, which drives
+        //                            a QueryDispatch discharge dispatch (data acquisition).
+        var admitDuringWindow = new List<string>();
+        var remainInpatient = new List<string>();
+        var dischargeDuringWindow = new List<string>();
+
+        var count = Math.Min(patientIds.Count, profiles.Count);
+        for (var i = 0; i < count; i++)
+        {
+            var pattern = profiles[i].ScheduledInpatientPattern
+                ?? ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod;
+            var behavior = pattern.GetCensusBehavior();
+
+            // Patterns whose entire stay sits outside the report period emit no census events;
+            // their synthetic encounter dates keep them out of the report via measure-eval.
+            if (!behavior.EmitAdmitDuringWindow)
+                continue;
+
+            admitDuringWindow.Add(patientIds[i]);
+            if (behavior.EmitDischargeDuringWindow)
+                dischargeDuringWindow.Add(patientIds[i]);
+            else
+                remainInpatient.Add(patientIds[i]);
+        }
 
     private static async Task WriteOrganizationLocationMappingStatusAsync(
         IDataAcquisitionServiceClient dataAcqClient,
@@ -638,6 +837,7 @@ internal sealed class RunExecutor
         services.AddSingleton(_hostServices.GetRequiredService<IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>>());
         services.AddSingleton(_hostServices.GetRequiredService<IOptions<LinkTokenServiceSettings>>());
         services.AddSingleton(_hostServices.GetRequiredService<ICreateSystemToken>());
+        services.AddHttpClient();
 
         services.AddLinkSdk();
 

@@ -89,7 +89,9 @@ public static class StartScenarioRequestResolver
             ResourcesPerPatient = request.ResourcesPerPatient ?? defaults.ResourcesPerPatient,
             Seed = request.Seed ?? defaults.Seed,
             PollingIntervalSeconds = 3,
-            MaxPollingDurationMinutes = 0,
+            // Keep an explicit hard timeout for custom runs so scheduled workflows
+            // fail-fast when end-of-period orchestration does not advance.
+            MaxPollingDurationMinutes = defaults.MaxPollingDurationMinutes,
             LokiScrapeWindowMinutes = 30,
             CleanupServiceData = request.CleanupServiceData ?? defaults.CleanupServiceData,
             CleanupFhirData = request.CleanupFhirData ?? defaults.CleanupFhirData,
@@ -289,13 +291,29 @@ public static class StartScenarioRequestResolver
                     }
                 }
 
+                ScheduledInpatientPattern? scheduledPattern = null;
+                if (item.TryGetProperty("scheduledInpatientPattern", out var spEl))
+                {
+                    if (spEl.ValueKind == JsonValueKind.String
+                        && Enum.TryParse<ScheduledInpatientPattern>(spEl.GetString(), ignoreCase: true, out var parsedPattern))
+                    {
+                        scheduledPattern = parsedPattern;
+                    }
+                    else if (spEl.ValueKind == JsonValueKind.Number
+                             && Enum.IsDefined(typeof(ScheduledInpatientPattern), spEl.GetInt32()))
+                    {
+                        scheduledPattern = (ScheduledInpatientPattern)spEl.GetInt32();
+                    }
+                }
+
                 cohorts.Add(new PatientCohortDefinition
                 {
                     PatientCount = count,
                     MeasureEligibilities = eligibilities,
                     EligibleClinicalScenarioIds = scenarioIds,
                     ResourcesPerPatientMin = min,
-                    ResourcesPerPatientMax = max
+                    ResourcesPerPatientMax = max,
+                    ScheduledInpatientPattern = scheduledPattern
                 });
             }
 

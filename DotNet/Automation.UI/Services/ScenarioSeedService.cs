@@ -39,8 +39,14 @@ public sealed class ScenarioSeedService : IHostedService
     private static readonly List<string> DefaultEligibleScenarioIds =
         [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DefaultMeasures, MeasureEligibility.Qualifying)];
 
+    private static readonly List<string> DefaultNonQualifyingScenarioIds =
+        [.. ClinicalScenarioEligibility.GetEligibleScenarioIds(DefaultMeasures, MeasureEligibility.NonQualifying)];
+
     private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DefaultQualifyingEligibilities =
         DefaultMeasures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying);
+
+    private static readonly Dictionary<ProfiledMeasureType, MeasureEligibility> DefaultNonQualifyingEligibilities =
+        DefaultMeasures.ToDictionary(m => m, _ => MeasureEligibility.NonQualifying);
 
     public ScenarioSeedService(IScenarioStore store, ILogger<ScenarioSeedService> logger)
     {
@@ -227,20 +233,20 @@ public sealed class ScenarioSeedService : IHostedService
             CleanupFhirData = true,
         },
 
-        // --- Scheduled Report Test (scheduled, 1 patient, 1000 resources, 1 discharge) ---
+        // --- Scheduled Report Test (scheduled, 6 patients with explicit inpatient timing patterns) ---
         new TestScenarioDefinition
         {
             Id = ScheduledReportId,
             Name = "Scheduled Report Test",
-            Description = "Exercises the full scheduled report workflow with patient admit and discharge. Mirrors the ReportScheduledWorkflowTest.",
+            Description = "Exercises the full scheduled report workflow with multiple inpatient timing patterns (before/during/after report period admit/discharge combinations). Mirrors the ReportScheduledWorkflowTest.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.ScheduledReport,
             SelectedMeasures = [..DefaultMeasures],
             NhsnOrganizationId = ScheduledReportTestNhsnOrganizationId,
             Seed = 20260326,
-            PatientCount = 1,
-            ResourcesPerPatientMin = 1000,
-            ResourcesPerPatientMax = 1000,
+            PatientCount = 6,
+            ResourcesPerPatientMin = 50,
+            ResourcesPerPatientMax = 100,
             PatientCohorts =
             [
                 new PatientCohortDefinition
@@ -248,8 +254,54 @@ public sealed class ScenarioSeedService : IHostedService
                     PatientCount = 1,
                     MeasureEligibilities = new(DefaultQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
-                    ResourcesPerPatientMin = 1000,
-                    ResourcesPerPatientMax = 1000
+                    ResourcesPerPatientMin = 50,
+                    ResourcesPerPatientMax = 100,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
+                },
+                new PatientCohortDefinition
+                {
+                    PatientCount = 1,
+                    MeasureEligibilities = new(DefaultQualifyingEligibilities),
+                    EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
+                    ResourcesPerPatientMin = 50,
+                    ResourcesPerPatientMax = 100,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodDischargedDuringPeriod
+                },
+                new PatientCohortDefinition
+                {
+                    PatientCount = 1,
+                    MeasureEligibilities = new(DefaultQualifyingEligibilities),
+                    EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
+                    ResourcesPerPatientMin = 50,
+                    ResourcesPerPatientMax = 100,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodRemainsInpatientAfterPeriod
+                },
+                new PatientCohortDefinition
+                {
+                    PatientCount = 1,
+                    MeasureEligibilities = new(DefaultQualifyingEligibilities),
+                    EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
+                    ResourcesPerPatientMin = 50,
+                    ResourcesPerPatientMax = 100,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod
+                },
+                new PatientCohortDefinition
+                {
+                    PatientCount = 1,
+                    MeasureEligibilities = new(DefaultNonQualifyingEligibilities),
+                    EligibleClinicalScenarioIds = [..DefaultNonQualifyingScenarioIds],
+                    ResourcesPerPatientMin = 50,
+                    ResourcesPerPatientMax = 100,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod
+                },
+                new PatientCohortDefinition
+                {
+                    PatientCount = 1,
+                    MeasureEligibilities = new(DefaultNonQualifyingEligibilities),
+                    EligibleClinicalScenarioIds = [..DefaultNonQualifyingScenarioIds],
+                    ResourcesPerPatientMin = 50,
+                    ResourcesPerPatientMax = 100,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod
                 }
             ],
             CleanupServiceData = false,

@@ -78,6 +78,7 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
         var facilityCreated = false;
         var queryConfigCreated = false;
         var dischargePlanCreated = false;
+        var fhirListCreated = false;
 
         try
         {
@@ -252,7 +253,37 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             results.Add(await RunStepAsync(StepNames.FhirConfigGet404, 404, async () =>
                 await _client.GetFhirQueryConfigurationAsync(facilityId, ct), ct: ct));
 
-            // --- Read-only operations (non-existent resources � prove reachability) ---
+            // --- FHIR List Configuration CRUD ---
+
+            // POST FHIR List Config → 200
+            results.Add(await RunStepAsync(StepNames.FhirListConfigPost200, 200, async () =>
+            {
+                var resp = await _client.CreateFhirListConfigurationAsync(BuildFhirListConfigRequest(facilityId), ct);
+                if (resp.IsSuccessStatusCode) fhirListCreated = true;
+                return resp;
+            }, ct: ct));
+
+            // GET FHIR List Config → 200
+            results.Add(await RunStepAsync(StepNames.FhirListConfigGet200, 200, async () =>
+                await _client.GetFhirListConfigurationAsync(facilityId, ct), ct: ct));
+
+            // POST FHIR List Config → 409 (duplicate)
+            results.Add(await RunStepAsync(StepNames.FhirListConfigPost409, 409, async () =>
+                await _client.CreateFhirListConfigurationAsync(BuildFhirListConfigRequest(facilityId), ct), ct: ct));
+
+            // DELETE FHIR List Config → 200
+            results.Add(await RunStepAsync(StepNames.FhirListConfigDelete200, 200, async () =>
+            {
+                var resp = await _client.DeleteFhirListConfigurationAsync(facilityId, ct);
+                if (resp.IsSuccessStatusCode) fhirListCreated = false;
+                return resp;
+            }, ct: ct));
+
+            // GET FHIR List Config → 404 (after delete)
+            results.Add(await RunStepAsync(StepNames.FhirListConfigGet404, 404, async () =>
+                await _client.GetFhirListConfigurationAsync(facilityId, ct), ct: ct));
+
+            // --- Read-only operations (non-existent resources — prove reachability) ---
             var fakeReportId = Guid.NewGuid().ToString();
 
             results.Add(await RunStepAsync(StepNames.AcquisitionLogsGet200, 200, async () =>
@@ -364,6 +395,7 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
         {
             if (dischargePlanCreated) await TryCleanupAsync(() => _client.DeleteQueryPlanAsync(facilityId, "Discharge", ct));
             if (queryConfigCreated) await TryCleanupAsync(() => _client.DeleteFhirQueryConfigurationAsync(facilityId, ct));
+            if (fhirListCreated) await TryCleanupAsync(() => _client.DeleteFhirListConfigurationAsync(facilityId, ct));
             if (facilityCreated) await TryCleanupAsync(() => _facilityClient.DeleteAsync(facilityId, ct));
         }
 
@@ -407,4 +439,29 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             ["0"] = new { QueryConfigType = "Reference", ResourceType = "Condition", OperationType = 2, Paged = 100 }
         }
     };
+
+    private object BuildFhirListConfigRequest(string facilityId)
+    {
+        var listConfigs = new[]
+        {
+            new { Status = "Admit", TimeFrame = "LessThan24Hours", FhirId = $"census-{facilityId}-admit-lt24" },
+            new { Status = "Admit", TimeFrame = "Between24To48Hours", FhirId = $"census-{facilityId}-admit-24to48" },
+            new { Status = "Admit", TimeFrame = "MoreThan48Hours", FhirId = $"census-{facilityId}-admit-gt48" },
+            new { Status = "Discharge", TimeFrame = "LessThan24Hours", FhirId = $"census-{facilityId}-discharge-lt24" },
+            new { Status = "Discharge", TimeFrame = "Between24To48Hours", FhirId = $"census-{facilityId}-discharge-24to48" },
+            new { Status = "Discharge", TimeFrame = "MoreThan48Hours", FhirId = $"census-{facilityId}-discharge-gt48" }
+        };
+
+        return new
+        {
+            FacilityId = facilityId,
+            FhirBaseServerUrl = _automationConfig.Value.FacilityFhirServerBase,
+            EHRPatientLists = listConfigs.Select(c => new
+            {
+                c.Status,
+                c.TimeFrame,
+                c.FhirId
+            }).ToList()
+        };
+    }
 }
