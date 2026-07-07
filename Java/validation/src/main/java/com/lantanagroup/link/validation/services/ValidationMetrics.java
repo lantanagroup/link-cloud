@@ -13,6 +13,8 @@ public class ValidationMetrics {
     private final LongCounter validationCounter;
     private final DoubleHistogram validationDuration;
     private final DoubleHistogram categorizationDuration;
+    private final LongCounter validateCodeCacheHit;
+    private final LongCounter validateCodeCacheMiss;
 
     public ValidationMetrics(OpenTelemetry openTelemetry) {
         Meter meter = openTelemetry.getMeter(ValidationMetrics.class.getName());
@@ -24,6 +26,12 @@ public class ValidationMetrics {
         categorizationDuration = meter.histogramBuilder("link.validation.categorization.duration")
                 .setDescription("The duration of the categorization process, excluding persisting categorized results")
                 .setUnit("ms")
+                .build();
+        validateCodeCacheHit = meter.counterBuilder("link.validation.cache.validate-code.hit")
+                .setDescription("Count of validateCode lookups served from the local cache")
+                .build();
+        validateCodeCacheMiss = meter.counterBuilder("link.validation.cache.validate-code.miss")
+                .setDescription("Count of validateCode lookups that missed the cache and hit the terminology service")
                 .build();
     }
 
@@ -37,5 +45,13 @@ public class ValidationMetrics {
 
     public void recordCategorizationDuration(double millis, Attributes attributes) {
         categorizationDuration.record(millis, attributes);
+    }
+
+    public void incrementValidateCodeCacheHit() {
+        validateCodeCacheHit.add(1L);
+    }
+
+    public void incrementValidateCodeCacheMiss() {
+        validateCodeCacheMiss.add(1L);
     }
 }
