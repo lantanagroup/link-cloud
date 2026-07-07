@@ -2,8 +2,12 @@
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using RestSharp;
 using System.Net;
 using System.IO.Compression;
 using Task = System.Threading.Tasks.Task;
@@ -12,19 +16,31 @@ namespace LantanaGroup.Link.Automation.Link.Services;
 
 public class ReportApiHelper
 {
+    public sealed record ReportTerminalState(
+        List<string> EntryPatientIds,
+        List<string> SubmittedPatientIds);
+
     private readonly IReportServiceClient _reportClient;
     private readonly IFacilityServiceClient _facilityClient;
     private readonly ISubmissionServiceClient _submissionClient;
     private readonly IAutomationOutput _output;
     private readonly AutomationConfig _automationConfig;
+    private readonly RestClient _adminBffClient;
 
-    public ReportApiHelper(IReportServiceClient reportClient, IFacilityServiceClient facilityClient, ISubmissionServiceClient submissionClient, IAutomationOutput output, AutomationConfig config)
+    public ReportApiHelper(
+        IReportServiceClient reportClient,
+        IFacilityServiceClient facilityClient,
+        ISubmissionServiceClient submissionClient,
+        IHttpClientFactory httpClientFactory,
+        IAutomationOutput output,
+        AutomationConfig config)
     {
         _reportClient = reportClient;
         _facilityClient = facilityClient;
         _submissionClient = submissionClient;
         _output = output;
         _automationConfig = config;
+        _adminBffClient = AdminBffClientFactory.Create(config, httpClientFactory);
     }
 
     public async Task<string> GenerateReportAsync(string facilityId, string measureId, TestScenarioConfig config)
@@ -74,6 +90,158 @@ public class ReportApiHelper
         var newReportId = response.Body!.ReportId.ToString();
         _output.WriteLine($"Regeneration initiated. New report ID: {newReportId}");
         return newReportId;
+    }
+
+    public async Task<string> StartScheduledReportAsync(
+        string facilityId,
+        IReadOnlyList<string> reportTypes,
+        DateTimeOffset startDateUtc,
+        TimeSpan reportDuration,
+        Frequency frequency,
+        string? reportTrackingId = null)
+    {
+        if (string.IsNullOrWhiteSpace(facilityId))
+            throw new ArgumentException("facilityId is required.", nameof(facilityId));
+        if (reportTypes == null || reportTypes.Count == 0)
+            throw new ArgumentException("At least one report type is required.", nameof(reportTypes));
+
+        var trackingId = string.IsNullOrWhiteSpace(reportTrackingId)
+            ? Guid.NewGuid().ToString()
+            : reportTrackingId.Trim();
+
+        var delayMinutes = Math.Max(1, (int)Math.Ceiling(reportDuration.TotalMinutes));
+
+        var request = new RestRequest("integration/report-scheduled", Method.Post)
+            .AddJsonBody(new
+            {
+                facilityId,
+                frequency = frequency.ToString(),
+                reportTypes = reportTypes.ToArray(),
+                startDate = startDateUtc.UtcDateTime,
+                delay = delayMinutes.ToString(),
+                reportTrackingId = trackingId
+            });
+
+        var response = await _adminBffClient.ExecuteAsync(request);
+        AutomationInvariant.Require(response.IsSuccessful,
+            $"Failed to produce ReportScheduled event for report '{trackingId}'. HTTP {(int)response.StatusCode}: {response.Content}");
+
+        _output.WriteLine($"Scheduled report event produced: reportTrackingId={trackingId}, start={startDateUtc:O}, delayMinutes={delayMinutes}");
+        return trackingId;
+    }
+
+    /// <summary>
+    /// Waits until the scheduled report identified by <paramref name="reportTrackingId"/> has been
+    /// persisted by the Report service. The ReportScheduled integration event is processed
+    /// asynchronously, so the schedule record does not exist the instant
+    /// <see cref="StartScheduledReportAsync"/> returns. The tracking id becomes the schedule's Id,
+    /// so a by-id lookup returns 404 until the record is committed. Publishing census snapshots
+    /// before this barrier lets Census emit PatientEvents that reach Report's PatientEventListener
+    /// before the schedule exists, throwing "No Scheduled Reports found for facilityId ...".
+    /// </summary>
+    public async Task<ReportScheduleApiModel> WaitForScheduledReportAsync(
+        string reportTrackingId,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Guid.TryParse(reportTrackingId, out _))
+            throw new ArgumentException("reportTrackingId must be a valid Guid.", nameof(reportTrackingId));
+
+        var effectiveTimeout = timeout ?? TimeSpan.FromMinutes(2);
+        var pollingInterval = TimeSpan.FromSeconds(2);
+        var start = DateTime.UtcNow;
+
+        _output.WriteLine($"Waiting for scheduled report {reportTrackingId} to be persisted before publishing census snapshots...");
+
+        while (DateTime.UtcNow - start < effectiveTimeout)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var response = await _reportClient.GetScheduleAsync(reportTrackingId, cancellationToken);
+            if (response.IsSuccessStatusCode && response.Body != null)
+            {
+                var elapsed = (DateTime.UtcNow - start).TotalSeconds;
+                _output.WriteLine($"Scheduled report {reportTrackingId} is persisted (after {elapsed:F0}s).");
+                return response.Body;
+            }
+
+            await Task.Delay(pollingInterval, cancellationToken);
+        }
+
+        throw new TimeoutException(
+            $"Scheduled report {reportTrackingId} was not persisted within {effectiveTimeout.TotalSeconds:F0}s. " +
+            "Census snapshots were not published to avoid a 'No Scheduled Reports found' race.");
+    }
+
+    public async Task PublishPatientListAcquiredAsync(
+        string facilityId,
+        string reportTrackingId,
+        IReadOnlyList<string>? admitPatientIds,
+        IReadOnlyList<string>? dischargePatientIds)
+    {
+        if (!Guid.TryParse(reportTrackingId, out var trackingGuid))
+            throw new ArgumentException("reportTrackingId must be a valid Guid.", nameof(reportTrackingId));
+
+        var admits = admitPatientIds?.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList() ?? [];
+        var discharges = dischargePatientIds?.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList() ?? [];
+        if (admits.Count == 0 && discharges.Count == 0)
+            return;
+
+        // Census validator requires exactly 6 lists: Admit/Discharge x 3 timeframes,
+        // each unique and present even when empty.
+        var patientLists = new List<object>
+        {
+            new
+            {
+                listType = "Admit",
+                timeFrame = "LessThan24Hours",
+                patientIds = new List<string>()
+            },
+            new
+            {
+                listType = "Admit",
+                timeFrame = "Between24To48Hours",
+                patientIds = new List<string>()
+            },
+            new
+            {
+                listType = "Admit",
+                timeFrame = "MoreThan48Hours",
+                patientIds = admits
+            },
+            new
+            {
+                listType = "Discharge",
+                timeFrame = "LessThan24Hours",
+                patientIds = discharges
+            },
+            new
+            {
+                listType = "Discharge",
+                timeFrame = "Between24To48Hours",
+                patientIds = new List<string>()
+            },
+            new
+            {
+                listType = "Discharge",
+                timeFrame = "MoreThan48Hours",
+                patientIds = new List<string>()
+            }
+        };
+
+        var request = new RestRequest("integration/patient-list-acquired", Method.Post)
+            .AddJsonBody(new
+            {
+                facilityId,
+                patientLists,
+                reportTrackingId = trackingGuid
+            });
+
+        var response = await _adminBffClient.ExecuteAsync(request);
+        AutomationInvariant.Require(response.IsSuccessful,
+            $"Failed to produce PatientListAcquired event for report '{reportTrackingId}'. HTTP {(int)response.StatusCode}: {response.Content}");
+
+        _output.WriteLine($"PatientListAcquired event produced: admits={admits.Count}, discharges={discharges.Count}, reportTrackingId={reportTrackingId}");
     }
 
     public async Task<bool> CheckSubmissionStatusAsync(string reportId, TestScenarioConfig config, BackgroundDiagnosticsMonitor? diagnostics = null)
@@ -205,6 +373,86 @@ public class ReportApiHelper
 
         _output.WriteLine($"Report {reportId} was not submitted before timeout.");
         return false;
+    }
+
+    public async Task<ReportTerminalState> WaitForTerminalReportStateAsync(
+        string reportId,
+        TimeSpan? timeout = null,
+        CancellationToken cancellationToken = default)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromMinutes(2);
+        var pollingInterval = TimeSpan.FromSeconds(2);
+        var start = DateTime.UtcNow;
+        string? lastState = null;
+
+        _output.WriteLine($"Waiting for report {reportId} to reach a terminal state before artifact validation...");
+
+        while (DateTime.UtcNow - start < effectiveTimeout)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var scheduleResponse = await _reportClient.GetScheduleAsync(reportId, cancellationToken);
+            if (!scheduleResponse.IsSuccessStatusCode || scheduleResponse.Body == null)
+            {
+                await Task.Delay(pollingInterval, cancellationToken);
+                continue;
+            }
+
+            var entriesResponse = await _reportClient.GetEntriesByScheduleAsync(reportId, cancellationToken);
+            if (!entriesResponse.IsSuccessStatusCode || entriesResponse.Body == null)
+            {
+                await Task.Delay(pollingInterval, cancellationToken);
+                continue;
+            }
+
+            var entries = entriesResponse.Body;
+            var hasIncompleteEntries = entries.Any(e => !IsTerminalEntry(e));
+
+            var state = $"status={scheduleResponse.Body.Status}, entries={entries.Count}, incomplete={(hasIncompleteEntries ? "yes" : "no")}";
+            if (!string.Equals(state, lastState, StringComparison.Ordinal))
+            {
+                _output.WriteLine($"[Poll] Waiting for terminal report state: {state}");
+                lastState = state;
+            }
+
+            if (scheduleResponse.Body.Status == ScheduleStatus.Submitted && !hasIncompleteEntries)
+            {
+                var entryPatientIds = entries
+                    .Select(e => e.PatientId)
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+
+                var submittedPatientIds = entries
+                    .Where(e => e.SubmissionStatus == SubmissionStatus.Submitted)
+                    .Select(e => e.PatientId)
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+
+                _output.WriteLine(
+                    $"Report {reportId} terminal state reached: entries={entryPatientIds.Count}, submittedPatients={submittedPatientIds.Count}.");
+
+                return new ReportTerminalState(entryPatientIds, submittedPatientIds);
+            }
+
+            await Task.Delay(pollingInterval, cancellationToken);
+        }
+
+        throw new TimeoutException(
+            $"Report {reportId} did not reach terminal state within {effectiveTimeout.TotalSeconds:F0}s.");
+    }
+
+    private static bool IsTerminalEntry(ReportEntryApiModel entry)
+    {
+        var reportingTerminal = entry.ReportingStatus is ReportingStatus.NotReportable
+            or ReportingStatus.PassedValidation
+            or ReportingStatus.FailedValidation;
+
+        var submissionTerminal = entry.SubmissionStatus is SubmissionStatus.Submitted
+            or SubmissionStatus.NotEligable;
+
+        return reportingTerminal && submissionTerminal;
     }
 
     public static TimeSpan GetEffectiveSubmissionTimeout(TestScenarioConfig config)

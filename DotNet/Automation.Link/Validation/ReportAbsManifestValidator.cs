@@ -1,5 +1,4 @@
 ï»¿using LantanaGroup.Link.Automation.Link.Helpers;
-using LantanaGroup.Automation.Generation;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Automation.Link.Validation;
@@ -136,7 +135,7 @@ public class ReportAbsManifestValidator
         }
 
         // When a manifest is available, validate ABS resource counts against the concrete
-        // generated input — no DB interrogation or baseline needed.
+        // generated input - no DB interrogation or baseline needed.
         if (manifest != null)
         {
             // Populate the count-level expectation for OperationOutcome from the authoritative
@@ -184,7 +183,7 @@ public class ReportAbsManifestValidator
         }
         catch (Exception ex)
         {
-            // Do not fail the validator on a DB read hiccup — just log. The strict check
+            // Do not fail the validator on a DB read hiccup - just log. The strict check
             // will then flag any unpredicted OperationOutcomes, which is the safe default.
             _output.WriteLine($"[ABS][WARN] Could not read ReportEntry statuses to predict OperationOutcomes: {ex.Message}");
         }
@@ -497,7 +496,7 @@ public class ReportAbsManifestValidator
     /// </list>
     ///
     /// A resource type is expected in ABS when: we generated it AND the query plan acquires
-    /// it AND the CQL references it. The system is deterministic — no tolerance is needed.
+    /// it AND the CQL references it. The system is deterministic - no tolerance is needed.
     ///
     /// Shared infrastructure resources are stored under the empty patient key in the manifest.
     /// They are excluded from per-patient key validation because their IDs are rewritten by
@@ -558,14 +557,23 @@ public class ReportAbsManifestValidator
         }
 
         // Validate that every expected patient-scoped resource key is present in ABS.
-        // Shared infrastructure (empty patient key) is excluded — those resources reach ABS
+        // Shared infrastructure (empty patient key) is excluded - those resources reach ABS
         // through MeasureReport contained resources with MeasureEval-rewritten IDs.
         var allAbsKeys = parsedPatientResources
             .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
             .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var expectedKeys = manifest.AllExpectedAbsPatientResourceKeys();
+        // Expected key-level ABS content must be scoped to the same terminal submitted-patient
+        // set used for patient artifact expectations. Using all manifest-qualified patients here
+        // causes false failures in scheduled runs where report entries resolve to NotReportable
+        // and no patient-{id}.ndjson is produced.
+        var expectedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var patientId in expectedSubmittedPatientIds)
+        {
+            foreach (var key in manifest.GetExpectedAbsKeysForPatient(patientId))
+                expectedKeys.Add(key);
+        }
 
         var missing = expectedKeys
             .Where(k => !allAbsKeys.Contains(k))

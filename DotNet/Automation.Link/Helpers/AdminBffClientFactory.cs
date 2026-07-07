@@ -1,22 +1,28 @@
 ﻿using LantanaGroup.Link.Automation.Link.Configuration;
 using RestSharp;
+using System.Net.Http.Headers;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
 public static class AdminBffClientFactory
 {
-    public static RestClient Create(AutomationConfig config)
+    private const string AdminBffHttpClientName = "Automation.AdminBff";
+
+    public static RestClient Create(AutomationConfig config, IHttpClientFactory httpClientFactory)
     {
-        return CreateAuthenticatedClient(config);
+        return CreateAuthenticatedClient(config, httpClientFactory);
     }
 
     public static void Reset()
     {
     }
 
-    private static RestClient CreateAuthenticatedClient(AutomationConfig config)
+    private static RestClient CreateAuthenticatedClient(AutomationConfig config, IHttpClientFactory httpClientFactory)
     {
-        var client = new RestClient(config.AdminBffBase);
+        var httpClient = httpClientFactory.CreateClient(AdminBffHttpClientName);
+
+        if (httpClient.BaseAddress == null)
+            httpClient.BaseAddress = new Uri(config.AdminBffBase);
 
         if (config.AdminBffOAuth.ShouldAuthenticate)
         {
@@ -25,9 +31,13 @@ public static class AdminBffClientFactory
             if (string.IsNullOrEmpty(token))
                 throw new InvalidOperationException("Could not get token for user");
 
-            client.AddDefaultHeader("Authorization", "Bearer " + token);
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
+        else
+        {
+            httpClient.DefaultRequestHeaders.Authorization = null;
         }
 
-        return client;
+        return new RestClient(httpClient, disposeHttpClient: false);
     }
 }

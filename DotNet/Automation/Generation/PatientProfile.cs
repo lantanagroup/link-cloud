@@ -25,7 +25,8 @@ public record PatientProfile(
     Dictionary<ProfiledMeasureType, MeasureEligibility> MeasureEligibilities,
     int? SeedOffset = null,
     string? ClinicalScenarioId = null,
-    int? ResourcesPerPatient = null)
+    int? ResourcesPerPatient = null,
+    ScheduledInpatientPattern? ScheduledInpatientPattern = null)
 {
     /// <summary>
     /// Returns true when this profile qualifies for the given measure.

@@ -15,6 +15,12 @@ public class PatientCohortDefinition
     public int PatientCount { get; set; }
 
     /// <summary>
+    /// Optional scheduled-report inpatient behavior for patients in this cohort.
+    /// When set, scheduled-report automation uses this to decide admit/discharge timing.
+    /// </summary>
+    public ScheduledInpatientPattern? ScheduledInpatientPattern { get; set; }
+
+    /// <summary>
     /// Per-measure eligibility map. Every selected measure should have an entry.
     /// Drives encounter type (inpatient vs ambulatory) and measure-specific
     /// resource generation (e.g., diabetic medication for Hypo).
@@ -69,7 +75,7 @@ public class PatientCohortDefinition
                 var resources = min == max ? min : min + ((seed + seedCursor) % (max - min + 1));
                 result.Add(new PatientProfile(
                     new Dictionary<ProfiledMeasureType, MeasureEligibility>(cohort.MeasureEligibilities),
-                    seedOffset, scenarioId, resources));
+                    seedOffset, scenarioId, resources, cohort.ScheduledInpatientPattern));
                 seedCursor++;
             }
         }
