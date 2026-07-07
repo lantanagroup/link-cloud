@@ -1,4 +1,4 @@
-using System.Text.Json;
+ï»¿using System.Text.Json;
 using Automation.UI.Models;
 using LantanaGroup.Automation.Generation;
 using MongoDB.Driver;
@@ -144,7 +144,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             }
 
             if (string.IsNullOrWhiteSpace(input.BundleJson))
-                continue; // ID-only entry mistakenly placed in the bundle list — nothing to externalize.
+                continue; // ID-only entry mistakenly placed in the bundle list â€” nothing to externalize.
 
             var hash = ComputeContentHash(input.BundleJson!);
             var byteCount = Encoding.UTF8.GetByteCount(input.BundleJson!);
@@ -314,6 +314,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             ResourcesPerPatientMin = model.ResourcesPerPatientMin,
             ResourcesPerPatientMax = model.ResourcesPerPatientMax,
             PatientCohortsJson = JsonSerializer.Serialize(model.PatientCohorts),
+            NhsnOrganizationId = model.NhsnOrganizationId,
             QueryPlanTemplateId = model.QueryPlanTemplateId,
             CleanupServiceData = model.CleanupServiceData,
             CleanupFhirData = model.CleanupFhirData,
@@ -344,6 +345,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             ResourcesPerPatientMin = doc.ResourcesPerPatientMin,
             ResourcesPerPatientMax = doc.ResourcesPerPatientMax,
             PatientCohorts = DeserializeCohorts(doc.PatientCohortsJson),
+            NhsnOrganizationId = string.IsNullOrWhiteSpace(doc.NhsnOrganizationId) ? string.Empty : doc.NhsnOrganizationId,
             QueryPlanTemplateId = doc.QueryPlanTemplateId,
             CleanupServiceData = doc.CleanupServiceData,
             CleanupFhirData = doc.CleanupFhirData,
@@ -386,7 +388,7 @@ public sealed class MongoScenarioStore : IScenarioStore
         foreach (var input in inputs)
         {
             if (!string.IsNullOrEmpty(input.BundleJson))
-                continue; // already inline (legacy doc) — leave as-is
+                continue; // already inline (legacy doc) â€” leave as-is
 
             var key = input.PatientId ?? string.Empty;
             if (refsByPatient.TryGetValue(key, out var queue) && queue.Count > 0)

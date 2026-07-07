@@ -166,6 +166,34 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             await CreateFacilityAsync(facilityId, ct);
             facilityCreated = true;
 
+            // Org-location configuration lifecycle checks
+            results.Add(await RunStepAsync(StepNames.OrgLocationConfigGet200, 200, async () =>
+                await _client.GetOrganizationLocationConfigurationsAsync(facilityId, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.OrgLocationConfigPost201, 201, async () =>
+                await _client.CreateOrganizationLocationConfigurationAsync(
+                    facilityId,
+                    new CreateOrganizationLocationConfigurationApiModel
+                    {
+                        Description = "ApiHealth org-location config",
+                        IsActive = true,
+                        Conditions =
+                        [
+                            new CreateOrganizationLocationConditionApiModel
+                            {
+                                FhirPath = "identifier.where(system='http://example.org/fhir/sid/location').exists() or type.coding.where(system='https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html').exists()",
+                                Priority = 1
+                            }
+                        ]
+                    },
+                    ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.OrgLocationConfigGet200AfterPost, 200, async () =>
+                await _client.GetOrganizationLocationConfigurationsAsync(facilityId, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.OrgLocationMappingsGet200, 200, async () =>
+                await _client.GetOrganizationLocationMappingsAsync(facilityId, ct), ct: ct));
+
             // CREATE FHIR Query Config
             results.Add(await RunStepAsync(StepNames.FhirConfigPost201, 201, async () =>
             {

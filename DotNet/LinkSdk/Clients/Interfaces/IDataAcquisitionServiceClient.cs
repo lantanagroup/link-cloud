@@ -38,4 +38,17 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse> SoftDeleteLogsByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> RestoreLogsByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> RestoreLogsByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse<List<OrganizationLocationConfigurationApiModel>>> GetOrganizationLocationConfigurationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse<OrganizationLocationConfigurationApiModel>> CreateOrganizationLocationConfigurationAsync(
+        string facilityId,
+        CreateOrganizationLocationConfigurationApiModel request,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse<List<OrganizationLocationMappingApiModel>>> GetOrganizationLocationMappingsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default);
 }

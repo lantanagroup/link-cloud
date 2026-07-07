@@ -228,6 +228,10 @@ public static class ApiEndPointLibrary
         public const string QueryPlanGet200 = "QueryPlan GET → 200";
         public const string QueryPlanGet404 = "QueryPlan GET → 404";
         public const string QueryPlanDelete202 = "QueryPlan DELETE → 202";
+        public const string OrgLocationConfigGet200 = "OrgLocationConfig GET → 200";
+        public const string OrgLocationConfigPost201 = "OrgLocationConfig POST → 201";
+        public const string OrgLocationConfigGet200AfterPost = "OrgLocationConfig GET → 200 (after post)";
+        public const string OrgLocationMappingsGet200 = "OrgLocationMappings GET → 200";
         public const string AcquisitionLogsGet200HasData = "AcquisitionLogs GET → 200 (has data)";
         public const string AcquisitionLogsGet200 = "AcquisitionLogs GET → 200";
         public const string GetLog200HasData = "GetLog → 200 (has data)";

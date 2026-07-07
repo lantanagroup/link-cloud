@@ -101,6 +101,7 @@ internal sealed class RunExecutor
 
             output.WriteLine($"Starting {state.Scenario} run: {state.RunId}");
             output.WriteLine($"Measure context: {string.Join(", ", state.Options.SelectedMeasures.Select(m => $"{ProfiledMeasureCatalog.GetDisplayName(m)} ({m})"))}");
+            output.WriteLine($"NHSN Organization ID: {state.Options.NhsnOrganizationId}");
             output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, seed={state.Options.Seed}");
 
             List<string> patientIds;
@@ -122,6 +123,13 @@ internal sealed class RunExecutor
             var effectiveQueryPlan = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
             if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
                 output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
+
+            var locationQueryCount = effectiveQueryPlan.InitialQueries.Concat(effectiveQueryPlan.SupplementalQueries)
+                .Count(q => string.Equals(q.ResourceType, "Location", StringComparison.OrdinalIgnoreCase));
+            var expectLocationResources = locationQueryCount > 0;
+            output.WriteLine($"Query plan Location queries: {locationQueryCount}");
+            if (locationQueryCount == 0)
+                output.WriteLine("WARNING: Query plan has no Location query entries; org-location mapping cannot be exercised for this run.");
 
             if (state.Options.PatientProfiles is { Count: > 0 }
                 || state.Options.ImportedPatientIds.Count > 0
@@ -258,10 +266,19 @@ internal sealed class RunExecutor
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 services.GetRequiredService<AutomationConfig>(),
                 output, facilityId);
+            await FacilitySetupHelper.EnsureOrganizationLocationConfigurationAsync(
+                services.GetRequiredService<IDataAcquisitionServiceClient>(),
+                output,
+                facilityId);
             await FacilitySetupHelper.EnsureQueryDispatchConfigAsync(
                 services.GetRequiredService<IQueryDispatchServiceClient>(),
                 output,
                 facilityId);
+            await WriteOrganizationLocationMappingStatusAsync(
+                services.GetRequiredService<IDataAcquisitionServiceClient>(),
+                output,
+                facilityId,
+                cancellationToken);
 
             var reportId = await reportHelper.GenerateReportAsync(facilityId, measureIds, scenarioConfig);
             lock (state.Sync)
@@ -393,6 +410,7 @@ internal sealed class RunExecutor
                 {
                     throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
                 }
+
             }
             else if (!string.Equals(manifestKey, "manifest.ndjson", StringComparison.Ordinal))
             {
@@ -493,7 +511,13 @@ internal sealed class RunExecutor
                     manifest: generationManifest));
 
             await RunValidator("DATA ACQUISITION DATABASE VALIDATION", () =>
-                dataAcqValidator.ValidateAllAsync(facilityId, reportId, measureIds[0], expectedAllPatientIds, expectDataAcquisitionData: expectDataAcquisitionData));
+                dataAcqValidator.ValidateAllAsync(
+                    facilityId,
+                    reportId,
+                    measureIds[0],
+                    expectedAllPatientIds,
+                    expectDataAcquisitionData: expectDataAcquisitionData,
+                    expectLocationResources: expectLocationResources));
 
             await RunValidator("NORMALIZATION DATABASE VALIDATION", () =>
                 normalizationValidator.ValidateAllAsync(facilityId));
@@ -544,6 +568,44 @@ internal sealed class RunExecutor
             await _orchestrator.CompleteRunAsync(state.RunId);
             await callbacks.BroadcastStatus();
             output.WriteLine($"Run failed: {ex.Message}");
+        }
+    }
+
+    private static async Task WriteOrganizationLocationMappingStatusAsync(
+        IDataAcquisitionServiceClient dataAcqClient,
+        IAutomationOutput output,
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var configsResp = await dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
+            if (!configsResp.IsSuccessStatusCode)
+            {
+                output.WriteLine($"Org-location mapping status: unable to read configurations (HTTP {configsResp.StatusCode}).");
+                return;
+            }
+
+            var configs = configsResp.Body ?? [];
+            var activeConfigs = configs.Count(c => c.IsActive);
+            var activeConditions = configs.Where(c => c.IsActive).Sum(c => c.Conditions?.Count ?? 0);
+
+            var mappingsResp = await dataAcqClient.GetOrganizationLocationMappingsAsync(facilityId, cancellationToken);
+            var mappings = mappingsResp.IsSuccessStatusCode
+                ? mappingsResp.Body ?? []
+                : [];
+            var activeMappings = mappings.Count(m => m.IsActive);
+            var orgMappings = mappings.Count(m => m.IsActive && m.IsOrgLocation);
+
+            output.WriteLine(
+                $"Org-location mapping status: activeConfigs={activeConfigs}, activeConditions={activeConditions}, activeMappings={activeMappings}, orgMappings={orgMappings}");
+
+            if (activeConfigs == 0 || activeConditions == 0)
+                output.WriteLine("  WARNING: Org-location mapping is not effectively enabled (missing active config/conditions).");
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"Org-location mapping status: failed to query mapping state ({ex.GetType().Name}: {ex.Message}).");
         }
     }
 

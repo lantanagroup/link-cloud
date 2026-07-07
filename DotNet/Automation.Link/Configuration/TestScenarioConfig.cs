@@ -27,6 +27,7 @@ public class TestScenarioConfig
 
     public string StartDate { get; set; } = "2023-01-01T00:00:00Z";
     public string EndDate { get; set; } = "2023-12-31T23:59:59Z";
+    public string NhsnOrganizationId { get; set; } = string.Empty;
     public List<string> PatientIds { get; set; } = ["207727"];
 
     /// <summary>

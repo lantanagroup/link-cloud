@@ -20,7 +20,8 @@ public class DataAcquisitionDatabaseValidator
         string reportId,
         string expectedMeasureId,
         List<string> expectedPatientIds,
-        bool expectDataAcquisitionData = true)
+        bool expectDataAcquisitionData = true,
+        bool expectLocationResources = false)
     {
         var errors = new List<string>();
 
@@ -31,6 +32,7 @@ public class DataAcquisitionDatabaseValidator
             await ValidateDataAcquisitionLogs(facilityId, reportId, expectedPatientIds, errors, expectDataAcquisitionData);
             await ValidateFhirQueries(facilityId, reportId, errors, expectDataAcquisitionData);
             await ValidateReferenceResources(facilityId, reportId, errors, expectDataAcquisitionData);
+            await ValidateOrganizationLocationTracking(facilityId, reportId, errors, expectDataAcquisitionData, expectLocationResources);
         }
         catch (Exception ex)
         {
@@ -198,5 +200,75 @@ public class DataAcquisitionDatabaseValidator
             $"Expected ReferenceResources rows for the facility but found none. " +
             $"Diagnostics: totalLogs={logs.Count}, referentialLogs={referentialLogs.Count}, referentialCompleted={referentialCompleted}, " +
             $"referentialStatuses=[{string.Join(", ", statusSummary)}].");
+    }
+
+    private async Task ValidateOrganizationLocationTracking(
+        string facilityId,
+        string reportId,
+        List<string> errors,
+        bool expectDataAcquisitionData,
+        bool expectLocationResources)
+    {
+        var configs = await _reader.GetOrganizationLocationConfigurationsAsync(facilityId);
+        var hasActiveConfiguredOrgLocation = configs.Any(c => c.IsActive && c.ConditionsCount > 0);
+
+        if (!hasActiveConfiguredOrgLocation)
+            return;
+
+        var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
+        if (logs.Count == 0)
+            return;
+
+        var hasLocationResourceEvidence = logs.Any(l =>
+            (l.ResourceAcquiredIds?.Any(r => r.StartsWith("Location/", StringComparison.OrdinalIgnoreCase)) ?? false)
+            || l.FhirQueries.Any(q => q.ResourceTypes.Any(rt => string.Equals(rt, "Location", StringComparison.OrdinalIgnoreCase))));
+
+        if (!hasLocationResourceEvidence)
+        {
+            var acquiredResourceIds = await _reader.GetAcquiredResourceIdsForReportAsync(facilityId, reportId);
+            hasLocationResourceEvidence = acquiredResourceIds.Any(id =>
+                id.StartsWith("Location/", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!hasLocationResourceEvidence)
+        {
+            if (expectDataAcquisitionData && expectLocationResources)
+            {
+                AddError(errors,
+                    "Org-location mapping is enabled and Location resources are expected by the query plan, but no Location acquisition evidence was observed in DataAcquisition logs.");
+            }
+            else
+            {
+                _output.WriteLine("  Org-location mapping configured, but no Location acquisition evidence was observed for this run; skipping strict mapping-row assertions.");
+            }
+            return;
+        }
+
+        var mappings = await _reader.GetOrganizationLocationMappingsAsync(facilityId);
+        _output.WriteLine($"  Org-location mappings for facility '{facilityId}': {mappings.Count} total row(s).");
+        foreach (var mapping in mappings.OrderBy(m => m.LocationId, StringComparer.OrdinalIgnoreCase))
+        {
+            _output.WriteLine(
+                $"    - FacilityId={mapping.FacilityId ?? "(null)"}, LocationId={mapping.LocationId ?? "(null)"}, IsActive={mapping.IsActive}, IsOrgLocation={mapping.IsOrgLocation}, PartOfValue={mapping.PartOfValue ?? "(null)"}");
+        }
+
+        if (mappings.Count == 0)
+        {
+            AddError(errors, "Org-location mapping is configured and Location acquisition was observed, but no OrganizationLocationMapping rows were found.");
+            return;
+        }
+
+        var activeMappings = mappings.Where(m => m.IsActive).ToList();
+        if (activeMappings.Count == 0)
+            AddError(errors, "Org-location mapping is configured and Location acquisition was observed, but no active OrganizationLocationMapping rows were found.");
+
+        if (activeMappings.All(m => !string.Equals(m.FacilityId, facilityId, StringComparison.Ordinal)))
+            AddError(errors, $"OrganizationLocationMapping rows do not match facility '{facilityId}'.");
+
+        if (activeMappings.All(m => string.IsNullOrWhiteSpace(m.LocationId)))
+            AddError(errors, "OrganizationLocationMapping rows are missing LocationId values.");
+
+        if (expectDataAcquisitionData && activeMappings.All(m => !m.IsOrgLocation))
+            AddError(errors, "OrganizationLocationMapping rows exist but none are marked IsOrgLocation=true.");
     }
 }
