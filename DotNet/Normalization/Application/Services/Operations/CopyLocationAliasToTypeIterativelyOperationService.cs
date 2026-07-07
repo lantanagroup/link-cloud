@@ -39,7 +39,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 location.Type = new List<CodeableConcept>();
             }
 
-            var maxIterations = 15; //guard against circular references by limiting the number of iterations. This could be a configuration option in the future.
+            var maxIterations = operation.MaxIterations; //prevent infinite loops in case of circular references in the partOf hierarchy
+            if (maxIterations <= 0)
+            {
+                return OperationResult.Failure("MaxIterations must be greater than zero.");
+            }
+
             int iterationCount = 0;
             do
             {
@@ -50,8 +55,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         continue;
                     }
 
-                    bool splitOnComma = true; // This could be a configuration option in the future
-                    if (splitOnComma)
+                    if (operation.SplitOnComma)
                     {
                         var aliases = alias.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                         foreach (var a in aliases)

@@ -46,13 +46,36 @@ public class CopyLocationAliasToTypeIterativelyOperationServiceTests
             Alias = ["ICU, Stepdown,  MedSurg  "]
         };
 
-        var result = await _service.ProcessOperationAsync(new CopyLocationAliasToTypeIterativelyOperation(), location);
+        var operation = new CopyLocationAliasToTypeIterativelyOperation
+        {
+            SplitOnComma = true
+        };
+
+        var result = await _service.ProcessOperationAsync(operation, location);
 
         Assert.Equal(OperationStatus.Success, result.SuccessCode);
         var modified = (Location)result.Resource;
         AssertAliasCode(modified, "ICU");
         AssertAliasCode(modified, "Stepdown");
         AssertAliasCode(modified, "MedSurg");
+    }
+
+    [Fact]
+    public async Task CopyLocationAliasToTypeIteratively_DefaultSplitOnComma_CopiesFullAliasValue()
+    {
+        var location = new Location
+        {
+            Id = "child-location",
+            Alias = ["ICU, Stepdown"]
+        };
+
+        var result = await _service.ProcessOperationAsync(new CopyLocationAliasToTypeIterativelyOperation(), location);
+
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        var modified = (Location)result.Resource;
+        AssertAliasCode(modified, "ICU, Stepdown");
+        Assert.DoesNotContain(modified.Type, concept => HasAliasCode("ICU")(concept));
+        Assert.DoesNotContain(modified.Type, concept => HasAliasCode("Stepdown")(concept));
     }
 
     [Fact]
@@ -154,6 +177,54 @@ public class CopyLocationAliasToTypeIterativelyOperationServiceTests
         Assert.Single(locationA.Type, concept => HasAliasCode("A")(concept));
         Assert.Single(locationB.Type, concept => HasAliasCode("B")(concept));
         VerifyLog(LogLevel.Warning, "Maximum iteration count of 15 reached", Times.Once());
+    }
+
+    [Fact]
+    public async Task CopyLocationAliasToTypeIteratively_UsesConfiguredMaxIterations()
+    {
+        var locationA = new Location
+        {
+            Id = "location-a",
+            Alias = ["A"],
+            PartOf = new ResourceReference("location-b")
+        };
+        var locationB = new Location
+        {
+            Id = "location-b",
+            Alias = ["B"],
+            PartOf = new ResourceReference("location-a")
+        };
+        var operation = new CopyLocationAliasToTypeIterativelyOperation
+        {
+            MaxIterations = 2
+        };
+
+        var result = await _service.ProcessOperationAsync(
+            operation,
+            locationA,
+            [locationA, locationB]);
+
+        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        VerifyLog(LogLevel.Warning, "Maximum iteration count of 2 reached", Times.Once());
+    }
+
+    [Fact]
+    public async Task CopyLocationAliasToTypeIteratively_MaxIterationsLessThanOne_ReturnsFailure()
+    {
+        var location = new Location
+        {
+            Id = "child-location",
+            Alias = ["ICU"]
+        };
+        var operation = new CopyLocationAliasToTypeIterativelyOperation
+        {
+            MaxIterations = 0
+        };
+
+        var result = await _service.ProcessOperationAsync(operation, location);
+
+        Assert.Equal(OperationStatus.Failure, result.SuccessCode);
+        Assert.Contains("MaxIterations must be greater than zero", result.ErrorMessage);
     }
 
     [Fact]

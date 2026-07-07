@@ -1,14 +1,15 @@
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
-using Microsoft.Identity.Client;
 
 namespace LantanaGroup.Link.Normalization.Application.Operations
 {
     public class CopyLocationAliasToTypeIterativelyOperation : IOperation
     {
-        public OperationType OperationType => OperationType.CopyLocation;
+        public OperationType OperationType => OperationType.CopyLocationAliasToTypeIteratively;
 
         public string Name { get; set; }
         public string Description { get; set; }
+        public int MaxIterations { get; set; } = 15;
+        public bool SplitOnComma { get; set; } = false;
 
         public CopyLocationAliasToTypeIterativelyOperation()
         {

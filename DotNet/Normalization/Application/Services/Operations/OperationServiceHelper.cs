@@ -831,7 +831,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 }
                 else if (operation is CopyLocationAliasToTypeIterativelyOperation)
                 {
-                    //No validation needed for CopyLocationAliasToTypeIterativelyOperation
+                    var op = (CopyLocationAliasToTypeIterativelyOperation)operation;
+
+                    if (op.MaxIterations <= 0)
+                    {
+                        return (false, "CopyLocationAliasToTypeIterativelyOperation.MaxIterations must be greater than zero.");
+                    }
                 }
                 else if (operation is RemoveExtensionsOperation)
                 {
