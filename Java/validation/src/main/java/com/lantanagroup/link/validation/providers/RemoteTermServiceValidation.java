@@ -58,6 +58,21 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
         return validationCacheService.cachedValidateCode(this, theCodeSystem, theCode, theDisplay, theValueSetUrl);
     }
 
+    /**
+     * HAPI calls this (rather than {@link #validateCode}) once it has resolved the bound ValueSet to a resource,
+     * which is the common case for loaded profiles. Delegating to the remote terminology service here ensures the
+     * inactive-code detection in {@link #invokeRemoteValidateCode} runs for value-set-bound codes instead of falling
+     * through to the in-memory support. When the ValueSet carries a canonical URL we route through the same cache as
+     * {@link #validateCode}; otherwise we send the ValueSet resource inline.
+     */
+    public IValidationSupport.CodeValidationResult validateCodeInValueSet(ValidationSupportContext theValidationSupportContext, ConceptValidationOptions theOptions, String theCodeSystem, String theCode, String theDisplay, IBaseResource theValueSet) {
+        String valueSetUrl = theValueSet instanceof org.hl7.fhir.r4.model.ValueSet valueSet ? valueSet.getUrl() : null;
+        if (StringUtils.isNotBlank(valueSetUrl)) {
+            return validationCacheService.cachedValidateCode(this, theCodeSystem, theCode, theDisplay, valueSetUrl);
+        }
+        return invokeRemoteValidateCode(theCodeSystem, theCode, theDisplay, null, theValueSet);
+    }
+
     @Nullable
     private IBaseResource fetchCodeSystem(String theSystem, @Nullable SummaryEnum theSummaryParam) {
         IGenericClient client = this.provideClient();

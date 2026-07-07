@@ -15,6 +15,7 @@ import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.hl7.fhir.r4.model.Parameters;
 import org.hl7.fhir.r4.model.StringType;
+import org.hl7.fhir.r4.model.ValueSet;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -23,6 +24,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
@@ -251,5 +253,59 @@ class RemoteTermServiceValidationTest {
         assertNotNull(result);
         assertEquals(CODE, result.getCode());
         assertEquals(IssueSeverity.INFORMATION, result.getSeverity());
+    }
+
+    @Test
+    void validateCodeInValueSet_withCanonicalUrl_delegatesToRemoteViaCache() {
+        // HAPI passes the resolved ValueSet resource; when it carries a canonical URL we route through the
+        // same cache as validateCode, using the extracted URL (not the inline resource).
+        ValidationCacheService cacheService = mock(ValidationCacheService.class);
+        RemoteTermServiceValidation subject = spy(new RemoteTermServiceValidation(
+                cacheService, fhirContext, "http://tx.example.org/fhir", List.of(), List.of()));
+
+        CodeValidationResult expected = new CodeValidationResult();
+        expected.setCode(CODE);
+        expected.setSeverity(IssueSeverity.WARNING);
+        when(cacheService.cachedValidateCode(subject, CODE_SYSTEM_URL, CODE, null, VALUE_SET_URL))
+                .thenReturn(expected);
+
+        ValueSet valueSet = new ValueSet();
+        valueSet.setUrl(VALUE_SET_URL);
+
+        CodeValidationResult result =
+                subject.validateCodeInValueSet(null, null, CODE_SYSTEM_URL, CODE, null, valueSet);
+
+        assertSame(expected, result);
+        verify(cacheService).cachedValidateCode(subject, CODE_SYSTEM_URL, CODE, null, VALUE_SET_URL);
+    }
+
+    @Test
+    void validateCodeInValueSet_withoutCanonicalUrl_sendsValueSetInlineAndDetectsInactive() {
+        // A ValueSet with no canonical URL is sent to the terminology server inline (resourceType "ValueSet"),
+        // and the inactive-code detection still applies to the value-set-bound code.
+        RemoteTermServiceValidation subject = newSpy();
+
+        Parameters response = new Parameters();
+        response.addParameter().setName("result").setValue(new BooleanType(true));
+        OperationOutcome outcome = new OperationOutcome();
+        outcome.addIssue()
+                .setSeverity(OperationOutcome.IssueSeverity.WARNING)
+                .setCode(OperationOutcome.IssueType.BUSINESSRULE)
+                .setDetails(new CodeableConcept().setText("Code is inactive."));
+        response.addParameter().setName("issues").setResource(outcome);
+        IOperation operation = stubClientChain(subject, response, false);
+
+        ValueSet valueSet = new ValueSet(); // no url -> inline
+
+        CodeValidationResult result =
+                subject.validateCodeInValueSet(null, null, CODE_SYSTEM_URL, CODE, null, valueSet);
+
+        assertNotNull(result);
+        assertEquals(IssueSeverity.WARNING, result.getSeverity());
+        assertEquals(
+                "The concept '" + CODE + "' has a status of inactive and its use should be reviewed.",
+                result.getMessage());
+        // The inline path targets the ValueSet resource, not CodeSystem.
+        verify(operation).onType("ValueSet");
     }
 }
