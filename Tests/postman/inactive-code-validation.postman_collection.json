@@ -1,0 +1,545 @@
+{
+  "info": {
+    "_postman_id": "a8cc30b2-9260-4ea9-b7d5-f1544e53cf9d",
+    "name": "LEGLINK-580 Inactive Code Validation",
+    "description": "End-to-end check that an inactive code surfaces as a validation Result and categorizes as a `missing_active_*` category.\n\nRun the requests top-to-bottom. Set the collection variables first (Variables tab):\n- `validationBaseUrl` (local: http://localhost:8075)\n- `terminologyBaseUrl` (local: http://localhost:8076)\n- `codeSystem`, `code`, `codeDisplay` — an INACTIVE code known to the terminology service\n- `codeSystemId` — the terminology CodeSystem id used by the config lookup endpoint\n- `resourceType` / `elementPath` / `profileUrl` — the resource+element+profile the code sits on (drives the sample bundle)\n\nPrereqs for LOCAL: validation must be wired to the terminology service (App Config is disabled locally). Add a docker-compose.override.yml:\n\n  services:\n    validation:\n      environment:\n        link.terminology-service-url: http://terminology:8076\n\nThe test env already has `link.terminology-service-url` set via Azure App Config, so there you only need requests 5-9.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "55093274"
+  },
+  "item": [
+    {
+      "name": "1. Health - Validation",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Validation service is up', () => pm.response.code < 500);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{validationBaseUrl}}/health",
+          "host": [
+            "{{validationBaseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "2. Health - Terminology",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Terminology service is up', () => pm.response.code < 500);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{terminologyBaseUrl}}/health",
+          "host": [
+            "{{terminologyBaseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "3. Terminology - Reload Cache",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Cache reload accepted', () => pm.expect(pm.response.code).to.be.oneOf([200, 202, 204]));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{terminologyBaseUrl}}/api/terminology/config/$reload-cache",
+          "host": [
+            "{{terminologyBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "terminology",
+            "config",
+            "$reload-cache"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "3b. Terminology - List loaded CodeSystems (discover ids)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const b = pm.response.json();",
+              "const entries = b.entry || [];",
+              "console.log('Loaded CodeSystems (' + entries.length + '):');",
+              "entries.forEach(e => { const cs = e.resource || {}; console.log(`  id=${cs.id}  url=${cs.url}  version=${cs.version}`); });",
+              "console.log('Set collection vars codeSystemId=<id> and codeSystem=<url> from a row above, then pick an inactive code for that system.');",
+              "pm.test('At least one CodeSystem is loaded', () => entries.length > 0);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{terminologyBaseUrl}}/api/terminology/fhir/CodeSystem?_summary=true",
+          "host": [
+            "{{terminologyBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "terminology",
+            "fhir",
+            "CodeSystem"
+          ],
+          "query": [
+            {
+              "key": "_summary",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "3c. Terminology - List loaded ValueSets (binding coverage)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const b = pm.response.json();",
+              "const entries = b.entry || [];",
+              "console.log('Loaded ValueSets (' + entries.length + '):');",
+              "entries.forEach(e => { const vs = e.resource || {}; console.log(`  id=${vs.id}  url=${vs.url}  version=${vs.version}`); });",
+              "console.log('For an inactive code to surface during bundle validation, the ValueSet the target element BINDS to must appear here, and your inactive code must be a MEMBER of it.');",
+              "pm.test('At least one ValueSet is loaded (else valueset binding checks fall back to in-memory)', () => entries.length > 0);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{terminologyBaseUrl}}/api/terminology/fhir/ValueSet?_summary=true",
+          "host": [
+            "{{terminologyBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "terminology",
+            "fhir",
+            "ValueSet"
+          ],
+          "query": [
+            {
+              "key": "_summary",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "4. Terminology - Confirm code is INACTIVE",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Code found', () => pm.response.code === 200);",
+              "const body = pm.response.json();",
+              "console.log('Code status:', JSON.stringify(body));",
+              "pm.test('Code status is Inactive', () => /inactive/i.test(JSON.stringify(body)));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{terminologyBaseUrl}}/api/terminology/config/code-systems/{{codeSystemId}}/codes/{{code}}",
+          "host": [
+            "{{terminologyBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "terminology",
+            "config",
+            "code-systems",
+            "{{codeSystemId}}",
+            "codes",
+            "{{code}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "5. Terminology - $validate-code (expect inactive issue)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const p = pm.response.json();",
+              "console.log('$validate-code response:', JSON.stringify(p, null, 2));",
+              "const params = p.parameter || [];",
+              "const result = params.find(x => x.name === 'result');",
+              "pm.test('result = true (valid but inactive)', () => result && result.valueBoolean === true);",
+              "const issues = params.find(x => x.name === 'issues');",
+              "pm.test('issues OperationOutcome carries an inactive warning', () => {",
+              "  const txt = JSON.stringify(issues || {});",
+              "  return /inactive/i.test(txt);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/fhir+json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"resourceType\": \"Parameters\",\n  \"parameter\": [\n    { \"name\": \"url\", \"valueUri\": \"{{codeSystem}}\" },\n    { \"name\": \"code\", \"valueString\": \"{{code}}\" }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{terminologyBaseUrl}}/api/terminology/fhir/CodeSystem/$validate-code",
+          "host": [
+            "{{terminologyBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "terminology",
+            "fhir",
+            "CodeSystem",
+            "$validate-code"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "5b. Terminology - $validate-code against ValueSet (binding proxy)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// This is exactly the call HAPI makes for the element's binding. If result=true AND inactive,",
+              "// step 9 will surface the inactive warning; if result=false, the code is NOT a member of the valueset.",
+              "const p = pm.response.json();",
+              "console.log('ValueSet $validate-code response:', JSON.stringify(p, null, 2));",
+              "const params = p.parameter || [];",
+              "const result = params.find(x => x.name === 'result');",
+              "pm.test('code is a MEMBER of the binding valueset (result=true)', () => result && result.valueBoolean === true);",
+              "const issues = params.find(x => x.name === 'issues');",
+              "pm.test('inactive issue present at the valueset level', () => /inactive/i.test(JSON.stringify(issues || {})));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/fhir+json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"resourceType\": \"Parameters\",\n  \"parameter\": [\n    { \"name\": \"url\", \"valueUri\": \"{{bindingValueSetUrl}}\" },\n    { \"name\": \"system\", \"valueUri\": \"{{codeSystem}}\" },\n    { \"name\": \"code\", \"valueString\": \"{{code}}\" }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{terminologyBaseUrl}}/api/terminology/fhir/ValueSet/$validate-code",
+          "host": [
+            "{{terminologyBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "terminology",
+            "fhir",
+            "ValueSet",
+            "$validate-code"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "6. Validation - Initialize Artifacts (profiles)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Artifacts initialized', () => pm.expect(pm.response.code).to.be.oneOf([200, 202, 204]));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{validationBaseUrl}}/api/validation/artifact/$initialize",
+          "host": [
+            "{{validationBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "validation",
+            "artifact",
+            "$initialize"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "7. Validation - Initialize Categories",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Categories initialized', () => pm.expect(pm.response.code).to.be.oneOf([200, 202, 204]));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{validationBaseUrl}}/api/validation/category/$initialize",
+          "host": [
+            "{{validationBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "validation",
+            "category",
+            "$initialize"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "8. Validation - Confirm inactive category loaded",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Expected inactive category exists', () => pm.response.code === 200);",
+              "if (pm.response.code === 200) { console.log('Category:', JSON.stringify(pm.response.json())); }"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{validationBaseUrl}}/api/validation/category/{{expectedCategoryId}}",
+          "host": [
+            "{{validationBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "validation",
+            "category",
+            "{{expectedCategoryId}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "9. Validation - $validate?categorize=true (THE TEST)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Validate returned 200', () => pm.response.code === 200);",
+              "const results = pm.response.json();",
+              "pm.test('Response is a results array', () => Array.isArray(results));",
+              "",
+              "// Find the inactive-code result (surfacing check)",
+              "const inactive = (results || []).find(r => /has a status of inactive/i.test(r.message || ''));",
+              "if (inactive) {",
+              "  console.log('INACTIVE RESULT:', JSON.stringify(inactive, null, 2));",
+              "} else {",
+              "  console.log('No inactive result. All messages:');",
+              "  (results || []).forEach(r => console.log(`[${r.severity}] expr=${r.expression} | ${r.message}`));",
+              "}",
+              "pm.test('SURFACING: inactive warning is present as a Result', () => !!inactive);",
+              "",
+              "// Categorization check",
+              "if (inactive) {",
+              "  const cats = (inactive.categories || []).map(c => c.id);",
+              "  console.log('Categories on inactive result:', cats.join(', '));",
+              "  pm.test('CATEGORIZED as a missing_active_* category', () => cats.some(id => /^missing_active_/.test(id)));",
+              "  pm.test(`CATEGORIZED as ${pm.collectionVariables.get('expectedCategoryId')}`, () => cats.includes(pm.collectionVariables.get('expectedCategoryId')));",
+              "}"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/fhir+json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"resourceType\": \"Bundle\",\n  \"type\": \"collection\",\n  \"entry\": [\n    {\n      \"fullUrl\": \"urn:uuid:enc-1\",\n      \"resource\": {\n        \"resourceType\": \"Encounter\",\n        \"id\": \"enc-1\",\n        \"meta\": { \"profile\": [\"{{profileUrl}}\"] },\n        \"identifier\": [ { \"system\": \"urn:example\", \"value\": \"enc-1\" } ],\n        \"status\": \"finished\",\n        \"class\": { \"system\": \"http://terminology.hl7.org/CodeSystem/v3-ActCode\", \"code\": \"SS\", \"display\": \"short stay\" },\n        \"type\": [ { \"coding\": [ { \"system\": \"{{codeSystem}}\", \"code\": \"{{code}}\", \"display\": \"{{codeDisplay}}\" } ] } ],\n        \"subject\": { \"reference\": \"Patient/pat-1\" }\n      }\n    },\n    {\n      \"fullUrl\": \"Patient/pat-1\",\n      \"resource\": {\n        \"resourceType\": \"Patient\",\n        \"id\": \"pat-1\",\n        \"extension\": [\n          {\n            \"url\": \"http://hl7.org/fhir/us/core/StructureDefinition/us-core-race\",\n            \"extension\": [\n              { \"url\": \"ombCategory\", \"valueCoding\": { \"system\": \"urn:oid:2.16.840.1.113883.6.238\", \"code\": \"1002-5\", \"display\": \"American Indian or Alaska Native\" } },\n              { \"url\": \"detailed\", \"valueCoding\": { \"system\": \"urn:oid:2.16.840.1.113883.6.238\", \"code\": \"1004-1\", \"display\": \"American Indian\" } },\n              { \"url\": \"text\", \"valueString\": \"American Indian\" }\n            ]\n          }\n        ]\n      }\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{validationBaseUrl}}/api/validation/$validate?categorize=true",
+          "host": [
+            "{{validationBaseUrl}}"
+          ],
+          "path": [
+            "api",
+            "validation",
+            "$validate"
+          ],
+          "query": [
+            {
+              "key": "categorize",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "packages": {},
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "validationBaseUrl",
+      "value": "http://localhost:8075"
+    },
+    {
+      "key": "terminologyBaseUrl",
+      "value": "http://localhost:8076"
+    },
+    {
+      "key": "codeSystem",
+      "value": "urn:oid:2.16.840.1.113883.6.238"
+    },
+    {
+      "key": "codeSystemId",
+      "value": "cdcrec"
+    },
+    {
+      "key": "code",
+      "value": "1004-1"
+    },
+    {
+      "key": "codeDisplay",
+      "value": "American Indian"
+    },
+    {
+      "key": "resourceType",
+      "value": "Encounter"
+    },
+    {
+      "key": "profileUrl",
+      "value": "http://hl7.org/fhir/us/core/StructureDefinition/us-core-encounter"
+    },
+    {
+      "key": "bindingValueSetUrl",
+      "value": "http://hl7.org/fhir/us/core/ValueSet/detailed-race"
+    },
+    {
+      "key": "expectedCategoryId",
+      "value": "missing_active_encounter_type_code"
+    }
+  ]
+}
