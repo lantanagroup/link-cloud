@@ -4,6 +4,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Filters;
 using LantanaGroup.Link.DataAcquisition.Models;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
@@ -18,6 +19,13 @@ namespace LantanaGroup.Link.DataAcquisition.Controllers;
 [ApiController]
 public class EncounterMappingController : Controller
 {
+    // Sort is only supported on EncounterId and PatientId (per LEGLINK-504); LocationId is not sortable.
+    private static readonly HashSet<string> AllowedSortBy = new(StringComparer.OrdinalIgnoreCase)
+    {
+        nameof(EncounterMappingModel.EncounterId),
+        nameof(EncounterMappingModel.PatientId)
+    };
+
     private readonly ILogger<EncounterMappingController> _logger;
     private readonly IEncounterMappingManager _manager;
     private readonly IEncounterMappingQueries _queries;
@@ -177,19 +185,25 @@ public class EncounterMappingController : Controller
     /// </summary>
     [HttpGet("facilities/{facilityId}/search")]
     [ProducesResponseType(typeof(PagedConfigModel<EncounterMappingModel>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult> SearchAsync(
         string facilityId,
         [FromQuery] EncounterMappingSearchParameters searchParams,
         int pageNumber = 1,
-        int pageSize = 10)
+        int pageSize = 10,
+        string? sortBy = null,
+        SortOrder? sortOrder = null)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(facilityId))
                 throw new BadRequestException("facilityId is required.");
+
+            if (!string.IsNullOrWhiteSpace(sortBy) && !AllowedSortBy.Contains(sortBy))
+                throw new BadRequestException($"Invalid sortBy. Allowed values: {string.Join(", ", AllowedSortBy)}");
+
+            searchParams ??= new EncounterMappingSearchParameters();
 
             var search = new EncounterMappingSearchModel
             {
@@ -199,11 +213,9 @@ public class EncounterMappingController : Controller
                 MappedToOrg = searchParams.MappedToOrg
             };
 
-            var result = await _queries.SearchAsync(search, pageNumber, pageSize);
+            var result = await _queries.SearchAsync(search, pageNumber, pageSize, sortBy, sortOrder);
 
-            if (result.Records == null || result.Records.Count == 0)
-                return NoContent();
-
+            // Always 200, even when empty, so the UI can render its empty state with valid paging metadata.
             return Ok(result);
         }
         catch (BadRequestException ex)
