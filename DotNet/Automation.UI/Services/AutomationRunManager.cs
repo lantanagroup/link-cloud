@@ -546,6 +546,7 @@ public class AutomationRunManager : IAutomationRunManager
                 StartedAt = state.StartedAt,
                 FinishedAt = state.FinishedAt,
                 Error = state.Error,
+                OrganizationId = state.Options.OrganizationId,
                 FacilityId = state.FacilityId,
                 ReportId = state.ReportId,
                 Logs = state.Logs.ToList()

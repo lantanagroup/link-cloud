@@ -16,6 +16,7 @@ public class AutomationRunSummary
     public string? Error { get; set; }
     /// <summary>Human-readable pipeline duration (report created ? submitted).</summary>
     public string? Duration { get; set; }
+    public string? OrganizationId { get; set; }
     public string? FacilityId { get; set; }
     public string? ReportId { get; set; }
     public string? RunConfigurationJson { get; set; }

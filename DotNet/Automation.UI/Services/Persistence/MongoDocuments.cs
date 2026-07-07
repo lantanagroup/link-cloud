@@ -12,6 +12,7 @@ public sealed class AutomationRunDocument
 
     public string FacilityId { get; set; } = string.Empty;
     public string ReportId { get; set; } = string.Empty;
+    public string OrganizationId { get; set; } = string.Empty;
 
     public string RunName { get; set; } = string.Empty;
     public string Scenario { get; set; } = string.Empty;

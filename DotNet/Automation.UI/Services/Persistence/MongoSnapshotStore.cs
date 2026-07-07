@@ -93,6 +93,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             .Set(r => r.StartedAt, summary.StartedAt ?? summary.CreatedAt)
             .Set(r => r.FinishedAt, summary.FinishedAt)
             .Set(r => r.Error, summary.Error)
+            .Set(r => r.OrganizationId, summary.OrganizationId ?? string.Empty)
             .Set(r => r.FacilityId, facilityId ?? string.Empty)
             .Set(r => r.ReportId, reportId ?? string.Empty)
             .Set(r => r.IsActive, hasIdentifiers && summary.Status is not AutomationRunStatus.Succeeded and not AutomationRunStatus.Failed and not AutomationRunStatus.Cancelled)
@@ -340,6 +341,7 @@ public sealed class MongoSnapshotStore : ISnapshotStore
             FinishedAt = doc.FinishedAt,
             Error = doc.Error,
             Duration = doc.Duration,
+            OrganizationId = string.IsNullOrWhiteSpace(doc.OrganizationId) ? doc.FacilityId : doc.OrganizationId,
             FacilityId = doc.FacilityId,
             ReportId = doc.ReportId,
             Logs = []

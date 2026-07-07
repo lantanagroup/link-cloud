@@ -266,6 +266,8 @@ internal sealed class RunExecutor
 
             var facilityId = state.RunId.ToString();
             state.FacilityId = facilityId;
+            if (!string.IsNullOrWhiteSpace(state.Options.OrganizationId))
+                output.WriteLine($"Using Organization ID context: {state.Options.OrganizationId.Trim()}");
 
             // Finalize manifest metadata now that we have measure IDs and query plan.
             if (generationManifest != null)

@@ -65,6 +65,9 @@ public static class StartScenarioRequestResolver
               ?? [];
 
         var (reportStart, reportEnd) = ResolveReportPeriod(request);
+        var organizationId = string.IsNullOrWhiteSpace(request.OrganizationId)
+            ? ExtractOrganizationIdFromJson(request.RunConfigurationJson)
+            : request.OrganizationId.Trim();
 
         return defaults with
         {
@@ -83,6 +86,7 @@ public static class StartScenarioRequestResolver
             PatientCohorts = cohorts,
             ReportMethod = request.ReportMethod,
             QueryPlanTemplateId = request.QueryPlanTemplateId,
+            OrganizationId = organizationId,
             ImportedPatientIds = importedIds,
             ImportedPatientBundles = importedBundles,
             ReportPeriodStart = reportStart,
@@ -126,6 +130,27 @@ public static class StartScenarioRequestResolver
         }
 
         return (start, end);
+    }
+
+    private static string? ExtractOrganizationIdFromJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("organizationId", out var idEl)
+                || idEl.ValueKind != JsonValueKind.String)
+                return null;
+
+            var value = idEl.GetString()?.Trim();
+            return string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>
