@@ -42,6 +42,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 OperationType.ConditionalTransform => (object)(ConditionalTransformOperation)operation,
                 OperationType.CopyLocation => (object)(CopyLocationOperation)operation,
                 OperationType.RemoveExtensions => (object)(RemoveExtensionsOperation)operation,
+                OperationType.CopyLocationAliasToTypeIteratively => (object)(CopyLocationAliasToTypeIterativelyOperation)operation,
                 _ => null
             };
         }
@@ -827,6 +828,10 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 else if (operation is CopyLocationOperation)
                 {
                     //No validation needed for CopyLocationOperation
+                }
+                else if (operation is CopyLocationAliasToTypeIterativelyOperation)
+                {
+                    //No validation needed for CopyLocationAliasToTypeIterativelyOperation
                 }
                 else if (operation is RemoveExtensionsOperation)
                 {
