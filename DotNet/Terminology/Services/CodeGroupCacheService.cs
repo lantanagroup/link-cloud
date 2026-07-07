@@ -3,6 +3,7 @@ using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
 using Microsoft.Extensions.Caching.Memory;
@@ -17,7 +18,7 @@ namespace LantanaGroup.Link.Terminology.Services;
 public class CodeGroupCacheService(
     ILogger<CodeGroupCacheService> logger,
     IMemoryCache cache,
-    IOptions<TerminologyConfig> terminologyConfig)
+    IOptions<TerminologyConfig> terminologyConfig) : ICodeGroupCacheService
 {
     private readonly MemoryCacheEntryOptions _cacheOptions = new MemoryCacheEntryOptions();
     private readonly ConcurrentBag<CacheKey> _cacheKeys = new ConcurrentBag<CacheKey>();

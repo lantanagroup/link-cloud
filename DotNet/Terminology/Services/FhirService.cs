@@ -2,6 +2,7 @@ using Amazon.Runtime.Internal;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 
 namespace LantanaGroup.Link.Terminology.Services;
@@ -12,7 +13,7 @@ namespace LantanaGroup.Link.Terminology.Services;
  * https://build.fhir.org/codesystem-operation-validate-code.html
  * https://build.fhir.org/valueset-operation-validate-code.html
  */
-public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService> logger)
+public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirService> logger)
 {
     public ValueSet GetValueSetById(string id)
     {
@@ -570,7 +571,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
             return CreateValidationParameters(false, $"Code not found in {codeGroup.Type}");
         }
 
-        return BuildMatchResult(matches, display);
+        return BuildMatchResult(matches, system, display);
     }
 
     /// <summary>
@@ -584,7 +585,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
 
             if (matches.Count > 0)
             {
-                return BuildMatchResult(matches, display);
+                return BuildMatchResult(matches, systemKey, display);
             }
         }
 
@@ -595,7 +596,7 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
     /// Builds the validation result for a set of codes that share the requested value, applying the
     /// display check and surfacing an inactive-code warning when the matched code is inactive.
     /// </summary>
-    private Parameters BuildMatchResult(List<Application.Models.Code> matches, string? display)
+    private Parameters BuildMatchResult(List<Application.Models.Code> matches, string? system, string? display)
     {
         if (!string.IsNullOrEmpty(display) && matches.All(c => c.Display != display))
         {
@@ -607,9 +608,34 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
             ? matches.First(c => c.Display == display)
             : matches[0];
 
-        var isActive = codeObject is not CodeSystemCode codeSystemCode
-                       || codeSystemCode.Status == CodeStatus.Active;
+        var isActive = ResolveIsActive(codeObject, system);
 
         return CreateValidationParameters(true, isActive: isActive);
+    }
+
+    /// <summary>
+    /// Determines whether a matched code is active. CodeSystem members carry their own status; ValueSet members
+    /// are plain codes with no status, so their status is rejoined from the CodeSystem identified by <paramref name="system"/>.
+    /// Defaults to active when the code cannot be resolved to a loaded CodeSystem, preserving prior behavior.
+    /// </summary>
+    private bool ResolveIsActive(Application.Models.Code codeObject, string? system)
+    {
+        if (codeObject is CodeSystemCode codeSystemCode)
+        {
+            return codeSystemCode.Status == CodeStatus.Active;
+        }
+
+        if (string.IsNullOrEmpty(system))
+        {
+            return true;
+        }
+
+        var codeSystemGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system);
+        var match = codeSystemGroup?.Codes.Values
+            .SelectMany(codes => codes)
+            .OfType<CodeSystemCode>()
+            .FirstOrDefault(c => c.Value == codeObject.Value);
+
+        return match == null || match.Status == CodeStatus.Active;
     }
 }
