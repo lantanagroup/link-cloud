@@ -9,11 +9,13 @@ import {MatInputModule} from '@angular/material/input';
 import {MatButtonModule} from '@angular/material/button';
 import {MatIconModule} from '@angular/material/icon';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
+import {MatDialog, MatDialogModule} from '@angular/material/dialog';
 import {Subject, Subscription} from 'rxjs';
 import {debounceTime} from 'rxjs/operators';
 import {DataAcquisitionService} from '../../../../services/gateway/data-acquisition/data-acquisition.service';
 import {PaginationMetadata} from '../../../../models/pagination-metadata.model';
-import {IEncounterMappingModel} from '../../../../interfaces/data-acquisition/encounter-mapping-model.interface';
+import {IEncounterLocationModel, IEncounterMappingModel} from '../../../../interfaces/data-acquisition/encounter-mapping-model.interface';
+import {LocationDetailsDialogComponent} from '../location-details-dialog/location-details-dialog.component';
 
 @Component({
   selector: 'app-encounters-list',
@@ -27,7 +29,8 @@ import {IEncounterMappingModel} from '../../../../interfaces/data-acquisition/en
     MatInputModule,
     MatButtonModule,
     MatIconModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatDialogModule
   ],
   templateUrl: './encounters-list.component.html',
   styleUrl: './encounters-list.component.scss'
@@ -66,7 +69,10 @@ export class EncountersListComponent implements OnInit, OnDestroy {
   private textFilterSubject = new Subject<void>();
   private textFilterSubscription?: Subscription;
 
-  constructor(private dataAcquisitionService: DataAcquisitionService) {}
+  constructor(
+    private dataAcquisitionService: DataAcquisitionService,
+    private dialog: MatDialog
+  ) {}
 
   ngOnInit(): void {
     // Debounce free-text typing so we don't fire a request per keystroke.
@@ -159,5 +165,18 @@ export class EncountersListComponent implements OnInit, OnDestroy {
       .map(l => l.locationId)
       .filter((id): id is string => !!id)
       .join(', ');
+  }
+
+  // The locations that have a resolvable LocationId — rendered as individual detail links.
+  getLocations(element: IEncounterMappingModel): IEncounterLocationModel[] {
+    return (element.encounterLocations ?? []).filter(l => !!l.locationId);
+  }
+
+  // Opens the read-only location-details dialog for the clicked location.
+  openLocationDetails(location: IEncounterLocationModel): void {
+    this.dialog.open(LocationDetailsDialogComponent, {
+      data: { locationMappingId: location.organizationLocationMappingId },
+      width: '480px'
+    });
   }
 }

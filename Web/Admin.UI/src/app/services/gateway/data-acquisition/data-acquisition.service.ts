@@ -28,7 +28,7 @@ import {
   IUpdateOrganizationLocationConfigurationModel
 } from 'src/app/interfaces/data-acquisition/organization-location-config-model.interface';
 import {IFhirPathValidationResponse} from 'src/app/interfaces/data-acquisition/fhir-path-validation-response.interface';
-import {IPagedOrganizationLocationMapping} from 'src/app/interfaces/data-acquisition/organization-location-mapping-model.interface';
+import {IOrganizationLocationMappingModel, IPagedOrganizationLocationMapping} from 'src/app/interfaces/data-acquisition/organization-location-mapping-model.interface';
 import {IPagedEncounterMapping} from 'src/app/interfaces/data-acquisition/encounter-mapping-model.interface';
 
 @Injectable({
@@ -410,6 +410,16 @@ export class DataAcquisitionService {
           return response;
         }),
         // Suppress the global toast; the Encounters tab surfaces the error inline.
+        catchError((error) => this.errorHandler.handleError(error, false))
+      );
+  }
+
+  // Fetches a single location mapping by its primary key. Used by the Encounters tab's
+  // location-details dialog, reached via an encounter row's organizationLocationMappingId.
+  getLocationMappingById(id: number): Observable<IOrganizationLocationMappingModel> {
+    const url = `${this.appConfigService.config?.baseApiUrl}/data/location-mappings/${id}`;
+    return this.http.get<IOrganizationLocationMappingModel>(url)
+      .pipe(
         catchError((error) => this.errorHandler.handleError(error, false))
       );
   }

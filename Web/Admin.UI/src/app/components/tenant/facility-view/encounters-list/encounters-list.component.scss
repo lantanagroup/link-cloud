@@ -78,3 +78,15 @@
   padding: 2em 0;
   color: rgba(0, 0, 0, 0.54);
 }
+
+// LocationId values are clickable links opening the read-only location-details dialog.
+.location-link {
+  color: #1976d2;
+  cursor: pointer;
+  text-decoration: none;
+
+  &:hover,
+  &:focus {
+    text-decoration: underline;
+  }
+}

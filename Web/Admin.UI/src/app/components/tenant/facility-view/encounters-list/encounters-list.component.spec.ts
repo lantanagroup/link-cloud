@@ -3,8 +3,10 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { PageEvent } from '@angular/material/paginator';
 import { Sort } from '@angular/material/sort';
+import { MatDialog } from '@angular/material/dialog';
 
 import { EncountersListComponent } from './encounters-list.component';
+import { LocationDetailsDialogComponent } from '../location-details-dialog/location-details-dialog.component';
 import { DataAcquisitionService } from '../../../../services/gateway/data-acquisition/data-acquisition.service';
 import { IPagedEncounterMapping } from '../../../../interfaces/data-acquisition/encounter-mapping-model.interface';
 
@@ -12,6 +14,7 @@ describe('EncountersListComponent', () => {
   let component: EncountersListComponent;
   let fixture: ComponentFixture<EncountersListComponent>;
   let serviceSpy: jasmine.SpyObj<DataAcquisitionService>;
+  let dialogSpy: jasmine.SpyObj<MatDialog>;
 
   function pagedResult(overrides: Partial<IPagedEncounterMapping> = {}): IPagedEncounterMapping {
     return {
@@ -36,12 +39,14 @@ describe('EncountersListComponent', () => {
   beforeEach(async () => {
     serviceSpy = jasmine.createSpyObj<DataAcquisitionService>('DataAcquisitionService', ['getEncounterMappings']);
     serviceSpy.getEncounterMappings.and.returnValue(of(pagedResult()));
+    dialogSpy = jasmine.createSpyObj<MatDialog>('MatDialog', ['open']);
 
     await TestBed.configureTestingModule({
       imports: [EncountersListComponent],
       providers: [
         provideNoopAnimations(),
-        { provide: DataAcquisitionService, useValue: serviceSpy }
+        { provide: DataAcquisitionService, useValue: serviceSpy },
+        { provide: MatDialog, useValue: dialogSpy }
       ]
     }).compileComponents();
 
@@ -130,6 +135,30 @@ describe('EncountersListComponent', () => {
 
   it('comma-joins location ids across multiple locations', () => {
     expect(component.getLocationIds(pagedResult().records[0])).toBe('Loc-A, Loc-B');
+  });
+
+  it('getLocations returns only locations with a resolvable locationId', () => {
+    const record = {
+      encounterMappingId: 3, facilityId: 'f', patientId: 'p', encounterId: 'e', mappedToOrg: false,
+      encounterLocations: [
+        { encounterLocationId: 1, encounterMappingId: 3, organizationLocationMappingId: 10, locationId: 'Loc-A' },
+        { encounterLocationId: 2, encounterMappingId: 3, organizationLocationMappingId: 11, locationId: null }
+      ]
+    };
+    const locations = component.getLocations(record);
+    expect(locations.length).toBe(1);
+    expect(locations[0].locationId).toBe('Loc-A');
+  });
+
+  it('opens the location-details dialog for the clicked location', () => {
+    const location = { encounterLocationId: 1, encounterMappingId: 1, organizationLocationMappingId: 42, locationId: 'Loc-A' };
+
+    component.openLocationDetails(location);
+
+    expect(dialogSpy.open).toHaveBeenCalledWith(
+      LocationDetailsDialogComponent,
+      jasmine.objectContaining({ data: { locationMappingId: 42 } })
+    );
   });
 
   it('ignores null/empty location ids when joining', () => {
