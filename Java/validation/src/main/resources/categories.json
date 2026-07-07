@@ -187,17 +187,6 @@
             }
           ],
           "requiresAllChildren": false
-          "children": [
-            {
-              "field": "MESSAGE",
-              "regex": "^Unknown Code '.*' in the system '.*'; The provided code .* is not in the value set '.*'"
-            },
-            {
-              "field": "MESSAGE",
-              "regex": "Unknown code '.*' for in-memory expansion of ValueSet '.*'"
-            }
-          ],
-          "requiresAllChildren": false
         },
         {
           "field": "MESSAGE",
