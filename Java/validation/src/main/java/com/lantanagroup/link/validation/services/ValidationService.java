@@ -60,13 +60,15 @@ public class ValidationService {
             validationSupportChain.addValidationSupport(remoteTerm);
             logger.info("Using Link terminology service at {}", terminologyServiceUrl);
         } else {
-            var commonCodeSystemsTerminologyService = new CommonCodeSystemsTerminologyService(fhirContext);
-            var inMemTerm = new InMemoryTerminologyServerValidationSupport(fhirContext);
-
-            validationSupportChain.addValidationSupport(commonCodeSystemsTerminologyService);
-            validationSupportChain.addValidationSupport(inMemTerm);
-            logger.info("Using in-memory terminology service");
+            logger.info("No remote terminology service configured; relying on in-memory terminology support");
         }
+
+        // Always register the in-memory terminology supports as a fallback. A remote terminology service
+        // only answers for the valuesets/code systems it owns; base-FHIR and package-owned valuesets (e.g.
+        // identifier-use, required code bindings) are validated in-process and have no validator otherwise.
+        // The chain consults the remote support first and falls through to these only when it declines.
+        validationSupportChain.addValidationSupport(new CommonCodeSystemsTerminologyService(fhirContext));
+        validationSupportChain.addValidationSupport(new InMemoryTerminologyServerValidationSupport(fhirContext));
     }
 
     public List<Result> validate(IBaseResource resource) {
