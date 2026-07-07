@@ -10,18 +10,19 @@ export interface NHSNLinkProps {
   activeTestUser?: TestUserProfile;
   userInfoService?: UserInfoService;
   baseUrl?: string;
+  apiBaseUrl?: string;
 }
 
 type RouteName = 'home' | 'users' | 'onboarding';
 
-const defaultService = new UserInfoService();
 const routePathMap: Record<RouteName, string> = {
   home: '/',
   users: '/admin/users',
   onboarding: '/onboard'
 };
 
-export function NHSNLink({ activeTestUser, userInfoService = defaultService, baseUrl = '/' }: NHSNLinkProps) {
+export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBaseUrl = '/api' }: NHSNLinkProps) {
+  const effectiveUserInfoService = useMemo(() => userInfoService ?? new UserInfoService(apiBaseUrl), [userInfoService, apiBaseUrl]);
   const [userInfo, setUserInfo] = useState<UserInfoResponse | null>(null);
   const [users, setUsers] = useState<UserRoleSummaryResponse[]>([]);
   const [usersError, setUsersError] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService, bas
     setLoading(true);
     setError(null);
 
-    userInfoService.getUserInfo(activeTestUser)
+    effectiveUserInfoService.getUserInfo(activeTestUser)
       .then(result => {
         if (!mounted) {
           return;
@@ -70,7 +71,7 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService, bas
     return () => {
       mounted = false;
     };
-  }, [activeTestUser, userInfoService]);
+  }, [activeTestUser, effectiveUserInfoService]);
 
   const navigation = useMemo<NavigationItem[]>(() => {
     if (!userInfo) {
@@ -119,7 +120,7 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService, bas
     }
 
     let cancelled = false;
-    userInfoService.getUsers(activeTestUser)
+    effectiveUserInfoService.getUsers(activeTestUser)
       .then(results => {
         if (!cancelled) {
           setUsers(results);
@@ -134,7 +135,7 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService, bas
     return () => {
       cancelled = true;
     };
-  }, [activeTestUser, userInfo?.IsSystemAdmin, userInfoService]);
+  }, [activeTestUser, userInfo?.IsSystemAdmin, effectiveUserInfoService]);
 
   if (loading) {
     return <div className="nhsn-link__state">Loading NHSNLink user context�</div>;
@@ -236,7 +237,7 @@ export function NHSNLink({ activeTestUser, userInfoService = defaultService, bas
             <SystemAdminUsersScreen
               activeTestUser={activeTestUser}
               currentUserEmail={userInfo.Email}
-              userInfoService={userInfoService}
+              userInfoService={effectiveUserInfoService}
               users={users}
               usersError={usersError}
               savingUserId={savingUserId}

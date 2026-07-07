@@ -1,6 +1,8 @@
 import {TestUserProfile, UserInfoResponse, UserRoleSummaryResponse} from '../shared/models';
 
 export class UserInfoService {
+  constructor(private readonly apiBaseUrl: string = '/api') {}
+
   async getUserInfo(activeProfile?: TestUserProfile): Promise<UserInfoResponse> {
     const headers = new Headers();
     headers.set('Accept', 'application/json');
@@ -15,7 +17,7 @@ export class UserInfoService {
       }));
     }
 
-    const response = await fetch('/api/nhsn-app-bff/userinfo', {
+    const response = await fetch(`${this.apiBaseUrl}/nhsn-app-bff/userinfo`, {
       method: 'GET',
       headers,
       credentials: 'include'
@@ -29,7 +31,7 @@ export class UserInfoService {
   }
 
   async getUsers(activeProfile: TestUserProfile): Promise<UserRoleSummaryResponse[]> {
-    const response = await fetch('/api/nhsn-app-bff/users', {
+    const response = await fetch(`${this.apiBaseUrl}/nhsn-app-bff/users`, {
       method: 'GET',
       headers: this.createHeaders(activeProfile),
       credentials: 'include'
@@ -47,7 +49,7 @@ export class UserInfoService {
   }
 
   async updateUserRoles(activeProfile: TestUserProfile, userId: string, roles: string[]): Promise<UserRoleSummaryResponse> {
-    const response = await fetch(`/api/nhsn-app-bff/users/${userId}/roles`, {
+    const response = await fetch(`${this.apiBaseUrl}/nhsn-app-bff/users/${userId}/roles`, {
       method: 'PUT',
       headers: this.createHeaders(activeProfile),
       credentials: 'include',
@@ -62,7 +64,7 @@ export class UserInfoService {
   }
 
   async updateUserStatus(activeProfile: TestUserProfile, userId: string, isActive: boolean): Promise<UserRoleSummaryResponse> {
-    const response = await fetch(`/api/nhsn-app-bff/users/${userId}/status`, {
+    const response = await fetch(`${this.apiBaseUrl}/nhsn-app-bff/users/${userId}/status`, {
       method: 'PUT',
       headers: this.createHeaders(activeProfile),
       credentials: 'include',

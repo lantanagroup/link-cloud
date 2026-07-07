@@ -8,7 +8,7 @@ class NhsnLinkElement extends HTMLElement {
   private root?: Root;
 
   static get observedAttributes() {
-    return ['baseurl'];
+    return ['baseurl', 'apibaseurl'];
   }
 
   attributeChangedCallback() {
@@ -34,9 +34,10 @@ class NhsnLinkElement extends HTMLElement {
     }
 
     const baseUrl = this.getAttribute('baseurl') || '/nhsnlink';
+    const apiBaseUrl = this.getAttribute('apibaseurl') || '/api';
     this.root.render(
       <NotificationProvider>
-        <NHSNLink baseUrl={baseUrl} />
+        <NHSNLink baseUrl={baseUrl} apiBaseUrl={apiBaseUrl} />
       </NotificationProvider>
     );
   }

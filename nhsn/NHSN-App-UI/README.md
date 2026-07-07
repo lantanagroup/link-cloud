@@ -37,21 +37,24 @@ This is the same component used by:
 The component supports a configurable routing base via:
 
 - `baseUrl`
+- `apiBaseUrl`
 
 Examples:
 
 ```tsx
-<NHSNLink baseUrl="/" />
-<NHSNLink baseUrl="/nhsnlink" />
+<NHSNLink baseUrl="/" apiBaseUrl="/api" />
+<NHSNLink baseUrl="/nhsnlink" apiBaseUrl="https://some-host/api" />
 ```
 
 The standalone app host uses `/` while the embedded NHSN App scenario is expected to use `/nhsnlink`.
+
+`apiBaseUrl` controls which backend API root the component targets for endpoints like `/userinfo`. This is especially important for NHSN App integration where the UI may need to call an externally routed BFF path.
 
 ## How the UI initializes
 
 The UI does **not** take a JWT prop.
 
-Instead, `NHSNLink` initializes by calling the BFF:
+Instead, `NHSNLink` initializes by calling the BFF using `apiBaseUrl`:
 
 - `GET /api/nhsn-app-bff/userinfo`
 
