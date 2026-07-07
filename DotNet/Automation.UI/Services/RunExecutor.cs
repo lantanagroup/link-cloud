@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+ï»¿using Automation.UI.Models;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
@@ -133,7 +133,7 @@ internal sealed class RunExecutor
             GenerationManifest? generationManifest = null;
 
             // Use the first measure for generation context (profile-driven generation picks
-            // the most restrictive measure — patients qualifying for all measures must meet
+            // the most restrictive measure â€” patients qualifying for all measures must meet
             // the criteria of each). For multi-measure, the pipeline handles the union.
             var primaryMeasure = state.Options.SelectedMeasures[0];
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
@@ -174,7 +174,7 @@ internal sealed class RunExecutor
                 importedPatients.AddRange(state.Options.ImportedPatientBundles);
 
                 // Pre-load imported patient FHIR data so the pipeline can reuse it without
-                // re-fetching, and surface — but do NOT enforce — whether each imported
+                // re-fetching, and surface â€” but do NOT enforce â€” whether each imported
                 // encounter sits inside the scenario's configured reporting period. A
                 // mismatched scenario is a legitimate test case (proper disqualification by
                 // measure-eval); the run continues either way.
@@ -320,7 +320,7 @@ internal sealed class RunExecutor
             // background census Quartz job: this run drives census entirely through explicit
             // snapshots, and letting the cron-scheduled PatientCensusScheduled job fire would
             // (a) attempt to read FHIR List resources that do not exist on the synthetic server
-            // — surfacing spurious "configuration missing" errors — and (b) publish empty
+            // â€” surfacing spurious "configuration missing" errors â€” and (b) publish empty
             // snapshots that auto-discharge our still-admitted patients out of turn.
             var enableBackgroundCensusJobs = state.Options.ReportMethod != ReportMethod.ScheduledReport;
             await FacilitySetupHelper.EnsureCensusConfigAsync(
@@ -534,7 +534,7 @@ internal sealed class RunExecutor
             // Flush stale cache from diagnostics polling so validators read authoritative data.
             services.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
-            // Regeneration reuses prior data acquisition — no new DA logs exist for the regenerated report.
+            // Regeneration reuses prior data acquisition â€” no new DA logs exist for the regenerated report.
             var expectDataAcquisitionData = state.Options.ReportMethod != ReportMethod.RegenerateReport;
 
             // Pipeline-built manifest already has all metadata; no need to re-parse bundles.
@@ -595,7 +595,7 @@ internal sealed class RunExecutor
                     manifest: generationManifest));
 
             // The ABS manifest validator enriches the manifest with downstream-derived
-            // predictions that are not known at generation time — most notably the
+            // predictions that are not known at generation time â€” most notably the
             // per-patient OperationOutcome count (one OO is appended to the ABS blob for
             // every patient whose ReportingStatus is FailedValidation). Re-persist the
             // snapshot so the Runs dashboard shows the final, fully-enriched predictions
@@ -623,7 +623,9 @@ internal sealed class RunExecutor
                     facilityId,
                     reportId,
                     measureIds[0],
-                    expectedAllPatientIds,
+                    state.Options.ReportMethod == ReportMethod.ScheduledReport
+                        ? expectedReportEntryPatientIds
+                        : expectedAllPatientIds,
                     expectDataAcquisitionData: expectDataAcquisitionData,
                     expectLocationResources: expectLocationResources));
 
@@ -769,6 +771,76 @@ internal sealed class RunExecutor
             else
                 remainInpatient.Add(patientIds[i]);
         }
+
+        var scheduleFrequency = selectedMeasures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            ? Frequency.Monthly
+            : Frequency.Daily;
+
+        var reportTrackingId = await reportHelper.StartScheduledReportAsync(
+            facilityId,
+            measureIds,
+            window.Start,
+            ScheduledRuntimeDelay,
+            scheduleFrequency,
+            reportTrackingId: Guid.NewGuid().ToString());
+
+        output.WriteLine(
+            $"Scheduled inpatient patterns resolved: admit-in-period={admitDuringWindow.Count}, " +
+            $"remain-inpatient={remainInpatient.Count}, discharge-in-period={dischargeDuringWindow.Count}.");
+
+        // The ReportScheduled event is processed asynchronously, so the schedule record is not
+        // committed the instant StartScheduledReportAsync returns. Block until Report has persisted
+        // it: otherwise the admit snapshot below produces PatientEvents that reach Report's
+        // PatientEventListener before the schedule exists, throwing "No Scheduled Reports found".
+        var persistedSchedule = await reportHelper.WaitForScheduledReportAsync(reportTrackingId, cancellationToken: cancellationToken);
+
+        // Reconcile to persisted report-period dates (single source of truth). This keeps
+        // validators aligned with real schedule boundaries even when the scheduler/broker path
+        // normalizes or computes end-date differently than the original request payload.
+        var persistedStartUtc = DateTime.SpecifyKind(persistedSchedule.ReportStartDate, DateTimeKind.Utc);
+        var persistedEndUtc = DateTime.SpecifyKind(persistedSchedule.ReportEndDate, DateTimeKind.Utc);
+        scenarioConfig.StartDate = ToZulu(new DateTimeOffset(persistedStartUtc));
+        scenarioConfig.EndDate = ToZulu(new DateTimeOffset(persistedEndUtc));
+
+        // --- Census snapshot 1: admit every in-period patient. ---
+        // Each admit produces a PatientEvent that the Report service turns into a
+        // PatientIdentified report entry, and Census records the encounter as admitted.
+        if (admitDuringWindow.Count > 0)
+        {
+            output.WriteLine($"Census snapshot 1 â€” admitting {admitDuringWindow.Count} in-period patient(s)...");
+            await reportHelper.PublishPatientListAcquiredAsync(
+                facilityId,
+                reportTrackingId,
+                admitPatientIds: admitDuringWindow,
+                dischargePatientIds: null);
+        }
+
+        // --- Census snapshot 2: keep remainers admitted, discharge the rest. ---
+        if (dischargeDuringWindow.Count > 0)
+        {
+            // Let the admit events propagate (Census â†’ PatientEvent â†’ Report entry creation) so
+            // every patient we are about to discharge already has an encounter and report entry.
+            await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
+
+            // The snapshot lists the still-admitted patients plus explicit discharges; Census
+            // discharges the listed patients inside the window, which triggers the QueryDispatch
+            // discharge dispatch (and therefore data acquisition) for those patients. Listing the
+            // remain-inpatient patients keeps them out of Census's auto-discharge-by-omission.
+            output.WriteLine($"Census snapshot 2 â€” discharging {dischargeDuringWindow.Count} in-period patient(s), keeping {remainInpatient.Count} inpatient...");
+            await reportHelper.PublishPatientListAcquiredAsync(
+                facilityId,
+                reportTrackingId,
+                admitPatientIds: remainInpatient,
+                dischargePatientIds: dischargeDuringWindow);
+        }
+
+        // Remain-inpatient patients are intentionally left admitted; the End-of-Report-Period
+        // job acquires them when the window closes.
+        if (remainInpatient.Count > 0)
+            output.WriteLine($"{remainInpatient.Count} patient(s) remain inpatient; they will be acquired by the end-of-report-period job.");
+
+        return new ScheduledWorkflowState(reportTrackingId, persistedSchedule.Frequency);
+    }
 
     private static async Task WriteOrganizationLocationMappingStatusAsync(
         IDataAcquisitionServiceClient dataAcqClient,
