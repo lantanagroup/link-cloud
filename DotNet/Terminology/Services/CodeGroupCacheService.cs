@@ -64,7 +64,7 @@ public class CodeGroupCacheService(
         CacheKey? key = null;
 
         if (version == null)
-            key = _cacheKeys.Where(k => k.Type == type && k.Id == id).OrderByDescending(k => k.Version).FirstOrDefault();
+            key = _cacheKeys.Where(k => k.Type == type && k.Id == id).OrderByDescending(k => k.Version, Comparer<string>.Create(CompareVersions)).FirstOrDefault();
         else
             key = _cacheKeys.FirstOrDefault(k => k.Type == type && k.Id == id && string.Equals(k.Version, version, StringComparison.CurrentCultureIgnoreCase));
 
@@ -113,13 +113,39 @@ public class CodeGroupCacheService(
         if (version != null)
             key = candidates.FirstOrDefault(k => string.Equals(k.Version, version, StringComparison.CurrentCultureIgnoreCase));
 
-        key ??= candidates.OrderByDescending(k => k.Version).FirstOrDefault();
+        key ??= candidates.OrderByDescending(k => k.Version, Comparer<string>.Create(CompareVersions)).FirstOrDefault();
 
         if (key == null)
             return null;
 
         cache.TryGetValue(key.Key, out CodeGroup? codeGroup);
         return codeGroup;
+    }
+
+    /// <summary>
+    /// Compares two version strings semantically (e.g. "4.0.10" &gt; "4.0.9") when both parse as
+    /// dotted-numeric versions; otherwise falls back to a case-insensitive ordinal string comparison.
+    /// </summary>
+    private static int CompareVersions(string? a, string? b)
+    {
+        if (TryParseVersion(a, out var versionA) && TryParseVersion(b, out var versionB))
+            return versionA.CompareTo(versionB);
+
+        return string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Attempts to parse a version string as a dotted-numeric <see cref="Version"/>. A bare component
+    /// like "4" is padded to "4.0" since <see cref="Version"/> requires at least major.minor.
+    /// </summary>
+    private static bool TryParseVersion(string? value, out Version version)
+    {
+        version = new Version(0, 0);
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var normalized = value.Contains('.') ? value : value + ".0";
+        return Version.TryParse(normalized, out version!);
     }
 
     /// <summary>
@@ -134,7 +160,7 @@ public class CodeGroupCacheService(
             .Where(k => k.Type == type)
             .Select(k => cache.Get<CodeGroup>(k.Key))
             .Where(cg => cg != null)
-            .OrderByDescending(cg => cg!.Version)
+            .OrderByDescending(cg => cg!.Version, Comparer<string?>.Create(CompareVersions))
             .ToList()!;
 
         // Remove all but the first duplicate by id (returning only the HEAD/latest version)
