@@ -57,7 +57,7 @@ namespace LantanaGroup.Link.Report.Listeners
             return System.Threading.Tasks.Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
 
-        private async void StartConsumerLoop(CancellationToken cancellationToken)
+        private async Task StartConsumerLoop(CancellationToken cancellationToken)
         {
             var consumerConfig = new ConsumerConfig()
             {
@@ -213,6 +213,10 @@ namespace LantanaGroup.Link.Report.Listeners
             catch (TransientException ex)
             {
                 _transientExceptionHandler.HandleException(result, ex, facilityId);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {

@@ -152,18 +152,18 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
             await Scheduler?.Shutdown(cancellationToken);
         }
 
-        public static async Task CreateJobAndTrigger(PatientDispatchEntity patientDispatch, IScheduler scheduler)
+        public static async Task CreateJobAndTrigger(PatientDispatchEntity patientDispatch, IScheduler scheduler, CancellationToken cancellationToken = default)
         {
             string group = nameof(KafkaTopic.PatientEvent);
             JobKey jobKey = new JobKey(patientDispatch.FacilityId, group);
 
-            if (!await scheduler.CheckExists(jobKey))
+            if (!await scheduler.CheckExists(jobKey, cancellationToken))
             {
                 IJobDetail job = CreateJob(patientDispatch.FacilityId);
-                await scheduler.AddJob(job, true);
+                await scheduler.AddJob(job, true, cancellationToken);
             }
 
-            var existingTriggers = await scheduler.GetTriggersOfJob(jobKey);
+            var existingTriggers = await scheduler.GetTriggersOfJob(jobKey, cancellationToken);
             DateTimeOffset expectedStart = ComputeOffset(patientDispatch);
 
             var matchingTrigger = existingTriggers.FirstOrDefault(t =>
@@ -172,7 +172,7 @@ namespace LantanaGroup.Link.QueryDispatch.Presentation.Services
             if (matchingTrigger == null)
             {
                 ITrigger trigger = CreateTrigger(patientDispatch, jobKey);
-                await scheduler.ScheduleJob(trigger);
+                await scheduler.ScheduleJob(trigger, cancellationToken);
             }
         }
 

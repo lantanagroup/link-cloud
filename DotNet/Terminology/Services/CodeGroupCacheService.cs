@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Globalization;
 using CsvHelper;
+using CsvHelper.Configuration;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
@@ -269,9 +270,9 @@ public class CodeGroupCacheService(
         csv.Read();
         csv.ReadHeader();
         var headers = csv.HeaderRecord;
-        if (headers == null || headers.Length != 2)
+        if (headers == null || headers.Length > 3 || headers.Length < 2)
         {
-            throw new InvalidOperationException("CodeSystem CSV must have exactly 2 columns: code and display");
+            throw new InvalidOperationException($"CodeSystem CSV must have exactly 2 or 3 columns: code, display, and optionally status.");
         }
 
         var records = csv.GetRecords<CsvCodeSystemRecord>();
@@ -281,14 +282,16 @@ public class CodeGroupCacheService(
         {
             string code = record.Code;
             string display = record.Display;
+            CodeStatus status = record.Status;
 
             if (!codeGroup.Codes.ContainsKey(system))
                 codeGroup.Codes.Add(system, new List<Code>());
 
-            codeGroup.Codes[system].Add(new Code
+            codeGroup.Codes[system].Add(new CodeSystemCode
             {
                 Value = code,
-                Display = display
+                Display = display,
+                Status = status
             });
         }
 
@@ -340,25 +343,30 @@ public class CodeGroupCacheService(
 
                 // Read the CSV file and extract "system", "code" and "display" values from each row
                 var csvContent = await ReadAllTextAsync(csvFilePath);
-                using (var reader = new StringReader(csvContent))
-                using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+                using var reader = new StringReader(csvContent);
+                var config = new CsvConfiguration(CultureInfo.InvariantCulture);
+
+                // CodeSystem CSVs have an optional trailing status column, so a missing field is
+                // tolerated there. ValueSet keeps strict missing-field validation.
+                if (codeGroup.Type == CodeGroup.CodeGroupTypes.CodeSystem)
+                    config.MissingFieldFound = null;
+
+                using var csv = new CsvReader(reader, config);
+                switch (codeGroup.Type)
                 {
-                    switch (codeGroup.Type)
-                    {
-                        case CodeGroup.CodeGroupTypes.CodeSystem:
-                            logger.LogDebug("Processing code system CSV for {CodeSystem}", codeGroup.Id);
-                            this.ProcessCodeSystemCsv(codeGroup, csv);
-                            loadedCodeSystems++;
-                            break;
-                        case CodeGroup.CodeGroupTypes.ValueSet:
-                            logger.LogDebug("Processing value set CSV for {ValueSet}", codeGroup.Id);
-                            this.ProcessValueSetCsv(codeGroup, csv);
-                            loadedValueSets++;
-                            break;
-                        default:
-                            logger.LogWarning("Code group type {Type} is not supported", codeGroup.Type);
-                            break;
-                    }
+                    case CodeGroup.CodeGroupTypes.CodeSystem:
+                        logger.LogDebug("Processing code system CSV for {CodeSystem}", codeGroup.Id);
+                        this.ProcessCodeSystemCsv(codeGroup, csv);
+                        loadedCodeSystems++;
+                        break;
+                    case CodeGroup.CodeGroupTypes.ValueSet:
+                        logger.LogDebug("Processing value set CSV for {ValueSet}", codeGroup.Id);
+                        this.ProcessValueSetCsv(codeGroup, csv);
+                        loadedValueSets++;
+                        break;
+                    default:
+                        logger.LogWarning("Code group type {Type} is not supported", codeGroup.Type);
+                        break;
                 }
             }
             catch (Exception ex)

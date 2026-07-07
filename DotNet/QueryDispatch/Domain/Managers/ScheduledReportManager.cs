@@ -13,8 +13,8 @@ namespace QueryDispatch.Domain.Managers
 
     public interface IScheduledReportManager
     {
-        public Task<string> createScheduledReport(ScheduledReportEntity scheduledReport);
-        public Task UpdateScheduledReport(ScheduledReportEntity existingReport, ScheduledReportEntity newReport);
+        public Task<string> createScheduledReport(ScheduledReportEntity scheduledReport, CancellationToken cancellationToken = default);
+        public Task UpdateScheduledReport(ScheduledReportEntity existingReport, ScheduledReportEntity newReport, CancellationToken cancellationToken = default);
     }
 
     public class ScheduledReportManager : IScheduledReportManager
@@ -38,11 +38,11 @@ namespace QueryDispatch.Domain.Managers
             _producer = producer ?? throw new ArgumentNullException(nameof(producer));
         }
 
-        public async Task<string> createScheduledReport(ScheduledReportEntity scheduledReport)
+        public async Task<string> createScheduledReport(ScheduledReportEntity scheduledReport, CancellationToken cancellationToken = default)
         {
             try
             {
-                await _scheduledReportRepository.AddAsync(scheduledReport);
+                await _scheduledReportRepository.AddAsync(scheduledReport, cancellationToken);
 
                 _logger.LogInformation("Created schedule report for facility {FacilityId}", HtmlInputSanitizer.Sanitize(scheduledReport.FacilityId));
 
@@ -73,7 +73,7 @@ namespace QueryDispatch.Domain.Managers
             }
         }
 
-        public async Task UpdateScheduledReport(ScheduledReportEntity existingReport, ScheduledReportEntity newReport)
+        public async Task UpdateScheduledReport(ScheduledReportEntity existingReport, ScheduledReportEntity newReport, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -118,7 +118,7 @@ namespace QueryDispatch.Domain.Managers
 
                 }
 
-                await _scheduledReportRepository.UpdateAsync(existingReport);
+                await _scheduledReportRepository.UpdateAsync(existingReport, cancellationToken);
 
                 _logger.LogInformation("Update scheduled report type {ReportTypes} for facility id {FacilityId}", HtmlInputSanitizer.Sanitize(newReportPeriod.ReportTypes.ToString()), HtmlInputSanitizer.Sanitize(existingReport.FacilityId));
 

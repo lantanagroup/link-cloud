@@ -11,7 +11,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
     public interface IOperationSequenceQueries
     {
         Task<OperationSequenceModel> Get(string resourceType, string? facilityId);
-        Task<List<OperationSequenceModel>> Search(OperationSequenceSearchModel model, bool useCache = true);
+        Task<List<OperationSequenceModel>> Search(OperationSequenceSearchModel model, bool useCache = true, CancellationToken cancellationToken = default);
         void ClearCache(OperationSequenceSearchModel model);
     }
 
@@ -50,7 +50,7 @@ namespace LantanaGroup.Link.Normalization.Domain.Queries
         private static (string? FacilityId, string? ResourceType, Guid? ResourceTypeId) BuildCacheKey(OperationSequenceSearchModel model) => (model.FacilityId, model.ResourceType, model.ResourceTypeId);
 
 
-        public async Task<List<OperationSequenceModel>> Search(OperationSequenceSearchModel model, bool useCache = true)
+        public async Task<List<OperationSequenceModel>> Search(OperationSequenceSearchModel model, bool useCache = true, CancellationToken cancellationToken = default)
         {
             if (!useCache) 
             {

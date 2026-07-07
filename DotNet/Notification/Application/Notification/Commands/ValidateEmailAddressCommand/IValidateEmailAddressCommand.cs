@@ -2,6 +2,6 @@
 {
     public interface IValidateEmailAddressCommand
     {
-        Task<bool> Execute(string emailAddress);
+        Task<bool> Execute(string emailAddress, CancellationToken cancellationToken = default);
     }
 }

@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             _logger = logger;
         }
 
-        protected override async Task<OperationResult> ExecuteOperation(CopyLocationOperation operation, DomainResource resource)
+        protected override async Task<OperationResult> ExecuteOperation(CopyLocationOperation operation, DomainResource resource, CancellationToken cancellationToken = default)
         {
             if (resource is not Location)
             {

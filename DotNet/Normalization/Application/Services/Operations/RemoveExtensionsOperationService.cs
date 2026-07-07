@@ -16,7 +16,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             _logger = logger;
         }
 
-        protected override Task<OperationResult> ExecuteOperation(RemoveExtensionsOperation operation, DomainResource resource)
+        protected override Task<OperationResult> ExecuteOperation(RemoveExtensionsOperation operation, DomainResource resource, CancellationToken cancellationToken = default)
         {
             if (resource.Extension == null || resource.Extension.Count == 0)
             {

@@ -67,7 +67,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
             {
                 try
                 {
-                    await consumer.ConsumeWithInstrumentation(async (result, CancellationToken) =>
+                    await consumer.ConsumeWithInstrumentation(async (result, consumeCancellationToken) =>
                     {
                         consumeResult = result;
 
@@ -75,7 +75,7 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         {
                             if (consumeResult != null)
                             {
-                                await ExecuteListenerAsync(consumeResult, cancellationToken);
+                                await ExecuteListenerAsync(consumeResult, consumeCancellationToken);
                             }
                         }
                         catch (DeadLetterException ex)
@@ -85,6 +85,10 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         catch (TransientException ex)
                         {
                             TransientExceptionHandler.HandleException(consumeResult, ex, ExtractFacilityId(consumeResult));
+                        }
+                        catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
+                        {
+                            throw;
                         }
                         catch (Exception ex)
                         {
@@ -96,7 +100,8 @@ public abstract class BaseListener<MessageType, ConsumeKeyType, ConsumeValueType
                         }
                         finally
                         {
-                            consumer.SafeCommit(consumeResult, Logger);
+                            if (!consumeCancellationToken.IsCancellationRequested)
+                                consumer.SafeCommit(consumeResult, Logger);
                         }
                     }, cancellationToken);
                 }

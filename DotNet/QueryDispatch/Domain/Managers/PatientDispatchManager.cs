@@ -14,7 +14,7 @@ namespace QueryDispatch.Domain.Managers
 
     public interface IPatientDispatchManager
     {
-        public Task<string> createPatientDispatch(PatientDispatchEntity patientDispatch);
+        public Task<string> createPatientDispatch(PatientDispatchEntity patientDispatch, CancellationToken cancellationToken = default);
         public Task<bool> deletePatientDispatch(string facilityId, string patientId);
     }
 
@@ -38,16 +38,16 @@ namespace QueryDispatch.Domain.Managers
 
 
 
-        public async Task<string> createPatientDispatch(PatientDispatchEntity patientDispatch)
+        public async Task<string> createPatientDispatch(PatientDispatchEntity patientDispatch, CancellationToken cancellationToken = default)
         {
             try
             {
                 //_datastore.Add(patientDispatch);
-                await _repository.AddAsync(patientDispatch);
+                await _repository.AddAsync(patientDispatch, cancellationToken);
 
                 _logger.LogInformation("Created patient dispatch for patient id {PatientId} in facility {FacilityId}", HtmlInputSanitizer.Sanitize(patientDispatch.PatientId), HtmlInputSanitizer.Sanitize(patientDispatch.FacilityId));
 
-                await ScheduleService.CreateJobAndTrigger(patientDispatch, await _schedulerFactory.GetScheduler());
+                await ScheduleService.CreateJobAndTrigger(patientDispatch, await _schedulerFactory.GetScheduler(cancellationToken), cancellationToken);
 
                 var headers = new Headers
                     {
@@ -73,6 +73,10 @@ namespace QueryDispatch.Domain.Managers
                 _producer.Flush();
 
                 return patientDispatch.FacilityId;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
