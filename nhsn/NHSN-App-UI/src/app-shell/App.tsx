@@ -176,7 +176,7 @@ export function App() {
 
       <main className="shell__content">
         {activeProfile ? (
-          <NHSNLink activeTestUser={activeProfile} baseUrl="/" />
+          <NHSNLink activeTestUser={activeProfile} baseUrl="/" apiBaseUrl="/api" />
         ) : (
           <div style={{ padding: '2rem' }}>
             <div style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
