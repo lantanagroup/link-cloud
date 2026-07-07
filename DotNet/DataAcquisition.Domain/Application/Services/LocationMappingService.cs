@@ -982,7 +982,22 @@ public class LocationMappingService(
         return resourceId.SplitReference();
     }
 
-    // SQL Server: 2627 = unique constraint, 2601 = unique index
-    private static bool IsUniqueConstraintViolation(DbUpdateException ex) =>
-        ex.InnerException is SqlException { Number: 2601 or 2627 };
+    // SQL Server: 2627 = unique constraint, 2601 = unique index.
+    // EF/database providers can wrap SqlException multiple levels deep, so walk the chain.
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        for (Exception? current = ex; current is not null; current = current.InnerException)
+        {
+            if (current is SqlException { Number: 2601 or 2627 })
+                return true;
+
+            if (current is SqlException sqlEx
+                && sqlEx.Message.Contains("UQ_LocationMapping_Facility_Location", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
