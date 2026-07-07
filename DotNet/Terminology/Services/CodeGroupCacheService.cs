@@ -84,41 +84,36 @@ public class CodeGroupCacheService(
     /// <returns>The requested code group if it exists in the cache; otherwise, null.</returns>
     public CodeGroup? GetCodeGroup(CodeGroup.CodeGroupTypes type, string identifier, string? version = null)
     {
-        CacheKey? key = null;
-
-        if (version == null)
+        // A canonical URL may carry a version suffix, e.g. "http://example.org/ValueSet/x|4.0.1".
+        // Split it off so the URL matches the cached (unversioned) key, and treat the embedded
+        // version as the requested version when one was not supplied explicitly.
+        var pipeIndex = identifier.IndexOf('|');
+        if (pipeIndex >= 0)
         {
-            key = _cacheKeys
-                .Where(k => k.Type == type)
-                .Where(k => string.Equals(k.Url, identifier, StringComparison.CurrentCultureIgnoreCase))
-                .OrderByDescending(k => k.Version)
-                .FirstOrDefault();
-
-            if (key == null)
-            {
-                key = _cacheKeys
-                    .Where(k => k.Type == type)
-                    .Where(k => k.Identifiers.Any(i => string.Equals(i.Value, identifier, StringComparison.CurrentCultureIgnoreCase)))
-                    .OrderByDescending(k => k.Version)
-                    .FirstOrDefault();
-            }
+            version ??= identifier[(pipeIndex + 1)..];
+            identifier = identifier[..pipeIndex];
         }
-        else
-        {
 
-            var keys = _cacheKeys
-                .Where(k => k.Type == type)
-                .Where(k => string.Equals(k.Version, version, StringComparison.CurrentCultureIgnoreCase))
+        var byType = _cacheKeys.Where(k => k.Type == type).ToList();
+
+        // Prefer a match on Url; fall back to a match on a secondary identifier.
+        var candidates = byType
+            .Where(k => string.Equals(k.Url, identifier, StringComparison.CurrentCultureIgnoreCase))
+            .ToList();
+
+        if (candidates.Count == 0)
+        {
+            candidates = byType
+                .Where(k => k.Identifiers.Any(i => string.Equals(i.Value, identifier, StringComparison.CurrentCultureIgnoreCase)))
                 .ToList();
-
-            key = keys
-                .FirstOrDefault(k => string.Equals(k.Url, identifier, StringComparison.CurrentCultureIgnoreCase));
-
-            if (key == null)
-                key = keys.FirstOrDefault(k =>
-                    k.Identifiers.Any(i =>
-                        string.Equals(i.Value, identifier, StringComparison.CurrentCultureIgnoreCase)));
         }
+
+        // Prefer the requested version if it is loaded; otherwise fall back to the latest.
+        CacheKey? key = null;
+        if (version != null)
+            key = candidates.FirstOrDefault(k => string.Equals(k.Version, version, StringComparison.CurrentCultureIgnoreCase));
+
+        key ??= candidates.OrderByDescending(k => k.Version).FirstOrDefault();
 
         if (key == null)
             return null;

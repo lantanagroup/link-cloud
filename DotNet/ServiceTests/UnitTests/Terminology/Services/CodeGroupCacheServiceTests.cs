@@ -423,6 +423,40 @@ http://test.system,123,Test Display,Extra Value";
         Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[1]).Status);
     }
 
+    [Theory]
+    [InlineData("http://test.codesystem")]        // no version
+    [InlineData("http://test.codesystem|1.0")]    // exact version suffix
+    [InlineData("http://test.codesystem|9.9")]    // unknown version -> falls back to latest loaded
+    public async Task GetCodeGroup_ResolvesCanonicalUrlWithVersionSuffix(string lookupUrl)
+    {
+        // HAPI sends versioned canonical URLs (e.g. ".../identifier-use|4.0.1"); the version
+        // suffix must not prevent the URL from resolving to the cached code group.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/cs"] = new[] { "cs.json", "cs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["cs.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
+                          "\"url\": \"http://test.codesystem\", \"version\": \"1.0\" }",
+            ["cs.csv"] = "code,display,status\r\n123,Test Display,Active\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+        await service.LoadCache();
+
+        var codeGroup = service.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, lookupUrl);
+
+        Assert.NotNull(codeGroup);
+        Assert.Equal("http://test.codesystem", codeGroup.Url);
+        Assert.Equal("1.0", codeGroup.Version);
+    }
+
     [Fact]
     public async Task LoadCache_BlankStatus_DefaultsToActive()
     {
