@@ -98,13 +98,13 @@ public class CodeGroupCacheService(
 
         // Prefer a match on Url; fall back to a match on a secondary identifier.
         var candidates = byType
-            .Where(k => string.Equals(k.Url, identifier, StringComparison.CurrentCultureIgnoreCase))
+            .Where(k => string.Equals(k.Url, identifier, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
         if (candidates.Count == 0)
         {
             candidates = byType
-                .Where(k => k.Identifiers.Any(i => string.Equals(i.Value, identifier, StringComparison.CurrentCultureIgnoreCase)))
+                .Where(k => k.Identifiers.Any(i => string.Equals(i.Value, identifier, StringComparison.OrdinalIgnoreCase)))
                 .ToList();
         }
 
