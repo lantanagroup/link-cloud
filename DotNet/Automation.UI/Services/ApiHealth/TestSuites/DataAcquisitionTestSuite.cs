@@ -432,7 +432,9 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
         Type = "Discharge",
         InitialQueries = new Dictionary<string, object>
         {
-            ["0"] = new { QueryConfigType = "Parameter", ResourceType = "Patient", Parameters = new[] { new { ParameterType = "Variable", Name = "_id", Variable = 0 } } }
+            ["0"] = new { QueryConfigType = "Parameter", ResourceType = "Patient", Parameters = new[] { new { ParameterType = "Variable", Name = "_id", Variable = 0 } } },
+            ["1"] = new { QueryConfigType = "Parameter", ResourceType = "Encounter", Parameters = new[] { new { ParameterType = "Variable", Name = "subject", Variable = 0 } } },
+            ["2"] = new { QueryConfigType = "Parameter", ResourceType = "Location", Parameters = new[] { new { ParameterType = "ResourceIds", Name = "_id", Resource = "Encounter", Paged = "100" } } }
         },
         SupplementalQueries = new Dictionary<string, object>
         {
