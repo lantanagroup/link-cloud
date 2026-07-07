@@ -14,6 +14,11 @@ public class TestScenarioDefinition
     /// <summary>User-facing name for this scenario.</summary>
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>
+    /// NHSN Organization ID used as the reporting-org context for this scenario run.
+    /// </summary>
+    public string OrganizationId { get; set; } = string.Empty;
+
     /// <summary>Optional description / notes.</summary>
     public string? Description { get; set; }
 

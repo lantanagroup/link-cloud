@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation;
@@ -48,6 +48,7 @@ public class ScenariosController(
             return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system scenario cannot be modified.");
 
         model.IsSystemScenario = false;
+        model.OrganizationId = string.IsNullOrWhiteSpace(model.OrganizationId) ? GenerateRandomOrganizationId() : model.OrganizationId.Trim();
         model.UpdatedAt = DateTimeOffset.UtcNow;
 
         if (model.ResourcesPerPatientMax < model.ResourcesPerPatientMin)
@@ -357,6 +358,7 @@ public class ScenariosController(
         {
             Id = Guid.NewGuid(),
             Name = $"{source.Name} (Copy)",
+            OrganizationId = source.OrganizationId,
             Description = source.Description,
             IsSystemScenario = false,
             ReportMethod = source.ReportMethod,
@@ -424,4 +426,7 @@ public class ScenariosController(
         var hash = SHA256.HashData(bytes);
         return Convert.ToHexString(hash);
     }
+
+    private static string GenerateRandomOrganizationId() =>
+        $"9{RandomNumberGenerator.GetInt32(0, 1_000_000):D6}";
 }

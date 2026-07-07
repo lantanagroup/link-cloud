@@ -24,6 +24,15 @@ public sealed class ScenarioSeedService : IHostedService
     private static readonly Guid MegaMultiPatientId = new("00000000-0000-0000-0000-000000000007");
     private static readonly Guid ApiHealthScenarioId = new("00000000-0000-0000-0000-000000000008");
 
+    private const string AdhocReportOrgId = "1075601";
+    private const string MultiPatientOrgId = "1075602";
+    private const string MegaPatientOrgId = "1075603";
+    private const string ScheduledReportOrgId = "1075604";
+    private const string RegenerateReportOrgId = "1075605";
+    private const string MultiMeasureOrgId = "1075606";
+    private const string MegaMultiPatientOrgId = "1075607";
+    private const string ApiHealthOrgId = "1075608";
+
     private static readonly List<ProfiledMeasureType> DefaultMeasures =
         [ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation];
 
@@ -76,6 +85,7 @@ public sealed class ScenarioSeedService : IHostedService
         {
             Id = AdhocReportTestId,
             Name = "Adhoc Report Test",
+            OrganizationId = AdhocReportOrgId,
             Description = "Single patient ad-hoc report. Mirrors the AdhocReportTest backend E2E test.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
@@ -104,6 +114,7 @@ public sealed class ScenarioSeedService : IHostedService
         {
             Id = ApiHealthScenarioId,
             Name = "ApiHealthScenario",
+            OrganizationId = ApiHealthOrgId,
             Description = "System scenario for API Health stateful seeding and diagnostics.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
@@ -132,6 +143,7 @@ public sealed class ScenarioSeedService : IHostedService
         {
             Id = MultiPatientId,
             Name = "Multi Patient Test",
+            OrganizationId = MultiPatientOrgId,
             Description = "Volume test with 150 patients, 25–50 resources each. Mirrors the MultiPatientTest backend E2E test.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
@@ -160,6 +172,7 @@ public sealed class ScenarioSeedService : IHostedService
         {
             Id = MegaPatientId,
             Name = "Mega Patient Test",
+            OrganizationId = MegaPatientOrgId,
             Description = "Stress test with a single patient and ~5,000 resources. Mirrors the MegaPatientTest backend E2E test.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
@@ -188,6 +201,7 @@ public sealed class ScenarioSeedService : IHostedService
         {
             Id = MegaMultiPatientId,
             Name = "Mega Multi Patient Test",
+            OrganizationId = MegaMultiPatientOrgId,
             Description = "Hybrid stress + volume test: one mega patient with ~5,000 resources plus 149 patients with 25–50 resources each.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,
@@ -224,6 +238,7 @@ public sealed class ScenarioSeedService : IHostedService
         {
             Id = ScheduledReportId,
             Name = "Scheduled Report Test",
+            OrganizationId = ScheduledReportOrgId,
             Description = "Exercises the full scheduled report workflow with multiple inpatient timing patterns (before/during/after report period admit/discharge combinations). Mirrors the ReportScheduledWorkflowTest.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.ScheduledReport,
@@ -298,6 +313,7 @@ public sealed class ScenarioSeedService : IHostedService
         {
             Id = RegenerateReportId,
             Name = "Regenerate Report Test",
+            OrganizationId = RegenerateReportOrgId,
             Description = "Produces a scheduled report, then regenerates it. Mirrors the RegenerateReportTest.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.RegenerateReport,
@@ -326,6 +342,7 @@ public sealed class ScenarioSeedService : IHostedService
         {
             Id = MultiMeasureId,
             Name = "Multi Measure Test",
+            OrganizationId = MultiMeasureOrgId,
             Description = "Multi-measure ad-hoc test with ACH + Hypoglycemic. Patient 1 qualifies for both, patient 2 qualifies ACH only. Mirrors the MultiMeasureTest backend E2E test.",
             IsSystemScenario = true,
             ReportMethod = ReportMethod.Adhoc,

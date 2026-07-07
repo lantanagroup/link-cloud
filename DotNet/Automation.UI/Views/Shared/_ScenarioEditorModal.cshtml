@@ -45,6 +45,10 @@
                             <input class="form-control" id="ScenarioDescription" maxlength="500" />
                         </div>
                         <div class="col-md-4">
+                            <label class="form-label" for="OrganizationId">NHSN Organization ID</label>
+                            <input class="form-control" id="OrganizationId" maxlength="64" />
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label" for="ReportMethod">Report Method</label>
                             <select class="form-select" id="ReportMethod">
                                 <option value="Adhoc">Adhoc</option>
@@ -216,6 +220,11 @@
             return esc(s)
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
+        }
+        function generateRandomOrganizationId() {
+            var arr = new Uint32Array(1);
+            window.crypto.getRandomValues(arr);
+            return '9' + String(arr[0] % 1000000).padStart(6, '0');
         }
         function openModal() { modal.style.display = ''; backdrop.style.display = ''; }
         function closeModal() { modal.style.display = 'none'; backdrop.style.display = 'none'; }
@@ -692,6 +701,7 @@
                 id: idInput.value || null,
                 name: document.getElementById('ScenarioName').value,
                 description: document.getElementById('ScenarioDescription').value,
+                organizationId: (document.getElementById('OrganizationId').value || '').trim(),
                 isSystemScenario: false,
                 reportMethod: document.getElementById('ReportMethod').value,
                 selectedMeasures: selectedMeasureTypes(),
@@ -719,6 +729,7 @@
             isSystemInput.value = data.isSystemScenario ? 'true' : 'false';
             document.getElementById('ScenarioName').value = data.name || '';
             document.getElementById('ScenarioDescription').value = data.description || '';
+            document.getElementById('OrganizationId').value = data.organizationId || generateRandomOrganizationId();
             document.getElementById('ReportMethod').value = data.reportMethod || 'Adhoc';
             document.getElementById('Seed').value = data.seed || 20260329;
             document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
@@ -813,6 +824,7 @@
                 setEditable(true);
                 document.getElementById('ScenarioName').value = '';
                 document.getElementById('ScenarioDescription').value = '';
+                document.getElementById('OrganizationId').value = generateRandomOrganizationId();
                 document.getElementById('ReportMethod').value = 'Adhoc';
                 document.getElementById('Seed').value = 20260329;
                 document.getElementById('CleanupFhirData').checked = true;
@@ -839,6 +851,7 @@
             var model = collectModel();
             var valid = true;
             if (!(model.name || '').trim()) { markFieldError('ScenarioName', 'Name is required.'); valid = false; }
+            if (!(model.organizationId || '').trim()) { markFieldError('OrganizationId', 'NHSN Organization ID is required.'); valid = false; }
             if (!model.selectedMeasures.length) { showError('At least one measure must be selected.'); valid = false; }
             var hasImported = (model.importedPatientIds && model.importedPatientIds.length > 0)
                 || (model.importedPatientBundles && model.importedPatientBundles.length > 0);

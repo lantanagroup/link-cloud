@@ -25,6 +25,11 @@ public record ResolvedRunOptions(
     Guid? QueryPlanTemplateId = null)
 {
     /// <summary>
+    /// NHSN Organization ID to use as reporting context for the run.
+    /// </summary>
+    public string? OrganizationId { get; init; }
+
+    /// <summary>
     /// Imported patients (referenced by ID, fetched from FHIR server at run time).
     /// </summary>
     public List<ImportedPatientInput> ImportedPatientIds { get; init; } = [];

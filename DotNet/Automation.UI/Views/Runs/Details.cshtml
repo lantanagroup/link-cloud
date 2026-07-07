@@ -30,6 +30,7 @@
         <div class="card-body">
             <div class="row g-3" id="runSummaryGrid">
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Status</span><span class="au-value" id="status">@Model.Status</span></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Organization ID</span><code class="au-value" id="organizationId">@(Model.OrganizationId ?? "-")</code></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Facility</span><code class="au-value" id="facilityId">@(Model.FacilityId ?? "-")</code></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Started</span><span class="au-value" id="started">@(Model.StartedAt?.ToString("u") ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value" id="finished">@(Model.FinishedAt?.ToString("u") ?? "-")</span></div></div>
@@ -1359,6 +1360,7 @@
         connection.on('status', (run) => {
             currentRunStatus = run.status || currentRunStatus;
             document.getElementById('runName').textContent = run.runName;
+            document.getElementById('organizationId').textContent = run.organizationId || run.facilityId || '-';
             document.getElementById('facilityId').textContent = run.facilityId || '-';
             document.getElementById('scheduleFacilityId').textContent = run.facilityId || '-';
             document.getElementById('status').textContent = run.status;

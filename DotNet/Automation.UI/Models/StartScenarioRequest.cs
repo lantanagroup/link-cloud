@@ -31,6 +31,9 @@ public class StartScenarioRequest : IValidatableObject
     [StringLength(120)]
     public string? ScenarioName { get; set; }
 
+    [StringLength(64)]
+    public string? OrganizationId { get; set; }
+
     public string? RunConfigurationJson { get; set; }
 
     /// <summary>
@@ -101,6 +104,7 @@ public class StartScenarioRequest : IValidatableObject
         ScenarioName = scenario.Name,
         RunConfigurationJson = SerializeScenarioConfiguration(scenario),
         ReportMethod = scenario.ReportMethod,
+        OrganizationId = scenario.OrganizationId,
         Seed = scenario.Seed,
         PatientCount = scenario.PatientCount,
         ResourcesPerPatient = scenario.ResourcesPerPatientMax,

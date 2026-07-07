@@ -1,4 +1,4 @@
-using System.Text.Json;
+ï»¿using System.Text.Json;
 using Automation.UI.Models;
 using LantanaGroup.Automation.Generation;
 using MongoDB.Driver;
@@ -144,7 +144,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             }
 
             if (string.IsNullOrWhiteSpace(input.BundleJson))
-                continue; // ID-only entry mistakenly placed in the bundle list — nothing to externalize.
+                continue; // ID-only entry mistakenly placed in the bundle list â€” nothing to externalize.
 
             var hash = ComputeContentHash(input.BundleJson!);
             var byteCount = Encoding.UTF8.GetByteCount(input.BundleJson!);
@@ -305,6 +305,7 @@ public sealed class MongoScenarioStore : IScenarioStore
         {
             Id = model.Id,
             Name = model.Name,
+            OrganizationId = model.OrganizationId,
             Description = model.Description,
             IsSystemScenario = model.IsSystemScenario,
             ReportMethod = model.ReportMethod.ToString(),
@@ -331,6 +332,7 @@ public sealed class MongoScenarioStore : IScenarioStore
         {
             Id = doc.Id,
             Name = doc.Name,
+            OrganizationId = doc.OrganizationId,
             Description = doc.Description,
             IsSystemScenario = doc.IsSystemScenario,
             ReportMethod = Enum.TryParse<ReportMethod>(doc.ReportMethod, true, out var rm) ? rm : ReportMethod.Adhoc,
@@ -386,7 +388,7 @@ public sealed class MongoScenarioStore : IScenarioStore
         foreach (var input in inputs)
         {
             if (!string.IsNullOrEmpty(input.BundleJson))
-                continue; // already inline (legacy doc) — leave as-is
+                continue; // already inline (legacy doc) â€” leave as-is
 
             var key = input.PatientId ?? string.Empty;
             if (refsByPatient.TryGetValue(key, out var queue) && queue.Count > 0)
