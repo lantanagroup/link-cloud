@@ -89,7 +89,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             try
                             {
                                 facilityId = result.Message.Value.FacilityId;
-                                await ProcessMessageAsync(result, facilityId, cancellationToken);
+                                await ProcessMessageAsync(result, facilityId, consumeCancellationToken);
                             }
                             catch (DeadLetterException ex)
                             {
@@ -99,13 +99,18 @@ namespace LantanaGroup.Link.Report.Listeners
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
+                            catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
+                            {
+                                throw;
+                            }
                             catch (Exception ex)
                             {
                                 _deadLetterExceptionHandler.HandleException(result, new DeadLetterException("Report - MeasureReportGenerated Exception thrown", ex), facilityId);
                             }
                             finally
                             {
-                                consumer.SafeCommit(result, _logger);
+                                if (!consumeCancellationToken.IsCancellationRequested)
+                                    consumer.SafeCommit(result, _logger);
                             }
                         }, cancellationToken);
                     }
@@ -164,7 +169,7 @@ namespace LantanaGroup.Link.Report.Listeners
             if (schedule == null)
                 throw new DeadLetterException($"{Name}: No scheduled report record was found (ReportId = {messageValue.ReportTrackingId}, FacilityId = {facilityId}).");
 
-            var reportEntry = await reportEntryManager.UpdateAsyncWithConsumerResult(messageValue);
+            var reportEntry = await reportEntryManager.UpdateAsyncWithConsumerResult(messageValue, cancellationToken);
 
             var isAllNonReportable = reportEntry.MeasureReports.All(x => x.Status == Domain.Enums.MeasureReportStatus.NotReportable);
 
@@ -173,7 +178,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 _logger.LogDebug("Entry not reportable (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
 
                 await reportEntryManager.UpdateAsyncNotReportableEntry(reportEntry, cancellationToken);
-                await reportManifestProducer.Produce(schedule, correlationId);
+                await reportManifestProducer.Produce(schedule, correlationId, cancellationToken);
                 return;
             }
 
@@ -185,7 +190,7 @@ namespace LantanaGroup.Link.Report.Listeners
                 _logger.LogDebug("Patient not ready for aggregation (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
                 //Daniel - 02/2026 - The 'isAllNonReportable' logic above was added and may replace the need for executing reportManifestProducer below. It won't hurt to run, but may not be needed. If we find that we don't need to execute the manifest producer, we will only need to return in this block.
 
-                await reportManifestProducer.Produce(schedule, correlationId);
+                await reportManifestProducer.Produce(schedule, correlationId, cancellationToken);
                 return;
             }
 
@@ -195,7 +200,7 @@ namespace LantanaGroup.Link.Report.Listeners
             AggregateResult aggregateResult;
             try
             {
-                aggregateResult = await patientAggregator.AggregateToABS(messageValue.PatientId, schedule);
+                aggregateResult = await patientAggregator.AggregateToABS(messageValue.PatientId, schedule, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -206,8 +211,8 @@ namespace LantanaGroup.Link.Report.Listeners
             _logger.LogDebug("Patient aggregation complete. Elapsed time: {Elapsed} (Facility = {FacilityId}, PatientId = {PatientId}, ReportScheduleId = {ReportScheduleId})", elapsed.ToString(), messageValue.FacilityId, messageValue.PatientId, messageValue.ReportTrackingId);
             startTime = Stopwatch.GetTimestamp();
 
-            await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult);
-            
+            await reportEntryManager.UpdateAsyncWithAggregateResult(reportEntry, aggregateResult, cancellationToken);            
+
             foreach (var agg in aggregateResult.MeasureReportResults)
             {
                 var existing = (await reportPopulationManager.FindAsync(
@@ -237,7 +242,7 @@ namespace LantanaGroup.Link.Report.Listeners
             
             try
             {
-                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, messageValue.PatientId, aggregateResult.Uri.AbsoluteUri, correlationId);
+                await _readyForValidationProducer.Produce(schedule.Id, schedule.ReportTypes, schedule.FacilityId, messageValue.PatientId, aggregateResult.Uri.AbsoluteUri, correlationId, cancellationToken);
             }
             catch (Exception ex)
             {

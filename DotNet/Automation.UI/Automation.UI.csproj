@@ -9,17 +9,21 @@
 
   <ItemGroup>
     <Compile Remove="Services\Caching\**" />
+    <Compile Remove="Services\Notifications\**" />
     <Compile Remove="Views\Account\**" />
     <Content Remove="Services\Caching\**" />
+    <Content Remove="Services\Notifications\**" />
     <Content Remove="Views\Account\**" />
     <EmbeddedResource Remove="Services\Caching\**" />
+    <EmbeddedResource Remove="Services\Notifications\**" />
     <EmbeddedResource Remove="Views\Account\**" />
     <None Remove="Services\Caching\**" />
+    <None Remove="Services\Notifications\**" />
     <None Remove="Views\Account\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="8.*" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
   </ItemGroup>
 
   <ItemGroup>
@@ -29,7 +33,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Services\Notifications\" />
     <Folder Include="Views\Home\" />
     <Folder Include="wwwroot\js\" />
   </ItemGroup>

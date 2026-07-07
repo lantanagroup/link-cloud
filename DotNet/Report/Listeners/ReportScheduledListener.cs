@@ -64,7 +64,7 @@ namespace LantanaGroup.Link.Report.Listeners
             return Task.Run(() => StartConsumerLoop(stoppingToken), stoppingToken);
         }
 
-        private async void StartConsumerLoop(CancellationToken cancellationToken)
+        private async Task StartConsumerLoop(CancellationToken cancellationToken)
         {
             var config = new ConsumerConfig()
             {
@@ -202,6 +202,10 @@ namespace LantanaGroup.Link.Report.Listeners
                 var exceptionMessage = $"Timeout exception encountered on {DateTime.UtcNow} for topics: [ReportScheduled] at offset: {result.TopicPartitionOffset}";
                 var transientException = new TransientException(exceptionMessage, ex);
                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {

@@ -1,5 +1,0 @@
-FROM busybox:musl AS busybox
-
-FROM hapiproject/hapi:latest
-
-COPY --from=busybox /bin/wget /usr/local/bin/wget

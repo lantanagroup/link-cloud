@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using CsvHelper;
+using CsvHelper.Configuration;
 using Hl7.Fhir.Model;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
@@ -22,6 +23,14 @@ public class CodeGroupCacheServiceTests
     {
         _loggerMock = new Mock<ILogger<CodeGroupCacheService>>();
         _config = new TerminologyConfig { Path = "/test/path" };
+    }
+
+    // Mirrors the reader LoadCache builds: the optional trailing status column means a
+    // 2-column CSV has no field at index 2, so missing fields must not be treated as errors.
+    private static CsvReader CreateCsvReader(string csvData)
+    {
+        var config = new CsvConfiguration(CultureInfo.InvariantCulture) { MissingFieldFound = null };
+        return new CsvReader(new StringReader(csvData), config);
     }
 
     [Fact]
@@ -135,8 +144,8 @@ public class CodeGroupCacheServiceTests
             Version = "1.0"
         };
 
-        var csvContent = @"code,display,extra
-123,Test Display,Extra Column";
+        var csvContent = @"code,display,status,extra
+123,Test Display,Active,Extra Column";
 
         using var reader = new StringReader(csvContent);
         using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
@@ -145,7 +154,7 @@ public class CodeGroupCacheServiceTests
         var ex = Assert.Throws<InvalidOperationException>(() =>
             mockService.Object.ProcessCodeSystemCsv(codeGroup, csv));
 
-        Assert.Contains("CodeSystem CSV must have exactly 2 columns", ex.Message);
+        Assert.Contains("CodeSystem CSV must have", ex.Message);
     }
 
     [Fact]
@@ -247,6 +256,67 @@ http://test.system,123,Test Display,Extra Value";
             Times.Once);
     }
 
+    [Theory]
+    [InlineData("code,display\r\n" +
+                "123,Test Display\r\n" +
+                "456,Another Display")]
+    [InlineData("code,display,status\r\n" +
+                "123,Test Display,Active\r\n" +
+                "456,Another Display,")]
+    public void ProcessCodeSystemCsv_WithTwoOrThreeColumnHeader_CallsSetCodeGroup(string csvData)
+    {
+        var mockCache = new Mock<IMemoryCache>();
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        // Create test service with mocked file system methods
+        var mockService = new Mock<CodeGroupCacheService>(
+            _loggerMock.Object,
+            mockCache.Object,
+            mockConfig.Object)
+        {
+            CallBase = true
+        };
+
+        mockService
+            .Setup(x => x.SetCodeGroup(It.IsAny<CodeGroup>()))
+            .Verifiable();
+
+        using var csv = CreateCsvReader(csvData);
+
+        var codeGroup = new CodeGroup
+        {
+            Id = "test-id",
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Url = "http://test.codesystem",
+            Version = "1.0",
+            Resource = new CodeSystem
+            {
+                Id = "test-id",
+                Url = "http://test.codesystem",
+                Version = "1.0"
+            }
+        };
+
+        // Act
+        mockService.Object.ProcessCodeSystemCsv(codeGroup, csv);
+
+        // Assert - both header shapes yield the same code/display parsing
+        mockService.Verify(x => x.SetCodeGroup(It.Is<CodeGroup>(cg =>
+            cg.Id == "test-id" &&
+            cg.Type == CodeGroup.CodeGroupTypes.CodeSystem &&
+            cg.Url == "http://test.codesystem" &&
+            cg.Version == "1.0" &&
+            cg.Codes.ContainsKey("http://test.codesystem") &&
+            cg.Codes["http://test.codesystem"].Count == 2 &&
+            cg.Codes["http://test.codesystem"][0].Value == "123" &&
+            cg.Codes["http://test.codesystem"][0].Display == "Test Display" &&
+            cg.Codes["http://test.codesystem"][1].Value == "456" &&
+            cg.Codes["http://test.codesystem"][1].Display == "Another Display")),
+            Times.Once);
+    }
+
     [Fact]
     public void ProcessCodeSystemCsv_WithValidData_CallsSetCodeGroup()
     {
@@ -272,8 +342,7 @@ http://test.system,123,Test Display,Extra Value";
 123,Test Display
 456,Another Display";
 
-        using var reader = new StringReader(csvData);
-        using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+        using var csv = CreateCsvReader(csvData);
 
         var codeGroup = new CodeGroup
         {
@@ -305,5 +374,211 @@ http://test.system,123,Test Display,Extra Value";
             cg.Codes["http://test.codesystem"][1].Value == "456" &&
             cg.Codes["http://test.codesystem"][1].Display == "Another Display")),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task LoadCache_PopulatesCacheWithRetrievableCodeSystem()
+    {
+        // Use a real memory cache and the real service (only the file-system seams are
+        // overridden) so LoadCache/ProcessCodeSystemCsv/SetCodeGroup are all exercised.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/cs"] = new[] { "cs.json", "cs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["cs.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
+                          "\"url\": \"http://test.codesystem\", \"version\": \"1.0\" }",
+            ["cs.csv"] = "code,display,status\r\n" +
+                         "123,Test Display,Active\r\n" +
+                         "456,Another Display,Inactive\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+
+        // Act
+        await service.LoadCache();
+
+        // Assert - the code group is retrievable from the cache with all its codes.
+        var codeGroup = service.GetCodeGroup(
+            CodeGroup.CodeGroupTypes.CodeSystem, "http://test.codesystem");
+
+        Assert.NotNull(codeGroup);
+        Assert.Equal("test-cs", codeGroup.Id);
+        Assert.Equal("1.0", codeGroup.Version);
+        Assert.True(codeGroup.Codes.ContainsKey("http://test.codesystem"));
+
+        var codes = codeGroup.Codes["http://test.codesystem"];
+        Assert.Equal(2, codes.Count);
+        Assert.Equal("123", codes[0].Value);
+        Assert.Equal("Test Display", codes[0].Display);
+        Assert.Equal(CodeStatus.Active, ((CodeSystemCode)codes[0]).Status);
+        Assert.Equal("456", codes[1].Value);
+        Assert.Equal("Another Display", codes[1].Display);
+        Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[1]).Status);
+    }
+
+    [Fact]
+    public async Task LoadCache_BlankStatus_DefaultsToActive()
+    {
+        // Use a real memory cache and the real service (only the file-system seams are
+        // overridden) so LoadCache/ProcessCodeSystemCsv/SetCodeGroup are all exercised.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/cs"] = new[] { "cs.json", "cs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["cs.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
+                          "\"url\": \"http://test.codesystem\", \"version\": \"1.0\" }",
+            // Second row has a blank status column, which should default to Active.
+            ["cs.csv"] = "code,display,status\r\n" +
+                         "123,Test Display,Inactive\r\n" +
+                         "456,Another Display,\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+
+        // Act
+        await service.LoadCache();
+
+        // Assert - the blank-status row is loaded as Active.
+        var codeGroup = service.GetCodeGroup(
+            CodeGroup.CodeGroupTypes.CodeSystem, "http://test.codesystem");
+
+        Assert.NotNull(codeGroup);
+        var codes = codeGroup.Codes["http://test.codesystem"];
+        Assert.Equal(2, codes.Count);
+        Assert.Equal("456", codes[1].Value);
+        Assert.Equal(CodeStatus.Active, ((CodeSystemCode)codes[1]).Status);
+    }
+
+    [Fact]
+    public async Task LoadCache_NoStatusColumn_AllRowsDefaultToActive()
+    {
+        // Use a real memory cache and the real service (only the file-system seams are
+        // overridden) so LoadCache/ProcessCodeSystemCsv/SetCodeGroup are all exercised.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/cs"] = new[] { "cs.json", "cs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["cs.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
+                          "\"url\": \"http://test.codesystem\", \"version\": \"1.0\" }",
+            // No status column at all - every row should default to Active.
+            ["cs.csv"] = "code,display\r\n" +
+                         "123,Test Display\r\n" +
+                         "456,Another Display\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+
+        // Act
+        await service.LoadCache();
+
+        // Assert - every code is loaded as Active.
+        var codeGroup = service.GetCodeGroup(
+            CodeGroup.CodeGroupTypes.CodeSystem, "http://test.codesystem");
+
+        Assert.NotNull(codeGroup);
+        var codes = codeGroup.Codes["http://test.codesystem"];
+        Assert.Equal(2, codes.Count);
+        Assert.All(codes, code => Assert.Equal(CodeStatus.Active, ((CodeSystemCode)code).Status));
+    }
+
+    [Fact]
+    public async Task LoadCache_MixedCaseStatus_ParsesCaseInsensitively()
+    {
+        // Use a real memory cache and the real service (only the file-system seams are
+        // overridden) so LoadCache/ProcessCodeSystemCsv/SetCodeGroup are all exercised.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/cs"] = new[] { "cs.json", "cs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["cs.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
+                          "\"url\": \"http://test.codesystem\", \"version\": \"1.0\" }",
+            // Status values in varied casing must all parse and canonicalize to the enum.
+            ["cs.csv"] = "code,display,status\r\n" +
+                         "123,Test Display,active\r\n" +
+                         "456,Another Display,INACTIVE\r\n" +
+                         "789,Third Display,Inactive\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+
+        // Act
+        await service.LoadCache();
+
+        // Assert - lowercase/uppercase/mixed-case status all load and normalize correctly.
+        var codeGroup = service.GetCodeGroup(
+            CodeGroup.CodeGroupTypes.CodeSystem, "http://test.codesystem");
+
+        Assert.NotNull(codeGroup);
+        var codes = codeGroup.Codes["http://test.codesystem"];
+        Assert.Equal(3, codes.Count);
+        Assert.Equal(CodeStatus.Active, ((CodeSystemCode)codes[0]).Status);
+        Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[1]).Status);
+        Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[2]).Status);
+    }
+
+    /// <summary>
+    /// Real <see cref="CodeGroupCacheService"/> with only the file-system seams overridden,
+    /// so LoadCache and everything it calls run against the actual implementation.
+    /// </summary>
+    private sealed class TestableCodeGroupCacheService : CodeGroupCacheService
+    {
+        private readonly IReadOnlyDictionary<string, string[]> _directoryFiles;
+        private readonly IReadOnlyDictionary<string, string> _fileContents;
+
+        public TestableCodeGroupCacheService(
+            ILogger<CodeGroupCacheService> logger,
+            IMemoryCache cache,
+            IOptions<TerminologyConfig> config,
+            IReadOnlyDictionary<string, string[]> directoryFiles,
+            IReadOnlyDictionary<string, string> fileContents)
+            : base(logger, cache, config)
+        {
+            _directoryFiles = directoryFiles;
+            _fileContents = fileContents;
+        }
+
+        protected internal override bool DirectoryExists(string path) => true;
+
+        protected internal override string[] GetDirectories(string path) =>
+            _directoryFiles.Keys.ToArray();
+
+        protected internal override string[] GetFiles(string path, string searchPattern)
+        {
+            var extension = searchPattern.TrimStart('*');
+            return _directoryFiles.TryGetValue(path, out var files)
+                ? files.Where(f => f.EndsWith(extension, StringComparison.OrdinalIgnoreCase)).ToArray()
+                : Array.Empty<string>();
+        }
+
+        protected internal override System.Threading.Tasks.Task<string> ReadAllTextAsync(string path) =>
+            System.Threading.Tasks.Task.FromResult(_fileContents[path]);
     }
 }

@@ -1,5 +1,3 @@
-version: '3.4'
-
 #### services and ports
 ## fhir_server: 6157
 ## mock-fhir-server: 6158
@@ -38,12 +36,20 @@ services:
   ###########################################
   ### FHIR Server (HAPI) - For testing
   ###########################################
+  fhir_server_prep:
+    image: alpine:latest
+    volumes:
+      - fhir_data:/data
+    # Give HAPI's (non-root) user access to the volume
+    command: >-
+      chown 65532:65532 /data
+
   fhir_server:
-    build:
-      context: .
-      dockerfile: Dockerfile.hapi
-    image: link-fhir-server
+    image: hapiproject/hapi:v8.10.0-2
     container_name: fhir-server
+    depends_on:
+      fhir_server_prep:
+        condition: service_completed_successfully
     ports:
       - "6157:8080"
     environment:
@@ -68,12 +74,13 @@ services:
       - hapi.fhir.binary_storage_enabled=false
       - hapi.fhir.validation.requests_enabled=false
       - hapi.fhir.validation.responses_enabled=false
+      - spring.datasource.url=jdbc:h2:file:/data/h2
     volumes:
       - fhir_data:/data
     networks:
       - link-nw
     healthcheck:
-      test: ["CMD", "wget", "-q", "--timeout=5", "--tries=1", "--spider", "http://localhost:8080/fhir/metadata"]
+      test: ["CMD", "java", "-cp", "/app", "HealthCheck"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -861,6 +868,7 @@ services:
       InternalBlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ExternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       ExternalBlobStorage__BlobContainerName: ${EXTERNAL_BLOB_CONTAINER_NAME}
+      ExternalBlobStorage__FlattenHierarchy: ${EXTERNAL_BLOB_FLATTEN_HIERARCHY}
     ports:
       - "8073:8073"
     build:
