@@ -892,7 +892,13 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
         { fhirPath: combined, priority: 1 }
       ];
 
-      if (this.formMode === FormMode.Create) {
+      // Decide insert-vs-update by whether we already have a persisted config id — NOT by
+      // formMode. A facility is meant to have a single reporting-organization config, and
+      // formMode can be stale (opened in Create while a config already exists), which would
+      // POST a duplicate row. A present configId unambiguously means "update the existing row".
+      const existingConfigId = this.item?.configId;
+
+      if (existingConfigId == null) {
         const payload: ICreateOrganizationLocationConfigurationModel = {
           description: this.descriptionControl.value || undefined,
           isActive: this.isActiveControl.value,
@@ -910,7 +916,7 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
             },
             error: err => this.setSaveError(err)
           });
-      } else if (this.formMode === FormMode.Edit) {
+      } else {
         const payload: IUpdateOrganizationLocationConfigurationModel = {
           description: this.descriptionControl.value || undefined,
           isActive: this.isActiveControl.value,
@@ -918,11 +924,11 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
         };
 
         this.dataAcquisitionService
-          .updateLocationConfiguration(this.item.configId!, payload)
+          .updateLocationConfiguration(existingConfigId, payload)
           .subscribe({
             next: response => {
               this.submittedConfiguration.emit({
-                id: String(response.configId ?? this.item.configId ?? ''),
+                id: String(response.configId ?? existingConfigId ?? ''),
                 message: 'Reporting Organization Configuration Updated'
               });
             },

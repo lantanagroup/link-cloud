@@ -1,0 +1,43 @@
+.location-details-loading {
+  display: flex;
+  justify-content: center;
+  padding: 2em 0;
+}
+
+.location-details-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.75em 1em;
+  border-radius: 4px;
+  color: #b71c1c;
+  background-color: #fdecea;
+
+  mat-icon {
+    flex-shrink: 0;
+  }
+}
+
+.location-details-empty {
+  padding: 1em 0;
+  color: rgba(0, 0, 0, 0.54);
+}
+
+// Two-column definition list: label on the left, value on the right.
+.location-details {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  min-width: 320px;
+
+  dt {
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  dd {
+    margin: 0;
+    word-break: break-word;
+  }
+}
