@@ -2577,7 +2577,7 @@
         "dependencies": {
           "Automation.Link": "[1.0.0, )",
           "LinkSdk": "[1.0.0, )",
-          "Microsoft.AspNetCore.Authentication.OpenIdConnect": "[8.0.27, )",
+          "Microsoft.AspNetCore.Authentication.OpenIdConnect": "(, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },
@@ -2824,7 +2824,7 @@
       "submission.data": {
         "type": "Project",
         "dependencies": {
-          "Quartz": "[3.18.1, )",
+          "Quartz": "(, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },

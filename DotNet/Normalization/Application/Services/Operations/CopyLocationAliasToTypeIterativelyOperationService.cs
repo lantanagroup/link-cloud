@@ -1,4 +1,4 @@
-using Google.Protobuf.Collections;
+﻿using Google.Protobuf.Collections;
 using Grpc.Core;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
@@ -7,6 +7,7 @@ using LantanaGroup.Link.Normalization.Application.Models.Operations;
 using LantanaGroup.Link.Normalization.Application.Operations;
 using LantanaGroup.Link.Normalization.Application.Services.FhirPathValidation;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Collections;
 using Task = System.Threading.Tasks.Task;
 
@@ -33,6 +34,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             _logger.LogDebug("Applying Copy Location Alias to Type Iteratively Operation (ResourceType: {type}, ResourceId: {resourceId})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
 
             Location? location = (Location)resource;
+            var originalLocation = location;
 
             if (location.Type == null)
             {
@@ -46,6 +48,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
 
             int iterationCount = 0;
+            int changes = 0;
             do
             {
                 foreach(var alias in location.Alias)
@@ -60,16 +63,16 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                         var aliases = alias.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                         foreach (var a in aliases)
                         {
-                            AddAliasToType(location, a);
+                            changes += AddAliasToType(originalLocation, a);
                         }
                     }
                     else
                     {
-                        AddAliasToType(location, alias);
+                        changes += AddAliasToType(originalLocation, alias);
                     }
                 }
 
-                var parentLocation = supportingResources?.FirstOrDefault(r => r is Location && r.Id == location.PartOf?.Reference);
+                var parentLocation = supportingResources?.FirstOrDefault(r => r is Location && r.Id == location.PartOf?.Reference?.SplitReference());
                 if (parentLocation is Location parentLoc)
                 {
                     location = parentLoc;
@@ -89,10 +92,17 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 }
             } while(location != null && iterationCount < maxIterations);
 
-            return OperationResult.Success(resource);
+            if(changes > 0)
+            {
+                return OperationResult.Success(resource);
+            }
+            else
+            {
+                return OperationResult.NoAction("No alias values were copied to Location.Type.", resource);
+            }
         }
 
-        protected void AddAliasToType(Location location, string alias)
+        protected int AddAliasToType(Location location, string alias)
         {
             var trimmedAlias = alias.Trim();
 
@@ -103,10 +113,11 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                     string.Equals(cd.Code, trimmedAlias, StringComparison.Ordinal)));
 
             if (exists)
-                return;
+                return 0;
 
             CodeableConcept codeableConcept = new(LocationAliasCodeSystem, trimmedAlias);
             location.Type.Add(codeableConcept);
+            return 1;
         }
     }
 }

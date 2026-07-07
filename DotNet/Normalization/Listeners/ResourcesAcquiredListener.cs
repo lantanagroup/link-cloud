@@ -202,7 +202,7 @@ public class ResourcesAcquiredListener : BackgroundService
                 var sequences = await operationSequenceQueries.Search(new OperationSequenceSearchModel()
                 {
                     FacilityId = result.Message.Key.FacilityId,
-                    ResourceType = resourceType.ToString(),
+                    ResourceType = resourceType.ToString()
                 }, cancellationToken: cancellationToken);
 
                 if (sequences == null || sequences.Count == 0)
@@ -221,9 +221,13 @@ public class ResourcesAcquiredListener : BackgroundService
                     foreach (var sequence in sequences)
                     {
                         var dbEntity = sequence.OperationResourceType.Operation;
+                        if(dbEntity != null && dbEntity.IsDisabled)
+                        {
+                            _logger.LogInformation("Skipping disabled operation {OperationType} ({OperationName}) for {FacilityId}/{ResourceType}/{ResourceId}.", dbEntity.OperationType, dbEntity.Name.SanitizeForLog(), result.Message.Key.FacilityId.SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
+                            continue;
+                        }
 
                         var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
-
                         if (operation == null)
                         {
                             throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
