@@ -676,7 +676,50 @@ export class FacilityEditComponent implements OnInit {
     }
   }
 
+  // A facility may hold several configs but at most one is active. Surface the active one so the
+  // dialog toggles the config that actually matters. If none is active, fall back to the newest
+  // (highest configId) so the Active toggle can turn one back on. (A full list view comes later.)
+  private selectReportingOrgConfig(
+    data: IOrganizationLocationConfigurationModel[]
+  ): IOrganizationLocationConfigurationModel | null {
+    if (!data || data.length === 0) {
+      return null;
+    }
+    return data.find(c => c.isActive)
+      ?? [...data].sort((a, b) => (b.configId ?? 0) - (a.configId ?? 0))[0];
+  }
+
   showReportingOrgDialog(): void {
+    // Resolve the facility's current config from the server *before* opening the dialog, so it
+    // always edits the existing row (when one exists) instead of inserting a duplicate. The
+    // cached showNoReportingOrgConfigAlert flag can be stale and open Create mode over an
+    // existing config — that is what produced multiple configuration rows per facility.
+    this.dataAcquisitionService.getLocationConfigurations(this.facilityId).subscribe({
+      next: (data: IOrganizationLocationConfigurationModel[]) =>
+        this.openReportingOrgDialog(this.selectReportingOrgConfig(data)),
+      error: (error) => {
+        if (error?.status === 404) {
+          this.openReportingOrgDialog(null);
+        } else {
+          this.snackBar.open(`Failed to load reporting organization configuration for the facility, see error for details.`, '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+        }
+      }
+    });
+  }
+
+  private openReportingOrgDialog(existing: IOrganizationLocationConfigurationModel | null): void {
+    this.showNoReportingOrgConfigAlert = existing == null;
+    this.reportingOrgConfig = existing ?? ({
+      facilityId: this.facilityId,
+      isActive: true,
+      conditions: []
+    } as IOrganizationLocationConfigurationModel);
+
     this.dialog.open(ReportingOrganizationConfigDialogComponent,
       {
         width: '90%',
@@ -684,7 +727,7 @@ export class FacilityEditComponent implements OnInit {
         disableClose: true,
         data: {
           dialogTitle: 'Reporting Organization Configuration',
-          formMode: this.showNoReportingOrgConfigAlert ? FormMode.Create : FormMode.Edit,
+          formMode: existing != null ? FormMode.Edit : FormMode.Create,
           viewOnly: false,
           vendor: this.facilityVendor,
           reportingOrgConfig: this.reportingOrgConfig
