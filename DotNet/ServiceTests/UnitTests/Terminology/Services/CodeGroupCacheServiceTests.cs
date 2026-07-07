@@ -423,6 +423,40 @@ http://test.system,123,Test Display,Extra Value";
         Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[1]).Status);
     }
 
+    [Theory]
+    [InlineData("http://test.codesystem")]        // no version
+    [InlineData("http://test.codesystem|1.0")]    // exact version suffix
+    [InlineData("http://test.codesystem|9.9")]    // unknown version -> falls back to latest loaded
+    public async Task GetCodeGroup_ResolvesCanonicalUrlWithVersionSuffix(string lookupUrl)
+    {
+        // HAPI sends versioned canonical URLs (e.g. ".../identifier-use|4.0.1"); the version
+        // suffix must not prevent the URL from resolving to the cached code group.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/cs"] = new[] { "cs.json", "cs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["cs.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
+                          "\"url\": \"http://test.codesystem\", \"version\": \"1.0\" }",
+            ["cs.csv"] = "code,display,status\r\n123,Test Display,Active\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+        await service.LoadCache();
+
+        var codeGroup = service.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, lookupUrl);
+
+        Assert.NotNull(codeGroup);
+        Assert.Equal("http://test.codesystem", codeGroup.Url);
+        Assert.Equal("1.0", codeGroup.Version);
+    }
+
     [Fact]
     public async Task LoadCache_BlankStatus_DefaultsToActive()
     {
@@ -542,6 +576,75 @@ http://test.system,123,Test Display,Extra Value";
         Assert.Equal(CodeStatus.Active, ((CodeSystemCode)codes[0]).Status);
         Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[1]).Status);
         Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[2]).Status);
+    }
+
+    // Loads two versions of the same code group ("4.0.9" and "4.0.10") into a real cache.
+    // String ordering would wrongly rank "4.0.9" above "4.0.10"; semantic ordering ranks
+    // "4.0.10" as the latest. Used by the "latest version" resolution tests below.
+    private TestableCodeGroupCacheService BuildTwoVersionService(IMemoryCache memoryCache)
+    {
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/v9"] = new[] { "v9.json", "v9.csv" },
+            ["/test/path/v10"] = new[] { "v10.json", "v10.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["v9.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
+                          "\"url\": \"http://test.codesystem\", \"version\": \"4.0.9\" }",
+            ["v9.csv"] = "code,display,status\r\n123,Test Display,Active\r\n",
+            ["v10.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
+                           "\"url\": \"http://test.codesystem\", \"version\": \"4.0.10\" }",
+            ["v10.csv"] = "code,display,status\r\n123,Test Display,Active\r\n"
+        };
+
+        return new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+    }
+
+    [Fact]
+    public async Task GetCodeGroup_NoVersion_ReturnsSemanticallyLatestVersion()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildTwoVersionService(memoryCache);
+        await service.LoadCache();
+
+        var codeGroup = service.GetCodeGroup(
+            CodeGroup.CodeGroupTypes.CodeSystem, "http://test.codesystem");
+
+        Assert.NotNull(codeGroup);
+        // String ordering would return "4.0.9"; semantic ordering returns "4.0.10".
+        Assert.Equal("4.0.10", codeGroup.Version);
+    }
+
+    [Fact]
+    public async Task GetCodeGroupById_NoVersion_ReturnsSemanticallyLatestVersion()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildTwoVersionService(memoryCache);
+        await service.LoadCache();
+
+        var codeGroup = service.GetCodeGroupById(
+            CodeGroup.CodeGroupTypes.CodeSystem, "test-cs");
+
+        Assert.NotNull(codeGroup);
+        Assert.Equal("4.0.10", codeGroup.Version);
+    }
+
+    [Fact]
+    public async Task GetAllCodeGroups_ReturnsSemanticallyLatestVersionPerId()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildTwoVersionService(memoryCache);
+        await service.LoadCache();
+
+        var codeGroups = service.GetAllCodeGroups(CodeGroup.CodeGroupTypes.CodeSystem);
+
+        var codeGroup = Assert.Single(codeGroups);
+        Assert.Equal("4.0.10", codeGroup.Version);
     }
 
     /// <summary>
