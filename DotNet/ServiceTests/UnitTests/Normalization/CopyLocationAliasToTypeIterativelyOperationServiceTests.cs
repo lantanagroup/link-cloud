@@ -93,13 +93,13 @@ public class CopyLocationAliasToTypeIterativelyOperationServiceTests
 
         var result = await _service.ProcessOperationAsync(new CopyLocationAliasToTypeIterativelyOperation(), location);
 
-        Assert.Equal(OperationStatus.Success, result.SuccessCode);
+        Assert.Equal(OperationStatus.NoAction, result.SuccessCode);
         var modified = (Location)result.Resource;
         Assert.Single(modified.Type, concept => HasAliasCode("ICU")(concept));
     }
 
     [Fact]
-    public async Task CopyLocationAliasToTypeIteratively_CopiesAliasesFromParentHierarchy()
+    public async Task CopyLocationAliasToTypeIteratively_CopiesAncestorAliasesToOriginalLocationType()
     {
         var child = new Location
         {
@@ -125,9 +125,13 @@ public class CopyLocationAliasToTypeIterativelyOperationServiceTests
             [parent, grandparent]);
 
         Assert.Equal(OperationStatus.Success, result.SuccessCode);
-        AssertAliasCode(child, "Child");
-        AssertAliasCode(parent, "Parent");
-        AssertAliasCode(grandparent, "Grandparent");
+        var modified = (Location)result.Resource;
+        Assert.Same(child, modified);
+        AssertAliasCode(modified, "Child");
+        AssertAliasCode(modified, "Parent");
+        AssertAliasCode(modified, "Grandparent");
+        Assert.Empty(parent.Type);
+        Assert.Empty(grandparent.Type);
     }
 
     [Fact]
@@ -173,9 +177,10 @@ public class CopyLocationAliasToTypeIterativelyOperationServiceTests
 
         Assert.Equal(OperationStatus.Success, result.SuccessCode);
         AssertAliasCode(locationA, "A");
-        AssertAliasCode(locationB, "B");
+        AssertAliasCode(locationA, "B");
         Assert.Single(locationA.Type, concept => HasAliasCode("A")(concept));
-        Assert.Single(locationB.Type, concept => HasAliasCode("B")(concept));
+        Assert.Single(locationA.Type, concept => HasAliasCode("B")(concept));
+        Assert.Empty(locationB.Type);
         VerifyLog(LogLevel.Warning, "Maximum iteration count of 15 reached", Times.Once());
     }
 
