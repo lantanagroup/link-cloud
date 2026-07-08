@@ -48,7 +48,7 @@
       <input matInput type="number" min="1" formControlName="maxIterations" [readonly]="viewOnly"/>
     </mat-form-field>
 
-    <mat-checkbox formControlName="splitOnComma">Split aliases on comma</mat-checkbox>
+    <mat-checkbox formControlName="splitOnComma" [disabled]="viewOnly">Split aliases on comma</mat-checkbox>
 
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>Resource Types</mat-label>
@@ -59,6 +59,6 @@
       </mat-select>
     </mat-form-field>
 
-    <mat-checkbox formControlName="isEnabled">Enabled</mat-checkbox>
+    <mat-checkbox formControlName="isEnabled" [disabled]="viewOnly">Enabled</mat-checkbox>
   </form>
 </mat-card-content>

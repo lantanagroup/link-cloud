@@ -91,7 +91,9 @@ export class CopyLocationAliasToTypeIterativelyComponent implements OnInit, OnDe
           })
       });
 
-    this.operationService.getVendors().subscribe({
+    this.operationService.getVendors()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
       next: (data) => {
         this.vendors = data;
         if (this.formMode === FormMode.Edit && this.isVendorMode && Array.isArray(this.operation.vendorPresets)) {
@@ -112,10 +114,18 @@ export class CopyLocationAliasToTypeIterativelyComponent implements OnInit, OnDe
           }
         }
       },
-      error: (err) => console.error('Error loading vendors', err)
+      error: (err) => {
+        console.error('Error loading vendors', err);
+        this.snackBar.open('Failed to load vendors', '', {
+          duration: 3500,
+          panelClass: 'error-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
     });
 
-    this.form.valueChanges.subscribe(() => {
+    this.form.valueChanges.pipe(takeUntil(this.destroy$)).subscribe(() => {
       this.formValueChanged.emit(this.form.invalid);
     });
 

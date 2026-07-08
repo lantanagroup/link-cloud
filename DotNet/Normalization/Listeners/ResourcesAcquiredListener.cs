@@ -223,7 +223,7 @@ public class ResourcesAcquiredListener : BackgroundService
                         var dbEntity = sequence.OperationResourceType.Operation;
                         if(dbEntity != null && dbEntity.IsDisabled)
                         {
-                            _logger.LogInformation("Skipping disabled operation {OperationType} ({OperationName}) for {FacilityId}/{ResourceType}/{ResourceId}.", dbEntity.OperationType, dbEntity.Name.SanitizeForLog(), result.Message.Key.FacilityId.SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
+                            _logger.LogDebug("Skipping disabled operation {OperationType} ({OperationName}) for {FacilityId}/{ResourceType}/{ResourceId}.", dbEntity.OperationType, dbEntity.Name.SanitizeForLog(), result.Message.Key.FacilityId.SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
                             continue;
                         }
 
