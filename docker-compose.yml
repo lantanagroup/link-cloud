@@ -691,6 +691,7 @@ services:
     container_name: link-automation-ui
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      PatientAggregator__IncludeOrganizationResource: true
     volumes:
       - automation_ui_keys:/keys/dataprotection
     ports:
@@ -825,6 +826,7 @@ services:
     container_name: link-report
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      PatientAggregator__IncludeOrganizationResource: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       InternalBlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}

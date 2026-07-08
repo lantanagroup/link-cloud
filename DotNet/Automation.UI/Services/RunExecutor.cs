@@ -36,6 +36,7 @@ internal sealed class RunExecutor
     private readonly RunSnapshotOrchestrator _orchestrator;
     private readonly QueryPlanTemplateResolver _queryPlanResolver;
     private readonly bool _suppressExternalManifest;
+    private readonly bool _includePatientAggregatorOrganizationResource;
     private readonly ILogger _logger;
 
     public RunExecutor(
@@ -53,6 +54,7 @@ internal sealed class RunExecutor
         _orchestrator = orchestrator;
         _queryPlanResolver = queryPlanResolver;
         _suppressExternalManifest = configuration.GetValue<bool>("ExternalBlobStorage:SuppressManifest");
+        _includePatientAggregatorOrganizationResource = configuration.GetValue<bool>("PatientAggregator:IncludeOrganizationResource");
         _logger = logger;
     }
 
@@ -274,6 +276,7 @@ internal sealed class RunExecutor
                 generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlan);
                 generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlan);
                 generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
+                generationManifest.IncludePatientAggregatorOrganizationResource = _includePatientAggregatorOrganizationResource;
 
                 // Persist a lightweight manifest snapshot for the UI.
                 await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
