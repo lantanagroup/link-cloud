@@ -2036,7 +2036,7 @@
       "submission.data": {
         "type": "Project",
         "dependencies": {
-          "Quartz": "[3.18.1, )",
+          "Quartz": "(, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },

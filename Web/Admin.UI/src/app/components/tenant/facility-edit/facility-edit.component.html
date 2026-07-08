@@ -276,6 +276,10 @@
             <mat-icon>content_copy</mat-icon>
             <span>Add Copy Location</span>
           </button>
+          <button mat-menu-item (click)="showOperationDialog(OperationType.CopyLocationAliasToTypeIteratively)">
+            <mat-icon>account_tree</mat-icon>
+            <span>Add Copy Location Alias to Type Iteratively</span>
+          </button>
           <button mat-menu-item (click)="showOperationDialog(OperationType.RemoveExtensions)">
             <mat-icon>filter_list_off</mat-icon>
             <span>Add Remove Extensions</span>

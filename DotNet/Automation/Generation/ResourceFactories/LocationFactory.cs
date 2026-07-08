@@ -28,6 +28,7 @@ public static class LocationFactory
             Id = id,
             Status = Location.LocationStatus.Active,
             Name = name,
+            Alias = new List<string> { "Alias, " + name },
             Identifier =
             [
                 new Identifier { System = "http://example.org/fhir/sid/location", Value = id }
