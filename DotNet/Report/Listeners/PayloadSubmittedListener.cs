@@ -156,7 +156,7 @@ public class PayloadSubmittedListener(
             var transientException = new TransientException(exceptionMessage, ex);
             transientExceptionHandler.HandleException(result, transientException, facilityId);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }

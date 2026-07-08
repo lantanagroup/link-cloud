@@ -37,6 +37,7 @@ import {MatCheckbox} from '@angular/material/checkbox';
 import {MatTooltipModule} from '@angular/material/tooltip';
 import {MatTabsModule} from '@angular/material/tabs';
 import {LocationsListComponent} from './locations-list/locations-list.component';
+import {EncountersListComponent} from './encounters-list/encounters-list.component';
 
 @Component({
   selector: 'app-facility-view',
@@ -60,7 +61,8 @@ import {LocationsListComponent} from './locations-list/locations-list.component'
     MatCheckbox,
     MatTooltipModule,
     MatTabsModule,
-    LocationsListComponent
+    LocationsListComponent,
+    EncountersListComponent
   ],
   templateUrl: './facility-view.component.html',
   styleUrl: './facility-view.component.scss'
