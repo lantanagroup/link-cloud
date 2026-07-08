@@ -124,6 +124,8 @@ public class PipelineDataReader
     public record FacilityInfo(string FacilityId, string? FacilityName, string? TimeZone, bool IsDeleted, DateTime? CreateDate, FacilityScheduledReports? ScheduledReports);
     public record OrganizationLocationConfigurationInfo(int ConfigId, bool IsActive, int ConditionsCount);
     public record OrganizationLocationMappingInfo(string? FacilityId, string? LocationId, bool IsOrgLocation, bool IsActive, string? PartOfValue);
+    public record EncounterLocationInfo(string? LocationId);
+    public record EncounterMappingInfo(string? FacilityId, string? PatientId, string? EncounterId, bool MappedToOrg, List<EncounterLocationInfo> EncounterLocations);
 
     public Task<ReportScheduleInfo?> GetReportScheduleAsync(Guid scheduleId)
     {
@@ -498,6 +500,22 @@ public class PipelineDataReader
             m.IsOrgLocation,
             m.IsActive,
             m.PartOfValue)).ToList();
+    }
+
+    public async Task<List<EncounterMappingInfo>> GetEncounterMappingsAsync(string facilityId)
+    {
+        var response = await _dataAcqClient.GetEncounterMappingsAsync(facilityId);
+        if (!response.IsSuccessStatusCode || response.Body == null)
+            return [];
+
+        return response.Body.Select(m => new EncounterMappingInfo(
+            m.FacilityId,
+            m.PatientId,
+            m.EncounterId,
+            m.MappedToOrg,
+            m.EncounterLocations
+                .Select(el => new EncounterLocationInfo(el.LocationId))
+                .ToList())).ToList();
     }
 
     public async Task<List<PatientResourceTypeCount>> GetMeasureEvalResourceCountsByPatientTypeAsync(Guid scheduleId)

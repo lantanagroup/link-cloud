@@ -54,4 +54,8 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse<List<OrganizationLocationMappingApiModel>>> GetOrganizationLocationMappingsAsync(
         string facilityId,
         CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse<List<EncounterMappingApiModel>>> GetEncounterMappingsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default);
 }

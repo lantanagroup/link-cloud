@@ -151,9 +151,15 @@ internal sealed class RunExecutor
             var locationQueryCount = effectiveQueryPlan.InitialQueries.Concat(effectiveQueryPlan.SupplementalQueries)
                 .Count(q => string.Equals(q.ResourceType, "Location", StringComparison.OrdinalIgnoreCase));
             var expectLocationResources = locationQueryCount > 0;
+            var encounterQueryCount = effectiveQueryPlan.InitialQueries.Concat(effectiveQueryPlan.SupplementalQueries)
+                .Count(q => string.Equals(q.ResourceType, "Encounter", StringComparison.OrdinalIgnoreCase));
+            var expectEncounterResources = encounterQueryCount > 0;
             output.WriteLine($"Query plan Location queries: {locationQueryCount}");
+            output.WriteLine($"Query plan Encounter queries: {encounterQueryCount}");
             if (locationQueryCount == 0)
                 output.WriteLine("WARNING: Query plan has no Location query entries; org-location mapping cannot be exercised for this run.");
+            if (encounterQueryCount == 0)
+                output.WriteLine("WARNING: Query plan has no Encounter query entries; encounter mapping checks will be limited for this run.");
 
             if (state.Options.PatientProfiles is { Count: > 0 }
                 || state.Options.ImportedPatientIds.Count > 0
@@ -316,13 +322,15 @@ internal sealed class RunExecutor
 
             // Census config + FHIR list config are required so the Census service accepts the
             // explicit PatientListsAcquired snapshots this workflow publishes (ProcessList
-            // rejects facilities without a census config). For scheduled reports we DISABLE the
-            // background census Quartz job: this run drives census entirely through explicit
-            // snapshots, and letting the cron-scheduled PatientCensusScheduled job fire would
-            // (a) attempt to read FHIR List resources that do not exist on the synthetic server
-            // — surfacing spurious "configuration missing" errors — and (b) publish empty
-            // snapshots that auto-discharge our still-admitted patients out of turn.
-            var enableBackgroundCensusJobs = state.Options.ReportMethod != ReportMethod.ScheduledReport;
+            // rejects facilities without a census config).
+            //
+            // For Automation runs, disable the background census Quartz job for all report
+            // methods. The automation workflow drives patient-list ingestion explicitly when
+            // needed, while the scheduled background job can attempt to read non-existent
+            // synthetic FHIR List resources (census-{facility}-...) and emit noisy
+            // DataAcquisition "Error retrieving patient list" exceptions that do not represent
+            // true pipeline failures.
+            var enableBackgroundCensusJobs = false;
             await FacilitySetupHelper.EnsureCensusConfigAsync(
                 services.GetRequiredService<ICensusServiceClient>(),
                 output,
@@ -627,7 +635,8 @@ internal sealed class RunExecutor
                         ? expectedReportEntryPatientIds
                         : expectedAllPatientIds,
                     expectDataAcquisitionData: expectDataAcquisitionData,
-                    expectLocationResources: expectLocationResources));
+                    expectLocationResources: expectLocationResources,
+                    expectEncounterResources: expectEncounterResources));
 
             await RunValidator("NORMALIZATION DATABASE VALIDATION", () =>
                 normalizationValidator.ValidateAllAsync(facilityId));
@@ -868,8 +877,14 @@ internal sealed class RunExecutor
             var activeMappings = mappings.Count(m => m.IsActive);
             var orgMappings = mappings.Count(m => m.IsActive && m.IsOrgLocation);
 
+            var encounterMappingsResp = await dataAcqClient.GetEncounterMappingsAsync(facilityId, cancellationToken);
+            var encounterMappings = encounterMappingsResp.IsSuccessStatusCode
+                ? encounterMappingsResp.Body ?? []
+                : [];
+            var orgEncounterMappings = encounterMappings.Count(m => m.MappedToOrg);
+
             output.WriteLine(
-                $"Org-location mapping status: activeConfigs={activeConfigs}, activeConditions={activeConditions}, activeMappings={activeMappings}, orgMappings={orgMappings}");
+                $"Org-location mapping status: activeConfigs={activeConfigs}, activeConditions={activeConditions}, activeMappings={activeMappings}, orgMappings={orgMappings}, encounterMappings={encounterMappings.Count}, orgEncounterMappings={orgEncounterMappings}");
 
             if (activeConfigs == 0 || activeConditions == 0)
                 output.WriteLine("  WARNING: Org-location mapping is not effectively enabled (missing active config/conditions).");

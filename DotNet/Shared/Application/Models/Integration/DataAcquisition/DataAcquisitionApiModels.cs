@@ -146,6 +146,24 @@ public class OrganizationLocationMappingApiModel
     public bool IsActive { get; set; }
 }
 
+public class EncounterLocationApiModel
+{
+    public int EncounterLocationId { get; set; }
+    public int EncounterMappingId { get; set; }
+    public int OrganizationLocationMappingId { get; set; }
+    public string? LocationId { get; set; }
+}
+
+public class EncounterMappingApiModel
+{
+    public int EncounterMappingId { get; set; }
+    public string FacilityId { get; set; } = string.Empty;
+    public string PatientId { get; set; } = string.Empty;
+    public string EncounterId { get; set; } = string.Empty;
+    public bool MappedToOrg { get; set; }
+    public List<EncounterLocationApiModel> EncounterLocations { get; set; } = [];
+}
+
 public class DataAcquisitionLogStatusStatisticsApiModel
 {
     public string ReportId { get; set; } = string.Empty;
