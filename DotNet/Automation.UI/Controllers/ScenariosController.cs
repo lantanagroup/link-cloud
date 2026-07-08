@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation;
@@ -48,6 +48,9 @@ public class ScenariosController(
             return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system scenario cannot be modified.");
 
         model.IsSystemScenario = false;
+        model.NhsnOrganizationId = string.IsNullOrWhiteSpace(model.NhsnOrganizationId)
+            ? GenerateRandomNhsnOrganizationId()
+            : model.NhsnOrganizationId.Trim();
         model.UpdatedAt = DateTimeOffset.UtcNow;
 
         if (model.ResourcesPerPatientMax < model.ResourcesPerPatientMin)
@@ -365,6 +368,7 @@ public class ScenariosController(
             PatientCount = source.PatientCount,
             ResourcesPerPatientMin = source.ResourcesPerPatientMin,
             ResourcesPerPatientMax = source.ResourcesPerPatientMax,
+            NhsnOrganizationId = source.NhsnOrganizationId,
             PatientCohorts = source.PatientCohorts
                 .Select(c => new PatientCohortDefinition
                 {
@@ -423,5 +427,10 @@ public class ScenariosController(
         var bytes = Encoding.UTF8.GetBytes(json);
         var hash = SHA256.HashData(bytes);
         return Convert.ToHexString(hash);
+    }
+
+    private static string GenerateRandomNhsnOrganizationId()
+    {
+        return Random.Shared.Next(10000, 100000).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 }

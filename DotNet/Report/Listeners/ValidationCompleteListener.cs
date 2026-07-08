@@ -114,7 +114,7 @@ namespace LantanaGroup.Link.Report.Listeners
                                 _transientExceptionHandler.HandleException(result, transientException, facilityId);
                                 consumer.SafeCommit(result, _logger);
                             }
-                            catch (OperationCanceledException)
+                            catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
                                 throw;
                             }

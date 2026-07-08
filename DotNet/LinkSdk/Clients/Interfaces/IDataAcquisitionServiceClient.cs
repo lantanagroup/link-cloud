@@ -9,6 +9,9 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse> GetFhirQueryConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateFhirQueryConfigurationAsync(CreateFhirQueryConfigurationRequestApiModel request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteFhirQueryConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> GetFhirListConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> CreateFhirListConfigurationAsync(object request, CancellationToken cancellationToken = default);
+    Task<LinkApiResponse> DeleteFhirListConfigurationAsync(string facilityId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> GetQueryPlanAsync(string facilityId, string type, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> CreateQueryPlanAsync(string facilityId, CreateQueryPlanRequestApiModel request, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> DeleteQueryPlanAsync(string facilityId, string type, CancellationToken cancellationToken = default);
@@ -38,4 +41,17 @@ public interface IDataAcquisitionServiceClient
     Task<LinkApiResponse> SoftDeleteLogsByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> RestoreLogsByReportTrackingIdAsync(string reportTrackingId, CancellationToken cancellationToken = default);
     Task<LinkApiResponse> RestoreLogsByFacilityAsync(string facilityId, CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse<List<OrganizationLocationConfigurationApiModel>>> GetOrganizationLocationConfigurationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse<OrganizationLocationConfigurationApiModel>> CreateOrganizationLocationConfigurationAsync(
+        string facilityId,
+        CreateOrganizationLocationConfigurationApiModel request,
+        CancellationToken cancellationToken = default);
+
+    Task<LinkApiResponse<List<OrganizationLocationMappingApiModel>>> GetOrganizationLocationMappingsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default);
 }

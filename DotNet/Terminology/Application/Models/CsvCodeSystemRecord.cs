@@ -1,4 +1,4 @@
-﻿using CsvHelper.Configuration.Attributes;
+using CsvHelper.Configuration.Attributes;
 
 namespace LantanaGroup.Link.Terminology.Application.Models;
 
@@ -35,5 +35,6 @@ public class CsvCodeSystemRecord
     /// </summary>
     [Index(2)]
     [Default(CodeStatus.Active)]
+    [EnumIgnoreCase]
     public CodeStatus Status { get; set; } = CodeStatus.Active;
 }

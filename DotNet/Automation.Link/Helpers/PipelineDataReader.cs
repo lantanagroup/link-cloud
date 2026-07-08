@@ -122,6 +122,8 @@ public class PipelineDataReader
 
     public record FacilityScheduledReports(string[] Monthly, string[] Daily, string[] Weekly);
     public record FacilityInfo(string FacilityId, string? FacilityName, string? TimeZone, bool IsDeleted, DateTime? CreateDate, FacilityScheduledReports? ScheduledReports);
+    public record OrganizationLocationConfigurationInfo(int ConfigId, bool IsActive, int ConditionsCount);
+    public record OrganizationLocationMappingInfo(string? FacilityId, string? LocationId, bool IsOrgLocation, bool IsActive, string? PartOfValue);
 
     public Task<ReportScheduleInfo?> GetReportScheduleAsync(Guid scheduleId)
     {
@@ -470,6 +472,32 @@ public class PipelineDataReader
                 facility.ScheduledReports?.Monthly ?? [],
                 facility.ScheduledReports?.Daily ?? [],
                 facility.ScheduledReports?.Weekly ?? []));
+    }
+
+    public async Task<List<OrganizationLocationConfigurationInfo>> GetOrganizationLocationConfigurationsAsync(string facilityId)
+    {
+        var response = await _dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId);
+        if (!response.IsSuccessStatusCode || response.Body == null)
+            return [];
+
+        return response.Body.Select(c => new OrganizationLocationConfigurationInfo(
+            c.ConfigId,
+            c.IsActive,
+            c.Conditions?.Count ?? 0)).ToList();
+    }
+
+    public async Task<List<OrganizationLocationMappingInfo>> GetOrganizationLocationMappingsAsync(string facilityId)
+    {
+        var response = await _dataAcqClient.GetOrganizationLocationMappingsAsync(facilityId);
+        if (!response.IsSuccessStatusCode || response.Body == null)
+            return [];
+
+        return response.Body.Select(m => new OrganizationLocationMappingInfo(
+            m.FacilityId,
+            m.LocationId,
+            m.IsOrgLocation,
+            m.IsActive,
+            m.PartOfValue)).ToList();
     }
 
     public async Task<List<PatientResourceTypeCount>> GetMeasureEvalResourceCountsByPatientTypeAsync(Guid scheduleId)

@@ -1,0 +1,274 @@
+As the Software Engineer, I need to ensure the Automation.UI sceanrios/runs have been updated with the new Org ID feature is integrated so that all aspects of the new feature are addressed in the automated smoke test. 
+
+
+Examine the feature description below that led to the implementation of NHSN OrganizationID specific reports. We need to update the Scenarios in Automation.UI so that they are Organization ID aware in the context of the scenario. 
+
+You will need to understand how and where OrganizationIds are defined and set, ensure that we are setting up the OrganizationID for each scenario, enabling any feature flags that need to be set, and otherwise update our scenario/runs in Automation.UI so that we are fully engaging with this feature on every scenario run.
+
+Every Scenario should have a configurable NHSN Organization ID that is saved in the scenario and run data, and displayed within the Run Details. System Scenarios should use a static NHSN Organization ID that is set in code. *New* Scenarios should have a randomly generated default value set. Do NOT use an unchanging default value for a New Scenario. Do NOT change/randomly generate a the Org ID when opening an already existing Scenario *unless there is no saved organization ID*.
+
+
+NHSN Organization ID Feature Description:
+
+<rss version="0.92">
+<channel>
+<title>Lantana JIRA Software</title>
+<link>https://lantana.atlassian.net</link>
+<description>This file is an XML representation of an issue</description>
+<language>en-us</language>
+<build-info>
+<version>1001.0.0-SNAPSHOT</version>
+<build-number>100292</build-number>
+<build-date>06-07-2026</build-date>
+</build-info>
+<item>
+<title>[LEGPROG-227] Location OrgID Resolution</title>
+<link>https://lantana.atlassian.net/browse/LEGPROG-227</link>
+<project id="15529" key="LEGPROG">LEGEND Program Management</project>
+<description><p><b>Description</b>: Add capability to generate reports specific to the configured reporting NHSN Org ID.</p> <ul> <li>Current state: Reporting and submissions do not take specific facilities into account when there is a common FHIR endpoint being used for a health system (ex. URMC).</li> </ul> <p><b>Purpose</b>: Ability to generate report for a given facility (configured NHSN Org ID)</p> <ul> <li>Required to meet the minimum necessary requirement in accordance with the HIPAA privacy rule</li> <li>Reporting organization meets reporting commitments</li> <li>Required for health systems that have multiples facilities (common FHIR endpoint)</li> <li>Required in order to onboard early adopters</li> </ul> <p><b>Change proposal</b>: <a href="https://ec.lantanagroup.com/docs/custom/design/proposals/location-proposal/" class="external-link" rel="nofollow noreferrer"><del>Link Here</del></a> <a href="https://keystone.lantanagroup.com/Proposals/Details/01-location-proposal" class="external-link" rel="nofollow noreferrer">Link Here</a></p> <p><b>Proposed Workflow:</b> <a href="https://mermaid.ai/app/projects/1729b97a-c0b8-4624-8b6b-b09fe6cadc21/diagrams/deb2fec5-d099-4b1f-8750-fb8d8219a88f/share/invite/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkb2N1bWVudElEIjoiZGViMmZlYzUtZDA5OS00YjFmLTg3NTAtZmI4ZDgyMTlhODhmIiwiYWNjZXNzIjoiVmlldyIsImlhdCI6MTc3MjEyNDIwMX0.4T2hsFQUjbrs3Szjyvvgd_eki7BYTPMTXN0YO8ob7UM" class="external-link" rel="nofollow noreferrer">Link Here</a></p> <p><b>Background</b>: Multiple facilities in a report bundle</p> <ul> <li>Health systems with multiple facilities are sending encounter data for every facility in their health system.</li> <li>Each submission bundle must have data from a single NHSN OrgID.</li> <li>MVP Example: URMC <ul> <li><b>Scenario 1</b> <b>(valid)</b>: Multiple facilities that share a physical address and data from multiple facilities included in the report bundle. <ul> <li>NHSN OrgID 10756 <ul> <li>Strong Memorial Hospital (EAF 101001),</li> <li>Golisano Children's Hospital (EAF 101002), and</li> <li>Strong West (Freestanding ED part of Strong Memorial)(EAF 1011115)</li> </ul> </li> </ul> </li> <li><b>Scenario 2 (issue)</b>: Health systems with multiple NHSN OrgIDs  are included in the report bundle</li> </ul> </li> </ul> </description>
+<environment/>
+<key id="65877">LEGPROG-227</key>
+<summary>Location OrgID Resolution</summary>
+<type id="11250" iconUrl="https://lantana.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/12216?size=medium">Program Feature</type>
+<parent id="136868">LEGPROG-212</parent>
+<priority id="10201" iconUrl="https://lantana.atlassian.net/images/icons/priorities/high.svg">High</priority>
+<status id="3" iconUrl="https://lantana.atlassian.net/images/icons/statuses/inprogress.png" description="This epic is actively being developed/implemented, deployed and tested.">In Progress</status>
+<statusCategory id="4" key="indeterminate" colorName="yellow"/>
+<resolution id="-1">Unresolved</resolution>
+<assignee accountid="712020:51c25bdc-4363-44d3-a62c-4775d05b8a85">durreshahwar.qadir</assignee>
+<reporter accountid="712020:51c25bdc-4363-44d3-a62c-4775d05b8a85">durreshahwar.qadir</reporter>
+<labels>
+<label>PI1</label>
+</labels>
+<created>Thu, 7 Nov 2024 17:09:40 -0800</created>
+<updated>Wed, 17 Jun 2026 13:53:08 -0700</updated>
+<due>Tue, 28 Jul 2026 00:00:00 +0000</due>
+<votes>0</votes>
+<watches>6</watches>
+<comments>
+<comment id="102709" author="712020:51c25bdc-4363-44d3-a62c-4775d05b8a85" created="Fri, 8 Nov 2024 07:11:11 -0800"><p>High priority, pending arch guidance. Heads up <a href="https://lantana.atlassian.net/secure/ViewProfile.jspa?accountId=61f07d8f78b7fd0072e12ffe" class="user-hover" rel="61f07d8f78b7fd0072e12ffe" data-account-id="61f07d8f78b7fd0072e12ffe" accountid="61f07d8f78b7fd0072e12ffe" rel="noreferrer">Artrina Sturges</a> <a href="https://lantana.atlassian.net/secure/ViewProfile.jspa?accountId=712020%3Afd05416a-45de-45ee-96b2-332c66288f82" class="user-hover" rel="712020:fd05416a-45de-45ee-96b2-332c66288f82" data-account-id="712020:fd05416a-45de-45ee-96b2-332c66288f82" accountid="712020:fd05416a-45de-45ee-96b2-332c66288f82" rel="noreferrer">Janet Alonzo</a> </p> <p>Updated per <a href="https://lantana.atlassian.net/secure/ViewProfile.jspa?accountId=6346f5f8b380bb46a091279f" class="user-hover" rel="6346f5f8b380bb46a091279f" data-account-id="6346f5f8b380bb46a091279f" accountid="6346f5f8b380bb46a091279f" rel="noreferrer">Karen Hansen-Rojas</a> </p> <ul class="alternate" type="square"> <li><em>can we make an indication that scenario 1 can occur and is acceptable whereas scenario 2 is occurring and is not acceptable?</em></li> </ul> </comment>
+<comment id="105609" author="712020:51c25bdc-4363-44d3-a62c-4775d05b8a85" created="Thu, 20 Feb 2025 07:27:11 -0800"><p>Per CCB: Hypo sites need ability to see data by June</p> <p>Hypo sites = UMich, UC Davis, Yale, Nebraska, Billings, (HCA TBD)</p> <p>DEPENDENCY: data in medallion tables, A&amp;R built</p></comment>
+<comment id="105824" author="557058:17df23b9-f94c-433d-9222-e21a3cc01573" created="Thu, 27 Feb 2025 09:02:18 -0800"><p>Architecture is responsible for indicating how and when to filter this data (i.e. within Data Acquisition before it leaves DA). Need to determine how to associate NHSN Org Id to each of the locations within the hospital (ie. configuration). Architecture needs to support answering the following questions:</p> <ul> <li>How do we determine if we need to get the location referenced in Location.partOf?</li> <li>When do we need to <em>re-get</em> a Location (if the Location changes)?</li> <li>How do we store the list of Location resources and their association/configuration of their associated NHSN Org Id.</li> </ul> <p><a href="https://lantana.atlassian.net/secure/ViewProfile.jspa?accountId=6239df13d32a94006a6390ef" class="user-hover" rel="6239df13d32a94006a6390ef" data-account-id="6239df13d32a94006a6390ef" accountid="6239df13d32a94006a6390ef" rel="noreferrer">Adam Phillips</a> would you create an architectural ticket to work on these questions/issues?</p> <p><a href="https://lantana.atlassian.net/secure/ViewProfile.jspa?accountId=5c0558e6b203a71cc9cb09f3" class="user-hover" rel="5c0558e6b203a71cc9cb09f3" data-account-id="5c0558e6b203a71cc9cb09f3" accountid="5c0558e6b203a71cc9cb09f3" rel="noreferrer">David deRoode</a> is responsible for indicating <em>what</em> we filter. ie. Exclude Encounter resources that don’t have a location that is associated with the contextual NHSN Org Id. David, can you confirm when (for Epic) we need to traverse to <tt>partOf</tt> location references? Do Encounters directly reference the “facility” Location that would be associated with an NHSN Org ID?</p> <p><a href="https://lantana.atlassian.net/secure/ViewProfile.jspa?accountId=6346f5f8b380bb46a091279f" class="user-hover" rel="6346f5f8b380bb46a091279f" data-account-id="6346f5f8b380bb46a091279f" accountid="6346f5f8b380bb46a091279f" rel="noreferrer">Karen Hansen-Rojas</a> need help figuring out if NHSN App can be updated to include “Location FHIR ID”. Then, maybe we could explore using the DMRP interface to get this information. This should be a phase 2 consideration.</p></comment>
+<comment id="105825" author="5c0558e6b203a71cc9cb09f3" created="Thu, 27 Feb 2025 09:22:17 -0800"><p>I think in all cases when .partOf exists, it should always be used/traversed/referenced. This is true for both Encounter.partOf and Location.partOf. When/where there is a choice (ie. an Encounter instance contains both Encounter.partOf referencing another Encounter AND a Encounter.location) it ultimately <em>should not matter</em> which reference (ie. traversal route) is used, as both routes will ultimately lead to a senior-most Encounter AND a senior-most Location. Note senior-most Encounters will reference multiple Locations, each of which will should in turn be traversed up to the senior-most Location, as this <em>senior-most Location.type.value</em> is where Link should be configurable to filter what (associated) data is reportable to NHSN (for Epic-sourced data). </p></comment>
+<comment id="105828" author="624c66cdf6a2690069607c89" created="Thu, 27 Feb 2025 10:16:04 -0800"><p>Isn’t it possible that the top-level location will be “too far up”? For instance …</p> <ul> <li>Top level: Acme Health System (aggregates data from multiple NHSN OrgIDs)</li> <li>Next level: <ul> <li>Foo Hospital (NHSN OrgID 123)</li> <li>Bar Hospital (NHSN OrgID 456)</li> <li>Baz Hospital (not reportable)</li> </ul> </li> </ul> <p>Don’t we need Link to be able to recognize locations at <em>any</em> point, not just the root, when walking up the <tt>Location.partOf</tt> hierarchical chain?</p></comment>
+<comment id="105831" author="5c0558e6b203a71cc9cb09f3" created="Thu, 27 Feb 2025 11:23:28 -0800"><p>Agreed, it is possible and likely the case that the senior-most Location may be one or two ladder rungs too high (poor word choice on my part, sorry!). I’m envisioning the solution based on something of a a Location map tree, where we GET (maybe persist/maintain for some period?) all Locations with some configurable metadata applied that designates isReportable (to NHSN). Thinking of scenarios of hospitals getting acquired, EHR migrations, surge locations, etc. <em>allowing a user</em> at the Org to visually ‘see’ its Location tree at any given time and select nodes/branches that are to be reported per NHSNOrgID will be key.</p></comment>
+<comment id="105843" author="624c66cdf6a2690069607c89" created="Thu, 27 Feb 2025 12:19:47 -0800"><p>Ah, gotcha. Makes sense. One complication for Epic (and maybe other vendors) will be that we can’t “discover” the location hierarchy via FHIR. Currently, at least, you can’t search for locations:</p> <p><a href="https://fhir.epic.com/Specifications?api=10084" class="external-link" rel="nofollow noreferrer">https://fhir.epic.com/Specifications?api=10084</a></p> <p>Well, technically you can, but you have to supply an <tt>_id</tt>, so it’s effectively a FHIR read.</p></comment>
+<comment id="105850" author="6346f5f8b380bb46a091279f" created="Thu, 27 Feb 2025 13:18:36 -0800"><p>I am not sure I entirely agree that a resource could be at a higher level - where it represents data from more than one NHSN OrgID. Data should be coming from a singular facility - the acquisition can pull more than one facility at a time, but each resource should only be from one facility, and each facility is only tied to one NHSN OrgID, so I am not so sure this would be an issue. </p> <p>Now the issue of not knowing all the locations for a facility nor what their location hierarchy is does need to be addressed. We also need to figure out how to account for locations that are not mapped to HSLOC codes as I can definitely say that most facilities are not mapping every unit location to an HSLOC code.</p></comment>
+<comment id="105853" author="5c0558e6b203a71cc9cb09f3" created="Thu, 27 Feb 2025 15:01:05 -0800"><p>The scenario I had in mind of a higher level would be if there is a Location instance representing the over-arching health system, such as University of Michigan Health or U. of Nebraska Medical System (i.e. encompassing multiple facilities/Locations, some of which are tied to an NHSNOrg ID, other which are not). </p></comment>
+<comment id="105976" author="557058:17df23b9-f94c-433d-9222-e21a3cc01573" created="Tue, 4 Mar 2025 08:59:16 -0800"><p>This Epic needs to be implemented by June, but maybe earlier if we want them to do some pre-validation on their data in the gold tables via NHSN App earlier than June.</p> <p>URMC gave us a spreadsheet of their locations, with HSLOC mapping. All records in the spreadsheet represent locations for the NHSN ORG ID that we should be reporting on. </p> <p>The logic we need to implement here is essentially: Only process resources that can be associated with a Location resource that is found on the spreadsheet.</p></comment>
+<comment id="119068" author="5c0558e6b203a71cc9cb09f3" created="Thu, 13 Mar 2025 11:59:03 -0700"><p>See Column F in <a href="https://lantanagroup.sharepoint.com/:x:/s/projects/client/CDC_GSA_NHSN_ATS_Support_BY/EfXc1TeLp8NGrb32E8F-q-4Blf2JibfIWNH9XaN18r2iCw?e=qjvDML" class="external-link" rel="nofollow noreferrer">‘encounter_location_analysis_epic.xslx’.</a> Only FHIR data <em>associated with</em> Location instances marked with 'Y' in column F should be submitted to NHSN for CoLab testing purposes. Blank values and anything other than 'Y' should not be submitted at that time. Note codes in column D are found in Location.type in raw FHIR data <em>for Epic</em>. </p></comment>
+<comment id="119075" author="6346f5f8b380bb46a091279f" created="Thu, 13 Mar 2025 15:02:13 -0700"><p><a href="https://lantana.atlassian.net/secure/ViewProfile.jspa?accountId=5c0558e6b203a71cc9cb09f3" class="user-hover" rel="5c0558e6b203a71cc9cb09f3" data-account-id="5c0558e6b203a71cc9cb09f3" accountid="5c0558e6b203a71cc9cb09f3" rel="noreferrer">David deRoode</a> et al., I reviewed the spreadsheet and I have a few concerns about the designations in column F. I know they are derived from the Facility ID, but many of those locations appear to be clinics, labs, or centers that do not care for inpatients (i.e. they are not acute care facilities). I realize that any patients from those locations will likely get filtered out by the IP criteria during evaluation, but it seems like we should not be sending ACH data that is meant to represent the acute care facilities reporting under the NHSN OrgID from non-acute care facilities. </p> <p><a href="https://lantana.atlassian.net/secure/ViewProfile.jspa?accountId=557058%3A17df23b9-f94c-433d-9222-e21a3cc01573" class="user-hover" rel="557058:17df23b9-f94c-433d-9222-e21a3cc01573" data-account-id="557058:17df23b9-f94c-433d-9222-e21a3cc01573" accountid="557058:17df23b9-f94c-433d-9222-e21a3cc01573" rel="noreferrer">Sean McIlvenna</a> - feedback on your comment from March 4th. Since the Initial Population criteria allows for a patient to meet based on encounter type or class OR location, I fear that if we filter to just the locations that are mapped for NHSN purposes, we risk filtering out patients that meet the IP criteria but maybe weren't in a reportable location within the hospital.</p></comment>
+<comment id="119079" author="5c0558e6b203a71cc9cb09f3" created="Fri, 14 Mar 2025 06:14:43 -0700"><p><a href="https://lantana.atlassian.net/secure/ViewProfile.jspa?accountId=6346f5f8b380bb46a091279f" class="user-hover" rel="6346f5f8b380bb46a091279f" data-account-id="6346f5f8b380bb46a091279f" accountid="6346f5f8b380bb46a091279f" rel="noreferrer">Karen Hansen-Rojas</a> the spreadsheet, specifically column F is intended to demonstrate feasibility; the values currently populated in it will need to be reviewed and updated for accuracy by those knowledgeable for a given CoLab, and eventually/ultimately (maybe?) possibly by someone at a hospital, through the UI during onboarding. I am largely unfamiliar with each CoLab and which of tue Locations are intended to be reportable for CoLab testing purposes; I essentially guessed with some help/answers on some specific rows from you and Shanai. </p> <p>Do you have concerns about the feasibility of the solution <em>design</em> of flagging each FHIR Location instance as reportable at a given point in time using a spreadsheet column?</p></comment>
+<comment id="119090" author="6346f5f8b380bb46a091279f" created="Fri, 14 Mar 2025 10:09:49 -0700"><p><a href="https://lantana.atlassian.net/secure/ViewProfile.jspa?accountId=5c0558e6b203a71cc9cb09f3" class="user-hover" rel="5c0558e6b203a71cc9cb09f3" data-account-id="5c0558e6b203a71cc9cb09f3" accountid="5c0558e6b203a71cc9cb09f3" rel="noreferrer">David deRoode</a> - Theoretically, no, I do not see an issue with solution design, but worry about the LOE to derive and maintain the mappings/flags.</p></comment>
+<comment id="119105" author="5c0558e6b203a71cc9cb09f3" created="Fri, 14 Mar 2025 13:29:25 -0700"><p>Agreed these are risks. Any ideas for how we could address/mitigate? <a href="https://lantana.atlassian.net/secure/ViewProfile.jspa?accountId=6346f5f8b380bb46a091279f" class="user-hover" rel="6346f5f8b380bb46a091279f" data-account-id="6346f5f8b380bb46a091279f" accountid="6346f5f8b380bb46a091279f" rel="noreferrer">Karen Hansen-Rojas</a> </p></comment>
+<comment id="119112" author="557058:17df23b9-f94c-433d-9222-e21a3cc01573" created="Fri, 14 Mar 2025 14:07:48 -0700"><blockquote><p>feedback on your comment from March 4th. Since the Initial Population criteria allows for a patient to meet based on encounter type or class OR location, I fear that if we filter to just the locations that are mapped for NHSN purposes, we risk filtering out patients that meet the IP criteria but maybe weren't in a reportable location within the hospital.</p></blockquote> <p><a href="https://lantana.atlassian.net/secure/ViewProfile.jspa?accountId=6346f5f8b380bb46a091279f" class="user-hover" rel="6346f5f8b380bb46a091279f" data-account-id="6346f5f8b380bb46a091279f" accountid="6346f5f8b380bb46a091279f" rel="noreferrer">Karen Hansen-Rojas</a> , yes, that’s a possibility. I think we need to <em>test</em> the implemented functionality to confirm if (or how much) it is an issue.</p></comment>
+<comment id="119535" author="712020:51c25bdc-4363-44d3-a62c-4775d05b8a85" created="Thu, 27 Mar 2025 06:13:58 -0700"><p>Updated priority to medium per discussion below.</p> <p>Per 3/26 “<b>Medallion Table &amp; Facility Identifiers Discussion</b>” meeting, </p> <ul> <li>Nadine indicated this (submission per NHSN Org ID) is not a requirement for colabs. It is acceptable to have more data to inform how we operate in the future (i.e. for early adopters). Further, this approach will be managed in communication with colabs.</li> <li>This is a requirement for early adopters.</li> <li>NHSN bed capacity project had a similar issue that was solved for - unsure on who is tracking this down, follow up needed.</li> </ul> </comment>
+<comment id="119555" author="6346f5f8b380bb46a091279f" created="Thu, 27 Mar 2025 10:08:01 -0700"><p><a href="https://lantana.atlassian.net/secure/ViewProfile.jspa?accountId=712020%3A51c25bdc-4363-44d3-a62c-4775d05b8a85" class="user-hover" rel="712020:51c25bdc-4363-44d3-a62c-4775d05b8a85" data-account-id="712020:51c25bdc-4363-44d3-a62c-4775d05b8a85" accountid="712020:51c25bdc-4363-44d3-a62c-4775d05b8a85" rel="noreferrer">durreshahwar.qadir</a> - I know that Nadine said this was not needed for CoLabs, but I want to challenge the downgrading of the priority. This is still a fundamental requirement. It may not be a showstopper for CoLabs for June, but it will impact the validation process for them and will have subsequent downstream impacts. I consider this to still be a high priority and acknowledging that it may require collaboration with the NHSN side for a complete solution, I think the sooner we tackle this, the better. </p></comment>
+<comment id="119585" author="712020:51c25bdc-4363-44d3-a62c-4775d05b8a85" created="Fri, 28 Mar 2025 05:55:21 -0700"><p>Agreed. I updated after you and I chatted during the meeting. Just keeping in alignment with our prioritization for colabs vs. early adopters. Stack rank hasn’t changed - so it won’t impact when it gets done unless any new roadblocks for colabs are identified.</p></comment>
+<comment id="126119" author="61f07d8f78b7fd0072e12ffe" created="Thu, 25 Sep 2025 12:52:28 -0700"> <p>09/25/25 - Grooming Notes Summary</p> <p><b>OVERVIEW</b></p> <p>Daniel presented a comprehensive proposal to the team detailing solutions for org ID and HSLOC location mapping challenges with a walkthrough of technical approaches for Epic and Cerner systems and implications for data acquisition and reporting.</p> <ul> <li><b>Org ID Mapping Challenges:</b> Daniel explained that many FHIR endpoints provided by facilities represent entire health systems rather than individual hospitals, leading to the acquisition of resources not relevant to the intended facility. The proposal aims to ensure only data for the reporting facility is retained, with non-matching resources expunged early in the workflow.</li> <li><b>Technical Approach for Epic and Cerner:</b> For Epic, the team will traverse the location tree using 'partOf' references to identify the facility node, relying on specific codes in location.identifier. For Cerner, parent facility records are more reliably identified via code sets and display names, and the managing organization field may allow direct identification without traversal.</li> <li><b>HSLOC Mapping and NHSN App Integration:</b> Current HSLOC mappings use concept maps applied to location resources, but Daniel suggested enhancing the NHSN app's locations page to include FHIR identifiers for easier mapping. This is a long-term consideration and not part of the immediate work.</li> <li><b>Workflow and Data Model Changes:</b> The workflow involves querying encounters, checking location mappings, and removing patients/resources not associated with the reporting facility. Daniel proposed maintaining tables to cache location-facility relationships and encounter statuses to optimize performance and ensure supplemental data is correctly filtered.</li> <li><b>API and Measure Evaluation Implications:</b> New REST APIs are proposed for configuration changes, and Daniel clarified that measure evaluation should not require significant changes since location traversals and mappings are completed before evaluation. QA is currently verifying code map operations for both Epic and Cerner.</li> <li><b>Feedback Mechanisms:</b> The team explored commenting directly in GitHub, using commit history, or creating issues and pull requests for feedback. Karen suggested associating questions with existing Jira epics, and Daniel confirmed that separate epics exist for org ID and HSLOC mappings, with 3168 covering org ID.</li> </ul> </comment>
+</comments>
+<issuelinks>
+<issuelinktype id="10400">
+<name>Blocks</name>
+<outwardlinks description="blocks">
+<issuelink>
+<issuekey id="133172">LEGLINK-117</issuekey>
+</issuelink>
+<issuelink>
+<issuekey id="72685">IMPS-866</issuekey>
+</issuelink>
+</outwardlinks>
+</issuelinktype>
+<issuelinktype id="10240">
+<name>Cloners</name>
+<outwardlinks description="Cloned to">
+<issuelink>
+<issuekey id="133714">LEGPROG-181</issuekey>
+</issuelink>
+</outwardlinks>
+</issuelinktype>
+<issuelinktype id="10402">
+<name>Polaris work item link</name>
+<outwardlinks description="implements">
+<issuelink>
+<issuekey id="73744">LNK-4057</issuekey>
+</issuelink>
+<issuelink>
+<issuekey id="137842">LEGPROG-272</issuekey>
+</issuelink>
+</outwardlinks>
+</issuelinktype>
+<issuelinktype id="10406">
+<name>Relates</name>
+<outwardlinks description="relates to">
+<issuelink>
+<issuekey id="75059">LNK-4272</issuekey>
+</issuelink>
+<issuelink>
+<issuekey id="137861">LEGPROG-318</issuekey>
+</issuelink>
+</outwardlinks>
+</issuelinktype>
+</issuelinks>
+<attachments>
+<attachment id="45895" name="SMH Location Mapping.xlsx" size="22577" author="6346f5f8b380bb46a091279f" created="Wed, 5 Mar 2025 07:36:33 -0800"/>
+<attachment id="45896" name="HCA_NHSN_Summit_Locations_FHIR_Crosswalk.xlsx" size="19827" author="6346f5f8b380bb46a091279f" created="Wed, 5 Mar 2025 07:36:39 -0800"/>
+<attachment id="68107" name="LINK_3168 _QA tickets Status.xlsx" size="12281" author="ug:1c4dc2de-7601-45be-865f-4fd058a675ae" created="Tue, 24 Mar 2026 10:22:16 -0700"/>
+</attachments>
+<subtasks> </subtasks>
+<customfields>
+<customfield id="customfield_14512" key="com.atlassian.jira.plugin.system.customfieldtypes:textarea">
+<customfieldname>Acceptance Criteria</customfieldname>
+<customfieldvalues>
+<customfieldvalue><ul> <li>Data is persisted for the configured NHSN OrgID(s) only</li> <li>Reports are created for the configured NHSN OrgID(s) only</li> <li>Reports are submitted to the NHSN data pipeline for the configured NHSN OrgID(s) only</li> <li>Each report contains data associated with the configured NHSN OrgID(s)</li> </ul> </customfieldvalue>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_14214" key="com.atlassian.servicedesk.approvals-plugin:sd-approvals">
+<customfieldname>Approvals</customfieldname>
+<customfieldvalues> </customfieldvalues>
+</customfield>
+<customfield id="customfield_10080" key="com.atlassian.jira.plugin.system.customfieldtypes:select">
+<customfieldname>Complexity</customfieldname>
+<customfieldvalues>
+<customfieldvalue key="10092">
+<![CDATA[ Large ]]>
+</customfieldvalue>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_14200" key="com.atlassian.jira.plugins.jira-development-integration-plugin:devsummarycf">
+<customfieldname>Development</customfieldname>
+<customfieldvalues> </customfieldvalues>
+</customfield>
+<customfield id="customfield_14760" key="com.atlassian.jira.plugin.system.customfieldtypes:textarea">
+<customfieldname>Development Plan</customfieldname>
+<customfieldvalues>
+<customfieldvalue><ul> <li>If FHIR endpoints cannot filter by OrgID directly, NHSNLink MUST filter Encounter resources post-query to retain only those matching the intended OrgID.</li> <li>All secondary resources (e.g., Condition, MedicationRequest) MUST be filtered based on the valid subset of Encounters after applying OrgID-based filtering.</li> <li>NHSNLink MUST support a location-to-OrgID mapping layer to enforce correct inclusion based on facility location metadata.</li> <li>Leverage normalization logic to aid in mapping FHIR location references to NHSN OrgIDs.</li> <li>NHSNLink MUST allow facility-level configuration during onboarding or integration to define desired OrgID scope for query execution.</li> <li>NHSNLink should support parameterization in CQL logic to respect OrgID-specific filtering rules; pass the NHSN Org ID to CQL as an additional parameter.</li> <li>If multiple OrgIDs are detected in a single bundle, system MUST log an error and reject the bundle generation.</li> <li>A single tenant supports configuration, mapping and segregated submission for multiple NHSN Org IDs.</li> </ul> </customfieldvalue>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_14620" key="com.atlassian.jira.plugin.system.customfieldtypes:goals">
+<customfieldname>Goals</customfieldname>
+<customfieldvalues> </customfieldvalues>
+</customfield>
+<customfield id="customfield_14507" key="com.pyxis.greenhopper.jira:jsw-issue-color">
+<customfieldname>Issue color</customfieldname>
+<customfieldvalues>
+<customfieldvalue>purple</customfieldvalue>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_14744" key="com.atlassian.servicedesk:sd-sla-field">
+<customfieldname>Order placed</customfieldname>
+<customfieldvalues> </customfieldvalues>
+</customfield>
+<customfield id="customfield_14201" key="com.atlassian.servicedesk:sd-customer-organizations">
+<customfieldname>Organizations</customfieldname>
+<customfieldvalues> </customfieldvalues>
+</customfield>
+<customfield id="customfield_14212" key="com.atlassian.jpo:jpo-custom-field-parent">
+<customfieldname>Parent Link</customfieldname>
+<customfieldvalues>
+<customfieldvalue>
+<![CDATA[ LEGPROG-212 ]]>
+</customfieldvalue>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_11050" key="com.atlassian.jira.toolkit:participants">
+<customfieldname>Participants</customfieldname>
+<customfieldvalues>
+<customfieldvalue>ug:0ab0a46d-f05a-43ba-a425-5c7d40eaf00c</customfieldvalue>
+<customfieldvalue>david.deroode</customfieldvalue>
+<customfieldvalue>712020:51c25bdc-4363-44d3-a62c-4775d05b8a85</customfieldvalue>
+<customfieldvalue>6346f5f8b380bb46a091279f</customfieldvalue>
+<customfieldvalue>sean.mcilvenna</customfieldvalue>
+<customfieldvalue>ug:087715d5-a30a-4695-b589-70759fe34b91</customfieldvalue>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_15724" key="com.atlassian.forge:ari:cloud:ecosystem::extension/cd9306ed-6755-4c70-86c9-920973122fda/0fb63637-06ca-4fac-96f7-34b4da5e55bb/static/program">
+<customfieldname>Program</customfieldname>
+<customfieldvalues>
+<label>LEGEND Program</label>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_15725" key="com.atlassian.forge:ari:cloud:ecosystem::extension/cd9306ed-6755-4c70-86c9-920973122fda/0fb63637-06ca-4fac-96f7-34b4da5e55bb/static/program-increment">
+<customfieldname>Program Increment</customfieldname>
+<customfieldvalues>
+<label>PI 1</label>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_13550" key="com.pyxis.greenhopper.jira:gh-lexo-rank">
+<customfieldname>Rank</customfieldname>
+<customfieldvalues>
+<customfieldvalue>1|hzzmof:0v1dr</customfieldvalue>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_14505" key="com.atlassian.servicedesk:sd-request-participants">
+<customfieldname>Request participants</customfieldname>
+<customfieldvalues> </customfieldvalues>
+</customfield>
+<customfield id="customfield_14597" key="com.atlassian.jira.plugin.system.customfieldtypes:select">
+<customfieldname>Requires Test Script</customfieldname>
+<customfieldvalues>
+<customfieldvalue key="12222">
+<![CDATA[ No ]]>
+</customfieldvalue>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_12350" key="com.pyxis.greenhopper.jira:gh-sprint">
+<customfieldname>Sprint</customfieldname>
+<customfieldvalues> </customfieldvalues>
+</customfield>
+<customfield id="customfield_14503" key="com.atlassian.jira.plugin.system.customfieldtypes:datepicker">
+<customfieldname>Start date</customfieldname>
+<customfieldvalues>
+<customfieldvalue>Wed, 7 Jan 2026 00:00:00 +0000</customfieldvalue>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_15991" key="com.atlassian.jira.plugin.system.customfieldtypes:select">
+<customfieldname>Task mode</customfieldname>
+<customfieldvalues>
+<customfieldvalue key="13522">
+<![CDATA[ Auto basic ]]>
+</customfieldvalue>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_14213" key="com.atlassian.jira.plugin.system.customfieldtypes:atlassian-team">
+<customfieldname>Team</customfieldname>
+<customfieldvalues>
+<customfieldvalue id="f43167c9-f2df-499e-920a-e3325034d7ab">LEGEND NHSNLink Team</customfieldvalue>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_14585" key="com.atlassian.servicedesk:sd-sla-field">
+<customfieldname>Time to close after resolution</customfieldname>
+<customfieldvalues> </customfieldvalues>
+</customfield>
+<customfield id="customfield_14584" key="com.atlassian.servicedesk:sd-sla-field">
+<customfieldname>Time to first response</customfieldname>
+<customfieldvalues> </customfieldvalues>
+</customfield>
+<customfield id="customfield_14583" key="com.atlassian.servicedesk:sd-sla-field">
+<customfieldname>Time to resolution</customfieldname>
+<customfieldvalues> </customfieldvalues>
+</customfield>
+<customfield id="customfield_14586" key="com.atlassian.servicedesk:sd-sla-field">
+<customfieldname>Time to review normal change</customfieldname>
+<customfieldvalues> </customfieldvalues>
+</customfield>
+<customfield id="customfield_14501" key="com.atlassian.jira.ext.charting:firstresponsedate">
+<customfieldname>[CHART] Date of First Response</customfieldname>
+<customfieldvalues>
+<customfieldvalue>Thu, 27 Feb 2025 17:02:18 +0000</customfieldvalue>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_14714" key="com.atlassian.jira.ext.charting:firstresponsedate">
+<customfieldname>[CHART] Date of First Response (migrated)</customfieldname>
+<customfieldvalues>
+<customfieldvalue>Thu, 27 Feb 2025 17:02:18 +0000</customfieldvalue>
+</customfieldvalues>
+</customfield>
+<customfield id="customfield_14618" key="com.atlassian.jira.toolkit:dayslastcommented">
+<customfieldname>commentLastUpdated</customfieldname>
+<customfieldvalues> 40 weeks, 4 days ago </customfieldvalues>
+</customfield>
+</customfields>
+</item>
+</channel>
+</rss>

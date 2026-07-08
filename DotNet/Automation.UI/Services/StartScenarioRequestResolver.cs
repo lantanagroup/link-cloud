@@ -14,6 +14,10 @@ namespace Automation.UI.Services;
 /// </summary>
 public static class StartScenarioRequestResolver
 {
+    private const string AdhocReportTestNhsnOrganizationId = "10756";
+    private const string MultiPatientTestNhsnOrganizationId = "10758";
+    private const string MegaPatientTestNhsnOrganizationId = "10759";
+
     /// <summary>
     /// Resolves the run options for a request. For non-Custom scenarios the static
     /// scenario-kind defaults win outright; Custom merges request overrides on top
@@ -25,10 +29,22 @@ public static class StartScenarioRequestResolver
         var defaultMeasures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
         var defaults = request.Scenario switch
         {
-            AutomationScenarioKind.AdhocReportTest => new ResolvedRunOptions(1, 1000, 20260326, 3, 0, 30, false, true, defaultMeasures, [], []),
-            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, 20260328, 3, 0, 30, false, true, defaultMeasures, [], []),
-            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, 20260327, 3, 0, 30, false, true, defaultMeasures, [], []),
-            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, 0, 30, false, true, defaultMeasures, [], []),
+            AutomationScenarioKind.AdhocReportTest => new ResolvedRunOptions(1, 1000, 20260326, 3, 0, 30, false, true, defaultMeasures, [], [])
+            {
+                NhsnOrganizationId = AdhocReportTestNhsnOrganizationId
+            },
+            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, 20260328, 3, 0, 30, false, true, defaultMeasures, [], [])
+            {
+                NhsnOrganizationId = MultiPatientTestNhsnOrganizationId
+            },
+            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, 20260327, 3, 0, 30, false, true, defaultMeasures, [], [])
+            {
+                NhsnOrganizationId = MegaPatientTestNhsnOrganizationId
+            },
+            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, 0, 30, false, true, defaultMeasures, [], [])
+            {
+                NhsnOrganizationId = GenerateRandomNhsnOrganizationId()
+            },
             _ => throw new ArgumentOutOfRangeException(nameof(request.Scenario), request.Scenario, null)
         };
 
@@ -65,6 +81,7 @@ public static class StartScenarioRequestResolver
               ?? [];
 
         var (reportStart, reportEnd) = ResolveReportPeriod(request);
+        var nhsnOrganizationId = ResolveNhsnOrganizationId(request, defaults.NhsnOrganizationId);
 
         return defaults with
         {
@@ -72,7 +89,9 @@ public static class StartScenarioRequestResolver
             ResourcesPerPatient = request.ResourcesPerPatient ?? defaults.ResourcesPerPatient,
             Seed = request.Seed ?? defaults.Seed,
             PollingIntervalSeconds = 3,
-            MaxPollingDurationMinutes = 0,
+            // Keep an explicit hard timeout for custom runs so scheduled workflows
+            // fail-fast when end-of-period orchestration does not advance.
+            MaxPollingDurationMinutes = defaults.MaxPollingDurationMinutes,
             LokiScrapeWindowMinutes = 30,
             CleanupServiceData = request.CleanupServiceData ?? defaults.CleanupServiceData,
             CleanupFhirData = request.CleanupFhirData ?? defaults.CleanupFhirData,
@@ -84,8 +103,41 @@ public static class StartScenarioRequestResolver
             ImportedPatientIds = importedIds,
             ImportedPatientBundles = importedBundles,
             ReportPeriodStart = reportStart,
-            ReportPeriodEnd = reportEnd
+            ReportPeriodEnd = reportEnd,
+            NhsnOrganizationId = nhsnOrganizationId
         };
+    }
+
+    private static string ResolveNhsnOrganizationId(StartScenarioRequest request, string defaultValue)
+    {
+        if (!string.IsNullOrWhiteSpace(request.NhsnOrganizationId))
+            return request.NhsnOrganizationId.Trim();
+
+        if (!string.IsNullOrWhiteSpace(request.RunConfigurationJson))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(request.RunConfigurationJson);
+                if (doc.RootElement.TryGetProperty("nhsnOrganizationId", out var org)
+                    && org.ValueKind == JsonValueKind.String)
+                {
+                    var value = org.GetString();
+                    if (!string.IsNullOrWhiteSpace(value))
+                        return value.Trim();
+                }
+            }
+            catch
+            {
+                // Fall through to default.
+            }
+        }
+
+        return defaultValue;
+    }
+
+    private static string GenerateRandomNhsnOrganizationId()
+    {
+        return Random.Shared.Next(10000, 100000).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     /// <summary>
@@ -239,13 +291,29 @@ public static class StartScenarioRequestResolver
                     }
                 }
 
+                ScheduledInpatientPattern? scheduledPattern = null;
+                if (item.TryGetProperty("scheduledInpatientPattern", out var spEl))
+                {
+                    if (spEl.ValueKind == JsonValueKind.String
+                        && Enum.TryParse<ScheduledInpatientPattern>(spEl.GetString(), ignoreCase: true, out var parsedPattern))
+                    {
+                        scheduledPattern = parsedPattern;
+                    }
+                    else if (spEl.ValueKind == JsonValueKind.Number
+                             && Enum.IsDefined(typeof(ScheduledInpatientPattern), spEl.GetInt32()))
+                    {
+                        scheduledPattern = (ScheduledInpatientPattern)spEl.GetInt32();
+                    }
+                }
+
                 cohorts.Add(new PatientCohortDefinition
                 {
                     PatientCount = count,
                     MeasureEligibilities = eligibilities,
                     EligibleClinicalScenarioIds = scenarioIds,
                     ResourcesPerPatientMin = min,
-                    ResourcesPerPatientMax = max
+                    ResourcesPerPatientMax = max,
+                    ScheduledInpatientPattern = scheduledPattern
                 });
             }
 
