@@ -103,6 +103,16 @@ public sealed class GenerationManifest
         = new Dictionary<string, int>(StringComparer.Ordinal);
 
     /// <summary>
+    /// When true, predict one additional <c>Organization</c> resource per submitted patient
+    /// artifact in ABS to account for Report's <c>PatientAggregator:IncludeOrganizationResource</c>
+    /// behavior.
+    ///
+    /// This is count-level only: the organization ID is assigned by downstream services and
+    /// is not represented in key-level expectations.
+    /// </summary>
+    public bool IncludePatientAggregatorOrganizationResource { get; set; }
+
+    /// <summary>
     /// Optional explicit ABS scope: when populated, only these patients are expected
     /// to produce patient-{id}.ndjson artifacts.
     ///
@@ -325,6 +335,13 @@ public sealed class GenerationManifest
             && ooCount > 0)
         {
             counts["OperationOutcome"] = ooCount;
+        }
+
+        if (IncludePatientAggregatorOrganizationResource)
+        {
+            counts["Organization"] = counts.TryGetValue("Organization", out var orgCount)
+                ? orgCount + 1
+                : 1;
         }
     }
 
