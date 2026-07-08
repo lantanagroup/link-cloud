@@ -23,6 +23,52 @@
   color: rgba(0, 0, 0, 0.54);
 }
 
+// Prominent banner shown when the underlying mapping is inactive — the common reason a
+// referencing encounter fails to map to the organization.
+.location-inactive-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.75em 1em;
+  margin-bottom: 1em;
+  border-radius: 4px;
+  color: #8a5a00;
+  background-color: #fff4e5;
+
+  mat-icon {
+    flex-shrink: 0;
+  }
+}
+
+// Primary-key value with a compact copy button, matching the list tables.
+.id-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+
+  .id-value {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .copy-button {
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+    opacity: 0.6;
+
+    &:hover,
+    &:focus {
+      opacity: 1;
+    }
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+  }
+}
+
 // Two-column definition list: label on the left, value on the right.
 .location-details {
   display: grid;

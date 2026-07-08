@@ -4,7 +4,10 @@ import {MAT_DIALOG_DATA, MatDialogModule} from '@angular/material/dialog';
 import {MatButtonModule} from '@angular/material/button';
 import {MatIconModule} from '@angular/material/icon';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
+import {MatTooltipModule} from '@angular/material/tooltip';
+import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {DataAcquisitionService} from '../../../../services/gateway/data-acquisition/data-acquisition.service';
+import {SnackbarHelper} from '../../../../services/snackbar-helper';
 import {IOrganizationLocationMappingModel} from '../../../../interfaces/data-acquisition/organization-location-mapping-model.interface';
 
 export interface LocationDetailsDialogData {
@@ -19,7 +22,9 @@ export interface LocationDetailsDialogData {
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatTooltipModule,
+    MatSnackBarModule
   ],
   templateUrl: './location-details-dialog.component.html',
   styleUrl: './location-details-dialog.component.scss'
@@ -32,8 +37,16 @@ export class LocationDetailsDialogComponent implements OnInit {
 
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: LocationDetailsDialogData,
-    private dataAcquisitionService: DataAcquisitionService
+    private dataAcquisitionService: DataAcquisitionService,
+    private snackBar: MatSnackBar
   ) {}
+
+  // Copies a value (e.g. the locationMappingId DB key) to the clipboard for log/DB lookups.
+  copyToClipboard(value: string | number, label: string = 'Value'): void {
+    navigator.clipboard.writeText(String(value))
+      .then(() => SnackbarHelper.showSuccessMessage(this.snackBar, `${label} copied to clipboard.`))
+      .catch(() => SnackbarHelper.showErrorMessage(this.snackBar, 'Unable to copy to clipboard.'));
+  }
 
   ngOnInit(): void {
     this.isLoading = true;

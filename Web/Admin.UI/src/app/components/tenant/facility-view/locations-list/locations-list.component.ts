@@ -10,9 +10,12 @@ import {MatButtonModule} from '@angular/material/button';
 import {MatIconModule} from '@angular/material/icon';
 import {MatCheckboxModule} from '@angular/material/checkbox';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
+import {MatTooltipModule} from '@angular/material/tooltip';
+import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {Subject, Subscription} from 'rxjs';
 import {debounceTime} from 'rxjs/operators';
 import {DataAcquisitionService} from '../../../../services/gateway/data-acquisition/data-acquisition.service';
+import {SnackbarHelper} from '../../../../services/snackbar-helper';
 import {PaginationMetadata} from '../../../../models/pagination-metadata.model';
 import {IOrganizationLocationMappingModel} from '../../../../interfaces/data-acquisition/organization-location-mapping-model.interface';
 
@@ -32,7 +35,9 @@ type TriStateFilter = '' | 'true' | 'false';
     MatButtonModule,
     MatIconModule,
     MatCheckboxModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatTooltipModule,
+    MatSnackBarModule
   ],
   templateUrl: './locations-list.component.html',
   styleUrl: './locations-list.component.scss'
@@ -41,7 +46,9 @@ export class LocationsListComponent implements OnInit, OnDestroy {
 
   @Input() facilityId: string = '';
 
-  displayedColumns = ['locationId', 'locationName', 'locationAlias', 'partOfValue', 'partOfId', 'isOrgLocation', 'isActive'];
+  // locationMappingId (the DB primary key) leads as a copyable debugging aid for cross-referencing
+  // backend logs; modifiedDate trails for "when did this change" investigations.
+  displayedColumns = ['locationMappingId', 'locationId', 'locationName', 'locationAlias', 'partOfValue', 'partOfId', 'isOrgLocation', 'isActive', 'createDate', 'modifiedDate'];
   dataSource = new MatTableDataSource<IOrganizationLocationMappingModel>([]);
   paginationMetadata: PaginationMetadata = Object.assign(new PaginationMetadata(), {
     pageSize: 10,
@@ -65,7 +72,10 @@ export class LocationsListComponent implements OnInit, OnDestroy {
   private textFilterSubject = new Subject<void>();
   private textFilterSubscription?: Subscription;
 
-  constructor(private dataAcquisitionService: DataAcquisitionService) {}
+  constructor(
+    private dataAcquisitionService: DataAcquisitionService,
+    private snackBar: MatSnackBar
+  ) {}
 
   ngOnInit(): void {
     // Debounce free-text typing so we don't fire a request per keystroke.
@@ -148,6 +158,14 @@ export class LocationsListComponent implements OnInit, OnDestroy {
       || !!this.partOfValueFilter
       || this.isOrgLocationFilter !== ''
       || this.showInactive;
+  }
+
+  // Copies a value (e.g. the locationMappingId DB key) to the clipboard so it can be pasted
+  // into a log search or DB query. Confirms via the shared snackbar.
+  copyToClipboard(value: string | number, label: string = 'Value'): void {
+    navigator.clipboard.writeText(String(value))
+      .then(() => SnackbarHelper.showSuccessMessage(this.snackBar, `${label} copied to clipboard.`))
+      .catch(() => SnackbarHelper.showErrorMessage(this.snackBar, 'Unable to copy to clipboard.'));
   }
 
   private toBool(value: TriStateFilter): boolean | undefined {

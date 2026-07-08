@@ -78,3 +78,32 @@
   padding: 2em 0;
   color: rgba(0, 0, 0, 0.54);
 }
+
+// Primary-key cell: the id value plus a compact copy button for cross-referencing logs/DB.
+.id-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+
+  .id-value {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .copy-button {
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+    opacity: 0.6;
+
+    &:hover,
+    &:focus {
+      opacity: 1;
+    }
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+  }
+}
