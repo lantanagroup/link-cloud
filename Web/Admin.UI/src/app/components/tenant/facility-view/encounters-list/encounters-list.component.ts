@@ -75,8 +75,12 @@ export class EncountersListComponent implements OnInit, OnDestroy {
 
   // Maps sortable UI column names to the API field names the backend allows.
   private readonly sortFieldMap: { [key: string]: string } = {
+    encounterMappingId: 'EncounterMappingId',
     encounterId: 'EncounterId',
-    patientId: 'PatientId'
+    patientId: 'PatientId',
+    mappedToOrg: 'MappedToOrg',
+    createDate: 'CreateDate',
+    modifiedDate: 'ModifiedDate'
   };
 
   isLoading = false;
