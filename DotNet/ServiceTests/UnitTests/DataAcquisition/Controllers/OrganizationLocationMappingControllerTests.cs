@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Managers;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Models;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
@@ -150,7 +151,7 @@ public class OrganizationLocationMappingControllerTests
             new List<OrganizationLocationMappingModel> { new() { LocationMappingId = 1, FacilityId = FacilityId, LocationId = LocationId } },
             new PaginationMetadata(1, 10, 1));
         mocker.GetMock<IOrganizationLocationMappingQueries>()
-            .Setup(q => q.SearchAsync(It.IsAny<OrganizationLocationMappingSearchModel>(), It.IsAny<int>(), It.IsAny<int>()))
+            .Setup(q => q.SearchAsync(It.IsAny<OrganizationLocationMappingSearchModel>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<SortOrder?>()))
             .ReturnsAsync(paged);
 
         var controller = mocker.CreateInstance<OrganizationLocationMappingController>();
@@ -179,7 +180,7 @@ public class OrganizationLocationMappingControllerTests
     {
         var mocker = new AutoMocker();
         mocker.GetMock<IOrganizationLocationMappingQueries>()
-            .Setup(q => q.SearchAsync(It.IsAny<OrganizationLocationMappingSearchModel>(), It.IsAny<int>(), It.IsAny<int>()))
+            .Setup(q => q.SearchAsync(It.IsAny<OrganizationLocationMappingSearchModel>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<SortOrder?>()))
             .ThrowsAsync(new Exception("boom"));
 
         var controller = mocker.CreateInstance<OrganizationLocationMappingController>();
