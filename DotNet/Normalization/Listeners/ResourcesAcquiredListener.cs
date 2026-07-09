@@ -44,6 +44,7 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly CodeMapOperationService _codeMapOperationService;
     private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
     private readonly CopyLocationOperationService _copyLocationOperationService;
+    private readonly CopyLocationAliasToTypeIterativelyOperationService _copyLocationAliasToTypeIterativelyOperationService;
     private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
     private readonly IResourceCache _resourceCache;
 
@@ -61,6 +62,7 @@ public class ResourcesAcquiredListener : BackgroundService
         CodeMapOperationService codeMapOperationService,
         ConditionalTransformOperationService conditionalTransformOperationService,
         CopyLocationOperationService copyLocationOperationService,
+        CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService,
         RemoveExtensionsOperationService removeExtensionsOperationService,
         IResourceCache resourceCache)
     {
@@ -86,6 +88,7 @@ public class ResourcesAcquiredListener : BackgroundService
         _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
         _conditionalTransformOperationService = conditionalTransformOperationService ?? throw new ArgumentNullException(nameof(conditionalTransformOperationService));
         _copyLocationOperationService = copyLocationOperationService ?? throw new ArgumentNullException(nameof(copyLocationOperationService));
+        _copyLocationAliasToTypeIterativelyOperationService = copyLocationAliasToTypeIterativelyOperationService ?? throw new ArgumentNullException(nameof(copyLocationAliasToTypeIterativelyOperationService));
         _removeExtensionsOperationService = removeExtensionsOperationService ?? throw new ArgumentNullException(nameof(removeExtensionsOperationService));
         _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
     }
@@ -199,7 +202,7 @@ public class ResourcesAcquiredListener : BackgroundService
                 var sequences = await operationSequenceQueries.Search(new OperationSequenceSearchModel()
                 {
                     FacilityId = result.Message.Key.FacilityId,
-                    ResourceType = resourceType.ToString(),
+                    ResourceType = resourceType.ToString()
                 }, cancellationToken: cancellationToken);
 
                 if (sequences == null || sequences.Count == 0)
@@ -218,9 +221,13 @@ public class ResourcesAcquiredListener : BackgroundService
                     foreach (var sequence in sequences)
                     {
                         var dbEntity = sequence.OperationResourceType.Operation;
+                        if(dbEntity != null && dbEntity.IsDisabled)
+                        {
+                            _logger.LogDebug("Skipping disabled operation {OperationType} ({OperationName}) for {FacilityId}/{ResourceType}/{ResourceId}.", dbEntity.OperationType, dbEntity.Name.SanitizeForLog(), result.Message.Key.FacilityId.SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
+                            continue;
+                        }
 
                         var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
-
                         if (operation == null)
                         {
                             throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
@@ -230,11 +237,12 @@ public class ResourcesAcquiredListener : BackgroundService
 
                         var operationResult = operation.OperationType switch
                         {
-                            OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource, cancellationToken),
-                            OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource, cancellationToken),
-                            OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource, cancellationToken),
-                            OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource, cancellationToken),
-                            OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, resource, cancellationToken),
+                            OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource, cancellationToken: cancellationToken),
+                            OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource, cancellationToken: cancellationToken),
+                            OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource, cancellationToken: cancellationToken),
+                            OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource, cancellationToken: cancellationToken),
+                            OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, resource, cancellationToken: cancellationToken),
+                            OperationType.CopyLocationAliasToTypeIteratively => await _copyLocationAliasToTypeIterativelyOperationService.ProcessOperationAsync((CopyLocationAliasToTypeIterativelyOperation)operation, resource, resources.OfType<Location>().ToList<DomainResource>(), cancellationToken),
                             _ => null
                         };
 

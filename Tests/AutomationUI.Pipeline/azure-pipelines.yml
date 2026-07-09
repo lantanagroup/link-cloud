@@ -10,11 +10,7 @@
 #  restructuring the pipeline -- just fill in their base URL below.
 # =========================================
 
-trigger:
-  branches:
-    include:
-      - main
-      - feature/*
+trigger: none
 
 pr: none
 
@@ -23,7 +19,7 @@ schedules:
     displayName: "Weekday 6AM CT Build"
     branches:
       include:
-        - main
+        - dev
     always: "true"
     batch: "false"
 
@@ -503,7 +499,7 @@ stages:
           # -------------------------------------------------------------
           - task: AzureCLI@2
             displayName: "Fetch Slack webhook from Azure App Configuration"
-            condition: always()
+            condition: and(always(), ne(variables.SKIP_RUN, 'true'))
             inputs:
               azureSubscription: "$(AZURE_SERVICE_CONNECTION)"
               scriptType: "pscore"
@@ -529,7 +525,7 @@ stages:
           # -------------------------------------------------------------
           - task: PowerShell@2
             displayName: "Send result to Slack"
-            condition: always()
+            condition: and(always(), ne(variables.SKIP_RUN, 'true'))
             env:
               RUN_STATUS: $(RUN_STATUS)
               RUN_ERROR: $(RUN_ERROR)

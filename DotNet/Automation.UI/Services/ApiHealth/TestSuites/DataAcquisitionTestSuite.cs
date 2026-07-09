@@ -195,6 +195,9 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             results.Add(await RunStepAsync(StepNames.OrgLocationMappingsGet200, 200, async () =>
                 await _client.GetOrganizationLocationMappingsAsync(facilityId, ct), ct: ct));
 
+            results.Add(await RunStepAsync(StepNames.EncounterMappingsGet200, 200, async () =>
+                await _client.GetEncounterMappingsAsync(facilityId, ct), ct: ct));
+
             // CREATE FHIR Query Config
             results.Add(await RunStepAsync(StepNames.FhirConfigPost201, 201, async () =>
             {

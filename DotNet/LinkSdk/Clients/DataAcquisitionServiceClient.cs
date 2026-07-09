@@ -233,4 +233,10 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         CancellationToken cancellationToken = default) =>
         SendAsync<List<OrganizationLocationMappingApiModel>>(() => Request($"data/location-mappings/facility/{facilityId}")
             .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<EncounterMappingApiModel>>> GetEncounterMappingsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<List<EncounterMappingApiModel>>(() => Request($"data/encounter-mappings/facilities/{facilityId}")
+            .GetAsync(cancellationToken: cancellationToken));
 }
