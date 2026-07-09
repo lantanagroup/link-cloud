@@ -6,16 +6,23 @@ import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
 import {MatSortModule, Sort} from '@angular/material/sort';
 import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatInputModule} from '@angular/material/input';
+import {MatSelectModule} from '@angular/material/select';
 import {MatButtonModule} from '@angular/material/button';
 import {MatIconModule} from '@angular/material/icon';
 import {MatProgressSpinnerModule} from '@angular/material/progress-spinner';
 import {MatDialog, MatDialogModule} from '@angular/material/dialog';
+import {MatTooltipModule} from '@angular/material/tooltip';
+import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
 import {Subject, Subscription} from 'rxjs';
 import {debounceTime} from 'rxjs/operators';
 import {DataAcquisitionService} from '../../../../services/gateway/data-acquisition/data-acquisition.service';
+import {SnackbarHelper} from '../../../../services/snackbar-helper';
 import {PaginationMetadata} from '../../../../models/pagination-metadata.model';
 import {IEncounterLocationModel, IEncounterMappingModel} from '../../../../interfaces/data-acquisition/encounter-mapping-model.interface';
 import {LocationDetailsDialogComponent} from '../location-details-dialog/location-details-dialog.component';
+
+// A tri-state filter value: '' means "Any" (no filter), otherwise a stringified boolean.
+type TriStateFilter = '' | 'true' | 'false';
 
 @Component({
   selector: 'app-encounters-list',
@@ -27,10 +34,13 @@ import {LocationDetailsDialogComponent} from '../location-details-dialog/locatio
     MatSortModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatDialogModule
+    MatDialogModule,
+    MatTooltipModule,
+    MatSnackBarModule
   ],
   templateUrl: './encounters-list.component.html',
   styleUrl: './encounters-list.component.scss'
@@ -39,7 +49,10 @@ export class EncountersListComponent implements OnInit, OnDestroy {
 
   @Input() facilityId: string = '';
 
-  displayedColumns = ['encounterId', 'patientId', 'locationId', 'mappedToOrg'];
+  // encounterMappingId (the DB primary key) is surfaced first as a copyable debugging aid so a
+  // row can be cross-referenced against backend logs; modifiedDate is shown last for "when did
+  // this change" investigations.
+  displayedColumns = ['encounterMappingId', 'encounterId', 'patientId', 'locationId', 'mappedToOrg', 'createDate', 'modifiedDate'];
   dataSource = new MatTableDataSource<IEncounterMappingModel>([]);
   paginationMetadata: PaginationMetadata = Object.assign(new PaginationMetadata(), {
     pageSize: 10,
@@ -48,9 +61,12 @@ export class EncountersListComponent implements OnInit, OnDestroy {
     totalPages: 0
   });
 
-  // Free-text (exact match) filters. Only EncounterId and PatientId are searchable in v1.
+  // Free-text (exact match) filters.
   encounterIdFilter = '';
   patientIdFilter = '';
+
+  // Tri-state "Mapped To Org" filter: '' = any, 'true' = mapped, 'false' = not mapped.
+  mappedToOrgFilter: TriStateFilter = '';
 
   // Undefined => let the backend apply its default sort (CreateDate desc).
   // sortOrder follows the API convention: 0 = Ascending, 1 = Descending.
@@ -71,7 +87,8 @@ export class EncountersListComponent implements OnInit, OnDestroy {
 
   constructor(
     private dataAcquisitionService: DataAcquisitionService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private snackBar: MatSnackBar
   ) {}
 
   ngOnInit(): void {
@@ -100,7 +117,8 @@ export class EncountersListComponent implements OnInit, OnDestroy {
       this.paginationMetadata.pageSize,
       {
         encounterId: this.encounterIdFilter?.trim() || undefined,
-        patientId: this.patientIdFilter?.trim() || undefined
+        patientId: this.patientIdFilter?.trim() || undefined,
+        mappedToOrg: this.toBool(this.mappedToOrgFilter)
       },
       this.currentSortBy,
       this.currentSortOrder
@@ -152,11 +170,12 @@ export class EncountersListComponent implements OnInit, OnDestroy {
   clearFilters(): void {
     this.encounterIdFilter = '';
     this.patientIdFilter = '';
+    this.mappedToOrgFilter = '';
     this.applyFilters();
   }
 
   hasActiveFilters(): boolean {
-    return !!this.encounterIdFilter || !!this.patientIdFilter;
+    return !!this.encounterIdFilter || !!this.patientIdFilter || !!this.mappedToOrgFilter;
   }
 
   // LocationId is read-only and comma-joined when an encounter maps to multiple locations.
@@ -172,11 +191,41 @@ export class EncountersListComponent implements OnInit, OnDestroy {
     return (element.encounterLocations ?? []).filter(l => !!l.locationId);
   }
 
+  // Copies a value (e.g. the encounterMappingId DB key) to the clipboard so it can be pasted
+  // into a log search or DB query. Confirms via the shared snackbar.
+  copyToClipboard(value: string | number, label: string = 'Value'): void {
+    navigator.clipboard.writeText(String(value))
+      .then(() => SnackbarHelper.showSuccessMessage(this.snackBar, `${label} copied to clipboard.`))
+      .catch(() => SnackbarHelper.showErrorMessage(this.snackBar, 'Unable to copy to clipboard.'));
+  }
+
+  // A best-effort debugging hint explaining why an encounter did not map to the organization.
+  // Derived only from the data on the row, so it points at the likely cause rather than asserting
+  // it — open the location details to confirm (e.g. an inactive underlying mapping).
+  getUnmappedReason(element: IEncounterMappingModel): string | null {
+    if (element.mappedToOrg) {
+      return null;
+    }
+    const locations = element.encounterLocations ?? [];
+    if (locations.length === 0) {
+      return 'Encounter has no locations to map.';
+    }
+    const resolvable = locations.filter(l => !!l.locationId);
+    if (resolvable.length === 0) {
+      return 'Encounter references location(s) with no matching active organization mapping.';
+    }
+    return 'Encounter references location(s) that are not mapped as organization locations. Open a location for details.';
+  }
+
   // Opens the read-only location-details dialog for the clicked location.
   openLocationDetails(location: IEncounterLocationModel): void {
     this.dialog.open(LocationDetailsDialogComponent, {
       data: { locationMappingId: location.organizationLocationMappingId },
       width: '480px'
     });
+  }
+
+  private toBool(value: TriStateFilter): boolean | undefined {
+    return value === '' ? undefined : value === 'true';
   }
 }

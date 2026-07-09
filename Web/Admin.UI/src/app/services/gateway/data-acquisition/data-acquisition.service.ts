@@ -380,6 +380,7 @@ export class DataAcquisitionService {
     filters?: {
       encounterId?: string;
       patientId?: string;
+      mappedToOrg?: boolean;
     },
     sortBy?: string,
     sortOrder?: number
@@ -395,6 +396,9 @@ export class DataAcquisitionService {
     }
     if (filters?.patientId) {
       params = params.set('PatientId', filters.patientId);
+    }
+    if (filters?.mappedToOrg !== undefined && filters?.mappedToOrg !== null) {
+      params = params.set('MappedToOrg', filters.mappedToOrg.toString());
     }
     if (sortBy) {
       params = params.set('sortBy', sortBy);

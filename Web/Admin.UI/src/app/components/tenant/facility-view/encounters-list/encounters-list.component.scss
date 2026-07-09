@@ -79,6 +79,50 @@
   color: rgba(0, 0, 0, 0.54);
 }
 
+// Primary-key cell: the id value plus a compact copy button for cross-referencing logs/DB.
+.id-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+
+  .id-value {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .copy-button {
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+    opacity: 0.6;
+
+    &:hover,
+    &:focus {
+      opacity: 1;
+    }
+
+    mat-icon {
+      font-size: 16px;
+      width: 16px;
+      height: 16px;
+    }
+  }
+}
+
+// "Mapped To Org" cell with an optional debugging hint icon when the encounter is unmapped.
+.mapped-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  .unmapped-hint {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: rgba(0, 0, 0, 0.45);
+    cursor: help;
+  }
+}
+
 // LocationId values are clickable links opening the read-only location-details dialog.
 .location-link {
   color: #1976d2;
