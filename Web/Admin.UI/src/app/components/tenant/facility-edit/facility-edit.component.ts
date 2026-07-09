@@ -645,8 +645,9 @@ export class FacilityEditComponent implements OnInit {
   loadReportingOrgConfig() {
     if (!this.reportingOrgConfig) {
       this.dataAcquisitionService.getLocationConfigurations(this.facilityId).subscribe((data: IOrganizationLocationConfigurationModel[]) => {
-        if (data && data.length > 0) {
-          this.reportingOrgConfig = data[0];
+        const selected = this.selectReportingOrgConfig(data);
+        if (selected) {
+          this.reportingOrgConfig = selected;
           this.showNoReportingOrgConfigAlert = false;
         } else {
           this.reportingOrgConfig = {
@@ -735,9 +736,10 @@ export class FacilityEditComponent implements OnInit {
       }).afterClosed().subscribe(res => {
       if (res) {
         this.dataAcquisitionService.getLocationConfigurations(this.facilityId).subscribe((data: IOrganizationLocationConfigurationModel[]) => {
-          if (data && data.length > 0) {
+          const selected = this.selectReportingOrgConfig(data);
+          if (selected) {
             this.showNoReportingOrgConfigAlert = false;
-            this.reportingOrgConfig = data[0];
+            this.reportingOrgConfig = selected;
           }
         });
         this.snackBar.open(`${res}`, '', {
@@ -763,9 +765,10 @@ export class FacilityEditComponent implements OnInit {
           next: () => {
             this.dataAcquisitionService.getLocationConfigurations(this.facilityId).subscribe({
               next: (data: IOrganizationLocationConfigurationModel[] | null) => {
-                if (data && data.length > 0) {
+                const selected = this.selectReportingOrgConfig(data ?? []);
+                if (selected) {
                   this.showNoReportingOrgConfigAlert = false;
-                  this.reportingOrgConfig = data[0];
+                  this.reportingOrgConfig = selected;
                 } else {
                   this.showNoReportingOrgConfigAlert = true;
                   this.reportingOrgConfig = {
