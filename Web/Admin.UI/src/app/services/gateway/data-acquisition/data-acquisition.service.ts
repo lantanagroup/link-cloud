@@ -333,7 +333,9 @@ export class DataAcquisitionService {
       partOfValue?: string;
       isOrgLocation?: boolean;
       isActive?: boolean;
-    }
+    },
+    sortBy?: string,
+    sortOrder?: number
   ): Observable<IPagedOrganizationLocationMapping> {
     const url = `${this.appConfigService.config?.baseApiUrl}/data/location-mappings/facility/${facilityId}/search`;
 
@@ -358,6 +360,12 @@ export class DataAcquisitionService {
     }
     if (filters?.isActive !== undefined && filters?.isActive !== null) {
       params = params.set('IsActive', filters.isActive.toString());
+    }
+    if (sortBy) {
+      params = params.set('sortBy', sortBy);
+    }
+    if (sortOrder !== undefined && sortOrder !== null) {
+      params = params.set('sortOrder', sortOrder.toString());
     }
 
     return this.http.get<IPagedOrganizationLocationMapping>(url, {params})

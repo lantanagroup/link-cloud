@@ -3,6 +3,7 @@ import {CommonModule} from '@angular/common';
 import {FormsModule} from '@angular/forms';
 import {MatTableDataSource, MatTableModule} from '@angular/material/table';
 import {MatPaginatorModule, PageEvent} from '@angular/material/paginator';
+import {MatSortModule, Sort} from '@angular/material/sort';
 import {MatFormFieldModule} from '@angular/material/form-field';
 import {MatInputModule} from '@angular/material/input';
 import {MatSelectModule} from '@angular/material/select';
@@ -29,6 +30,7 @@ type TriStateFilter = '' | 'true' | 'false';
     FormsModule,
     MatTableModule,
     MatPaginatorModule,
+    MatSortModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
@@ -65,6 +67,26 @@ export class LocationsListComponent implements OnInit, OnDestroy {
   partOfValueFilter = '';
   isOrgLocationFilter: TriStateFilter = '';
   showInactive = false;
+
+  // Undefined => let the backend apply its default sort (CreateDate desc).
+  // sortOrder follows the API convention: 0 = Ascending, 1 = Descending.
+  currentSortBy?: string;
+  currentSortOrder?: number;
+
+  // Maps sortable UI column names to the API field names the backend allows. Every displayed column
+  // is a scalar column on the mapping row, so all are sortable.
+  private readonly sortFieldMap: { [key: string]: string } = {
+    locationMappingId: 'LocationMappingId',
+    locationId: 'LocationId',
+    locationName: 'LocationName',
+    locationAlias: 'LocationAlias',
+    partOfValue: 'PartOfValue',
+    partOfId: 'PartOfId',
+    isOrgLocation: 'IsOrgLocation',
+    isActive: 'IsActive',
+    createDate: 'CreateDate',
+    modifiedDate: 'ModifiedDate'
+  };
 
   isLoading = false;
   errorMessage: string | null = null;
@@ -109,7 +131,9 @@ export class LocationsListComponent implements OnInit, OnDestroy {
         isOrgLocation: this.toBool(this.isOrgLocationFilter),
         // Default to active-only; when "Show inactive" is checked, don't filter on active.
         isActive: this.showInactive ? undefined : true
-      }
+      },
+      this.currentSortBy,
+      this.currentSortOrder
     ).subscribe({
       next: (result) => {
         this.dataSource.data = result.records ?? [];
@@ -127,6 +151,20 @@ export class LocationsListComponent implements OnInit, OnDestroy {
   onPageChange(event: PageEvent): void {
     this.paginationMetadata.pageSize = event.pageSize;
     this.paginationMetadata.pageNumber = event.pageIndex;
+    this.loadLocations();
+  }
+
+  onSortChange(sort: Sort): void {
+    if (sort.active && sort.direction && this.sortFieldMap[sort.active]) {
+      this.currentSortBy = this.sortFieldMap[sort.active];
+      this.currentSortOrder = sort.direction === 'desc' ? 1 : 0;
+    } else {
+      // Cleared sort — fall back to the backend default.
+      this.currentSortBy = undefined;
+      this.currentSortOrder = undefined;
+    }
+    // Sorting changes ordering across the whole result set, so return to the first page.
+    this.paginationMetadata.pageNumber = 0;
     this.loadLocations();
   }
 
