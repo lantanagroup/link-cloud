@@ -1,5 +1,8 @@
-﻿using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
+﻿using System.Linq.Expressions;
+using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Context;
+using LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Entities;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,7 +16,9 @@ public interface IOrganizationLocationMappingQueries
     Task<PagedConfigModel<OrganizationLocationMappingModel>> SearchAsync(
         OrganizationLocationMappingSearchModel search,
         int pageNumber = 1,
-        int pageSize = 10);
+        int pageSize = 10,
+        string? sortBy = null,
+        SortOrder? sortOrder = null);
 
     Task<List<LocationHierarchyNode>> GetHierarchyUpAsync(string facilityId, string locationId);
     Task<LocationHierarchyNode> GetFullSubtreeAsync(string facilityId, string locationId);
@@ -95,7 +100,9 @@ public class OrganizationLocationMappingQueries : IOrganizationLocationMappingQu
     public async Task<PagedConfigModel<OrganizationLocationMappingModel>> SearchAsync(
         OrganizationLocationMappingSearchModel search,
         int pageNumber = 1,
-        int pageSize = 10)
+        int pageSize = 10,
+        string? sortBy = null,
+        SortOrder? sortOrder = null)
     {
         if (string.IsNullOrWhiteSpace(search.FacilityId))
             throw new ArgumentException("FacilityId is required for search.");
@@ -124,8 +131,7 @@ public class OrganizationLocationMappingQueries : IOrganizationLocationMappingQu
 
         int totalCount = await query.CountAsync();
 
-        var items = await query
-            .OrderByDescending(m => m.CreateDate)
+        var items = await ApplySort(query, sortBy, sortOrder)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .Select(m => new OrganizationLocationMappingModel
@@ -146,6 +152,37 @@ public class OrganizationLocationMappingQueries : IOrganizationLocationMappingQu
 
         return new PagedConfigModel<OrganizationLocationMappingModel>(items, new PaginationMetadata(pageSize, pageNumber, totalCount));
     }
+
+    // Ordering is restricted to scalar columns; the controller validates sortBy against its allow-list.
+    // An unrecognized (or absent) sort field falls back to newest-first (CreateDate descending), which
+    // preserves the endpoint's previous default ordering. Direction defaults to descending.
+    private static IOrderedQueryable<OrganizationLocationMapping> ApplySort(
+        IQueryable<OrganizationLocationMapping> query,
+        string? sortBy,
+        SortOrder? sortOrder)
+    {
+        var descending = (sortOrder ?? SortOrder.Descending) == SortOrder.Descending;
+
+        return sortBy switch
+        {
+            nameof(OrganizationLocationMapping.LocationMappingId) => Order(query, m => m.LocationMappingId, descending),
+            nameof(OrganizationLocationMapping.LocationId) => Order(query, m => m.LocationId, descending),
+            nameof(OrganizationLocationMapping.LocationName) => Order(query, m => m.LocationName, descending),
+            nameof(OrganizationLocationMapping.LocationAlias) => Order(query, m => m.LocationAlias, descending),
+            nameof(OrganizationLocationMapping.PartOfValue) => Order(query, m => m.PartOfValue, descending),
+            nameof(OrganizationLocationMapping.PartOfId) => Order(query, m => m.PartOfId, descending),
+            nameof(OrganizationLocationMapping.IsOrgLocation) => Order(query, m => m.IsOrgLocation, descending),
+            nameof(OrganizationLocationMapping.IsActive) => Order(query, m => m.IsActive, descending),
+            nameof(OrganizationLocationMapping.ModifiedDate) => Order(query, m => m.ModifiedDate, descending),
+            _ => Order(query, m => m.CreateDate, descending)
+        };
+    }
+
+    private static IOrderedQueryable<OrganizationLocationMapping> Order<TKey>(
+        IQueryable<OrganizationLocationMapping> query,
+        Expression<Func<OrganizationLocationMapping, TKey>> keySelector,
+        bool descending)
+        => descending ? query.OrderByDescending(keySelector) : query.OrderBy(keySelector);
 
     #region Hierarchy Methods
 

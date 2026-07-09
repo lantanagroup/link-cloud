@@ -3,6 +3,7 @@ using LantanaGroup.Link.DataAcquisition.Domain.Application.Models;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Models.Exceptions;
 using LantanaGroup.Link.DataAcquisition.Domain.Application.Queries;
 using LantanaGroup.Link.DataAcquisition.Models;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using Link.Authorization.Policies;
@@ -17,6 +18,22 @@ namespace LantanaGroup.Link.DataAcquisition.Controllers;
 [ApiController]
 public class OrganizationLocationMappingController : Controller
 {
+    // Sort is supported on the scalar OrganizationLocationMapping columns (every displayed column maps
+    // to a real column on the row, so all are sortable).
+    private static readonly HashSet<string> AllowedSortBy = new(StringComparer.OrdinalIgnoreCase)
+    {
+        nameof(OrganizationLocationMappingModel.LocationMappingId),
+        nameof(OrganizationLocationMappingModel.LocationId),
+        nameof(OrganizationLocationMappingModel.LocationName),
+        nameof(OrganizationLocationMappingModel.LocationAlias),
+        nameof(OrganizationLocationMappingModel.PartOfValue),
+        nameof(OrganizationLocationMappingModel.PartOfId),
+        nameof(OrganizationLocationMappingModel.IsOrgLocation),
+        nameof(OrganizationLocationMappingModel.IsActive),
+        nameof(OrganizationLocationMappingModel.CreateDate),
+        nameof(OrganizationLocationMappingModel.ModifiedDate)
+    };
+
     private readonly ILogger<OrganizationLocationMappingController> _logger;
     private readonly IOrganizationLocationMappingManager _manager;
     private readonly IOrganizationLocationMappingQueries _queries;
@@ -103,12 +120,17 @@ public class OrganizationLocationMappingController : Controller
         string facilityId,
         [FromQuery] OrganizationLocationMappingSearchParameters searchParams,
         int pageNumber = 1,
-        int pageSize = 10)
+        int pageSize = 10,
+        string? sortBy = null,
+        SortOrder? sortOrder = null)
     {
         try
         {
             if (string.IsNullOrWhiteSpace(facilityId))
                 throw new BadRequestException("facilityId is required.");
+
+            if (!string.IsNullOrWhiteSpace(sortBy) && !AllowedSortBy.Contains(sortBy))
+                throw new BadRequestException($"Invalid sortBy. Allowed values: {string.Join(", ", AllowedSortBy)}");
 
             var search = new OrganizationLocationMappingSearchModel
             {
@@ -121,7 +143,7 @@ public class OrganizationLocationMappingController : Controller
                 IsActive = searchParams.IsActive
             };
 
-            var result = await _queries.SearchAsync(search, pageNumber, pageSize);
+            var result = await _queries.SearchAsync(search, pageNumber, pageSize, sortBy, sortOrder);
             return Ok(result);
         }
         catch (BadRequestException ex)
