@@ -134,6 +134,9 @@ stages:
                 $buildReason  = "$(Build.Reason)"
                 $resourceRunId = "$(resources.pipeline.DeployAll.runID)"
 
+                Write-Host "Build reason: $buildReason"
+                Write-Host "DeployAll resource run id: $resourceRunId"
+
                 function Normalize-EnvironmentName([string]$value) {
                   if (-not $value) { return "" }
                   $v = $value.Trim().ToLowerInvariant()
@@ -181,7 +184,7 @@ stages:
                       Write-Host "Triggering Deploy_All_Services build $($b.id) env '$deployEnvRaw' (normalized '$deployEnv') does not match target '$targetEnv'. Skipping."
                     }
                   } catch {
-                    Write-Host "Failed to query triggering Deploy_All_Services build $resourceRunId: $_"
+                    Write-Host "Failed to query triggering Deploy_All_Services build $($resourceRunId): $_"
                   }
                 }
 
