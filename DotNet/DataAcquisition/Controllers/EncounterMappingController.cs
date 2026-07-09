@@ -19,11 +19,16 @@ namespace LantanaGroup.Link.DataAcquisition.Controllers;
 [ApiController]
 public class EncounterMappingController : Controller
 {
-    // Sort is only supported on EncounterId and PatientId (per LEGLINK-504); LocationId is not sortable.
+    // Sort is supported on the scalar EncounterMapping columns; LocationId is not sortable because it
+    // is a derived, multi-valued projection (resolved via join after paging), not a column on the row.
     private static readonly HashSet<string> AllowedSortBy = new(StringComparer.OrdinalIgnoreCase)
     {
+        nameof(EncounterMappingModel.EncounterMappingId),
         nameof(EncounterMappingModel.EncounterId),
-        nameof(EncounterMappingModel.PatientId)
+        nameof(EncounterMappingModel.PatientId),
+        nameof(EncounterMappingModel.MappedToOrg),
+        nameof(EncounterMappingModel.CreateDate),
+        nameof(EncounterMappingModel.ModifiedDate)
     };
 
     private readonly ILogger<EncounterMappingController> _logger;
