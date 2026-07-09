@@ -612,14 +612,21 @@ stages:
           - task: PowerShell@2
             displayName: "Pipeline summary"
             condition: always()
+            env:
+              SCENARIO_ID: $(SCENARIO_ID)
+              RUN_ID: $(RUN_ID)
+              RUN_STATUS: $(RUN_STATUS)
+              RUN_DURATION: $(RUN_DURATION)
+              COMMIT_SHORT: $(COMMIT_SHORT)
+              SKIP_RUN: $(SKIP_RUN)
             inputs:
               targetType: "inline"
               script: |
                 Write-Host "##[section]Automation.UI run summary"
                 Write-Host "Environment : ${{ parameters.targetEnvironment }}"
-                Write-Host "Scenario    : ${{ parameters.scenario }} ($(SCENARIO_ID))"
-                Write-Host "Run id      : $(RUN_ID)"
-                Write-Host "Status      : $(RUN_STATUS)"
-                Write-Host "Duration    : $(RUN_DURATION)"
-                Write-Host "Commit      : $(COMMIT_SHORT)"
-                Write-Host "Skipped     : $(SKIP_RUN)"
+                Write-Host "Scenario    : ${{ parameters.scenario }} ($env:SCENARIO_ID)"
+                Write-Host "Run id      : $env:RUN_ID"
+                Write-Host "Status      : $env:RUN_STATUS"
+                Write-Host "Duration    : $env:RUN_DURATION"
+                Write-Host "Commit      : $env:COMMIT_SHORT"
+                Write-Host "Skipped     : $env:SKIP_RUN"
