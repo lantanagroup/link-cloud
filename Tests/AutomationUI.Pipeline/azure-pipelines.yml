@@ -168,7 +168,7 @@ stages:
 
                 if (-not $shouldRun -and $buildReason -ieq "ResourceTrigger" -and $resourceRunId) {
                   try {
-                    $u = "$org$project/_apis/build/builds/$resourceRunId?api-version=7.1-preview.7"
+                    $u = "$org$project/_apis/build/builds/$($resourceRunId)?api-version=7.1-preview.7"
                     $h = @{ Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN" }
                     $b = Invoke-RestMethod -Uri $u -Headers $h -Method Get
                     $deployEnvRaw = Get-EnvFromBuild $b
