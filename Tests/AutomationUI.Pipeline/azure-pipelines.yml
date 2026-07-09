@@ -29,10 +29,7 @@ resources:
     - pipeline: DeployAll
       source: 'Deploy All Services'
       project: nhsnlink
-      trigger:
-        branches:
-          include:
-            - dev
+      trigger: true
 
 parameters:
   - name: targetEnvironment
@@ -125,19 +122,34 @@ stages:
                 Write-Host "##vso[task.setvariable variable=AUTOMATION_UI_BASE_URL]$base"
                 Write-Host "##vso[task.setvariable variable=SCENARIO_ID]$scenarioId"
 
-                # ----- Gate on latest succeeded Deploy_All_Services for this env -----
+                # ----- Gate behavior by run reason -----
+                # Manual + schedule should always run.
+                # ResourceTrigger should only run when the *triggering* Deploy_All_Services
+                # build targeted the requested environment.
                 $org          = "$(System.CollectionUri)"
                 $project      = "nhsnlink"
                 $definitionId = 226
                 $shouldRun    = $false
                 $commitSha    = ""
                 $buildReason  = "$(Build.Reason)"
+                $resourceRunId = "$(resources.pipeline.DeployAll.runID)"
 
-                # Manual runs are explicit operator intent; do not gate them on
-                # Deploy_All_Services discovery.
+                function Normalize-EnvironmentName([string]$value) {
+                  if (-not $value) { return "" }
+                  $v = $value.Trim().ToLowerInvariant()
+                  if ($v -eq "scale-test" -or $v -eq "test-scale") { return "test" }
+                  if ($v -eq "dev-scale" -or $v -eq "scale-dev")   { return "dev" }
+                  if ($v -eq "scale-qa" -or $v -eq "qa-scale")     { return "qa" }
+                  return $v
+                }
+
                 if ($buildReason -ieq "Manual") {
                   $shouldRun = $true
                   Write-Host "Manual run detected. Bypassing Deploy_All_Services gate."
+                }
+                elseif ($buildReason -ieq "Schedule") {
+                  $shouldRun = $true
+                  Write-Host "Scheduled run detected. Bypassing Deploy_All_Services gate."
                 }
 
                 function Get-EnvFromBuild($Build) {
@@ -151,24 +163,30 @@ stages:
                   return $null
                 }
 
-                if (-not $shouldRun) {
+                if (-not $shouldRun -and $buildReason -ieq "ResourceTrigger" -and $resourceRunId) {
                   try {
-                    $u = "$org$project/_apis/build/builds?definitions=$definitionId&resultFilter=succeeded&`$top=50&api-version=7.1-preview.7"
+                    $u = "$org$project/_apis/build/builds/$resourceRunId?api-version=7.1-preview.7"
                     $h = @{ Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN" }
-                    $resp = Invoke-RestMethod -Uri $u -Headers $h -Method Get
-                    $sorted = $resp.value | Sort-Object -Property finishTime -Descending
-                    foreach ($b in $sorted) {
-                      $envVal = Get-EnvFromBuild $b
-                      if ($envVal -ieq $envName) {
-                        $commitSha = $b.sourceVersion
-                        $shouldRun = $true
-                        Write-Host "Matched Deploy_All_Services build $($b.id) for env '$envName' commit $commitSha."
-                        break
-                      }
+                    $b = Invoke-RestMethod -Uri $u -Headers $h -Method Get
+                    $deployEnvRaw = Get-EnvFromBuild $b
+                    $deployEnv = Normalize-EnvironmentName $deployEnvRaw
+                    $targetEnv = Normalize-EnvironmentName $envName
+
+                    if ($deployEnv -eq $targetEnv) {
+                      $commitSha = $b.sourceVersion
+                      $shouldRun = $true
+                      Write-Host "Matched triggering Deploy_All_Services build $($b.id) for env '$deployEnvRaw' (normalized '$deployEnv') commit $commitSha."
+                    }
+                    else {
+                      Write-Host "Triggering Deploy_All_Services build $($b.id) env '$deployEnvRaw' (normalized '$deployEnv') does not match target '$targetEnv'. Skipping."
                     }
                   } catch {
-                    Write-Host "Failed to query Deploy_All_Services: $_"
+                    Write-Host "Failed to query triggering Deploy_All_Services build $resourceRunId: $_"
                   }
+                }
+
+                if (-not $shouldRun -and $buildReason -ieq "ResourceTrigger" -and -not $resourceRunId) {
+                  Write-Host "ResourceTrigger run did not expose resources.pipeline.DeployAll.runID; skipping."
                 }
 
                 if (-not $commitSha) { $commitSha = "$(Build.SourceVersion)" }
