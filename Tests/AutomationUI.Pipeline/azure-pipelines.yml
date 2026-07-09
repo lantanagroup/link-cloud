@@ -23,7 +23,7 @@ schedules:
     displayName: "Weekday 6AM CT Build"
     branches:
       include:
-        - main
+        - dev
     always: "true"
     batch: "false"
 
