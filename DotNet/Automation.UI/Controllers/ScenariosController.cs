@@ -381,10 +381,12 @@ public class ScenariosController(
                 .Select(c => new PatientCohortDefinition
                 {
                     PatientCount = c.PatientCount,
+                    CohortQualification = c.CohortQualification,
                     MeasureEligibilities = new(c.MeasureEligibilities),
                     EligibleClinicalScenarioIds = [.. c.EligibleClinicalScenarioIds],
                     ResourcesPerPatientMin = c.ResourcesPerPatientMin,
-                    ResourcesPerPatientMax = c.ResourcesPerPatientMax
+                    ResourcesPerPatientMax = c.ResourcesPerPatientMax,
+                    ScheduledInpatientPattern = c.ScheduledInpatientPattern
                 })
                 .ToList(),
             QueryPlanTemplateId = source.QueryPlanTemplateId,
