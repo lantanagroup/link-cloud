@@ -30,6 +30,8 @@ namespace Automation.UI.Services;
 /// </summary>
 internal sealed class RunExecutor
 {
+    private const ScheduledInpatientPattern DefaultScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
+
     private readonly AutomationConfig _automationConfig;
     private readonly IServiceProvider _hostServices;
     private readonly ISnapshotStore _snapshotStore;
@@ -215,7 +217,10 @@ internal sealed class RunExecutor
                     {
                         QueryPlan = effectiveQueryPlan,
                         ClinicalPeriodStart = scenarioConfig.StartDate,
-                        ClinicalPeriodEnd = scenarioConfig.EndDate
+                        ClinicalPeriodEnd = scenarioConfig.EndDate,
+                        AllowEncounterAnchoredDateOverrideForOutOfRange =
+                            state.Options.ReportMethod == ReportMethod.ScheduledReport
+                            || state.Options.ReportMethod == ReportMethod.RegenerateReport
                     },
                     importedPatients: importedPatients.Count > 0 ? importedPatients : null);
 
@@ -226,7 +231,7 @@ internal sealed class RunExecutor
                 // Use the manifest's parallel PatientIds + Profiles arrays as the source of truth.
                 expectedSubmittedPatientIds = generationManifest.PatientIds
                     .Where((_, idx) => idx < generationManifest.Profiles.Count
-                                       && generationManifest.Profiles[idx].QualifiesForAny(selectedMeasures))
+                                       && generationManifest.Profiles[idx].IsExpectedToBeSubmitted(selectedMeasures))
                     .ToList();
 
                 if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
@@ -668,20 +673,13 @@ internal sealed class RunExecutor
         for (var i = 0; i < count; i++)
         {
             var profile = profiles[i];
-            if (!profile.QualifiesForAny(selectedMeasures))
+            if (!profile.IsExpectedToBeSubmitted(selectedMeasures))
                 continue;
 
-            if (IsExpectedInScheduledReport(profile.ScheduledInpatientPattern))
-                expected.Add(patientIds[i]);
+            expected.Add(patientIds[i]);
         }
 
         return expected;
-    }
-
-    private static bool IsExpectedInScheduledReport(ScheduledInpatientPattern? pattern)
-    {
-        var effective = pattern ?? ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod;
-        return effective.GetCensusBehavior().ExpectedInReport;
     }
 
     private static string ToZulu(DateTimeOffset value)
@@ -734,7 +732,7 @@ internal sealed class RunExecutor
         for (var i = 0; i < count; i++)
         {
             var pattern = profiles[i].ScheduledInpatientPattern
-                ?? ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod;
+                ?? DefaultScheduledInpatientPattern;
             var behavior = pattern.GetCensusBehavior();
 
             // Patterns whose entire stay sits outside the report period emit no census events;

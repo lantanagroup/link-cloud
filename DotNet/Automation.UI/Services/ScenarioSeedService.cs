@@ -273,6 +273,7 @@ public sealed class ScenarioSeedService : IHostedService
                 new PatientCohortDefinition
                 {
                     PatientCount = 1,
+                    CohortQualification = MeasureEligibility.NonQualifying,
                     MeasureEligibilities = new(DefaultNonQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultNonQualifyingScenarioIds],
                     ResourcesPerPatientMin = 50,
@@ -282,6 +283,7 @@ public sealed class ScenarioSeedService : IHostedService
                 new PatientCohortDefinition
                 {
                     PatientCount = 1,
+                    CohortQualification = MeasureEligibility.NonQualifying,
                     MeasureEligibilities = new(DefaultNonQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultNonQualifyingScenarioIds],
                     ResourcesPerPatientMin = 50,
@@ -358,7 +360,8 @@ public sealed class ScenarioSeedService : IHostedService
                         ], MeasureEligibility.Qualifying)
                     ],
                     ResourcesPerPatientMin = 250,
-                    ResourcesPerPatientMax = 250
+                    ResourcesPerPatientMax = 250,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod
                 },
                 // Cohort 2: qualifies for ACH only (inpatient, no Hypo med)
                 new PatientCohortDefinition
@@ -371,7 +374,8 @@ public sealed class ScenarioSeedService : IHostedService
                     },
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
                     ResourcesPerPatientMin = 250,
-                    ResourcesPerPatientMax = 250
+                    ResourcesPerPatientMax = 250,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod
                 }
             ],
             CleanupServiceData = false,

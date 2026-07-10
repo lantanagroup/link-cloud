@@ -1,4 +1,4 @@
-using System.Text.Json;
+ï»¿using System.Text.Json;
 using Automation.UI.Models;
 using LantanaGroup.Automation.Generation;
 using MongoDB.Driver;
@@ -144,7 +144,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             }
 
             if (string.IsNullOrWhiteSpace(input.BundleJson))
-                continue; // ID-only entry mistakenly placed in the bundle list — nothing to externalize.
+                continue; // ID-only entry mistakenly placed in the bundle list â€” nothing to externalize.
 
             var hash = ComputeContentHash(input.BundleJson!);
             var byteCount = Encoding.UTF8.GetByteCount(input.BundleJson!);
@@ -386,7 +386,7 @@ public sealed class MongoScenarioStore : IScenarioStore
         foreach (var input in inputs)
         {
             if (!string.IsNullOrEmpty(input.BundleJson))
-                continue; // already inline (legacy doc) — leave as-is
+                continue; // already inline (legacy doc) â€” leave as-is
 
             var key = input.PatientId ?? string.Empty;
             if (refsByPatient.TryGetValue(key, out var queue) && queue.Count > 0)
@@ -408,7 +408,16 @@ public sealed class MongoScenarioStore : IScenarioStore
 
         try
         {
-            return JsonSerializer.Deserialize<List<PatientCohortDefinition>>(json) ?? [];
+            var cohorts = JsonSerializer.Deserialize<List<PatientCohortDefinition>>(json) ?? [];
+            foreach (var cohort in cohorts)
+            {
+                var allNonQualifying = cohort.MeasureEligibilities.Count > 0
+                    && cohort.MeasureEligibilities.Values.All(v => v == MeasureEligibility.NonQualifying);
+                if (allNonQualifying)
+                    cohort.CohortQualification = MeasureEligibility.NonQualifying;
+            }
+
+            return cohorts;
         }
         catch
         {

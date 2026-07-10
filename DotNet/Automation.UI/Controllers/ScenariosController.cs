@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation;
@@ -52,6 +52,18 @@ public class ScenariosController(
 
         if (model.ResourcesPerPatientMax < model.ResourcesPerPatientMin)
             model.ResourcesPerPatientMax = model.ResourcesPerPatientMin;
+
+        foreach (var cohort in model.PatientCohorts)
+        {
+            cohort.ScheduledInpatientPattern ??= ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
+
+            var allNonQualifying = model.SelectedMeasures.Count > 0
+                && model.SelectedMeasures.All(m => cohort.GetEligibility(m) == MeasureEligibility.NonQualifying);
+
+            // Back-compat normalization for payloads that do not yet send cohortQualification.
+            if (allNonQualifying)
+                cohort.CohortQualification = MeasureEligibility.NonQualifying;
+        }
 
         // ----- Imported-patient validation (fail save on bad input) -----
         var importValidation = await ValidateImportedPatientsAsync(model, ct);

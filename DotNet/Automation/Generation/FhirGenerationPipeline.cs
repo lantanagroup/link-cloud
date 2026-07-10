@@ -59,6 +59,13 @@ public static class FhirGenerationPipeline
         public required QueryPlanInput QueryPlan { get; init; }
         public string? ClinicalPeriodStart { get; init; }
         public string? ClinicalPeriodEnd { get; init; }
+
+        /// <summary>
+        /// When true, the simulator may use encounter-anchored fallback for date-mismatch
+        /// cases (resource has a recognized date, but falls outside strict ge/le bounds).
+        /// Scheduled workflows rely on this to mirror downstream acquisition behavior.
+        /// </summary>
+        public bool AllowEncounterAnchoredDateOverrideForOutOfRange { get; init; }
     }
 
     /// <summary>
@@ -346,7 +353,8 @@ public static class FhirGenerationPipeline
                 acquisitionSimulation.QueryPlan,
                 acquisitionSimulation.ClinicalPeriodStart,
                 acquisitionSimulation.ClinicalPeriodEnd,
-                output);
+                output,
+                acquisitionSimulation.AllowEncounterAnchoredDateOverrideForOutOfRange);
             manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
             // patientSimEntries (JsonElement clones) are now eligible for GC
         }
@@ -484,7 +492,8 @@ public static class FhirGenerationPipeline
                 acquisitionSimulation.QueryPlan,
                 acquisitionSimulation.ClinicalPeriodStart,
                 acquisitionSimulation.ClinicalPeriodEnd,
-                output);
+                output,
+                acquisitionSimulation.AllowEncounterAnchoredDateOverrideForOutOfRange);
             manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
         }
 

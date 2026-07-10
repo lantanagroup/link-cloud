@@ -15,6 +15,13 @@ public class PatientCohortDefinition
     public int PatientCount { get; set; }
 
     /// <summary>
+    /// Concrete cohort-level expected qualification outcome used by prediction logic.
+    /// This allows scenarios to explicitly mark a cohort as qualifying vs non-qualifying
+    /// independent of per-measure checkbox drift in UI editing.
+    /// </summary>
+    public MeasureEligibility CohortQualification { get; set; } = MeasureEligibility.Qualifying;
+
+    /// <summary>
     /// Optional scheduled-report inpatient behavior for patients in this cohort.
     /// When set, scheduled-report automation uses this to decide admit/discharge timing.
     /// </summary>
@@ -75,7 +82,11 @@ public class PatientCohortDefinition
                 var resources = min == max ? min : min + ((seed + seedCursor) % (max - min + 1));
                 result.Add(new PatientProfile(
                     new Dictionary<ProfiledMeasureType, MeasureEligibility>(cohort.MeasureEligibilities),
-                    seedOffset, scenarioId, resources, cohort.ScheduledInpatientPattern));
+                    seedOffset,
+                    scenarioId,
+                    resources,
+                    cohort.ScheduledInpatientPattern,
+                    cohort.CohortQualification));
                 seedCursor++;
             }
         }
@@ -95,6 +106,7 @@ public class PatientCohortDefinition
         return new PatientCohortDefinition
         {
             PatientCount = patientCount,
+            CohortQualification = MeasureEligibility.Qualifying,
             MeasureEligibilities = measures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying),
             ResourcesPerPatientMin = resourcesMin,
             ResourcesPerPatientMax = resourcesMax
@@ -113,6 +125,7 @@ public class PatientCohortDefinition
         return new PatientCohortDefinition
         {
             PatientCount = patientCount,
+            CohortQualification = MeasureEligibility.NonQualifying,
             MeasureEligibilities = measures.ToDictionary(m => m, _ => MeasureEligibility.NonQualifying),
             ResourcesPerPatientMin = resourcesMin,
             ResourcesPerPatientMax = resourcesMax

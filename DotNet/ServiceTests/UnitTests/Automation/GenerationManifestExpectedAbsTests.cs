@@ -166,4 +166,51 @@ public class GenerationManifestExpectedAbsTests
 
         keys.Should().BeEquivalentTo(["Patient/p-q", "Encounter/Esim"]);
     }
+
+    [Fact]
+    public void Pattern_excluded_patient_is_not_predicted_in_abs_even_if_measure_qualifying()
+    {
+        var manifest = new GenerationManifest
+        {
+            PatientIds = ["p-pattern-out"],
+            Profiles =
+            [
+                new PatientProfile(
+                    new Dictionary<ProfiledMeasureType, MeasureEligibility> { [Ach] = MeasureEligibility.Qualifying },
+                    ScheduledInpatientPattern: ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod)
+            ],
+            SelectedMeasures = [Ach],
+            ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["p-pattern-out"] = new(StringComparer.OrdinalIgnoreCase) { "Encounter/E1", "Condition/C1" }
+            }
+        };
+
+        manifest.GetExpectedAbsKeysForPatient("p-pattern-out").Should().BeEmpty();
+        manifest.ExpectedSubmittedPatientIds().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Cohort_non_qualifying_designation_excludes_patient_from_predictions()
+    {
+        var manifest = new GenerationManifest
+        {
+            PatientIds = ["p-cohort-nq"],
+            Profiles =
+            [
+                new PatientProfile(
+                    new Dictionary<ProfiledMeasureType, MeasureEligibility> { [Ach] = MeasureEligibility.Qualifying },
+                    CohortQualification: MeasureEligibility.NonQualifying)
+            ],
+            SelectedMeasures = [Ach],
+            ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["p-cohort-nq"] = new(StringComparer.OrdinalIgnoreCase) { "Encounter/E2", "Condition/C2" }
+            }
+        };
+
+        manifest.GetExpectedAbsKeysForPatient("p-cohort-nq").Should().BeEmpty();
+        manifest.ExpectedSubmittedPatientIds().Should().BeEmpty();
+        manifest.QualifyingPatientCount("any").Should().Be(0);
+    }
 }

@@ -107,6 +107,102 @@ public class StartScenarioRequestResolverTests
         options.PatientProfiles.Should().HaveCount(5);
     }
 
+    [Fact]
+    public void Scheduled_report_defaults_missing_cohort_inpatient_pattern_to_first_pattern()
+    {
+        var json = """
+            {
+                "patientCohorts": [
+                    {
+                        "patientCount": 2,
+                        "resourcesPerPatientMin": 50,
+                        "resourcesPerPatientMax": 75,
+                        "measureEligibilities": {
+                            "NhsnAcuteCareHospitalMonthlyInitialPopulation": "Qualifying"
+                        }
+                    }
+                ]
+            }
+            """;
+
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            ReportMethod = ReportMethod.ScheduledReport,
+            RunConfigurationJson = json,
+        });
+
+        options.PatientCohorts.Should().ContainSingle();
+        options.PatientCohorts[0].ScheduledInpatientPattern
+            .Should().Be(ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod);
+
+        options.PatientProfiles.Should().HaveCount(2);
+        options.PatientProfiles.Should().OnlyContain(p =>
+            p.ScheduledInpatientPattern == ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod);
+    }
+
+    [Fact]
+    public void Adhoc_report_also_defaults_missing_cohort_inpatient_pattern_to_first_pattern()
+    {
+        var json = """
+            {
+                "patientCohorts": [
+                    {
+                        "patientCount": 1,
+                        "resourcesPerPatientMin": 50,
+                        "resourcesPerPatientMax": 75,
+                        "measureEligibilities": {
+                            "NhsnAcuteCareHospitalMonthlyInitialPopulation": "Qualifying"
+                        }
+                    }
+                ]
+            }
+            """;
+
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            ReportMethod = ReportMethod.Adhoc,
+            RunConfigurationJson = json,
+        });
+
+        options.PatientCohorts.Should().ContainSingle();
+        options.PatientCohorts[0].ScheduledInpatientPattern
+            .Should().Be(ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod);
+        options.PatientProfiles.Should().ContainSingle();
+        options.PatientProfiles[0].ScheduledInpatientPattern
+            .Should().Be(ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod);
+    }
+
+    [Fact]
+    public void Cohort_qualification_is_extracted_and_propagated_to_profiles()
+    {
+        var json = """
+            {
+                "patientCohorts": [
+                    {
+                        "patientCount": 1,
+                        "cohortQualification": "NonQualifying",
+                        "measureEligibilities": {
+                            "NhsnAcuteCareHospitalMonthlyInitialPopulation": "Qualifying"
+                        }
+                    }
+                ]
+            }
+            """;
+
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            RunConfigurationJson = json,
+        });
+
+        options.PatientCohorts.Should().ContainSingle();
+        options.PatientCohorts[0].CohortQualification.Should().Be(MeasureEligibility.NonQualifying);
+        options.PatientProfiles.Should().ContainSingle();
+        options.PatientProfiles[0].CohortQualification.Should().Be(MeasureEligibility.NonQualifying);
+    }
+
     // ---------- Custom scenario: JSON fallback when typed properties are missing ----------
 
     [Fact]
