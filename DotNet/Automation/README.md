@@ -323,18 +323,37 @@ before saving the scenario.
 Compact cohort inputs defining a group of patients:
 
 - `PatientCount` -- how many patients to generate.
+- `CohortQualification` -- explicit cohort intent (`Qualifying` / `NonQualifying`) used by
+  prediction gating, independent of per-measure map drift.
 - `MeasureEligibilities` -- per-measure `Qualifying` / `NonQualifying` map.
+- `ScheduledInpatientPattern` -- encounter admit/discharge timing relative to the report
+  period.
 - `EligibleClinicalScenarioIds` -- which clinical scenarios to draw from (empty = all).
 - `ResourcesPerPatientMin` / `ResourcesPerPatientMax` -- resource count range.
+
+`ScheduledInpatientPattern` values:
+
+- `AdmittedBeforePeriodRemainsInpatientAfterPeriod`
+- `AdmittedBeforePeriodDischargedDuringPeriod`
+- `AdmittedDuringPeriodRemainsInpatientAfterPeriod`
+- `AdmittedDuringPeriodDischargedDuringPeriod`
+- `AdmittedAndDischargedBeforePeriod`
+- `AdmittedAndDischargedAfterPeriod`
 
 ### 7.2 `PatientProfile`
 
 Expanded per-patient configuration produced by `PatientCohortDefinition.ExpandProfiles()`:
 
 - Per-measure eligibility map.
+- `CohortQualification` propagated from the source cohort.
+- `ScheduledInpatientPattern` propagated from the source cohort.
 - Seed offset for deterministic generation.
 - Clinical scenario assignment (round-robin from eligible scenarios).
 - Resource count (randomized within the cohort's min/max range).
+
+`PatientProfile` exposes prediction helpers that combine measure eligibility with cohort-level
+intent and pattern inclusion semantics, so hosts can compute expected submitted/ABS sets
+without re-implementing rule logic.
 
 ### 7.3 Expansion flow
 
@@ -392,6 +411,8 @@ For each patient the predicted set of resources is computed in layers:
 base        = simulated-acquired keys (fallback: generated keys) filtered by
               IsExpectedInAbs(resourceType)
 base        = base minus CqlFilteredResourceKeysByPatient[patientId]
+base        = empty when patient is excluded by cohort qualification/pattern inclusion
+              semantics
 base        = base plus Patient/{patientId}   when the patient qualifies for any measure
               (MeasureEval's CQL engine loads Patient implicitly)
 

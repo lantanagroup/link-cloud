@@ -287,7 +287,7 @@ A `TestScenarioDefinition` captures everything needed to run a test:
 | `Seed` | Deterministic generation seed. |
 | `PatientCount` | Computed from cohorts plus imported patients (read-only on the editor). |
 | `ResourcesPerPatientMin/Max` | Resource count range per patient. |
-| `PatientCohorts` | List of cohort definitions (count, eligibility, clinical profiles, resource range). |
+| `PatientCohorts` | List of cohort definitions (count, `CohortQualification`, per-measure eligibility, clinical profiles, resource range, inpatient pattern). |
 | `QueryPlanTemplateId` | Optional override for the FHIR query plan (null = system default). |
 | `CleanupServiceData` | Remove facility config and run artifacts after completion. |
 | `CleanupFhirData` | Expunge FHIR server data after completion. |
@@ -363,6 +363,72 @@ The editor enforces measure eligibility constraints in the UI:
   the generation layer).
 - The Hypoglycemic measure requires ACH Monthly to also be qualifying (dependency
   enforcement).
+
+### Inpatient Pattern (UI-driven encounter timing)
+
+Each cohort includes a `ScheduledInpatientPattern` that defines encounter timing relative to
+the report period. This is authored in the shared scenario editor modal and persisted with
+the cohort JSON.
+
+Supported values:
+
+- `AdmittedBeforePeriodRemainsInpatientAfterPeriod`
+- `AdmittedBeforePeriodDischargedDuringPeriod`
+- `AdmittedDuringPeriodRemainsInpatientAfterPeriod`
+- `AdmittedDuringPeriodDischargedDuringPeriod`
+- `AdmittedAndDischargedBeforePeriod`
+- `AdmittedAndDischargedAfterPeriod`
+
+The dropdown uses compact labels for readability and tooltip hints for the full wording.
+
+#### Cohort Outcome + Pattern compatibility
+
+The editor now treats cohort intent as explicit via `CohortQualification`:
+
+- `Qualifying`
+- `NonQualifying`
+
+Pattern options are filtered by that choice:
+
+- **Qualifying** cohorts can choose only patterns whose census behavior is
+  `ExpectedInReport=true`.
+- **Non-Qualifying** cohorts can choose only patterns whose census behavior is
+  `ExpectedInReport=false`.
+
+This prevents invalid UI combinations that previously caused prediction drift.
+
+#### Measure checkbox rules by Cohort Outcome
+
+The cohort measure-eligibility editor enforces hard constraints:
+
+- **Qualifying cohort**
+  - If one selected measure exists in the scenario, it cannot be unchecked.
+  - If multiple measures exist, at least one must remain checked.
+- **Non-Qualifying cohort**
+  - No measure checkboxes can be selected.
+
+These rules run on row add, measure toggle, cohort-outcome toggle, and global measure-list
+changes.
+
+#### Runtime impact
+
+The UI host passes inpatient pattern + cohort qualification through run resolution so the
+downstream generation/prediction model can align expectations with authored scenario intent:
+
+- Pattern shapes encounter timing for both scheduled and non-scheduled runs.
+- Scheduled/regenerate runs additionally use pattern-derived live census orchestration.
+- Expected submitted/ABS sets are gated by measure eligibility **and**
+  (`CohortQualification` + pattern inclusion semantics), reducing false validator failures.
+
+#### Backward compatibility
+
+Legacy scenarios (saved before these fields were first-class) are normalized on load/save:
+
+- missing pattern defaults to
+  `AdmittedBeforePeriodRemainsInpatientAfterPeriod`.
+- missing `CohortQualification` is inferred from per-measure eligibility where possible.
+
+This keeps existing saved scenarios runnable while adopting the new model.
 ---
 
 ## 6. Dashboard and real-time updates
