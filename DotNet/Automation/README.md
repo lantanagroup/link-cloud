@@ -126,6 +126,10 @@ logic in a streaming pipeline that:
    patient IDs are appended to `MarkPreExistingPatient` when sourced by ID, so cleanup
    skips expunging them.
 
+Inpatient-pattern shaping is applied in this pipeline for both scheduled and non-scheduled
+workflows whenever the profile carries `ScheduledInpatientPattern` and a clinical period is
+provided. This keeps generation and prediction aligned with scenario-authored timing intent.
+
 The pipeline accepts an optional `runId` parameter; when omitted a fresh short GUID is
 generated so concurrent invocations remain isolated. Provide a stable `runId` only when
 reproducing a specific run for debugging.
@@ -368,6 +372,25 @@ PatientCohortDefinition[]
 When `EligibleClinicalScenarioIds` is empty, expansion falls back to all clinical scenarios
 from `FhirGenerationCodes.ClinicalScenarios`.
 
+### 7.4 Inpatient pattern semantics in generation/prediction
+
+`ScheduledInpatientPattern` influences two independent but coordinated behaviors:
+
+1. **Encounter window derivation** -- controls admit/discharge placement relative to the
+   report period (`before`, `during`, `after`).
+2. **Prediction inclusion semantics** -- each pattern maps to `ExpectedInReport` via
+   `ScheduledInpatientPatternExtensions.GetCensusBehavior()`.
+
+Prediction helpers (`PatientProfile.IsExpectedInReportByCohortAndPattern()` and
+`IsExpectedToBeSubmitted(...)`) combine:
+
+- per-measure eligibility,
+- `CohortQualification`,
+- pattern `ExpectedInReport`.
+
+This prevents expected-output inflation for cohorts intentionally configured as
+non-reportable by timing or cohort qualification.
+
 ---
 
 ## 8. Predictive expectation model
@@ -522,7 +545,8 @@ matter of implementing `ICqlFilterProfile` (which exposes `TargetResourceType`,
   acquire for each patient. The single-patient entrypoint
   `SimulateAcquiredKeysForPatient` accepts the patient's pre-parsed entries plus the
   shared infrastructure entries, the query plan, and an optional clinical period
-  (`clinicalPeriodStart` / `clinicalPeriodEnd`):
+  (`clinicalPeriodStart` / `clinicalPeriodEnd`), plus an optional
+  `allowEncounterAnchoredDateOverrideForOutOfRange` mode switch:
   - When the query plan declares a `date=ge...` or `date=le...` parameter, the simulator
     extracts the candidate resource's date range (instant fields collapse to start == end)
     and applies FHIR overlap semantics: `ge S` requires `resource.End >= S`, `le E`
@@ -532,6 +556,10 @@ matter of implementing `ICqlFilterProfile` (which exposes `TargetResourceType`,
     set and a one-time-per-resource warning is emitted via the optional `IAutomationOutput`
     sink. This keeps prediction honest for unfamiliar imported FHIR shapes; extending
     `TryGetResourceDateRange` is the way to model new shapes.
+  - **Encounter-anchored out-of-range override (optional)** -- callers can opt-in to keep
+    encounter-linked Observation/DiagnosticReport/Procedure resources when strict date-bound
+    matching would otherwise exclude them. Hosts typically enable this for scheduled/regenerate
+    workflows and keep strict mode for non-scheduled runs.
 - `CqlResourceTypeExtractor` -- extracts CQL-retrieved resource types from measure bundles.
   Reachability roots include both population criteria expressions and `supplementalData`
   criteria expressions (SDE roots).
