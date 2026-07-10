@@ -3,6 +3,7 @@ using MongoDB.Driver;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Automation.UI.Services.Persistence;
 
@@ -46,8 +47,18 @@ namespace Automation.UI.Services.Persistence;
 /// </summary>
 public sealed class MongoScenarioStore : IScenarioStore
 {
+    private static readonly JsonSerializerOptions CohortJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly IMongoCollection<TestScenarioDocument> _scenarios;
     private readonly IMongoCollection<ImportedBundleDocument> _bundles;
+
+    static MongoScenarioStore()
+    {
+        CohortJsonOptions.Converters.Add(new JsonStringEnumConverter());
+    }
 
     public MongoScenarioStore(IMongoDatabase database)
     {
@@ -409,12 +420,12 @@ public sealed class MongoScenarioStore : IScenarioStore
         {
             using var doc = JsonDocument.Parse(json);
             if (doc.RootElement.ValueKind != JsonValueKind.Array)
-                return JsonSerializer.Deserialize<List<PatientCohortDefinition>>(json) ?? [];
+                return JsonSerializer.Deserialize<List<PatientCohortDefinition>>(json, CohortJsonOptions) ?? [];
 
             var cohorts = new List<PatientCohortDefinition>();
             foreach (var cohortElement in doc.RootElement.EnumerateArray())
             {
-                var cohort = JsonSerializer.Deserialize<PatientCohortDefinition>(cohortElement.GetRawText());
+                var cohort = JsonSerializer.Deserialize<PatientCohortDefinition>(cohortElement.GetRawText(), CohortJsonOptions);
                 if (cohort == null)
                     continue;
 
