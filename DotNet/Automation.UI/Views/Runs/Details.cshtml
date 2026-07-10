@@ -565,6 +565,31 @@
             NhsnGlycemicControlHypoglycemicInitialPopulation: 'Hypoglycemic'
         };
 
+        const scheduledPatternShortNames = {
+            AdmittedBeforePeriodRemainsInpatientAfterPeriod: 'Before → Remains after',
+            AdmittedBeforePeriodDischargedDuringPeriod: 'Before → Discharged during',
+            AdmittedDuringPeriodRemainsInpatientAfterPeriod: 'During → Remains after',
+            AdmittedDuringPeriodDischargedDuringPeriod: 'During → Discharged during',
+            AdmittedAndDischargedBeforePeriod: 'Before → Before',
+            AdmittedAndDischargedAfterPeriod: 'After → After'
+        };
+        const defaultScheduledPattern = 'AdmittedBeforePeriodRemainsInpatientAfterPeriod';
+
+        function formatScheduledPattern(value) {
+            if (value === null || value === undefined || value === '')
+                return escapeHtml(scheduledPatternShortNames[defaultScheduledPattern]);
+            const key = String(value).trim();
+            if (!key) return escapeHtml(scheduledPatternShortNames[defaultScheduledPattern]);
+            if (scheduledPatternShortNames[key]) return escapeHtml(scheduledPatternShortNames[key]);
+            if (/^\d+$/.test(key)) {
+                const index = Number.parseInt(key, 10);
+                const keys = Object.keys(scheduledPatternShortNames);
+                if (index >= 0 && index < keys.length)
+                    return escapeHtml(scheduledPatternShortNames[keys[index]]);
+            }
+            return escapeHtml(toLabel(key));
+        }
+
         function renderConfigProperties(rawJson) {
             const container = document.getElementById('runConfigProps');
             if (!container) return;
@@ -692,11 +717,12 @@
                     }).join('');
                     const min = c?.resourcesPerPatientMin ?? '-';
                     const max = c?.resourcesPerPatientMax ?? '-';
-                    return `<tr><td class="fw-semibold">${idx + 1}</td><td>${c?.patientCount ?? '-'}</td><td>${escapeHtml(String(min))}\u2013${escapeHtml(String(max))}</td>${eligCells}</tr>`;
+                    const inpatientPattern = formatScheduledPattern(c?.scheduledInpatientPattern);
+                    return `<tr><td class="fw-semibold">${idx + 1}</td><td>${c?.patientCount ?? '-'}</td><td>${escapeHtml(String(min))}\u2013${escapeHtml(String(max))}</td><td>${inpatientPattern}</td>${eligCells}</tr>`;
                 }).join('');
 
                 cohortBody.innerHTML =
-                    `<table class="au-cohort-summary-table"><thead><tr><th>#</th><th>Patients</th><th>Resources</th>${measureCols}</tr></thead><tbody>${rows}</tbody></table>`;
+                    `<table class="au-cohort-summary-table"><thead><tr><th>#</th><th>Patients</th><th>Resources</th><th>Inpatient Pattern</th>${measureCols}</tr></thead><tbody>${rows}</tbody></table>`;
                 cohortCard.style.display = '';
             }
         }

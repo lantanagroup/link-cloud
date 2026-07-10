@@ -30,6 +30,8 @@ namespace Automation.UI.Services;
 /// </summary>
 internal sealed class RunExecutor
 {
+    private const ScheduledInpatientPattern DefaultScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
+
     private readonly AutomationConfig _automationConfig;
     private readonly IServiceProvider _hostServices;
     private readonly ISnapshotStore _snapshotStore;
@@ -83,9 +85,11 @@ internal sealed class RunExecutor
         {
             var scenarioConfig = ScenarioConfigBuilder.Build(state.Scenario, state.Options);
 
-            // For scheduled-report, compute the active window immediately so generation
+            var usesScheduledWorkflow = state.Options.ReportMethod is ReportMethod.ScheduledReport or ReportMethod.RegenerateReport;
+
+            // For scheduled-style runs, compute the active window immediately so generation
             // uses the correct clinical period boundaries (scenarioConfig.StartDate/EndDate).
-            if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+            if (usesScheduledWorkflow)
             {
                 // Use a clinically meaningful report window for generation so scheduled
                 // inpatient patterns produce rich in-period evidence (not minute-scale data).
@@ -215,7 +219,10 @@ internal sealed class RunExecutor
                     {
                         QueryPlan = effectiveQueryPlan,
                         ClinicalPeriodStart = scenarioConfig.StartDate,
-                        ClinicalPeriodEnd = scenarioConfig.EndDate
+                        ClinicalPeriodEnd = scenarioConfig.EndDate,
+                        AllowEncounterAnchoredDateOverrideForOutOfRange =
+                            state.Options.ReportMethod == ReportMethod.ScheduledReport
+                            || state.Options.ReportMethod == ReportMethod.RegenerateReport
                     },
                     importedPatients: importedPatients.Count > 0 ? importedPatients : null);
 
@@ -226,7 +233,7 @@ internal sealed class RunExecutor
                 // Use the manifest's parallel PatientIds + Profiles arrays as the source of truth.
                 expectedSubmittedPatientIds = generationManifest.PatientIds
                     .Where((_, idx) => idx < generationManifest.Profiles.Count
-                                       && generationManifest.Profiles[idx].QualifiesForAny(selectedMeasures))
+                                       && generationManifest.Profiles[idx].IsExpectedToBeSubmitted(selectedMeasures))
                     .ToList();
 
                 if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
@@ -308,7 +315,7 @@ internal sealed class RunExecutor
             // (a) attempt to read FHIR List resources that do not exist on the synthetic server
             // — surfacing spurious "configuration missing" errors — and (b) publish empty
             // snapshots that auto-discharge our still-admitted patients out of turn.
-            var enableBackgroundCensusJobs = state.Options.ReportMethod != ReportMethod.ScheduledReport;
+            var enableBackgroundCensusJobs = !usesScheduledWorkflow;
             await FacilitySetupHelper.EnsureCensusConfigAsync(
                 services.GetRequiredService<ICensusServiceClient>(),
                 output,
@@ -322,7 +329,7 @@ internal sealed class RunExecutor
 
             Frequency? scheduledRunFrequency = null;
             string reportId;
-            if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+            if (usesScheduledWorkflow)
             {
                 var scheduledWorkflowState = await ExecuteScheduledReportWorkflowAsync(
                     reportHelper,
@@ -371,7 +378,7 @@ internal sealed class RunExecutor
                     throw new InvalidOperationException($"Expected report with id {reportId} to be submitted but it was not.");
             }
 
-            if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+            if (usesScheduledWorkflow)
             {
                 // Scheduled runs can briefly report Submitted while entry-level state is still
                 // converging. Reconcile against terminal report truth (entries + submission
@@ -668,20 +675,13 @@ internal sealed class RunExecutor
         for (var i = 0; i < count; i++)
         {
             var profile = profiles[i];
-            if (!profile.QualifiesForAny(selectedMeasures))
+            if (!profile.IsExpectedToBeSubmitted(selectedMeasures))
                 continue;
 
-            if (IsExpectedInScheduledReport(profile.ScheduledInpatientPattern))
-                expected.Add(patientIds[i]);
+            expected.Add(patientIds[i]);
         }
 
         return expected;
-    }
-
-    private static bool IsExpectedInScheduledReport(ScheduledInpatientPattern? pattern)
-    {
-        var effective = pattern ?? ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod;
-        return effective.GetCensusBehavior().ExpectedInReport;
     }
 
     private static string ToZulu(DateTimeOffset value)
@@ -693,7 +693,7 @@ internal sealed class RunExecutor
     // Keep scheduled test runtimes bounded while still allowing long clinical windows.
     // Admin.BFF computes EndDate using current-time + delay, so this controls how long
     // the run waits for end-of-period execution.
-    private static readonly TimeSpan ScheduledRuntimeDelay = TimeSpan.FromMinutes(4);
+    private static readonly TimeSpan ScheduledRuntimeDelay = TimeSpan.FromMinutes(2);
 
     private static ScheduledReportWindow DeriveScheduledReportWindow(TestScenarioConfig scenarioConfig)
     {
@@ -734,7 +734,7 @@ internal sealed class RunExecutor
         for (var i = 0; i < count; i++)
         {
             var pattern = profiles[i].ScheduledInpatientPattern
-                ?? ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod;
+                ?? DefaultScheduledInpatientPattern;
             var behavior = pattern.GetCensusBehavior();
 
             // Patterns whose entire stay sits outside the report period emit no census events;

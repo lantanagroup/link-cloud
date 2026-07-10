@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation;
@@ -50,8 +50,22 @@ public class ScenariosController(
         model.IsSystemScenario = false;
         model.UpdatedAt = DateTimeOffset.UtcNow;
 
-        if (model.ResourcesPerPatientMax < model.ResourcesPerPatientMin)
-            model.ResourcesPerPatientMax = model.ResourcesPerPatientMin;
+        foreach (var cohort in model.PatientCohorts)
+        {
+            if (cohort.ResourcesPerPatientMin < 1)
+                cohort.ResourcesPerPatientMin = 1;
+            if (cohort.ResourcesPerPatientMax < cohort.ResourcesPerPatientMin)
+                cohort.ResourcesPerPatientMax = cohort.ResourcesPerPatientMin;
+
+            cohort.ScheduledInpatientPattern ??= ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
+
+            var allNonQualifying = model.SelectedMeasures.Count > 0
+                && model.SelectedMeasures.All(m => cohort.GetEligibility(m) == MeasureEligibility.NonQualifying);
+
+            // Back-compat normalization for payloads that do not yet send cohortQualification.
+            if (allNonQualifying)
+                cohort.CohortQualification = MeasureEligibility.NonQualifying;
+        }
 
         // ----- Imported-patient validation (fail save on bad input) -----
         var importValidation = await ValidateImportedPatientsAsync(model, ct);
@@ -363,16 +377,16 @@ public class ScenariosController(
             SelectedMeasures = [.. source.SelectedMeasures],
             Seed = source.Seed,
             PatientCount = source.PatientCount,
-            ResourcesPerPatientMin = source.ResourcesPerPatientMin,
-            ResourcesPerPatientMax = source.ResourcesPerPatientMax,
             PatientCohorts = source.PatientCohorts
                 .Select(c => new PatientCohortDefinition
                 {
                     PatientCount = c.PatientCount,
+                    CohortQualification = c.CohortQualification,
                     MeasureEligibilities = new(c.MeasureEligibilities),
                     EligibleClinicalScenarioIds = [.. c.EligibleClinicalScenarioIds],
                     ResourcesPerPatientMin = c.ResourcesPerPatientMin,
-                    ResourcesPerPatientMax = c.ResourcesPerPatientMax
+                    ResourcesPerPatientMax = c.ResourcesPerPatientMax,
+                    ScheduledInpatientPattern = c.ScheduledInpatientPattern
                 })
                 .ToList(),
             QueryPlanTemplateId = source.QueryPlanTemplateId,
