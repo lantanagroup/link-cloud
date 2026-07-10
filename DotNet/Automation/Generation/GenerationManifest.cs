@@ -459,6 +459,7 @@ public sealed class GenerationManifest
     public GenerationManifestSnapshot ToSnapshot()
     {
         var eligibility = new Dictionary<string, List<string>>();
+        var inpatientPatterns = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var i = 0; i < PatientIds.Count && i < Profiles.Count; i++)
         {
             var qualifying = new List<string>();
@@ -468,6 +469,10 @@ public sealed class GenerationManifest
                     qualifying.Add(measure.ToString());
             }
             eligibility[PatientIds[i]] = qualifying;
+
+            var pattern = Profiles[i].ScheduledInpatientPattern
+                ?? ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
+            inpatientPatterns[PatientIds[i]] = pattern.ToString();
         }
 
         // Build predicted ABS counts per patient (generated ? acquired ? CQL-referenced)
@@ -503,6 +508,7 @@ public sealed class GenerationManifest
                 .Where(kv => !string.IsNullOrEmpty(kv.Key))
                 .ToDictionary(kv => kv.Key, kv => new Dictionary<string, int>(kv.Value)),
             PatientEligibility = eligibility,
+            PatientInpatientPatterns = inpatientPatterns,
             ExpectedAbsCountsByPatient = expectedAbsByPatient,
             ExpectedAbsTotalCountsByType = expectedAbsTotals
         };

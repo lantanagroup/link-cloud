@@ -65,6 +65,7 @@ public class PatientCohortDefinition
     {
         var result = new List<PatientProfile>();
         var seedCursor = 0;
+        var cohortIndex = 0;
 
         foreach (var cohort in cohorts)
         {
@@ -79,7 +80,7 @@ public class PatientCohortDefinition
             {
                 var seedOffset = seedCursor;
                 var scenarioId = scenarios[seedCursor % scenarios.Count];
-                var resources = min == max ? min : min + ((seed + seedCursor) % (max - min + 1));
+                var resources = ComputeResourceTarget(seed, cohortIndex, i, min, max);
                 result.Add(new PatientProfile(
                     new Dictionary<ProfiledMeasureType, MeasureEligibility>(cohort.MeasureEligibilities),
                     seedOffset,
@@ -89,9 +90,29 @@ public class PatientCohortDefinition
                     cohort.CohortQualification));
                 seedCursor++;
             }
+
+            cohortIndex++;
         }
 
         return result;
+    }
+
+    private static int ComputeResourceTarget(int seed, int cohortIndex, int patientIndexInCohort, int min, int max)
+    {
+        if (max <= min)
+            return min;
+
+        var span = max - min + 1;
+
+        // Deterministic per-patient selection based on (seed, cohort #, patient #).
+        // Cantor pairing gives each (cohort,patient) tuple a stable unique ordinal so
+        // adjacent patients and same patient-number across cohorts distribute independently.
+        long sum = cohortIndex + patientIndexInCohort;
+        long pairedOrdinal = (sum * (sum + 1) / 2) + patientIndexInCohort;
+        long raw = seed + pairedOrdinal;
+        var offset = (int)((raw % span + span) % span);
+
+        return min + offset;
     }
 
     /// <summary>

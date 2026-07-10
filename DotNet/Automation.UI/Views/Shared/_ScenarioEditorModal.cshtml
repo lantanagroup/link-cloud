@@ -845,8 +845,6 @@
         // ---- Collect form into JSON payload ----
         function collectModel() {
             var cohorts = getCohorts();
-            var mins = cohorts.map(function (c) { return c.resourcesPerPatientMin || 50; });
-            var maxes = cohorts.map(function (c) { return c.resourcesPerPatientMax || 100; });
             var imported = getImportedPatients();
             var importedIds = imported.filter(function (p) { return p.source === 'ExistingId'; });
             var importedBundles = imported.filter(function (p) { return p.source === 'Bundle'; });
@@ -862,8 +860,6 @@
                 // patientCount as a fallback cohort-generation target when no cohorts are
                 // configured; including imported patients here would inflate that fallback.
                 patientCount: cohorts.reduce(function (s, c) { return s + (c.patientCount || 0); }, 0),
-                resourcesPerPatientMin: mins.length > 0 ? Math.min.apply(null, mins) : 50,
-                resourcesPerPatientMax: maxes.length > 0 ? Math.max.apply(null, maxes) : 100,
                 patientCohorts: cohorts,
                 cleanupServiceData: document.getElementById('CleanupServiceData').checked,
                 cleanupFhirData: document.getElementById('CleanupFhirData').checked,

@@ -62,7 +62,6 @@ public class StartScenarioRequestResolverTests
         {
             Scenario = AutomationScenarioKind.Custom,
             PatientCount = 7,
-            ResourcesPerPatient = 42,
             Seed = 12345,
             CleanupServiceData = true,
             CleanupFhirData = false,
@@ -74,7 +73,7 @@ public class StartScenarioRequestResolverTests
         var options = StartScenarioRequestResolver.Resolve(request);
 
         options.PatientCount.Should().Be(7);
-        options.ResourcesPerPatient.Should().Be(42);
+        options.ResourcesPerPatient.Should().Be(250);
         options.Seed.Should().Be(12345);
         options.CleanupServiceData.Should().BeTrue();
         options.CleanupFhirData.Should().BeFalse();
@@ -102,6 +101,8 @@ public class StartScenarioRequestResolverTests
         cohort.PatientCount.Should().Be(5);
         cohort.GetEligibility(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
             .Should().Be(MeasureEligibility.Qualifying);
+        cohort.ResourcesPerPatientMin.Should().Be(250);
+        cohort.ResourcesPerPatientMax.Should().Be(250);
 
         // Synthesized cohort should expand to PatientCount profiles.
         options.PatientProfiles.Should().HaveCount(5);

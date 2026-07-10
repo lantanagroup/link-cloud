@@ -46,8 +46,8 @@ public static class StartScenarioRequestResolver
                   BuildDefaultCohort(
                       effectiveMeasures,
                       request.PatientCount ?? defaults.PatientCount,
-                      request.ResourcesPerPatient ?? defaults.ResourcesPerPatient,
-                      request.ResourcesPerPatient ?? defaults.ResourcesPerPatient)
+                      defaultResourcesMin: 250,
+                      defaultResourcesMax: 250)
               ];
 
         ApplyCohortDefaults(cohorts, effectiveMeasures);
@@ -70,7 +70,9 @@ public static class StartScenarioRequestResolver
         return defaults with
         {
             PatientCount = request.PatientCount ?? defaults.PatientCount,
-            ResourcesPerPatient = request.ResourcesPerPatient ?? defaults.ResourcesPerPatient,
+            // Legacy run-level ResourcesPerPatient is obsolete for cohort-based runs.
+            // Keep the field populated for back-compat telemetry/UI callers.
+            ResourcesPerPatient = cohorts.FirstOrDefault()?.ResourcesPerPatientMax ?? defaults.ResourcesPerPatient,
             Seed = request.Seed ?? defaults.Seed,
             PollingIntervalSeconds = 3,
             // Keep an explicit hard timeout for custom runs so scheduled workflows
@@ -94,10 +96,10 @@ public static class StartScenarioRequestResolver
     private static PatientCohortDefinition BuildDefaultCohort(
         IReadOnlyList<ProfiledMeasureType> measures,
         int patientCount,
-        int resourcesMin,
-        int resourcesMax)
+        int defaultResourcesMin,
+        int defaultResourcesMax)
     {
-        var cohort = PatientCohortDefinition.AllQualifying(measures, patientCount, resourcesMin, resourcesMax);
+        var cohort = PatientCohortDefinition.AllQualifying(measures, patientCount, defaultResourcesMin, defaultResourcesMax);
         cohort.ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
         return cohort;
     }

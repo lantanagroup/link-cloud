@@ -50,11 +50,13 @@ public class ScenariosController(
         model.IsSystemScenario = false;
         model.UpdatedAt = DateTimeOffset.UtcNow;
 
-        if (model.ResourcesPerPatientMax < model.ResourcesPerPatientMin)
-            model.ResourcesPerPatientMax = model.ResourcesPerPatientMin;
-
         foreach (var cohort in model.PatientCohorts)
         {
+            if (cohort.ResourcesPerPatientMin < 1)
+                cohort.ResourcesPerPatientMin = 1;
+            if (cohort.ResourcesPerPatientMax < cohort.ResourcesPerPatientMin)
+                cohort.ResourcesPerPatientMax = cohort.ResourcesPerPatientMin;
+
             cohort.ScheduledInpatientPattern ??= ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
 
             var allNonQualifying = model.SelectedMeasures.Count > 0
@@ -375,8 +377,6 @@ public class ScenariosController(
             SelectedMeasures = [.. source.SelectedMeasures],
             Seed = source.Seed,
             PatientCount = source.PatientCount,
-            ResourcesPerPatientMin = source.ResourcesPerPatientMin,
-            ResourcesPerPatientMax = source.ResourcesPerPatientMax,
             PatientCohorts = source.PatientCohorts
                 .Select(c => new PatientCohortDefinition
                 {
