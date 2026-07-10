@@ -59,6 +59,13 @@ public static class FhirGenerationPipeline
         public required QueryPlanInput QueryPlan { get; init; }
         public string? ClinicalPeriodStart { get; init; }
         public string? ClinicalPeriodEnd { get; init; }
+
+        /// <summary>
+        /// When true, the simulator may use encounter-anchored fallback for date-mismatch
+        /// cases (resource has a recognized date, but falls outside strict ge/le bounds).
+        /// Scheduled workflows rely on this to mirror downstream acquisition behavior.
+        /// </summary>
+        public bool AllowEncounterAnchoredDateOverrideForOutOfRange { get; init; }
     }
 
     /// <summary>
@@ -136,9 +143,13 @@ public static class FhirGenerationPipeline
         var qualifyingAllCount = profiles.Count(p => p.QualifiesForAll(measures));
         var nonQualifyingAllCount = profiles.Count(p => p.QualifiesForNone(measures));
         var mixedEligibilityCount = profiles.Count - qualifyingAllCount - nonQualifyingAllCount;
+        var profileResourceOverrides = profiles.Count(p => p.ResourcesPerPatient.HasValue);
+        var resourceShape = profileResourceOverrides > 0
+            ? $"run default ~{totalResourcesPerPatient} resources (per-profile overrides: {profileResourceOverrides})"
+            : $"~{totalResourcesPerPatient} resources each";
         output.WriteLine($"[Pipeline] Generating {profiles.Count} profiled patients ({qualifyingAllCount} qualifying-all, " +
                          $"{nonQualifyingAllCount} non-qualifying-all, {mixedEligibilityCount} mixed) " +
-                         $"with ~{totalResourcesPerPatient} resources each, runId='{effectiveRunId}'" +
+                         $"with {resourceShape}, runId='{effectiveRunId}'" +
                          (generationSeed.HasValue ? $", seed={generationSeed.Value}" : string.Empty) + "...");
 
         // ------------------------------------------------------------------
@@ -280,9 +291,13 @@ public static class FhirGenerationPipeline
         var patientSeed = baseSeed + (profile.SeedOffset ?? patientIndex);
         var patientId = ids.PatientId(patientIndex);
 
+        // Respect per-profile resources override when present (e.g., cohort min/max expansion).
+        // Falls back to run-level default for profiles that do not specify a concrete target.
+        var effectiveResourcesPerPatient = profile.ResourcesPerPatient ?? totalResourcesPerPatient;
+
         // Generate entries using the same per-patient logic shared with FhirBundleGenerator.
         var entries = GeneratePatientEntries(
-            profile, patientIndex, baseSeed, totalResourcesPerPatient,
+            profile, patientIndex, baseSeed, effectiveResourcesPerPatient,
             sharedPractitionerIds, sharedMedicationIds, measures,
             generationClinicalPeriodStart, generationClinicalPeriodEnd, config, ids);
 
@@ -346,7 +361,8 @@ public static class FhirGenerationPipeline
                 acquisitionSimulation.QueryPlan,
                 acquisitionSimulation.ClinicalPeriodStart,
                 acquisitionSimulation.ClinicalPeriodEnd,
-                output);
+                output,
+                acquisitionSimulation.AllowEncounterAnchoredDateOverrideForOutOfRange);
             manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
             // patientSimEntries (JsonElement clones) are now eligible for GC
         }
@@ -484,7 +500,8 @@ public static class FhirGenerationPipeline
                 acquisitionSimulation.QueryPlan,
                 acquisitionSimulation.ClinicalPeriodStart,
                 acquisitionSimulation.ClinicalPeriodEnd,
-                output);
+                output,
+                acquisitionSimulation.AllowEncounterAnchoredDateOverrideForOutOfRange);
             manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
         }
 

@@ -283,3 +283,126 @@ Primary consumers:
   namespaces.
 - Strict prediction-vs-actual reconciliation is the default. The `Automation` README documents
   the prediction formula that drives these validators.
+
+---
+
+## 12. Inpatient Pattern feature (UI-driven cohort timing)
+
+`Automation.Link` now participates in a UI-driven inpatient-pattern workflow where each
+patient cohort carries explicit encounter timing intent relative to the report period.
+
+This replaced older hidden/default-only behavior and made cohort timing first-class in
+scenario authoring, orchestration, and strict prediction.
+
+### 12.1 What the feature is
+
+The feature allows each cohort to set a `ScheduledInpatientPattern` value that encodes
+admit/discharge timing relative to the report period:
+
+- admitted before / remains after,
+- admitted before / discharged during,
+- admitted during / remains after,
+- admitted during / discharged during,
+- admitted+discharged before,
+- admitted+discharged after.
+
+Patterns are authored in the scenario editor and persisted with the cohort definition.
+
+### 12.2 Why it matters for `Automation.Link`
+
+`Automation.Link` does not own the enum, but it is where orchestration + validators enforce
+pipeline truth. The inpatient pattern now affects:
+
+1. **Who should appear in report entries/submission**
+2. **Which census events are emitted in scheduled runs**
+3. **Which resources are predicted to land in ABS/report-resource stores**
+
+So this feature is tightly coupled to strict prediction-vs-actual validation behavior.
+
+### 12.3 Data flow (authoring -> execution -> validation)
+
+1. **Scenario authoring (Automation.UI)**
+   - Cohorts include explicit inpatient pattern.
+   - Cohorts also include concrete `CohortQualification` (`Qualifying` / `NonQualifying`).
+   - UI rules constrain incompatible combinations (e.g., non-qualifying cohorts cannot mark
+     measure eligibility as qualifying).
+
+2. **Run option resolution (Automation.UI)**
+   - Missing pattern defaults to `AdmittedBeforePeriodRemainsInpatientAfterPeriod`.
+   - Legacy scenarios are normalized so older persisted JSON still runs deterministically.
+
+3. **Generation (`Automation`)**
+   - Encounter windows are shaped from pattern + report period for all workflows
+     (scheduled and non-scheduled).
+
+4. **Execution (`Automation.Link` + Automation.UI host)**
+   - Scheduled workflows use pattern-derived census behavior to emit admit/discharge
+     snapshots and reconcile terminal submitted-patient sets.
+
+5. **Validation (`Automation.Link`)**
+   - Expected submitted/ABS sets now honor cohort qualification + pattern inclusion,
+     not measure flags alone.
+
+### 12.4 Scheduled vs non-scheduled behavior
+
+#### Scheduled / Regenerate
+
+- Patterns drive **live** census orchestration (`PatientListsAcquired` admit/discharge).
+- End-of-period acquisition behavior is pattern-sensitive (`remain inpatient` vs
+  `discharge during`).
+- Expected submitted sets are reconciled to terminal report truth before strict ABS checks.
+
+#### Adhoc / other non-scheduled
+
+- No live scheduled census event orchestration is required.
+- Pattern still drives generated encounter timing versus report period boundaries.
+- This keeps measure-eval and ABS expectations aligned with authored cohort intent.
+
+### 12.5 Prediction impact (strict validator mode)
+
+The strict validators compare `actual == expected`.
+
+With inpatient patterns enabled, expected counts/keys are gated by:
+
+- per-measure eligibility,
+- `CohortQualification`,
+- pattern inclusion semantics (`ExpectedInReport`).
+
+This prevents false expectations for cohorts that are intentionally outside report inclusion
+(for example, admitted/discharged fully before/after period).
+
+### 12.6 Acquisition simulation nuance
+
+`Automation` acquisition simulation supports a caller-controlled mode for encounter-anchored
+date override behavior. `Automation.Link` relies on this to keep prediction aligned by workflow:
+
+- **Scheduled / Regenerate**: encounter-anchored out-of-range override can be enabled to match
+  observed acquisition behavior.
+- **Non-scheduled**: strict date-bound simulation is preferred to avoid overprediction.
+
+This split is important for avoiding opposite failure shapes across test categories:
+
+- overprediction (`expected > actual`) in non-scheduled runs,
+- underprediction (`expected < actual`) in scheduled runs.
+
+### 12.7 Diagnostics and failure interpretation
+
+When inpatient-pattern mismatches exist, the first visible failure is usually
+`ReportAbsManifestValidator` with one of these shapes:
+
+- `expected=N, actual<N` and/or `missing expected resource <key>`
+- `expected=N, actual=M (ABS has M-N more than predicted)`
+
+Use the pipeline snapshot + run manifest to verify:
+
+- selected pattern per cohort,
+- terminal submitted patient set,
+- per-type expected-vs-actual deltas,
+- whether the run is scheduled/regenerate vs non-scheduled (different simulator mode).
+
+### 12.8 Operational notes
+
+- System scenarios are re-seeded on app startup; changing seeded inpatient patterns requires
+  restarting `Automation.UI` to refresh persisted system scenarios.
+- Unit tests should cover both seeded defaults and pattern-sensitive prediction behavior,
+  especially for multi-measure scenarios where one measure may be not-reportable per patient.

@@ -173,6 +173,27 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
 }
 .au-cohort-card .card-body { padding: .75rem 1rem; }
 
+.au-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.au-cohort-table {
+  min-width: 1080px;
+}
+
+.au-imported-table {
+  min-width: 860px;
+}
+
+.au-cohort-table td .form-control,
+.au-cohort-table td .form-select,
+.au-imported-table td .form-control,
+.au-imported-table td .form-select {
+  max-width: 100%;
+}
+
 /* ===================================================================
    Scenario header bar (inside the form)
    =================================================================== */
@@ -182,6 +203,10 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   border-radius: var(--au-radius);
   padding: .75rem 1rem;
   margin-bottom: 1rem;
+}
+
+.au-scenario-modal-dialog {
+  max-width: min(96vw, 1360px);
 }
 
 /* ===================================================================
@@ -277,6 +302,7 @@ body { margin-bottom: 60px; background: var(--au-bg); color: #222; }
   .au-card .card-body { padding: .75rem; }
   .au-table { font-size: .8rem; }
   .au-summary-item { font-size: .8rem; }
+  .au-scenario-modal-dialog { max-width: 96vw; }
 }
 
 /* ===================================================================
