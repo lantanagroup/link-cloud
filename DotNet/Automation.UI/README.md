@@ -429,6 +429,7 @@ Legacy scenarios (saved before these fields were first-class) are normalized on 
 - missing `CohortQualification` is inferred from per-measure eligibility where possible.
 
 This keeps existing saved scenarios runnable while adopting the new model.
+
 ---
 
 ## 6. Dashboard and real-time updates
