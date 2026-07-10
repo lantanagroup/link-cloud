@@ -1,9 +1,8 @@
-﻿using System.Text.Json;
-using Automation.UI.Models;
-using LantanaGroup.Automation.Generation;
+﻿using Automation.UI.Models;
 using MongoDB.Driver;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace Automation.UI.Services.Persistence;
 
@@ -408,13 +407,30 @@ public sealed class MongoScenarioStore : IScenarioStore
 
         try
         {
-            var cohorts = JsonSerializer.Deserialize<List<PatientCohortDefinition>>(json) ?? [];
-            foreach (var cohort in cohorts)
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                return JsonSerializer.Deserialize<List<PatientCohortDefinition>>(json) ?? [];
+
+            var cohorts = new List<PatientCohortDefinition>();
+            foreach (var cohortElement in doc.RootElement.EnumerateArray())
             {
-                var allNonQualifying = cohort.MeasureEligibilities.Count > 0
-                    && cohort.MeasureEligibilities.Values.All(v => v == MeasureEligibility.NonQualifying);
-                if (allNonQualifying)
-                    cohort.CohortQualification = MeasureEligibility.NonQualifying;
+                var cohort = JsonSerializer.Deserialize<PatientCohortDefinition>(cohortElement.GetRawText());
+                if (cohort == null)
+                    continue;
+
+                var hasExplicitCohortQualification = cohortElement.ValueKind == JsonValueKind.Object
+                    && cohortElement.EnumerateObject().Any(p =>
+                        string.Equals(p.Name, nameof(PatientCohortDefinition.CohortQualification), StringComparison.OrdinalIgnoreCase));
+
+                if (!hasExplicitCohortQualification)
+                {
+                    var allNonQualifying = cohort.MeasureEligibilities.Count > 0
+                        && cohort.MeasureEligibilities.Values.All(v => v == MeasureEligibility.NonQualifying);
+                    if (allNonQualifying)
+                        cohort.CohortQualification = MeasureEligibility.NonQualifying;
+                }
+
+                cohorts.Add(cohort);
             }
 
             return cohorts;
