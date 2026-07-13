@@ -140,10 +140,11 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
             {
                 if (!string.IsNullOrEmpty(this.AdminBffServiceUrl))
                 {
-                    if (this.AdminBffServiceUrl.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
-                        return this.AdminBffServiceUrl.TrimEnd('/');
+                    var normalized = this.AdminBffServiceUrl.TrimEnd('/');
+                    if (normalized.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
+                        return normalized;
 
-                    return this.AdminBffServiceUrl.TrimEnd('/') + "/api";
+                    return normalized + "/api";
                 }
 
                 return null;
@@ -277,10 +278,11 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
             {
                 if (!string.IsNullOrEmpty(this.PublicAdminBffServiceUrl))
                 {
-                    if (this.PublicAdminBffServiceUrl.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
-                        return this.PublicAdminBffServiceUrl.TrimEnd('/');
+                    var normalized = this.PublicAdminBffServiceUrl.TrimEnd('/');
+                    if (normalized.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
+                        return normalized;
 
-                    return this.PublicAdminBffServiceUrl.TrimEnd('/') + "/api";
+                    return normalized + "/api";
                 }
 
                 return null;
