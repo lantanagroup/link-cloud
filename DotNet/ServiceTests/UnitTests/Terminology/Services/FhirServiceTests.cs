@@ -499,6 +499,85 @@ public class FhirServiceTests
     }
 
     [Fact]
+    public void ValidateCodeInCodeSystem_WithDuplicateMatchesAndDisplay_SelectsLastMatchingDisplay()
+    {
+        // Arrange
+        var codeSystemId = "test-cs-duplicate-display";
+        var code = "duplicate-code";
+        var system = "http://test.system";
+        var display = "Matching Display";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    system,
+                    new List<Code>
+                    {
+                        new CodeSystemCode { Value = code, Display = display, Status = CodeStatus.Active },
+                        new CodeSystemCode { Value = code, Display = "Other Display", Status = CodeStatus.Active },
+                        new CodeSystemCode { Value = code, Display = display, Status = CodeStatus.Inactive },
+                        new CodeSystemCode { Value = code, Display = "Last Entry", Status = CodeStatus.Active }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.ValidateCodeInCodeSystem(null, codeSystemId, code, display, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        var outcome = Assert.IsType<OperationOutcome>(result.Parameter.Single(p => p.Name == "issues").Resource);
+        Assert.Equal("Code is inactive.", Assert.Single(outcome.Issue).Details?.Text);
+    }
+
+    [Fact]
+    public void ValidateCodeInCodeSystem_WithDuplicateMatchesAndNoDisplay_SelectsLastEntry()
+    {
+        // Arrange
+        var codeSystemId = "test-cs-duplicate-no-display";
+        var code = "duplicate-code";
+        var system = "http://test.system";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    system,
+                    new List<Code>
+                    {
+                        new CodeSystemCode { Value = code, Display = "First Entry", Status = CodeStatus.Active },
+                        new CodeSystemCode { Value = code, Display = "Last Entry", Status = CodeStatus.Inactive }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.ValidateCodeInCodeSystem(null, codeSystemId, code, null, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        var outcome = Assert.IsType<OperationOutcome>(result.Parameter.Single(p => p.Name == "issues").Resource);
+        Assert.Equal("Code is inactive.", Assert.Single(outcome.Issue).Details?.Text);
+    }
+
+    [Fact]
     public void ValidateCodeInCodeSystem_WithInvalidCode_ReturnsFalse()
     {
         // Arrange
