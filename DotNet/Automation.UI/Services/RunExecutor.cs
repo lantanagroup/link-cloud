@@ -39,6 +39,7 @@ internal sealed class RunExecutor
     private readonly QueryPlanTemplateResolver _queryPlanResolver;
     private readonly bool _suppressExternalManifest;
     private readonly bool _includePatientAggregatorOrganizationResource;
+    private readonly string _includePatientAggregatorOrganizationResourceSource;
     private readonly ILogger _logger;
 
     public RunExecutor(
@@ -56,8 +57,28 @@ internal sealed class RunExecutor
         _orchestrator = orchestrator;
         _queryPlanResolver = queryPlanResolver;
         _suppressExternalManifest = configuration.GetValue<bool>("ExternalBlobStorage:SuppressManifest");
-        _includePatientAggregatorOrganizationResource = configuration.GetValue<bool>("PatientAggregator:IncludeOrganizationResource");
+        var includeOrg = ResolveIncludePatientAggregatorOrganizationResource(configuration);
+        _includePatientAggregatorOrganizationResource = includeOrg.Value;
+        _includePatientAggregatorOrganizationResourceSource = includeOrg.Source;
         _logger = logger;
+    }
+
+    private static (bool Value, string Source) ResolveIncludePatientAggregatorOrganizationResource(IConfiguration configuration)
+    {
+        var shared = TryGetBool(configuration, "PatientAggregator:IncludeOrganizationResource");
+        if (shared.HasValue)
+            return (shared.Value, "PatientAggregator:IncludeOrganizationResource");
+
+        return (false, "default(false)");
+    }
+
+    private static bool? TryGetBool(IConfiguration configuration, string key)
+    {
+        var raw = configuration[key];
+        if (string.IsNullOrWhiteSpace(raw))
+            return null;
+
+        return bool.TryParse(raw, out var parsed) ? parsed : null;
     }
 
     /// <summary>
@@ -284,6 +305,7 @@ internal sealed class RunExecutor
                 generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlan);
                 generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
                 generationManifest.IncludePatientAggregatorOrganizationResource = _includePatientAggregatorOrganizationResource;
+                output.WriteLine($"[Manifest] IncludePatientAggregatorOrganizationResource={_includePatientAggregatorOrganizationResource} (source={_includePatientAggregatorOrganizationResourceSource})");
 
                 // Persist a lightweight manifest snapshot for the UI.
                 await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
