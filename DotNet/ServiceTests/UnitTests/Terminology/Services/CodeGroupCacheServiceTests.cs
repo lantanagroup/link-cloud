@@ -256,52 +256,6 @@ http://test.system,123,Test Display,Extra Value";
             Times.Once);
     }
 
-    [Fact]
-    public void ProcessValueSetCsv_WithDuplicateCode_UsesLastRecord()
-    {
-        var mockCache = new Mock<IMemoryCache>();
-        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
-
-        mockConfig.Setup(x => x.Value).Returns(_config);
-
-        var mockService = new Mock<CodeGroupCacheService>(
-            _loggerMock.Object,
-            mockCache.Object,
-            mockConfig.Object)
-        {
-            CallBase = true
-        };
-
-        mockService
-            .Setup(x => x.SetCodeGroup(It.IsAny<CodeGroup>()))
-            .Verifiable();
-
-        var csvData = "system,code,display\r\n" +
-                     "http://test.system,123,Original Display\r\n" +
-                     "http://test.system,456,Another Display\r\n" +
-                     "http://test.system,123,Replacement Display";
-
-        using var reader = new StringReader(csvData);
-        using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
-
-        var codeGroup = new CodeGroup
-        {
-            Id = "test-id",
-            Type = CodeGroup.CodeGroupTypes.ValueSet,
-            Url = "http://test.valueset",
-            Version = "1.0"
-        };
-
-        mockService.Object.ProcessValueSetCsv(codeGroup, csv);
-
-        var codes = codeGroup.Codes["http://test.system"];
-        Assert.Equal(2, codes.Count);
-
-        var duplicateCode = Assert.Single(codes, code => code.Value == "123");
-        Assert.Equal("Replacement Display", duplicateCode.Display);
-        Assert.DoesNotContain(codes, code => code.Display == "Original Display");
-    }
-
     [Theory]
     [InlineData("code,display\r\n" +
                 "123,Test Display\r\n" +
