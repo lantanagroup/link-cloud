@@ -111,7 +111,7 @@ public class ReportApiHelper
 
         var delayMinutes = Math.Max(1, (int)Math.Ceiling(reportDuration.TotalMinutes));
 
-        var request = new RestRequest("integration/report-scheduled", Method.Post)
+        var request = new RestRequest(GetIntegrationEndpointPath("report-scheduled"), Method.Post)
             .AddJsonBody(new
             {
                 facilityId,
@@ -124,7 +124,7 @@ public class ReportApiHelper
 
         var response = await _adminBffClient.ExecuteAsync(request);
         AutomationInvariant.Require(response.IsSuccessful,
-            $"Failed to produce ReportScheduled event for report '{trackingId}'. HTTP {(int)response.StatusCode}: {response.Content}");
+            $"Failed to produce ReportScheduled event for report '{trackingId}'. HTTP {(int)response.StatusCode}: {response.Content ?? response.ErrorMessage}");
 
         _output.WriteLine($"Scheduled report event produced: reportTrackingId={trackingId}, start={startDateUtc:O}, delayMinutes={delayMinutes}");
         return trackingId;
@@ -229,7 +229,7 @@ public class ReportApiHelper
             }
         };
 
-        var request = new RestRequest("integration/patient-list-acquired", Method.Post)
+        var request = new RestRequest(GetIntegrationEndpointPath("patient-list-acquired"), Method.Post)
             .AddJsonBody(new
             {
                 facilityId,
@@ -239,9 +239,31 @@ public class ReportApiHelper
 
         var response = await _adminBffClient.ExecuteAsync(request);
         AutomationInvariant.Require(response.IsSuccessful,
-            $"Failed to produce PatientListAcquired event for report '{reportTrackingId}'. HTTP {(int)response.StatusCode}: {response.Content}");
+            $"Failed to produce PatientListAcquired event for report '{reportTrackingId}'. HTTP {(int)response.StatusCode}: {response.Content ?? response.ErrorMessage}");
 
         _output.WriteLine($"PatientListAcquired event produced: admits={admits.Count}, discharges={discharges.Count}, reportTrackingId={reportTrackingId}");
+    }
+
+    private string GetIntegrationEndpointPath(string endpoint)
+    {
+        var normalizedEndpoint = endpoint.TrimStart('/');
+
+        // IntegrationTestingEndpoints are mounted under /api/integration/* in Admin.BFF.
+        // Some deployments set AdminBffBase with the /api suffix, others without it.
+        // Build the relative path to work with both shapes.
+        if (Uri.TryCreate(_automationConfig.AdminBffBase, UriKind.Absolute, out var baseUri))
+        {
+            var basePath = baseUri.AbsolutePath.TrimEnd('/');
+            var baseEndsWithApi = basePath.EndsWith("/api", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(basePath, "api", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(basePath, "/api", StringComparison.OrdinalIgnoreCase);
+
+            return baseEndsWithApi
+                ? $"integration/{normalizedEndpoint}"
+                : $"api/integration/{normalizedEndpoint}";
+        }
+
+        return $"api/integration/{normalizedEndpoint}";
     }
 
     public async Task<bool> CheckSubmissionStatusAsync(string reportId, TestScenarioConfig config, BackgroundDiagnosticsMonitor? diagnostics = null)
