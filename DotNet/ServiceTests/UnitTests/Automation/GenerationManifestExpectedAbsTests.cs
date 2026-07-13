@@ -168,6 +168,49 @@ public class GenerationManifestExpectedAbsTests
     }
 
     [Fact]
+    public void Expected_abs_counts_do_not_include_organization_when_include_setting_is_false()
+    {
+        var manifest = new GenerationManifest
+        {
+            PatientIds = ["p-q"],
+            Profiles = [QualifyingProfile()],
+            SelectedMeasures = [Ach],
+            ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["p-q"] = new(StringComparer.OrdinalIgnoreCase) { "Encounter/Eq" },
+            },
+            IncludePatientAggregatorOrganizationResource = false,
+        };
+
+        var counts = manifest.GetExpectedAbsCountsForPatient("p-q");
+
+        counts.Should().NotBeNull();
+        counts!.Should().NotContainKey("Organization");
+    }
+
+    [Fact]
+    public void Expected_abs_counts_include_one_organization_when_include_setting_is_true()
+    {
+        var manifest = new GenerationManifest
+        {
+            PatientIds = ["p-q"],
+            Profiles = [QualifyingProfile()],
+            SelectedMeasures = [Ach],
+            ResourceKeysByPatient = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
+            {
+                ["p-q"] = new(StringComparer.OrdinalIgnoreCase) { "Encounter/Eq" },
+            },
+            IncludePatientAggregatorOrganizationResource = true,
+        };
+
+        var counts = manifest.GetExpectedAbsCountsForPatient("p-q");
+
+        counts.Should().NotBeNull();
+        counts!.Should().ContainKey("Organization");
+        counts["Organization"].Should().Be(1);
+    }
+
+    [Fact]
     public void Pattern_excluded_patient_is_not_predicted_in_abs_even_if_measure_qualifying()
     {
         var manifest = new GenerationManifest
