@@ -253,8 +253,11 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         string method,
         int expectedStatus,
         Func<Task<LinkApiResponse<string>>> send,
-        CancellationToken ct) =>
-        CallBffAsync(endpointName, method, expectedStatus, async () => await send(), ct);
+        CancellationToken ct)
+    {
+        Func<Task<LinkApiResponse>> sendUntyped = async () => (await send()).AsUntyped();
+        return CallBffAsync(endpointName, method, expectedStatus, sendUntyped, ct);
+    }
 
     private ApiTestRunResult MakeFailedResult(string endpointName, string error) => new()
     {
