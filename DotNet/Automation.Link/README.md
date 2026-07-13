@@ -90,8 +90,9 @@ A typical host-driven flow (`BackendE2ETests` or `Automation.UI`) composed throu
   MeasureEval executes measure-authored SDE logic.
 - **`QueryPlanBuilder`** -- converts `QueryPlanInput` into DataAcquisition wire format;
   delegates canonical defaults and acquired-type extraction to `Automation.QueryPlanDefaults`.
-- **`AdminBffClientFactory`** -- builds authenticated Admin BFF clients for flows that require
-  BFF endpoints.
+- **`IAdminBffIntegrationClient` (`LinkSdk`)** -- typed client used for Admin BFF integration
+  endpoints (`/api/integration/*`) with the same shared bearer-token infrastructure as other
+  LinkSdk service clients.
 - **`ValidationApiHelper`** -- initializes validation artifacts and categories with retry +
   Loki diagnostics hooks.
 

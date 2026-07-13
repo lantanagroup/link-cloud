@@ -13,6 +13,7 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddLinkSdk(this IServiceCollection services)
     {
+        services.AddSingleton<IAdminBffIntegrationClient, AdminBffIntegrationClient>();
         services.AddSingleton<IFacilityServiceClient, FacilityServiceClient>();
         services.AddSingleton<ICensusServiceClient, CensusServiceClient>();
         services.AddSingleton<IDataAcquisitionServiceClient, DataAcquisitionServiceClient>();

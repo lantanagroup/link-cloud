@@ -1,14 +1,13 @@
-﻿using System.Diagnostics;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
-using Automation.UI.Models.ApiHealth;
+﻿using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
-using LantanaGroup.Link.Automation.Link.Configuration;
-using LantanaGroup.Link.Shared.Application.Extensions.Security;
-using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
+using LantanaGroup.Link.Sdk.ApiClient;
+using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
+using System.Text.Json;
 using StepNames = Automation.UI.Services.ApiHealth.TestSuites.ApiEndPointLibrary.AdminBffSteps;
 
 namespace Automation.UI.Services.ApiHealth.TestSuites;
@@ -20,30 +19,21 @@ namespace Automation.UI.Services.ApiHealth.TestSuites;
 /// </summary>
 public sealed class AdminBffTestSuite : ServiceTestSuiteBase
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IOptions<AutomationConfig> _automationConfig;
-    private readonly ICreateSystemToken _tokenService;
-    private readonly IOptions<LinkTokenServiceSettings> _tokenSettings;
-    private readonly IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> _bearerOptions;
+    private readonly IAdminBffIntegrationClient _adminBffClient;
+    private readonly IOptions<ServiceRegistry> _serviceRegistry;
     private readonly IApiHealthSeedContextAccessor _seedContext;
     private readonly ILogger<AdminBffTestSuite> _logger;
 
     public override string ServiceName => "AdminBff";
 
     public AdminBffTestSuite(
-        IHttpClientFactory httpClientFactory,
-        IOptions<AutomationConfig> automationConfig,
-        ICreateSystemToken tokenService,
-        IOptions<LinkTokenServiceSettings> tokenSettings,
-        IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
+        IAdminBffIntegrationClient adminBffClient,
+        IOptions<ServiceRegistry> serviceRegistry,
         IApiHealthSeedContextAccessor seedContext,
         ILogger<AdminBffTestSuite> logger)
     {
-        _httpClientFactory = httpClientFactory;
-        _automationConfig = automationConfig;
-        _tokenService = tokenService;
-        _tokenSettings = tokenSettings;
-        _bearerOptions = bearerOptions;
+        _adminBffClient = adminBffClient;
+        _serviceRegistry = serviceRegistry;
         _seedContext = seedContext;
         _logger = logger;
     }
@@ -59,7 +49,7 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
     public override async Task<IReadOnlyList<ApiTestRunResult>> ExecuteAsync(CancellationToken ct = default)
     {
         var results = new List<ApiTestRunResult>();
-        var baseUrl = _automationConfig.Value.AdminBffBase?.TrimEnd('/');
+        var baseUrl = _serviceRegistry.Value.AdminBffServiceApiUrl?.TrimEnd('/');
 
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
@@ -68,15 +58,15 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
                 EndpointKey = $"{ServiceName}::{StepNames.HealthGet200}",
                 ServiceName = ServiceName,
                 Passed = false,
-                ErrorMessage = "AdminBffBase URL is not configured in Automation settings.",
-                RequestBody = "Request was not sent because the AdminBffBase URL is missing.",
-                ResponseBody = "Response was not received because the AdminBffBase URL is missing."
+                ErrorMessage = "ServiceRegistry:AdminBffServiceUrl is not configured.",
+                RequestBody = "Request was not sent because ServiceRegistry:AdminBffServiceUrl is missing.",
+                ResponseBody = "Response was not received because ServiceRegistry:AdminBffServiceUrl is missing."
             });
             return results;
         }
 
         // --- /api/monitor/health ---
-        results.Add(await CallBffAsync(StepNames.HealthGet200, $"{baseUrl}/monitor/health", "GET", 200, ct));
+        results.Add(await CallBffAsync(StepNames.HealthGet200, "GET", 200, () => _adminBffClient.GetHealthAsync(ct), ct));
 
         // --- /api/aggregate/facility/{id} lifecycle ---
         var facilityId = $"ApiHealth-BFF-{Guid.NewGuid():N}";
@@ -84,13 +74,15 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
 
         try
         {
-            var createResult = await CreateFacilityViaBffAsync(baseUrl, facilityId, ct);
+            var createResult = await CreateFacilityViaBffAsync(facilityId, ct);
             facilityCreated = createResult;
 
             if (facilityCreated)
             {
-                results.Add(await CallBffAsync(StepNames.FacilityDelete200, $"{baseUrl}/aggregate/facility/{facilityId}", "DELETE", 200, ct));
-                results.Add(await CallBffAsync(StepNames.FacilityRestorePatch200, $"{baseUrl}/aggregate/facility/{facilityId}/restore", "PATCH", 200, ct));
+                results.Add(await CallBffAsync(StepNames.FacilityDelete200, "DELETE", 200,
+                    () => _adminBffClient.SoftDeleteAggregateFacilityAsync(facilityId, ct), ct));
+                results.Add(await CallBffAsync(StepNames.FacilityRestorePatch200, "PATCH", 200,
+                    () => _adminBffClient.RestoreAggregateFacilityAsync(facilityId, ct), ct));
             }
             else
             {
@@ -102,17 +94,20 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         {
             if (facilityCreated)
             {
-                try { await CallBffRawAsync($"{baseUrl}/Facility/{facilityId}", "DELETE", ct); }
+                try { await _adminBffClient.DeleteFacilityAsync(facilityId, ct); }
                 catch { /* best effort */ }
             }
         }
 
         var fakeFacilityId = $"ApiHealth-BFF-{Guid.NewGuid():N}";
-        results.Add(await CallBffAsync(StepNames.FacilityDelete404, $"{baseUrl}/aggregate/facility/{fakeFacilityId}", "DELETE", 404, ct));
-        results.Add(await CallBffAsync(StepNames.FacilityRestorePatch404, $"{baseUrl}/aggregate/facility/{fakeFacilityId}/restore", "PATCH", 404, ct));
+        results.Add(await CallBffAsync(StepNames.FacilityDelete404, "DELETE", 404,
+            () => _adminBffClient.SoftDeleteAggregateFacilityAsync(fakeFacilityId, ct), ct));
+        results.Add(await CallBffAsync(StepNames.FacilityRestorePatch404, "PATCH", 404,
+            () => _adminBffClient.RestoreAggregateFacilityAsync(fakeFacilityId, ct), ct));
 
         // --- /api/aggregate/reports/summaries ---
-        results.Add(await CallBffAsync(StepNames.SummariesGet200, $"{baseUrl}/aggregate/reports/summaries", "GET", 200, ct));
+        results.Add(await CallBffAsync(StepNames.SummariesGet200, "GET", 200,
+            () => _adminBffClient.GetReportSummariesAsync(ct), ct));
 
         // Seed-owned only: this suite requires ReportSchedule seed fixture.
         var reportScheduleId = _seedContext.Current?.Report?.ScheduleId;
@@ -120,19 +115,23 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
 
         // --- /api/aggregate/reports/summaries/{id} ---
         if (!string.IsNullOrWhiteSpace(reportScheduleId))
-            results.Add(await CallBffAsync(StepNames.SummaryGet200, $"{baseUrl}/aggregate/reports/summaries/{reportScheduleId}", "GET", 200, ct));
+            results.Add(await CallBffAsync(StepNames.SummaryGet200, "GET", 200,
+                () => _adminBffClient.GetReportSummaryAsync(reportScheduleId, ct), ct));
         else
             results.Add(SkipStepAsync(StepNames.SummaryGet200, reportSeedMissing));
 
         var fakeReportId = Guid.NewGuid().ToString();
-        results.Add(await CallBffAsync(StepNames.SummaryGet404, $"{baseUrl}/aggregate/reports/summaries/{fakeReportId}", "GET", 404, ct));
+        results.Add(await CallBffAsync(StepNames.SummaryGet404, "GET", 404,
+            () => _adminBffClient.GetReportSummaryAsync(fakeReportId, ct), ct));
 
         // --- /api/aggregate/reports/{id} lifecycle ---
 
         if (!string.IsNullOrWhiteSpace(reportScheduleId))
         {
-            results.Add(await CallBffAsync(StepNames.ReportDelete204, $"{baseUrl}/aggregate/reports/{reportScheduleId}", "DELETE", 204, ct));
-            results.Add(await CallBffAsync(StepNames.ReportRestorePatch204, $"{baseUrl}/aggregate/reports/{reportScheduleId}/restore", "PATCH", 204, ct));
+            results.Add(await CallBffAsync(StepNames.ReportDelete204, "DELETE", 204,
+                () => _adminBffClient.DeleteAggregateReportAsync(reportScheduleId, ct), ct));
+            results.Add(await CallBffAsync(StepNames.ReportRestorePatch204, "PATCH", 204,
+                () => _adminBffClient.RestoreAggregateReportAsync(reportScheduleId, ct), ct));
         }
         else
         {
@@ -141,8 +140,10 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         }
 
         var fakeScheduleId = Guid.NewGuid().ToString();
-        results.Add(await CallBffAsync(StepNames.ReportDelete404, $"{baseUrl}/aggregate/reports/{fakeScheduleId}", "DELETE", 404, ct));
-        results.Add(await CallBffAsync(StepNames.ReportRestorePatch404, $"{baseUrl}/aggregate/reports/{fakeScheduleId}/restore", "PATCH", 404, ct));
+        results.Add(await CallBffAsync(StepNames.ReportDelete404, "DELETE", 404,
+            () => _adminBffClient.DeleteAggregateReportAsync(fakeScheduleId, ct), ct));
+        results.Add(await CallBffAsync(StepNames.ReportRestorePatch404, "PATCH", 404,
+            () => _adminBffClient.RestoreAggregateReportAsync(fakeScheduleId, ct), ct));
 
         return results;
     }
@@ -151,19 +152,24 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
     /// Creates a facility through the BFF's YARP proxy to the Tenant service.
     /// Returns true if the facility was created successfully.
     /// </summary>
-    private async Task<bool> CreateFacilityViaBffAsync(string baseUrl, string facilityId, CancellationToken ct)
+    private async Task<bool> CreateFacilityViaBffAsync(string facilityId, CancellationToken ct)
     {
         try
         {
-            var body = JsonSerializer.Serialize(new
+            var body = new FacilityModel
             {
-                facilityId,
-                facilityName = facilityId,
-                timeZone = "America/Chicago",
-                vendor = "Epic",
-                scheduledReports = new { daily = Array.Empty<string>(), weekly = Array.Empty<string>(), monthly = Array.Empty<string>() }
-            });
-            var response = await CallBffRawAsync($"{baseUrl}/Facility", "POST", ct, body);
+                FacilityId = facilityId,
+                FacilityName = facilityId,
+                TimeZone = "America/Chicago",
+                Vendor = Vendor.Epic,
+                ScheduledReports = new TenantScheduledReportConfig
+                {
+                    Daily = [],
+                    Weekly = [],
+                    Monthly = []
+                }
+            };
+            var response = await _adminBffClient.CreateFacilityAsync(body, ct);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -174,30 +180,12 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
     }
 
 
-    private async Task<HttpResponseMessage> CallBffRawAsync(string url, string method, CancellationToken ct, string? jsonBody = null)
-    {
-        var client = _httpClientFactory.CreateClient("ApiHealthTest");
-        client.Timeout = TimeSpan.FromSeconds(30);
-
-        var request = new HttpRequestMessage(new HttpMethod(method), url);
-        if (jsonBody != null)
-            request.Content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-
-        if (_bearerOptions.Value?.AllowAnonymous != true)
-        {
-            var signingKey = _tokenSettings.Value?.SigningKey;
-            if (!string.IsNullOrWhiteSpace(signingKey))
-            {
-                var token = await _tokenService.ExecuteAsync(signingKey, 5);
-                if (!string.IsNullOrWhiteSpace(token))
-                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            }
-        }
-
-        return await client.SendAsync(request, ct);
-    }
-
-    private async Task<ApiTestRunResult> CallBffAsync(string endpointName, string url, string method, int expectedStatus, CancellationToken ct)
+    private async Task<ApiTestRunResult> CallBffAsync(
+        string endpointName,
+        string method,
+        int expectedStatus,
+        Func<Task<LinkApiResponse>> send,
+        CancellationToken ct)
     {
         var result = new ApiTestRunResult
         {
@@ -206,7 +194,6 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
             EndpointName = endpointName,
             ExpectedStatusCode = expectedStatus,
             ExecutedAt = DateTimeOffset.UtcNow,
-            RequestUrl = url,
             RequestMethod = method,
             RequestBody = $"No request body was sent ({method.ToUpperInvariant()})."
         };
@@ -214,36 +201,23 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
         var sw = Stopwatch.StartNew();
         try
         {
-            var response = await CallBffRawAsync(url, method, ct);
+            ct.ThrowIfCancellationRequested();
+            var response = await send();
             sw.Stop();
 
-            result.ActualStatusCode = (int)response.StatusCode;
+            result.ActualStatusCode = response.StatusCode;
             result.DurationMs = sw.ElapsedMilliseconds;
             result.Passed = result.ActualStatusCode == expectedStatus;
+            result.RequestUrl = response.RequestUrl;
+            result.TraceId = response.TraceId;
 
-            // Extract trace ID from response headers
-            if (response.Headers.TryGetValues("traceparent", out var traceValues))
-                result.TraceId = traceValues.FirstOrDefault();
-            else if (response.Headers.TryGetValues("X-Trace-Id", out var xTraceValues))
-                result.TraceId = xTraceValues.FirstOrDefault();
-
-            // Capture response body for diagnostics
-            try
-            {
-                var body = await response.Content.ReadAsStringAsync(ct);
-                var capturedBody = body.Length > 500 ? body[..500] : body;
-                result.ResponseBody = string.IsNullOrWhiteSpace(capturedBody)
-                    ? $"No response body was returned (HTTP {result.ActualStatusCode})."
-                    : capturedBody;
-                if (!result.Passed)
-                    result.ErrorMessage = BuildStatusMismatchMessage(expectedStatus, result.ActualStatusCode ?? 0, result.ResponseBody, result.TraceId);
-            }
-            catch
-            {
-                result.ResponseBody = $"Response body could not be read (HTTP {result.ActualStatusCode}).";
-                if (!result.Passed)
-                    result.ErrorMessage = BuildStatusMismatchMessage(expectedStatus, result.ActualStatusCode ?? 0, result.ResponseBody, result.TraceId);
-            }
+            var body = response.RawBody;
+            var capturedBody = string.IsNullOrWhiteSpace(body)
+                ? $"No response body was returned (HTTP {result.ActualStatusCode})."
+                : (body.Length > 500 ? body[..500] : body);
+            result.ResponseBody = capturedBody;
+            if (!result.Passed)
+                result.ErrorMessage = BuildStatusMismatchMessage(expectedStatus, result.ActualStatusCode ?? 0, result.ResponseBody, result.TraceId);
         }
         catch (TaskCanceledException)
         {
@@ -273,6 +247,14 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
 
         return result;
     }
+
+    private Task<ApiTestRunResult> CallBffAsync(
+        string endpointName,
+        string method,
+        int expectedStatus,
+        Func<Task<LinkApiResponse<string>>> send,
+        CancellationToken ct) =>
+        CallBffAsync(endpointName, method, expectedStatus, async () => await send(), ct);
 
     private ApiTestRunResult MakeFailedResult(string endpointName, string error) => new()
     {

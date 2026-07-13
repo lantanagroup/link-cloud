@@ -3,11 +3,12 @@ using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
+using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.SerDes;
-using RestSharp;
 using System.Net;
 using System.IO.Compression;
 using Task = System.Threading.Tasks.Task;
@@ -23,24 +24,24 @@ public class ReportApiHelper
     private readonly IReportServiceClient _reportClient;
     private readonly IFacilityServiceClient _facilityClient;
     private readonly ISubmissionServiceClient _submissionClient;
+    private readonly IAdminBffIntegrationClient _adminBffClient;
     private readonly IAutomationOutput _output;
     private readonly AutomationConfig _automationConfig;
-    private readonly RestClient _adminBffClient;
 
     public ReportApiHelper(
         IReportServiceClient reportClient,
         IFacilityServiceClient facilityClient,
         ISubmissionServiceClient submissionClient,
-        IHttpClientFactory httpClientFactory,
+        IAdminBffIntegrationClient adminBffClient,
         IAutomationOutput output,
         AutomationConfig config)
     {
         _reportClient = reportClient;
         _facilityClient = facilityClient;
         _submissionClient = submissionClient;
+        _adminBffClient = adminBffClient;
         _output = output;
         _automationConfig = config;
-        _adminBffClient = AdminBffClientFactory.Create(config, httpClientFactory);
     }
 
     public async Task<string> GenerateReportAsync(string facilityId, string measureId, TestScenarioConfig config)
@@ -111,20 +112,16 @@ public class ReportApiHelper
 
         var delayMinutes = Math.Max(1, (int)Math.Ceiling(reportDuration.TotalMinutes));
 
-        var request = new RestRequest(GetIntegrationEndpointPath("report-scheduled"), Method.Post)
-            .AddJsonBody(new
-            {
-                facilityId,
-                frequency = frequency.ToString(),
-                reportTypes = reportTypes.ToArray(),
-                startDate = startDateUtc.UtcDateTime,
-                delay = delayMinutes.ToString(),
-                reportTrackingId = trackingId
-            });
+        var response = await _adminBffClient.CreateReportScheduledAsync(
+            facilityId,
+            frequency,
+            reportTypes,
+            startDateUtc.UtcDateTime,
+            delayMinutes,
+            trackingId);
 
-        var response = await _adminBffClient.ExecuteAsync(request);
-        AutomationInvariant.Require(response.IsSuccessful,
-            $"Failed to produce ReportScheduled event for report '{trackingId}'. HTTP {(int)response.StatusCode}: {response.Content ?? response.ErrorMessage}");
+        AutomationInvariant.Require(response.IsSuccessStatusCode,
+            $"Failed to produce ReportScheduled event for report '{trackingId}'. HTTP {response.StatusCode}: {response.RawBody}");
 
         _output.WriteLine($"Scheduled report event produced: reportTrackingId={trackingId}, start={startDateUtc:O}, delayMinutes={delayMinutes}");
         return trackingId;
@@ -189,81 +186,54 @@ public class ReportApiHelper
 
         // Census validator requires exactly 6 lists: Admit/Discharge x 3 timeframes,
         // each unique and present even when empty.
-        var patientLists = new List<object>
+        var patientLists = new List<PatientListItem>
         {
-            new
+            new()
             {
-                listType = "Admit",
-                timeFrame = "LessThan24Hours",
-                patientIds = new List<string>()
+                ListType = ListType.Admit,
+                TimeFrame = TimeFrame.LessThan24Hours,
+                PatientIds = new List<string>()
             },
-            new
+            new()
             {
-                listType = "Admit",
-                timeFrame = "Between24To48Hours",
-                patientIds = new List<string>()
+                ListType = ListType.Admit,
+                TimeFrame = TimeFrame.Between24To48Hours,
+                PatientIds = new List<string>()
             },
-            new
+            new()
             {
-                listType = "Admit",
-                timeFrame = "MoreThan48Hours",
-                patientIds = admits
+                ListType = ListType.Admit,
+                TimeFrame = TimeFrame.MoreThan48Hours,
+                PatientIds = admits
             },
-            new
+            new()
             {
-                listType = "Discharge",
-                timeFrame = "LessThan24Hours",
-                patientIds = discharges
+                ListType = ListType.Discharge,
+                TimeFrame = TimeFrame.LessThan24Hours,
+                PatientIds = discharges
             },
-            new
+            new()
             {
-                listType = "Discharge",
-                timeFrame = "Between24To48Hours",
-                patientIds = new List<string>()
+                ListType = ListType.Discharge,
+                TimeFrame = TimeFrame.Between24To48Hours,
+                PatientIds = new List<string>()
             },
-            new
+            new()
             {
-                listType = "Discharge",
-                timeFrame = "MoreThan48Hours",
-                patientIds = new List<string>()
+                ListType = ListType.Discharge,
+                TimeFrame = TimeFrame.MoreThan48Hours,
+                PatientIds = new List<string>()
             }
         };
 
-        var request = new RestRequest(GetIntegrationEndpointPath("patient-list-acquired"), Method.Post)
-            .AddJsonBody(new
-            {
-                facilityId,
-                patientLists,
-                reportTrackingId = trackingGuid
-            });
-
-        var response = await _adminBffClient.ExecuteAsync(request);
-        AutomationInvariant.Require(response.IsSuccessful,
-            $"Failed to produce PatientListAcquired event for report '{reportTrackingId}'. HTTP {(int)response.StatusCode}: {response.Content ?? response.ErrorMessage}");
+        var response = await _adminBffClient.CreatePatientListAcquiredAsync(
+            facilityId,
+            patientLists,
+            trackingGuid);
+        AutomationInvariant.Require(response.IsSuccessStatusCode,
+            $"Failed to produce PatientListAcquired event for report '{reportTrackingId}'. HTTP {response.StatusCode}: {response.RawBody}");
 
         _output.WriteLine($"PatientListAcquired event produced: admits={admits.Count}, discharges={discharges.Count}, reportTrackingId={reportTrackingId}");
-    }
-
-    private string GetIntegrationEndpointPath(string endpoint)
-    {
-        var normalizedEndpoint = endpoint.TrimStart('/');
-
-        // IntegrationTestingEndpoints are mounted under /api/integration/* in Admin.BFF.
-        // Some deployments set AdminBffBase with the /api suffix, others without it.
-        // Build the relative path to work with both shapes.
-        if (Uri.TryCreate(_automationConfig.AdminBffBase, UriKind.Absolute, out var baseUri))
-        {
-            var basePath = baseUri.AbsolutePath.TrimEnd('/');
-            var baseEndsWithApi = basePath.EndsWith("/api", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(basePath, "api", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(basePath, "/api", StringComparison.OrdinalIgnoreCase);
-
-            return baseEndsWithApi
-                ? $"integration/{normalizedEndpoint}"
-                : $"api/integration/{normalizedEndpoint}";
-        }
-
-        return $"api/integration/{normalizedEndpoint}";
     }
 
     public async Task<bool> CheckSubmissionStatusAsync(string reportId, TestScenarioConfig config, BackgroundDiagnosticsMonitor? diagnostics = null)
