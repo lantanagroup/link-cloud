@@ -56,8 +56,27 @@ internal sealed class RunExecutor
         _orchestrator = orchestrator;
         _queryPlanResolver = queryPlanResolver;
         _suppressExternalManifest = configuration.GetValue<bool>("ExternalBlobStorage:SuppressManifest");
-        _includePatientAggregatorOrganizationResource = configuration.GetValue<bool>("PatientAggregator:IncludeOrganizationResource");
+        _includePatientAggregatorOrganizationResource = ResolveIncludePatientAggregatorOrganizationResource(configuration);
         _logger = logger;
+    }
+
+    private static bool ResolveIncludePatientAggregatorOrganizationResource(IConfiguration configuration)
+    {
+        var reportScoped = TryGetBool(configuration, "Report:PatientAggregator:IncludeOrganizationResource");
+        if (reportScoped.HasValue)
+            return reportScoped.Value;
+
+        var shared = TryGetBool(configuration, "PatientAggregator:IncludeOrganizationResource");
+        return shared.GetValueOrDefault();
+    }
+
+    private static bool? TryGetBool(IConfiguration configuration, string key)
+    {
+        var raw = configuration[key];
+        if (string.IsNullOrWhiteSpace(raw))
+            return null;
+
+        return bool.TryParse(raw, out var parsed) ? parsed : null;
     }
 
     /// <summary>
