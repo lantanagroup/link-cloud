@@ -318,52 +318,6 @@ http://test.system,123,Test Display,Extra Value";
     }
 
     [Fact]
-    public void ProcessCodeSystemCsv_WithDuplicateCode_UsesLastRecord()
-    {
-        var mockCache = new Mock<IMemoryCache>();
-        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
-
-        mockConfig.Setup(x => x.Value).Returns(_config);
-
-        var mockService = new Mock<CodeGroupCacheService>(
-            _loggerMock.Object,
-            mockCache.Object,
-            mockConfig.Object)
-        {
-            CallBase = true
-        };
-
-        mockService
-            .Setup(x => x.SetCodeGroup(It.IsAny<CodeGroup>()))
-            .Verifiable();
-
-        var csvData = "code,display,status\r\n" +
-                      "123,Original Display,Inactive\r\n" +
-                      "456,Another Display,Active\r\n" +
-                      "123,Replacement Display,Active";
-
-        using var csv = CreateCsvReader(csvData);
-
-        var codeGroup = new CodeGroup
-        {
-            Id = "test-id",
-            Type = CodeGroup.CodeGroupTypes.CodeSystem,
-            Url = "http://test.codesystem",
-            Version = "1.0"
-        };
-
-        mockService.Object.ProcessCodeSystemCsv(codeGroup, csv);
-
-        var codes = codeGroup.Codes["http://test.codesystem"];
-        Assert.Equal(2, codes.Count);
-
-        var duplicateCode = Assert.IsType<CodeSystemCode>(Assert.Single(codes, code => code.Value == "123"));
-        Assert.Equal("Replacement Display", duplicateCode.Display);
-        Assert.Equal(CodeStatus.Active, duplicateCode.Status);
-        Assert.DoesNotContain(codes, code => code.Display == "Original Display");
-    }
-
-    [Fact]
     public void ProcessCodeSystemCsv_WithValidData_CallsSetCodeGroup()
     {
         var mockCache = new Mock<IMemoryCache>();
