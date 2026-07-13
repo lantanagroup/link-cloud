@@ -15,10 +15,17 @@ export interface UserInfoResponse {
   IsSystemAdmin: boolean;
   IsOnboarded: boolean;
   IsActive: boolean;
+  HasFacility: boolean;
   FacilityId?: string;
   Groups: string[];
   AvailableNavigation: string[];
   AccessRequestUrl?: string;
+}
+
+export interface FacilitySummaryResponse {
+  Id: string;
+  FacilityId: string;
+  IsOnboarded: boolean;
 }
 
 export interface UserRoleSummaryResponse {
@@ -28,5 +35,6 @@ export interface UserRoleSummaryResponse {
   FacilityId?: string;
   IsOnboarded: boolean;
   IsActive: boolean;
-  Roles: string[];
+  IsAdmin: boolean;
+  Groups: string[];
 }

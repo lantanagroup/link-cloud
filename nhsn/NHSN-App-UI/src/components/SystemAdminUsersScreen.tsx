@@ -1,4 +1,4 @@
-import React, {ChangeEvent} from 'react';
+import React from 'react';
 import {TestUserProfile, UserRoleSummaryResponse} from '../shared/models';
 import {UserInfoService} from '../services/user-info-service';
 import {useNotifications} from './notifications/NotificationProvider';
@@ -15,8 +15,6 @@ interface SystemAdminUsersScreenProps {
   onSavingUserIdChanged: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
-const availableRoles = ['System Admin', 'Facility Admin', 'Facility IT'];
-
 export function SystemAdminUsersScreen({
   activeTestUser,
   currentUserEmail,
@@ -31,18 +29,17 @@ export function SystemAdminUsersScreen({
   const { notifySuccess, notifyError } = useNotifications();
   const normalizedCurrentUserEmail = currentUserEmail.toLowerCase();
 
-  async function handleRoleChanged(user: UserRoleSummaryResponse, event: ChangeEvent<HTMLSelectElement>) {
-    const selectedRole = event.target.value;
-    const nextRoles = selectedRole ? [selectedRole] : [];
-
+  async function handleAdminToggle(user: UserRoleSummaryResponse, nextIsAdmin: boolean) {
     try {
       onSavingUserIdChanged(user.Id);
       onUsersErrorChanged(null);
-      const updated = await userInfoService.updateUserRoles(activeTestUser, user.Id, nextRoles);
+      const updated = await userInfoService.updateUserAdmin(activeTestUser, user.Id, nextIsAdmin);
       onUsersChanged(current => current.map(existing => existing.Id === updated.Id ? updated : existing));
-      notifySuccess(`Updated roles for ${updated.Name}.`);
+      notifySuccess(nextIsAdmin
+        ? `Granted NHSNLINKSYSADMIN to ${updated.Name}.`
+        : `Removed NHSNLINKSYSADMIN from ${updated.Name}.`);
     } catch (updateError) {
-      const message = updateError instanceof Error ? updateError.message : 'Unable to update roles.';
+      const message = updateError instanceof Error ? updateError.message : 'Unable to update admin flag.';
       onUsersErrorChanged(message);
       notifyError(message);
     } finally {
@@ -89,7 +86,7 @@ export function SystemAdminUsersScreen({
           <tr>
             <th align="left">User</th>
             <th align="left">Facility</th>
-            <th align="left">Roles</th>
+            <th align="left">NHSNLink Sys Admin</th>
             <th align="left">Access</th>
           </tr>
           </thead>
@@ -102,23 +99,21 @@ export function SystemAdminUsersScreen({
               </td>
               <td>{user.FacilityId ?? 'Not assigned'}</td>
               <td>
-                <select
-                  value={user.Roles[0] ?? ''}
-                  disabled={savingUserId === user.Id || user.Email.toLowerCase() === normalizedCurrentUserEmail}
-                  onChange={event => handleRoleChanged(user, event)}>
-                  <option value="">No role assigned</option>
-                  {availableRoles.map(role => (
-                    <option key={role} value={role}>{role}</option>
-                  ))}
-                </select>
-                {user.Roles.length > 1 && (
-                  <div style={{ marginTop: '0.35rem', fontSize: '0.9rem' }}>
-                    Additional roles currently assigned: {user.Roles.slice(1).join(', ')}
-                  </div>
-                )}
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={user.IsAdmin}
+                    disabled={savingUserId === user.Id || user.Email.toLowerCase() === normalizedCurrentUserEmail}
+                    onChange={event => handleAdminToggle(user, event.target.checked)} /> NHSNLINKSYSADMIN
+                </label>
                 {user.Email.toLowerCase() === normalizedCurrentUserEmail && (
                   <div style={{ marginTop: '0.35rem', fontSize: '0.9rem' }}>
-                    You cannot change your own role.
+                    You cannot change your own admin flag.
+                  </div>
+                )}
+                {user.Groups.length > 0 && (
+                  <div style={{ marginTop: '0.35rem', fontSize: '0.9rem' }}>
+                    Incoming JWT groups: {user.Groups.join(', ')}
                   </div>
                 )}
               </td>

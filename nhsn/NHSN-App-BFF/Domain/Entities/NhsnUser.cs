@@ -27,6 +27,8 @@ public class NhsnUser
 
     public bool IsActive { get; set; } = true;
 
+    public bool IsAdmin { get; set; }
+
     public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
 
     [MaxLength(256)]
@@ -36,6 +38,4 @@ public class NhsnUser
 
     [MaxLength(256)]
     public string? LastModifiedBy { get; set; }
-
-    public ICollection<NhsnUserRole> UserRoles { get; set; } = [];
 }

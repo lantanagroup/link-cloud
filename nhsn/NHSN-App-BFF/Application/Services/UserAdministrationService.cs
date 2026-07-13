@@ -1,7 +1,5 @@
-using System.Linq.Expressions;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models;
-using LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,19 +18,26 @@ public class UserAdministrationService : IUserAdministrationService
     {
         return await _dbContext.Users
             .AsNoTracking()
-            .Include(x => x.UserRoles)
-            .ThenInclude(x => x.Role)
             .OrderBy(x => x.Email)
-            .Select(MapProjection())
+            .Select(user => new UserRoleSummaryResponse
+            {
+                Id = user.Id,
+                Email = user.Email,
+                Name = user.Name,
+                FacilityId = user.FacilityId,
+                IsOnboarded = user.IsOnboarded,
+                IsActive = user.IsActive,
+                IsAdmin = user.IsAdmin,
+                Groups = string.IsNullOrWhiteSpace(user.GroupsRaw)
+                    ? Array.Empty<string>()
+                    : user.GroupsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            })
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<UserRoleSummaryResponse?> UpdateUserRolesAsync(Guid userId, string actingExternalUserId, UpdateUserRolesRequest request, CancellationToken cancellationToken = default)
+    public async Task<UserRoleSummaryResponse?> UpdateUserAdminAsync(Guid userId, string actingExternalUserId, UpdateUserAdminRequest request, CancellationToken cancellationToken = default)
     {
-        var user = await _dbContext.Users
-            .Include(x => x.UserRoles)
-            .ThenInclude(x => x.Role)
-            .SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        var user = await _dbContext.Users.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
 
         if (user is null)
         {
@@ -41,30 +46,10 @@ public class UserAdministrationService : IUserAdministrationService
 
         if (string.Equals(user.ExternalUserId, actingExternalUserId, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("System administrators cannot change their own role.");
+            throw new InvalidOperationException("System administrators cannot change their own admin flag.");
         }
 
-        var normalizedRoles = request.Roles
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Select(x => x.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        var roles = await _dbContext.Roles
-            .Where(x => normalizedRoles.Contains(x.Name))
-            .ToListAsync(cancellationToken);
-
-        user.UserRoles.Clear();
-        foreach (var role in roles)
-        {
-            user.UserRoles.Add(new NhsnUserRole
-            {
-                UserId = user.Id,
-                RoleId = role.Id,
-                User = user,
-                Role = role
-            });
-        }
+        user.IsAdmin = request.IsAdmin;
 
         user.LastModifiedBy = "user-admin";
         user.LastModifiedOn = DateTime.UtcNow;
@@ -78,16 +63,16 @@ public class UserAdministrationService : IUserAdministrationService
             FacilityId = user.FacilityId,
             IsOnboarded = user.IsOnboarded,
             IsActive = user.IsActive,
-            Roles = user.UserRoles.Select(x => x.Role.Name).OrderBy(x => x).ToArray()
+            IsAdmin = user.IsAdmin,
+            Groups = string.IsNullOrWhiteSpace(user.GroupsRaw)
+                ? Array.Empty<string>()
+                : user.GroupsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         };
     }
 
     public async Task<UserRoleSummaryResponse?> UpdateUserStatusAsync(Guid userId, string actingExternalUserId, UpdateUserStatusRequest request, CancellationToken cancellationToken = default)
     {
-        var user = await _dbContext.Users
-            .Include(x => x.UserRoles)
-            .ThenInclude(x => x.Role)
-            .SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
+        var user = await _dbContext.Users.SingleOrDefaultAsync(x => x.Id == userId, cancellationToken);
 
         if (user is null)
         {
@@ -112,21 +97,10 @@ public class UserAdministrationService : IUserAdministrationService
             FacilityId = user.FacilityId,
             IsOnboarded = user.IsOnboarded,
             IsActive = user.IsActive,
-            Roles = user.UserRoles.Select(x => x.Role.Name).OrderBy(x => x).ToArray()
-        };
-    }
-
-    private static Expression<Func<NhsnUser, UserRoleSummaryResponse>> MapProjection()
-    {
-        return user => new UserRoleSummaryResponse
-        {
-            Id = user.Id,
-            Email = user.Email,
-            Name = user.Name,
-            FacilityId = user.FacilityId,
-            IsOnboarded = user.IsOnboarded,
-            IsActive = user.IsActive,
-            Roles = user.UserRoles.Select(x => x.Role.Name).OrderBy(x => x).ToArray()
+            IsAdmin = user.IsAdmin,
+            Groups = string.IsNullOrWhiteSpace(user.GroupsRaw)
+                ? Array.Empty<string>()
+                : user.GroupsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
         };
     }
 }

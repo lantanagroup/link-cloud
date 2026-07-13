@@ -6,8 +6,6 @@ public static class NhsnAppConstants
 
     public static class Roles
     {
-        public const string SystemAdmin = "System Admin";
-        public const string FacilityAdmin = "Facility Admin";
-        public const string FacilityIt = "Facility IT";
+        public const string NhsnLinkSysAdmin = "NHSNLINKSYSADMIN";
     }
 }

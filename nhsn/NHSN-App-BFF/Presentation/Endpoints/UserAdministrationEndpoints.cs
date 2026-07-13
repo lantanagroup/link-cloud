@@ -24,12 +24,12 @@ public class UserAdministrationEndpoints : IApi
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status204NoContent);
 
-        group.MapPut("/{userId:guid}/roles", async (Guid userId, UpdateUserRolesRequest request, HttpContext httpContext, IUserAdministrationService userAdministrationService, IOptions<NhsnJwtSettings> jwtOptions, CancellationToken cancellationToken) =>
+        group.MapPut("/{userId:guid}/admin", async (Guid userId, UpdateUserAdminRequest request, HttpContext httpContext, IUserAdministrationService userAdministrationService, IOptions<NhsnJwtSettings> jwtOptions, CancellationToken cancellationToken) =>
             {
                 try
                 {
                     var actingExternalUserId = ResolveActingExternalUserId(httpContext, jwtOptions.Value);
-                    var updated = await userAdministrationService.UpdateUserRolesAsync(userId, actingExternalUserId, request, cancellationToken);
+                    var updated = await userAdministrationService.UpdateUserAdminAsync(userId, actingExternalUserId, request, cancellationToken);
                     return updated is null ? Results.NotFound() : Results.Ok(updated);
                 }
                 catch (InvalidOperationException ex)
@@ -37,7 +37,7 @@ public class UserAdministrationEndpoints : IApi
                     return Results.BadRequest(new { message = ex.Message });
                 }
             })
-            .WithName("UpdateNhsnUserRoles")
+            .WithName("UpdateNhsnUserAdmin")
             .Produces(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 

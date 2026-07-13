@@ -8,5 +8,6 @@ public class UserRoleSummaryResponse
     public string? FacilityId { get; set; }
     public bool IsOnboarded { get; set; }
     public bool IsActive { get; set; }
-    public IReadOnlyCollection<string> Roles { get; set; } = [];
+    public bool IsAdmin { get; set; }
+    public IReadOnlyCollection<string> Groups { get; set; } = [];
 }

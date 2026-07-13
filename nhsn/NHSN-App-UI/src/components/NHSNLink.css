@@ -46,6 +46,17 @@
   margin: 0;
 }
 
+.nhsn-link__nav-sections {
+  display: grid;
+  gap: 1rem;
+}
+
+.nhsn-link__nav-section-heading {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  color: #486581;
+}
+
 .nhsn-link__nav li {
   margin-bottom: 0.5rem;
 }

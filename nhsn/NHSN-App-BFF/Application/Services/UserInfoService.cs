@@ -24,10 +24,25 @@ public class UserInfoService : IUserInfoService
     public async Task<UserInfoResponse> GetUserInfoAsync(ClaimsPrincipal principal, HttpRequest request, CancellationToken cancellationToken = default)
     {
         var incomingUser = ResolveIncomingUser(principal, request);
-        var user = await _dbContext.Users
-            .Include(x => x.UserRoles)
-            .ThenInclude(x => x.Role)
-            .SingleOrDefaultAsync(x => x.ExternalUserId == incomingUser.ExternalUserId, cancellationToken);
+        NhsnFacility? facility = null;
+
+        if (!string.IsNullOrWhiteSpace(incomingUser.FacilityId))
+        {
+            facility = await _dbContext.Facilities.SingleOrDefaultAsync(x => x.FacilityId == incomingUser.FacilityId, cancellationToken);
+            if (facility is null)
+            {
+                facility = new NhsnFacility
+                {
+                    FacilityId = incomingUser.FacilityId,
+                    IsOnboarded = false
+                };
+
+                _dbContext.Facilities.Add(facility);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        var user = await _dbContext.Users.SingleOrDefaultAsync(x => x.ExternalUserId == incomingUser.ExternalUserId, cancellationToken);
 
         if (user is null)
         {
@@ -40,7 +55,7 @@ public class UserInfoService : IUserInfoService
                 FacilityId = incomingUser.FacilityId,
                 CreatedBy = "userinfo",
                 LastModifiedBy = "userinfo",
-                IsOnboarded = false,
+                IsOnboarded = facility?.IsOnboarded ?? false,
                 IsActive = true
             };
 
@@ -53,29 +68,39 @@ public class UserInfoService : IUserInfoService
             user.Name = incomingUser.Name;
             user.GroupsRaw = string.Join(',', incomingUser.Groups);
             user.FacilityId = incomingUser.FacilityId;
+            user.IsOnboarded = facility?.IsOnboarded ?? false;
             user.LastModifiedBy = "userinfo";
             user.LastModifiedOn = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        var roleNames = user.UserRoles.Select(x => x.Role.Name).OrderBy(x => x).ToArray();
-        var isSystemAdmin = roleNames.Contains(NhsnAppConstants.Roles.SystemAdmin, StringComparer.OrdinalIgnoreCase);
+        var effectiveGroups = BuildEffectiveGroups(incomingUser.Groups, user.IsAdmin);
+        var isSystemAdmin = effectiveGroups.Contains(NhsnAppConstants.Roles.NhsnLinkSysAdmin, StringComparer.OrdinalIgnoreCase);
+        var hasFacility = !string.IsNullOrWhiteSpace(user.FacilityId);
+        var isFacilityAdmin = effectiveGroups.Contains("FACADMIN", StringComparer.OrdinalIgnoreCase);
+        var facilityIsOnboarded = facility?.IsOnboarded ?? false;
         var availableNavigation = isSystemAdmin
-            ? new[] { "users" }
-            : user.IsOnboarded
-                ? new[] { "maintenance", "configuration-overview", "configuration-changes" }
-                : new[] { "onboarding" };
+            ? new[] { "users", "facilities" }
+            : !hasFacility
+                ? Array.Empty<string>()
+                : isFacilityAdmin && !facilityIsOnboarded
+                    ? new[] { "onboarding" }
+                    : isFacilityAdmin && facilityIsOnboarded
+                        ? new[] { "configuration" }
+                        : new[] { "maintenance", "configuration-overview", "configuration-changes" };
 
         return new UserInfoResponse
         {
             Email = user.Email,
             Name = user.Name,
-            Roles = roleNames,
+            Roles = effectiveGroups,
             IsSystemAdmin = isSystemAdmin,
-            IsOnboarded = user.IsOnboarded,
+            IsOnboarded = facilityIsOnboarded,
             IsActive = user.IsActive,
+            IsAdmin = user.IsAdmin,
+            HasFacility = hasFacility,
             FacilityId = user.FacilityId,
-            Groups = SplitGroups(user.GroupsRaw),
+            Groups = effectiveGroups,
             AvailableNavigation = availableNavigation,
             AccessRequestUrl = _jwtSettings.AccessRequestUrl
         };
@@ -117,11 +142,20 @@ public class UserInfoService : IUserInfoService
         return new IncomingUser(externalUserId, email, name, groups, facilityId);
     }
 
-    private static string[] SplitGroups(string? groupsRaw)
+    private static string[] BuildEffectiveGroups(string[] incomingGroups, bool isAdmin)
     {
-        return string.IsNullOrWhiteSpace(groupsRaw)
-            ? []
-            : groupsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var groups = incomingGroups
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (isAdmin && !groups.Contains(NhsnAppConstants.Roles.NhsnLinkSysAdmin, StringComparer.OrdinalIgnoreCase))
+        {
+            groups.Add(NhsnAppConstants.Roles.NhsnLinkSysAdmin);
+        }
+
+        return groups.ToArray();
     }
 
     private sealed record IncomingUser(string ExternalUserId, string Email, string Name, string[] Groups, string? FacilityId);
