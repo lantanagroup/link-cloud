@@ -243,12 +243,6 @@ public class CodeGroupCacheService(
                 continue;
             }
 
-            if (systemCodes.Any(c => c.Value == code))
-            {
-                logger.LogWarning("Duplicate code {Code} detected for system {System} while loading value set {ValueSet}. Replacing the previous occurrence.", code.SanitizeForLog(), system.SanitizeForLog(), codeGroup.Id.SanitizeForLog());
-                systemCodes.RemoveAll(c => c.Value == code);
-            }
-
             systemCodes.Add(new Code
             {
                 Value = code,
@@ -288,12 +282,6 @@ public class CodeGroupCacheService(
 
             if (!codeGroup.Codes.ContainsKey(system))
                 codeGroup.Codes.Add(system, new List<Code>());
-
-            if (codeGroup.Codes[system].Any(c => c.Value == code))
-            {
-                logger.LogWarning("Duplicate code {Code} detected for code system {CodeSystem}. Replacing the previous occurrence.", code.SanitizeForLog(), codeGroup.Id.SanitizeForLog());
-                codeGroup.Codes[system].RemoveAll(c => c.Value == code);
-            }
 
             codeGroup.Codes[system].Add(new CodeSystemCode
             {

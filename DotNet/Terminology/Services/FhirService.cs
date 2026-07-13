@@ -604,8 +604,8 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
 
         // Prefer the code whose display matches (when a display was supplied); otherwise the first match.
         var codeObject = !string.IsNullOrEmpty(display)
-            ? matches.First(c => c.Display == display)
-            : matches[0];
+            ? matches.Last(c => c.Display == display)
+            : matches[matches.Count - 1];
 
         var isActive = codeObject is not CodeSystemCode codeSystemCode
                        || codeSystemCode.Status == CodeStatus.Active;
