@@ -310,8 +310,8 @@ public class CodeGroupCacheService(
         {
             logger.LogWarning(
                 "Code {Code} in code group {CodeGroupId} appears to be in scientific notation. Verify that the code was not altered during CSV creation",
-                code,
-                codeGroupId);
+                code.SanitizeForLog(),
+                codeGroupId.SanitizeForLog());
         }
     }
 
