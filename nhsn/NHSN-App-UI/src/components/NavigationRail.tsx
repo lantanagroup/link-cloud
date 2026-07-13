@@ -1,15 +1,20 @@
 import React from 'react';
 
-type RouteName = 'home' | 'users' | 'onboarding';
+type RouteName = 'home' | 'users' | 'onboarding' | 'configuration' | 'facilities';
 
 export interface NavigationItem {
   key: RouteName;
   label: string;
 }
 
+export interface NavigationSection {
+  heading?: string;
+  items: NavigationItem[];
+}
+
 interface NavigationRailProps {
   title: string;
-  items: NavigationItem[];
+  sections: NavigationSection[];
   activeRoute: RouteName;
   onNavigate: (route: RouteName) => void;
   userName: string;
@@ -18,7 +23,7 @@ interface NavigationRailProps {
 
 export function NavigationRail({
   title,
-  items,
+  sections,
   activeRoute,
   onNavigate,
   userName,
@@ -30,18 +35,25 @@ export function NavigationRail({
         <h1 className="nhsn-link__nav-title">{title}</h1>
         <h2>Navigation</h2>
       </div>
-      <ul>
-        {items.map(item => (
-          <li key={item.key}>
-            <button
-              type="button"
-              className={`nhsn-link__nav-button${activeRoute === item.key ? ' nhsn-link__nav-button--active' : ''}`}
-              onClick={() => onNavigate(item.key)}>
-              {item.label}
-            </button>
-          </li>
+      <div className="nhsn-link__nav-sections">
+        {sections.map((section, index) => (
+          <div key={section.heading ?? `section-${index}`} className="nhsn-link__nav-section">
+            {section.heading && <h3 className="nhsn-link__nav-section-heading">{section.heading}</h3>}
+            <ul>
+              {section.items.map(item => (
+                <li key={item.key}>
+                  <button
+                    type="button"
+                    className={`nhsn-link__nav-button${activeRoute === item.key ? ' nhsn-link__nav-button--active' : ''}`}
+                    onClick={() => onNavigate(item.key)}>
+                    {item.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         ))}
-      </ul>
+      </div>
 
       <div className="nhsn-link__nav-userinfo">
         <p>

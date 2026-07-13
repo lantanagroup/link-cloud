@@ -19,9 +19,5 @@ public class NhsnUserConfiguration : IEntityTypeConfiguration<NhsnUser>
         builder.Property(x => x.FacilityId).HasMaxLength(64);
         builder.Property(x => x.CreatedBy).HasMaxLength(256);
         builder.Property(x => x.LastModifiedBy).HasMaxLength(256);
-
-        builder.HasMany(x => x.UserRoles)
-            .WithOne(x => x.User)
-            .HasForeignKey(x => x.UserId);
     }
 }

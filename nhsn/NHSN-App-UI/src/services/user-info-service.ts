@@ -1,4 +1,4 @@
-import {TestUserProfile, UserInfoResponse, UserRoleSummaryResponse} from '../shared/models';
+import {FacilitySummaryResponse, TestUserProfile, UserInfoResponse, UserRoleSummaryResponse} from '../shared/models';
 
 export class UserInfoService {
   constructor(private readonly apiBaseUrl: string = '/api') {}
@@ -48,16 +48,16 @@ export class UserInfoService {
     return response.json() as Promise<UserRoleSummaryResponse[]>;
   }
 
-  async updateUserRoles(activeProfile: TestUserProfile, userId: string, roles: string[]): Promise<UserRoleSummaryResponse> {
-    const response = await fetch(`${this.apiBaseUrl}/nhsn-app-bff/users/${userId}/roles`, {
+  async updateUserAdmin(activeProfile: TestUserProfile, userId: string, isAdmin: boolean): Promise<UserRoleSummaryResponse> {
+    const response = await fetch(`${this.apiBaseUrl}/nhsn-app-bff/users/${userId}/admin`, {
       method: 'PUT',
       headers: this.createHeaders(activeProfile),
       credentials: 'include',
-      body: JSON.stringify({ roles })
+      body: JSON.stringify({ isAdmin })
     });
 
     if (!response.ok) {
-      throw new Error(`Unable to update user roles (${response.status}).`);
+      throw new Error(`Unable to update admin flag (${response.status}).`);
     }
 
     return response.json() as Promise<UserRoleSummaryResponse>;
@@ -76,6 +76,39 @@ export class UserInfoService {
     }
 
     return response.json() as Promise<UserRoleSummaryResponse>;
+  }
+
+  async getFacilities(activeProfile: TestUserProfile): Promise<FacilitySummaryResponse[]> {
+    const response = await fetch(`${this.apiBaseUrl}/nhsn-app-bff/facilities`, {
+      method: 'GET',
+      headers: this.createHeaders(activeProfile),
+      credentials: 'include'
+    });
+
+    if (response.status === 204) {
+      return [];
+    }
+
+    if (!response.ok) {
+      throw new Error(`Unable to load facilities (${response.status}).`);
+    }
+
+    return response.json() as Promise<FacilitySummaryResponse[]>;
+  }
+
+  async updateFacilityOnboarding(activeProfile: TestUserProfile, facilityId: string, isOnboarded: boolean): Promise<FacilitySummaryResponse> {
+    const response = await fetch(`${this.apiBaseUrl}/nhsn-app-bff/facilities/${facilityId}/onboarding`, {
+      method: 'PUT',
+      headers: this.createHeaders(activeProfile),
+      credentials: 'include',
+      body: JSON.stringify({ isOnboarded })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Unable to update facility onboarding (${response.status}).`);
+    }
+
+    return response.json() as Promise<FacilitySummaryResponse>;
   }
 
   private createHeaders(activeProfile?: TestUserProfile): Headers {

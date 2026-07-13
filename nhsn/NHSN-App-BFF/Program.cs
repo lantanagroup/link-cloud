@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 using HealthChecks.UI.Client;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces;
+using LantanaGroup.Link.Nhsn.App.Bff.Application.Middleware;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Services;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence.Seed;
@@ -81,12 +82,16 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddScoped<IUserInfoService, UserInfoService>();
     builder.Services.AddScoped<IUserAdministrationService, UserAdministrationService>();
+    builder.Services.AddScoped<IFacilityAdministrationService, FacilityAdministrationService>();
 
     builder.Services.AddTransient<IApi, UserInfoEndpoints>();
     builder.Services.AddTransient<IApi, SimulationEndpoints>();
     builder.Services.AddTransient<IApi, UserAdministrationEndpoints>();
+    builder.Services.AddTransient<IApi, FacilityAdministrationEndpoints>();
 
     builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>("Database");
+
+    builder.Services.AddHttpContextAccessor();
 
     builder.Services.AddLinkCorsService(options =>
     {
@@ -172,6 +177,7 @@ static void SetupMiddleware(WebApplication app)
     {
         app.UseAuthentication();
     }
+    app.UseMiddleware<AdminGroupAugmentationMiddleware>();
     app.UseAuthorization();
 
     var apis = app.Services.GetServices<IApi>();

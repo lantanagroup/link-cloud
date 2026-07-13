@@ -11,8 +11,7 @@ public class NhsnAppDbContext : DbContext
     }
 
     public DbSet<NhsnUser> Users { get; set; } = null!;
-    public DbSet<NhsnRole> Roles { get; set; } = null!;
-    public DbSet<NhsnUserRole> UserRoles { get; set; } = null!;
+    public DbSet<NhsnFacility> Facilities { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
