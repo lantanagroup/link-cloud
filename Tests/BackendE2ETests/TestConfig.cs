@@ -37,9 +37,6 @@ public static class TestConfig
     public static string ValidationServiceBase => Environment.GetEnvironmentVariable("VALIDATION_SERVICE_BASE_URL") ?? "http://localhost:8075";
     public static string SubmissionServiceBase => Environment.GetEnvironmentVariable("SUBMISSION_SERVICE_BASE_URL") ?? "http://localhost:8073";
 
-    // AdminBFF — only for operations that have no direct service endpoint
-    public static string AdminBffBase => Environment.GetEnvironmentVariable("ADMIN_BFF_BASE_URL") ?? "http://localhost:8063/api";
-
     // Automation.UI — used by AutomationUiApiSmokeTest to exercise the /api/runs endpoints.
     // Host port 5256 matches the docker-compose mapping (5256:5257).
     public static string AutomationUiBase => Environment.GetEnvironmentVariable("AUTOMATION_UI_BASE_URL") ?? "http://localhost:5256";
@@ -59,10 +56,8 @@ public static class TestConfig
     {
         FhirServerBase = FhirServerBase,
         FacilityFhirServerBase = FacilityFhirServerBase,
-        AdminBffBase = AdminBffBase,
         LokiBaseUrl = LokiBaseUrl,
         DownloadPath = AdhocReportTestDownloadPath,
-        AdminBffOAuth = BuildOAuthConfig("ADMINBFF"),
         FhirServerOAuth = BuildOAuthConfig("FHIRSERVER"),
         FhirServerBasicAuth = BuildBasicAuthConfig("FHIRSERVER"),
         FhirQuery = new AutomationConfig.FhirQuerySettings
