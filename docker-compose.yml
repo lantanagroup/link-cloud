@@ -483,6 +483,13 @@ services:
     container_name: link-admin-bff
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Authentication__EnableAnonymousAccess: ${LOCAL_AUTH_ENABLE_ANONYMOUS_ACCESS:-true}
+      Authentication__DefaultChallengeScheme: "link_cookie"
+      Authentication__Schemas__Oauth2__Enabled: ${LOCAL_AUTH_ENABLE_OAUTH2:-false}
+      Authentication__Schemas__OpenIdConnect__Enabled: ${LOCAL_AUTH_ENABLE_OPENID_CONNECT:-false}
+      Authentication__Schemas__Jwt__Enabled: ${LOCAL_AUTH_ENABLE_JWT:-false}
+      LinkTokenService__Authority: ${LOCAL_LINK_TOKEN_AUTHORITY:-LinkServiceAdmin}
+      LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
       KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Redis__Password: ${REDIS_PASS}
@@ -677,7 +684,7 @@ services:
     build:
       context: Web/Admin.UI
     environment:
-      LINK_AUTH_REQUIRED: false
+      LINK_AUTH_REQUIRED: ${LOCAL_ADMIN_UI_AUTH_REQUIRED:-false}
       LINK_BASE_API_URL: http://localhost:8063/api
       GRAFANA_URL: http://localhost:3000
       KAFKA_URL: http://localhost:9095
@@ -691,6 +698,9 @@ services:
     container_name: link-automation-ui
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Authentication__UseBearerForServiceCalls: ${LOCAL_AUTOMATION_UI_USE_BEARER_FOR_SERVICE_CALLS:-false}
+      LinkTokenService__Authority: ${LOCAL_LINK_TOKEN_AUTHORITY:-LinkServiceAdmin}
+      LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
       PatientAggregator__IncludeOrganizationResource: true
     volumes:
       - automation_ui_keys:/keys/dataprotection
