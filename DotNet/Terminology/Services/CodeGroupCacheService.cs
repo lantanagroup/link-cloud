@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Hl7.Fhir.Model;
@@ -20,6 +21,10 @@ public class CodeGroupCacheService(
     IMemoryCache cache,
     IOptions<TerminologyConfig> terminologyConfig)
 {
+    private static readonly Regex ScientificNotationPattern = new(
+        @"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)[eE][+-]?\d+$",
+        RegexOptions.CultureInvariant);
+
     private readonly MemoryCacheEntryOptions _cacheOptions = new MemoryCacheEntryOptions();
     private readonly ConcurrentBag<CacheKey> _cacheKeys = new ConcurrentBag<CacheKey>();
     private readonly TerminologyConfig _terminologyConfig = terminologyConfig.Value;
@@ -220,6 +225,8 @@ public class CodeGroupCacheService(
             string code = record.Code;
             string display = record.Display;
 
+            LogScientificNotationWarning(code, codeGroup.Id);
+
             if (system == null || (!string.IsNullOrEmpty(record.System) && system != record.System))
             {
                 if (string.IsNullOrEmpty(record.System))
@@ -241,12 +248,6 @@ public class CodeGroupCacheService(
             {
                 logger.LogWarning("System codes list is null for code {Code}", code);
                 continue;
-            }
-
-            if (systemCodes.Any(c => c.Value == code))
-            {
-                logger.LogWarning("Duplicate code {Code} detected for system {System} while loading value set {ValueSet}. Replacing the previous occurrence.", code.SanitizeForLog(), system.SanitizeForLog(), codeGroup.Id.SanitizeForLog());
-                systemCodes.RemoveAll(c => c.Value == code);
             }
 
             systemCodes.Add(new Code
@@ -286,14 +287,10 @@ public class CodeGroupCacheService(
             string display = record.Display;
             CodeStatus status = record.Status;
 
+            LogScientificNotationWarning(code, codeGroup.Id);
+
             if (!codeGroup.Codes.ContainsKey(system))
                 codeGroup.Codes.Add(system, new List<Code>());
-
-            if (codeGroup.Codes[system].Any(c => c.Value == code))
-            {
-                logger.LogWarning("Duplicate code {Code} detected for code system {CodeSystem}. Replacing the previous occurrence.", code.SanitizeForLog(), codeGroup.Id.SanitizeForLog());
-                codeGroup.Codes[system].RemoveAll(c => c.Value == code);
-            }
 
             codeGroup.Codes[system].Add(new CodeSystemCode
             {
@@ -305,6 +302,17 @@ public class CodeGroupCacheService(
 
         SetCodeGroup(codeGroup);
         logger.LogDebug("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes[system].Count);
+    }
+
+    private void LogScientificNotationWarning(string code, string? codeGroupId)
+    {
+        if (ScientificNotationPattern.IsMatch(code))
+        {
+            logger.LogWarning(
+                "Code {Code} in code group {CodeGroupId} appears to be in scientific notation. Verify that the code was not altered during CSV creation",
+                code.SanitizeForLog(),
+                codeGroupId.SanitizeForLog());
+        }
     }
 
     /// <summary>
