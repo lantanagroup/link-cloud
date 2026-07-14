@@ -41,6 +41,10 @@ public sealed class GenerationManifestSnapshot
     public IReadOnlyDictionary<string, List<string>> PatientEligibility { get; init; }
         = new Dictionary<string, List<string>>();
 
+    /// <summary>Per-patient scheduled inpatient pattern (enum name) used during generation.</summary>
+    public IReadOnlyDictionary<string, string> PatientInpatientPatterns { get; init; }
+        = new Dictionary<string, string>();
+
     /// <summary>
     /// Per-patient predicted ABS resource counts (generated ∩ query-plan-acquired ∩ CQL-referenced).
     /// This is the "our prediction" side of the Generated vs ABS comparison.

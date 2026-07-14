@@ -445,6 +445,139 @@ public class FhirServiceTests
     }
 
     [Fact]
+    public void ValidateCodeInCodeSystem_WithInactiveCode_ReturnsInactiveIssueOutcome()
+    {
+        // Arrange
+        var codeSystemId = "test-cs-inactive";
+        var code = "inactive-code";
+        var system = "http://test.system";
+        var display = "Inactive Code";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Url = system,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    system,
+                    new List<Code>
+                    {
+                        new CodeSystemCode
+                        {
+                            Value = code,
+                            Display = display,
+                            Status = CodeStatus.Inactive
+                        }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.ValidateCodeInCodeSystem(null, codeSystemId, code, display, null);
+
+        // Assert
+        Assert.NotNull(result);
+        var resultParameter = result.GetSingleValue<FhirBoolean>("result");
+        Assert.NotNull(resultParameter);
+        Assert.True(resultParameter.Value);
+
+        var issuesParameter = result.Parameter.FirstOrDefault(p => p.Name == "issues");
+        Assert.NotNull(issuesParameter);
+
+        var outcome = Assert.IsType<OperationOutcome>(issuesParameter.Resource);
+        var issue = Assert.Single(outcome.Issue);
+        Assert.Equal(OperationOutcome.IssueSeverity.Warning, issue.Severity);
+        Assert.Equal(OperationOutcome.IssueType.BusinessRule, issue.Code);
+        Assert.Equal("Code is inactive.", issue.Details?.Text);
+    }
+
+    [Fact]
+    public void ValidateCodeInCodeSystem_WithDuplicateMatchesAndDisplay_SelectsLastMatchingDisplay()
+    {
+        // Arrange
+        var codeSystemId = "test-cs-duplicate-display";
+        var code = "duplicate-code";
+        var system = "http://test.system";
+        var display = "Matching Display";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    system,
+                    new List<Code>
+                    {
+                        new CodeSystemCode { Value = code, Display = display, Status = CodeStatus.Active },
+                        new CodeSystemCode { Value = code, Display = "Other Display", Status = CodeStatus.Active },
+                        new CodeSystemCode { Value = code, Display = display, Status = CodeStatus.Inactive },
+                        new CodeSystemCode { Value = code, Display = "Last Entry", Status = CodeStatus.Active }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.ValidateCodeInCodeSystem(null, codeSystemId, code, display, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        var outcome = Assert.IsType<OperationOutcome>(result.Parameter.Single(p => p.Name == "issues").Resource);
+        Assert.Equal("Code is inactive.", Assert.Single(outcome.Issue).Details?.Text);
+    }
+
+    [Fact]
+    public void ValidateCodeInCodeSystem_WithDuplicateMatchesAndNoDisplay_SelectsLastEntry()
+    {
+        // Arrange
+        var codeSystemId = "test-cs-duplicate-no-display";
+        var code = "duplicate-code";
+        var system = "http://test.system";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    system,
+                    new List<Code>
+                    {
+                        new CodeSystemCode { Value = code, Display = "First Entry", Status = CodeStatus.Active },
+                        new CodeSystemCode { Value = code, Display = "Last Entry", Status = CodeStatus.Inactive }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, codeSystemId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.ValidateCodeInCodeSystem(null, codeSystemId, code, null, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        var outcome = Assert.IsType<OperationOutcome>(result.Parameter.Single(p => p.Name == "issues").Resource);
+        Assert.Equal("Code is inactive.", Assert.Single(outcome.Issue).Details?.Text);
+    }
+
+    [Fact]
     public void ValidateCodeInCodeSystem_WithInvalidCode_ReturnsFalse()
     {
         // Arrange
@@ -685,6 +818,45 @@ public class FhirServiceTests
         var resultParameter = result.GetSingleValue<FhirBoolean>("result");
         Assert.NotNull(resultParameter);
         Assert.True(resultParameter.Value);
+    }
+
+    #endregion
+
+    #region ExpandValueSet Tests
+
+    [Fact]
+    public void ExpandValueSet_WithMultipleSystems_IncludesCodesFromAllSystems()
+    {
+        // Arrange
+        var valueSetId = "test-vs-expand";
+        var system1 = "http://test.system/1";
+        var system2 = "http://test.system/2";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Resource = new ValueSet { Id = valueSetId },
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system1, new List<Code> { new() { Value = "code-1", Display = "Code One" } } },
+                { system2, new List<Code> { new() { Value = "code-2", Display = "Code Two" } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var result = _service.ExpandValueSet(valueSetId, null, null);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.NotNull(result.Expansion);
+        Assert.Equal(2, result.Expansion.Contains.Count);
+        Assert.Contains(result.Expansion.Contains, c => c.System == system1 && c.Code == "code-1");
+        Assert.Contains(result.Expansion.Contains, c => c.System == system2 && c.Code == "code-2");
     }
 
     #endregion

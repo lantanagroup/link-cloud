@@ -109,7 +109,6 @@ public class StartScenarioRequest : IValidatableObject
         ReportMethod = scenario.ReportMethod,
         Seed = scenario.Seed,
         PatientCount = scenario.PatientCount,
-        ResourcesPerPatient = scenario.ResourcesPerPatientMax,
         CleanupServiceData = scenario.CleanupServiceData,
         CleanupFhirData = scenario.CleanupFhirData,
         SelectedMeasures = scenario.SelectedMeasures,
