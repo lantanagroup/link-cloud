@@ -29,6 +29,7 @@ export interface CsvImportDialogData {
   facilityId?: string;
   isVendorMode: boolean;
   vendorIds: string[];
+  validResourceTypes: string[];
 }
 
 export interface CsvImportDialogResult {
@@ -48,6 +49,7 @@ export class RemoveExtensionsCsvImportDialogComponent {
   stage: 'upload' | 'preview' | 'submitting' | 'results' = 'upload';
   groups: CsvOperationGroup[] = [];
   conflicts: ConflictInfo[] = [];
+  invalidResourceTypes: string[] = [];
   isChecking = false;
   parseError = '';
   created = 0;
@@ -79,6 +81,7 @@ export class RemoveExtensionsCsvImportDialogComponent {
 
   onFileSelected(file: File | null): void {
     this.conflicts = [];
+    this.invalidResourceTypes = [];
     this.parseError = '';
     if (!file) {
       this.groups = [];
@@ -123,6 +126,25 @@ export class RemoveExtensionsCsvImportDialogComponent {
 
     if (this.groups.length === 0) {
       this.parseError = 'No valid rows found. Ensure column 1 is the resource type and column 2 is the URL.';
+      this.cdr.detectChanges();
+      return;
+    }
+
+    const canonicalMap = new Map<string, string>();
+    for (const rt of this.data.validResourceTypes) {
+      canonicalMap.set(rt.toLowerCase(), rt);
+    }
+    const unknowns: string[] = [];
+    for (const group of this.groups) {
+      const canonical = canonicalMap.get(group.resourceType.toLowerCase());
+      if (canonical) {
+        group.resourceType = canonical;
+      } else {
+        unknowns.push(group.resourceType);
+      }
+    }
+    if (unknowns.length > 0) {
+      this.invalidResourceTypes = unknowns;
       this.cdr.detectChanges();
       return;
     }
@@ -235,6 +257,7 @@ export class RemoveExtensionsCsvImportDialogComponent {
     this.stage = 'upload';
     this.groups = [];
     this.conflicts = [];
+    this.invalidResourceTypes = [];
     this.parseError = '';
   }
 
