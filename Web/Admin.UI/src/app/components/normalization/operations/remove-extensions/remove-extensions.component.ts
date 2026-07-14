@@ -357,7 +357,8 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
     const dialogData: CsvImportDialogData = {
       facilityId: this.operation.facilityId,
       isVendorMode: this.isVendorMode,
-      vendorIds: this.selectedVendorControl.value ?? []
+      vendorIds: this.selectedVendorControl.value ?? [],
+      validResourceTypes: this.resourceTypes
     };
 
     this.dialog.open(RemoveExtensionsCsvImportDialogComponent, {
