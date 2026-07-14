@@ -108,13 +108,27 @@ export class RemoveExtensionsCsvImportDialogComponent {
   }
 
   private processRows(rows: string[][]): void {
+    const canonicalMap = new Map<string, string>();
+    for (const rt of this.data.validResourceTypes) {
+      canonicalMap.set(rt.toLowerCase(), rt);
+    }
+
     const groupMap = new Map<string, string[]>();
+    const unknownSet = new Set<string>();
     for (const row of rows) {
-      const resourceType = (row[0] ?? '').trim();
+      const raw = (row[0] ?? '').trim();
       const url = (row[1] ?? '').trim();
-      if (!resourceType || !url) continue;
-      if (!groupMap.has(resourceType)) groupMap.set(resourceType, []);
-      groupMap.get(resourceType)!.push(url);
+      if (!raw || !url) continue;
+      const canonical = canonicalMap.get(raw.toLowerCase());
+      if (!canonical) { unknownSet.add(raw); continue; }
+      if (!groupMap.has(canonical)) groupMap.set(canonical, []);
+      groupMap.get(canonical)!.push(url);
+    }
+
+    if (unknownSet.size > 0) {
+      this.invalidResourceTypes = Array.from(unknownSet);
+      this.cdr.detectChanges();
+      return;
     }
 
     this.groups = Array.from(groupMap.entries()).map(([resourceType, urls]) => ({
@@ -126,25 +140,6 @@ export class RemoveExtensionsCsvImportDialogComponent {
 
     if (this.groups.length === 0) {
       this.parseError = 'No valid rows found. Ensure column 1 is the resource type and column 2 is the URL.';
-      this.cdr.detectChanges();
-      return;
-    }
-
-    const canonicalMap = new Map<string, string>();
-    for (const rt of this.data.validResourceTypes) {
-      canonicalMap.set(rt.toLowerCase(), rt);
-    }
-    const unknowns: string[] = [];
-    for (const group of this.groups) {
-      const canonical = canonicalMap.get(group.resourceType.toLowerCase());
-      if (canonical) {
-        group.resourceType = canonical;
-      } else {
-        unknowns.push(group.resourceType);
-      }
-    }
-    if (unknowns.length > 0) {
-      this.invalidResourceTypes = unknowns;
       this.cdr.detectChanges();
       return;
     }
