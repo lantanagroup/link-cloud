@@ -210,6 +210,10 @@ public class ResourcesAcquiredListener : BackgroundService
                     sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
                     foreach (var resource in resources)
                     {
+                        // IMPORTANT: step summary token format is consumed by Automation.UI
+                        // normalization validation evidence parsing. Keep each token as:
+                        //   "{Sequence}:{OperationType}:{OperationName}:{Outcome}"
+                        // and keep the overall separator " | " in the final summary log.
                         var stepSummaries = new List<string>(sequences.Count);
 
                         foreach (var sequence in sequences)
@@ -253,6 +257,9 @@ public class ResourcesAcquiredListener : BackgroundService
                         }
 
                         _logger.LogInformation(
+                            // IMPORTANT: this message shape is intentionally stable.
+                            // Automation validators query Loki for this marker and parse
+                            // FacilityId/ResourceType/ResourceId/Steps from the rendered line.
                             "[NormalizationExecutionSummary] FacilityId={FacilityId}, CorrelationId={CorrelationId}, PatientId={PatientId}, ResourceType={ResourceType}, ResourceId={ResourceId}, Steps=[{Steps}]",
                             result.Message.Key.FacilityId.SanitizeForLog(),
                             correlationId.SanitizeForLog(),
