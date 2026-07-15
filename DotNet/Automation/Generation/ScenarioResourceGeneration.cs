@@ -35,6 +35,20 @@ namespace LantanaGroup.Automation.Generation;
 /// </summary>
 internal static class ScenarioResourceGeneration
 {
+    private const string DataAbsentReasonExtensionUrl = "http://hl7.org/fhir/StructureDefinition/data-absent-reason";
+    private const string EncounterAccidentRelatedExtensionUrl = "http://open.epic.com/FHIR/StructureDefinition/extension/accidentrelated";
+    private const string EncounterEpicIdExtensionUrl = "http://open.epic.com/FHIR/StructureDefinition/extension/epic-id";
+    private const string ObservationDatetimeExtensionUrl = "http://open.epic.com/FHIR/StructureDefinition/extension/observation-datetime";
+    private const string PatientMergeUnmergeInstantExtensionUrl = "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant";
+    private static readonly HashSet<string> SystemDefaultRemoveExtensionsResourceTypes =
+    [
+        ResourceType.Encounter.ToString(),
+        ResourceType.Patient.ToString(),
+        ResourceType.Condition.ToString(),
+        ResourceType.MedicationRequest.ToString(),
+        ResourceType.Observation.ToString()
+    ];
+
     // ------------------------------------------------------------------
     //  Bundle entry construction + serialization
     // ------------------------------------------------------------------
@@ -45,12 +59,75 @@ internal static class ScenarioResourceGeneration
     /// real upload happens through the configured FHIR client, which rewrites
     /// it as needed.
     /// </summary>
-    internal static Bundle.EntryComponent Entry(string resourceUrl, Resource resource) => new()
+    internal static Bundle.EntryComponent Entry(string resourceUrl, Resource resource)
     {
-        FullUrl = $"http://localhost:8080/fhir/{resourceUrl}",
-        Resource = resource,
-        Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = resourceUrl }
-    };
+        AddSystemDefaultNormalizationOpportunities(resource);
+        return new Bundle.EntryComponent
+        {
+            Resource = resource,
+            FullUrl = $"http://localhost:8080/fhir/{resourceUrl}",
+            Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = resourceUrl }
+        };
+    }
+
+    private static void AddSystemDefaultNormalizationOpportunities(Resource resource)
+    {
+        if (resource is Location location)
+        {
+            AddLocationCopyOperationOpportunities(location);
+            return;
+        }
+
+        if (resource is not DomainResource domainResource)
+            return;
+
+        if (!SystemDefaultRemoveExtensionsResourceTypes.Contains(resource.TypeName))
+            return;
+
+        AddTopLevelExtensionIfMissing(domainResource, DataAbsentReasonExtensionUrl, new Code("unknown"));
+
+        if (resource is Encounter)
+        {
+            AddTopLevelExtensionIfMissing(domainResource, EncounterAccidentRelatedExtensionUrl, new FhirBoolean(false));
+            AddTopLevelExtensionIfMissing(domainResource, EncounterEpicIdExtensionUrl, new FhirString($"synthetic-epic-enc-{domainResource.Id}"));
+        }
+        else if (resource is Observation)
+        {
+            AddTopLevelExtensionIfMissing(domainResource, ObservationDatetimeExtensionUrl, new FhirDateTime(DateTime.UtcNow));
+        }
+        else if (resource is Patient)
+        {
+            AddTopLevelExtensionIfMissing(domainResource, PatientMergeUnmergeInstantExtensionUrl, new Instant(DateTimeOffset.UtcNow));
+        }
+    }
+
+    private static void AddTopLevelExtensionIfMissing(DomainResource resource, string url, DataType value)
+    {
+        if (resource.Extension.Any(e => string.Equals(e.Url, url, StringComparison.Ordinal)))
+            return;
+
+        resource.Extension.Add(new Extension(url, value));
+    }
+
+    private static void AddLocationCopyOperationOpportunities(Location location)
+    {
+        var hasUsableIdentifier = location.Identifier.Any(i =>
+            !string.IsNullOrWhiteSpace(i.System) &&
+            !string.IsNullOrWhiteSpace(i.Value));
+
+        if (hasUsableIdentifier)
+            return;
+
+        var fallbackId = string.IsNullOrWhiteSpace(location.Id)
+            ? Guid.NewGuid().ToString("N")
+            : location.Id;
+
+        location.Identifier.Add(new Identifier
+        {
+            System = "http://example.org/fhir/sid/location",
+            Value = fallbackId
+        });
+    }
 
     /// <summary>
     /// Serializes a list of bundle entries as a transaction-type FHIR Bundle.

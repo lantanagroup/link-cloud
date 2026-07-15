@@ -1,7 +1,7 @@
-﻿using System.Net;
-using LantanaGroup.Link.Automation.Link.Configuration;
+﻿using LantanaGroup.Link.Automation.Link.Configuration;
 using Newtonsoft.Json.Linq;
 using RestSharp;
+using System.Net;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
 
@@ -127,7 +127,6 @@ public class LokiScraper
                     _output.WriteLine($"[DIAG]   {component}: {lines.Count} issue(s)");
                     foreach (var line in lines)
                     {
-                        // Split summary from detail for clean log output.
                         var dIdx = line.IndexOf("|||", StringComparison.Ordinal);
                         var summaryPart = dIdx >= 0 ? line[..dIdx].TrimEnd() : line;
 
@@ -153,6 +152,73 @@ public class LokiScraper
         }
 
         _output.WriteLine("[DIAG] === End error summary ===");
+    }
+
+    public async Task<List<string>> QueryServiceLogsAsync(
+        string componentName,
+        string includePattern,
+        TimeSpan lookback,
+        string? facilityId = null,
+        string? structuredFieldName = null,
+        string? structuredFieldValue = null,
+        int limit = 2000)
+    {
+        var end = DateTime.UtcNow;
+        var start = end - lookback;
+
+        var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
+        var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
+
+        var correlationFilter = !string.IsNullOrWhiteSpace(facilityId)
+            ? $" |= \"{facilityId}\""
+            : string.Empty;
+
+        var structuredFilter = string.Empty;
+        if (!string.IsNullOrWhiteSpace(structuredFieldName) && !string.IsNullOrWhiteSpace(structuredFieldValue))
+        {
+            var escaped = structuredFieldValue.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            structuredFilter = $" | json | {structuredFieldName}=\"{escaped}\"";
+        }
+
+        var query = $"{{app=\"link-cloud\", component=\"{componentName}\"}} |= \"{includePattern}\"{correlationFilter}{structuredFilter}";
+
+        var request = new RestRequest("/loki/api/v1/query_range");
+        request.AddParameter("query", query);
+        request.AddParameter("start", startUnix.ToString());
+        request.AddParameter("end", endUnix.ToString());
+        request.AddParameter("limit", Math.Max(1, limit).ToString());
+
+        var lines = new List<string>();
+        try
+        {
+            var response = await _lokiClient.ExecuteAsync(request);
+            if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+                return lines;
+
+            var jsonResponse = JObject.Parse(response.Content);
+            var results = jsonResponse["data"]?["result"] as JArray;
+            if (results == null)
+                return lines;
+
+            foreach (var result in results)
+            {
+                var values = result["values"] as JArray;
+                if (values == null) continue;
+
+                foreach (var value in values)
+                {
+                    var logLine = value[1]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(logLine))
+                        lines.Add(logLine);
+                }
+            }
+        }
+        catch
+        {
+            return lines;
+        }
+
+        return lines;
     }
 
     /// <summary>

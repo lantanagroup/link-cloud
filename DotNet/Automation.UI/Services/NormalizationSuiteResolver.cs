@@ -1,5 +1,4 @@
 ﻿using Automation.UI.Models;
-using Automation.UI.Models;
 using Automation.UI.Services.Persistence;
 
 namespace Automation.UI.Services;
@@ -31,13 +30,15 @@ public sealed class NormalizationSuiteResolver
         suite ??= await _store.GetDefaultSuiteAsync(ct);
 
         if (suite == null)
-            return new NormalizationSuiteResolution("None", []);
+            return new NormalizationSuiteResolution("None", [], [], []);
 
         var allOperations = await _store.GetAllOperationsAsync(ct);
         var allSequences = await _store.GetAllSequencesAsync(ct);
         var opLookup = allOperations.ToDictionary(o => o.Id);
 
         var resolvedOps = new List<NormalizationOperationDefinition>();
+        var resolvedSequences = new List<NormalizationSuiteSequenceResolution>();
+        var standaloneOperations = new List<NormalizationOperationDefinition>();
 
         // Add operations from sequences (in sequence order).
         foreach (var seqId in suite.SequenceIds)
@@ -45,25 +46,47 @@ public sealed class NormalizationSuiteResolver
             var seq = allSequences.FirstOrDefault(s => s.Id == seqId);
             if (seq == null) continue;
 
+            var sequenceOps = new List<NormalizationSuiteSequenceOperationResolution>();
+
             foreach (var entry in seq.Entries.OrderBy(e => e.Sequence))
             {
                 if (opLookup.TryGetValue(entry.OperationId, out var op))
+                {
                     resolvedOps.Add(op);
+                    sequenceOps.Add(new NormalizationSuiteSequenceOperationResolution(entry.Sequence, op));
+                }
             }
+
+            resolvedSequences.Add(new NormalizationSuiteSequenceResolution(seq.Name, sequenceOps));
         }
 
         // Add standalone operations from the suite.
         foreach (var opId in suite.OperationIds)
         {
             if (opLookup.TryGetValue(opId, out var op))
+            {
                 resolvedOps.Add(op);
+                standaloneOperations.Add(op);
+            }
         }
 
-        return new NormalizationSuiteResolution(suite.Name, resolvedOps);
+        return new NormalizationSuiteResolution(suite.Name, resolvedOps, resolvedSequences, standaloneOperations);
     }
 }
 
 /// <summary>
 /// The result of resolving a normalization suite.
 /// </summary>
-public record NormalizationSuiteResolution(string SuiteName, List<NormalizationOperationDefinition> Operations);
+public record NormalizationSuiteResolution(
+    string SuiteName,
+    List<NormalizationOperationDefinition> Operations,
+    List<NormalizationSuiteSequenceResolution> Sequences,
+    List<NormalizationOperationDefinition> StandaloneOperations);
+
+public record NormalizationSuiteSequenceResolution(
+    string SequenceName,
+    List<NormalizationSuiteSequenceOperationResolution> Operations);
+
+public record NormalizationSuiteSequenceOperationResolution(
+    int Sequence,
+    NormalizationOperationDefinition Operation);

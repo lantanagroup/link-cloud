@@ -150,6 +150,7 @@ internal sealed class RunExecutor
             var reportAbsValidator = services.GetRequiredService<ReportAbsManifestValidator>();
             var dataAcqValidator = services.GetRequiredService<DataAcquisitionDatabaseValidator>();
             var normalizationValidator = services.GetRequiredService<NormalizationDatabaseValidator>();
+            var normalizationSuiteApplicationValidator = new NormalizationSuiteApplicationValidator(output);
             var tenantValidator = services.GetRequiredService<TenantDatabaseValidator>();
             var validationResultsValidator = services.GetRequiredService<ValidationResultsValidator>();
             var pipelineSnapshot = services.GetRequiredService<PipelineSnapshot>();
@@ -318,7 +319,7 @@ internal sealed class RunExecutor
             await FacilitySetupHelper.EnsureFacilityAsync(
                 services.GetRequiredService<IFacilityServiceClient>(),
                 output, facilityId, measureIds);
-            await EnsureNormalizationFromSuiteAsync(
+            var normalizationResolution = await EnsureNormalizationFromSuiteAsync(
                 services.GetRequiredService<INormalizationServiceClient>(),
                 output, facilityId, state.Options.NormalizationSuiteId, cancellationToken);
             await FacilitySetupHelper.EnsureQueryPlansAsync(
@@ -477,7 +478,11 @@ internal sealed class RunExecutor
                 output.WriteLine("Regenerated report submitted successfully.");
             }
 
-            await pipelineSnapshot.WriteFullSnapshotAsync(output, facilityId, reportId);
+            await pipelineSnapshot.WriteFullSnapshotAsync(
+                output,
+                facilityId,
+                reportId,
+                BuildNormalizationSuiteSnapshot(normalizationResolution));
 
             var downloadedResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig);
             var internalAbsResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig, external: false);
@@ -641,6 +646,18 @@ internal sealed class RunExecutor
 
             await RunValidator("NORMALIZATION DATABASE VALIDATION", () =>
                 normalizationValidator.ValidateAllAsync(facilityId));
+
+            var normalizationSummaryLogs = await lokiScraper.QueryServiceLogsAsync(
+                LokiScraper.Components.Normalization,
+                "[NormalizationExecutionSummary]",
+                scenarioConfig.LokiScrapeWindow,
+                facilityId: null,
+                structuredFieldName: "FacilityId",
+                structuredFieldValue: facilityId,
+                limit: 5000);
+
+            await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", () =>
+                normalizationSuiteApplicationValidator.ValidateAllAsync(internalAbsResources, normalizationResolution, normalizationSummaryLogs));
 
             await RunValidator("TENANT DATABASE VALIDATION", () =>
                 tenantValidator.ValidateAllAsync(facilityId, measureId));
@@ -913,34 +930,64 @@ internal sealed class RunExecutor
         return null;
     }
 
+    private static PipelineSnapshot.NormalizationSuiteSnapshot BuildNormalizationSuiteSnapshot(NormalizationSuiteResolution resolution)
+    {
+        var sequences = resolution.Sequences
+            .Select(s => new PipelineSnapshot.NormalizationSequenceSnapshot(
+                s.SequenceName,
+                s.Operations
+                    .OrderBy(o => o.Sequence)
+                    .Select(o => new PipelineSnapshot.NormalizationSequenceOperationSnapshot(
+                        o.Sequence,
+                        o.Operation.OperationType,
+                        o.Operation.Name,
+                        o.Operation.ResourceTypes))
+                    .ToList()))
+            .ToList();
+
+        var standaloneOperations = resolution.StandaloneOperations
+            .Select(o => new PipelineSnapshot.NormalizationSequenceOperationSnapshot(
+                Sequence: 0,
+                OperationType: o.OperationType,
+                OperationName: o.Name,
+                ResourceTypes: o.ResourceTypes))
+            .ToList();
+
+        return new PipelineSnapshot.NormalizationSuiteSnapshot(
+            resolution.SuiteName,
+            sequences,
+            standaloneOperations);
+    }
+
     /// <summary>
     /// Resolves the normalization suite and creates the appropriate operations and sequences
     /// via the Normalization API for the given facility. Replaces the legacy
     /// <c>FacilitySetupHelper.EnsureNormalizationConfigAsync</c> which only created a single
     /// hard-coded CopyProperty operation.
     /// </summary>
-    private async Task EnsureNormalizationFromSuiteAsync(
+    private async Task<NormalizationSuiteResolution> EnsureNormalizationFromSuiteAsync(
         INormalizationServiceClient normalizationClient,
         IAutomationOutput output,
         string facilityId,
         Guid? suiteId,
         CancellationToken cancellationToken)
     {
+        var resolution = await _normalizationSuiteResolver.ResolveAsync(suiteId, cancellationToken);
+
         // Check if the facility already has operations configured.
         var existingResp = await normalizationClient.SearchFacilityOperationsAsync(facilityId);
         if (existingResp.IsSuccessStatusCode && existingResp.Body?.Records?.Count > 0)
         {
             output.WriteLine($"Normalization config for facility '{facilityId}' already exists. Skipping create.");
-            return;
+            return resolution;
         }
 
-        var resolution = await _normalizationSuiteResolver.ResolveAsync(suiteId, cancellationToken);
         output.WriteLine($"Using normalization suite: {resolution.SuiteName} ({resolution.Operations.Count} operation(s))");
 
         if (resolution.Operations.Count == 0)
         {
             output.WriteLine("Normalization suite has no operations — skipping normalization configuration.");
-            return;
+            return resolution;
         }
 
         // Track created operation IDs per resource type so we can build sequences.
@@ -1055,5 +1102,7 @@ internal sealed class RunExecutor
                     output.WriteLine($"  WARNING: Failed to create sequence for {resourceType}: HTTP {seqResp.StatusCode}");
             }
         }
+
+        return resolution;
     }
 }
