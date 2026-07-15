@@ -217,12 +217,12 @@ public class ResourcesAcquiredListener : BackgroundService
                     {
                         var dbEntity = sequence.OperationResourceType.Operation;
 
-                        var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
+                            var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
 
-                        if (operation == null)
-                        {
-                            throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
-                        }
+                            if (operation == null)
+                            {
+                                throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
+                            }
 
                         var operationResult = operation.OperationType switch
                         {
