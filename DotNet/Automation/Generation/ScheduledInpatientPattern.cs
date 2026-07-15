@@ -1,16 +1,29 @@
 ﻿namespace LantanaGroup.Automation.Generation;
 
+using System.ComponentModel;
+
 /// <summary>
 /// Defines when a patient's inpatient stay starts/ends relative to the scheduled report period.
 /// Used by scheduled-report automation to emit the right admit/discharge events.
 /// </summary>
 public enum ScheduledInpatientPattern
 {
+    [Description("Admitted before, remains")]
     AdmittedBeforePeriodRemainsInpatientAfterPeriod,
+
+    [Description("Admitted before, discharged during")]
     AdmittedBeforePeriodDischargedDuringPeriod,
+
+    [Description("Admitted during, remains")]
     AdmittedDuringPeriodRemainsInpatientAfterPeriod,
+
+    [Description("Admitted during, discharged during")]
     AdmittedDuringPeriodDischargedDuringPeriod,
+
+    [Description("Admitted & discharged before period")]
     AdmittedAndDischargedBeforePeriod,
+
+    [Description("Admitted & discharged after period")]
     AdmittedAndDischargedAfterPeriod
 }
 
@@ -53,6 +66,40 @@ public readonly record struct ScheduledPatternCensusBehavior(
 /// </summary>
 public static class ScheduledInpatientPatternExtensions
 {
+    /// <summary>
+    /// Compact UI label suitable for dropdown display.
+    /// </summary>
+    public static string GetUiShortLabel(this ScheduledInpatientPattern pattern) => pattern switch
+    {
+        ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod => "Before -> Remains after",
+        ScheduledInpatientPattern.AdmittedBeforePeriodDischargedDuringPeriod => "Before -> Discharged during",
+        ScheduledInpatientPattern.AdmittedDuringPeriodRemainsInpatientAfterPeriod => "During -> Remains after",
+        ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod => "During -> Discharged during",
+        ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod => "Before -> Before",
+        ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod => "After -> After",
+        _ => pattern.ToString()
+    };
+
+    /// <summary>
+    /// Full explanatory text for tooltips/help text.
+    /// </summary>
+    public static string GetUiHint(this ScheduledInpatientPattern pattern) => pattern switch
+    {
+        ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
+            => "Admitted before report period; remains inpatient after report period.",
+        ScheduledInpatientPattern.AdmittedBeforePeriodDischargedDuringPeriod
+            => "Admitted before report period; discharged during report period.",
+        ScheduledInpatientPattern.AdmittedDuringPeriodRemainsInpatientAfterPeriod
+            => "Admitted during report period; remains inpatient after report period.",
+        ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod
+            => "Admitted and discharged during report period.",
+        ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod
+            => "Admitted and discharged before report period.",
+        ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod
+            => "Admitted and discharged after report period.",
+        _ => pattern.ToString()
+    };
+
     /// <summary>
     /// Returns the census-event behavior required to exercise the given pattern.
     /// </summary>

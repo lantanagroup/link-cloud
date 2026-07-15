@@ -102,7 +102,8 @@ public sealed class ScenarioSeedService : IHostedService
                     MeasureEligibilities = new(DefaultQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
                     ResourcesPerPatientMin = 1000,
-                    ResourcesPerPatientMax = 1000
+                    ResourcesPerPatientMax = 1000,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
             CleanupServiceData = false,
@@ -131,7 +132,8 @@ public sealed class ScenarioSeedService : IHostedService
                     MeasureEligibilities = new(DefaultQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
                     ResourcesPerPatientMin = 15,
-                    ResourcesPerPatientMax = 15
+                    ResourcesPerPatientMax = 15,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
             CleanupServiceData = false,
@@ -160,7 +162,8 @@ public sealed class ScenarioSeedService : IHostedService
                     MeasureEligibilities = new(DefaultQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
                     ResourcesPerPatientMin = 25,
-                    ResourcesPerPatientMax = 50
+                    ResourcesPerPatientMax = 50,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
             CleanupServiceData = false,
@@ -189,7 +192,8 @@ public sealed class ScenarioSeedService : IHostedService
                     MeasureEligibilities = new(DefaultQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
                     ResourcesPerPatientMin = FhirBundleGenerator.DefaultResourcesPerPatient,
-                    ResourcesPerPatientMax = FhirBundleGenerator.DefaultResourcesPerPatient
+                    ResourcesPerPatientMax = FhirBundleGenerator.DefaultResourcesPerPatient,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
             CleanupServiceData = false,
@@ -218,7 +222,8 @@ public sealed class ScenarioSeedService : IHostedService
                     MeasureEligibilities = new(DefaultQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
                     ResourcesPerPatientMin = 5000,
-                    ResourcesPerPatientMax = 5000
+                    ResourcesPerPatientMax = 5000,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 },
                 new PatientCohortDefinition
                 {
@@ -226,7 +231,8 @@ public sealed class ScenarioSeedService : IHostedService
                     MeasureEligibilities = new(DefaultQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
                     ResourcesPerPatientMin = 25,
-                    ResourcesPerPatientMax = 50
+                    ResourcesPerPatientMax = 50,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
             CleanupServiceData = false,
@@ -288,6 +294,7 @@ public sealed class ScenarioSeedService : IHostedService
                 new PatientCohortDefinition
                 {
                     PatientCount = 1,
+                    CohortQualification = MeasureEligibility.NonQualifying,
                     MeasureEligibilities = new(DefaultNonQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultNonQualifyingScenarioIds],
                     ResourcesPerPatientMin = 50,
@@ -297,6 +304,7 @@ public sealed class ScenarioSeedService : IHostedService
                 new PatientCohortDefinition
                 {
                     PatientCount = 1,
+                    CohortQualification = MeasureEligibility.NonQualifying,
                     MeasureEligibilities = new(DefaultNonQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultNonQualifyingScenarioIds],
                     ResourcesPerPatientMin = 50,
@@ -330,7 +338,8 @@ public sealed class ScenarioSeedService : IHostedService
                     MeasureEligibilities = new(DefaultQualifyingEligibilities),
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
                     ResourcesPerPatientMin = 100,
-                    ResourcesPerPatientMax = 100
+                    ResourcesPerPatientMax = 100,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
                 }
             ],
             CleanupServiceData = false,
@@ -375,7 +384,8 @@ public sealed class ScenarioSeedService : IHostedService
                         ], MeasureEligibility.Qualifying)
                     ],
                     ResourcesPerPatientMin = 250,
-                    ResourcesPerPatientMax = 250
+                    ResourcesPerPatientMax = 250,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod
                 },
                 // Cohort 2: qualifies for ACH only (inpatient, no Hypo med)
                 new PatientCohortDefinition
@@ -388,7 +398,8 @@ public sealed class ScenarioSeedService : IHostedService
                     },
                     EligibleClinicalScenarioIds = [..DefaultEligibleScenarioIds],
                     ResourcesPerPatientMin = 250,
-                    ResourcesPerPatientMax = 250
+                    ResourcesPerPatientMax = 250,
+                    ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod
                 }
             ],
             CleanupServiceData = false,

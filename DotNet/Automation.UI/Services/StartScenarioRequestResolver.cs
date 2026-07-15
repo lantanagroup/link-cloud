@@ -1,6 +1,5 @@
-﻿using System.Text.Json;
-using Automation.UI.Models;
-using LantanaGroup.Automation.Generation;
+﻿using Automation.UI.Models;
+using System.Text.Json;
 
 namespace Automation.UI.Services;
 
@@ -60,12 +59,14 @@ public static class StartScenarioRequestResolver
             ? request.PatientCohorts
             : ExtractCohortsFromJson(request.RunConfigurationJson, effectiveMeasures)
               ?? [
-                  PatientCohortDefinition.AllQualifying(
+                  BuildDefaultCohort(
                       effectiveMeasures,
                       request.PatientCount ?? defaults.PatientCount,
-                      request.ResourcesPerPatient ?? defaults.ResourcesPerPatient,
-                      request.ResourcesPerPatient ?? defaults.ResourcesPerPatient)
+                      defaultResourcesMin: 250,
+                      defaultResourcesMax: 250)
               ];
+
+        ApplyCohortDefaults(cohorts, effectiveMeasures);
 
         // Cohorts are the single source of truth for patient profiles; expand them.
         var profiles = PatientCohortDefinition.ExpandProfiles(cohorts, request.Seed ?? defaults.Seed);
@@ -86,7 +87,9 @@ public static class StartScenarioRequestResolver
         return defaults with
         {
             PatientCount = request.PatientCount ?? defaults.PatientCount,
-            ResourcesPerPatient = request.ResourcesPerPatient ?? defaults.ResourcesPerPatient,
+            // Legacy run-level ResourcesPerPatient is obsolete for cohort-based runs.
+            // Keep the field populated for back-compat telemetry/UI callers.
+            ResourcesPerPatient = cohorts.FirstOrDefault()?.ResourcesPerPatientMax ?? defaults.ResourcesPerPatient,
             Seed = request.Seed ?? defaults.Seed,
             PollingIntervalSeconds = 3,
             // Keep an explicit hard timeout for custom runs so scheduled workflows
@@ -138,6 +141,32 @@ public static class StartScenarioRequestResolver
     private static string GenerateRandomNhsnOrganizationId()
     {
         return Random.Shared.Next(10000, 100000).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static PatientCohortDefinition BuildDefaultCohort(
+        IReadOnlyList<ProfiledMeasureType> measures,
+        int patientCount,
+        int defaultResourcesMin,
+        int defaultResourcesMax)
+    {
+        var cohort = PatientCohortDefinition.AllQualifying(measures, patientCount, defaultResourcesMin, defaultResourcesMax);
+        cohort.ScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
+        return cohort;
+    }
+
+    private static void ApplyCohortDefaults(
+        IReadOnlyList<PatientCohortDefinition> cohorts,
+        IReadOnlyList<ProfiledMeasureType> selectedMeasures)
+    {
+        foreach (var cohort in cohorts)
+        {
+            cohort.ScheduledInpatientPattern ??= ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
+
+            var allNonQualifying = selectedMeasures.Count > 0
+                && selectedMeasures.All(m => cohort.GetEligibility(m) == MeasureEligibility.NonQualifying);
+            if (allNonQualifying)
+                cohort.CohortQualification = MeasureEligibility.NonQualifying;
+        }
     }
 
     /// <summary>
@@ -306,9 +335,12 @@ public static class StartScenarioRequestResolver
                     }
                 }
 
+                var cohortQualification = InferCohortQualification(item, eligibilities, measures);
+
                 cohorts.Add(new PatientCohortDefinition
                 {
                     PatientCount = count,
+                    CohortQualification = cohortQualification,
                     MeasureEligibilities = eligibilities,
                     EligibleClinicalScenarioIds = scenarioIds,
                     ResourcesPerPatientMin = min,
@@ -323,7 +355,10 @@ public static class StartScenarioRequestResolver
         {
             return null;
         }
+
     }
+
+
 
     /// <summary>
     /// Extracts an imported-patient list (<c>importedPatientIds</c> or <c>importedPatientBundles</c>)
@@ -358,5 +393,32 @@ public static class StartScenarioRequestResolver
         {
             return null;
         }
+    }
+
+    private static MeasureEligibility InferCohortQualification(
+        JsonElement cohortElement,
+        IReadOnlyDictionary<ProfiledMeasureType, MeasureEligibility> eligibilities,
+        IReadOnlyList<ProfiledMeasureType> measures)
+    {
+        if (cohortElement.TryGetProperty("cohortQualification", out var cqEl))
+        {
+            if (cqEl.ValueKind == JsonValueKind.String
+                && Enum.TryParse<MeasureEligibility>(cqEl.GetString(), ignoreCase: true, out var parsed))
+            {
+                return parsed;
+            }
+
+            if (cqEl.ValueKind == JsonValueKind.Number)
+            {
+                var asInt = cqEl.GetInt32();
+                if (asInt == (int)MeasureEligibility.Qualifying) return MeasureEligibility.Qualifying;
+                if (asInt == (int)MeasureEligibility.NonQualifying) return MeasureEligibility.NonQualifying;
+            }
+        }
+
+        // Back-compat inference for scenarios saved before cohortQualification existed.
+        var allNonQualifying = measures.Count > 0
+            && measures.All(m => eligibilities.TryGetValue(m, out var e) && e == MeasureEligibility.NonQualifying);
+        return allNonQualifying ? MeasureEligibility.NonQualifying : MeasureEligibility.Qualifying;
     }
 }

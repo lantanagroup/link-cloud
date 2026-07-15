@@ -30,6 +30,8 @@ namespace Automation.UI.Services;
 /// </summary>
 internal sealed class RunExecutor
 {
+    private const ScheduledInpatientPattern DefaultScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
+
     private readonly AutomationConfig _automationConfig;
     private readonly IServiceProvider _hostServices;
     private readonly ISnapshotStore _snapshotStore;
@@ -37,6 +39,7 @@ internal sealed class RunExecutor
     private readonly QueryPlanTemplateResolver _queryPlanResolver;
     private readonly bool _suppressExternalManifest;
     private readonly bool _includePatientAggregatorOrganizationResource;
+    private readonly string _includePatientAggregatorOrganizationResourceSource;
     private readonly ILogger _logger;
 
     public RunExecutor(
@@ -54,8 +57,28 @@ internal sealed class RunExecutor
         _orchestrator = orchestrator;
         _queryPlanResolver = queryPlanResolver;
         _suppressExternalManifest = configuration.GetValue<bool>("ExternalBlobStorage:SuppressManifest");
-        _includePatientAggregatorOrganizationResource = configuration.GetValue<bool>("PatientAggregator:IncludeOrganizationResource");
+        var includeOrg = ResolveIncludePatientAggregatorOrganizationResource(configuration);
+        _includePatientAggregatorOrganizationResource = includeOrg.Value;
+        _includePatientAggregatorOrganizationResourceSource = includeOrg.Source;
         _logger = logger;
+    }
+
+    private static (bool Value, string Source) ResolveIncludePatientAggregatorOrganizationResource(IConfiguration configuration)
+    {
+        var shared = TryGetBool(configuration, "PatientAggregator:IncludeOrganizationResource");
+        if (shared.HasValue)
+            return (shared.Value, "PatientAggregator:IncludeOrganizationResource");
+
+        return (false, "default(false)");
+    }
+
+    private static bool? TryGetBool(IConfiguration configuration, string key)
+    {
+        var raw = configuration[key];
+        if (string.IsNullOrWhiteSpace(raw))
+            return null;
+
+        return bool.TryParse(raw, out var parsed) ? parsed : null;
     }
 
     /// <summary>
@@ -83,9 +106,11 @@ internal sealed class RunExecutor
         {
             var scenarioConfig = ScenarioConfigBuilder.Build(state.Scenario, state.Options);
 
-            // For scheduled-report, compute the active window immediately so generation
+            var usesScheduledWorkflow = state.Options.ReportMethod is ReportMethod.ScheduledReport or ReportMethod.RegenerateReport;
+
+            // For scheduled-style runs, compute the active window immediately so generation
             // uses the correct clinical period boundaries (scenarioConfig.StartDate/EndDate).
-            if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+            if (usesScheduledWorkflow)
             {
                 // Use a clinically meaningful report window for generation so scheduled
                 // inpatient patterns produce rich in-period evidence (not minute-scale data).
@@ -229,7 +254,10 @@ internal sealed class RunExecutor
                     {
                         QueryPlan = effectiveQueryPlan,
                         ClinicalPeriodStart = scenarioConfig.StartDate,
-                        ClinicalPeriodEnd = scenarioConfig.EndDate
+                        ClinicalPeriodEnd = scenarioConfig.EndDate,
+                        AllowEncounterAnchoredDateOverrideForOutOfRange =
+                            state.Options.ReportMethod == ReportMethod.ScheduledReport
+                            || state.Options.ReportMethod == ReportMethod.RegenerateReport
                     },
                     importedPatients: importedPatients.Count > 0 ? importedPatients : null);
 
@@ -240,7 +268,7 @@ internal sealed class RunExecutor
                 // Use the manifest's parallel PatientIds + Profiles arrays as the source of truth.
                 expectedSubmittedPatientIds = generationManifest.PatientIds
                     .Where((_, idx) => idx < generationManifest.Profiles.Count
-                                       && generationManifest.Profiles[idx].QualifiesForAny(selectedMeasures))
+                                       && generationManifest.Profiles[idx].IsExpectedToBeSubmitted(selectedMeasures))
                     .ToList();
 
                 if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
@@ -291,6 +319,7 @@ internal sealed class RunExecutor
                 generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlan);
                 generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
                 generationManifest.IncludePatientAggregatorOrganizationResource = _includePatientAggregatorOrganizationResource;
+                output.WriteLine($"[Manifest] IncludePatientAggregatorOrganizationResource={_includePatientAggregatorOrganizationResource} (source={_includePatientAggregatorOrganizationResourceSource})");
 
                 // Persist a lightweight manifest snapshot for the UI.
                 await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
@@ -347,7 +376,7 @@ internal sealed class RunExecutor
 
             Frequency? scheduledRunFrequency = null;
             string reportId;
-            if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+            if (usesScheduledWorkflow)
             {
                 var scheduledWorkflowState = await ExecuteScheduledReportWorkflowAsync(
                     reportHelper,
@@ -396,7 +425,7 @@ internal sealed class RunExecutor
                     throw new InvalidOperationException($"Expected report with id {reportId} to be submitted but it was not.");
             }
 
-            if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+            if (usesScheduledWorkflow)
             {
                 // Scheduled runs can briefly report Submitted while entry-level state is still
                 // converging. Reconcile against terminal report truth (entries + submission
@@ -703,20 +732,13 @@ internal sealed class RunExecutor
         for (var i = 0; i < count; i++)
         {
             var profile = profiles[i];
-            if (!profile.QualifiesForAny(selectedMeasures))
+            if (!profile.IsExpectedToBeSubmitted(selectedMeasures))
                 continue;
 
-            if (IsExpectedInScheduledReport(profile.ScheduledInpatientPattern))
-                expected.Add(patientIds[i]);
+            expected.Add(patientIds[i]);
         }
 
         return expected;
-    }
-
-    private static bool IsExpectedInScheduledReport(ScheduledInpatientPattern? pattern)
-    {
-        var effective = pattern ?? ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod;
-        return effective.GetCensusBehavior().ExpectedInReport;
     }
 
     private static string ToZulu(DateTimeOffset value)
@@ -728,7 +750,7 @@ internal sealed class RunExecutor
     // Keep scheduled test runtimes bounded while still allowing long clinical windows.
     // Admin.BFF computes EndDate using current-time + delay, so this controls how long
     // the run waits for end-of-period execution.
-    private static readonly TimeSpan ScheduledRuntimeDelay = TimeSpan.FromMinutes(4);
+    private static readonly TimeSpan ScheduledRuntimeDelay = TimeSpan.FromMinutes(2);
 
     private static ScheduledReportWindow DeriveScheduledReportWindow(TestScenarioConfig scenarioConfig)
     {
@@ -769,7 +791,7 @@ internal sealed class RunExecutor
         for (var i = 0; i < count; i++)
         {
             var pattern = profiles[i].ScheduledInpatientPattern
-                ?? ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod;
+                ?? DefaultScheduledInpatientPattern;
             var behavior = pattern.GetCensusBehavior();
 
             // Patterns whose entire stay sits outside the report period emit no census events;
