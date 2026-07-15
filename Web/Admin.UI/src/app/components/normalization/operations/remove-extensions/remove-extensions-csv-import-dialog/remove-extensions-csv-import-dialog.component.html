@@ -20,6 +20,24 @@
         {{ parseError }}
       </div>
     }
+    @if (invalidResourceTypes.length > 0) {
+      <div class="conflict-error">
+        <div class="conflict-header">
+          <mat-icon>error</mat-icon>
+          Import rejected &mdash; {{ invalidResourceTypes.length }} unrecognized resource type(s).
+          Correct or remove these rows before importing:
+        </div>
+        <div class="conflict-groups">
+          <div class="conflict-group">
+            <ul>
+              @for (rt of invalidResourceTypes; track rt) {
+                <li>{{ rt }}</li>
+              }
+            </ul>
+          </div>
+        </div>
+      </div>
+    }
     @if (conflicts.length > 0) {
       <div class="conflict-error">
         <div class="conflict-header">
