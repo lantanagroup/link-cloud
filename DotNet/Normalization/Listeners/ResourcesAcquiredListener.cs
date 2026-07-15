@@ -210,10 +210,9 @@ public class ResourcesAcquiredListener : BackgroundService
                 }
                 else
                 {
+                    sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
                     foreach (var resource in resources)
                     {
-                        sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
-
                         foreach (var sequence in sequences)
                         {
                             var dbEntity = sequence.OperationResourceType.Operation;
