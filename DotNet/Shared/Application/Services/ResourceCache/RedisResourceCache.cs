@@ -85,13 +85,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             _db.HashSet(correlationId, correlationHash.ToArray());
         }
 
-        public void Skipped(string sourceCache, string correlationId)
-        {
-            var hashEntries = _db.HashGetAll(sourceCache);
-
-            _db.HashSet(correlationId, hashEntries);
-        }
-
         public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
         {
             return ResourceCacheType.Redis;
