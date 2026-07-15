@@ -172,34 +172,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return this;
         }
 
-        public void Skipped(string sourceCache, string destinationCache)
-        {
-            BlockBlobClient sourceBlobClient = _containerClient.GetBlockBlobClient(GetBlobKey(sourceCache));
-
-            if (!sourceBlobClient.Exists())
-            {
-                _logger.LogWarning("ABS blob not found for Skipped. SourceKey='{SourceKey}', BlobPath='{BlobPath}', Container='{Container}', DestinationKey='{DestinationKey}'",
-                    sourceCache, GetBlobKey(sourceCache), _settings.BlobContainerName, destinationCache);
-                return;
-            }
-
-            AppendBlobClient destinationBlobClient = _containerClient.GetAppendBlobClient(GetBlobKey(destinationCache));
-            destinationBlobClient.CreateIfNotExists();
-
-            try
-            {
-                using (Stream sourceStream = sourceBlobClient.OpenRead(true))
-                using (Stream destinationStream = destinationBlobClient.OpenWrite(false))
-                {
-                    sourceStream.CopyTo(destinationStream);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Error when reading skipped ABS blob: Source Cache = {source}, Destination Cache = {destination}", sourceCache, destinationCache);
-            }
-        }
-
         public void Delete(List<string> cacheKeys)
         {
             foreach (var cacheKey in cacheKeys)
