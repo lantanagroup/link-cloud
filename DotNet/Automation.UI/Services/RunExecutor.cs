@@ -168,6 +168,8 @@ internal sealed class RunExecutor
             // the criteria of each). For multi-measure, the pipeline handles the union.
             var primaryMeasure = state.Options.SelectedMeasures[0];
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
+            var normalizationResolution = await _normalizationSuiteResolver.ResolveAsync(state.Options.NormalizationSuiteId, cancellationToken);
+            var generationRequirementsPlan = BuildGenerationRequirementsPlan(normalizationResolution);
 
             await fhirDataLoader.WaitForServerAsync(output);
 
@@ -241,6 +243,7 @@ internal sealed class RunExecutor
                     state.Options.ResourcesPerPatient,
                     state.Options.Seed,
                     generationConfig,
+                    generationRequirementsPlan,
                     acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
                     {
                         QueryPlan = effectiveQueryPlan,
@@ -274,7 +277,8 @@ internal sealed class RunExecutor
             {
                 var (genPatientIds, bundles) = FhirBundleGenerator.Generate(
                     output, state.Options.PatientCount, state.Options.ResourcesPerPatient, state.Options.Seed,
-                    generationConfig);
+                    generationConfig,
+                    generationRequirementsPlan);
 
                 patientIds = genPatientIds;
                 expectedSubmittedPatientIds = patientIds.ToList();
@@ -319,9 +323,9 @@ internal sealed class RunExecutor
             await FacilitySetupHelper.EnsureFacilityAsync(
                 services.GetRequiredService<IFacilityServiceClient>(),
                 output, facilityId, measureIds);
-            var normalizationResolution = await EnsureNormalizationFromSuiteAsync(
+            normalizationResolution = await EnsureNormalizationFromSuiteAsync(
                 services.GetRequiredService<INormalizationServiceClient>(),
-                output, facilityId, state.Options.NormalizationSuiteId, cancellationToken);
+                output, facilityId, state.Options.NormalizationSuiteId, cancellationToken, normalizationResolution);
             await FacilitySetupHelper.EnsureQueryPlansAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 output, facilityId, measureIds, "Epic", queryPlanInput);
@@ -959,6 +963,41 @@ internal sealed class RunExecutor
             standaloneOperations);
     }
 
+    private static GenerationRequirementsPlan BuildGenerationRequirementsPlan(NormalizationSuiteResolution resolution)
+    {
+        var plan = new GenerationRequirementsPlan
+        {
+            PlanName = resolution.SuiteName,
+            Requirements = []
+        };
+
+        foreach (var op in resolution.Operations)
+        {
+            plan.Requirements.Add(new GenerationRequirement
+            {
+                Name = op.Name,
+                RequirementType = op.OperationType,
+                ResourceTypes = op.ResourceTypes.ToList(),
+                SourceFhirPath = op.SourceFhirPath,
+                CodeMapFhirPath = op.CodeMapFhirPath,
+                ExtensionUrls = op.ExtensionUrls.ToList(),
+                Conditions = op.Conditions.Select(c => new GenerationRequirementCondition
+                {
+                    FhirPathSource = c.FhirPathSource,
+                    Operator = c.Operator,
+                    Value = c.Value
+                }).ToList(),
+                CodeSystemMaps = op.CodeSystemMaps.Select(m => new GenerationRequirementCodeSystemMap
+                {
+                    SourceSystem = m.SourceSystem,
+                    SourceCodes = m.CodeMaps.Keys.ToDictionary(k => k, _ => string.Empty, StringComparer.Ordinal)
+                }).ToList()
+            });
+        }
+
+        return plan;
+    }
+
     /// <summary>
     /// Resolves the normalization suite and creates the appropriate operations and sequences
     /// via the Normalization API for the given facility. Replaces the legacy
@@ -970,9 +1009,10 @@ internal sealed class RunExecutor
         IAutomationOutput output,
         string facilityId,
         Guid? suiteId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        NormalizationSuiteResolution? preResolved = null)
     {
-        var resolution = await _normalizationSuiteResolver.ResolveAsync(suiteId, cancellationToken);
+        var resolution = preResolved ?? await _normalizationSuiteResolver.ResolveAsync(suiteId, cancellationToken);
 
         // Check if the facility already has operations configured.
         var existingResp = await normalizationClient.SearchFacilityOperationsAsync(facilityId);

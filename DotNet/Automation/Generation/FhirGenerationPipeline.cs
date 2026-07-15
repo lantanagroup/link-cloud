@@ -88,6 +88,7 @@ public static class FhirGenerationPipeline
         int totalResourcesPerPatient = FhirBundleGenerator.DefaultResourcesPerPatient,
         int? generationSeed = null,
         FhirGenerationConfig? config = null,
+        GenerationRequirementsPlan? generationRequirementsPlan = null,
         AcquisitionSimulationConfig? acquisitionSimulation = null,
         string? runId = null,
         IReadOnlyList<ImportedPatientInput>? importedPatients = null)
@@ -155,7 +156,7 @@ public static class FhirGenerationPipeline
         // ------------------------------------------------------------------
         // Shared infrastructure — generated once, uploaded first
         // ------------------------------------------------------------------
-        var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) = GenerateSharedInfrastructure();
+        var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) = GenerateSharedInfrastructure(generationRequirementsPlan);
 
         // Upload shared infrastructure first
         var sharedBundles = ChunkEntries(sharedEntries, "shared", 0);
@@ -206,6 +207,7 @@ public static class FhirGenerationPipeline
                         generationClinicalPeriodStart,
                         generationClinicalPeriodEnd,
                         config,
+                        generationRequirementsPlan,
                         ids);
 
                     patientIds[patientIndex] = patientId;
@@ -286,6 +288,7 @@ public static class FhirGenerationPipeline
         DateTime? generationClinicalPeriodStart,
         DateTime? generationClinicalPeriodEnd,
         FhirGenerationConfig? config,
+        GenerationRequirementsPlan? generationRequirementsPlan,
         FhirBundleGenerator.SharedIds ids)
     {
         var patientSeed = baseSeed + (profile.SeedOffset ?? patientIndex);
@@ -299,7 +302,7 @@ public static class FhirGenerationPipeline
         var entries = GeneratePatientEntries(
             profile, patientIndex, baseSeed, effectiveResourcesPerPatient,
             sharedPractitionerIds, sharedMedicationIds, measures,
-            generationClinicalPeriodStart, generationClinicalPeriodEnd, config, ids);
+            generationClinicalPeriodStart, generationClinicalPeriodEnd, config, generationRequirementsPlan, ids);
 
         var scenario = FhirGenerationCodes.GetScenarioById(profile.ClinicalScenarioId)
                        ?? FhirGenerationCodes.GetScenarioBySeed(patientSeed);
@@ -547,6 +550,7 @@ public static class FhirGenerationPipeline
         DateTime? generationClinicalPeriodStart,
         DateTime? generationClinicalPeriodEnd,
         FhirGenerationConfig? config,
+        GenerationRequirementsPlan? generationRequirementsPlan,
         FhirBundleGenerator.SharedIds ids)
     {
         var patientSeed = baseSeed + (profile.SeedOffset ?? patientIndex);
@@ -610,6 +614,7 @@ public static class FhirGenerationPipeline
             entries, patientId, patientSeed, patientIndex, baseSeed, totalResourcesPerPatient,
             encStart, encEnd, scenario, anchors, encounter,
             sharedPractitionerIds, sharedMedicationIds, config, ids,
+            generationRequirementsPlan,
             addHypoglycemicMedicationPair: profile.RequiresHypoglycemicMedication());
 
         return entries;
@@ -620,13 +625,13 @@ public static class FhirGenerationPipeline
     // ------------------------------------------------------------------
 
     private static (List<Bundle.EntryComponent> Entries, List<string> PractitionerIds, List<string> MedicationIds, FhirBundleGenerator.SharedIds Ids)
-        GenerateSharedInfrastructure()
+        GenerateSharedInfrastructure(GenerationRequirementsPlan? generationRequirementsPlan)
     {
         // All shared-infrastructure construction lives in ScenarioResourceGeneration so
         // FhirBundleGenerator (bulk path) and FhirGenerationPipeline (streaming path)
         // can never drift on shared-resource shape, IDs, or order.
         var ids = new FhirBundleGenerator.SharedIds();
-        var (entries, practitionerIds, medicationIds) = ScenarioResourceGeneration.BuildSharedInfrastructure(ids);
+        var (entries, practitionerIds, medicationIds) = ScenarioResourceGeneration.BuildSharedInfrastructure(ids, generationRequirementsPlan);
         return (entries, practitionerIds, medicationIds, ids);
     }
 

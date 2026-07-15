@@ -1,6 +1,5 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Automation.Generation.ResourceFactories;
-using LantanaGroup.Automation.Helpers;
 using System.Text.Json;
 
 namespace LantanaGroup.Automation.Generation;
@@ -35,20 +34,6 @@ namespace LantanaGroup.Automation.Generation;
 /// </summary>
 internal static class ScenarioResourceGeneration
 {
-    private const string DataAbsentReasonExtensionUrl = "http://hl7.org/fhir/StructureDefinition/data-absent-reason";
-    private const string EncounterAccidentRelatedExtensionUrl = "http://open.epic.com/FHIR/StructureDefinition/extension/accidentrelated";
-    private const string EncounterEpicIdExtensionUrl = "http://open.epic.com/FHIR/StructureDefinition/extension/epic-id";
-    private const string ObservationDatetimeExtensionUrl = "http://open.epic.com/FHIR/StructureDefinition/extension/observation-datetime";
-    private const string PatientMergeUnmergeInstantExtensionUrl = "https://open.epic.com/FHIR/StructureDefinition/extension/patient-merge-unmerge-instant";
-    private static readonly HashSet<string> SystemDefaultRemoveExtensionsResourceTypes =
-    [
-        ResourceType.Encounter.ToString(),
-        ResourceType.Patient.ToString(),
-        ResourceType.Condition.ToString(),
-        ResourceType.MedicationRequest.ToString(),
-        ResourceType.Observation.ToString()
-    ];
-
     // ------------------------------------------------------------------
     //  Bundle entry construction + serialization
     // ------------------------------------------------------------------
@@ -61,44 +46,12 @@ internal static class ScenarioResourceGeneration
     /// </summary>
     internal static Bundle.EntryComponent Entry(string resourceUrl, Resource resource)
     {
-        AddSystemDefaultNormalizationOpportunities(resource);
         return new Bundle.EntryComponent
         {
             Resource = resource,
             FullUrl = $"http://localhost:8080/fhir/{resourceUrl}",
             Request = new Bundle.RequestComponent { Method = Bundle.HTTPVerb.PUT, Url = resourceUrl }
         };
-    }
-
-    private static void AddSystemDefaultNormalizationOpportunities(Resource resource)
-    {
-        if (resource is Location location)
-        {
-            AddLocationCopyOperationOpportunities(location);
-            return;
-        }
-
-        if (resource is not DomainResource domainResource)
-            return;
-
-        if (!SystemDefaultRemoveExtensionsResourceTypes.Contains(resource.TypeName))
-            return;
-
-        AddTopLevelExtensionIfMissing(domainResource, DataAbsentReasonExtensionUrl, new Code("unknown"));
-
-        if (resource is Encounter)
-        {
-            AddTopLevelExtensionIfMissing(domainResource, EncounterAccidentRelatedExtensionUrl, new FhirBoolean(false));
-            AddTopLevelExtensionIfMissing(domainResource, EncounterEpicIdExtensionUrl, new FhirString($"synthetic-epic-enc-{domainResource.Id}"));
-        }
-        else if (resource is Observation)
-        {
-            AddTopLevelExtensionIfMissing(domainResource, ObservationDatetimeExtensionUrl, new FhirDateTime(DateTime.UtcNow));
-        }
-        else if (resource is Patient)
-        {
-            AddTopLevelExtensionIfMissing(domainResource, PatientMergeUnmergeInstantExtensionUrl, new Instant(DateTimeOffset.UtcNow));
-        }
     }
 
     private static void AddTopLevelExtensionIfMissing(DomainResource resource, string url, DataType value)
@@ -175,7 +128,7 @@ internal static class ScenarioResourceGeneration
     /// for MedicationRequest/MedicationAdministration RxNorm matching).
     /// </summary>
     internal static (List<Bundle.EntryComponent> Entries, List<string> PractitionerIds, List<string> MedicationIds)
-        BuildSharedInfrastructure(FhirBundleGenerator.SharedIds ids)
+        BuildSharedInfrastructure(FhirBundleGenerator.SharedIds ids, GenerationRequirementsPlan? generationRequirementsPlan = null)
     {
         var entries = new List<Bundle.EntryComponent>
         {
@@ -199,6 +152,9 @@ internal static class ScenarioResourceGeneration
         }
 
         var medicationIds = GenerateSharedMedications(entries, ids);
+
+        ApplyGenerationRequirements(entries, generationRequirementsPlan);
+
         return (entries, practitionerIds, medicationIds);
     }
 
@@ -566,6 +522,7 @@ internal static class ScenarioResourceGeneration
         List<string> sharedMedicationIds,
         FhirGenerationConfig? config,
         FhirBundleGenerator.SharedIds ids,
+        GenerationRequirementsPlan? generationRequirementsPlan = null,
         bool addHypoglycemicMedicationPair = false)
     {
         // Core anchors — order matters: Patient → Device → primary Condition →
@@ -603,6 +560,8 @@ internal static class ScenarioResourceGeneration
             encStart, encEnd, anchors.PrimaryDxId, anchors.AttendingPractId, anchors.CareTeamId,
             totalResourcesPerPatient, baseSeed, patientIndex,
             sharedPractitionerIds, sharedMedicationIds, config, ids);
+
+        ApplyGenerationRequirements(entries, generationRequirementsPlan);
     }
 
     /// <summary>
@@ -649,5 +608,167 @@ internal static class ScenarioResourceGeneration
                 20, "[iU]",
                 diabetesIndicationCode, diabetesIndicationDisplay,
                 false, ids.HypoInsulinGlargineMedication)));
+    }
+
+    private static void ApplyGenerationRequirements(
+        List<Bundle.EntryComponent> entries,
+        GenerationRequirementsPlan? generationRequirementsPlan)
+    {
+        if (generationRequirementsPlan == null || generationRequirementsPlan.Requirements.Count == 0)
+            return;
+
+        var resourcesByType = entries
+            .Where(e => e.Resource != null)
+            .GroupBy(e => e.Resource!.TypeName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.Resource!).ToList(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var requirement in generationRequirementsPlan.Requirements)
+        {
+            foreach (var resourceType in requirement.ResourceTypes.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (!resourcesByType.TryGetValue(resourceType, out var candidates) || candidates.Count == 0)
+                    continue;
+
+                ApplyRequirement(requirement, candidates[0]);
+            }
+        }
+    }
+
+    private static void ApplyRequirement(GenerationRequirement requirement, Resource resource)
+    {
+        switch (requirement.RequirementType)
+        {
+            case "RemoveExtensions":
+                if (resource is DomainResource dr)
+                    EnsureExtensionUrls(dr, requirement.ExtensionUrls);
+                break;
+
+            case "CopyLocation":
+                if (resource is Location loc)
+                    AddLocationCopyOperationOpportunities(loc);
+                break;
+
+            case "CopyProperty":
+                EnsureSourcePathOpportunity(resource, requirement.SourceFhirPath);
+                break;
+
+            case "CodeMap":
+                EnsureCodeMapOpportunity(resource, requirement);
+                break;
+
+            case "ConditionalTransform":
+                EnsureConditionalOpportunity(resource, requirement);
+                break;
+        }
+    }
+
+    private static void EnsureExtensionUrls(DomainResource resource, List<string> extensionUrls)
+    {
+        foreach (var url in extensionUrls.Where(u => !string.IsNullOrWhiteSpace(u)).Distinct(StringComparer.Ordinal))
+            AddTopLevelExtensionIfMissing(resource, url, new FhirString("normalization-opportunity"));
+    }
+
+    private static void EnsureSourcePathOpportunity(Resource resource, string? sourceFhirPath)
+    {
+        if (string.IsNullOrWhiteSpace(sourceFhirPath))
+            return;
+
+        var path = sourceFhirPath.Trim();
+
+        if (string.Equals(path, "identifier.value", StringComparison.OrdinalIgnoreCase))
+        {
+            EnsureIdentifierValue(resource);
+            return;
+        }
+
+        if (string.Equals(path, "code.coding.code", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(path, "code.coding.system", StringComparison.OrdinalIgnoreCase))
+        {
+            EnsureCodeCoding(resource, "http://example.org/fhir/sid/opportunity", "opportunity-code");
+        }
+    }
+
+    private static void EnsureIdentifierValue(Resource resource)
+    {
+        if (resource is Location location)
+        {
+            AddLocationCopyOperationOpportunities(location);
+            return;
+        }
+
+        var identifierProp = resource.GetType().GetProperty("Identifier");
+        if (identifierProp == null)
+            return;
+
+        if (identifierProp.GetValue(resource) is not List<Identifier> identifiers)
+        {
+            identifiers = [];
+            identifierProp.SetValue(resource, identifiers);
+        }
+
+        var hasUsable = identifiers.Any(i => !string.IsNullOrWhiteSpace(i.Value));
+        if (hasUsable)
+            return;
+
+        identifiers.Add(new Identifier
+        {
+            System = "http://example.org/fhir/sid/identifier",
+            Value = string.IsNullOrWhiteSpace(resource.Id) ? Guid.NewGuid().ToString("N") : resource.Id
+        });
+    }
+
+    private static void EnsureCodeMapOpportunity(Resource resource, GenerationRequirement requirement)
+    {
+        var map = requirement.CodeSystemMaps.FirstOrDefault();
+        var sourceSystem = map?.SourceSystem;
+        var sourceCode = map?.SourceCodes.Keys.FirstOrDefault() ?? "opportunity-code";
+        if (string.IsNullOrWhiteSpace(sourceSystem))
+            sourceSystem = "http://example.org/fhir/sid/opportunity";
+
+        var path = string.IsNullOrWhiteSpace(requirement.CodeMapFhirPath)
+            ? "code.coding.code"
+            : requirement.CodeMapFhirPath.Trim();
+
+        if (string.Equals(path, "code.coding.code", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(path, "code.coding.system", StringComparison.OrdinalIgnoreCase))
+        {
+            EnsureCodeCoding(resource, sourceSystem, sourceCode);
+        }
+    }
+
+    private static void EnsureConditionalOpportunity(Resource resource, GenerationRequirement requirement)
+    {
+        foreach (var condition in requirement.Conditions)
+        {
+            var op = condition.Operator?.Trim() ?? string.Empty;
+            if (op.Equals("Exists", StringComparison.OrdinalIgnoreCase)
+                || op.Equals("Equal", StringComparison.OrdinalIgnoreCase)
+                || op.Equals("GreaterThan", StringComparison.OrdinalIgnoreCase)
+                || op.Equals("GreaterThanOrEqual", StringComparison.OrdinalIgnoreCase)
+                || op.Equals("LessThan", StringComparison.OrdinalIgnoreCase)
+                || op.Equals("LessThanOrEqual", StringComparison.OrdinalIgnoreCase))
+            {
+                EnsureSourcePathOpportunity(resource, condition.FhirPathSource);
+            }
+        }
+    }
+
+    private static void EnsureCodeCoding(Resource resource, string system, string code)
+    {
+        var codeProp = resource.GetType().GetProperty("Code");
+        if (codeProp == null)
+            return;
+
+        if (codeProp.GetValue(resource) is not CodeableConcept concept)
+        {
+            concept = new CodeableConcept();
+            codeProp.SetValue(resource, concept);
+        }
+
+        concept.Coding ??= [];
+        if (concept.Coding.Any(c => string.Equals(c.System, system, StringComparison.Ordinal) && string.Equals(c.Code, code, StringComparison.Ordinal)))
+            return;
+
+        concept.Coding.Add(new Coding(system, code));
     }
 }
