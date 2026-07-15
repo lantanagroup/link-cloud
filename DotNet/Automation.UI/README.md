@@ -28,14 +28,16 @@ pipeline tests. It provides:
 1. **Scenario management** -- create, edit, clone, and delete reusable test configurations.
 2. **Query plan management** -- define which FHIR resource types are acquired during data
    acquisition.
-3. **Scenario execution** -- start, cancel, and delete runs.
-4. **Live telemetry** -- SignalR-driven logs, status, and dashboard updates.
-5. **Dashboard analytics** -- KPIs, success rates, 14-day run histograms.
-6. **Persistent run history** -- MongoDB-backed state across restarts.
-7. **Snapshot-based inspection** -- pipeline domains pre-aggregated for UI rendering.
-8. **Validation-backed confidence** -- report, ABS, DA, normalization, tenant, validation
+3. **Normalization suite management** -- define reusable normalization operations,
+   sequences, and suites; select suites per scenario.
+4. **Scenario execution** -- start, cancel, and delete runs.
+5. **Live telemetry** -- SignalR-driven logs, status, and dashboard updates.
+6. **Dashboard analytics** -- KPIs, success rates, 14-day run histograms.
+7. **Persistent run history** -- MongoDB-backed state across restarts.
+8. **Snapshot-based inspection** -- pipeline domains pre-aggregated for UI rendering.
+9. **Validation-backed confidence** -- report, ABS, DA, normalization, tenant, validation
    checks.
-9. **API Health automated testing** -- service-oriented endpoint/status-path verification with
+10. **API Health automated testing** -- service-oriented endpoint/status-path verification with
    seeded test data, streaming progress, and run history.
 
 ---
@@ -48,6 +50,7 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 |   +-- RunsController          dashboard, run lifecycle, snapshot/log APIs
 |   +-- ScenariosController     inline CRUD for scenario templates
 |   +-- QueryPlansController    inline CRUD for query plan templates
+|   +-- NormalizationsController inline CRUD for normalization operations/sequences/suites
 |   +-- ApiHealthController     API Health dashboard + SSE run streaming
 |   +-- Api/AutomationRunsApiController  external start/status API
 |   +-- HomeController          landing redirect
@@ -57,6 +60,7 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 |   +-- Runs/Manifest.cshtml    Generation-Manifest deep dive (generated / predicted / actual)
 |   +-- Scenarios/Index.cshtml  scenario list (uses shared editor modal)
 |   +-- QueryPlans/Index.cshtml query plan list + inline modal editor
+|   +-- Normalizations/Index.cshtml normalization operations/sequences/suites management
 |   +-- ApiHealth/Index.cshtml  API test matrix, run controls, SSE/live updates
 |   +-- Shared/_ScenarioEditorModal.cshtml   reusable scenario editor (markup + JS)
 +-- Models/
@@ -71,6 +75,8 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 |   +-- StoreBackedServicePoller polls pipeline domains and writes snapshots
 |   +-- RunHub                  SignalR hub for run logs + dashboard updates
 |   +-- ScenarioSeedService     seeds system scenarios at startup
+|   +-- NormalizationSuiteSeedService seeds system normalization operations/sequences/suites
+|   +-- NormalizationSuiteResolver resolves selected suite at run time
 +-- Services/Persistence/
     +-- MongoSnapshotStore      run summaries, logs, per-domain snapshots
     +-- MongoScenarioStore      saved scenario templates
@@ -172,11 +178,33 @@ acquisition. Follows the same inline editing pattern as Scenarios.
 System query plans cannot be modified or deleted. The default query plan is used for new
 scenarios unless overridden.
 
-### 3.4 `HomeController`
+### 3.4 `NormalizationsController`
+
+Manages reusable normalization definitions used by scenarios:
+
+- **Operations** (`NormalizationOperationDefinition`) -- unit operations (for example
+  `RemoveExtensions`, `CopyProperty`, `CodeMap`, `ConditionalTransform`, `CopyLocation`).
+- **Sequences** (`NormalizationSequenceDefinition`) -- ordered operation references.
+- **Suites** (`NormalizationSuiteDefinition`) -- bundles of sequences and/or standalone
+  operations, with optional default marker.
+
+All edits are inline JSON POSTs with antiforgery and system-item protection semantics
+(system items can be cloned, not modified/deleted).
+
+| Action | Method | Purpose |
+|---|---|---|
+| `Index` | GET | Normalization management page (operations / sequences / suites tabs). |
+| `GetOperationJson` / `GetSequenceJson` / `GetSuiteJson` | GET | Fetch one definition by id. |
+| `SaveOperation` / `SaveSequence` / `SaveSuite` | POST | Create or update non-system definitions. |
+| `CloneOperation` / `CloneSequence` / `CloneSuite` | POST | Deep copy selected definition. |
+| `DeleteOperation` / `DeleteSequence` / `DeleteSuite` | POST | Delete non-system definitions. |
+| `SetDefaultSuite` | POST | Mark one suite as default. |
+
+### 3.5 `HomeController`
 
 Redirects to `Runs/Index`.
 
-### 3.5 `ApiHealthController`
+### 3.6 `ApiHealthController`
 
 Primary API Health UI surface. Provides dashboard rendering, run launch, SSE streaming,
 active-run resume, and history APIs.
@@ -289,6 +317,7 @@ A `TestScenarioDefinition` captures everything needed to run a test:
 | `ResourcesPerPatientMin/Max` | Resource count range per patient. |
 | `PatientCohorts` | List of cohort definitions (count, `CohortQualification`, per-measure eligibility, clinical profiles, resource range, inpatient pattern). |
 | `QueryPlanTemplateId` | Optional override for the FHIR query plan (null = system default). |
+| `NormalizationSuiteId` | Optional override for the normalization suite (null = system default suite). |
 | `CleanupServiceData` | Remove facility config and run artifacts after completion. |
 | `CleanupFhirData` | Expunge FHIR server data after completion. |
 | `ReportPeriodStart` / `ReportPeriodEnd` | Optional reporting period (UTC). When null, the system defaults (`2023-01-01T00:00:00Z` / `2023-12-31T23:59:59Z`) are used. The runtime uses these to bound generated encounter windows and to drive the report's clinical period; the editor auto-suggests a value that encompasses any imported-patient encounter dates. |
@@ -345,6 +374,24 @@ UI scenario and the backend test produces equivalent FHIR input:
 | Multi Measure Test | 20260420 | 2 | 250 |
 
 These scenarios match `Tests/BackendE2ETests` entry by entry (see that project's README).
+
+### Normalization suites and generation requirements plans
+
+`Automation.UI` stores and manages normalization suites as Link-facing configuration, but it
+does **not** hardcode suite behavior into the core generator. At run time:
+
+1. The selected suite id (`NormalizationSuiteId`) is resolved to concrete operations via
+   `NormalizationSuiteResolver`.
+2. `RunExecutor` maps that resolved suite into a platform-agnostic
+   `GenerationRequirementsPlan` (from the `Automation` project).
+3. The generation plan is passed into both generation paths
+   (`FhirGenerationPipeline` and `FhirBundleGenerator`) so generated data includes required
+   trigger characteristics.
+4. The original suite is still applied to Link Normalization service configuration for
+   execution-time normalization.
+
+This separation keeps `Automation` platform-agnostic while allowing `Automation.UI` to
+author and enforce Link-specific normalization intent.
 
 ### Cohort model
 
@@ -497,6 +544,9 @@ Why SSE here:
      (generated cohort first, imported patients appended).
    - `GenerationManifest` is built incrementally during generation; ID-imported patients
      are recorded via `MarkPreExistingPatient` so cleanup skips them.
+    - The resolved normalization suite is translated into a platform-agnostic
+      `GenerationRequirementsPlan` and supplied to generation so produced resources include
+      the required trigger characteristics.
    - `QueryPlanAcquisitionSimulator` runs per-patient with the resolved clinical period.
    - `CqlFilterSimulator` runs per-patient over the patient's qualifying measures only.
 3. **Initialize validation dependencies** -- validation artifacts and categories.
@@ -645,6 +695,9 @@ Collections:
 - `automation_logs` -- full run logs.
 - `automation_scenarios` -- user and system scenario templates.
 - `automation_query_plan_templates` -- query plan templates.
+- `automation_normalization_operations` -- normalization operation definitions.
+- `automation_normalization_sequences` -- normalization sequence definitions.
+- `automation_normalization_suites` -- normalization suite definitions.
 - `api_health_runs` -- API Health endpoint execution history.
 
 ### Document conventions
