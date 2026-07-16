@@ -500,6 +500,7 @@ public class AcquisitionProcessingJobTests
                 {
                     FacilityId = facilityId,
                     Status = RequestStatus.Pending,
+                    RetryAttempts = 2,
                     CorrelationId = Guid.NewGuid().ToString(),
                     ReportTrackingId = reportTrackingId,
                     PatientId = $"Patient/{i}",
@@ -678,7 +679,11 @@ public class AcquisitionProcessingJobTests
 
             var pendingLogIds = pendingLogsByFacility[facilityId].Select(l => l.Id).ToHashSet();
             var pendingLogs = allLogs.Where(l => pendingLogIds.Contains(l.Id)).ToList();
-            Assert.All(pendingLogs, log => Assert.Equal(RequestStatus.Ready, log.Status));
+            Assert.All(pendingLogs, log =>
+            {
+                Assert.Equal(RequestStatus.Ready, log.Status);
+                Assert.Equal(0, log.RetryAttempts ?? 0);
+            });
 
             var retryableLogIds = retryableLogsByFacility[facilityId].Select(l => l.Id).ToHashSet();
             var retryableLogs = allLogs.Where(l => retryableLogIds.Contains(l.Id)).ToList();

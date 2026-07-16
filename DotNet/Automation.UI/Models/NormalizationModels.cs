@@ -31,6 +31,10 @@ public class NormalizationOperationDefinition
     // --- RemoveExtensions fields ---
     public List<string> ExtensionUrls { get; set; } = [];
 
+    // --- CopyLocationAliasToTypeIteratively fields ---
+    public int MaxIterations { get; set; } = 15;
+    public bool SplitOnComma { get; set; }
+
     // --- CopyLocation has no extra fields ---
 
     public bool IsSystem { get; set; }

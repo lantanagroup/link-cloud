@@ -249,6 +249,7 @@
                             <select class="form-select" id="OpType">
                                 <option value="CopyProperty">CopyProperty</option>
                                 <option value="CopyLocation">CopyLocation</option>
+                                <option value="CopyLocationAliasToTypeIteratively">CopyLocationAliasToTypeIteratively</option>
                                 <option value="ConditionalTransform">ConditionalTransform</option>
                                 <option value="CodeMap">CodeMap</option>
                                 <option value="RemoveExtensions">RemoveExtensions</option>
@@ -302,6 +303,18 @@
                         <div class="col-12 op-field op-field-RemoveExtensions">
                             <label class="form-label" for="OpExtensionUrls">Extension URLs <small class="text-muted">(one per line)</small></label>
                             <textarea class="form-control font-monospace" id="OpExtensionUrls" rows="4" style="font-size:.8rem;"></textarea>
+                        </div>
+
+                        @* --- CopyLocationAliasToTypeIteratively fields --- *@
+                        <div class="col-md-6 op-field op-field-CopyLocationAliasToTypeIteratively">
+                            <label class="form-label" for="OpMaxIterations">Max Iterations</label>
+                            <input class="form-control" type="number" min="1" id="OpMaxIterations" value="15" />
+                        </div>
+                        <div class="col-md-6 op-field op-field-CopyLocationAliasToTypeIteratively d-flex align-items-end">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="OpSplitOnComma" />
+                                <label class="form-check-label" for="OpSplitOnComma">Split Alias Entries on Comma</label>
+                            </div>
                         </div>
                     </div>
                     <div id="opSystemOverlay" class="position-absolute top-0 start-0 w-100 h-100 au-system-overlay" style="display:none;"></div>
@@ -503,6 +516,8 @@
         document.getElementById('OpCodeMapFhirPath').value = data?.codeMapFhirPath || '';
         document.getElementById('OpCodeSystemMaps').value = data?.codeSystemMaps ? JSON.stringify(data.codeSystemMaps, null, 2) : '';
         document.getElementById('OpExtensionUrls').value = (data?.extensionUrls || []).join('\n');
+        document.getElementById('OpMaxIterations').value = data?.maxIterations ?? 15;
+        document.getElementById('OpSplitOnComma').checked = !!data?.splitOnComma;
 
         // Conditions
         const condContainer = document.getElementById('opConditionsContainer');
@@ -624,6 +639,8 @@
             codeMapFhirPath: document.getElementById('OpCodeMapFhirPath').value || null,
             codeSystemMaps: codeSystemMaps,
             extensionUrls: document.getElementById('OpExtensionUrls').value.split('\n').map(s => s.trim()).filter(Boolean),
+            maxIterations: parseInt(document.getElementById('OpMaxIterations').value || '15', 10),
+            splitOnComma: document.getElementById('OpSplitOnComma').checked,
             isSystem: false
         };
     }

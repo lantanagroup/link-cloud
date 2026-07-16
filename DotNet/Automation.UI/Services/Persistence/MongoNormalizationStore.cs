@@ -154,7 +154,9 @@ public sealed class MongoNormalizationStore : INormalizationStore
             m.Conditions,
             m.CodeMapFhirPath,
             m.CodeSystemMaps,
-            m.ExtensionUrls
+            m.ExtensionUrls,
+            m.MaxIterations,
+            m.SplitOnComma
         }, JsonOpts)
     };
 
@@ -194,6 +196,10 @@ public sealed class MongoNormalizationStore : INormalizationStore
                     m.CodeSystemMaps = JsonSerializer.Deserialize<List<NormalizationCodeSystemMap>>(csm.GetRawText(), JsonOpts) ?? [];
                 if (root.TryGetProperty("extensionUrls", out var eu) && eu.ValueKind == JsonValueKind.Array)
                     m.ExtensionUrls = JsonSerializer.Deserialize<List<string>>(eu.GetRawText(), JsonOpts) ?? [];
+                if (root.TryGetProperty("maxIterations", out var mi) && mi.ValueKind == JsonValueKind.Number && mi.TryGetInt32(out var maxIterations))
+                    m.MaxIterations = maxIterations;
+                if (root.TryGetProperty("splitOnComma", out var soc) && (soc.ValueKind == JsonValueKind.True || soc.ValueKind == JsonValueKind.False))
+                    m.SplitOnComma = soc.GetBoolean();
             }
             catch { /* best effort */ }
         }

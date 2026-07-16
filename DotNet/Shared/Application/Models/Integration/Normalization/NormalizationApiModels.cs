@@ -41,6 +41,10 @@ public class CreateNormalizationOperationDetailsApiModel
 
     // RemoveExtensions
     public List<string>? ExtensionUrls { get; set; }
+
+    // CopyLocationAliasToTypeIteratively
+    public int? MaxIterations { get; set; }
+    public bool? SplitOnComma { get; set; }
 }
 
 public class CreateNormalizationConditionApiModel

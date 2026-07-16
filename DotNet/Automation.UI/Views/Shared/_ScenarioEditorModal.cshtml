@@ -111,6 +111,10 @@
                             <input class="form-control" type="number" id="PatientCount" value="10" readonly title="Sum of cohort patients + imported patients (read-only)." />
                         </div>
                         <div class="col-md-3">
+                            <label class="form-label" for="NhsnOrganizationId">NHSN Organization ID</label>
+                            <input class="form-control" type="text" id="NhsnOrganizationId" maxlength="64" />
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label" for="ReportPeriodStart">Report Period Start</label>
                             <input class="form-control" type="date" id="ReportPeriodStart" />
                         </div>
@@ -240,6 +244,14 @@
         }
 
         function af() { var t = document.querySelector('input[name="__RequestVerificationToken"]'); return t ? t.value : ''; }
+        function generateRandomNhsnOrganizationId() {
+            var arr = new Uint32Array(1);
+            if (window.crypto && window.crypto.getRandomValues) {
+                window.crypto.getRandomValues(arr);
+                return String(10000 + (arr[0] % 90000));
+            }
+            return String(10000 + Math.floor(Math.random() * 90000));
+        }
         function esc(s) {
             return String(s == null ? '' : s)
                 .replace(/&/g, '&amp;')
@@ -880,6 +892,7 @@
                 // configured; including imported patients here would inflate that fallback.
                 patientCount: cohorts.reduce(function (s, c) { return s + (c.patientCount || 0); }, 0),
                 patientCohorts: cohorts,
+                nhsnOrganizationId: (document.getElementById('NhsnOrganizationId').value || '').trim(),
                 cleanupServiceData: document.getElementById('CleanupServiceData').checked,
                 cleanupFhirData: document.getElementById('CleanupFhirData').checked,
                 queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null,
@@ -901,6 +914,7 @@
             document.getElementById('Seed').value = data.seed || 20260329;
             document.getElementById('CleanupFhirData').checked = data.cleanupFhirData !== false;
             document.getElementById('CleanupServiceData').checked = !!data.cleanupServiceData;
+            document.getElementById('NhsnOrganizationId').value = (data.nhsnOrganizationId || '').trim() || generateRandomNhsnOrganizationId();
             // Report Period (yyyy-MM-dd from any ISO-ish input the server returns).
             function isoToDateValue(s) {
                 if (!s) return '';
@@ -1008,6 +1022,7 @@
                 document.getElementById('Seed').value = 20260329;
                 document.getElementById('CleanupFhirData').checked = true;
                 document.getElementById('CleanupServiceData').checked = false;
+                document.getElementById('NhsnOrganizationId').value = generateRandomNhsnOrganizationId();
                 document.getElementById('ReportPeriodStart').value = '';
                 document.getElementById('ReportPeriodEnd').value = '';
                 selectDefaultNormalizationSuite();
@@ -1031,6 +1046,7 @@
             var model = collectModel();
             var valid = true;
             if (!(model.name || '').trim()) { markFieldError('ScenarioName', 'Name is required.'); valid = false; }
+            if (!(model.nhsnOrganizationId || '').trim()) { markFieldError('NhsnOrganizationId', 'NHSN Organization ID is required.'); valid = false; }
             if (!model.selectedMeasures.length) { showError('At least one measure must be selected.'); valid = false; }
             var hasImported = (model.importedPatientIds && model.importedPatientIds.length > 0)
                 || (model.importedPatientBundles && model.importedPatientBundles.length > 0);

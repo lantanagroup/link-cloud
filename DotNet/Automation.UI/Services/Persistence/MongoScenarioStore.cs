@@ -1,4 +1,4 @@
-﻿using Automation.UI.Models;
+using Automation.UI.Models;
 using MongoDB.Driver;
 using System.Security.Cryptography;
 using System.Text;
@@ -324,6 +324,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             ResourcesPerPatientMin = model.ResourcesPerPatientMin,
             ResourcesPerPatientMax = model.ResourcesPerPatientMax,
             PatientCohortsJson = JsonSerializer.Serialize(model.PatientCohorts),
+            NhsnOrganizationId = model.NhsnOrganizationId,
             QueryPlanTemplateId = model.QueryPlanTemplateId,
             CleanupServiceData = model.CleanupServiceData,
             CleanupFhirData = model.CleanupFhirData,
@@ -354,6 +355,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             ResourcesPerPatientMin = doc.ResourcesPerPatientMin,
             ResourcesPerPatientMax = doc.ResourcesPerPatientMax,
             PatientCohorts = DeserializeCohorts(doc.PatientCohortsJson),
+            NhsnOrganizationId = string.IsNullOrWhiteSpace(doc.NhsnOrganizationId) ? string.Empty : doc.NhsnOrganizationId,
             QueryPlanTemplateId = doc.QueryPlanTemplateId,
             CleanupServiceData = doc.CleanupServiceData,
             CleanupFhirData = doc.CleanupFhirData,

@@ -123,6 +123,52 @@ public static class FacilitySetupHelper
         }
     }
 
+    public static async Task EnsureOrganizationLocationConfigurationAsync(
+        IDataAcquisitionServiceClient dataAcqClient,
+        IAutomationOutput output,
+        string facilityId)
+    {
+        var existing = await dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId);
+        if (existing.IsSuccessStatusCode)
+        {
+            var hasActiveConfigured = existing.Body?.Any(c =>
+                c.IsActive && c.Conditions is { Count: > 0 }) == true;
+
+            if (hasActiveConfigured)
+            {
+                output.WriteLine($"Org-location configuration for facility '{facilityId}' already exists. Skipping create.");
+                return;
+            }
+        }
+
+        var create = await dataAcqClient.CreateOrganizationLocationConfigurationAsync(
+            facilityId,
+            new CreateOrganizationLocationConfigurationApiModel
+            {
+                Description = "Automation smoke-test org-location configuration",
+                IsActive = true,
+                Conditions =
+                [
+                    new CreateOrganizationLocationConditionApiModel
+                    {
+                        // Match the synthetic Location shape produced by automation:
+                        // - Identifier.system = http://example.org/fhir/sid/location
+                        // - CDC HSLOC coding present on Location.type
+                        // This engages org-location mapping with conditions that are
+                        // semantically tied to generated data (not a blanket true).
+                        FhirPath = "identifier.where(system='http://example.org/fhir/sid/location').exists() or type.coding.where(system='https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html').exists()",
+                        Priority = 1
+                    }
+                ]
+            });
+
+        if (!create.IsSuccessStatusCode)
+            throw new InvalidOperationException(
+                $"Failed to create organization location configuration for facility '{facilityId}'. HTTP {create.StatusCode}: {create.RawBody ?? "(no body)"}");
+
+        output.WriteLine($"Ensured org-location configuration for facility '{facilityId}'.");
+    }
+
     public static async Task EnsureQueryPlansAsync(
         IDataAcquisitionServiceClient dataAcqClient,
         IAutomationOutput output,
