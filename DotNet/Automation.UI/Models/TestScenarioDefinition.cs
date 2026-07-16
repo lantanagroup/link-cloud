@@ -54,6 +54,11 @@ public class TestScenarioDefinition
     /// </summary>
     public List<PatientCohortDefinition> PatientCohorts { get; set; } = [];
 
+    /// <summary>
+    /// Configured NHSN reporting Organization ID for this scenario.
+    /// </summary>
+    public string NhsnOrganizationId { get; set; } = string.Empty;
+
     // ----- Housekeeping -----
 
     /// <summary>

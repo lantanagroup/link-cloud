@@ -416,6 +416,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     public async Task<int> UpdateStatusBatchAsync(IEnumerable<long> ids, RequestStatus newStatus, bool incrementRetry = false, CancellationToken cancellationToken = default)
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.UpdateStatusBatchAsync");
+        var now = DateTime.UtcNow;
 
         // High-speed bulk update without fetching entities. 
         return await _dbContext.DataAcquisitionLogs
@@ -423,7 +424,8 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(l => l.Status, newStatus)
                 .SetProperty(l => l.RetryAttempts, l => incrementRetry ? l.RetryAttempts + 1 : l.RetryAttempts)
-                .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                .SetProperty(l => l.CompletionDate, l => newStatus == RequestStatus.Completed ? l.CompletionDate ?? now : l.CompletionDate)
+                .SetProperty(l => l.ModifyDate, now),
                 cancellationToken);
     }
 
@@ -431,7 +433,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.CancelBulkAsync");
 
-        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
+        var cancellableStatuses = RequestStatusExtensions.CancellableStatuses;
 
         var cancelledCount = 0;
         foreach (var batch in ids.Chunk(DataAcquisitionConstants.DatabaseSettings.MaxBulkIds))
@@ -439,7 +441,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             var query = _dbContext.DataAcquisitionLogs
                 .Where(l => batch.Contains(l.Id)
                     && l.Status != null
-                    && !terminalStatuses.Contains(l.Status.Value));
+                    && cancellableStatuses.Contains(l.Status.Value));
 
             if (minAgeHours > 0)
                 query = query.Where(l => l.CreateDate <= DateTime.UtcNow.AddHours(-minAgeHours));
@@ -458,7 +460,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.CancelByFilterAsync");
 
-        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled };
+        var cancellableStatuses = RequestStatusExtensions.CancellableStatuses;
 
         var query = _dbContext.DataAcquisitionLogs.AsQueryable();
 
@@ -512,7 +514,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
 
         // Get IDs of logs eligible for cancellation
         var eligibleQuery = query.Where(l => l.Status != null
-            && !terminalStatuses.Contains(l.Status.Value));
+            && cancellableStatuses.Contains(l.Status.Value));
 
         if (minAgeHours > 0)
             eligibleQuery = eligibleQuery.Where(l => l.CreateDate <= DateTime.UtcNow.AddHours(-minAgeHours));
@@ -607,12 +609,14 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
     {
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.TrySetLogStatusAsync");
         activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, logId);
+        var now = DateTime.UtcNow;
 
         int rowsAffected = await _dbContext.DataAcquisitionLogs
             .Where(l => l.Id == logId && l.Status != null && validCurrentStatuses.Contains(l.Status.Value))
             .ExecuteUpdateAsync(setters => setters
                     .SetProperty(l => l.Status, newStatus)
-                    .SetProperty(l => l.ModifyDate, DateTime.UtcNow),
+                    .SetProperty(l => l.CompletionDate, l => newStatus == RequestStatus.Completed ? l.CompletionDate ?? now : l.CompletionDate)
+                    .SetProperty(l => l.ModifyDate, now),
                 cancellationToken);
 
         if (rowsAffected > 0 && !string.IsNullOrWhiteSpace(note))
@@ -621,7 +625,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
             {
                 DataAcquisitionLogId = logId,
                 Note = note,
-                CreateDate = DateTime.UtcNow
+                CreateDate = now
             });
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
@@ -786,7 +790,7 @@ public class DataAcquisitionLogManager : IDataAcquisitionLogManager
         using var activity = ServiceActivitySource.Instance.StartActivity("DataAcquisitionLogManager.TryCompleteTailAsync");
         activity?.SetTag(DiagnosticNames.DataAcquisitionLogId, completedLogId);
 
-        var terminalStatuses = new[] { RequestStatus.Completed, RequestStatus.MaxRetriesReached, RequestStatus.Skipped, RequestStatus.Cancelled, RequestStatus.ConfigurationMissing };
+        var terminalStatuses = RequestStatusExtensions.TerminalStatuses;
 
         // Load group identity for the completed log (PK lookup)
         var groupInfo = await _dbContext.DataAcquisitionLogs.AsNoTracking()

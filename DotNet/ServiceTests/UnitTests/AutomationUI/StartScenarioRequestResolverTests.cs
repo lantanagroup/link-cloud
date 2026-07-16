@@ -67,6 +67,7 @@ public class StartScenarioRequestResolverTests
             CleanupFhirData = false,
             ReportMethod = ReportMethod.RegenerateReport,
             QueryPlanTemplateId = Guid.NewGuid(),
+            NhsnOrganizationId = "10756",
             SelectedMeasures = [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation],
         };
 
@@ -79,8 +80,25 @@ public class StartScenarioRequestResolverTests
         options.CleanupFhirData.Should().BeFalse();
         options.ReportMethod.Should().Be(ReportMethod.RegenerateReport);
         options.QueryPlanTemplateId.Should().Be(request.QueryPlanTemplateId);
+        options.NhsnOrganizationId.Should().Be("10756");
         options.SelectedMeasures.Should().ContainSingle()
             .Which.Should().Be(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
+    }
+
+    [Theory]
+    [InlineData(AutomationScenarioKind.AdhocReportTest, "10756")]
+    [InlineData(AutomationScenarioKind.MultiPatientTest, "10758")]
+    [InlineData(AutomationScenarioKind.MegaPatientTest, "10759")]
+    public void Non_custom_scenarios_default_to_distinct_static_nhsn_organization_ids(
+        AutomationScenarioKind scenario,
+        string expectedNhsnOrganizationId)
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = scenario,
+        });
+
+        options.NhsnOrganizationId.Should().Be(expectedNhsnOrganizationId);
     }
 
     [Fact]
@@ -387,6 +405,18 @@ public class StartScenarioRequestResolverTests
 
         options.ReportPeriodStart.Should().Be(DateTimeOffset.Parse("2024-03-01T00:00:00Z"));
         options.ReportPeriodEnd.Should().Be(DateTimeOffset.Parse("2024-03-31T23:59:59Z"));
+    }
+
+    [Fact]
+    public void Custom_scenario_extracts_nhsn_organization_id_from_json_when_missing_on_request()
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            RunConfigurationJson = """{ "nhsnOrganizationId": "22001" }"""
+        });
+
+        options.NhsnOrganizationId.Should().Be("22001");
     }
 
     [Fact]

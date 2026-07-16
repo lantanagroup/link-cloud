@@ -39,4 +39,7 @@ public record ResolvedRunOptions(
 
     /// <summary>Reporting period end (UTC). Null = use system default.</summary>
     public DateTimeOffset? ReportPeriodEnd { get; init; }
+
+    /// <summary>NHSN reporting Organization ID for this run.</summary>
+    public string NhsnOrganizationId { get; init; } = string.Empty;
 }

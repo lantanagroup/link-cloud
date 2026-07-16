@@ -34,7 +34,8 @@ public class QueryPlanManagerTests
         var logger = new Mock<ILogger<QueryPlanManager>>().Object;
         var database = scope.ServiceProvider.GetRequiredService<IDatabase>();
         IQueryPlanValidator validator = new Mock<QueryPlanValidator>().Object;
-        return new QueryPlanManager(database, logger, validator);
+        var locationResolutionValidator = scope.ServiceProvider.GetRequiredService<ILocationResolutionValidator>();
+        return new QueryPlanManager(database, logger, validator, locationResolutionValidator);
     }
 
     private static string CreateFacilityId() => $"NonExistent_{Guid.NewGuid():N}";
