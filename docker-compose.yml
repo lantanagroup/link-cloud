@@ -531,7 +531,6 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-nhsn-app-bff;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-      Authentication__EnableAnonymousAccess: true
     ports:
       - "8079:8079"
     build:
@@ -554,8 +553,9 @@ services:
     image: link-nhsn-app-ui
     container_name: link-nhsn-app-ui
     environment:
-      BFF_BASE_URL: http://nhsn-app-bff:8079/api
-      PORT: 8090
+      NHSN_APP_UI_DEFAULT_JWT_ISSUER: https://docker-nhsn-app.example.org
+      NHSN_APP_UI_DEFAULT_JWT_KEY_ID: 'DF16055303FFC2CF3A226F0980E2E1E7BAB396D0'
+      NHSN_APP_UI_DEFAULT_JWT_PRIVATE_KEY_PEM: '-----BEGIN PRIVATE KEY-----MIGHxAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgpwUvQIQSV1Gq+e/p7WKoxm/RzUxLLiEg4E2UofVGkuKhRANCAAROb88LPDVyAJqHzkdqAtMhOSznB6QmAZMHib4WCWifbU508aZ6TvBizYNHC3S1V/nUrVHtUtmhxpXzFK4/GyLu-----END PRIVATE KEY-----'
     ports:
       - "8090:8090"
     build:
@@ -1044,7 +1044,6 @@ services:
       Telemetry__EnableOtelCollector: true
       Telemetry__OtelCollectorEndpoint: http://otel-collector:4317
       EnableSwagger: true
-      Authentication__EnableAnonymousAccess: true
     volumes:
       - terminology_data:/data
     ports:
@@ -1088,3 +1087,6 @@ volumes:
     driver: local
   automation_ui_keys:
     driver: local
+
+
+

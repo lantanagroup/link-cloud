@@ -1,6 +1,4 @@
 using System.Security.Claims;
-using System.Text.Json;
-using LantanaGroup.Link.Nhsn.App.Bff.Application.Models;
 using LantanaGroup.Link.Nhsn.App.Bff.Persistence;
 using LantanaGroup.Link.Nhsn.App.Bff.Settings;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +18,9 @@ public class AdminGroupAugmentationMiddleware
     public async Task InvokeAsync(HttpContext context, NhsnAppDbContext dbContext, IOptions<NhsnJwtSettings> jwtOptions)
     {
         var settings = jwtOptions.Value;
-        var externalUserId = ResolveExternalUserId(context, settings);
+        var externalUserId = context.User.FindFirstValue(settings.UserIdClaimType)
+                             ?? context.User.FindFirstValue(settings.EmailClaimType)
+                             ?? context.User.Identity?.Name;
 
         if (!string.IsNullOrWhiteSpace(externalUserId))
         {
@@ -43,18 +43,5 @@ public class AdminGroupAugmentationMiddleware
         }
 
         await _next(context);
-    }
-
-    private static string? ResolveExternalUserId(HttpContext context, NhsnJwtSettings settings)
-    {
-        if (settings.AllowSimulatedJwtHeader && context.Request.Headers.TryGetValue(settings.SimulatedJwtHeaderName, out var headerValue))
-        {
-            var payload = JsonSerializer.Deserialize<SimulatedUserHeaderPayload>(headerValue.ToString(), new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            return payload?.ExternalUserId ?? payload?.Email;
-        }
-
-        return context.User.FindFirstValue(settings.UserIdClaimType)
-               ?? context.User.FindFirstValue(settings.EmailClaimType)
-               ?? context.User.Identity?.Name;
     }
 }

@@ -2,6 +2,16 @@ import {TestUserProfile} from './models';
 
 const profilesKey = 'nhsn-app-ui.testUsers';
 const activeProfileKey = 'nhsn-app-ui.activeTestUserId';
+const defaultIssuer = 'https://dev-nhsn-app.example.org';
+
+function normalizeProfile(profile: Partial<TestUserProfile> & Pick<TestUserProfile, 'id' | 'label' | 'email' | 'name' | 'groups' | 'facilityId' | 'lastUsedOn'>): TestUserProfile {
+  return {
+    ...profile,
+    issuer: profile.issuer?.trim() || defaultIssuer,
+    keyId: profile.keyId?.trim() || '',
+    privateKeyPem: profile.privateKeyPem ?? ''
+  };
+}
 
 export function loadProfiles(): TestUserProfile[] {
   const raw = window.localStorage.getItem(profilesKey);
@@ -10,8 +20,8 @@ export function loadProfiles(): TestUserProfile[] {
   }
 
   try {
-    const parsed = JSON.parse(raw) as TestUserProfile[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed = JSON.parse(raw) as Array<Partial<TestUserProfile> & Pick<TestUserProfile, 'id' | 'label' | 'email' | 'name' | 'groups' | 'facilityId' | 'lastUsedOn'>>;
+    return Array.isArray(parsed) ? parsed.map(normalizeProfile) : [];
   } catch {
     return [];
   }

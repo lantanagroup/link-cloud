@@ -47,6 +47,10 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.CORS));
+    builder.Services.AddLinkCorsService(options =>
+    {
+        options.Environment = builder.Environment;
+    });
     builder.Services.Configure<NhsnJwtSettings>(builder.Configuration.GetRequiredSection(NhsnJwtSettings.SectionName));
 
     builder.Services.AddDbContext<NhsnAppDbContext>(options =>
@@ -58,27 +62,63 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     var jwtSettings = builder.Configuration.GetRequiredSection(NhsnJwtSettings.SectionName).Get<NhsnJwtSettings>()
                      ?? throw new InvalidOperationException("NhsnJwt configuration is required.");
+    var validationParameters = CreateValidationParameters(jwtSettings);
+    var signingKeyId = validationParameters.IssuerSigningKey?.KeyId ?? "<none>";
 
-    var allowAnonymousAccess = builder.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess");
-
-    if (!allowAnonymousAccess)
-    {
-        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+            options.MapInboundClaims = false;
+            options.TokenValidationParameters = validationParameters;
+            options.Events = new JwtBearerEvents
             {
-                options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
-                options.MapInboundClaims = false;
-                options.TokenValidationParameters = CreateValidationParameters(jwtSettings);
-            });
+                OnAuthenticationFailed = context =>
+                {
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("NhsnJwtAuth");
+                    logger.LogWarning(
+                        context.Exception,
+                        "JWT authentication failed. Path={Path}; Scheme={Scheme}; Issuer={Issuer}; Audience={Audience}; SigningKeyId={SigningKeyId}; AuthHeaderPresent={AuthHeaderPresent}",
+                        context.HttpContext.Request.Path,
+                        context.Scheme.Name,
+                        jwtSettings.Issuer,
+                        string.IsNullOrWhiteSpace(jwtSettings.Audience) ? "<none>" : jwtSettings.Audience,
+                        signingKeyId,
+                        context.Request.Headers.ContainsKey("Authorization"));
+                    return Task.CompletedTask;
+                },
+                OnChallenge = context =>
+                {
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("NhsnJwtAuth");
+                    logger.LogWarning(
+                        "JWT challenge triggered. Path={Path}; Error={Error}; ErrorDescription={ErrorDescription}; SigningKeyId={SigningKeyId}; AuthHeaderPresent={AuthHeaderPresent}",
+                        context.HttpContext.Request.Path,
+                        context.Error,
+                        context.ErrorDescription,
+                        signingKeyId,
+                        context.Request.Headers.ContainsKey("Authorization"));
+                    return Task.CompletedTask;
+                },
+                OnTokenValidated = context =>
+                {
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("NhsnJwtAuth");
+                    var subject = context.Principal?.FindFirstValue(jwtSettings.UserIdClaimType)
+                                  ?? context.Principal?.FindFirstValue(jwtSettings.EmailClaimType)
+                                  ?? context.Principal?.Identity?.Name
+                                  ?? "<unknown>";
+                    logger.LogInformation(
+                        "JWT token validated successfully. Path={Path}; Subject={Subject}; ClaimsCount={ClaimsCount}; SigningKeyId={SigningKeyId}",
+                        context.HttpContext.Request.Path,
+                        subject,
+                        context.Principal?.Claims.Count() ?? 0,
+                        signingKeyId);
+                    return Task.CompletedTask;
+                }
+            };
+        });
 
-        builder.Services.AddAuthorizationBuilder()
-            .AddPolicy("AuthenticatedUser", policy => policy.RequireAuthenticatedUser());
-    }
-    else
-    {
-        builder.Services.AddAuthorizationBuilder()
-            .AddPolicy("AuthenticatedUser", policy => policy.RequireAssertion(_ => true));
-    }
+    builder.Services.AddAuthorizationBuilder()
+        .AddPolicy("AuthenticatedUser", policy => policy.RequireAuthenticatedUser());
 
     builder.Services.AddScoped<IUserInfoService, UserInfoService>();
     builder.Services.AddScoped<IUserAdministrationService, UserAdministrationService>();
@@ -88,53 +128,40 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IApi, SimulationEndpoints>();
     builder.Services.AddTransient<IApi, UserAdministrationEndpoints>();
     builder.Services.AddTransient<IApi, FacilityAdministrationEndpoints>();
-
-    builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>("Database");
-
-    builder.Services.AddHttpContextAccessor();
-
-    builder.Services.AddLinkCorsService(options =>
-    {
-        options.Environment = builder.Environment;
-    });
-
+    builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
     {
         options.SwaggerDoc("v1", new OpenApiInfo
         {
-            Title = "NHSN App BFF",
             Version = "v1",
-            Description = "Backend-for-frontend for the NHSN App integration framework."
+            Title = "NHSN App BFF"
         });
 
-        if (!allowAnonymousAccess)
+        options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
         {
-            options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-            {
-                Description = "Authorization using JWT",
-                Name = "Authorization",
-                Type = SecuritySchemeType.Http,
-                BearerFormat = "JWT",
-                In = ParameterLocation.Header,
-                Scheme = JwtBearerDefaults.AuthenticationScheme
-            });
+            Description = "JWT Authorization header using the Bearer scheme.",
+            Name = "Authorization",
+            Type = SecuritySchemeType.Http,
+            BearerFormat = "JWT",
+            In = ParameterLocation.Header,
+            Scheme = JwtBearerDefaults.AuthenticationScheme
+        });
 
-            options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        options.AddSecurityRequirement(new OpenApiSecurityRequirement
+        {
             {
+                new OpenApiSecurityScheme
                 {
-                    new OpenApiSecurityScheme
+                    Reference = new OpenApiReference
                     {
-                        Reference = new OpenApiReference
-                        {
-                            Id = "Bearer",
-                            Type = ReferenceType.SecurityScheme
-                        }
-                    },
-                    new List<string>()
-                }
-            });
-        }
+                        Id = "Bearer",
+                        Type = ReferenceType.SecurityScheme
+                    }
+                },
+                new List<string>()
+            }
+        });
 
         options.DocumentFilter<HealthChecksFilter>();
     });
@@ -172,11 +199,7 @@ static void SetupMiddleware(WebApplication app)
     app.ConfigureSwagger();
     app.UseRouting();
     app.UseCors(CorsSettings.DefaultCorsPolicyName);
-
-    if (!app.Configuration.GetValue<bool>("Authentication:EnableAnonymousAccess"))
-    {
-        app.UseAuthentication();
-    }
+    app.UseAuthentication();
     app.UseMiddleware<AdminGroupAugmentationMiddleware>();
     app.UseAuthorization();
 
@@ -200,13 +223,22 @@ static TokenValidationParameters CreateValidationParameters(NhsnJwtSettings sett
         throw new InvalidOperationException("NhsnJwt:PublicCertificatePem must be configured.");
     }
 
+    if (string.IsNullOrWhiteSpace(settings.Issuer))
+    {
+        throw new InvalidOperationException("NhsnJwt:Issuer must be configured.");
+    }
+
     var certificate = X509Certificate2.CreateFromPem(settings.PublicCertificatePem);
+    var issuerSigningKey = CreateIssuerSigningKey(certificate);
+
     return new TokenValidationParameters
     {
+        TryAllIssuerSigningKeys = true,
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new X509SecurityKey(certificate),
-        ValidateIssuer = !string.IsNullOrWhiteSpace(settings.Issuer),
-        ValidIssuer = string.IsNullOrWhiteSpace(settings.Issuer) ? null : settings.Issuer,
+        IssuerSigningKey = issuerSigningKey,
+        ValidAlgorithms = [SecurityAlgorithms.EcdsaSha256],
+        ValidateIssuer = true,
+        ValidIssuer = settings.Issuer,
         ValidateAudience = !string.IsNullOrWhiteSpace(settings.Audience),
         ValidAudience = string.IsNullOrWhiteSpace(settings.Audience) ? null : settings.Audience,
         ValidateLifetime = true,
@@ -214,4 +246,27 @@ static TokenValidationParameters CreateValidationParameters(NhsnJwtSettings sett
         NameClaimType = settings.NameClaimType,
         RoleClaimType = ClaimTypes.Role
     };
+}
+
+static SecurityKey CreateIssuerSigningKey(X509Certificate2 certificate)
+{
+    var ecdsa = certificate.GetECDsaPublicKey();
+    if (ecdsa is not null)
+    {
+        return new ECDsaSecurityKey(ecdsa)
+        {
+            KeyId = certificate.Thumbprint
+        };
+    }
+
+    var rsa = certificate.GetRSAPublicKey();
+    if (rsa is not null)
+    {
+        return new RsaSecurityKey(rsa)
+        {
+            KeyId = certificate.Thumbprint
+        };
+    }
+
+    throw new InvalidOperationException("NhsnJwt:PublicCertificatePem must contain an RSA or ECDSA public key.");
 }
