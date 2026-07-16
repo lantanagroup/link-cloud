@@ -37,8 +37,18 @@ public sealed class MongoIndexManager
         EnsureImportedBundleIndexes();
         EnsureQueryPlanTemplateIndexes();
         EnsureNormalizationIndexes();
+        EnsureOrganizationResourceMapTemplateIndexes();
         EnsureApiHealthRunIndexes();
         EnsureApiHealthExecutionRunIndexes();
+    }
+
+    // --- automation_org_resource_map_templates ---
+
+    private void EnsureOrganizationResourceMapTemplateIndexes()
+    {
+        var collection = _database.GetCollection<BsonDocument>("automation_org_resource_map_templates");
+        CreateIndexSafe(collection, new BsonDocument { { "Name", 1 } }, unique: false, "idx_name_asc");
+        CreateIndexSafe(collection, new BsonDocument { { "IsDefault", 1 } }, unique: false, "idx_isDefault");
     }
 
     // --- automation_runs ---

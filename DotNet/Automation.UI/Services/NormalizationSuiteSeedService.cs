@@ -126,10 +126,10 @@ public sealed class NormalizationSuiteSeedService : IHostedService
         {
             Id = OpCopyIdentifierToTypeId,
             Name = "Copy Location Identifier Value to Type Code",
-            Description = "Copies Location identifier.value to type[0].coding.code via CopyProperty.",
+            Description = "Copies the first Location identifier.value to type[0].coding.code via CopyProperty.",
             OperationType = "CopyProperty",
             ResourceTypes = ["Location"],
-            SourceFhirPath = "identifier.value",
+            SourceFhirPath = "identifier[0].value",
             TargetFhirPath = "type[0].coding.code",
             IsSystem = true,
             UpdatedAt = DateTimeOffset.UtcNow

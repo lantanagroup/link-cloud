@@ -23,7 +23,8 @@ public record ResolvedRunOptions(
     List<PatientCohortDefinition> PatientCohorts,
     ReportMethod ReportMethod = ReportMethod.Adhoc,
     Guid? QueryPlanTemplateId = null,
-    Guid? NormalizationSuiteId = null)
+    Guid? NormalizationSuiteId = null,
+    Guid? OrganizationResourceMapTemplateId = null)
 {
     /// <summary>
     /// Imported patients (referenced by ID, fetched from FHIR server at run time).

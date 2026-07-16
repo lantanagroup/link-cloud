@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Models;
 using LantanaGroup.Automation;
+using Automation.UI.Models;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -11,8 +12,10 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using Microsoft.Extensions.Options;
+using Task = System.Threading.Tasks.Task;
 
 namespace Automation.UI.Services;
 
@@ -39,6 +42,7 @@ internal sealed class RunExecutor
     private readonly RunSnapshotOrchestrator _orchestrator;
     private readonly QueryPlanTemplateResolver _queryPlanResolver;
     private readonly NormalizationSuiteResolver _normalizationSuiteResolver;
+    private readonly OrganizationResourceMapTemplateResolver _organizationResourceMapResolver;
     private readonly bool _suppressExternalManifest;
     private readonly bool _includePatientAggregatorOrganizationResource;
     private readonly string _includePatientAggregatorOrganizationResourceSource;
@@ -51,6 +55,7 @@ internal sealed class RunExecutor
         RunSnapshotOrchestrator orchestrator,
         QueryPlanTemplateResolver queryPlanResolver,
         NormalizationSuiteResolver normalizationSuiteResolver,
+        OrganizationResourceMapTemplateResolver organizationResourceMapResolver,
         IConfiguration configuration,
         ILogger logger)
     {
@@ -60,6 +65,7 @@ internal sealed class RunExecutor
         _orchestrator = orchestrator;
         _queryPlanResolver = queryPlanResolver;
         _normalizationSuiteResolver = normalizationSuiteResolver;
+        _organizationResourceMapResolver = organizationResourceMapResolver;
         _suppressExternalManifest = configuration.GetValue<bool>("ExternalBlobStorage:SuppressManifest");
         var includeOrg = ResolveIncludePatientAggregatorOrganizationResource(configuration);
         _includePatientAggregatorOrganizationResource = includeOrg.Value;
@@ -170,6 +176,7 @@ internal sealed class RunExecutor
             var primaryMeasure = state.Options.SelectedMeasures[0];
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
             var normalizationResolution = await _normalizationSuiteResolver.ResolveAsync(state.Options.NormalizationSuiteId, cancellationToken);
+            var organizationResourceMapTemplate = await _organizationResourceMapResolver.ResolveAsync(state.Options.OrganizationResourceMapTemplateId, cancellationToken);
             var generationRequirementsPlan = BuildGenerationRequirementsPlan(normalizationResolution);
 
             await fhirDataLoader.WaitForServerAsync(output);
@@ -347,10 +354,12 @@ internal sealed class RunExecutor
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 services.GetRequiredService<AutomationConfig>(),
                 output, facilityId);
-            await FacilitySetupHelper.EnsureOrganizationLocationConfigurationAsync(
+            await EnsureOrganizationLocationConfigurationFromTemplateAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 output,
-                facilityId);
+                facilityId,
+                organizationResourceMapTemplate,
+                cancellationToken);
             await FacilitySetupHelper.EnsureQueryDispatchConfigAsync(
                 services.GetRequiredService<IQueryDispatchServiceClient>(),
                 output,
@@ -960,6 +969,64 @@ internal sealed class RunExecutor
             IncludeLowValueOptionalReferences = includeLowValueOptionalReferences,
             ResourceDistribution = new Dictionary<string, double>(distribution, StringComparer.OrdinalIgnoreCase)
         };
+    }
+
+    private static async Task EnsureOrganizationLocationConfigurationFromTemplateAsync(
+        IDataAcquisitionServiceClient dataAcqClient,
+        IAutomationOutput output,
+        string facilityId,
+        OrganizationResourceMapTemplate? template,
+        CancellationToken cancellationToken)
+    {
+        if (template == null)
+        {
+            output.WriteLine($"No Organization Resource Map template resolved for facility '{facilityId}'. Skipping org-location configuration create.");
+            return;
+        }
+
+        var conditions = template.Conditions
+            .Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
+            .OrderBy(c => c.Priority)
+            .Select(c => new CreateOrganizationLocationConditionApiModel
+            {
+                FhirPath = c.FhirPath,
+                Priority = c.Priority
+            })
+            .ToList();
+
+        if (conditions.Count == 0)
+            throw new InvalidOperationException($"Organization resource map template '{template.Name}' has no valid conditions.");
+
+        var existing = await dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
+        if (existing.IsSuccessStatusCode && existing.Body != null)
+        {
+            var normalizedTemplate = string.Join("\n", conditions.Select(c => $"{c.Priority}:{c.FhirPath}"));
+            var hasMatchingActive = existing.Body.Any(cfg =>
+                cfg.IsActive
+                && string.Join("\n", cfg.Conditions.OrderBy(c => c.Priority).Select(c => $"{c.Priority}:{c.FhirPath}")) == normalizedTemplate);
+
+            if (hasMatchingActive)
+            {
+                output.WriteLine($"Org-location configuration for facility '{facilityId}' already matches template '{template.Name}'. Skipping create.");
+                return;
+            }
+        }
+
+        var create = await dataAcqClient.CreateOrganizationLocationConfigurationAsync(
+            facilityId,
+            new CreateOrganizationLocationConfigurationApiModel
+            {
+                Description = template.Description ?? $"Automation org-location mapping from template '{template.Name}'",
+                IsActive = true,
+                Conditions = conditions
+            },
+            cancellationToken);
+
+        if (!create.IsSuccessStatusCode)
+            throw new InvalidOperationException(
+                $"Failed to create organization location configuration for facility '{facilityId}' from template '{template.Name}'. HTTP {create.StatusCode}: {create.RawBody ?? "(no body)"}");
+
+        output.WriteLine($"Ensured org-location configuration for facility '{facilityId}' from template '{template.Name}'.");
     }
 
     private ServiceProvider BuildRunServiceProvider(IAutomationOutput output)

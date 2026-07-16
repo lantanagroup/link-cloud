@@ -1,0 +1,151 @@
+@model List<OrganizationResourceMapTemplate>
+@{
+    ViewData["Title"] = "Organization Resource Maps";
+}
+
+<div class="container mt-4">
+    <h2 class="fw-bold mb-1"><i class="bi bi-diagram-2 me-2"></i>Organization Resource Maps</h2>
+    <p class="text-muted mb-3">Reusable templates for Data Acquisition location/encounter organization mapping conditions.</p>
+
+    <div class="au-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>All Templates</span>
+            <button type="button" class="btn btn-sm btn-success" id="btnNewMap">New</button>
+        </div>
+        <div class="card-body p-0">
+            <table class="table au-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Conditions</th>
+                        <th>Kind</th>
+                        <th>Updated</th>
+                        <th style="width:250px"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var t in Model)
+                {
+                    <tr>
+                        <td>
+                            <strong>@t.Name</strong>
+                            @if (t.IsDefault)
+                            {
+                                <span class="badge bg-success ms-1">Default</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(t.Description))
+                            {
+                                <br/><small class="text-muted">@t.Description</small>
+                            }
+                        </td>
+                        <td><small class="text-muted">@t.Conditions.Count condition(s)</small></td>
+                        <td>@(t.IsSystem ? "System" : "Custom")</td>
+                        <td class="small text-muted">@t.UpdatedAt.LocalDateTime.ToString("g")</td>
+                        <td class="text-nowrap">
+                            <button class="btn btn-sm btn-outline-primary btn-map-open" data-id="@t.Id" data-mode="@(t.IsSystem?"view":"edit")">@(t.IsSystem?"View":"Edit")</button>
+                            <button class="btn btn-sm btn-outline-secondary btn-map-clone" data-id="@t.Id">Clone</button>
+                            @if (!t.IsDefault)
+                            {
+                                <button class="btn btn-sm btn-outline-success btn-map-default" data-id="@t.Id">Default</button>
+                            }
+                            @if (!t.IsSystem)
+                            {
+                                <button class="btn btn-sm btn-outline-danger btn-map-delete" data-id="@t.Id">Delete</button>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="mapModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;">
+    <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
+        <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:900px;display:flex;flex-direction:column;max-height:90vh;">
+            <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;" class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0" id="mapModalTitle">Organization Resource Map</h5>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-success" id="btnMapSave">Save</button>
+                    <button type="button" class="btn btn-sm btn-outline-light" id="btnMapClose">Close</button>
+                </div>
+            </div>
+            <div id="mapFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
+            <div style="flex:1;overflow-y:auto;padding:1.25rem;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="MapId"/>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="MapName">Name</label>
+                        <input class="form-control" id="MapName" maxlength="120" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="MapDescription">Description</label>
+                        <input class="form-control" id="MapDescription" maxlength="500" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="MapConditionsJson">Conditions JSON</label>
+                        <textarea class="form-control font-monospace" id="MapConditionsJson" rows="10"></textarea>
+                        <div class="form-text">Array of objects with <code>fhirPath</code> and <code>priority</code>.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="mapBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
+
+@section Scripts {
+<script>
+(function(){
+    const modal = document.getElementById('mapModal');
+    const backdrop = document.getElementById('mapBackdrop');
+    const errs = document.getElementById('mapFormErrors');
+    const saveUrl='@Url.Action("SaveInline","OrganizationResourceMaps")';
+    const getUrl='@Url.Action("GetJson","OrganizationResourceMaps")';
+    const cloneUrl='@Url.Action("CloneInline","OrganizationResourceMaps")';
+    const delUrl='@Url.Action("DeleteInline","OrganizationResourceMaps")';
+    const defUrl='@Url.Action("SetDefaultInline","OrganizationResourceMaps")';
+    function af(){ const t=document.querySelector('input[name="__RequestVerificationToken"]'); return t?t.value:''; }
+    function show(){ modal.style.display=''; backdrop.style.display=''; }
+    function hide(){ modal.style.display='none'; backdrop.style.display='none'; }
+    async function post(url,body){ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','RequestVerificationToken':af()},body:JSON.stringify(body)}); if(!r.ok) throw new Error(await r.text()||('Server '+r.status)); return r.headers.get('content-type')?.includes('json')? r.json():null; }
+    function setModel(m,mode){
+        document.getElementById('MapId').value=m?.id||'';
+        document.getElementById('MapName').value=m?.name||'';
+        document.getElementById('MapDescription').value=m?.description||'';
+        document.getElementById('MapConditionsJson').value=JSON.stringify(m?.conditions||[{fhirPath:"identifier.where(system='http://example.org/fhir/sid/location').exists()",priority:1}],null,2);
+        document.getElementById('btnMapSave').style.display=mode==='view'?'none':'';
+        document.getElementById('mapModalTitle').textContent=(mode==='view'?'View':'Edit')+' Organization Resource Map';
+        errs.style.display='none'; errs.textContent='';
+        show();
+    }
+    document.getElementById('btnNewMap').addEventListener('click',()=>setModel(null,'edit'));
+    document.getElementById('btnMapClose').addEventListener('click',hide);
+    backdrop.addEventListener('click',hide);
+    document.getElementById('btnMapSave').addEventListener('click', async ()=>{
+        try{
+            const conditions = JSON.parse(document.getElementById('MapConditionsJson').value||'[]');
+            const model={
+                id: document.getElementById('MapId').value || crypto.randomUUID(),
+                name: document.getElementById('MapName').value,
+                description: document.getElementById('MapDescription').value || null,
+                conditions: conditions,
+                isSystem:false,
+                isDefault:false
+            };
+            await post(saveUrl,model);
+            location.reload();
+        }catch(e){ errs.textContent=e.message||'Save failed'; errs.style.display=''; }
+    });
+    document.querySelectorAll('.btn-map-open').forEach(b=>b.addEventListener('click',async()=>{
+        const r=await fetch(getUrl+'?id='+encodeURIComponent(b.dataset.id));
+        if(r.ok) setModel(await r.json(), b.dataset.mode||'edit');
+    }));
+    document.querySelectorAll('.btn-map-clone').forEach(b=>b.addEventListener('click',async()=>{ await post(cloneUrl,{id:b.dataset.id}); location.reload(); }));
+    document.querySelectorAll('.btn-map-default').forEach(b=>b.addEventListener('click',async()=>{ await post(defUrl,{id:b.dataset.id}); location.reload(); }));
+    document.querySelectorAll('.btn-map-delete').forEach(b=>b.addEventListener('click',async()=>{ if(confirm('Delete this template?')){ await post(delUrl,{id:b.dataset.id}); location.reload(); } }));
+})();
+</script>
+}

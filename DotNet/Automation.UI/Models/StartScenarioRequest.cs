@@ -90,6 +90,13 @@ public class StartScenarioRequest : IValidatableObject
     public Guid? NormalizationSuiteId { get; set; }
 
     /// <summary>
+    /// Optional organization-resource-map template ID. When set, the run uses this
+    /// template's DataAcquisition organization-location mapping conditions.
+    /// When null, the system default template is used.
+    /// </summary>
+    public Guid? OrganizationResourceMapTemplateId { get; set; }
+
+    /// <summary>
     /// Cross-field validation. Rejects inverted report windows
     /// (<see cref="ReportPeriodStart"/> &gt; <see cref="ReportPeriodEnd"/>) at the request
     /// boundary so that invalid windows are never forwarded to
@@ -125,6 +132,7 @@ public class StartScenarioRequest : IValidatableObject
         NhsnOrganizationId = scenario.NhsnOrganizationId,
         QueryPlanTemplateId = scenario.QueryPlanTemplateId,
         NormalizationSuiteId = scenario.NormalizationSuiteId,
+        OrganizationResourceMapTemplateId = scenario.OrganizationResourceMapTemplateId,
     };
 
     private static string SerializeScenarioConfiguration(TestScenarioDefinition scenario)

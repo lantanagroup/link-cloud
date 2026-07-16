@@ -15,6 +15,7 @@ public class ScenariosController(
     IScenarioStore scenarioStore,
     IQueryPlanTemplateStore queryPlanTemplateStore,
     INormalizationStore normalizationStore,
+    IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
     IOptions<AutomationConfig> automationConfig,
     IMongoDatabase database) : Controller
 {
@@ -27,6 +28,7 @@ public class ScenariosController(
         var scenarios = await scenarioStore.GetAllAsync(ct);
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(ct);
         ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(ct);
+        ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(ct);
         return View(scenarios);
     }
 
@@ -50,10 +52,6 @@ public class ScenariosController(
             return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system scenario cannot be modified.");
 
         model.IsSystemScenario = false;
-        model.NhsnOrganizationId = string.IsNullOrWhiteSpace(model.NhsnOrganizationId)
-            ? GenerateRandomNhsnOrganizationId()
-            : model.NhsnOrganizationId.Trim();
-        model.UpdatedAt = DateTimeOffset.UtcNow;
 
         foreach (var cohort in model.PatientCohorts)
         {
@@ -76,6 +74,11 @@ public class ScenariosController(
         var importValidation = await ValidateImportedPatientsAsync(model, ct);
         if (importValidation != null)
             return BadRequest(importValidation);
+
+        model.NhsnOrganizationId = string.IsNullOrWhiteSpace(model.NhsnOrganizationId)
+            ? GenerateRandomNhsnOrganizationId()
+            : model.NhsnOrganizationId.Trim();
+        model.UpdatedAt = DateTimeOffset.UtcNow;
 
         await scenarioStore.UpsertAsync(model, ct);
         return Json(new { id = model.Id });
@@ -214,6 +217,15 @@ public class ScenariosController(
         if (patientResource == null || string.IsNullOrWhiteSpace(patientResource.Id))
             return BadRequest($"Bundle '{request.File.FileName}' must contain a Patient resource with an id.");
 
+        var organizationIds = bundle.Entry
+            .Select(e => e?.Resource)
+            .OfType<Organization>()
+            .Select(o => o.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Cast<string>()
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
         var now = DateTimeOffset.UtcNow;
         var hash = ComputeContentHash(json);
         var byteCount = Encoding.UTF8.GetByteCount(json);
@@ -242,7 +254,9 @@ public class ScenariosController(
             bundleId = doc.Id,
             patientId = patientResource.Id,
             fileName = request.File.FileName,
-            byteCount
+            byteCount,
+            organizationId = organizationIds.Count == 1 ? organizationIds[0] : null,
+            organizationIds
         });
     }
 
@@ -328,6 +342,15 @@ public class ScenariosController(
             if (e.HasValue && (encEnd == null || e.Value > encEnd.Value)) encEnd = e;
         }
 
+        var organizationIds = entries
+            .Select(e => e.Resource)
+            .OfType<Organization>()
+            .Select(o => o.Id)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Cast<string>()
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
         return Json(new
         {
             patientId = resolvedPatientId,
@@ -335,7 +358,9 @@ public class ScenariosController(
                 .ToDictionary(kv => kv.Key.ToString(), kv => kv.Value.ToString()),
             detectedClinicalScenarioId = classification.DetectedClinicalScenarioId,
             encounterStart = encStart?.ToString("yyyy-MM-ddTHH:mm:ssZ"),
-            encounterEnd = encEnd?.ToString("yyyy-MM-ddTHH:mm:ssZ")
+            encounterEnd = encEnd?.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            organizationId = organizationIds.Count == 1 ? organizationIds[0] : null,
+            organizationIds
         });
     }
 
@@ -396,6 +421,7 @@ public class ScenariosController(
                 })
                 .ToList(),
             QueryPlanTemplateId = source.QueryPlanTemplateId,
+            OrganizationResourceMapTemplateId = source.OrganizationResourceMapTemplateId,
             CleanupServiceData = source.CleanupServiceData,
             CleanupFhirData = source.CleanupFhirData,
             ReportPeriodStart = source.ReportPeriodStart,
