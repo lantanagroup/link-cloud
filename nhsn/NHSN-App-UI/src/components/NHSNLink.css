@@ -3,16 +3,29 @@
   color: #12344d;
   background: #f5f8fa;
   min-height: 100vh;
-  display: flex;
+}
+
+.nhsn-link__testing-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.65rem 1rem;
+  background: #fff3cd;
+  color: #663c00;
+  border-bottom: 1px solid #f0c36d;
+  font-weight: 700;
+  text-align: center;
 }
 
 .nhsn-link__layout {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 260px minmax(0, 1fr);
   gap: 1.5rem;
   padding: 1.5rem;
   box-sizing: border-box;
-  min-height: 100vh;
+  min-height: calc(100vh - 52px);
   width: 100%;
 }
 
@@ -112,6 +125,7 @@
 .nhsn-link__grid {
   display: grid;
   gap: 1rem;
+  min-width: 0;
 }
 
 .notification-stack {
@@ -164,5 +178,6 @@
 @media (max-width: 900px) {
   .nhsn-link__layout {
     grid-template-columns: 1fr;
+    min-height: auto;
   }
 }

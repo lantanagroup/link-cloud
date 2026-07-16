@@ -17,15 +17,31 @@ type EditorState = {
   name: string;
   groups: string;
   facilityId: string;
+  issuer: string;
+  keyId: string;
+  privateKeyPem: string;
 };
 
+function getRuntimeDefaults() {
+  const runtimeConfig = window.__NHSN_APP_UI_CONFIG__;
+  return {
+    issuer: runtimeConfig?.defaultJwtIssuer?.trim() || 'https://dev-nhsn-app.example.org',
+    keyId: runtimeConfig?.defaultJwtKeyId?.trim() || '',
+    privateKeyPem: runtimeConfig?.defaultJwtPrivateKeyPem || ''
+  };
+}
+
 function createEmptyEditor(): EditorState {
+  const defaults = getRuntimeDefaults();
   return {
     label: '',
     email: '',
     name: '',
     groups: '',
-    facilityId: ''
+    facilityId: '',
+    issuer: defaults.issuer,
+    keyId: defaults.keyId,
+    privateKeyPem: defaults.privateKeyPem
   };
 }
 
@@ -71,7 +87,10 @@ export function App() {
       email: profile.email,
       name: profile.name,
       groups: profile.groups.join(', '),
-      facilityId: profile.facilityId
+      facilityId: profile.facilityId,
+      issuer: profile.issuer,
+      keyId: profile.keyId,
+      privateKeyPem: profile.privateKeyPem
     });
   }
 
@@ -96,6 +115,9 @@ export function App() {
       name: editor.name.trim(),
       groups: editor.groups.split(',').map(item => item.trim()).filter(Boolean),
       facilityId: editor.facilityId.trim(),
+      issuer: editor.issuer.trim(),
+      keyId: editor.keyId.trim(),
+      privateKeyPem: editor.privateKeyPem.trim(),
       lastUsedOn: new Date().toISOString()
     };
 
@@ -112,13 +134,13 @@ export function App() {
       <aside className="shell__sidebar">
         <h1>NHSN App UI Shell</h1>
         <p className="shell__tagline">
-          Lower-environment shell for switching among saved simulated user contexts while exercising the shared NHSNLink component.
+          Lower-environment shell for switching among saved signed-JWT test users while exercising the shared NHSNLink UI.
         </p>
 
         <div className="shell__card">
           <h2>Saved test users</h2>
           {sortedProfiles.length === 0 ? (
-            <p>No test users saved yet. Start by answering “who are you simulating?” below.</p>
+            <p>No test users have been saved yet. Answer "who are you simulating?" below.</p>
           ) : (
             <ul className="shell__list">
               {sortedProfiles.map(profile => (
@@ -130,6 +152,7 @@ export function App() {
                     {profile.label}
                   </button>
                   <div style={{ marginTop: '0.35rem', display: 'grid', gap: '0.35rem' }}>
+                    <small>Signed JWT ({profile.issuer}{profile.keyId ? `; kid=${profile.keyId}` : ''})</small>
                     <button type="button" onClick={() => editProfile(profile)}>Edit</button>
                     <button type="button" onClick={() => removeProfile(profile.id)}>Remove</button>
                   </div>
@@ -140,7 +163,7 @@ export function App() {
         </div>
 
         <div className="shell__card">
-          <h2>{editor.id ? 'Update simulated user' : 'Who are you simulating?'}</h2>
+          <h2>{editor.id ? 'Update test user' : 'Who are you simulating?'}</h2>
           <form onSubmit={handleSubmit}>
             <div className="shell__row">
               <label htmlFor="label">Friendly label</label>
@@ -156,14 +179,26 @@ export function App() {
             </div>
             <div className="shell__row">
               <label htmlFor="groups">Groups (comma separated)</label>
-              <input id="groups" value={editor.groups} onChange={event => setEditor({ ...editor, groups: event.target.value })} placeholder="GRPADMIN, AUTHENTICATED" />
+              <input id="groups" value={editor.groups} onChange={event => setEditor({ ...editor, groups: event.target.value })} placeholder="FACADMIN, AUTHENTICATED" />
             </div>
             <div className="shell__row">
               <label htmlFor="facilityId">Facility ID</label>
               <input id="facilityId" value={editor.facilityId} onChange={event => setEditor({ ...editor, facilityId: event.target.value })} required />
             </div>
             <div className="shell__row">
-              <button type="submit">{editor.id ? 'Save and activate user' : 'Save and activate user'}</button>
+              <label htmlFor="issuer">JWT Issuer</label>
+              <input id="issuer" value={editor.issuer} onChange={event => setEditor({ ...editor, issuer: event.target.value })} />
+            </div>
+            <div className="shell__row">
+              <label htmlFor="keyId">JWT Key ID (kid)</label>
+              <input id="keyId" value={editor.keyId} onChange={event => setEditor({ ...editor, keyId: event.target.value })} placeholder="Certificate thumbprint / key id" />
+            </div>
+            <div className="shell__row">
+              <label htmlFor="privateKeyPem">JWT Private Key PEM</label>
+              <textarea id="privateKeyPem" value={editor.privateKeyPem} onChange={event => setEditor({ ...editor, privateKeyPem: event.target.value })} rows={8} placeholder="-----BEGIN PRIVATE KEY-----" />
+            </div>
+            <div className="shell__row">
+              <button type="submit">Save and activate user</button>
             </div>
             {editor.id && (
               <div className="shell__row">
@@ -180,10 +215,10 @@ export function App() {
         ) : (
           <div style={{ padding: '2rem' }}>
             <div style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
-              <h2>Select or create a simulated user</h2>
+              <h2>Select or create a test user</h2>
               <p>
-                The standalone shell only initializes NHSNLink after a simulated user has been selected. Use the shell controls on the left to answer
-                “who are you simulating?” and then the UI will load the shared NHSNLink experience against the BFF.
+                The standalone shell only initializes NHSNLink after a signed-JWT test user has been selected. Use the shell controls on the left to answer
+                �who are you simulating?� and configure the issuer, key id, and private key used by the harness to sign the bearer token.
               </p>
             </div>
           </div>
@@ -194,3 +229,4 @@ export function App() {
 }
 
 export default App;
+

@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text.Json;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models;
 using LantanaGroup.Link.Nhsn.App.Bff.Domain.Entities;
@@ -23,7 +22,7 @@ public class UserInfoService : IUserInfoService
 
     public async Task<UserInfoResponse> GetUserInfoAsync(ClaimsPrincipal principal, HttpRequest request, CancellationToken cancellationToken = default)
     {
-        var incomingUser = ResolveIncomingUser(principal, request);
+        var incomingUser = ResolveIncomingUser(principal);
         NhsnFacility? facility = null;
 
         if (!string.IsNullOrWhiteSpace(incomingUser.FacilityId))
@@ -102,26 +101,13 @@ public class UserInfoService : IUserInfoService
             FacilityId = user.FacilityId,
             Groups = effectiveGroups,
             AvailableNavigation = availableNavigation,
-            AccessRequestUrl = _jwtSettings.AccessRequestUrl
+            AccessRequestUrl = _jwtSettings.AccessRequestUrl,
+            IsLowerEnvironmentTestingMode = true
         };
     }
 
-    private IncomingUser ResolveIncomingUser(ClaimsPrincipal principal, HttpRequest request)
+    private IncomingUser ResolveIncomingUser(ClaimsPrincipal principal)
     {
-        if (_jwtSettings.AllowSimulatedJwtHeader && request.Headers.TryGetValue(_jwtSettings.SimulatedJwtHeaderName, out var headerValue))
-        {
-            var payload = JsonSerializer.Deserialize<SimulatedUserHeaderPayload>(headerValue.ToString(), new JsonSerializerOptions(JsonSerializerDefaults.Web));
-            if (payload is not null && !string.IsNullOrWhiteSpace(payload.Email))
-            {
-                return new IncomingUser(
-                    payload.ExternalUserId ?? payload.Email,
-                    payload.Email,
-                    payload.Name,
-                    payload.Groups,
-                    payload.FacilityId);
-            }
-        }
-
         var externalUserId = principal.FindFirstValue(_jwtSettings.UserIdClaimType)
                              ?? principal.FindFirstValue(_jwtSettings.EmailClaimType)
                              ?? principal.Identity?.Name

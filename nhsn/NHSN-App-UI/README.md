@@ -9,7 +9,7 @@ This project intentionally produces **two different outputs**:
 1. a **standalone shell application** for lower/test environments
 2. a **separate embeddable webpack bundle** for NHSN App integration
 
-The shell exists to simulate user contexts, while the embeddable bundle exists to be loaded by the NHSN App.
+The shell exists to generate signed lower-environment JWTs, while the embeddable bundle exists to be loaded by the NHSN App.
 
 ## Key architectural rule
 
@@ -67,14 +67,14 @@ The `/userinfo` response also drives:
 - whether the user is a System Administrator
 - the navigation options that should be available
 
-## Shell simulation model
+## Shell signed-JWT model
 
 The standalone shell is designed for lower-environment testing.
 
 ### First launch
 If there are no saved test users, the shell asks:
 
-> “Who are you simulating?”
+> �Who are you simulating?�
 
 It captures:
 
@@ -82,6 +82,9 @@ It captures:
 - name
 - group(s)
 - facilityId
+- issuer
+- key id (`kid`)
+- private key PEM
 
 ### Saved profile library
 The shell stores a library of previously used test-user profiles in browser local storage so the tester can easily switch among user contexts.
@@ -89,13 +92,13 @@ The shell stores a library of previously used test-user profiles in browser loca
 The shell tracks:
 
 - multiple saved test users
-- the currently active simulated user
+- the currently active test user
 - last-used timestamps
 
 ### Request behavior
-When the shell makes a request to the BFF, it injects a `jwt` header containing the active simulated user payload.
+When the shell makes a request to the BFF, it signs a real bearer JWT using the configured issuer, key id, and private key PEM and sends it through the normal `Authorization: Bearer ...` header.
 
-The BFF only honors that header when its lower-environment simulation feature flag is enabled.
+This mimics the production request shape as closely as possible while still allowing lower-environment negative testing by changing the issuer, key id, or private key in the harness.
 
 ## Top-navigation behavior
 
@@ -113,20 +116,19 @@ The navigation rail is implemented as its own component:
 
 - `src/components/NavigationRail.tsx`
 
-It is responsible for:
+The rail currently shows:
 
-- rendering the `NHSNLink` heading
-- rendering route-aware navigation buttons
-- highlighting the active route
-- rendering current-user identity at the bottom of the rail
+- app title
+- available navigation options
+- the current end-user identity at the bottom of the rail
 
 ### Current routes
 
 The UI currently supports component-controlled routes relative to `baseUrl`:
 
-- `/` → Home
-- `/onboard` → Onboarding
-- `/admin/users` → System administrator user management
+- `/` ? Home
+- `/onboard` ? Onboarding
+- `/admin/users` ? System administrator user management
 
 Under an embedded base of `/nhsnlink`, those resolve as:
 
@@ -210,7 +212,7 @@ This starts the lower-environment shell on port `4300` and proxies `/api` reques
 In the standalone shell, the app host renders:
 
 ```tsx
-<NHSNLink baseUrl="/" />
+<NHSNLink baseUrl="/" apiBaseUrl="/api" />
 ```
 
 ### Build both outputs
@@ -219,13 +221,30 @@ In the standalone shell, the app host renders:
 npm run build
 ```
 
+### Harness JWT signing mode
+
+For signed JWT mode:
+
+- configure a test user with the JWT issuer that matches `NhsnJwt:Issuer` in the BFF config
+- configure the `kid` that matches the key id/thumbprint expected by the BFF signing certificate
+- provide the matching PKCS#8 private key PEM used to sign the token
+- configure the matching public certificate PEM in `NHSN-App-BFF` development/docker appsettings
+
+The shell runtime server also supports these environment variables for default harness JWT signing settings:
+
+- `NHSN_APP_UI_DEFAULT_JWT_ISSUER`
+- `NHSN_APP_UI_DEFAULT_JWT_KEY_ID`
+- `NHSN_APP_UI_DEFAULT_JWT_PRIVATE_KEY_PEM`
+
+These are exposed to the lower-environment shell through `/shell-config.js` so testers can avoid pasting the key information repeatedly. Saved test-user profiles may still override any of these values for negative testing.
+
 ## Docker usage
 
 The Dockerfile builds and publishes the **standalone shell only**.
 
 That container is intended for lower-environment deployment where testers need to:
 
-- save multiple simulated user profiles
+- save multiple signed-JWT test users
 - switch among them
 - re-run the same shared `NHSNLink` component against the BFF
 
@@ -278,99 +297,4 @@ If `/userinfo` indicates that the current user is disabled, the UI blocks normal
 
 - `Your account does not have access to NHSNLink. Submit a request to restore access`
 
-If the BFF provides an access-request URL, the user is shown a clickable `Submit a request` link.
-
-## Why the shell exists
-
-The shell is intentionally a testing harness and framework host. It proves:
-
-- how multiple user contexts can be exercised
-- how the reusable component behaves without the real NHSN App shell
-- how the BFF-driven `/userinfo` contract shapes the UI
-
-## Why the embed bundle exists
-
-The embed bundle exists to prove that the reusable UI can be loaded separately by the NHSN App without pulling in shell-only simulation logic.
-
-## Foundation intent
-
-This project is a framework/foundation, not the full facility configuration product.
-
-It establishes:
-
-- React as the UI framework
-- webpack packaging for the embed artifact
-- a shared `NHSNLink` entry point
-- lower-environment simulated user switching
-- BFF-driven user/role initialization
-- onboarding vs maintenance navigation scaffolding
-
-Future work can add:
-
-- richer onboarding workflow screens
-- configuration maintenance details
-- shared NHSN React core components once available
-- more sophisticated navigation and role-based experiences
-
-## Temporary `nhsn-react-core` package usage
-
-Until `nhsn-react-core` is published to a shared internal package location, this project can consume the package from a local `.tgz` placed inside the UI project.
-
-### Expected folder
-
-Create this folder locally:
-
-- `D:\Code\link-cloud\nhsn\NHSN-App-UI\packages\`
-
-Place the package there, for example:
-
-- `D:\Code\link-cloud\nhsn\NHSN-App-UI\packages\nhsn-react-core-1.2.3.tgz`
-
-The `packages/` folder should remain gitignored so the private package is never committed to the public repository.
-
-### Install pattern
-
-Install the package from the local file path inside the project:
-
-```bash
-npm install --save .\packages\nhsn-react-core-1.2.3.tgz
-```
-
-This allows npm to record a local file dependency while keeping the actual `.tgz` out of source control.
-
-### Local developer setup
-
-1. Obtain the private `nhsn-react-core` `.tgz`
-2. Copy it into:
-   - `D:\Code\link-cloud\nhsn\NHSN-App-UI\packages\`
-3. Run:
-
-```bash
-npm install --save .\packages\nhsn-react-core-1.2.3.tgz
-npm run build
-```
-
-### CI / secured build agent setup
-
-A build agent should:
-
-1. Download or copy the `.tgz` from a secure internal location
-2. Place it in:
-   - `D:\Code\link-cloud\nhsn\NHSN-App-UI\packages\`
-3. Run `npm install --save .\packages\nhsn-react-core-<version>.tgz`
-4. Run the normal build
-
-### Docker build implications
-
-This approach works better with Docker than a host-only environment variable path because the package is expected to live **inside the UI project build context**.
-
-As long as the `.tgz` has been placed in `packages/` before the Docker build starts, the Docker build can access it naturally.
-
-### Source-control safety
-
-The following are intentionally **not** committed:
-
-- the `packages/` contents
-- the private `.tgz` package itself
-
-This keeps the public repository free of private artifacts while still allowing local, CI, and Docker builds to consume the package temporarily.
+If the BFF provides an `AccessRequestUrl`, the UI renders it as a direct link.

@@ -5,6 +5,9 @@ export interface TestUserProfile {
   name: string;
   groups: string[];
   facilityId: string;
+  issuer: string;
+  keyId: string;
+  privateKeyPem: string;
   lastUsedOn: string;
 }
 
@@ -20,6 +23,7 @@ export interface UserInfoResponse {
   Groups: string[];
   AvailableNavigation: string[];
   AccessRequestUrl?: string;
+  IsLowerEnvironmentTestingMode: boolean;
 }
 
 export interface FacilitySummaryResponse {

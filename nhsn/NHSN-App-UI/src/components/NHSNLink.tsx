@@ -187,7 +187,7 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
   }, [activeTestUser, userInfo?.IsSystemAdmin, effectiveUserInfoService]);
 
   if (loading) {
-    return <div className="nhsn-link__state">Loading NHSNLink user context�</div>;
+    return <div className="nhsn-link__state">Loading NHSNLink user context...</div>;
   }
 
   if (error) {
@@ -236,6 +236,11 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
 
   return (
     <div className="nhsn-link">
+      {userInfo.IsLowerEnvironmentTestingMode && (
+        <div className="nhsn-link__testing-banner" role="alert">
+          This system is configured for lower environment testing. Do not use this configuration in production.
+        </div>
+      )}
       <div className="nhsn-link__layout">
         <NavigationRail
           title="NHSNLink"
@@ -338,43 +343,26 @@ function normalizeBaseUrl(baseUrl: string): string {
     return '/';
   }
 
-  const withLeadingSlash = baseUrl.startsWith('/') ? baseUrl : `/${baseUrl}`;
-  return withLeadingSlash.endsWith('/') ? withLeadingSlash.slice(0, -1) : withLeadingSlash;
-}
-
-function buildPath(route: RouteName, baseUrl: string): string {
-  const normalizedBase = normalizeBaseUrl(baseUrl);
-  const routePath = routePathMap[route];
-
-  if (normalizedBase === '/') {
-    return routePath;
-  }
-
-  return routePath === '/'
-    ? normalizedBase
-    : `${normalizedBase}${routePath}`;
+  const trimmed = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
 function resolveRoute(pathname: string, baseUrl: string): RouteName {
-  const normalizedBase = normalizeBaseUrl(baseUrl);
-  const strippedPath = normalizedBase === '/'
-    ? pathname || '/'
-    : pathname.startsWith(normalizedBase)
-      ? pathname.slice(normalizedBase.length) || '/'
-      : '/';
+  const withoutBase = baseUrl !== '/' && pathname.startsWith(baseUrl)
+    ? pathname.slice(baseUrl.length) || '/'
+    : pathname;
 
-  switch (strippedPath) {
-    case '/admin/users':
-      return 'users';
-    case '/admin/facilities':
-      return 'facilities';
-    case '/onboard':
-      return 'onboarding';
-    case '/configuration':
-      return 'configuration';
-    case '/':
-    case '':
-    default:
-      return 'home';
+  const normalizedPath = withoutBase || '/';
+
+  const match = (Object.entries(routePathMap) as Array<[RouteName, string]>).find(([, path]) => path === normalizedPath);
+  return match?.[0] ?? 'home';
+}
+
+function buildPath(route: RouteName, baseUrl: string): string {
+  const routePath = routePathMap[route];
+  if (baseUrl === '/') {
+    return routePath;
   }
+
+  return routePath === '/' ? baseUrl : `${baseUrl}${routePath}`;
 }

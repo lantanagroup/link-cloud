@@ -9,8 +9,8 @@ This project is intentionally separate from the existing Link `Account` service.
 ## Core responsibilities
 
 - Validate incoming JWTs using a configured public certificate.
-- Support a lower-environment feature flag that honors a simulated `jwt` header sent by the standalone UI shell.
-- Resolve the effective user from either the real authenticated principal or the lower-environment simulated header payload.
+- Require JWT bearer authentication for all authenticated NHSNLink operations.
+- Resolve the effective user from the authenticated JWT principal.
 - Persist and manage NHSNLink-specific user records in SQL Server.
 - Persist and manage NHSNLink-specific role associations in SQL Server.
 - Expose a `/userinfo` endpoint that returns the normalized UI initialization payload.
@@ -19,7 +19,7 @@ This project is intentionally separate from the existing Link `Account` service.
 
 The NHSN App integration needs a backend that can answer a question like:
 
-> â€œWho is the current NHSNLink user and what role should they have inside NHSNLink?â€
+> “Who is the current NHSNLink user and what role should they have inside NHSNLink?”
 
 That cannot be solved entirely in the UI because:
 
@@ -60,7 +60,7 @@ Seeded roles:
 
 ## JWT validation
 
-JWT validation is performed against a configured public certificate.
+JWT validation is performed against a configured public certificate and issuer.
 
 ### Initial approach
 The public certificate can be stored in configuration (`appsettings.json`, `appsettings.Development.json`, or `appsettings.Docker.json`) using the `NhsnJwt:PublicCertificatePem` setting.
@@ -68,15 +68,9 @@ The public certificate can be stored in configuration (`appsettings.json`, `apps
 ### Future-ready design
 The configuration model is designed so the certificate source can later move to Azure App Configuration and/or Azure Key Vault without changing the authentication flow.
 
-## Lower-environment simulated user flow
+## Lower-environment signed JWT flow
 
-The standalone `NHSN-App-UI` shell maintains a local library of simulated test users and sends the active user profile to the BFF using a custom `jwt` header.
-
-This BFF only honors that header when:
-
-- `NhsnJwt:AllowSimulatedJwtHeader = true`
-
-That behavior is intended for local/lower-environment testing only.
+The standalone `NHSN-App-UI` shell can mint lower-environment bearer JWTs using a configured private key and issuer. Those JWTs are sent to the BFF through the normal `Authorization: Bearer ...` header so lower-environment testing follows the same authentication shape used in production.
 
 ## `/userinfo` endpoint contract
 
@@ -131,13 +125,9 @@ This allows the BFF to start with local file-based configuration and later move 
 
 #### JWT settings
 - `NhsnJwt:PublicCertificatePem`
-- optional `NhsnJwt:Issuer`
+- `NhsnJwt:Issuer`
 - optional `NhsnJwt:Audience`
 - claim mapping keys such as `EmailClaimType`, `UserIdClaimType`, etc.
-
-#### Lower-env simulation
-- `NhsnJwt:AllowSimulatedJwtHeader`
-- `NhsnJwt:SimulatedJwtHeaderName`
 
 ## EF Core migrations
 
@@ -154,9 +144,9 @@ The repo guidance requires migrations for persisted EF entities, so schema chang
 ### Development
 1. Set `ConnectionStrings:DatabaseConnection`
 2. Optionally set `ExternalConfigurationSource=AzureAppConfiguration` and `ConnectionStrings:AzureAppConfiguration` if you want to use centralized configuration
-3. Ensure `NhsnJwt:PublicCertificatePem` is configured
+3. Ensure `NhsnJwt:Issuer` and `NhsnJwt:PublicCertificatePem` are configured
 4. Run the project
-5. Call `/api/nhsn-app-bff/userinfo`
+5. Call `/api/nhsn-app-bff/userinfo` with a signed bearer JWT
 
 ### Migration behavior
 
@@ -166,13 +156,6 @@ This service follows the same `AutoMigrate` pattern used by other SQL-backed Lin
 - `AutoMigrate: false` can be used in environments where schema is managed separately
 
 The BFF calls `app.AutoMigrateEF<NhsnAppDbContext>()` before seed logic runs, so the `Roles`, `Users`, and `UserRoles` tables should exist before seed data is inserted when `AutoMigrate` is enabled.
-
-### Lower-environment simulation
-1. Enable `NhsnJwt:AllowSimulatedJwtHeader`
-2. Run the UI shell
-3. Choose or create a simulated user profile
-4. The shell sends the simulated header to the BFF
-5. The BFF resolves/creates the user and returns the normalized userinfo payload
 
 ## Relationship to the UI project
 
@@ -192,7 +175,6 @@ This project is a framework/foundation, not the full facility configuration prod
 - authentication shape
 - identity resolution
 - role persistence
-- lower-environment user simulation
 - the UI initialization contract
 
 Future work can expand this foundation with richer onboarding state, facility relationships, audit history, and configuration orchestration.
