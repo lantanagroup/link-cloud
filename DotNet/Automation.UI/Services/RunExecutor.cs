@@ -1012,15 +1012,79 @@ internal sealed class RunExecutor
         CancellationToken cancellationToken,
         NormalizationSuiteResolution? preResolved = null)
     {
+        static string[] GetPlannedResourceTypes(NormalizationOperationDefinition planned)
+            => planned.ResourceTypes
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(r => r, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+        static List<NormalizationOperationApiModel> BuildKeyedOperationPool(
+            List<NormalizationOperationApiModel> operations,
+            string name,
+            string operationType)
+            => operations
+                .Where(op => string.Equals(op.Name ?? string.Empty, name, StringComparison.Ordinal)
+                             && string.Equals(op.OperationType ?? string.Empty, operationType, StringComparison.Ordinal))
+                .ToList();
+
+        static bool TryTakeMatchingOperation(
+            List<NormalizationOperationApiModel> candidates,
+            string[] plannedResourceTypes,
+            out NormalizationOperationApiModel? matched)
+        {
+            matched = candidates.FirstOrDefault(op =>
+            {
+                var returnedResourceTypes = op.OperationResourceTypes
+                    .Select(ort => ort.Resource?.ResourceName)
+                    .Where(r => !string.IsNullOrWhiteSpace(r))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(r => r, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                return plannedResourceTypes.SequenceEqual(returnedResourceTypes, StringComparer.OrdinalIgnoreCase);
+            }) ?? candidates.FirstOrDefault();
+
+            if (matched == null)
+                return false;
+
+            candidates.Remove(matched);
+            return true;
+        }
+
+        async Task<List<NormalizationOperationApiModel>> FetchAllFacilityOperationsAsync()
+        {
+            var all = new List<NormalizationOperationApiModel>();
+            const int pageSize = 100;
+            var pageNumber = 1;
+
+            while (true)
+            {
+                var resp = await normalizationClient.SearchFacilityOperationsAsync(
+                    facilityId,
+                    pageSize: pageSize,
+                    pageNumber: pageNumber,
+                    cancellationToken: cancellationToken);
+
+                if (!resp.IsSuccessStatusCode || resp.Body?.Records == null)
+                    throw new InvalidOperationException($"Failed to search normalization operations for facility '{facilityId}' on page {pageNumber}. HTTP {(int)resp.StatusCode}");
+
+                all.AddRange(resp.Body.Records);
+
+                var totalPages = resp.Body.Metadata?.TotalPages ?? 1;
+                if (pageNumber >= totalPages)
+                    break;
+
+                pageNumber++;
+            }
+
+            return all;
+        }
+
         var resolution = preResolved ?? await _normalizationSuiteResolver.ResolveAsync(suiteId, cancellationToken);
 
-        // Check if the facility already has operations configured.
-        var existingResp = await normalizationClient.SearchFacilityOperationsAsync(facilityId);
-        if (existingResp.IsSuccessStatusCode && existingResp.Body?.Records?.Count > 0)
-        {
-            output.WriteLine($"Normalization config for facility '{facilityId}' already exists. Skipping create.");
-            return resolution;
-        }
+        var existingOperations = await FetchAllFacilityOperationsAsync();
+        if (existingOperations.Count > 0)
+            output.WriteLine($"Normalization config for facility '{facilityId}' already has {existingOperations.Count} operation(s). Reconciling suite configuration idempotently.");
 
         output.WriteLine($"Using normalization suite: {resolution.SuiteName} ({resolution.Operations.Count} operation(s))");
 
@@ -1030,13 +1094,25 @@ internal sealed class RunExecutor
             return resolution;
         }
 
-        // Track created operation IDs per resource type so we can build sequences.
+        // Track sequence intent in suite order; operation IDs are resolved after reconciliation.
         var createdOpsByResourceType = new Dictionary<string, List<(Guid OpId, int Order)>>(StringComparer.OrdinalIgnoreCase);
-        int globalOrder = 0;
+
+        var existingPoolByKey = existingOperations
+            .GroupBy(op => (op.Name ?? string.Empty, op.OperationType ?? string.Empty), EqualityComparer<(string Name, string Type)>.Default)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         foreach (var opDef in resolution.Operations)
         {
-            globalOrder++;
+            var plannedResourceTypes = GetPlannedResourceTypes(opDef);
+            var key = (opDef.Name ?? string.Empty, opDef.OperationType ?? string.Empty);
+            if (existingPoolByKey.TryGetValue(key, out var existingCandidates)
+                && TryTakeMatchingOperation(existingCandidates, plannedResourceTypes, out var existingMatch)
+                && existingMatch != null)
+            {
+                output.WriteLine($"  Using existing operation: {opDef.Name} ({opDef.OperationType}) for [{string.Join(", ", plannedResourceTypes)}]");
+                continue;
+            }
+
             var apiOp = new CreateNormalizationOperationDetailsApiModel
             {
                 OperationType = opDef.OperationType,
@@ -1086,48 +1162,54 @@ internal sealed class RunExecutor
 
             if (!createResp.IsSuccessStatusCode)
             {
-                output.WriteLine($"  WARNING: Failed to create normalization operation '{opDef.Name}': HTTP {createResp.StatusCode}");
-                continue;
+                throw new InvalidOperationException($"Failed to create normalization operation '{opDef.Name}' ({opDef.OperationType}) for facility '{facilityId}'. HTTP {(int)createResp.StatusCode}");
             }
 
             output.WriteLine($"  Created operation: {opDef.Name} ({opDef.OperationType}) for [{string.Join(", ", opDef.ResourceTypes)}]");
 
-            // Track for sequence creation.
-            foreach (var rt in opDef.ResourceTypes)
-            {
-                if (!createdOpsByResourceType.ContainsKey(rt))
-                    createdOpsByResourceType[rt] = [];
-                createdOpsByResourceType[rt].Add((opDef.Id, globalOrder));
-            }
         }
 
         // Create sequences per resource type.
         // We need to get operations back from the API since the create response may not give IDs directly.
         // Instead, re-search to find newly created ops and build sequences.
-        var opsResp = await normalizationClient.SearchFacilityOperationsAsync(facilityId, pageSize: 100, cancellationToken: cancellationToken);
-        if (opsResp.IsSuccessStatusCode && opsResp.Body?.Records?.Count > 0)
-        {
-            // Group by resource type and create sequences in order.
-            var opsByResourceType = new Dictionary<string, List<(Guid OpId, int Seq)>>(StringComparer.OrdinalIgnoreCase);
-            int seq = 0;
-            foreach (var op in opsResp.Body.Records)
-            {
-                seq++;
-                foreach (var ort in op.OperationResourceTypes)
-                {
-                    var resourceName = ort.Resource?.ResourceName;
-                    if (string.IsNullOrEmpty(resourceName)) continue;
+        var allReturnedOperations = await FetchAllFacilityOperationsAsync();
 
-                    if (!opsByResourceType.ContainsKey(resourceName))
-                        opsByResourceType[resourceName] = [];
-                    opsByResourceType[resourceName].Add((op.Id, seq));
+        if (allReturnedOperations.Count > 0)
+        {
+            var availableByKey = allReturnedOperations
+                .GroupBy(op => (op.Name ?? string.Empty, op.OperationType ?? string.Empty),
+                    EqualityComparer<(string Name, string Type)>.Default)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            for (var i = 0; i < resolution.Operations.Count; i++)
+            {
+                var planned = resolution.Operations[i];
+                var key = (planned.Name ?? string.Empty, planned.OperationType ?? string.Empty);
+                if (!availableByKey.TryGetValue(key, out var candidates) || candidates.Count == 0)
+                {
+                    throw new InvalidOperationException($"Could not map normalization operation '{planned.Name}' ({planned.OperationType}) from API search results for facility '{facilityId}'.");
+                }
+
+                var plannedResourceTypes = GetPlannedResourceTypes(planned);
+                if (!TryTakeMatchingOperation(candidates, plannedResourceTypes, out var matched) || matched == null)
+                    throw new InvalidOperationException($"Could not map normalization operation '{planned.Name}' ({planned.OperationType}) from API search results for facility '{facilityId}'.");
+
+                foreach (var resourceType in plannedResourceTypes)
+                {
+                    if (!createdOpsByResourceType.TryGetValue(resourceType, out var mapped))
+                    {
+                        mapped = [];
+                        createdOpsByResourceType[resourceType] = mapped;
+                    }
+
+                    mapped.Add((matched.Id, i + 1));
                 }
             }
 
-            foreach (var (resourceType, ops) in opsByResourceType)
+            foreach (var (resourceType, ops) in createdOpsByResourceType)
             {
                 var sequences = ops
-                    .OrderBy(o => o.Seq)
+                    .OrderBy(o => o.Order)
                     .Select((o, idx) => new CreateNormalizationOperationSequenceApiModel
                     {
                         OperationId = o.OpId,
@@ -1139,7 +1221,7 @@ internal sealed class RunExecutor
                 if (seqResp.IsSuccessStatusCode)
                     output.WriteLine($"  Created operation sequence for resource type: {resourceType} ({sequences.Count} op(s))");
                 else
-                    output.WriteLine($"  WARNING: Failed to create sequence for {resourceType}: HTTP {seqResp.StatusCode}");
+                    throw new InvalidOperationException($"Failed to create normalization sequence for resource type '{resourceType}' in facility '{facilityId}'. HTTP {(int)seqResp.StatusCode}");
             }
         }
 

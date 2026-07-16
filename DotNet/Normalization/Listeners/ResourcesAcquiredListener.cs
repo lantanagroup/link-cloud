@@ -252,9 +252,11 @@ public class ResourcesAcquiredListener : BackgroundService
                             else
                             {
                                 stepSummaries.Add($"{sequence.Sequence}:{operation.OperationType}:{operation.Name}:Failure");
-                                _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", result.Message.Key.FacilityId.SanitizeForLog(), correlationId.SanitizeForLog(), operation.OperationType, operationResult?.ErrorMessage?.SanitizeForLog() ?? "No Operation Result Error result");
+                                _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", result.Message.Key.FacilityId.SanitizeForLog(), correlationId.SanitizeForLog(), operation.OperationType.ToString().SanitizeForLog(), operationResult?.ErrorMessage?.SanitizeForLog() ?? "No Operation Result Error result");
                             }
                         }
+
+                        var stepSummaryText = string.Join(" | ", stepSummaries).SanitizeForLog();
 
                         _logger.LogInformation(
                             // IMPORTANT: this message shape is intentionally stable.
@@ -266,7 +268,7 @@ public class ResourcesAcquiredListener : BackgroundService
                             result.Message.Key.PatientId.SanitizeForLog(),
                             resource.TypeName.SanitizeForLog(),
                             resource.Id.SanitizeForLog(),
-                            string.Join(" | ", stepSummaries));
+                            stepSummaryText);
                     }
                 }
 

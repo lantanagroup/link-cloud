@@ -204,14 +204,15 @@ public sealed class NormalizationSuiteApplicationValidator
         var matches = evidence.Where(e =>
                 string.Equals(e.ResourceType, resourceType, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(e.OperationType, operation.Operation.OperationType, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(e.OperationName, operation.Operation.Name, StringComparison.Ordinal))
+                && string.Equals(e.OperationName, operation.Operation.Name, StringComparison.Ordinal)
+                && e.Sequence == operation.Sequence)
             .ToList();
 
         if (matches.Count == 0)
         {
             if (!evidenceOptional)
             {
-                AddWarning(warnings, $"No normalization execution evidence found for {operation.SequenceName}#{operation.Sequence} '{operation.Operation.Name}' ({operation.Operation.OperationType}) on resource type '{resourceType}'.");
+                AddError(errors, $"No normalization execution evidence found for {operation.SequenceName}#{operation.Sequence} '{operation.Operation.Name}' ({operation.Operation.OperationType}) on resource type '{resourceType}'.");
             }
             return;
         }
@@ -237,13 +238,29 @@ public sealed class NormalizationSuiteApplicationValidator
 
             if (missingCandidateEvidence.Count > 0)
             {
-                AddWarning(warnings,
-                    $"Execution evidence for '{operation.Operation.Name}' on '{resourceType}' did not include all ABS candidates (example missing IDs: {string.Join(", ", missingCandidateEvidence)}). ");
+                if (!evidenceOptional)
+                {
+                    AddError(errors,
+                        $"Execution evidence for '{operation.Operation.Name}' on '{resourceType}' did not include all ABS candidates (example missing IDs: {string.Join(", ", missingCandidateEvidence)}). ");
+                }
+                else
+                {
+                    AddWarning(warnings,
+                        $"Execution evidence for '{operation.Operation.Name}' on '{resourceType}' did not include all ABS candidates (example missing IDs: {string.Join(", ", missingCandidateEvidence)}). ");
+                }
             }
         }
 
-        if (matches.All(m => string.Equals(m.Outcome, "Failure", StringComparison.OrdinalIgnoreCase)))
-            AddError(errors, $"Normalization execution evidence for '{operation.Operation.Name}' on '{resourceType}' only shows Failure outcomes.");
+        var hasSuccessOutcome = matches.Any(m => string.Equals(m.Outcome, "Success", StringComparison.OrdinalIgnoreCase));
+        if (!evidenceOptional && !hasSuccessOutcome)
+        {
+            if (matches.All(m => string.Equals(m.Outcome, "NoAction", StringComparison.OrdinalIgnoreCase)))
+                AddError(errors, $"Normalization execution evidence for '{operation.Operation.Name}' on '{resourceType}' only shows NoAction outcomes.");
+            else if (matches.All(m => string.Equals(m.Outcome, "Failure", StringComparison.OrdinalIgnoreCase)))
+                AddError(errors, $"Normalization execution evidence for '{operation.Operation.Name}' on '{resourceType}' only shows Failure outcomes.");
+            else
+                AddError(errors, $"Normalization execution evidence for '{operation.Operation.Name}' on '{resourceType}' did not show any Success outcomes.");
+        }
 
         var outcomeSummary = string.Join(", ",
             matches

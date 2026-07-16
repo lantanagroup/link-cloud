@@ -104,8 +104,15 @@ public class NormalizationDatabaseValidator
                 AddError(errors, $"OperationSequence {seq.Id} ResourceType is null.");
         }
 
-        var sequenceGroups = sequences
-            .Where(s => s.Sequence.HasValue)
+        foreach (var seq in sequences)
+        {
+            if (!seq.Sequence.HasValue)
+                AddError(errors, $"OperationSequence {seq.Id} Sequence is null.");
+        }
+
+        var sequencesWithNumber = sequences.Where(s => s.Sequence.HasValue).ToList();
+
+        var sequenceGroups = sequencesWithNumber
             .GroupBy(s => s.ResourceType ?? string.Empty, StringComparer.OrdinalIgnoreCase);
 
         foreach (var group in sequenceGroups)

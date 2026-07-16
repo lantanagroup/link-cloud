@@ -72,7 +72,7 @@ internal static class ScenarioResourceGeneration
             return;
 
         var fallbackId = string.IsNullOrWhiteSpace(location.Id)
-            ? Guid.NewGuid().ToString("N")
+            ? BuildDeterministicLocationIdentifier(location)
             : location.Id;
 
         location.Identifier.Add(new Identifier
@@ -80,6 +80,26 @@ internal static class ScenarioResourceGeneration
             System = "http://example.org/fhir/sid/location",
             Value = fallbackId
         });
+    }
+
+    private static string BuildDeterministicLocationIdentifier(Location location)
+    {
+        var codingSignature = string.Join(",",
+            location.Type
+                .SelectMany(t => t.Coding)
+                .Select(c => $"{c.System}|{c.Code}")
+                .OrderBy(s => s, StringComparer.Ordinal));
+
+        var stableInput = string.Join("|",
+            location.Name ?? string.Empty,
+            location.ManagingOrganization?.Reference ?? string.Empty,
+            codingSignature,
+            location.PhysicalType?.Text ?? string.Empty);
+
+        if (string.IsNullOrWhiteSpace(stableInput))
+            stableInput = "location";
+
+        return $"loc-{stableInput.GetStableHash32():X8}";
     }
 
     /// <summary>

@@ -34,7 +34,7 @@
             <div class="au-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-gear me-2"></i>All Operations</span>
-                    <button type="button" class="btn btn-sm btn-success" id="btnNewOp"><i class="bi bi-plus-lg"></i></button>
+                    <button type="button" class="btn btn-sm btn-success" id="btnNewOp" aria-label="Create new normalization operation" title="Create new normalization operation"><i class="bi bi-plus-lg"></i></button>
                 </div>
                 <div class="card-body p-0">
                     <table class="table au-table mb-0" id="opTable">
@@ -95,7 +95,7 @@
             <div class="au-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-list-ol me-2"></i>All Sequences</span>
-                    <button type="button" class="btn btn-sm btn-success" id="btnNewSeq"><i class="bi bi-plus-lg"></i></button>
+                    <button type="button" class="btn btn-sm btn-success" id="btnNewSeq" aria-label="Create new normalization sequence" title="Create new normalization sequence"><i class="bi bi-plus-lg"></i></button>
                 </div>
                 <div class="card-body p-0">
                     <table class="table au-table mb-0" id="seqTable">
@@ -154,7 +154,7 @@
             <div class="au-card">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-box me-2"></i>All Suites</span>
-                    <button type="button" class="btn btn-sm btn-success" id="btnNewSuite"><i class="bi bi-plus-lg"></i></button>
+                    <button type="button" class="btn btn-sm btn-success" id="btnNewSuite" aria-label="Create new normalization suite" title="Create new normalization suite"><i class="bi bi-plus-lg"></i></button>
                 </div>
                 <div class="card-body p-0">
                     <table class="table au-table mb-0" id="suiteTable">
@@ -223,7 +223,7 @@
 </div>
 
 @* ========== Operation Editor Modal ========== *@
-<div id="opModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;">
+<div id="opModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;" role="dialog" aria-modal="true" aria-labelledby="opModalTitle" tabindex="-1">
     <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
         <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:800px;display:flex;flex-direction:column;max-height:90vh;">
             <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;flex-shrink:0;" class="d-flex justify-content-between align-items-center">
@@ -313,7 +313,7 @@
 <div id="opModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
 
 @* ========== Sequence Editor Modal ========== *@
-<div id="seqModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;">
+<div id="seqModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;" role="dialog" aria-modal="true" aria-labelledby="seqModalTitle" tabindex="-1">
     <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
         <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:800px;display:flex;flex-direction:column;max-height:90vh;">
             <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;flex-shrink:0;" class="d-flex justify-content-between align-items-center">
@@ -353,7 +353,7 @@
 <div id="seqModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
 
 @* ========== Suite Editor Modal ========== *@
-<div id="suiteModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;">
+<div id="suiteModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;" role="dialog" aria-modal="true" aria-labelledby="suiteModalTitle" tabindex="-1">
     <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
         <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:800px;display:flex;flex-direction:column;max-height:90vh;">
             <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;flex-shrink:0;" class="d-flex justify-content-between align-items-center">
@@ -415,8 +415,71 @@
     const opModal = document.getElementById('opModal');
     const opBackdrop = document.getElementById('opModalBackdrop');
 
-    function showOpModal() { opModal.style.display = ''; opBackdrop.style.display = ''; }
-    function hideOpModal() { opModal.style.display = 'none'; opBackdrop.style.display = 'none'; }
+    const modalFocusState = new WeakMap();
+
+    function getFocusableElements(modal) {
+        return Array.from(modal.querySelectorAll('a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+            .filter(el => el.offsetParent !== null);
+    }
+
+    function onModalKeyDown(event) {
+        const modal = event.currentTarget;
+        const state = modalFocusState.get(modal);
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            if (state?.requestClose) state.requestClose();
+            return;
+        }
+
+        if (event.key !== 'Tab') return;
+
+        const focusable = getFocusableElements(modal);
+        if (!focusable.length) {
+            event.preventDefault();
+            modal.focus();
+            return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    }
+
+    function showCrudModal(modal, backdrop, requestClose) {
+        const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        modalFocusState.set(modal, { trigger, requestClose });
+
+        modal.style.display = '';
+        backdrop.style.display = '';
+        modal.addEventListener('keydown', onModalKeyDown);
+
+        const focusable = getFocusableElements(modal);
+        const focusTarget = focusable[0] || modal;
+        setTimeout(() => focusTarget.focus(), 0);
+    }
+
+    function hideCrudModal(modal, backdrop) {
+        modal.style.display = 'none';
+        backdrop.style.display = 'none';
+        modal.removeEventListener('keydown', onModalKeyDown);
+
+        const state = modalFocusState.get(modal);
+        if (state?.trigger && document.contains(state.trigger)) {
+            state.trigger.focus();
+        }
+        modalFocusState.delete(modal);
+    }
+
+    function showOpModal() { showCrudModal(opModal, opBackdrop, hideOpModal); }
+    function hideOpModal() { hideCrudModal(opModal, opBackdrop); }
 
     function toggleOpFields() {
         const t = document.getElementById('OpType').value;
@@ -455,19 +518,85 @@
 
     function addConditionRow(cond) {
         const container = document.getElementById('opConditionsContainer');
-        const idx = container.children.length;
         const operators = ['Equal','NotEqual','GreaterThan','GreaterThanOrEqual','LessThan','LessThanOrEqual','Exists','NotExists'];
         const row = document.createElement('div');
         row.className = 'row g-2 mb-1 align-items-center';
-        row.innerHTML = `
-            <div class="col-4"><input class="form-control form-control-sm cond-fhirpath" placeholder="FhirPath" value="${cond?.fhirPathSource || ''}"/></div>
-            <div class="col-3"><select class="form-select form-select-sm cond-operator">${operators.map(o => `<option value="${o}" ${o === (cond?.operator || 'Equal') ? 'selected' : ''}>${o}</option>`).join('')}</select></div>
-            <div class="col-3"><input class="form-control form-control-sm cond-value" placeholder="Value" value="${cond?.value ?? ''}"/></div>
-            <div class="col-2"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.row').remove()"><i class="bi bi-x-lg"></i></button></div>`;
+
+        const col1 = document.createElement('div');
+        col1.className = 'col-4';
+        const fhirPathInput = document.createElement('input');
+        fhirPathInput.className = 'form-control form-control-sm cond-fhirpath';
+        fhirPathInput.placeholder = 'FhirPath';
+        fhirPathInput.value = cond?.fhirPathSource || '';
+        col1.appendChild(fhirPathInput);
+
+        const col2 = document.createElement('div');
+        col2.className = 'col-3';
+        const operatorSelect = document.createElement('select');
+        operatorSelect.className = 'form-select form-select-sm cond-operator';
+        const selectedOperator = cond?.operator || 'Equal';
+        operators.forEach(o => {
+            const option = document.createElement('option');
+            option.value = o;
+            option.textContent = o;
+            if (o === selectedOperator) option.selected = true;
+            operatorSelect.appendChild(option);
+        });
+        col2.appendChild(operatorSelect);
+
+        const col3 = document.createElement('div');
+        col3.className = 'col-3';
+        const valueInput = document.createElement('input');
+        valueInput.className = 'form-control form-control-sm cond-value';
+        valueInput.placeholder = 'Value';
+        valueInput.value = cond?.value ?? '';
+        col3.appendChild(valueInput);
+
+        const col4 = document.createElement('div');
+        col4.className = 'col-2';
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'btn btn-sm btn-outline-danger';
+        removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
+        removeButton.addEventListener('click', () => row.remove());
+        col4.appendChild(removeButton);
+
+        row.appendChild(col1);
+        row.appendChild(col2);
+        row.appendChild(col3);
+        row.appendChild(col4);
         container.appendChild(row);
     }
 
     document.getElementById('btnAddCondition').addEventListener('click', () => addConditionRow(null));
+
+    function parseCodeSystemMapsOrError() {
+        const csmText = document.getElementById('OpCodeSystemMaps').value.trim();
+        if (!csmText) return [];
+
+        let parsed;
+        try {
+            parsed = JSON.parse(csmText);
+        } catch (e) {
+            throw new Error('Code System Maps must be valid JSON.');
+        }
+
+        if (!Array.isArray(parsed))
+            throw new Error('Code System Maps JSON must be an array.');
+
+        parsed.forEach((m, i) => {
+            if (!m || typeof m !== 'object' || Array.isArray(m))
+                throw new Error(`Code System Maps entry #${i + 1} must be an object.`);
+            if (typeof m.sourceSystem !== 'string' || !m.sourceSystem.trim())
+                throw new Error(`Code System Maps entry #${i + 1} requires a non-empty sourceSystem.`);
+            if (typeof m.targetSystem !== 'string' || !m.targetSystem.trim())
+                throw new Error(`Code System Maps entry #${i + 1} requires a non-empty targetSystem.`);
+            if (!m.codeMaps || typeof m.codeMaps !== 'object' || Array.isArray(m.codeMaps))
+                throw new Error(`Code System Maps entry #${i + 1} requires a codeMaps object.`);
+        });
+
+        return parsed;
+    }
 
     function collectOpData() {
         const conditions = [];
@@ -479,9 +608,7 @@
             });
         });
 
-        let codeSystemMaps = [];
-        const csmText = document.getElementById('OpCodeSystemMaps').value.trim();
-        if (csmText) { try { codeSystemMaps = JSON.parse(csmText); } catch(e) {} }
+        const codeSystemMaps = parseCodeSystemMapsOrError();
 
         return {
             id: document.getElementById('OpId').value || crypto.randomUUID(),
@@ -502,16 +629,29 @@
     }
 
     document.getElementById('btnOpSave').addEventListener('click', async () => {
-        const data = collectOpData();
+        const formErrors = document.getElementById('opFormErrors');
+        formErrors.style.display = 'none';
+        formErrors.textContent = '';
+
+        let data;
+        try {
+            data = collectOpData();
+        } catch (e) {
+            formErrors.textContent = e.message || 'Invalid operation form data.';
+            formErrors.style.display = '';
+            return;
+        }
+
         const resp = await postJson('@Url.Action("SaveOperation", "Normalizations")', data);
         if (resp.ok) { location.reload(); } else {
             const err = await resp.text();
-            document.getElementById('opFormErrors').textContent = err;
-            document.getElementById('opFormErrors').style.display = '';
+            formErrors.textContent = err;
+            formErrors.style.display = '';
         }
     });
 
     document.getElementById('btnOpClose').addEventListener('click', hideOpModal);
+    opBackdrop.addEventListener('click', hideOpModal);
     document.getElementById('btnNewOp').addEventListener('click', () => openOpEditor(null, 'edit'));
 
     document.querySelectorAll('.btn-op-open').forEach(btn => btn.addEventListener('click', async () => {
@@ -532,8 +672,8 @@
     const seqModal = document.getElementById('seqModal');
     const seqBackdrop = document.getElementById('seqModalBackdrop');
 
-    function showSeqModal() { seqModal.style.display = ''; seqBackdrop.style.display = ''; }
-    function hideSeqModal() { seqModal.style.display = 'none'; seqBackdrop.style.display = 'none'; }
+    function showSeqModal() { showCrudModal(seqModal, seqBackdrop, hideSeqModal); }
+    function hideSeqModal() { hideCrudModal(seqModal, seqBackdrop); }
 
     function openSeqEditor(data, mode) {
         document.getElementById('SeqId').value = data?.id || '';
@@ -597,6 +737,7 @@
     });
 
     document.getElementById('btnSeqClose').addEventListener('click', hideSeqModal);
+    seqBackdrop.addEventListener('click', hideSeqModal);
     document.getElementById('btnNewSeq').addEventListener('click', () => openSeqEditor(null, 'edit'));
 
     document.querySelectorAll('.btn-seq-open').forEach(btn => btn.addEventListener('click', async () => {
@@ -617,8 +758,8 @@
     const suiteModal = document.getElementById('suiteModal');
     const suiteBackdrop = document.getElementById('suiteModalBackdrop');
 
-    function showSuiteModal() { suiteModal.style.display = ''; suiteBackdrop.style.display = ''; }
-    function hideSuiteModal() { suiteModal.style.display = 'none'; suiteBackdrop.style.display = 'none'; }
+    function showSuiteModal() { showCrudModal(suiteModal, suiteBackdrop, hideSuiteModal); }
+    function hideSuiteModal() { hideCrudModal(suiteModal, suiteBackdrop); }
 
     function openSuiteEditor(data, mode) {
         document.getElementById('SuiteId').value = data?.id || '';
@@ -642,23 +783,53 @@
 
     function addSuiteSeqRow(selectedId) {
         const container = document.getElementById('suiteSequencesContainer');
-        const options = allSequences.map(s => `<option value="${s.id}" ${s.id === selectedId ? 'selected' : ''}>${s.name}</option>`).join('');
         const row = document.createElement('div');
         row.className = 'd-flex gap-2 mb-1 align-items-center';
-        row.innerHTML = `
-            <select class="form-select form-select-sm suite-seq-select">${options}</select>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.d-flex').remove()"><i class="bi bi-x-lg"></i></button>`;
+
+        const sequenceSelect = document.createElement('select');
+        sequenceSelect.className = 'form-select form-select-sm suite-seq-select';
+        allSequences.forEach(s => {
+            const option = document.createElement('option');
+            option.value = s.id;
+            option.textContent = s.name;
+            if (s.id === selectedId) option.selected = true;
+            sequenceSelect.appendChild(option);
+        });
+
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'btn btn-sm btn-outline-danger';
+        removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
+        removeButton.addEventListener('click', () => row.remove());
+
+        row.appendChild(sequenceSelect);
+        row.appendChild(removeButton);
         container.appendChild(row);
     }
 
     function addSuiteOpRow(selectedId) {
         const container = document.getElementById('suiteOpsContainer');
-        const options = allOperations.map(o => `<option value="${o.id}" ${o.id === selectedId ? 'selected' : ''}>${o.name} (${o.operationType})</option>`).join('');
         const row = document.createElement('div');
         row.className = 'd-flex gap-2 mb-1 align-items-center';
-        row.innerHTML = `
-            <select class="form-select form-select-sm suite-op-select">${options}</select>
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.d-flex').remove()"><i class="bi bi-x-lg"></i></button>`;
+
+        const operationSelect = document.createElement('select');
+        operationSelect.className = 'form-select form-select-sm suite-op-select';
+        allOperations.forEach(o => {
+            const option = document.createElement('option');
+            option.value = o.id;
+            option.textContent = `${o.name} (${o.operationType})`;
+            if (o.id === selectedId) option.selected = true;
+            operationSelect.appendChild(option);
+        });
+
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'btn btn-sm btn-outline-danger';
+        removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
+        removeButton.addEventListener('click', () => row.remove());
+
+        row.appendChild(operationSelect);
+        row.appendChild(removeButton);
         container.appendChild(row);
     }
 
@@ -692,6 +863,7 @@
     });
 
     document.getElementById('btnSuiteClose').addEventListener('click', hideSuiteModal);
+    suiteBackdrop.addEventListener('click', hideSuiteModal);
     document.getElementById('btnNewSuite').addEventListener('click', () => openSuiteEditor(null, 'edit'));
 
     document.querySelectorAll('.btn-suite-open').forEach(btn => btn.addEventListener('click', async () => {

@@ -61,6 +61,16 @@ public class NormalizationsController(INormalizationStore store) : Controller
         if (op.IsSystem)
             return StatusCode(StatusCodes.Status403Forbidden, "System operations cannot be deleted.");
 
+        var sequences = await store.GetAllSequencesAsync(ct);
+        var referencedBySequence = sequences.Any(s => s.Entries.Any(e => e.OperationId == request.Id));
+        if (referencedBySequence)
+            return Conflict("Operation is referenced by one or more sequences and cannot be deleted.");
+
+        var suites = await store.GetAllSuitesAsync(ct);
+        var referencedBySuite = suites.Any(s => s.OperationIds.Contains(request.Id));
+        if (referencedBySuite)
+            return Conflict("Operation is referenced by one or more suites and cannot be deleted.");
+
         await store.DeleteOperationAsync(request.Id, ct);
         return Ok();
     }
@@ -133,6 +143,11 @@ public class NormalizationsController(INormalizationStore store) : Controller
         if (seq.IsSystem)
             return StatusCode(StatusCodes.Status403Forbidden, "System sequences cannot be deleted.");
 
+        var suites = await store.GetAllSuitesAsync(ct);
+        var referencedBySuite = suites.Any(s => s.SequenceIds.Contains(request.Id));
+        if (referencedBySuite)
+            return Conflict("Sequence is referenced by one or more suites and cannot be deleted.");
+
         await store.DeleteSequenceAsync(request.Id, ct);
         return Ok();
     }
@@ -179,6 +194,9 @@ public class NormalizationsController(INormalizationStore store) : Controller
         if (existing is { IsSystem: true })
             return StatusCode(StatusCodes.Status403Forbidden, "System suites cannot be modified.");
 
+        // Existing suites preserve their current default flag. New suites may
+        // carry an explicit initial IsDefault value from the caller.
+        model.IsDefault = existing?.IsDefault ?? model.IsDefault;
         model.IsSystem = false;
         model.UpdatedAt = DateTimeOffset.UtcNow;
         await store.UpsertSuiteAsync(model, ct);
@@ -193,6 +211,8 @@ public class NormalizationsController(INormalizationStore store) : Controller
         if (suite == null) return NotFound();
         if (suite.IsSystem)
             return StatusCode(StatusCodes.Status403Forbidden, "System suites cannot be deleted.");
+        if (suite.IsDefault)
+            return Conflict("Default suite cannot be deleted. Promote another suite first.");
 
         await store.DeleteSuiteAsync(request.Id, ct);
         return Ok();

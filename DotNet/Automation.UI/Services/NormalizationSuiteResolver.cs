@@ -25,9 +25,15 @@ public sealed class NormalizationSuiteResolver
         NormalizationSuiteDefinition? suite = null;
 
         if (suiteId.HasValue)
+        {
             suite = await _store.GetSuiteByIdAsync(suiteId.Value, ct);
-
-        suite ??= await _store.GetDefaultSuiteAsync(ct);
+            if (suite == null)
+                throw new InvalidOperationException($"Normalization suite '{suiteId.Value}' was not found.");
+        }
+        else
+        {
+            suite = await _store.GetDefaultSuiteAsync(ct);
+        }
 
         if (suite == null)
             return new NormalizationSuiteResolution("None", [], [], []);
@@ -44,7 +50,8 @@ public sealed class NormalizationSuiteResolver
         foreach (var seqId in suite.SequenceIds)
         {
             var seq = allSequences.FirstOrDefault(s => s.Id == seqId);
-            if (seq == null) continue;
+            if (seq == null)
+                throw new InvalidOperationException($"Normalization suite '{suite.Name}' references missing sequence '{seqId}'.");
 
             var sequenceOps = new List<NormalizationSuiteSequenceOperationResolution>();
 
@@ -54,6 +61,10 @@ public sealed class NormalizationSuiteResolver
                 {
                     resolvedOps.Add(op);
                     sequenceOps.Add(new NormalizationSuiteSequenceOperationResolution(entry.Sequence, op));
+                }
+                else
+                {
+                    throw new InvalidOperationException($"Normalization sequence '{seq.Name}' references missing operation '{entry.OperationId}'.");
                 }
             }
 
@@ -67,6 +78,10 @@ public sealed class NormalizationSuiteResolver
             {
                 resolvedOps.Add(op);
                 standaloneOperations.Add(op);
+            }
+            else
+            {
+                throw new InvalidOperationException($"Normalization suite '{suite.Name}' references missing standalone operation '{opId}'.");
             }
         }
 

@@ -170,7 +170,8 @@ public sealed class NormalizationSuiteSeedService : IHostedService
                 new NormalizationSequenceEntry { OperationId = OpRemoveExtensionsId, Sequence = 1 },
                 new NormalizationSequenceEntry { OperationId = OpRemoveEncounterEpicExtensionsId, Sequence = 2 },
                 new NormalizationSequenceEntry { OperationId = OpRemoveObservationDatetimeExtensionId, Sequence = 3 },
-                new NormalizationSequenceEntry { OperationId = OpRemovePatientMergeInstantExtensionId, Sequence = 4 }
+                new NormalizationSequenceEntry { OperationId = OpRemovePatientMergeInstantExtensionId, Sequence = 4 },
+                new NormalizationSequenceEntry { OperationId = OpRemoveMeasureReportExtensionsId, Sequence = 5 }
             ],
             IsSystem = true,
             UpdatedAt = DateTimeOffset.UtcNow
@@ -187,7 +188,7 @@ public sealed class NormalizationSuiteSeedService : IHostedService
             Id = SuiteSystemDefaultId,
             Name = "System Default",
             Description = "Built-in normalization suite that applies location normalization and extension cleanup.",
-            OperationIds = [],
+            OperationIds = [OpRemoveMeasureReportExtensionsId],
             SequenceIds = [SeqDefaultLocationId, SeqDefaultCleanupId],
             IsSystem = true,
             IsDefault = true,

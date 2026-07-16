@@ -169,9 +169,12 @@ public class LokiScraper
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        var correlationFilter = !string.IsNullOrWhiteSpace(facilityId)
-            ? $" |= \"{facilityId}\""
-            : string.Empty;
+        var correlationFilter = string.Empty;
+        if (!string.IsNullOrWhiteSpace(facilityId))
+        {
+            var escapedFacilityId = facilityId.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            correlationFilter = $" |= \"{escapedFacilityId}\"";
+        }
 
         var structuredFilter = string.Empty;
         if (!string.IsNullOrWhiteSpace(structuredFieldName) && !string.IsNullOrWhiteSpace(structuredFieldValue))

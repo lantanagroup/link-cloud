@@ -1,7 +1,9 @@
 ﻿using System.Text.Json;
 using Automation.UI.Models;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Attributes;
+using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 
 namespace Automation.UI.Services.Persistence;
@@ -108,11 +110,23 @@ public sealed class MongoNormalizationStore : INormalizationStore
 
     public async Task SetDefaultSuiteAsync(Guid id, CancellationToken ct = default)
     {
-        var clearUpdate = Builders<NormalizationSuiteDocument>.Update.Set(d => d.IsDefault, false);
-        await _suites.UpdateManyAsync(_ => true, clearUpdate, cancellationToken: ct);
+        using var session = await _suites.Database.Client.StartSessionAsync(cancellationToken: ct);
+        session.StartTransaction();
+        try
+        {
+            var clearUpdate = Builders<NormalizationSuiteDocument>.Update.Set(d => d.IsDefault, false);
+            await _suites.UpdateManyAsync(session, _ => true, clearUpdate, cancellationToken: ct);
 
-        var setUpdate = Builders<NormalizationSuiteDocument>.Update.Set(d => d.IsDefault, true);
-        await _suites.UpdateOneAsync(d => d.Id == id, setUpdate, cancellationToken: ct);
+            var setUpdate = Builders<NormalizationSuiteDocument>.Update.Set(d => d.IsDefault, true);
+            await _suites.UpdateOneAsync(session, d => d.Id == id, setUpdate, cancellationToken: ct);
+
+            await session.CommitTransactionAsync(ct);
+        }
+        catch
+        {
+            await session.AbortTransactionAsync(ct);
+            throw;
+        }
     }
 
     public async Task DeleteSuiteAsync(Guid id, CancellationToken ct = default)
@@ -171,7 +185,7 @@ public sealed class MongoNormalizationStore : INormalizationStore
                 if (root.TryGetProperty("conditionTargetFhirPath", out var ctfp) && ctfp.ValueKind == JsonValueKind.String)
                     m.ConditionTargetFhirPath = ctfp.GetString();
                 if (root.TryGetProperty("conditionTargetValue", out var ctv) && ctv.ValueKind != JsonValueKind.Null)
-                    m.ConditionTargetValue = ctv.ValueKind == JsonValueKind.String ? ctv.GetString() : ctv.GetRawText();
+                    m.ConditionTargetValue = ctv.ValueKind == JsonValueKind.String ? ctv.GetString() : ctv.Clone();
                 if (root.TryGetProperty("conditions", out var conds) && conds.ValueKind == JsonValueKind.Array)
                     m.Conditions = JsonSerializer.Deserialize<List<NormalizationCondition>>(conds.GetRawText(), JsonOpts) ?? [];
                 if (root.TryGetProperty("codeMapFhirPath", out var cmfp) && cmfp.ValueKind == JsonValueKind.String)
@@ -274,11 +288,53 @@ internal class NormalizationSuiteDocument
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    [BsonRepresentation(BsonType.String)]
+    [BsonSerializer(typeof(GuidStringListSerializer))]
     public List<Guid> OperationIds { get; set; } = [];
-    [BsonRepresentation(BsonType.String)]
+    [BsonSerializer(typeof(GuidStringListSerializer))]
     public List<Guid> SequenceIds { get; set; } = [];
     public bool IsSystem { get; set; }
     public bool IsDefault { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+}
+
+internal sealed class GuidStringListSerializer : SerializerBase<List<Guid>>
+{
+    public override void Serialize(BsonSerializationContext context, BsonSerializationArgs args, List<Guid> value)
+    {
+        if (value == null)
+        {
+            context.Writer.WriteNull();
+            return;
+        }
+
+        context.Writer.WriteStartArray();
+        foreach (var guid in value)
+            context.Writer.WriteString(guid.ToString());
+        context.Writer.WriteEndArray();
+    }
+
+    public override List<Guid> Deserialize(BsonDeserializationContext context, BsonDeserializationArgs args)
+    {
+        if (context.Reader.GetCurrentBsonType() == BsonType.Null)
+        {
+            context.Reader.ReadNull();
+            return [];
+        }
+
+        var result = new List<Guid>();
+        context.Reader.ReadStartArray();
+        while (context.Reader.ReadBsonType() != BsonType.EndOfDocument)
+        {
+            if (context.Reader.GetCurrentBsonType() != BsonType.String)
+                throw new FormatException("Expected GUID array values to be stored as BSON string.");
+
+            var raw = context.Reader.ReadString();
+            if (!Guid.TryParse(raw, out var parsed))
+                throw new FormatException($"Invalid GUID value '{raw}' in BSON string array.");
+
+            result.Add(parsed);
+        }
+        context.Reader.ReadEndArray();
+        return result;
+    }
 }

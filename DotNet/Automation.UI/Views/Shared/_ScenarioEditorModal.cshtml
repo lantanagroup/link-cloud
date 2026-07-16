@@ -285,6 +285,13 @@
             document.querySelectorAll('#scenarioConfigArea .invalid-feedback').forEach(function (el) { el.style.display = 'none'; });
         }
 
+        function selectDefaultNormalizationSuite() {
+            var ns = document.getElementById('NormalizationSuite');
+            if (!ns) return;
+            var nd = ns.querySelector('[data-is-default="true"]');
+            if (nd) ns.value = nd.value;
+        }
+
         // ---- AJAX helper ----
         async function postJson(url, body) {
             var res = await fetch(url, {
@@ -909,7 +916,7 @@
             else { var d = qp.querySelector('[data-is-default="true"]'); if (d) qp.value = d.value; }
             var ns = document.getElementById('NormalizationSuite');
             if (data.normalizationSuiteId) ns.value = data.normalizationSuiteId;
-            else { var nd = ns.querySelector('[data-is-default="true"]'); if (nd) ns.value = nd.value; }
+            else selectDefaultNormalizationSuite();
             document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
             var mMap = { 'NhsnAcuteCareHospitalMonthlyInitialPopulation': 'measure_monthly', 'NhsnAcuteCareHospitalDailyInitialPopulation': 'measure_daily', 'NhsnGlycemicControlHypoglycemicInitialPopulation': 'measure_hypo' };
             (data.selectedMeasures || []).forEach(function (m) { var cb = document.getElementById(mMap[String(m)]); if (cb) cb.checked = true; });
@@ -1003,6 +1010,7 @@
                 document.getElementById('CleanupServiceData').checked = false;
                 document.getElementById('ReportPeriodStart').value = '';
                 document.getElementById('ReportPeriodEnd').value = '';
+                selectDefaultNormalizationSuite();
                 document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
                 document.getElementById('measure_monthly').checked = true;
                 cohortRows.innerHTML = '';
