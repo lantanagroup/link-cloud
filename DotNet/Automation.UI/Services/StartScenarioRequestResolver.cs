@@ -13,6 +13,10 @@ namespace Automation.UI.Services;
 /// </summary>
 public static class StartScenarioRequestResolver
 {
+    private const string AdhocReportTestNhsnOrganizationId = "10756";
+    private const string MultiPatientTestNhsnOrganizationId = "10758";
+    private const string MegaPatientTestNhsnOrganizationId = "10759";
+
     /// <summary>
     /// Resolves the run options for a request. For non-Custom scenarios the static
     /// scenario-kind defaults win outright; Custom merges request overrides on top
@@ -24,10 +28,22 @@ public static class StartScenarioRequestResolver
         var defaultMeasures = new List<ProfiledMeasureType> { ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation };
         var defaults = request.Scenario switch
         {
-            AutomationScenarioKind.AdhocReportTest => new ResolvedRunOptions(1, 1000, 20260326, 3, 0, 30, false, true, defaultMeasures, [], []),
-            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, 20260328, 3, 0, 30, false, true, defaultMeasures, [], []),
-            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, 20260327, 3, 0, 30, false, true, defaultMeasures, [], []),
-            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, 0, 30, false, true, defaultMeasures, [], []),
+            AutomationScenarioKind.AdhocReportTest => new ResolvedRunOptions(1, 1000, 20260326, 3, 0, 30, false, true, defaultMeasures, [], [])
+            {
+                NhsnOrganizationId = AdhocReportTestNhsnOrganizationId
+            },
+            AutomationScenarioKind.MultiPatientTest => new ResolvedRunOptions(1000, 100, 20260328, 3, 0, 30, false, true, defaultMeasures, [], [])
+            {
+                NhsnOrganizationId = MultiPatientTestNhsnOrganizationId
+            },
+            AutomationScenarioKind.MegaPatientTest => new ResolvedRunOptions(FhirBundleGenerator.DefaultPatientCount, FhirBundleGenerator.DefaultResourcesPerPatient, 20260327, 3, 0, 30, false, true, defaultMeasures, [], [])
+            {
+                NhsnOrganizationId = MegaPatientTestNhsnOrganizationId
+            },
+            AutomationScenarioKind.Custom => new ResolvedRunOptions(10, 250, 20260329, 3, 0, 30, false, true, defaultMeasures, [], [])
+            {
+                NhsnOrganizationId = GenerateRandomNhsnOrganizationId()
+            },
             _ => throw new ArgumentOutOfRangeException(nameof(request.Scenario), request.Scenario, null)
         };
 
@@ -66,6 +82,7 @@ public static class StartScenarioRequestResolver
               ?? [];
 
         var (reportStart, reportEnd) = ResolveReportPeriod(request);
+        var nhsnOrganizationId = ResolveNhsnOrganizationId(request, defaults.NhsnOrganizationId);
 
         return defaults with
         {
@@ -89,8 +106,41 @@ public static class StartScenarioRequestResolver
             ImportedPatientIds = importedIds,
             ImportedPatientBundles = importedBundles,
             ReportPeriodStart = reportStart,
-            ReportPeriodEnd = reportEnd
+            ReportPeriodEnd = reportEnd,
+            NhsnOrganizationId = nhsnOrganizationId
         };
+    }
+
+    private static string ResolveNhsnOrganizationId(StartScenarioRequest request, string defaultValue)
+    {
+        if (!string.IsNullOrWhiteSpace(request.NhsnOrganizationId))
+            return request.NhsnOrganizationId.Trim();
+
+        if (!string.IsNullOrWhiteSpace(request.RunConfigurationJson))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(request.RunConfigurationJson);
+                if (doc.RootElement.TryGetProperty("nhsnOrganizationId", out var org)
+                    && org.ValueKind == JsonValueKind.String)
+                {
+                    var value = org.GetString();
+                    if (!string.IsNullOrWhiteSpace(value))
+                        return value.Trim();
+                }
+            }
+            catch
+            {
+                // Fall through to default.
+            }
+        }
+
+        return defaultValue;
+    }
+
+    private static string GenerateRandomNhsnOrganizationId()
+    {
+        return Random.Shared.Next(10000, 100000).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
     private static PatientCohortDefinition BuildDefaultCohort(

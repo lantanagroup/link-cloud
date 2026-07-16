@@ -48,6 +48,9 @@ public class ScenariosController(
             return StatusCode(StatusCodes.Status403Forbidden, "Forbidden: system scenario cannot be modified.");
 
         model.IsSystemScenario = false;
+        model.NhsnOrganizationId = string.IsNullOrWhiteSpace(model.NhsnOrganizationId)
+            ? GenerateRandomNhsnOrganizationId()
+            : model.NhsnOrganizationId.Trim();
         model.UpdatedAt = DateTimeOffset.UtcNow;
 
         foreach (var cohort in model.PatientCohorts)
@@ -377,6 +380,7 @@ public class ScenariosController(
             SelectedMeasures = [.. source.SelectedMeasures],
             Seed = source.Seed,
             PatientCount = source.PatientCount,
+            NhsnOrganizationId = source.NhsnOrganizationId,
             PatientCohorts = source.PatientCohorts
                 .Select(c => new PatientCohortDefinition
                 {
@@ -437,5 +441,10 @@ public class ScenariosController(
         var bytes = Encoding.UTF8.GetBytes(json);
         var hash = SHA256.HashData(bytes);
         return Convert.ToHexString(hash);
+    }
+
+    private static string GenerateRandomNhsnOrganizationId()
+    {
+        return Random.Shared.Next(10000, 100000).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 }

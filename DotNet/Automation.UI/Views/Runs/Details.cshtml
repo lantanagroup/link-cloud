@@ -31,6 +31,7 @@
             <div class="row g-3" id="runSummaryGrid">
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Status</span><span class="au-value" id="status">@Model.Status</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Facility</span><code class="au-value" id="facilityId">@(Model.FacilityId ?? "-")</code></div></div>
+                <div class="col-md-3"><div class="au-summary-item"><span class="au-label">NHSN Organization ID</span><code class="au-value" id="nhsnOrganizationIdSummary">-</code></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Started</span><span class="au-value" id="started">@(Model.StartedAt?.ToString("u") ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Finished</span><span class="au-value" id="finished">@(Model.FinishedAt?.ToString("u") ?? "-")</span></div></div>
                 <div class="col-md-3"><div class="au-summary-item"><span class="au-label">Pipeline Duration</span><span class="au-value" id="pipelineDuration">@(Model.Duration ?? "-")</span></div></div>
@@ -595,6 +596,9 @@
             if (!container) return;
             container.innerHTML = '';
 
+            const summaryOrgIdEl = document.getElementById('nhsnOrganizationIdSummary');
+            if (summaryOrgIdEl) summaryOrgIdEl.textContent = '-';
+
             const cohortCard = document.getElementById('cohortSummaryCard');
             const cohortBody = document.getElementById('cohortSummaryBody');
             if (cohortCard) cohortCard.style.display = 'none';
@@ -608,6 +612,11 @@
             let parsed;
             try { parsed = JSON.parse(rawJson); } catch { return; }
             if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+
+            if (summaryOrgIdEl) {
+                const orgId = (parsed.nhsnOrganizationId ?? parsed.NhsnOrganizationId ?? '').toString().trim();
+                summaryOrgIdEl.textContent = orgId || '-';
+            }
 
             const importedIdCount = Array.isArray(parsed.importedPatientIds) ? parsed.importedPatientIds.length : 0;
             const importedBundleCount = Array.isArray(parsed.importedPatientBundles) ? parsed.importedPatientBundles.length : 0;
@@ -658,6 +667,7 @@
                 patientCount: 'Patients',
                 importedPatientIds: 'Imported Patient IDs',
                 importedPatientBundles: 'Imported Patient Bundles',
+                nhsnOrganizationId: 'NHSN Organization ID',
                 queryPlanTemplateName: 'Query Plan',
                 cleanupServiceData: 'Cleanup Service Data',
                 cleanupFhirData: 'Cleanup FHIR Data'

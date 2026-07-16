@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Services;
