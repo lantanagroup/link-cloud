@@ -205,35 +205,33 @@ public class ResourcesAcquiredListener : BackgroundService
                     ResourceType = resourceType.ToString()
                 }, cancellationToken: cancellationToken);
 
+                List<DomainResource> resources = resourceCache.Get(cacheKey);
+
                 if (sequences == null || sequences.Count == 0)
                 {
                     _logger.LogDebug("No operation sequences configured for {FacilityId}/{ResourceType}. Passing resource through without normalization.", result.Message.Key.FacilityId.SanitizeForLog(), resourceType.ToString().SanitizeForLog());
-                    resourceCache.Skipped(cacheKey, correlationId);
-                    continue;
                 }
-
-                List<DomainResource> resources = resourceCache.Get(cacheKey);
-
-                foreach (var resource in resources)
+                else
                 {
                     sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
-
-                    foreach (var sequence in sequences)
+                    foreach (var resource in resources)
                     {
-                        var dbEntity = sequence.OperationResourceType.Operation;
-                        if(dbEntity != null && dbEntity.IsDisabled)
+                        foreach (var sequence in sequences)
                         {
-                            _logger.LogDebug("Skipping disabled operation {OperationType} ({OperationName}) for {FacilityId}/{ResourceType}/{ResourceId}.", dbEntity.OperationType, dbEntity.Name.SanitizeForLog(), result.Message.Key.FacilityId.SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
-                            continue;
-                        }
+                            var dbEntity = sequence.OperationResourceType.Operation;
+                            if(dbEntity != null && dbEntity.IsDisabled)
+                            {
+                                _logger.LogDebug("Skipping disabled operation {OperationType} ({OperationName}) for {FacilityId}/{ResourceType}/{ResourceId}.", dbEntity.OperationType, dbEntity.Name.SanitizeForLog(), result.Message.Key.FacilityId.SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
+                                continue;
+                            }
 
-                        var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
-                        if (operation == null)
-                        {
-                            throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
-                        }
+                            var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
+                            if (operation == null)
+                            {
+                                throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
+                            }
 
-                        _logger.LogInformation("Normalizing {ResourceType}/{ResourceId} with {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
+                            _logger.LogInformation("Normalizing {ResourceType}/{ResourceId} with {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
 
                         var operationResult = operation.OperationType switch
                         {
@@ -246,32 +244,33 @@ public class ResourcesAcquiredListener : BackgroundService
                             _ => null
                         };
 
-                        if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
-                        {
-                            if (operationResult.SuccessCode == OperationStatus.Success)
+                            if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
                             {
-                                _logger.LogInformation("Changed {ResourceType}/{ResourceId} as part of {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
-                            }
-                            else if (operationResult.SuccessCode == OperationStatus.NoAction)
-                            {
-                                _logger.LogInformation("No changes made to {ResourceType}/{ResourceId} as part of {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
-                            }
+                                if (operationResult.SuccessCode == OperationStatus.Success)
+                                {
+                                    _logger.LogInformation("Changed {ResourceType}/{ResourceId} as part of {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
+                                }
+                                else if (operationResult.SuccessCode == OperationStatus.NoAction)
+                                {
+                                    _logger.LogInformation("No changes made to {ResourceType}/{ResourceId} as part of {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
+                                }
 
-                            _metrics.IncrementResourceChangedCounter(new List<KeyValuePair<string, object?>>() {
-                                                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, result.Message.Key.FacilityId),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.PatientId, result.Message.Key.PatientId),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resource.TypeName),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.OperationType, operation.OperationType.ToString())},
-                                                operationResult.SuccessCode == OperationStatus.Success);
-                        }
-                        else
-                        {
-                            _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", result.Message.Key.FacilityId.SanitizeForLog(), correlationId.SanitizeForLog(), operation.OperationType, operationResult?.ErrorMessage?.SanitizeForLog() ?? "No Operation Result Error result");
+                                _metrics.IncrementResourceChangedCounter(new List<KeyValuePair<string, object?>>() {
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, result.Message.Key.FacilityId),
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.PatientId, result.Message.Key.PatientId),
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resource.TypeName),
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.OperationType, operation.OperationType.ToString())},
+                                                    operationResult.SuccessCode == OperationStatus.Success);
+                            }
+                            else
+                            {
+                                _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", result.Message.Key.FacilityId.SanitizeForLog(), correlationId.SanitizeForLog(), operation.OperationType, operationResult?.ErrorMessage?.SanitizeForLog() ?? "No Operation Result Error result");
+                            }
                         }
                     }
                 }
-
+                
                 resourceCache.UpdateCorrelationCache(correlationId, resources, resourceType);
             }
 

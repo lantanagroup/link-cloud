@@ -55,13 +55,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
-        public void Skipped(string sourceCache, string correlationId)
-        {
-            var cache = ResolveFromKey(sourceCache);
-            cache.Skipped(sourceCache, correlationId);
-        }
-
-        /// <inheritdoc/>
         public ResourceType GetResourceTypeByCacheKey(string cacheKey)
         {
             var cache = ResolveFromKey(cacheKey);
