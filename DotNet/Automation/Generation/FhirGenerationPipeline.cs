@@ -59,6 +59,7 @@ public static class FhirGenerationPipeline
         public required QueryPlanInput QueryPlan { get; init; }
         public string? ClinicalPeriodStart { get; init; }
         public string? ClinicalPeriodEnd { get; init; }
+        public IReadOnlyList<string>? OrganizationLocationConditionFhirPaths { get; init; }
 
         /// <summary>
         /// When true, the simulator may use encounter-anchored fallback for date-mismatch
@@ -366,6 +367,11 @@ public static class FhirGenerationPipeline
                 acquisitionSimulation.ClinicalPeriodEnd,
                 output,
                 acquisitionSimulation.AllowEncounterAnchoredDateOverrideForOutOfRange);
+            acquiredKeys = OrgResourceMapPredictionFilter.Apply(
+                acquiredKeys,
+                patientSimEntries,
+                sharedSimEntries,
+                acquisitionSimulation.OrganizationLocationConditionFhirPaths);
             manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
             // patientSimEntries (JsonElement clones) are now eligible for GC
         }
@@ -505,6 +511,11 @@ public static class FhirGenerationPipeline
                 acquisitionSimulation.ClinicalPeriodEnd,
                 output,
                 acquisitionSimulation.AllowEncounterAnchoredDateOverrideForOutOfRange);
+            acquiredKeys = OrgResourceMapPredictionFilter.Apply(
+                acquiredKeys,
+                patientSimEntries,
+                sharedSimEntries,
+                acquisitionSimulation.OrganizationLocationConditionFhirPaths);
             manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
         }
 

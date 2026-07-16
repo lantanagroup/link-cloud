@@ -177,7 +177,7 @@ internal sealed class RunExecutor
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
             var normalizationResolution = await _normalizationSuiteResolver.ResolveAsync(state.Options.NormalizationSuiteId, cancellationToken);
             var organizationResourceMapTemplate = await _organizationResourceMapResolver.ResolveAsync(state.Options.OrganizationResourceMapTemplateId, cancellationToken);
-            var generationRequirementsPlan = BuildGenerationRequirementsPlan(normalizationResolution);
+            var generationRequirementsPlan = BuildGenerationRequirementsPlan(normalizationResolution, organizationResourceMapTemplate);
 
             await fhirDataLoader.WaitForServerAsync(output);
 
@@ -270,6 +270,11 @@ internal sealed class RunExecutor
                         QueryPlan = effectiveQueryPlan,
                         ClinicalPeriodStart = scenarioConfig.StartDate,
                         ClinicalPeriodEnd = scenarioConfig.EndDate,
+                        OrganizationLocationConditionFhirPaths = organizationResourceMapTemplate?.Conditions
+                            ?.Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
+                            .OrderBy(c => c.Priority)
+                            .Select(c => NormalizeOrgLocationFhirPathForDataAcquisition(c.FhirPath))
+                            .ToList(),
                         AllowEncounterAnchoredDateOverrideForOutOfRange =
                             state.Options.ReportMethod == ReportMethod.ScheduledReport
                             || state.Options.ReportMethod == ReportMethod.RegenerateReport
@@ -989,7 +994,7 @@ internal sealed class RunExecutor
             .OrderBy(c => c.Priority)
             .Select(c => new CreateOrganizationLocationConditionApiModel
             {
-                FhirPath = c.FhirPath,
+                FhirPath = NormalizeOrgLocationFhirPathForDataAcquisition(c.FhirPath),
                 Priority = c.Priority
             })
             .ToList();
@@ -1027,6 +1032,15 @@ internal sealed class RunExecutor
                 $"Failed to create organization location configuration for facility '{facilityId}' from template '{template.Name}'. HTTP {create.StatusCode}: {create.RawBody ?? "(no body)"}");
 
         output.WriteLine($"Ensured org-location configuration for facility '{facilityId}' from template '{template.Name}'.");
+    }
+
+    private static string NormalizeOrgLocationFhirPathForDataAcquisition(string fhirPath)
+    {
+        var path = (fhirPath ?? string.Empty).Trim();
+        if (path.StartsWith("Location.", StringComparison.OrdinalIgnoreCase))
+            return path["Location.".Length..];
+
+        return path;
     }
 
     private ServiceProvider BuildRunServiceProvider(IAutomationOutput output)
@@ -1109,7 +1123,9 @@ internal sealed class RunExecutor
             standaloneOperations);
     }
 
-    private static GenerationRequirementsPlan BuildGenerationRequirementsPlan(NormalizationSuiteResolution resolution)
+    private static GenerationRequirementsPlan BuildGenerationRequirementsPlan(
+        NormalizationSuiteResolution resolution,
+        OrganizationResourceMapTemplate? organizationResourceMapTemplate)
     {
         var plan = new GenerationRequirementsPlan
         {
@@ -1139,6 +1155,22 @@ internal sealed class RunExecutor
                     SourceCodes = m.CodeMaps.Keys.ToDictionary(k => k, _ => string.Empty, StringComparer.Ordinal)
                 }).ToList()
             });
+        }
+
+        if (organizationResourceMapTemplate?.Conditions is { Count: > 0 })
+        {
+            foreach (var condition in organizationResourceMapTemplate.Conditions
+                         .Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
+                         .OrderBy(c => c.Priority))
+            {
+                plan.Requirements.Add(new GenerationRequirement
+                {
+                    Name = $"Organization Resource Map Condition {condition.Priority}",
+                    RequirementType = "OrganizationLocationMapping",
+                    ResourceTypes = ["Location"],
+                    SourceFhirPath = condition.FhirPath.Trim()
+                });
+            }
         }
 
         return plan;

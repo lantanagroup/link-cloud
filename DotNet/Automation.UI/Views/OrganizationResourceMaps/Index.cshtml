@@ -85,9 +85,27 @@
                         <input class="form-control" id="MapDescription" maxlength="500" />
                     </div>
                     <div class="col-12">
-                        <label class="form-label" for="MapConditionsJson">Conditions JSON</label>
-                        <textarea class="form-control font-monospace" id="MapConditionsJson" rows="10"></textarea>
-                        <div class="form-text">Array of objects with <code>fhirPath</code> and <code>priority</code>.</div>
+                        <label class="form-label">Matches <i class="bi bi-info-circle text-muted" title="Use Identifier mode for guided FHIRPath generation, or Custom FHIRPath mode for advanced expressions."></i></label>
+                        <div class="d-flex gap-4 align-items-center mb-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="MapMode" id="MapModeIdentifier" value="Identifier" checked>
+                                <label class="form-check-label" for="MapModeIdentifier">Identifier</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="MapMode" id="MapModeCustom" value="Custom">
+                                <label class="form-check-label" for="MapModeCustom">Custom FHIRPath</label>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary ms-auto" id="btnAddMapMatch">
+                                <i class="bi bi-plus-lg me-1"></i>Add Match
+                            </button>
+                        </div>
+
+                        <div id="identifierMatchHelp" class="small text-muted mb-2">
+                            A location is included if it matches any identifier match below.
+                        </div>
+                        <div id="identifierMatchesContainer"></div>
+                        <div id="customMatchesContainer" style="display:none;"></div>
+                        <div id="mapBuilderHint" class="form-text mt-2"></div>
                     </div>
                 </div>
             </div>
@@ -111,22 +129,207 @@
     function show(){ modal.style.display=''; backdrop.style.display=''; }
     function hide(){ modal.style.display='none'; backdrop.style.display='none'; }
     async function post(url,body){ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','RequestVerificationToken':af()},body:JSON.stringify(body)}); if(!r.ok) throw new Error(await r.text()||('Server '+r.status)); return r.headers.get('content-type')?.includes('json')? r.json():null; }
+    function escapeFhirLiteral(value){
+        return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    }
+
+    function buildIdentifierFhirPath(system, code){
+        return "Location.identifier.exists(system = '" + escapeFhirLiteral(system) + "' and value = '" + escapeFhirLiteral(code) + "')";
+    }
+
+    function parseIdentifierCondition(path){
+        if(!path) return null;
+        const text = String(path).trim();
+        let m = text.match(/^Location\.identifier\.exists\(\s*system\s*=\s*'([^']+)'\s+and\s+value\s*=\s*'([^']+)'\s*\)$/i);
+        if(m) return { system:m[1], code:m[2] };
+        m = text.match(/^identifier\.where\(\s*system\s*=\s*'([^']+)'\s+and\s+value\s*=\s*'([^']+)'\s*\)\.exists\(\s*\)$/i);
+        if(m) return { system:m[1], code:m[2] };
+        return null;
+    }
+
+    function makeRemoveButton(onClick){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-outline-danger';
+        btn.innerHTML = '<i class="bi bi-x-lg"></i>';
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    function makeMoveButton(iconClass, title, onClick){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-outline-secondary';
+        btn.title = title;
+        btn.innerHTML = '<i class="bi ' + iconClass + '"></i>';
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    function renumberMatches(){
+        document.querySelectorAll('#identifierMatchesContainer .map-match-card, #customMatchesContainer .map-match-card')
+            .forEach((row, idx) => {
+                const label = row.querySelector('.map-match-title');
+                if(label) label.textContent = 'Match ' + (idx + 1);
+            });
+    }
+
+    function attachMatchCardControls(row){
+        const actions = row.querySelector('.map-match-actions');
+        if(!actions) return;
+        actions.appendChild(makeMoveButton('bi-arrow-up', 'Move up', () => {
+            const prev = row.previousElementSibling;
+            if(prev){ row.parentElement.insertBefore(row, prev); renumberMatches(); }
+        }));
+        actions.appendChild(makeMoveButton('bi-arrow-down', 'Move down', () => {
+            const next = row.nextElementSibling;
+            if(next){ row.parentElement.insertBefore(next, row); renumberMatches(); }
+        }));
+        actions.appendChild(makeRemoveButton(() => { row.remove(); renumberMatches(); }));
+    }
+
+    function addIdentifierMatchRow(match){
+        const host = document.getElementById('identifierMatchesContainer');
+        const row = document.createElement('div');
+        row.className = 'card mb-2 p-2 identifier-match-row map-match-card';
+        row.innerHTML = '<div class="d-flex justify-content-between align-items-center mb-2">'
+            + '<span class="fw-semibold map-match-title">Match</span>'
+            + '<div class="d-flex gap-1 map-match-actions"></div>'
+            + '</div>'
+            + '<div class="row g-2">'
+            + '<div class="col-md-5"><label class="form-label mb-1 small">Identifier System</label><input class="form-control form-control-sm map-id-system" /></div>'
+            + '<div class="col-md-5"><label class="form-label mb-1 small">Identifier Code</label><input class="form-control form-control-sm map-id-code" /></div>'
+            + '<div class="col-md-2 d-flex align-items-end"><span class="badge text-bg-light border w-100 text-center">Identifier Match</span></div>'
+            + '<div class="col-12"><label class="form-label mb-1 small">Generated FHIRPath</label><input class="form-control form-control-sm map-generated-fhirpath font-monospace" readonly /></div>'
+            + '</div>';
+        attachMatchCardControls(row);
+
+        const systemInput = row.querySelector('.map-id-system');
+        const codeInput = row.querySelector('.map-id-code');
+        const generatedInput = row.querySelector('.map-generated-fhirpath');
+
+        function refreshGenerated(){
+            var s = (systemInput.value || '').trim();
+            var c = (codeInput.value || '').trim();
+            generatedInput.value = (s && c) ? buildIdentifierFhirPath(s, c) : '';
+        }
+        systemInput.addEventListener('input', refreshGenerated);
+        codeInput.addEventListener('input', refreshGenerated);
+
+        systemInput.value = match?.system || '';
+        codeInput.value = match?.code || '';
+        refreshGenerated();
+        host.appendChild(row);
+        renumberMatches();
+    }
+
+    function addCustomMatchRow(match){
+        const host = document.getElementById('customMatchesContainer');
+        const row = document.createElement('div');
+        row.className = 'card mb-2 p-2 custom-match-row map-match-card';
+        row.innerHTML = '<div class="d-flex justify-content-between align-items-center mb-2">'
+            + '<span class="fw-semibold map-match-title">Match</span>'
+            + '<div class="d-flex gap-1 map-match-actions"></div>'
+            + '</div>'
+            + '<label class="form-label mb-1 small">FHIRPath</label>'
+            + '<div class="small text-muted mb-1">Expression is evaluated against <code>Location</code>. Example: <code>Location.identifier.exists(system = \'http://hospital.example.org/locations\' and value = \'LOC-38660106\')</code></div>'
+            + '<div class="d-flex align-items-center gap-2 mb-1"><span class="badge text-bg-light border">Custom</span><span class="small text-muted">Use precise predicates for deterministic mapping.</span></div>'
+            + '<textarea class="form-control form-control-sm map-custom-fhirpath font-monospace" rows="3" placeholder="Enter custom Location FHIRPath..."></textarea>'
+            + '<div class="small text-muted mt-1 map-custom-length"></div>';
+        attachMatchCardControls(row);
+        const textArea = row.querySelector('.map-custom-fhirpath');
+        const length = row.querySelector('.map-custom-length');
+        function syncLength(){ length.textContent = (textArea.value || '').trim().length + ' characters'; }
+        textArea.addEventListener('input', syncLength);
+        textArea.value = match?.fhirPath || '';
+        syncLength();
+        host.appendChild(row);
+        renumberMatches();
+    }
+
+    function setMode(mode, ensureOneRow){
+        if(ensureOneRow === undefined) ensureOneRow = true;
+        const identifierMode = mode === 'Identifier';
+        document.getElementById('MapModeIdentifier').checked = identifierMode;
+        document.getElementById('MapModeCustom').checked = !identifierMode;
+        document.getElementById('identifierMatchesContainer').style.display = identifierMode ? '' : 'none';
+        document.getElementById('identifierMatchHelp').style.display = identifierMode ? '' : 'none';
+        document.getElementById('customMatchesContainer').style.display = identifierMode ? 'none' : '';
+        document.getElementById('mapBuilderHint').textContent = identifierMode
+            ? 'Tip: add one row per accepted Location identifier. Generated FHIRPath updates automatically.'
+            : 'Tip: add one or more custom predicates. At least one match is required.';
+
+        if(ensureOneRow && identifierMode && document.querySelectorAll('.identifier-match-row').length === 0)
+            addIdentifierMatchRow({ system:'', code:'' });
+        if(ensureOneRow && !identifierMode && document.querySelectorAll('.custom-match-row').length === 0)
+            addCustomMatchRow({ fhirPath:'' });
+    }
+
+    function collectConditions(){
+        const identifierMode = document.getElementById('MapModeIdentifier').checked;
+        if(identifierMode){
+            const rows = Array.from(document.querySelectorAll('.identifier-match-row'));
+            if(!rows.length) throw new Error('At least one identifier match is required.');
+            return rows.map((row, idx) => {
+                const system = (row.querySelector('.map-id-system').value || '').trim();
+                const code = (row.querySelector('.map-id-code').value || '').trim();
+                if(!system || !code) throw new Error('Identifier matches require both Identifier System and Identifier Code.');
+                return { fhirPath: buildIdentifierFhirPath(system, code), priority: idx + 1 };
+            });
+        }
+
+        const rows = Array.from(document.querySelectorAll('.custom-match-row'));
+        if(!rows.length) throw new Error('At least one custom FHIRPath match is required.');
+        return rows.map((row, idx) => {
+            const fhirPath = (row.querySelector('.map-custom-fhirpath').value || '').trim();
+            if(!fhirPath) throw new Error('Custom FHIRPath matches cannot be empty.');
+            return { fhirPath: fhirPath, priority: idx + 1 };
+        });
+    }
+
     function setModel(m,mode){
         document.getElementById('MapId').value=m?.id||'';
         document.getElementById('MapName').value=m?.name||'';
         document.getElementById('MapDescription').value=m?.description||'';
-        document.getElementById('MapConditionsJson').value=JSON.stringify(m?.conditions||[{fhirPath:"identifier.where(system='http://example.org/fhir/sid/location').exists()",priority:1}],null,2);
+        document.getElementById('identifierMatchesContainer').innerHTML='';
+        document.getElementById('customMatchesContainer').innerHTML='';
+
+        const conditions = (m?.conditions || []).slice().sort((a,b)=> (a.priority||1) - (b.priority||1));
+        const parsedIdentifier = conditions.map(c => ({ original:c, parsed:parseIdentifierCondition(c.fhirPath) }));
+        const allIdentifier = conditions.length > 0 && parsedIdentifier.every(x => !!x.parsed);
+
+        if(conditions.length === 0){
+            // New template: start in Identifier mode with one blank row so
+            // controls are immediately visible, but without example values.
+            setMode('Identifier', true);
+        } else if(allIdentifier){
+            setMode('Identifier', false);
+            parsedIdentifier.forEach(x => addIdentifierMatchRow(x.parsed));
+        } else {
+            setMode('Custom', false);
+            conditions.forEach(c => addCustomMatchRow(c));
+        }
+
         document.getElementById('btnMapSave').style.display=mode==='view'?'none':'';
         document.getElementById('mapModalTitle').textContent=(mode==='view'?'View':'Edit')+' Organization Resource Map';
+        document.querySelectorAll('#MapModeIdentifier,#MapModeCustom,#btnAddMapMatch,#identifierMatchesContainer input,#customMatchesContainer textarea,.identifier-match-row button,.custom-match-row button').forEach(el=>{
+            if(mode==='view') el.setAttribute('disabled','disabled'); else el.removeAttribute('disabled');
+        });
         errs.style.display='none'; errs.textContent='';
         show();
     }
     document.getElementById('btnNewMap').addEventListener('click',()=>setModel(null,'edit'));
     document.getElementById('btnMapClose').addEventListener('click',hide);
     backdrop.addEventListener('click',hide);
+    document.getElementById('MapModeIdentifier').addEventListener('change',()=>setMode('Identifier', true));
+    document.getElementById('MapModeCustom').addEventListener('change',()=>setMode('Custom', true));
+    document.getElementById('btnAddMapMatch').addEventListener('click', ()=>{
+        if(document.getElementById('MapModeIdentifier').checked) addIdentifierMatchRow({ system:'', code:'' });
+        else addCustomMatchRow({ fhirPath:'' });
+    });
     document.getElementById('btnMapSave').addEventListener('click', async ()=>{
         try{
-            const conditions = JSON.parse(document.getElementById('MapConditionsJson').value||'[]');
+            const conditions = collectConditions();
             const model={
                 id: document.getElementById('MapId').value || crypto.randomUUID(),
                 name: document.getElementById('MapName').value,

@@ -935,6 +935,15 @@ public class LocationMappingService(
 
     private static List<string> GetEncounterReferenceIds(Resource resource)
     {
+        // Encounter resources themselves must not be filtered by their internal encounter-to-encounter
+        // links (for example Encounter.partOf). During initial acquisition those child encounters are
+        // needed to establish encounter/location mappings; treating partOf as an external encounter
+        // dependency can drop valid child encounters before mapping has been computed.
+        if (resource is Encounter)
+        {
+            return [];
+        }
+
         return ReferenceResourceBundleExtractor
             .Extract(resource, [ResourceType.Encounter.ToString()])
             .Select(GetEncounterReferenceId)

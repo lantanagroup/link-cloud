@@ -1,5 +1,6 @@
 ﻿using Hl7.Fhir.Model;
 using LantanaGroup.Automation.Generation.ResourceFactories;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 
 namespace LantanaGroup.Automation.Generation;
@@ -649,7 +650,19 @@ internal static class ScenarioResourceGeneration
                 if (!resourcesByType.TryGetValue(resourceType, out var candidates) || candidates.Count == 0)
                     continue;
 
-                ApplyRequirement(requirement, candidates[0]);
+                // Most requirement types only need one representative resource to ensure
+                // an opportunity exists (normalization scaffolding). Organization location
+                // mapping requirements, however, must be applied to every candidate Location
+                // so org-mapping predicates can match across the generated encounter graph.
+                if (string.Equals(requirement.RequirementType, "OrganizationLocationMapping", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var candidate in candidates)
+                        ApplyRequirement(requirement, candidate);
+                }
+                else
+                {
+                    ApplyRequirement(requirement, candidates[0]);
+                }
             }
         }
     }
@@ -679,6 +692,70 @@ internal static class ScenarioResourceGeneration
             case "ConditionalTransform":
                 EnsureConditionalOpportunity(resource, requirement);
                 break;
+
+            case "OrganizationLocationMapping":
+                if (resource is Location mapLocation)
+                    EnsureOrganizationLocationMappingOpportunity(mapLocation, requirement.SourceFhirPath);
+                break;
+        }
+    }
+
+    private static void EnsureOrganizationLocationMappingOpportunity(Location location, string? mappingFhirPath)
+    {
+        if (string.IsNullOrWhiteSpace(mappingFhirPath))
+            return;
+
+        var path = mappingFhirPath.Trim();
+        if (path.StartsWith("Location.", StringComparison.OrdinalIgnoreCase))
+            path = path["Location.".Length..];
+
+        static string? ExtractQuotedValue(string source, string key)
+        {
+            var match = Regex.Match(source, $@"\b{Regex.Escape(key)}\s*=\s*'([^']+)'", RegexOptions.IgnoreCase);
+            return match.Success ? match.Groups[1].Value : null;
+        }
+
+        var system = ExtractQuotedValue(path, "system");
+        var value = ExtractQuotedValue(path, "value");
+        var code = ExtractQuotedValue(path, "code");
+
+        if (path.Contains("identifier", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(system))
+        {
+            location.Identifier ??= [];
+            var hasIdentifier = location.Identifier.Any(i =>
+                string.Equals(i.System, system, StringComparison.OrdinalIgnoreCase)
+                && (string.IsNullOrWhiteSpace(value) || string.Equals(i.Value, value, StringComparison.OrdinalIgnoreCase)));
+
+            if (!hasIdentifier)
+            {
+                location.Identifier.Add(new Identifier
+                {
+                    System = system,
+                    Value = string.IsNullOrWhiteSpace(value) ? BuildDeterministicLocationIdentifier(location) : value
+                });
+            }
+        }
+
+        if (path.Contains("type.coding", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(system))
+        {
+            location.Type ??= [];
+            if (location.Type.Count == 0)
+                location.Type.Add(new CodeableConcept());
+
+            var coding = location.Type[0].Coding ??= [];
+            var hasCoding = coding.Any(c =>
+                string.Equals(c.System, system, StringComparison.OrdinalIgnoreCase)
+                && (string.IsNullOrWhiteSpace(code) || string.Equals(c.Code, code, StringComparison.OrdinalIgnoreCase)));
+
+            if (!hasCoding)
+            {
+                coding.Add(new Coding
+                {
+                    System = system,
+                    Code = string.IsNullOrWhiteSpace(code) ? "ORG-MAP" : code,
+                    Display = location.Name ?? "Mapped Organization Location"
+                });
+            }
         }
     }
 

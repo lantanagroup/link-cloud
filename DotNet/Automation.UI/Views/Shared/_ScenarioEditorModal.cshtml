@@ -1027,8 +1027,6 @@
                         c.scheduledInpatientPattern || DEFAULT_SCHEDULED_PATTERN,
                         c.cohortQualification || inferCohortQualification(c.measureEligibilities));
                 });
-            } else {
-                addDefault(data.patientCount || 10, true, data.resourcesPerPatientMin || 50, data.resourcesPerPatientMax || 100);
             }
             syncPatternColumns();
             // Imported patients

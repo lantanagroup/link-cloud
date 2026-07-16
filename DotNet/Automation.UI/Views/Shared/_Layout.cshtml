@@ -28,16 +28,17 @@
                             <a class="nav-link" asp-area="" asp-controller="Scenarios" asp-action="Index"><i class="bi bi-journal-text me-1"></i>Scenarios</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="QueryPlans" asp-action="Index"><i class="bi bi-diagram-3 me-1"></i>Query Plans</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="Normalizations" asp-action="Index"><i class="bi bi-funnel me-1"></i>Normalizations</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="OrganizationResourceMaps" asp-action="Index"><i class="bi bi-diagram-2 me-1"></i>Org Resource Maps</a>
-                        </li>
-                        <li class="nav-item">
                             <a class="nav-link" asp-area="" asp-controller="ApiHealth" asp-action="Index"><i class="bi bi-heart-pulse me-1"></i>API Health</a>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="configurationsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-sliders me-1"></i>Configurations
+                            </a>
+                            <ul class="dropdown-menu au-nav-dropdown-menu" aria-labelledby="configurationsDropdown">
+                                <li><a class="dropdown-item" asp-area="" asp-controller="QueryPlans" asp-action="Index"><i class="bi bi-diagram-3 me-1"></i>Query Plans</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="Normalizations" asp-action="Index"><i class="bi bi-funnel me-1"></i>Normalizations</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-controller="OrganizationResourceMaps" asp-action="Index"><i class="bi bi-diagram-2 me-1"></i>Org Resource Maps</a></li>
+                            </ul>
                         </li>
                     </ul>
                 </div>
