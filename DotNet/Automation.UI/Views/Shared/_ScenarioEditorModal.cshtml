@@ -12,6 +12,8 @@
 *@
 @{
     var queryPlanTemplates = (List<QueryPlanTemplate>?)ViewBag.QueryPlanTemplates ?? [];
+    var normalizationSuites = (List<NormalizationSuiteDefinition>?)ViewBag.NormalizationSuites ?? [];
+    var organizationResourceMaps = (List<OrganizationResourceMapTemplate>?)ViewBag.OrganizationResourceMaps ?? [];
     var clinicalScenarios = ClinicalScenarioInfo.GetAll(Enum.GetValues<ProfiledMeasureType>().ToList());
     var scheduledPatternOptions = Enum.GetValues<ScheduledInpatientPattern>()
         .Select(p =>
@@ -90,6 +92,28 @@
                                 }
                             </select>
                         </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="NormalizationSuite">Normalization Suite</label>
+                            <select class="form-select" id="NormalizationSuite">
+                                @foreach (var ns in normalizationSuites)
+                                {
+                                    var nsDefaultLabel = ns.IsDefault ? " (Default)" : "";
+                                    var nsSystemLabel = ns.IsSystem ? " [System]" : "";
+                                    <option value="@ns.Id" data-name="@ns.Name" data-is-default="@ns.IsDefault.ToString().ToLower()">@ns.Name@nsDefaultLabel@nsSystemLabel</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="OrganizationResourceMap">Organization Resource Map</label>
+                            <select class="form-select" id="OrganizationResourceMap">
+                                @foreach (var orm in organizationResourceMaps)
+                                {
+                                    var ormDefaultLabel = orm.IsDefault ? " (Default)" : "";
+                                    var ormSystemLabel = orm.IsSystem ? " [System]" : "";
+                                    <option value="@orm.Id" data-name="@orm.Name" data-is-default="@orm.IsDefault.ToString().ToLower()">@orm.Name@ormDefaultLabel@ormSystemLabel</option>
+                                }
+                            </select>
+                        </div>
                         <div class="col-md-3">
                             <label class="form-label" for="Seed">Seed</label>
                             <input class="form-control" type="number" min="1" id="Seed" value="20260329" />
@@ -101,6 +125,7 @@
                         <div class="col-md-3">
                             <label class="form-label" for="NhsnOrganizationId">NHSN Organization ID</label>
                             <input class="form-control" type="text" id="NhsnOrganizationId" maxlength="64" />
+                            <div id="nhsnOrganizationHint" class="form-text"></div>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label" for="ReportPeriodStart">Report Period Start</label>
@@ -283,6 +308,40 @@
         function clearFieldErrors() {
             document.querySelectorAll('#scenarioConfigArea .is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
             document.querySelectorAll('#scenarioConfigArea .invalid-feedback').forEach(function (el) { el.style.display = 'none'; });
+        }
+
+        function getUploadedOrganizationConflictMessage() {
+            return null;
+        }
+
+        function getSingleUploadedOrganizationId() {
+            return null;
+        }
+
+        function syncNhsnOrganizationFromUploadedPatients() {
+            var input = document.getElementById('NhsnOrganizationId');
+            var hint = document.getElementById('nhsnOrganizationHint');
+            if (!input || !hint) return;
+
+            input.classList.remove('is-invalid', 'bg-light');
+            hint.className = 'form-text';
+            hint.textContent = '';
+
+            input.readOnly = false;
+        }
+
+        function selectDefaultNormalizationSuite() {
+            var ns = document.getElementById('NormalizationSuite');
+            if (!ns) return;
+            var nd = ns.querySelector('[data-is-default="true"]');
+            if (nd) ns.value = nd.value;
+        }
+
+        function selectDefaultOrganizationResourceMap() {
+            var orm = document.getElementById('OrganizationResourceMap');
+            if (!orm) return;
+            var d = orm.querySelector('[data-is-default="true"]');
+            if (d) orm.value = d.value;
         }
 
         // ---- AJAX helper ----
@@ -667,6 +726,28 @@
         function addImportedRow(row) {
             // row = { source, patientId, fileName, bundleJson, autoDetect, measureEligibilities, detectedClinicalScenarioId, encounterStart, encounterEnd }
             var elig = row.measureEligibilities || {};
+            var orgId = (row.organizationId || '').trim();
+            var organizationConflict = Array.isArray(row.organizationIds) && row.organizationIds.length > 1;
+            var organizationConflictMessage = organizationConflict
+                ? 'Uploaded bundle contains multiple Organization ids (' + row.organizationIds.join(', ') + '). Only one Organization id is supported per uploaded patient.'
+                : '';
+
+            if (!orgId && row.source === 'Bundle' && row.bundleJson) {
+                try {
+                    var parsedBundle = JSON.parse(row.bundleJson);
+                    var orgIds = (parsedBundle && parsedBundle.entry || [])
+                        .map(function (e) { return e && e.resource; })
+                        .filter(function (r) { return r && r.resourceType === 'Organization' && (r.id || '').trim(); })
+                        .map(function (r) { return String(r.id).trim(); });
+                    var uniqueOrgIds = Array.from(new Set(orgIds));
+                    if (uniqueOrgIds.length === 1) orgId = uniqueOrgIds[0];
+                    if (uniqueOrgIds.length > 1) {
+                        organizationConflict = true;
+                        organizationConflictMessage = 'Uploaded bundle contains multiple Organization ids (' + uniqueOrgIds.join(', ') + '). Only one Organization id is supported per uploaded patient.';
+                    }
+                } catch (_) { }
+            }
+
             var sourceLabel = row.source === 'Bundle'
                 ? '<span class="badge bg-info text-dark"><i class="bi bi-file-earmark-arrow-up me-1"></i>Bundle</span>'
                 : '<span class="badge bg-secondary"><i class="bi bi-cloud-arrow-down me-1"></i>By ID</span>';
@@ -681,6 +762,9 @@
             tr.dataset.autoDetect = String(row.autoDetect !== false);
             tr.dataset.encounterStart = row.encounterStart || '';
             tr.dataset.encounterEnd = row.encounterEnd || '';
+            tr.dataset.organizationId = orgId;
+            tr.dataset.organizationConflict = organizationConflict ? 'true' : 'false';
+            tr.dataset.organizationConflictMessage = organizationConflictMessage;
             tr.innerHTML =
                 '<td class="text-center align-middle">' + (importedRows.children.length + 1) + '</td>' +
                 '<td class="align-middle">' + sourceLabel + '</td>' +
@@ -693,6 +777,7 @@
             renderImportedEncounterCell(tr);
             reindexImported();
             updateImportedSummary();
+            syncNhsnOrganizationFromUploadedPatients();
         }
 
         // Renders the encounter-dates cell with an in/out-of-period indicator. Called whenever
@@ -765,8 +850,17 @@
                     if (res.encounterStart || res.encounterEnd) {
                         suggestPeriodFromEncounter(res.encounterStart, res.encounterEnd);
                     }
+                    var orgIds = Array.isArray(res.organizationIds) ? res.organizationIds : [];
+                    row.dataset.organizationConflict = orgIds.length > 1 ? 'true' : 'false';
+                    row.dataset.organizationConflictMessage = orgIds.length > 1
+                        ? ('Imported patient classification found multiple Organization ids (' + orgIds.join(', ') + ').')
+                        : '';
+                    row.dataset.organizationId = orgIds.length === 1
+                        ? String(orgIds[0] || '').trim()
+                        : (res.organizationId ? String(res.organizationId).trim() : '');
                     renderImportedEncounterCell(row);
                     updateImportedSummary();
+                    syncNhsnOrganizationFromUploadedPatients();
                 }
             } catch (err) {
                 showError('Classification failed: ' + (err.message || 'Unknown error'));
@@ -798,6 +892,8 @@
                         patientId: uploaded && uploaded.patientId ? uploaded.patientId : '',
                         fileName: uploaded && uploaded.fileName ? uploaded.fileName : file.name,
                         uploadedBundleId: uploaded && uploaded.bundleId ? uploaded.bundleId : null,
+                        organizationId: uploaded && uploaded.organizationId ? uploaded.organizationId : null,
+                        organizationIds: uploaded && uploaded.organizationIds ? uploaded.organizationIds : [],
                         bundleJson: null,
                         autoDetect: true,
                         measureEligibilities: {},
@@ -815,7 +911,7 @@
 
         importedRows.addEventListener('click', function (e) {
             var rm = e.target.closest('.btn-remove-imported');
-            if (rm) { rm.closest('tr').remove(); reindexImported(); updateImportedSummary(); return; }
+            if (rm) { rm.closest('tr').remove(); reindexImported(); updateImportedSummary(); syncNhsnOrganizationFromUploadedPatients(); return; }
             var det = e.target.closest('.btn-detect-imported');
             if (det) { classifyImportedRow(det.closest('tr')); return; }
         });
@@ -877,6 +973,8 @@
                 cleanupServiceData: document.getElementById('CleanupServiceData').checked,
                 cleanupFhirData: document.getElementById('CleanupFhirData').checked,
                 queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null,
+                normalizationSuiteId: document.getElementById('NormalizationSuite').value || null,
+                organizationResourceMapTemplateId: document.getElementById('OrganizationResourceMap').value || null,
                 reportPeriodStart: (document.getElementById('ReportPeriodStart').value || '').trim() ? (document.getElementById('ReportPeriodStart').value + 'T00:00:00Z') : null,
                 reportPeriodEnd: (document.getElementById('ReportPeriodEnd').value || '').trim() ? (document.getElementById('ReportPeriodEnd').value + 'T23:59:59Z') : null,
                 importedPatientIds: importedIds,
@@ -908,6 +1006,12 @@
             var qp = document.getElementById('QueryPlanTemplate');
             if (data.queryPlanTemplateId) qp.value = data.queryPlanTemplateId;
             else { var d = qp.querySelector('[data-is-default="true"]'); if (d) qp.value = d.value; }
+            var ns = document.getElementById('NormalizationSuite');
+            if (data.normalizationSuiteId) ns.value = data.normalizationSuiteId;
+            else selectDefaultNormalizationSuite();
+            var orm = document.getElementById('OrganizationResourceMap');
+            if (data.organizationResourceMapTemplateId) orm.value = data.organizationResourceMapTemplateId;
+            else selectDefaultOrganizationResourceMap();
             document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
             var mMap = { 'NhsnAcuteCareHospitalMonthlyInitialPopulation': 'measure_monthly', 'NhsnAcuteCareHospitalDailyInitialPopulation': 'measure_daily', 'NhsnGlycemicControlHypoglycemicInitialPopulation': 'measure_hypo' };
             (data.selectedMeasures || []).forEach(function (m) { var cb = document.getElementById(mMap[String(m)]); if (cb) cb.checked = true; });
@@ -923,8 +1027,6 @@
                         c.scheduledInpatientPattern || DEFAULT_SCHEDULED_PATTERN,
                         c.cohortQualification || inferCohortQualification(c.measureEligibilities));
                 });
-            } else {
-                addDefault(data.patientCount || 10, true, data.resourcesPerPatientMin || 50, data.resourcesPerPatientMax || 100);
             }
             syncPatternColumns();
             // Imported patients
@@ -968,6 +1070,7 @@
             });
             updateImportedSummary();
             syncCount();
+            syncNhsnOrganizationFromUploadedPatients();
         }
 
         // ---- Open modal ----
@@ -1002,6 +1105,8 @@
                 document.getElementById('NhsnOrganizationId').value = generateRandomNhsnOrganizationId();
                 document.getElementById('ReportPeriodStart').value = '';
                 document.getElementById('ReportPeriodEnd').value = '';
+                selectDefaultNormalizationSuite();
+                selectDefaultOrganizationResourceMap();
                 document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });
                 document.getElementById('measure_monthly').checked = true;
                 cohortRows.innerHTML = '';
@@ -1009,6 +1114,7 @@
                 importedRows.innerHTML = '';
                 updateImportedSummary();
                 syncCount();
+                syncNhsnOrganizationFromUploadedPatients();
                 openModal();
             }
         }

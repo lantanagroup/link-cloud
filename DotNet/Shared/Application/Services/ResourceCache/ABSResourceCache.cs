@@ -3,13 +3,11 @@ using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using SharpCompress.Common;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache

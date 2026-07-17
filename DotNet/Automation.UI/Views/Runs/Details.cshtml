@@ -405,6 +405,9 @@
         const runConfigurationJson = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.RunConfigurationJson ?? string.Empty));
         const snapshotUrl = '@Url.Action("PipelineSnapshot", "Runs")';
         const manifestUrl = '@Url.Action("ManifestData", "Runs")';
+        const queryPlanGetJsonUrl = '@Url.Action("GetJson", "QueryPlans")';
+        const normalizationSuiteGetJsonUrl = '@Url.Action("GetSuiteJson", "Normalizations")';
+        const orgResourceMapGetJsonUrl = '@Url.Action("GetJson", "OrganizationResourceMaps")';
         const logBox = document.getElementById('logBox');
         let dataAcqErrors = [];
         let measureErrors = [];
@@ -423,6 +426,32 @@
         let currentFinishedAt = '@(Model.FinishedAt?.ToString("O") ?? string.Empty)';
         let runCompletedAtMs = currentFinishedAt ? (Date.parse(currentFinishedAt) || Date.now()) : null;
         let snapshotTimer = null;
+        const templateNameCache = new Map();
+
+        async function resolveTemplateName(endpointUrl, id) {
+            const normalized = String(id || '').trim();
+            if (!normalized) return '';
+
+            const cacheKey = `${endpointUrl}|${normalized}`;
+            if (templateNameCache.has(cacheKey))
+                return templateNameCache.get(cacheKey) || '';
+
+            try {
+                const response = await fetch(`${endpointUrl}?id=${encodeURIComponent(normalized)}`);
+                if (!response.ok) {
+                    templateNameCache.set(cacheKey, '');
+                    return '';
+                }
+
+                const body = await response.json();
+                const name = (body?.name || body?.Name || '').toString().trim();
+                templateNameCache.set(cacheKey, name);
+                return name;
+            } catch {
+                templateNameCache.set(cacheKey, '');
+                return '';
+            }
+        }
 
         function antiforgeryToken() {
             var token = document.querySelector('input[name="__RequestVerificationToken"]');
@@ -591,7 +620,7 @@
             return escapeHtml(toLabel(key));
         }
 
-        function renderConfigProperties(rawJson) {
+        async function renderConfigProperties(rawJson) {
             const container = document.getElementById('runConfigProps');
             if (!container) return;
             container.innerHTML = '';
@@ -612,6 +641,18 @@
             let parsed;
             try { parsed = JSON.parse(rawJson); } catch { return; }
             if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+
+            const queryPlanTemplateId = (parsed.queryPlanTemplateId ?? parsed.QueryPlanTemplateId ?? '').toString().trim();
+            if (queryPlanTemplateId && !parsed.queryPlanTemplateName)
+                parsed.queryPlanTemplateName = await resolveTemplateName(queryPlanGetJsonUrl, queryPlanTemplateId);
+
+            const normalizationSuiteId = (parsed.normalizationSuiteId ?? parsed.NormalizationSuiteId ?? '').toString().trim();
+            if (normalizationSuiteId && !parsed.normalizationSuiteName)
+                parsed.normalizationSuiteName = await resolveTemplateName(normalizationSuiteGetJsonUrl, normalizationSuiteId);
+
+            const organizationResourceMapTemplateId = (parsed.organizationResourceMapTemplateId ?? parsed.OrganizationResourceMapTemplateId ?? '').toString().trim();
+            if (organizationResourceMapTemplateId && !parsed.organizationResourceMapTemplateName)
+                parsed.organizationResourceMapTemplateName = await resolveTemplateName(orgResourceMapGetJsonUrl, organizationResourceMapTemplateId);
 
             if (summaryOrgIdEl) {
                 const orgId = (parsed.nhsnOrganizationId ?? parsed.NhsnOrganizationId ?? '').toString().trim();
@@ -655,7 +696,10 @@
                 'id', 'isSystemScenario',
                 'patientCohorts',
                 'resourcesPerPatientMin', 'resourcesPerPatientMax',
-                'queryPlanTemplateId', 'updatedAt'
+                'queryPlanTemplateId', 'QueryPlanTemplateId',
+                'normalizationSuiteId', 'NormalizationSuiteId',
+                'organizationResourceMapTemplateId', 'OrganizationResourceMapTemplateId',
+                'updatedAt'
             ]);
 
             const labels = {
@@ -669,6 +713,8 @@
                 importedPatientBundles: 'Imported Patient Bundles',
                 nhsnOrganizationId: 'NHSN Organization ID',
                 queryPlanTemplateName: 'Query Plan',
+                normalizationSuiteName: 'Normalization Suite',
+                organizationResourceMapTemplateName: 'Org Resource Map',
                 cleanupServiceData: 'Cleanup Service Data',
                 cleanupFhirData: 'Cleanup FHIR Data'
             };

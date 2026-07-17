@@ -1,4 +1,4 @@
-using Automation.UI.Models;
+﻿using Automation.UI.Models;
 using MongoDB.Driver;
 using System.Security.Cryptography;
 using System.Text;
@@ -326,6 +326,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             PatientCohortsJson = JsonSerializer.Serialize(model.PatientCohorts),
             NhsnOrganizationId = model.NhsnOrganizationId,
             QueryPlanTemplateId = model.QueryPlanTemplateId,
+            OrganizationResourceMapTemplateId = model.OrganizationResourceMapTemplateId,
             CleanupServiceData = model.CleanupServiceData,
             CleanupFhirData = model.CleanupFhirData,
             ReportPeriodStart = model.ReportPeriodStart?.UtcDateTime,
@@ -357,6 +358,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             PatientCohorts = DeserializeCohorts(doc.PatientCohortsJson),
             NhsnOrganizationId = string.IsNullOrWhiteSpace(doc.NhsnOrganizationId) ? string.Empty : doc.NhsnOrganizationId,
             QueryPlanTemplateId = doc.QueryPlanTemplateId,
+            OrganizationResourceMapTemplateId = doc.OrganizationResourceMapTemplateId,
             CleanupServiceData = doc.CleanupServiceData,
             CleanupFhirData = doc.CleanupFhirData,
             ReportPeriodStart = doc.ReportPeriodStart.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(doc.ReportPeriodStart.Value, DateTimeKind.Utc)) : null,

@@ -69,6 +69,20 @@ public class TestScenarioDefinition
     public Guid? QueryPlanTemplateId { get; set; }
 
     /// <summary>
+    /// Optional normalization suite ID. When set, the scenario uses this suite's
+    /// operations instead of creating a simple default normalization.
+    /// When null, the system default normalization suite is used.
+    /// </summary>
+    public Guid? NormalizationSuiteId { get; set; }
+
+    /// <summary>
+    /// Optional organization-resource-map template ID used to configure
+    /// DataAcquisition organization-location mapping behavior for the run.
+    /// When null, the system default template is used.
+    /// </summary>
+    public Guid? OrganizationResourceMapTemplateId { get; set; }
+
+    /// <summary>
     /// Remove facility config, soft-delete reports, DA logs, and query dispatch config after the run.
     /// </summary>
     public bool CleanupServiceData { get; set; }
