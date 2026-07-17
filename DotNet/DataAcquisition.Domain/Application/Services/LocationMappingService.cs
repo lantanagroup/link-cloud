@@ -595,7 +595,7 @@ public class LocationMappingService(
                             LocationId = locationId
                         });
                     }
-                    catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+                    catch (Exception ex) when (IsUniqueConstraintViolation(ex))
                     {
                         // Another worker may insert the same (facility, location) mapping concurrently.
                         // Re-read and continue instead of failing the entire acquisition log.
@@ -685,7 +685,7 @@ public class LocationMappingService(
         {
             locationMapping = await _organizationLocationMappingManager.CreateAsync(newMapping);
         }
-        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        catch (Exception ex) when (IsUniqueConstraintViolation(ex))
         {
             // A concurrent work item inserted the same (facility, location) between our null-check
             // and SaveChanges. That's expected for shared Locations — re-read and update instead of failing.
@@ -693,10 +693,7 @@ public class LocationMappingService(
                 .GetByFacilityIdAndLocationIdAsync(facilityId, location.Id);
 
             if (existing is null)
-            {
-                // not a duplicate — a real failure, rethrow
                 throw;
-            }
 
             locationMapping = await UpdateMapping(location, isOrgLocation, existing, partOf);
         }
@@ -993,7 +990,7 @@ public class LocationMappingService(
 
     // SQL Server: 2627 = unique constraint, 2601 = unique index.
     // EF/database providers can wrap SqlException multiple levels deep, so walk the chain.
-    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    private static bool IsUniqueConstraintViolation(Exception ex)
     {
         for (Exception? current = ex; current is not null; current = current.InnerException)
         {

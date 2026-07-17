@@ -28,16 +28,18 @@ pipeline tests. It provides:
 1. **Scenario management** -- create, edit, clone, and delete reusable test configurations.
 2. **Query plan management** -- define which FHIR resource types are acquired during data
    acquisition.
-3. **Normalization suite management** -- define reusable normalization operations,
+3. **Organization Resource Map management** -- define reusable org-location matching templates
+   (FHIRPath conditions) used to scope reporting to organization-relevant encounters/resources.
+4. **Normalization suite management** -- define reusable normalization operations,
    sequences, and suites; select suites per scenario.
-4. **Scenario execution** -- start, cancel, and delete runs.
-5. **Live telemetry** -- SignalR-driven logs, status, and dashboard updates.
-6. **Dashboard analytics** -- KPIs, success rates, 14-day run histograms.
-7. **Persistent run history** -- MongoDB-backed state across restarts.
-8. **Snapshot-based inspection** -- pipeline domains pre-aggregated for UI rendering.
-9. **Validation-backed confidence** -- report, ABS, DA, normalization, tenant, validation
+5. **Scenario execution** -- start, cancel, and delete runs.
+6. **Live telemetry** -- SignalR-driven logs, status, and dashboard updates.
+7. **Dashboard analytics** -- KPIs, success rates, 14-day run histograms.
+8. **Persistent run history** -- MongoDB-backed state across restarts.
+9. **Snapshot-based inspection** -- pipeline domains pre-aggregated for UI rendering.
+10. **Validation-backed confidence** -- report, ABS, DA, normalization, tenant, validation
    checks.
-10. **API Health automated testing** -- service-oriented endpoint/status-path verification with
+11. **API Health automated testing** -- service-oriented endpoint/status-path verification with
    seeded test data, streaming progress, and run history.
 
 ---
@@ -50,6 +52,7 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 |   +-- RunsController          dashboard, run lifecycle, snapshot/log APIs
 |   +-- ScenariosController     inline CRUD for scenario templates
 |   +-- QueryPlansController    inline CRUD for query plan templates
+|   +-- OrganizationResourceMapsController inline CRUD for org resource map templates
 |   +-- NormalizationsController inline CRUD for normalization operations/sequences/suites
 |   +-- ApiHealthController     API Health dashboard + SSE run streaming
 |   +-- Api/AutomationRunsApiController  external start/status API
@@ -60,6 +63,7 @@ Automation.UI (ASP.NET Core MVC + Razor views + SignalR)
 |   +-- Runs/Manifest.cshtml    Generation-Manifest deep dive (generated / predicted / actual)
 |   +-- Scenarios/Index.cshtml  scenario list (uses shared editor modal)
 |   +-- QueryPlans/Index.cshtml query plan list + inline modal editor
+|   +-- OrganizationResourceMaps/Index.cshtml organization resource map template management
 |   +-- Normalizations/Index.cshtml normalization operations/sequences/suites management
 |   +-- ApiHealth/Index.cshtml  API test matrix, run controls, SSE/live updates
 |   +-- Shared/_ScenarioEditorModal.cshtml   reusable scenario editor (markup + JS)
@@ -200,11 +204,28 @@ All edits are inline JSON POSTs with antiforgery and system-item protection sema
 | `DeleteOperation` / `DeleteSequence` / `DeleteSuite` | POST | Delete non-system definitions. |
 | `SetDefaultSuite` | POST | Mark one suite as default. |
 
-### 3.5 `HomeController`
+### 3.5 `OrganizationResourceMapsController`
+
+Manages reusable Organization Resource Map templates used to configure Data Acquisition
+org-location matching conditions per run.
+
+| Action | Method | Purpose |
+|---|---|---|
+| `Index` | GET | Template list/editor page. |
+| `GetJson` | GET | Return a single org resource map template as JSON. |
+| `SaveInline` | POST | Create or update a custom org resource map template. |
+| `CloneInline` | POST | Clone an existing template. |
+| `DeleteInline` | POST | Delete a non-system template. |
+| `SetDefaultInline` | POST | Mark a template as the default for new scenarios. |
+
+Templates store one or more FHIRPath conditions (evaluated against `Location`) and are
+applied with "any match" semantics.
+
+### 3.6 `HomeController`
 
 Redirects to `Runs/Index`.
 
-### 3.6 `ApiHealthController`
+### 3.7 `ApiHealthController`
 
 Primary API Health UI surface. Provides dashboard rendering, run launch, SSE streaming,
 active-run resume, and history APIs.
@@ -317,6 +338,7 @@ A `TestScenarioDefinition` captures everything needed to run a test:
 | `ResourcesPerPatientMin/Max` | Resource count range per patient. |
 | `PatientCohorts` | List of cohort definitions (count, `CohortQualification`, per-measure eligibility, clinical profiles, resource range, inpatient pattern). |
 | `QueryPlanTemplateId` | Optional override for the FHIR query plan (null = system default). |
+| `OrganizationResourceMapTemplateId` | Optional override for org-location matching template (null = default template). |
 | `NormalizationSuiteId` | Optional override for the normalization suite (null = system default suite). |
 | `CleanupServiceData` | Remove facility config and run artifacts after completion. |
 | `CleanupFhirData` | Expunge FHIR server data after completion. |
@@ -356,6 +378,12 @@ each imported patient the editor calls `ScenariosController.ClassifyImported` to
 
 When an imported encounter falls outside the configured Report Period, the editor shows
 a warning so the user knows to expect non-qualification. The save proceeds either way.
+
+> **Important for Custom / Uploaded patients:** imported data is used as-authored. To get
+> expected org-scoped acquisition and ABS outcomes, the selected Organization Resource Map
+> must be compatible with the actual `Location` / `Encounter.location` shape in that data
+> (for example matching the identifier systems/codes present on referenced locations).
+> A broad/default map that fits generated synthetic data may not fit uploaded bundles.
 
 ### System scenarios
 
@@ -547,6 +575,9 @@ Why SSE here:
     - The resolved normalization suite is translated into a platform-agnostic
       `GenerationRequirementsPlan` and supplied to generation so produced resources include
       the required trigger characteristics.
+   - When an Organization Resource Map template is selected, its conditions are applied to:
+     - Data Acquisition org-location configuration for the run facility, and
+     - generation/prediction modeling so expected ABS counts are org-scope aware.
    - `QueryPlanAcquisitionSimulator` runs per-patient with the resolved clinical period.
    - `CqlFilterSimulator` runs per-patient over the patient's qualifying measures only.
 3. **Initialize validation dependencies** -- validation artifacts and categories.
@@ -585,6 +616,8 @@ with:
 - Acquired resource types from the effective query plan.
 - Parameter-query resource types.
 - Simulated acquired keys per patient (`QueryPlanAcquisitionSimulator`).
+- Organization Resource Map post-filtering over simulated acquired keys
+  (`OrgResourceMapPredictionFilter`).
 - CQL-referenced resource types (`CqlResourceTypeExtractor`).
 - Per-resource CQL exclusions (`CqlFilterSimulator`, measure-family profiles, intersection
   semantics across the patient's qualifying measures).
@@ -610,6 +643,10 @@ This matters on the `Runs/Manifest` page: a `Specimen` can be shown as generated
 DataAcquisition-acquired through a reference query, but still be filtered from the predicted
 ABS set when patient-context CQL retrieval or measure-specific SDE predicates do not include
 it.
+
+Likewise, when Organization Resource Map conditions are active, resources tied only to
+non-org encounters are intentionally excluded from the predicted ABS set, even if they are
+otherwise query-plan-acquired and CQL-referenced.
 
 See `DotNet/Automation/README.md` section 8 for the full prediction formula and profile table.
 
@@ -807,6 +844,10 @@ Port mapping: host `5256` -- container `5257`.
 - Imported patients (by ID and by uploaded bundle) are first-class scenario inputs.
   Bundles are validated server-side on save; ID-only patients are pre-fetched at run
   start so the run's reporting period can widen to enclose their encounter dates.
+- Organization Resource Maps are first-class scenario inputs and directly affect both
+  acquisition behavior and ABS prediction math. For uploaded/custom patients, choose a map
+  that specifically matches the locations and encounter references present in the imported
+  dataset.
 - The Report Period (`ReportPeriodStart` / `ReportPeriodEnd`) is exposed in the editor
   and on the dashboard quick-launch row. When omitted, the system default for the chosen
   report method is used.
