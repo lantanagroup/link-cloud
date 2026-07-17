@@ -48,6 +48,14 @@ public static class QueryPlanAcquisitionSimulator
         var hasStart = DateTimeOffset.TryParse(clinicalPeriodStart, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var start);
         var hasEnd = DateTimeOffset.TryParse(clinicalPeriodEnd, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var end);
 
+        // DataAcquisition variable substitution normalizes PeriodStart/PeriodEnd to day bounds
+        // (00:00:00Z / 23:59:59Z) before applying ge/le formatting. Mirror that behavior so
+        // simulator date filtering matches runtime acquisition semantics.
+        if (hasStart)
+            start = new DateTimeOffset(start.UtcDateTime.Date, TimeSpan.Zero);
+        if (hasEnd)
+            end = new DateTimeOffset(end.UtcDateTime.Date.AddDays(1).AddSeconds(-1), TimeSpan.Zero);
+
         // Track resource keys we've already emitted a "no recognized date" warning for, so
         // a single missing-date resource doesn't spam the log once per date-parameter iteration.
         var warnedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

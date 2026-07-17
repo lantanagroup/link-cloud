@@ -595,7 +595,7 @@ public class LocationMappingService(
                             LocationId = locationId
                         });
                     }
-                    catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+                    catch (Exception ex) when (IsUniqueConstraintViolation(ex))
                     {
                         // Another worker may insert the same (facility, location) mapping concurrently.
                         // Re-read and continue instead of failing the entire acquisition log.
@@ -685,7 +685,7 @@ public class LocationMappingService(
         {
             locationMapping = await _organizationLocationMappingManager.CreateAsync(newMapping);
         }
-        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        catch (Exception ex) when (IsUniqueConstraintViolation(ex))
         {
             // A concurrent work item inserted the same (facility, location) between our null-check
             // and SaveChanges. That's expected for shared Locations — re-read and update instead of failing.
@@ -693,10 +693,7 @@ public class LocationMappingService(
                 .GetByFacilityIdAndLocationIdAsync(facilityId, location.Id);
 
             if (existing is null)
-            {
-                // not a duplicate — a real failure, rethrow
                 throw;
-            }
 
             locationMapping = await UpdateMapping(location, isOrgLocation, existing, partOf);
         }
@@ -935,6 +932,15 @@ public class LocationMappingService(
 
     private static List<string> GetEncounterReferenceIds(Resource resource)
     {
+        // Encounter resources themselves must not be filtered by their internal encounter-to-encounter
+        // links (for example Encounter.partOf). During initial acquisition those child encounters are
+        // needed to establish encounter/location mappings; treating partOf as an external encounter
+        // dependency can drop valid child encounters before mapping has been computed.
+        if (resource is Encounter)
+        {
+            return [];
+        }
+
         return ReferenceResourceBundleExtractor
             .Extract(resource, [ResourceType.Encounter.ToString()])
             .Select(GetEncounterReferenceId)
@@ -984,7 +990,7 @@ public class LocationMappingService(
 
     // SQL Server: 2627 = unique constraint, 2601 = unique index.
     // EF/database providers can wrap SqlException multiple levels deep, so walk the chain.
-    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    private static bool IsUniqueConstraintViolation(Exception ex)
     {
         for (Exception? current = ex; current is not null; current = current.InnerException)
         {

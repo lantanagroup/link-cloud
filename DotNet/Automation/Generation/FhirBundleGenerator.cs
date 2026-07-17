@@ -92,6 +92,7 @@ public static class FhirBundleGenerator
         int totalResourcesPerPatient = DefaultResourcesPerPatient,
         int? generationSeed = null,
         FhirGenerationConfig? config = null,
+        GenerationRequirementsPlan? generationRequirementsPlan = null,
         DateTime? clinicalPeriodStart = null,
         DateTime? clinicalPeriodEnd = null)
     {
@@ -107,7 +108,7 @@ public static class FhirBundleGenerator
         // Shared infrastructure - uploaded once in the first chunk
         // ------------------------------------------------------------------
         var (sharedEntries, sharedPractitionerIds, sharedMedicationIds) =
-            ScenarioResourceGeneration.BuildSharedInfrastructure(ids);
+            ScenarioResourceGeneration.BuildSharedInfrastructure(ids, generationRequirementsPlan);
 
         // ------------------------------------------------------------------
         // Per-patient generation
@@ -137,7 +138,7 @@ public static class FhirBundleGenerator
             ScenarioResourceGeneration.AddPatientCoreAndScenarioResources(
                 entries, patientId, patientSeed, p, baseSeed, totalResourcesPerPatient,
                 encStart, encEnd, scenario, anchors, encounter,
-                sharedPractitionerIds, sharedMedicationIds, config, ids);
+                sharedPractitionerIds, sharedMedicationIds, config, ids, generationRequirementsPlan);
 
             output.WriteLine($"  Patient {patientId}: {entries.Count} entries | scenario={scenario.PrimaryDxDisplay} | " +
                              $"encounter={anchors.EncounterId} LOS={(encEnd - encStart).TotalDays:F1}d " +
@@ -347,6 +348,7 @@ public static class FhirBundleGenerator
         int totalResourcesPerPatient = DefaultResourcesPerPatient,
         int? seed = null,
         FhirGenerationConfig? config = null,
+        GenerationRequirementsPlan? generationRequirementsPlan = null,
         DateTime? clinicalPeriodStart = null,
         DateTime? clinicalPeriodEnd = null)
     {
@@ -365,7 +367,7 @@ public static class FhirBundleGenerator
         ScenarioResourceGeneration.AddPatientCoreAndScenarioResources(
             entries, patientId, patientSeed, 0, patientSeed, totalResourcesPerPatient,
             encStart, encEnd, scenario, anchors, encounter,
-            sharedPractitionerIds, sharedMedicationIds, config, ids);
+            sharedPractitionerIds, sharedMedicationIds, config, ids, generationRequirementsPlan);
 
         return entries;
     }
