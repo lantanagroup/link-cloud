@@ -156,16 +156,6 @@
         return btn;
     }
 
-    function makeMoveButton(iconClass, title, onClick){
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn btn-sm btn-outline-secondary';
-        btn.title = title;
-        btn.innerHTML = '<i class="bi ' + iconClass + '"></i>';
-        btn.addEventListener('click', onClick);
-        return btn;
-    }
-
     function renumberMatches(){
         document.querySelectorAll('#identifierMatchesContainer .map-match-card, #customMatchesContainer .map-match-card')
             .forEach((row, idx) => {
@@ -177,14 +167,6 @@
     function attachMatchCardControls(row){
         const actions = row.querySelector('.map-match-actions');
         if(!actions) return;
-        actions.appendChild(makeMoveButton('bi-arrow-up', 'Move up', () => {
-            const prev = row.previousElementSibling;
-            if(prev){ row.parentElement.insertBefore(row, prev); renumberMatches(); }
-        }));
-        actions.appendChild(makeMoveButton('bi-arrow-down', 'Move down', () => {
-            const next = row.nextElementSibling;
-            if(next){ row.parentElement.insertBefore(next, row); renumberMatches(); }
-        }));
         actions.appendChild(makeRemoveButton(() => { row.remove(); renumberMatches(); }));
     }
 
@@ -199,7 +181,7 @@
             + '<div class="row g-2">'
             + '<div class="col-md-5"><label class="form-label mb-1 small">Identifier System</label><input class="form-control form-control-sm map-id-system" /></div>'
             + '<div class="col-md-5"><label class="form-label mb-1 small">Identifier Code</label><input class="form-control form-control-sm map-id-code" /></div>'
-            + '<div class="col-md-2 d-flex align-items-end"><span class="badge text-bg-light border w-100 text-center">Identifier Match</span></div>'
+            + '<div class="col-md-2 d-flex align-items-end"><small class="text-muted w-100 text-center">Auto-generated</small></div>'
             + '<div class="col-12"><label class="form-label mb-1 small">Generated FHIRPath</label><input class="form-control form-control-sm map-generated-fhirpath font-monospace" readonly /></div>'
             + '</div>';
         attachMatchCardControls(row);
@@ -233,7 +215,7 @@
             + '</div>'
             + '<label class="form-label mb-1 small">FHIRPath</label>'
             + '<div class="small text-muted mb-1">Expression is evaluated against <code>Location</code>. Example: <code>Location.identifier.exists(system = \'http://hospital.example.org/locations\' and value = \'LOC-38660106\')</code></div>'
-            + '<div class="d-flex align-items-center gap-2 mb-1"><span class="badge text-bg-light border">Custom</span><span class="small text-muted">Use precise predicates for deterministic mapping.</span></div>'
+            + '<div class="d-flex align-items-center gap-2 mb-1"><small class="text-muted">Custom mode</small><span class="small text-muted">Use precise predicates for deterministic mapping.</span></div>'
             + '<textarea class="form-control form-control-sm map-custom-fhirpath font-monospace" rows="3" placeholder="Enter custom Location FHIRPath..."></textarea>'
             + '<div class="small text-muted mt-1 map-custom-length"></div>';
         attachMatchCardControls(row);
