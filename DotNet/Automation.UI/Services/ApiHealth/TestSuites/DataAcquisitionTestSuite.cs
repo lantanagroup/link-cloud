@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
+using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
@@ -22,18 +23,21 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
     private readonly IFacilityServiceClient _facilityClient;
     private readonly IApiHealthSeedContextAccessor _seedContext;
     private readonly IOptions<AutomationConfig> _automationConfig;
+    private readonly IOrganizationResourceMapTemplateStore _organizationResourceMapTemplateStore;
 
     public override string ServiceName => "DataAcquisition";
     public DataAcquisitionTestSuite(
         IDataAcquisitionServiceClient client,
         IFacilityServiceClient facilityClient,
         IApiHealthSeedContextAccessor seedContext,
-        IOptions<AutomationConfig> automationConfig)
+        IOptions<AutomationConfig> automationConfig,
+        IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore)
     {
         _client = client;
         _facilityClient = facilityClient;
         _seedContext = seedContext;
         _automationConfig = automationConfig;
+        _organizationResourceMapTemplateStore = organizationResourceMapTemplateStore;
     }
 
     public override IReadOnlyList<ApiHealthSeedRequirement> GetSeedRequirements() =>
@@ -171,21 +175,29 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             results.Add(await RunStepAsync(StepNames.OrgLocationConfigGet200, 200, async () =>
                 await _client.GetOrganizationLocationConfigurationsAsync(facilityId, ct), ct: ct));
 
+            var defaultOrgMap = await _organizationResourceMapTemplateStore.GetDefaultAsync(ct);
+            var mapConditions = defaultOrgMap?.Conditions
+                .Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
+                .OrderBy(c => c.Priority)
+                .Select(c => new CreateOrganizationLocationConditionApiModel
+                {
+                    FhirPath = c.FhirPath,
+                    Priority = c.Priority
+                })
+                .ToList()
+                ?? [];
+
+            if (mapConditions.Count == 0)
+                throw new InvalidOperationException("Default Organization Resource Map template is missing or has no conditions.");
+
             results.Add(await RunStepAsync(StepNames.OrgLocationConfigPost201, 201, async () =>
                 await _client.CreateOrganizationLocationConfigurationAsync(
                     facilityId,
                     new CreateOrganizationLocationConfigurationApiModel
                     {
-                        Description = "ApiHealth org-location config",
+                        Description = defaultOrgMap?.Description ?? "ApiHealth org-location config",
                         IsActive = true,
-                        Conditions =
-                        [
-                            new CreateOrganizationLocationConditionApiModel
-                            {
-                                FhirPath = "identifier.where(system='http://example.org/fhir/sid/location').exists() or type.coding.where(system='https://www.cdc.gov/nhsn/cdaportal/terminology/codesystem/hsloc.html').exists()",
-                                Priority = 1
-                            }
-                        ]
+                        Conditions = mapConditions
                     },
                     ct), ct: ct));
 

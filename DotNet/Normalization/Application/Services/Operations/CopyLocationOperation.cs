@@ -36,6 +36,8 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
                 location.Type = new List<CodeableConcept>();
             }
 
+            var addedCount = 0;
+
             foreach (var identifier in location.Identifier)
             {
                 if (string.IsNullOrWhiteSpace(identifier.System) && string.IsNullOrWhiteSpace(identifier.Value))
@@ -54,9 +56,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
 
                 CodeableConcept codeableConcept = new(identifier.System, identifier.Value);
                 location.Type.Add(codeableConcept);
+                addedCount++;
             }
 
-            return OperationResult.Success(location);
+            return addedCount > 0
+                ? OperationResult.Success(location)
+                : OperationResult.NoAction("No location identifiers required copying.", location);
         }
     }
 }

@@ -83,6 +83,7 @@ public static class StartScenarioRequestResolver
 
         var (reportStart, reportEnd) = ResolveReportPeriod(request);
         var nhsnOrganizationId = ResolveNhsnOrganizationId(request, defaults.NhsnOrganizationId);
+        var organizationResourceMapTemplateId = request.OrganizationResourceMapTemplateId ?? ExtractGuidFromJson(request.RunConfigurationJson, "organizationResourceMapTemplateId");
 
         return defaults with
         {
@@ -103,12 +104,37 @@ public static class StartScenarioRequestResolver
             PatientCohorts = cohorts,
             ReportMethod = request.ReportMethod,
             QueryPlanTemplateId = request.QueryPlanTemplateId,
+            NormalizationSuiteId = request.NormalizationSuiteId,
+            OrganizationResourceMapTemplateId = organizationResourceMapTemplateId,
             ImportedPatientIds = importedIds,
             ImportedPatientBundles = importedBundles,
             ReportPeriodStart = reportStart,
             ReportPeriodEnd = reportEnd,
             NhsnOrganizationId = nhsnOrganizationId
         };
+    }
+
+    private static Guid? ExtractGuidFromJson(string? runConfigurationJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(runConfigurationJson))
+            return null;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(runConfigurationJson);
+            if (doc.RootElement.TryGetProperty(propertyName, out var prop)
+                && prop.ValueKind == JsonValueKind.String
+                && Guid.TryParse(prop.GetString(), out var parsed))
+            {
+                return parsed;
+            }
+        }
+        catch
+        {
+            // fall through
+        }
+
+        return null;
     }
 
     private static string ResolveNhsnOrganizationId(StartScenarioRequest request, string defaultValue)

@@ -11,7 +11,7 @@ This README is the comprehensive reference for the project. It is aimed at three
   and why it exists.
 - **QA** -- sections 3 and 4 explain how generation is configured and what determinism
   guarantees are in place.
-- **Developers** -- sections 5 through 9 walk through every extensible surface and the
+- **Developers** -- sections 5 through 10 walk through every extensible surface and the
   mathematical model that drives predictions.
 
 ---
@@ -38,15 +38,17 @@ clients, and presentation on top.
 Although orchestration happens in host projects, `Automation` is designed around this lifecycle:
 
 1. **Input selection** -- choose patient count, cohorts, profiles, measures, seed.
-2. **Deterministic generation** -- produce clinically coherent FHIR resources and transaction
+2. **Generation requirements planning** -- optional host-supplied requirements can shape
+   generated data so specific downstream behaviors are exercised.
+3. **Deterministic generation** -- produce clinically coherent FHIR resources and transaction
    bundles.
-3. **Streaming upload** -- upload each patient's data as it is generated (no full dataset in
+4. **Streaming upload** -- upload each patient's data as it is generated (no full dataset in
    memory).
-4. **Manifest construction** -- build concrete generated resource-key and resource-count maps
+5. **Manifest construction** -- build concrete generated resource-key and resource-count maps
    incrementally.
-5. **Acquisition + CQL reachability modeling** -- determine which generated resources are
+6. **Acquisition + CQL reachability modeling** -- determine which generated resources are
    expected to be acquired and to appear in final artifacts.
-6. **Validation support** -- expose stable contracts and derived expectations that validators can
+7. **Validation support** -- expose stable contracts and derived expectations that validators can
    compare against actual pipeline output.
 
 This design avoids brittle static baselines and favors deterministic, input-derived
@@ -61,7 +63,8 @@ Automation (no Link dependencies)
 +-- Generation/          FHIR R4 bundle generation, prediction model, streaming pipeline,
 |                        imported-patient ingestion + classification, IP-window resolver,
 |                        CQL filter simulator + per-resource-type filter profiles,
-|                        deterministic acquisition simulator
+|                        deterministic acquisition simulator,
+|                        optional generation requirements planning
 +-- Helpers/             output abstractions, retry, monitoring, diagnostics
 +-- Configuration/       base config classes for host extension
 +-- ExtractCqlTypes/     tiny utility app for extracting CQL retrieve types from measure bundles
@@ -210,6 +213,41 @@ patient graph that downstream processes traverse deterministically. Examples:
 Central code tables covering SNOMED, ICD-10, RxNorm, LOINC, and CVX selections for
 demographics, practitioners, scenario definitions, observations, medications, procedures,
 service requests, and related artifacts.
+
+### 4.9 Generation requirements plans (`GenerationRequirementsPlan`)
+
+`Automation` supports optional host-supplied generation shaping through
+`GenerationRequirementsPlan` (`Generation/GenerationRequirementsPlan.cs`).
+
+This contract is intentionally platform-agnostic: it does not encode product-specific
+pipeline concepts. Instead, it expresses generic statements of
+"generated data must include characteristics X for resource types Y." A host can derive
+those requirements from any external configuration model.
+
+Core model:
+
+- `GenerationRequirementsPlan`
+  - `PlanName`
+  - `List<GenerationRequirement> Requirements`
+- `GenerationRequirement`
+  - `Name`
+  - `RequirementType` (for example `RemoveExtensions`, `CopyProperty`, `CodeMap`,
+    `ConditionalTransform`, `CopyLocation`)
+  - `List<string> ResourceTypes`
+  - optional type-specific fields (`SourceFhirPath`, `CodeMapFhirPath`,
+    `ExtensionUrls`, `Conditions`, `CodeSystemMaps`)
+
+Both generation entry points accept this plan:
+
+- `FhirGenerationPipeline.GenerateAndUploadAsync(..., GenerationRequirementsPlan? generationRequirementsPlan = null, ...)`
+- `FhirBundleGenerator.Generate(..., GenerationRequirementsPlan? generationRequirementsPlan = null, ...)`
+
+Plan application is centralized in `ScenarioResourceGeneration` so bulk and streaming paths
+cannot drift. The generation layer applies best-effort shaping to ensure target trigger
+conditions are present in produced resources while preserving deterministic behavior.
+
+This allows hosts to evolve downstream test intent without hardcoding those assumptions in
+the core generator.
 
 ---
 
@@ -637,6 +675,9 @@ infrastructure coupling.
 - Uses `Hl7.Fhir.R4` for FHIR model types and `System.Text.Json` for serialization.
 - `FhirGenerationPipeline` is the recommended entry point for any non-trivial dataset;
   `FhirBundleGenerator.Generate()` is suitable only for small/test datasets.
+- `GenerationRequirementsPlan` is optional and consumer-supplied. When present, it shapes
+  generated resources to include required characteristics using platform-agnostic
+  requirement semantics.
 - `UploadBundlesSequentiallyAsync` aborts on first failure to preserve resource dependency
   ordering guarantees.
 - Pipeline-derived resources (`Patient`, `MeasureReport`, `OperationOutcome`) are predicted

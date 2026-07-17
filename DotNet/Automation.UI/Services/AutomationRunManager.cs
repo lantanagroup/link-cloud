@@ -19,6 +19,8 @@ public class AutomationRunManager : IAutomationRunManager
     private readonly RunSnapshotOrchestrator _orchestrator;
     private readonly ISnapshotStore _snapshotStore;
     private readonly QueryPlanTemplateResolver _queryPlanResolver;
+    private readonly NormalizationSuiteResolver _normalizationSuiteResolver;
+    private readonly OrganizationResourceMapTemplateResolver _organizationResourceMapResolver;
     private readonly DashboardStatsAggregator _dashboardAggregator;
     private readonly RunExecutor _runExecutor;
     private readonly ConcurrentDictionary<Guid, MutableRunState> _runs = new();
@@ -31,7 +33,9 @@ public class AutomationRunManager : IAutomationRunManager
         IConfiguration configuration,
         RunSnapshotOrchestrator orchestrator,
         ISnapshotStore snapshotStore,
-        IQueryPlanTemplateStore queryPlanTemplateStore)
+        IQueryPlanTemplateStore queryPlanTemplateStore,
+        INormalizationStore normalizationStore,
+        IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore)
     {
         _hub = hub;
         _automationConfig = automationConfig.Value;
@@ -40,6 +44,8 @@ public class AutomationRunManager : IAutomationRunManager
         _orchestrator = orchestrator;
         _snapshotStore = snapshotStore;
         _queryPlanResolver = new QueryPlanTemplateResolver(queryPlanTemplateStore);
+        _normalizationSuiteResolver = new NormalizationSuiteResolver(normalizationStore);
+        _organizationResourceMapResolver = new OrganizationResourceMapTemplateResolver(organizationResourceMapTemplateStore);
         _dashboardAggregator = new DashboardStatsAggregator(snapshotStore);
         _runExecutor = new RunExecutor(
             _automationConfig,
@@ -47,6 +53,8 @@ public class AutomationRunManager : IAutomationRunManager
             _snapshotStore,
             _orchestrator,
             _queryPlanResolver,
+            _normalizationSuiteResolver,
+            _organizationResourceMapResolver,
             configuration,
             _logger);
     }
