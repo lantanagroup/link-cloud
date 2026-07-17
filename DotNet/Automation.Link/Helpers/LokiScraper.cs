@@ -158,10 +158,9 @@ public class LokiScraper
         string componentName,
         string includePattern,
         TimeSpan lookback,
-        string? facilityId = null,
-        string? structuredFieldName = null,
-        string? structuredFieldValue = null,
-        int limit = 2000)
+        IReadOnlyCollection<string>? additionalContainsFilters = null,
+        int limit = 2000,
+        int maxPages = 10)
     {
         var end = DateTime.UtcNow;
         var start = end - lookback;
@@ -169,51 +168,87 @@ public class LokiScraper
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        var correlationFilter = string.Empty;
-        if (!string.IsNullOrWhiteSpace(facilityId))
+        var escapedIncludePattern = includePattern.Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+        var containsFilter = string.Empty;
+        if (additionalContainsFilters != null)
         {
-            var escapedFacilityId = facilityId.Replace("\\", "\\\\").Replace("\"", "\\\"");
-            correlationFilter = $" |= \"{escapedFacilityId}\"";
+            foreach (var filter in additionalContainsFilters)
+            {
+                if (string.IsNullOrWhiteSpace(filter))
+                    continue;
+
+                var escapedFilter = filter.Replace("\\", "\\\\").Replace("\"", "\\\"");
+                containsFilter += $" |= \"{escapedFilter}\"";
+            }
         }
 
-        var structuredFilter = string.Empty;
-        if (!string.IsNullOrWhiteSpace(structuredFieldName) && !string.IsNullOrWhiteSpace(structuredFieldValue))
-        {
-            var escaped = structuredFieldValue.Replace("\\", "\\\\").Replace("\"", "\\\"");
-            structuredFilter = $" | json | {structuredFieldName}=\"{escaped}\"";
-        }
-
-        var query = $"{{app=\"link-cloud\", component=\"{componentName}\"}} |= \"{includePattern}\"{correlationFilter}{structuredFilter}";
-
-        var request = new RestRequest("/loki/api/v1/query_range");
-        request.AddParameter("query", query);
-        request.AddParameter("start", startUnix.ToString());
-        request.AddParameter("end", endUnix.ToString());
-        request.AddParameter("limit", Math.Max(1, limit).ToString());
+        var query = $"{{app=\"link-cloud\", component=\"{componentName}\"}} |= \"{escapedIncludePattern}\"{containsFilter}";
 
         var lines = new List<string>();
+        var pageSize = Math.Max(1, limit);
+        var pageCount = 0;
+        var currentEndUnix = endUnix;
+
         try
         {
-            var response = await _lokiClient.ExecuteAsync(request);
-            if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
-                return lines;
-
-            var jsonResponse = JObject.Parse(response.Content);
-            var results = jsonResponse["data"]?["result"] as JArray;
-            if (results == null)
-                return lines;
-
-            foreach (var result in results)
+            while (pageCount < Math.Max(1, maxPages))
             {
-                var values = result["values"] as JArray;
-                if (values == null) continue;
+                var request = new RestRequest("/loki/api/v1/query_range");
+                request.AddParameter("query", query);
+                request.AddParameter("start", startUnix.ToString());
+                request.AddParameter("end", currentEndUnix.ToString());
+                request.AddParameter("limit", pageSize.ToString());
+                request.AddParameter("direction", "backward");
 
-                foreach (var value in values)
+                var response = await _lokiClient.ExecuteAsync(request);
+                if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+                    return lines;
+
+                var jsonResponse = JObject.Parse(response.Content);
+                var results = jsonResponse["data"]?["result"] as JArray;
+                if (results == null)
+                    return lines;
+
+                var pageEntries = new List<(long Timestamp, string Line)>();
+
+                foreach (var result in results)
                 {
-                    var logLine = value[1]?.ToString();
-                    if (!string.IsNullOrWhiteSpace(logLine))
-                        lines.Add(logLine);
+                    var values = result["values"] as JArray;
+                    if (values == null) continue;
+
+                    foreach (var value in values)
+                    {
+                        var timestampToken = value[0]?.ToString();
+                        var logLine = value[1]?.ToString();
+                        if (string.IsNullOrWhiteSpace(logLine))
+                            continue;
+
+                        if (!long.TryParse(timestampToken, out var timestamp))
+                            timestamp = 0;
+
+                        pageEntries.Add((timestamp, logLine));
+                    }
                 }
+
+                if (pageEntries.Count == 0)
+                    break;
+
+                foreach (var entry in pageEntries)
+                {
+                    lines.Add(entry.Line);
+                }
+
+                pageCount++;
+
+                if (pageEntries.Count < pageSize)
+                    break;
+
+                var oldestTimestamp = pageEntries.Min(e => e.Timestamp);
+                if (oldestTimestamp <= startUnix)
+                    break;
+
+                currentEndUnix = Math.Max(startUnix, oldestTimestamp - 1);
             }
         }
         catch

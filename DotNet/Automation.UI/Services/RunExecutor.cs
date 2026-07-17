@@ -700,14 +700,53 @@ internal sealed class RunExecutor
             await RunValidator("NORMALIZATION DATABASE VALIDATION", () =>
                 normalizationValidator.ValidateAllAsync(facilityId));
 
-            var normalizationSummaryLogs = await lokiScraper.QueryServiceLogsAsync(
-                LokiScraper.Components.Normalization,
-                "[NormalizationExecutionSummary]",
-                scenarioConfig.LokiScrapeWindow,
-                facilityId: null,
-                structuredFieldName: "FacilityId",
-                structuredFieldValue: facilityId,
-                limit: 5000);
+            var normalizationSummaryMarker = "[NormalizationExecutionSummary]";
+            var evidenceRequiredResourceTypes = normalizationResolution.Sequences
+                .SelectMany(s => s.Operations)
+                .Where(s => !string.Equals(s.Operation.OperationType, "RemoveExtensions", StringComparison.OrdinalIgnoreCase))
+                .SelectMany(s => s.Operation.ResourceTypes)
+                .Concat(
+                    normalizationResolution.StandaloneOperations
+                        .Where(o => !string.Equals(o.OperationType, "RemoveExtensions", StringComparison.OrdinalIgnoreCase))
+                        .SelectMany(o => o.ResourceTypes))
+                .Where(rt => !string.IsNullOrWhiteSpace(rt))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var runScopeFilters = new List<string> { facilityId, reportId };
+
+            var normalizationSummaryLogs = new List<string>();
+            if (evidenceRequiredResourceTypes.Count > 0)
+            {
+                foreach (var resourceType in evidenceRequiredResourceTypes)
+                {
+                    var logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
+                        LokiScraper.Components.Normalization,
+                        normalizationSummaryMarker,
+                        scenarioConfig.LokiScrapeWindow,
+                        additionalContainsFilters: [.. runScopeFilters, resourceType],
+                        limit: 5000,
+                        maxPages: 20);
+
+                    normalizationSummaryLogs.AddRange(logsForResourceType);
+                }
+            }
+            else
+            {
+                normalizationSummaryLogs = await lokiScraper.QueryServiceLogsAsync(
+                    LokiScraper.Components.Normalization,
+                    normalizationSummaryMarker,
+                    scenarioConfig.LokiScrapeWindow,
+                    additionalContainsFilters: runScopeFilters,
+                    limit: 5000,
+                    maxPages: 20);
+            }
+
+            normalizationSummaryLogs = normalizationSummaryLogs
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
 
             await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", () =>
                 normalizationSuiteApplicationValidator.ValidateAllAsync(internalAbsResources, normalizationResolution, normalizationSummaryLogs));
