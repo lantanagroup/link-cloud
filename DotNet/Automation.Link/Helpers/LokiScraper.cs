@@ -8,13 +8,18 @@ namespace LantanaGroup.Link.Automation.Link.Helpers;
 public class LokiScraper
 {
     private readonly IAutomationOutput _output;
-    private readonly RestClient _lokiClient;
+    private readonly IRestClient _lokiClient;
     private DateTime _lastQueryTime = DateTime.UtcNow;
 
     public LokiScraper(IAutomationOutput output, AutomationConfig config)
+        : this(output, new RestClient(config.LokiBaseUrl))
+    {
+    }
+
+    public LokiScraper(IAutomationOutput output, IRestClient lokiClient)
     {
         _output = output;
-        _lokiClient = new RestClient(config.LokiBaseUrl);
+        _lokiClient = lokiClient;
     }
 
     public static class Components
@@ -192,6 +197,9 @@ public class LokiScraper
 
         try
         {
+            var seenEntries = new HashSet<string>(StringComparer.Ordinal);
+            var overlapAttemptsByTimestamp = new Dictionary<long, int>();
+
             while (pageCount < Math.Max(1, maxPages))
             {
                 var request = new RestRequest("/loki/api/v1/query_range");
@@ -210,7 +218,8 @@ public class LokiScraper
                 if (results == null)
                     return lines;
 
-                var pageEntries = new List<(long Timestamp, string Line)>();
+                var pageEntries = new List<(long? Timestamp, string Line)>();
+                var malformedTimestampCount = 0;
 
                 foreach (var result in results)
                 {
@@ -225,10 +234,19 @@ public class LokiScraper
                             continue;
 
                         if (!long.TryParse(timestampToken, out var timestamp))
-                            timestamp = 0;
+                        {
+                            malformedTimestampCount++;
+                            pageEntries.Add((null, logLine));
+                            continue;
+                        }
 
                         pageEntries.Add((timestamp, logLine));
                     }
+                }
+
+                if (malformedTimestampCount > 0)
+                {
+                    _output.WriteLine($"[DIAG][Loki] Encountered {malformedTimestampCount} malformed timestamp token(s) in query_range response; preserving lines and continuing pagination using valid timestamps only.");
                 }
 
                 if (pageEntries.Count == 0)
@@ -236,7 +254,9 @@ public class LokiScraper
 
                 foreach (var entry in pageEntries)
                 {
-                    lines.Add(entry.Line);
+                    var dedupeKey = $"{entry.Timestamp?.ToString() ?? "(null)"}|{entry.Line}";
+                    if (seenEntries.Add(dedupeKey))
+                        lines.Add(entry.Line);
                 }
 
                 pageCount++;
@@ -244,11 +264,33 @@ public class LokiScraper
                 if (pageEntries.Count < pageSize)
                     break;
 
-                var oldestTimestamp = pageEntries.Min(e => e.Timestamp);
+                var validTimestamps = pageEntries
+                    .Where(e => e.Timestamp.HasValue)
+                    .Select(e => e.Timestamp!.Value)
+                    .ToList();
+
+                if (validTimestamps.Count == 0)
+                    break;
+
+                var oldestTimestamp = validTimestamps.Min();
                 if (oldestTimestamp <= startUnix)
                     break;
 
-                currentEndUnix = Math.Max(startUnix, oldestTimestamp - 1);
+                overlapAttemptsByTimestamp.TryGetValue(oldestTimestamp, out var overlapAttempts);
+                if (overlapAttempts == 0)
+                {
+                    // Overlap once at the oldest timestamp so entries sharing the boundary
+                    // timestamp have a chance to appear on the next page.
+                    overlapAttemptsByTimestamp[oldestTimestamp] = 1;
+                    currentEndUnix = oldestTimestamp;
+                    continue;
+                }
+
+                var nextEndUnix = Math.Max(startUnix, oldestTimestamp - 1);
+                if (nextEndUnix >= currentEndUnix)
+                    break;
+
+                currentEndUnix = nextEndUnix;
             }
         }
         catch

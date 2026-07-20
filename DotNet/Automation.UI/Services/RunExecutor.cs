@@ -399,6 +399,7 @@ internal sealed class RunExecutor
 
             Frequency? scheduledRunFrequency = null;
             string reportId;
+            string normalizationEvidenceReportId;
             if (usesScheduledWorkflow)
             {
                 var scheduledWorkflowState = await ExecuteScheduledReportWorkflowAsync(
@@ -413,11 +414,13 @@ internal sealed class RunExecutor
                     cancellationToken);
 
                 reportId = scheduledWorkflowState.ReportTrackingId;
+                normalizationEvidenceReportId = reportId;
                 scheduledRunFrequency = scheduledWorkflowState.Frequency;
             }
             else
             {
                 reportId = await reportHelper.GenerateReportAsync(facilityId, measureIds, scenarioConfig);
+                normalizationEvidenceReportId = reportId;
             }
             lock (state.Sync)
             {
@@ -488,8 +491,10 @@ internal sealed class RunExecutor
                 // Flush stale domain data so the regenerated report starts fresh.
                 services.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
+                var originalReportId = reportId;
                 var regeneratedReportId = await reportHelper.RegenerateReportAsync(facilityId, reportId);
                 reportId = regeneratedReportId;
+                normalizationEvidenceReportId = originalReportId;
                 lock (state.Sync)
                 {
                     state.ReportId = reportId;
@@ -713,7 +718,7 @@ internal sealed class RunExecutor
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            var runScopeFilters = new List<string> { facilityId, reportId };
+            var runScopeFilters = new List<string> { facilityId, normalizationEvidenceReportId };
 
             async Task<List<string>> QueryNormalizationSummaryLogsAsync()
             {
