@@ -396,7 +396,7 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
 
         if (issue.getCode() == org.hl7.fhir.r4.model.OperationOutcome.IssueType.BUSINESSRULE && 
             issue.getSeverity() == org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity.WARNING &&
-            message.equalsIgnoreCase("code is inactive.")) {
+            "code is inactive.".equalsIgnoreCase(message)) {
                 return true;
             }
 
