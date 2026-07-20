@@ -11,6 +11,10 @@ namespace LantanaGroup.Link.Nhsn.App.Bff.Application.Services;
 
 public class UserInfoService : IUserInfoService
 {
+    private const string AccessStateAllowed = "Allowed";
+    private const string AccessStateMissingFacility = "MissingFacility";
+    private const string AccessStateMissingRequiredRole = "MissingRequiredRole";
+
     private readonly NhsnAppDbContext _dbContext;
     private readonly NhsnJwtSettings _jwtSettings;
 
@@ -54,8 +58,7 @@ public class UserInfoService : IUserInfoService
                 FacilityId = incomingUser.FacilityId,
                 CreatedBy = "userinfo",
                 LastModifiedBy = "userinfo",
-                IsOnboarded = facility?.IsOnboarded ?? false,
-                IsActive = true
+                LastAccessedOn = DateTime.UtcNow
             };
 
             _dbContext.Users.Add(user);
@@ -67,36 +70,34 @@ public class UserInfoService : IUserInfoService
             user.Name = incomingUser.Name;
             user.GroupsRaw = string.Join(',', incomingUser.Groups);
             user.FacilityId = incomingUser.FacilityId;
-            user.IsOnboarded = facility?.IsOnboarded ?? false;
             user.LastModifiedBy = "userinfo";
             user.LastModifiedOn = DateTime.UtcNow;
+            user.LastAccessedOn = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        var effectiveGroups = BuildEffectiveGroups(incomingUser.Groups, user.IsAdmin);
-        var isSystemAdmin = effectiveGroups.Contains(NhsnAppConstants.Roles.NhsnLinkSysAdmin, StringComparer.OrdinalIgnoreCase);
+        var effectiveGroups = BuildEffectiveGroups(incomingUser.Groups);
         var hasFacility = !string.IsNullOrWhiteSpace(user.FacilityId);
         var isFacilityAdmin = effectiveGroups.Contains("FACADMIN", StringComparer.OrdinalIgnoreCase);
         var facilityIsOnboarded = facility?.IsOnboarded ?? false;
-        var availableNavigation = isSystemAdmin
-            ? new[] { "users", "facilities" }
-            : !hasFacility
-                ? Array.Empty<string>()
-                : isFacilityAdmin && !facilityIsOnboarded
-                    ? new[] { "onboarding" }
-                    : isFacilityAdmin && facilityIsOnboarded
-                        ? new[] { "configuration" }
-                        : new[] { "maintenance", "configuration-overview", "configuration-changes" };
+        var accessState = !hasFacility
+            ? AccessStateMissingFacility
+            : !isFacilityAdmin
+                ? AccessStateMissingRequiredRole
+                : AccessStateAllowed;
+        var availableNavigation = accessState != AccessStateAllowed
+            ? Array.Empty<string>()
+            : facilityIsOnboarded
+                ? new[] { "configuration" }
+                : new[] { "onboarding" };
 
         return new UserInfoResponse
         {
+            AccessState = accessState,
             Email = user.Email,
             Name = user.Name,
-            Roles = effectiveGroups,
-            IsSystemAdmin = isSystemAdmin,
+            IsFacilityAdmin = isFacilityAdmin,
             IsOnboarded = facilityIsOnboarded,
-            IsActive = user.IsActive,
-            IsAdmin = user.IsAdmin,
             HasFacility = hasFacility,
             FacilityId = user.FacilityId,
             Groups = effectiveGroups,
@@ -128,20 +129,13 @@ public class UserInfoService : IUserInfoService
         return new IncomingUser(externalUserId, email, name, groups, facilityId);
     }
 
-    private static string[] BuildEffectiveGroups(string[] incomingGroups, bool isAdmin)
+    private static string[] BuildEffectiveGroups(string[] incomingGroups)
     {
-        var groups = incomingGroups
+        return incomingGroups
             .Where(x => !string.IsNullOrWhiteSpace(x))
             .Select(x => x.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (isAdmin && !groups.Contains(NhsnAppConstants.Roles.NhsnLinkSysAdmin, StringComparer.OrdinalIgnoreCase))
-        {
-            groups.Add(NhsnAppConstants.Roles.NhsnLinkSysAdmin);
-        }
-
-        return groups.ToArray();
+            .ToArray();
     }
 
     private sealed record IncomingUser(string ExternalUserId, string Email, string Name, string[] Groups, string? FacilityId);

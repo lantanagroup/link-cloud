@@ -1,6 +1,6 @@
 import React from 'react';
 
-type RouteName = 'home' | 'users' | 'onboarding' | 'configuration' | 'facilities';
+type RouteName = 'home' | 'onboarding' | 'configuration';
 
 export interface NavigationItem {
   key: RouteName;

@@ -19,7 +19,7 @@ public class SimulationEndpoints : IApi
                         x.Email,
                         x.Name,
                         x.FacilityId,
-                        x.IsOnboarded
+                        x.LastAccessedOn
                     })
                     .ToListAsync(cancellationToken);
 

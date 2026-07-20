@@ -4,27 +4,29 @@
 
 `NHSN-App-BFF` is the backend-for-frontend foundation for the NHSN App integration proof-of-concept described by the `nhsn-app-web-component-poc` ADR.
 
-This project is intentionally separate from the existing Link `Account` service. The Account service governs Link Admin UI access, while `NHSN-App-BFF` owns its own user-resolution and role-association model specifically for the NHSN App framework.
+This project is intentionally separate from the existing Link `Account` service. The Account service governs Link Admin UI access, while `NHSN-App-BFF` resolves facility-facing NHSN App user context for the embedded NHSNLink experience.
 
 ## Core responsibilities
 
 - Validate incoming JWTs using a configured public certificate.
 - Require JWT bearer authentication for all authenticated NHSNLink operations.
 - Resolve the effective user from the authenticated JWT principal.
-- Persist and manage NHSNLink-specific user records in SQL Server.
-- Persist and manage NHSNLink-specific role associations in SQL Server.
+- Persist minimal NHSNLink user-observation records in SQL Server for auditability and troubleshooting.
+- Derive FACADMIN authorization and facility context from the validated JWT.
+- Persist mutable onboarding state for facilities.
 - Expose a `/userinfo` endpoint that returns the normalized UI initialization payload.
 
 ## Why this project exists
 
 The NHSN App integration needs a backend that can answer a question like:
 
-> “Who is the current NHSNLink user and what role should they have inside NHSNLink?”
+> ï¿½Who is the current NHSNLink user and what role should they have inside NHSNLink?ï¿½
 
 That cannot be solved entirely in the UI because:
 
 - the App Gateway injects the JWT on the backend request path,
-- the NHSNLink roles are owned by the BFF/database, not by the UI,
+- the App Gateway injects the JWT on the backend request path,
+- the FACADMIN role and facility context come from the validated JWT,
 - the UI needs a server-shaped user context anyway.
 
 As a result, the UI initializes from `/api/nhsn-app-bff/userinfo`, not from direct JWT parsing.
@@ -40,23 +42,13 @@ The initial SQL schema is intentionally small:
 - `Name`
 - `GroupsRaw`
 - `FacilityId`
-- `IsOnboarded`
-- `IsActive`
+- `LastAccessedOn`
 - audit fields
 
-### `Roles`
+### `Facilities`
 - `Id`
-- `Name`
-- `Description`
-
-Seeded roles:
-- `System Admin`
-- `Facility Admin`
-- `Facility IT`
-
-### `UserRoles`
-- `UserId`
-- `RoleId`
+- `FacilityId`
+- `IsOnboarded`
 
 ## JWT validation
 
@@ -80,15 +72,16 @@ Endpoint:
 
 Expected response includes:
 
+- `AccessState`
 - `Email`
 - `Name`
-- `Roles`
+- `IsFacilityAdmin`
 - `IsOnboarded`
 - `FacilityId`
 - `Groups`
 - `AvailableNavigation`
 
-The UI uses this to determine whether to render onboarding or maintenance navigation.
+The UI uses this to determine whether to render no-access, missing-facility, onboarding, or configuration states.
 
 ## Configuration
 
@@ -131,11 +124,10 @@ This allows the BFF to start with local file-based configuration and later move 
 
 ## EF Core migrations
 
-This project includes an initial EF migration that creates the foundational schema for:
+This project includes EF migrations that create and evolve the foundational schema for:
 
 - users
-- roles
-- user_roles
+- facilities
 
 The repo guidance requires migrations for persisted EF entities, so schema changes should always be accompanied by a new migration.
 
@@ -155,18 +147,18 @@ This service follows the same `AutoMigrate` pattern used by other SQL-backed Lin
 - `AutoMigrate: true` in development/docker enables startup execution of EF migrations
 - `AutoMigrate: false` can be used in environments where schema is managed separately
 
-The BFF calls `app.AutoMigrateEF<NhsnAppDbContext>()` before seed logic runs, so the `Roles`, `Users`, and `UserRoles` tables should exist before seed data is inserted when `AutoMigrate` is enabled.
+The BFF calls `app.AutoMigrateEF<NhsnAppDbContext>()` before seed logic runs, so the `Users` and `Facilities` tables should exist before seed data is inserted when `AutoMigrate` is enabled.
 
 ## Relationship to the UI project
 
-`NHSN-App-UI` does not own roles. It asks this service for user context.
+`NHSN-App-UI` does not own roles. It asks this service for normalized facility-facing user context.
 
 That means the component startup flow is:
 
 1. render `NHSNLink`
 2. call `/userinfo`
 3. receive normalized context
-4. render onboarding/maintenance navigation based on BFF-owned state
+4. render no-access, onboarding, or configuration behavior based on JWT-derived access and facility onboarding state
 
 ## Foundation intent
 
@@ -174,7 +166,8 @@ This project is a framework/foundation, not the full facility configuration prod
 
 - authentication shape
 - identity resolution
-- role persistence
+- FACADMIN/facility-context interpretation
+- facility onboarding state
 - the UI initialization contract
 
 Future work can expand this foundation with richer onboarding state, facility relationships, audit history, and configuration orchestration.

@@ -1,11 +1,9 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {UserInfoService} from '../services/user-info-service';
-import {FacilitySummaryResponse, TestUserProfile, UserInfoResponse, UserRoleSummaryResponse} from '../shared/models';
+import {TestUserProfile, UserInfoResponse} from '../shared/models';
 import {NavigationItem, NavigationRail, NavigationSection} from './NavigationRail';
 import {ConfigurationScreen} from './ConfigurationScreen';
 import {OnboardingScreen} from './OnboardingScreen';
-import {SystemAdminFacilitiesScreen} from './SystemAdminFacilitiesScreen';
-import {SystemAdminUsersScreen} from './SystemAdminUsersScreen';
 import './NHSNLink.css';
 
 export interface NHSNLinkProps {
@@ -15,12 +13,10 @@ export interface NHSNLinkProps {
   apiBaseUrl?: string;
 }
 
-type RouteName = 'home' | 'users' | 'onboarding' | 'configuration' | 'facilities';
+type RouteName = 'home' | 'onboarding' | 'configuration';
 
 const routePathMap: Record<RouteName, string> = {
   home: '/',
-  users: '/admin/users',
-  facilities: '/admin/facilities',
   onboarding: '/onboard',
   configuration: '/configuration'
 };
@@ -28,14 +24,8 @@ const routePathMap: Record<RouteName, string> = {
 export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBaseUrl = '/api' }: NHSNLinkProps) {
   const effectiveUserInfoService = useMemo(() => userInfoService ?? new UserInfoService(apiBaseUrl), [userInfoService, apiBaseUrl]);
   const [userInfo, setUserInfo] = useState<UserInfoResponse | null>(null);
-  const [users, setUsers] = useState<UserRoleSummaryResponse[]>([]);
-  const [usersError, setUsersError] = useState<string | null>(null);
-  const [facilities, setFacilities] = useState<FacilitySummaryResponse[]>([]);
-  const [facilitiesError, setFacilitiesError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [savingUserId, setSavingUserId] = useState<string | null>(null);
-  const [savingFacilityId, setSavingFacilityId] = useState<string | null>(null);
   const [route, setRoute] = useState<RouteName>('home');
   const normalizedBaseUrl = useMemo(() => normalizeBaseUrl(baseUrl), [baseUrl]);
 
@@ -56,18 +46,14 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
 
     effectiveUserInfoService.getUserInfo(activeTestUser)
       .then(result => {
-        if (!mounted) {
-          return;
+        if (mounted) {
+          setUserInfo(result);
         }
-
-        setUserInfo(result);
       })
       .catch(err => {
-        if (!mounted) {
-          return;
+        if (mounted) {
+          setError(err instanceof Error ? err.message : 'Unable to load user context.');
         }
-
-        setError(err instanceof Error ? err.message : 'Unable to load user context.');
       })
       .finally(() => {
         if (mounted) {
@@ -81,110 +67,22 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
   }, [activeTestUser, effectiveUserInfoService]);
 
   const navigationSections = useMemo<NavigationSection[]>(() => {
-    if (!userInfo) {
+    if (!userInfo || userInfo.AccessState !== 'Allowed') {
       return [];
     }
 
-    const facilityItems: NavigationItem[] = [{ key: 'home' as RouteName, label: 'Home' }];
-    const hasFacility = userInfo.HasFacility;
-    const isFacilityAdmin = userInfo.Groups.includes('FACADMIN');
+    const facilityItems: NavigationItem[] = [{ key: 'home', label: 'Home' }];
 
-    if (hasFacility && isFacilityAdmin) {
-      if (!userInfo.IsOnboarded) {
-        facilityItems.push({ key: 'onboarding' as RouteName, label: 'Onboarding' });
-      } else {
-        facilityItems.push({ key: 'configuration' as RouteName, label: 'Configuration' });
-      }
+    if (!userInfo.IsOnboarded) {
+      facilityItems.push({ key: 'onboarding', label: 'Onboarding' });
     }
 
-    if (userInfo.IsSystemAdmin) {
-      const sections: NavigationSection[] = [];
-      if (hasFacility) {
-        sections.push({ items: facilityItems });
-      } else {
-        sections.push({ items: [{ key: 'home' as RouteName, label: 'Home' }] });
-      }
-
-      sections.push({
-        heading: 'Administration',
-        items: [
-          { key: 'users' as RouteName, label: 'Users' },
-          { key: 'facilities' as RouteName, label: 'Facilities' }
-        ]
-      });
-
-      return sections;
+    if (userInfo.IsOnboarded) {
+      facilityItems.push({ key: 'configuration', label: 'Configuration' });
     }
 
-    return [{ items: facilityItems }];
+    return [{ heading: 'Facility', items: facilityItems }];
   }, [userInfo]);
-
-  useEffect(() => {
-    if (!userInfo) {
-      return;
-    }
-
-    if (userInfo?.IsSystemAdmin) {
-      if (route === 'onboarding') {
-        navigateTo('home');
-      }
-      return;
-    }
-
-    if (route === 'users' || route === 'facilities') {
-      navigateTo('home');
-    }
-  }, [route, userInfo?.IsSystemAdmin, normalizedBaseUrl]);
-
-  useEffect(() => {
-    if (!activeTestUser || !userInfo?.IsSystemAdmin) {
-      setUsers([]);
-      setUsersError(null);
-      return;
-    }
-
-    let cancelled = false;
-    effectiveUserInfoService.getUsers(activeTestUser)
-      .then(results => {
-        if (!cancelled) {
-          setUsers(results);
-        }
-      })
-      .catch(loadError => {
-        if (!cancelled) {
-          setUsersError(loadError instanceof Error ? loadError.message : 'Unable to load users.');
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTestUser, userInfo?.IsSystemAdmin, effectiveUserInfoService]);
-
-  useEffect(() => {
-    if (!activeTestUser || !userInfo?.IsSystemAdmin) {
-      setFacilities([]);
-      setFacilitiesError(null);
-      return;
-    }
-
-    let cancelled = false;
-    effectiveUserInfoService.getFacilities(activeTestUser)
-      .then(results => {
-        if (!cancelled) {
-          setFacilities(results);
-        }
-      })
-      .catch(loadError => {
-        if (!cancelled) {
-          setFacilitiesError(loadError instanceof Error ? loadError.message : 'Unable to load facilities.');
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTestUser, userInfo?.IsSystemAdmin, effectiveUserInfoService]);
 
   if (loading) {
     return <div className="nhsn-link__state">Loading NHSNLink user context...</div>;
@@ -198,12 +96,12 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
     return <div className="nhsn-link__state">No user context was returned.</div>;
   }
 
-  if (!userInfo.IsActive) {
+  if (userInfo.AccessState === 'MissingRequiredRole') {
     return (
       <div className="nhsn-link__state">
         <div style={{ maxWidth: '600px', textAlign: 'center', padding: '1rem' }}>
-          <h2>Your account does not have access to NHSNLink.</h2>
-          <p>Submit a request to restore access.</p>
+          <h2>You do not currently have access to NHSNLink configuration.</h2>
+          <p>Your NHSN App identity does not include the FACADMIN role required for this experience.</p>
           {userInfo.AccessRequestUrl && (
             <p>
               <a href={userInfo.AccessRequestUrl} target="_blank" rel="noreferrer">Submit a request</a>
@@ -214,7 +112,7 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
     );
   }
 
-  if (!userInfo.HasFacility) {
+  if (userInfo.AccessState === 'MissingFacility' || !userInfo.HasFacility) {
     return (
       <div className="nhsn-link__state">
         <div style={{ maxWidth: '600px', textAlign: 'center', padding: '1rem' }}>
@@ -256,25 +154,15 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
               <div className="nhsn-link__panel">
                 <h2>User context</h2>
                 <p><strong>Facility:</strong> {userInfo.FacilityId ?? 'Not assigned'}</p>
-                <p><strong>Roles:</strong> {userInfo.Roles.length > 0 ? userInfo.Roles.join(', ') : 'No NHSNLink roles assigned yet'}</p>
                 <p><strong>Groups:</strong> {userInfo.Groups.length > 0 ? userInfo.Groups.join(', ') : 'No groups provided'}</p>
-                <p><strong>System administrator:</strong> {userInfo.IsSystemAdmin ? 'Yes' : 'No'}</p>
-                <p><strong>Onboarding complete:</strong> {userInfo.IsSystemAdmin ? 'Not required for system administrators' : (userInfo.IsOnboarded ? 'Yes' : 'No')}</p>
+                <p><strong>Access state:</strong> {userInfo.AccessState}</p>
+                <p><strong>Facility admin:</strong> {userInfo.IsFacilityAdmin ? 'Yes' : 'No'}</p>
+                <p><strong>Onboarding:</strong> {userInfo.IsOnboarded ? 'Complete' : 'In progress'}</p>
               </div>
 
-              <div className="nhsn-link__content">
-                <h2>{userInfo.IsOnboarded ? 'Configuration maintenance' : 'Onboarding'}</h2>
-                {!userInfo.IsSystemAdmin && userInfo.Groups.includes('FACADMIN') && !userInfo.IsOnboarded ? (
-                  <>
-                    <p>You must complete onboarding to continue...</p>
-                    <button
-                      type="button"
-                      className="nhsn-link__action-button"
-                      onClick={() => navigateTo('onboarding')}>
-                      Begin Onboarding
-                    </button>
-                  </>
-                ) : userInfo.IsOnboarded ? (
+              <div className="nhsn-link__panel">
+                <h2>Framework status</h2>
+                {userInfo.IsOnboarded ? (
                   <p>
                     This framework foundation is in maintenance mode. As the facility configuration evolves, this area can surface the
                     specific onboarding artifacts or settings that need to be reviewed or updated.
@@ -294,7 +182,7 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
             </>
           )}
 
-          {route === 'onboarding' && !userInfo.IsSystemAdmin && userInfo.Groups.includes('FACADMIN') && !userInfo.IsOnboarded && activeTestUser && userInfo.FacilityId && (
+          {route === 'onboarding' && !userInfo.IsOnboarded && activeTestUser && userInfo.FacilityId && (
             <OnboardingScreen
               activeTestUser={activeTestUser}
               facilityId={userInfo.FacilityId}
@@ -302,33 +190,8 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
               onCompleted={() => window.location.reload()} />
           )}
 
-          {route === 'configuration' && !userInfo.IsSystemAdmin && userInfo.Groups.includes('FACADMIN') && userInfo.IsOnboarded && (
+          {route === 'configuration' && userInfo.IsOnboarded && (
             <ConfigurationScreen />
-          )}
-
-          {route === 'users' && activeTestUser && userInfo.IsSystemAdmin && (
-            <SystemAdminUsersScreen
-              activeTestUser={activeTestUser}
-              currentUserEmail={userInfo.Email}
-              userInfoService={effectiveUserInfoService}
-              users={users}
-              usersError={usersError}
-              savingUserId={savingUserId}
-              onUsersChanged={setUsers}
-              onUsersErrorChanged={setUsersError}
-              onSavingUserIdChanged={setSavingUserId} />
-          )}
-
-          {route === 'facilities' && activeTestUser && userInfo.IsSystemAdmin && (
-            <SystemAdminFacilitiesScreen
-              activeTestUser={activeTestUser}
-              facilities={facilities}
-              facilitiesError={facilitiesError}
-              savingFacilityId={savingFacilityId}
-              userInfoService={effectiveUserInfoService}
-              onFacilitiesChanged={setFacilities}
-              onFacilitiesErrorChanged={setFacilitiesError}
-              onSavingFacilityIdChanged={setSavingFacilityId} />
           )}
         </section>
       </div>

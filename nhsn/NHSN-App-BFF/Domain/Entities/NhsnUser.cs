@@ -23,18 +23,14 @@ public class NhsnUser
     [MaxLength(64)]
     public string? FacilityId { get; set; }
 
-    public bool IsOnboarded { get; set; }
-
-    public bool IsActive { get; set; } = true;
-
-    public bool IsAdmin { get; set; }
-
     public DateTime CreatedOn { get; set; } = DateTime.UtcNow;
 
     [MaxLength(256)]
     public string? CreatedBy { get; set; }
 
     public DateTime? LastModifiedOn { get; set; }
+
+    public DateTime? LastAccessedOn { get; set; }
 
     [MaxLength(256)]
     public string? LastModifiedBy { get; set; }
