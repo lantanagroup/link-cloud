@@ -768,7 +768,7 @@ stages:
                       }
                     }
                   } catch {
-                    $lines += "_Failed to parse suite results: $_|"
+                    $lines += "_Failed to parse suite results: $_ _"
                   }
                 } else {
                   $lines += "_No suite results recorded._"

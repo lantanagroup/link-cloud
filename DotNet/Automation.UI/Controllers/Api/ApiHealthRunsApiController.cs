@@ -15,7 +15,6 @@ namespace Automation.UI.Controllers.Api;
 /// </summary>
 [ApiController]
 [Route("api/api-health-runs")]
-[Authorize(Policy = "ApiBearerPolicy")]
 public sealed class ApiHealthRunsApiController(ApiHealthExecutionRunManager runManager) : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
