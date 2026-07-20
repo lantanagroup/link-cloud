@@ -1125,11 +1125,20 @@ internal sealed class RunExecutor
         services.AddSingleton(_hostServices.GetRequiredService<IOptions<LinkTokenServiceSettings>>());
         services.AddSingleton(_hostServices.GetRequiredService<ICreateSystemToken>());
         services.AddHttpClient();
+        services.AddHttpClient<LokiScraper>((sp, client) =>
+        {
+            var cfg = sp.GetRequiredService<AutomationConfig>();
+            var configuredBaseUrl = string.IsNullOrWhiteSpace(cfg.LokiBaseUrl)
+                ? "http://localhost:3100"
+                : cfg.LokiBaseUrl;
+
+            if (Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var baseUri))
+                client.BaseAddress = baseUri;
+        });
 
         services.AddLinkSdk();
 
-        services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<IAutomationOutput>(), sp.GetRequiredService<AutomationConfig>()))
-            .AddSingleton(sp => {
+        services.AddSingleton(sp => {
                 var cfg = sp.GetRequiredService<AutomationConfig>();
                 return new FhirDataLoader(cfg.FhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
             })
