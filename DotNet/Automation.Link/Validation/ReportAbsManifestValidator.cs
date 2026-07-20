@@ -120,7 +120,32 @@ public class ReportAbsManifestValidator
             ValidatePatientArtifact(patientId, patientResources, patientMeasureReportIds, errors);
         }
 
-        ValidateManifestMeasureReportReferences(manifestResources, patientMeasureReportIds, errors);
+        HashSet<string>? expectedSubmittedMeasureReportIds = null;
+        if (!string.IsNullOrWhiteSpace(reportId) && Guid.TryParse(reportId, out var scheduleIdForMeasureReports))
+        {
+            try
+            {
+                var expectedSubmittedPatientSet = expectedSubmittedPatientIds
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .ToHashSet(StringComparer.Ordinal);
+
+                var entries = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleIdForMeasureReports);
+                expectedSubmittedMeasureReportIds = entries
+                    .Where(e => !string.IsNullOrWhiteSpace(e.PatientId)
+                                && expectedSubmittedPatientSet.Contains(e.PatientId)
+                                && string.Equals(e.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
+                    .SelectMany(e => e.MeasureReports)
+                    .Select(mr => mr.MeasureReportId)
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .ToHashSet(StringComparer.Ordinal);
+            }
+            catch (Exception ex)
+            {
+                _output.WriteLine($"[ABS][WARN] Could not read submitted MeasureReport ids for manifest reference reconciliation: {ex.Message}");
+            }
+        }
+
+        ValidateManifestMeasureReportReferences(manifestResources, patientMeasureReportIds, expectedSubmittedMeasureReportIds, errors);
 
         if (!string.IsNullOrWhiteSpace(facilityId) && !string.IsNullOrWhiteSpace(reportId))
         {
@@ -357,6 +382,7 @@ public class ReportAbsManifestValidator
     private void ValidateManifestMeasureReportReferences(
         List<JsonElement> manifestResources,
         HashSet<string> patientMeasureReportIds,
+        HashSet<string>? expectedSubmittedMeasureReportIds,
         List<string> errors)
     {
         var manifestReferencedIds = new HashSet<string>(StringComparer.Ordinal);
@@ -387,7 +413,11 @@ public class ReportAbsManifestValidator
 
         foreach (var id in manifestReferencedIds)
         {
-            if (!patientMeasureReportIds.Contains(id))
+            var shouldRequireInSubmittedPatientArtifacts = expectedSubmittedMeasureReportIds == null
+                || expectedSubmittedMeasureReportIds.Count == 0
+                || expectedSubmittedMeasureReportIds.Contains(id);
+
+            if (shouldRequireInSubmittedPatientArtifacts && !patientMeasureReportIds.Contains(id))
                 AddError(errors, $"Manifest references MeasureReport/{id} but it was not found in patient artifacts.");
         }
     }
@@ -738,7 +768,18 @@ public class ReportAbsManifestValidator
             _output.WriteLine($"  - Additional issues omitted: {errors.Count - MaxErrors}");
 
         await Task.CompletedTask;
-        throw new InvalidOperationException($"REPORT INTERNAL ABS MANIFEST VALIDATION failed with {errors.Count} issue(s).");
+        var sampleIssues = errors
+            .Take(3)
+            .Select(e => $"- {e}")
+            .ToList();
+
+        var sampleSuffix = errors.Count > sampleIssues.Count
+            ? $" | ... and {errors.Count - sampleIssues.Count} more"
+            : string.Empty;
+
+        await Task.CompletedTask;
+        throw new InvalidOperationException(
+            $"REPORT INTERNAL ABS MANIFEST VALIDATION failed with {errors.Count} issue(s): {string.Join(" | ", sampleIssues)}{sampleSuffix}");
     }
 
     private static void AddError(List<string> errors, string message)

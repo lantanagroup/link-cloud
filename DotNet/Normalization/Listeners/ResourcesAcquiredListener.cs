@@ -270,15 +270,19 @@ public class ResourcesAcquiredListener : BackgroundService
                         }
 
                         var stepSummaryText = string.Join(" | ", stepSummaries).SanitizeForLog();
+                        var reportTrackingId = result.Message.Value.ScheduledReports
+                            .Select(sr => sr.ReportTrackingId)
+                            .FirstOrDefault(id => !string.IsNullOrWhiteSpace(id)) ?? string.Empty;
 
                         _logger.LogInformation(
                             // IMPORTANT: this message shape is intentionally stable.
                             // Automation validators query Loki for this marker and parse
                             // FacilityId/ResourceType/ResourceId/Steps from the rendered line.
-                            "[NormalizationExecutionSummary] FacilityId={FacilityId}, CorrelationId={CorrelationId}, PatientId={PatientId}, ResourceType={ResourceType}, ResourceId={ResourceId}, Steps=[{Steps}]",
+                            "[NormalizationExecutionSummary] FacilityId={FacilityId}, PatientId={PatientId}, CorrelationId={CorrelationId}, ReportTrackingId={ReportTrackingId}, ResourceType={ResourceType}, ResourceId={ResourceId}, Steps=[{Steps}]",
                             result.Message.Key.FacilityId.SanitizeForLog(),
-                            correlationId.SanitizeForLog(),
                             result.Message.Key.PatientId.SanitizeForLog(),
+                            correlationId.SanitizeForLog(),
+                            reportTrackingId.SanitizeForLog(),
                             resource.TypeName.SanitizeForLog(),
                             resource.Id.SanitizeForLog(),
                             stepSummaryText);
