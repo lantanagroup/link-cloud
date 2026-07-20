@@ -14,6 +14,7 @@ using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using Microsoft.AspNetCore.HeaderPropagation;
 using Microsoft.Extensions.Options;
 using Task = System.Threading.Tasks.Task;
 
@@ -1125,11 +1126,27 @@ internal sealed class RunExecutor
         services.AddSingleton(_hostServices.GetRequiredService<IOptions<LinkTokenServiceSettings>>());
         services.AddSingleton(_hostServices.GetRequiredService<ICreateSystemToken>());
         services.AddHttpClient();
+        services.AddHeaderPropagation(options =>
+        {
+            options.Headers.Add("traceparent");
+            options.Headers.Add("tracestate");
+            options.Headers.Add("baggage");
+            options.Headers.Add("Authorization");
+        });
+        services.AddHttpClient<LokiScraper>((sp, client) =>
+        {
+            var cfg = sp.GetRequiredService<AutomationConfig>();
+            var configuredBaseUrl = string.IsNullOrWhiteSpace(cfg.LokiBaseUrl)
+                ? "http://localhost:3100"
+                : cfg.LokiBaseUrl;
+
+            if (Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var baseUri))
+                client.BaseAddress = baseUri;
+        }).AddHeaderPropagation();
 
         services.AddLinkSdk();
 
-        services.AddSingleton(sp => new LokiScraper(sp.GetRequiredService<IAutomationOutput>(), sp.GetRequiredService<AutomationConfig>()))
-            .AddSingleton(sp => {
+        services.AddSingleton(sp => {
                 var cfg = sp.GetRequiredService<AutomationConfig>();
                 return new FhirDataLoader(cfg.FhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
             })

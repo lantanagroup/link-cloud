@@ -1,6 +1,5 @@
 ﻿using LantanaGroup.Link.Automation.Link.Configuration;
 using Newtonsoft.Json.Linq;
-using RestSharp;
 using System.Net;
 
 namespace LantanaGroup.Link.Automation.Link.Helpers;
@@ -8,22 +7,27 @@ namespace LantanaGroup.Link.Automation.Link.Helpers;
 public class LokiScraper
 {
     private readonly IAutomationOutput _output;
-    private readonly IRestClient _lokiClient;
+    private readonly HttpClient _lokiClient;
     private readonly string _lokiAppLabel;
     private DateTime _lastQueryTime = DateTime.UtcNow;
 
-    public LokiScraper(IAutomationOutput output, AutomationConfig config)
-        : this(output, new RestClient(config.LokiBaseUrl), config.LokiAppLabel)
+    public LokiScraper(HttpClient lokiClient, IAutomationOutput output, AutomationConfig config)
     {
-    }
+        if (lokiClient.BaseAddress == null)
+        {
+            var configuredBaseUrl = string.IsNullOrWhiteSpace(config.LokiBaseUrl)
+                ? "http://localhost:3100"
+                : config.LokiBaseUrl;
 
-    public LokiScraper(IAutomationOutput output, IRestClient lokiClient, string? lokiAppLabel = null)
-    {
+            if (Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var lokiBaseUri))
+                lokiClient.BaseAddress = lokiBaseUri;
+        }
+
         _output = output;
         _lokiClient = lokiClient;
-        _lokiAppLabel = string.IsNullOrWhiteSpace(lokiAppLabel)
+        _lokiAppLabel = string.IsNullOrWhiteSpace(config.LokiAppLabel)
             ? "link-cloud"
-            : lokiAppLabel.Trim();
+            : config.LokiAppLabel.Trim();
     }
 
     public static class Components
@@ -91,20 +95,14 @@ public class LokiScraper
                     ? $" |= \"{facilityId}\""
                     : "";
                 var query = $"{{app=\"{_lokiAppLabel}\", component=\"{component}\"}} |~ \"(?i)(error|exception|fail|timeout|disconnect)\" !~ \"(?i)({HarmlessPatterns})\"{correlationFilter}";
-                var request = new RestRequest("/loki/api/v1/query_range");
-                request.AddParameter("query", query);
-                request.AddParameter("start", startUnix.ToString());
-                request.AddParameter("end", endUnix.ToString());
-                request.AddParameter("limit", "5");
-
-                var response = await _lokiClient.ExecuteAsync(request);
-                if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+                var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 5);
+                if (statusCode != HttpStatusCode.OK || content == null)
                 {
                     cleanServices.Add($"{component}(?)");
                     continue;
                 }
 
-                var jsonResponse = JObject.Parse(response.Content);
+                var jsonResponse = JObject.Parse(content);
                 var results = jsonResponse["data"]?["result"] as JArray;
 
                 var lines = new List<string>();
@@ -206,18 +204,11 @@ public class LokiScraper
 
             while (pageCount < Math.Max(1, maxPages))
             {
-                var request = new RestRequest("/loki/api/v1/query_range");
-                request.AddParameter("query", query);
-                request.AddParameter("start", startUnix.ToString());
-                request.AddParameter("end", currentEndUnix.ToString());
-                request.AddParameter("limit", pageSize.ToString());
-                request.AddParameter("direction", "backward");
-
-                var response = await _lokiClient.ExecuteAsync(request);
-                if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+                var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, currentEndUnix, pageSize, "backward");
+                if (statusCode != HttpStatusCode.OK || content == null)
                     return lines;
 
-                var jsonResponse = JObject.Parse(response.Content);
+                var jsonResponse = JObject.Parse(content);
                 var results = jsonResponse["data"]?["result"] as JArray;
                 if (results == null)
                     return lines;
@@ -318,18 +309,12 @@ public class LokiScraper
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
         var query = $"{{app=\"{_lokiAppLabel}\", component=\"{componentName}\"}} |~ \"(?i)(error|warn|exception|fail|timeout|duration|evaluated|validated|submitted|generated|measure.?report)\" !~ \"(?i)({HarmlessPatterns})\"";
-        var request = new RestRequest("/loki/api/v1/query_range");
-        request.AddParameter("query", query);
-        request.AddParameter("start", startUnix.ToString());
-        request.AddParameter("end", endUnix.ToString());
-        request.AddParameter("limit", "100");
-
         try
         {
-            var response = await _lokiClient.ExecuteAsync(request);
-            if (response.StatusCode == HttpStatusCode.OK && response.Content != null)
+            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 100);
+            if (statusCode == HttpStatusCode.OK && content != null)
             {
-                var jsonResponse = JObject.Parse(response.Content);
+                var jsonResponse = JObject.Parse(content);
                 var results = jsonResponse["data"]?["result"] as JArray;
                 if (results != null)
                 {
@@ -374,19 +359,12 @@ public class LokiScraper
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        var request = new RestRequest("/loki/api/v1/query_range");
-        request.AddParameter("query", query);
-        request.AddParameter("start", startUnix.ToString());
-        request.AddParameter("end", endUnix.ToString());
-        if (limit.HasValue)
-            request.AddParameter("limit", limit.Value.ToString());
-
         try
         {
-            var response = await _lokiClient.ExecuteAsync(request);
-            if (response.StatusCode == HttpStatusCode.OK && response.Content != null)
+            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit);
+            if (statusCode == HttpStatusCode.OK && content != null)
             {
-                var jsonResponse = JObject.Parse(response.Content);
+                var jsonResponse = JObject.Parse(content);
                 var results = jsonResponse["data"]?["result"] as JArray;
                 if (results != null)
                 {
@@ -430,9 +408,9 @@ public class LokiScraper
                     }
                 }
             }
-            else if (response.StatusCode != 0 && response.StatusCode != HttpStatusCode.OK)
+            else if (statusCode != HttpStatusCode.OK)
             {
-                _output.WriteLine($"Warning: Failed to scrape Loki: {response.StatusCode} {response.Content}");
+                _output.WriteLine($"Warning: Failed to scrape Loki: {statusCode} {content}");
             }
         }
         catch (Exception ex)
@@ -528,19 +506,13 @@ public class LokiScraper
 
         // Query for all MeasureEval consuming lines (these are DEBUG level)
         var query = $"{{app=\"link-cloud\", component=\"{Components.MeasureEval}\"}} |= \"Consuming\"";
-        var request = new RestRequest("/loki/api/v1/query_range");
-        request.AddParameter("query", query);
-        request.AddParameter("start", startUnix.ToString());
-        request.AddParameter("end", endUnix.ToString());
-        request.AddParameter("limit", "200");
-
         try
         {
-            var response = await _lokiClient.ExecuteAsync(request);
-            if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
+            if (statusCode != HttpStatusCode.OK || content == null)
                 return null;
 
-            var jsonResponse = JObject.Parse(response.Content);
+            var jsonResponse = JObject.Parse(content);
             var results = jsonResponse["data"]?["result"] as JArray;
             if (results == null) return null;
 
@@ -623,21 +595,15 @@ public class LokiScraper
             : "";
         var query = $"{{app=\"{_lokiAppLabel}\", component=\"{componentName}\"}} |~ \"(?i)(exception|fatal|unhandled|stack\\s*trace|critical)\" !~ \"(?i)({HarmlessPatterns}|Unknown message ID)\"{correlationFilter}";
 
-        var request = new RestRequest("/loki/api/v1/query_range");
-        request.AddParameter("query", query);
-        request.AddParameter("start", startUnix.ToString());
-        request.AddParameter("end", endUnix.ToString());
-        request.AddParameter("limit", limit.ToString());
-
         var lines = new List<string>();
 
         try
         {
-            var response = await _lokiClient.ExecuteAsync(request);
-            if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit);
+            if (statusCode != HttpStatusCode.OK || content == null)
                 return lines;
 
-            var jsonResponse = JObject.Parse(response.Content);
+            var jsonResponse = JObject.Parse(content);
             var results = jsonResponse["data"]?["result"] as JArray;
             if (results == null)
                 return lines;
@@ -675,19 +641,13 @@ public class LokiScraper
 
         // Focus on ReadyForValidation processing lines emitted by the consumer.
         var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Validation}\"}} |= \"Processing\" |= \"patient\" |= \"report\" !~ \"(?i)({HarmlessPatterns})\"";
-        var request = new RestRequest("/loki/api/v1/query_range");
-        request.AddParameter("query", query);
-        request.AddParameter("start", startUnix.ToString());
-        request.AddParameter("end", endUnix.ToString());
-        request.AddParameter("limit", "200");
-
         try
         {
-            var response = await _lokiClient.ExecuteAsync(request);
-            if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
+            if (statusCode != HttpStatusCode.OK || content == null)
                 return null;
 
-            var jsonResponse = JObject.Parse(response.Content);
+            var jsonResponse = JObject.Parse(content);
             var results = jsonResponse["data"]?["result"] as JArray;
             if (results == null)
                 return null;
@@ -745,19 +705,13 @@ public class LokiScraper
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
         var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Normalization}\"}} |~ \"(?i)(ResourceNormalized|Producing|Normalization Operation|Acquisition Complete)\" !~ \"(?i)({HarmlessPatterns})\"";
-        var request = new RestRequest("/loki/api/v1/query_range");
-        request.AddParameter("query", query);
-        request.AddParameter("start", startUnix.ToString());
-        request.AddParameter("end", endUnix.ToString());
-        request.AddParameter("limit", "200");
-
         try
         {
-            var response = await _lokiClient.ExecuteAsync(request);
-            if (response.StatusCode != HttpStatusCode.OK || response.Content == null)
+            var (statusCode, content) = await ExecuteQueryRangeAsync(query, startUnix, endUnix, limit: 200);
+            if (statusCode != HttpStatusCode.OK || content == null)
                 return null;
 
-            var jsonResponse = JObject.Parse(response.Content);
+            var jsonResponse = JObject.Parse(content);
             var results = jsonResponse["data"]?["result"] as JArray;
             if (results == null)
                 return null;
@@ -818,5 +772,26 @@ public class LokiScraper
         {
             return null;
         }
+    }
+
+    private async Task<(HttpStatusCode StatusCode, string? Content)> ExecuteQueryRangeAsync(
+        string query,
+        long startUnix,
+        long endUnix,
+        int? limit = null,
+        string? direction = null)
+    {
+        var queryString =
+            $"query={Uri.EscapeDataString(query)}&start={startUnix}&end={endUnix}";
+
+        if (limit.HasValue)
+            queryString += $"&limit={limit.Value}";
+
+        if (!string.IsNullOrWhiteSpace(direction))
+            queryString += $"&direction={Uri.EscapeDataString(direction)}";
+
+        using var response = await _lokiClient.GetAsync($"/loki/api/v1/query_range?{queryString}");
+        var content = await response.Content.ReadAsStringAsync();
+        return (response.StatusCode, string.IsNullOrWhiteSpace(content) ? null : content);
     }
 }
