@@ -578,10 +578,13 @@ http://test.system,123,Test Display,Extra Value";
         Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[2]).Status);
     }
 
-    // Loads two versions of the same code group ("4.0.9" and "4.0.10") into a real cache.
-    // String ordering would wrongly rank "4.0.9" above "4.0.10"; semantic ordering ranks
-    // "4.0.10" as the latest. Used by the "latest version" resolution tests below.
-    private TestableCodeGroupCacheService BuildTwoVersionService(IMemoryCache memoryCache)
+    // Loads two versions of the same code group into a real cache. Defaults to "4.0.9" and
+    // "4.0.10", where string ordering would wrongly rank "4.0.9" above "4.0.10" but semantic
+    // ordering ranks "4.0.10" as the latest. Callers can supply other version strings (including
+    // null, blank, or non-numeric) to exercise the CompareVersions fallback path. Used by the
+    // "latest version" resolution tests below.
+    private TestableCodeGroupCacheService BuildTwoVersionService(
+        IMemoryCache memoryCache, string? versionA = "4.0.9", string? versionB = "4.0.10")
     {
         var mockConfig = new Mock<IOptions<TerminologyConfig>>();
         mockConfig.Setup(x => x.Value).Returns(_config);
@@ -593,16 +596,23 @@ http://test.system,123,Test Display,Extra Value";
         };
         var fileContents = new Dictionary<string, string>
         {
-            ["v9.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
-                          "\"url\": \"http://test.codesystem\", \"version\": \"4.0.9\" }",
+            ["v9.json"] = BuildCodeSystemJson(versionA),
             ["v9.csv"] = "code,display,status\r\n123,Test Display,Active\r\n",
-            ["v10.json"] = "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
-                           "\"url\": \"http://test.codesystem\", \"version\": \"4.0.10\" }",
+            ["v10.json"] = BuildCodeSystemJson(versionB),
             ["v10.csv"] = "code,display,status\r\n123,Test Display,Active\r\n"
         };
 
         return new TestableCodeGroupCacheService(
             _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+    }
+
+    // Builds a minimal CodeSystem document with the given version. A null version omits the
+    // "version" field entirely (FHIR version is optional), yielding a null CodeGroup.Version.
+    private static string BuildCodeSystemJson(string? version)
+    {
+        var versionField = version is null ? "" : $", \"version\": \"{version}\"";
+        return "{ \"resourceType\": \"CodeSystem\", \"id\": \"test-cs\", " +
+               "\"url\": \"http://test.codesystem\"" + versionField + " }";
     }
 
     [Fact]
@@ -645,6 +655,29 @@ http://test.system,123,Test Display,Extra Value";
 
         var codeGroup = Assert.Single(codeGroups);
         Assert.Equal("4.0.10", codeGroup.Version);
+    }
+
+    // When one or both versions fail TryParseVersion (null, blank, or non-numeric), CompareVersions
+    // falls back to a case-insensitive ordinal string comparison, so OrderByDescending resolves the
+    // "latest" as the version that sorts last under that ordering.
+    [Theory]
+    [InlineData(null, "2.0", "2.0")]            // null fails parse; null sorts before "2.0"
+    [InlineData("", "2.0", "2.0")]              // blank fails parse; "" sorts before "2.0"
+    [InlineData("2.0", "unknown", "unknown")]   // numeric vs non-numeric; 'u' (0x75) > '2' (0x32)
+    [InlineData("beta", "unknown", "unknown")]  // both non-numeric; 'u' > 'b'
+    [InlineData("alpha", "Beta", "Beta")]       // case-insensitive: "beta" > "alpha" though 'B' < 'a' ordinally
+    public async Task GetCodeGroup_UnparseableVersions_FallBackToCaseInsensitiveOrdinal(
+        string? versionA, string? versionB, string expectedLatest)
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var service = BuildTwoVersionService(memoryCache, versionA, versionB);
+        await service.LoadCache();
+
+        var codeGroup = service.GetCodeGroup(
+            CodeGroup.CodeGroupTypes.CodeSystem, "http://test.codesystem");
+
+        Assert.NotNull(codeGroup);
+        Assert.Equal(expectedLatest, codeGroup.Version);
     }
 
     /// <summary>
