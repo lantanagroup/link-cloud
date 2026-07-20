@@ -53,6 +53,23 @@ if (!string.IsNullOrWhiteSpace(grafanaBaseUrlFallback))
     });
 }
 
+var lokiAppLabelFallback = builder.Configuration["/loki/app"]
+    ?? builder.Configuration["loki/app"]
+    ?? builder.Configuration["Loki:App"]
+    ?? builder.Configuration["Automation:LokiAppLabel"];
+
+if (!string.IsNullOrWhiteSpace(lokiAppLabelFallback))
+{
+    builder.Services.PostConfigure<AutomationConfig>(cfg =>
+    {
+        if (string.IsNullOrWhiteSpace(cfg.LokiAppLabel)
+            || string.Equals(cfg.LokiAppLabel, "link-cloud", StringComparison.OrdinalIgnoreCase))
+        {
+            cfg.LokiAppLabel = lokiAppLabelFallback.Trim();
+        }
+    });
+}
+
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection("LinkTokenService"));
 
