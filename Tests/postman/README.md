@@ -18,6 +18,7 @@ Set these on the collection's **Variables** tab before running:
 | `terminologyBaseUrl` | Terminology service base URL | `http://localhost:8076` |
 | `codeSystem` / `codeSystemId` / `code` / `codeDisplay` | An **inactive** code known to the terminology service | SNOMED `423666004` |
 | `resourceType` / `profileUrl` | The resource + profile the code sits on (drives request 9's bundle) | `Encounter` / `us-core-encounter` |
+| `bindingValueSetUrl` | The value set bound to that element (drives request 9's bundle) | `http://hl7.org/fhir/us/core/ValueSet/detailed-race` |
 | `expectedCategoryId` | The category the finding should map to | `missing_active_encounter_type_code` |
 
 The sample bundle in request 9 places the code on `Encounter.type`. If your loaded inactive code sits on a different element, update the variables and edit request 9's body to match.
