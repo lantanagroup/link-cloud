@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth;
 using Microsoft.AspNetCore.Authorization;
@@ -15,6 +15,7 @@ namespace Automation.UI.Controllers.Api;
 /// </summary>
 [ApiController]
 [Route("api/api-health-runs")]
+[Authorize(Policy = "ApiBearerPolicy")]
 public sealed class ApiHealthRunsApiController(ApiHealthExecutionRunManager runManager) : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
