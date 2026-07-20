@@ -100,7 +100,17 @@ public class PipelineDataReader
     public record GroupPopulationInfo(string? PopulationCodeJson, List<MeasureReportPopulationInfo> MeasureReportPopulations);
     public record MeasureReportPopulationInfo(string? MeasureReportId);
 
-    public record AcquisitionLogInfo(long Id, string? PatientId, string? Status, string? QueryPhase, List<string> Notes, List<string> ResourceAcquiredIds, List<FhirQueryInfo> FhirQueries);
+    public record AcquisitionLogInfo(
+        long Id,
+        string? PatientId,
+        string? CorrelationId,
+        string? ReportTrackingId,
+        string? Status,
+        string? QueryPhase,
+        List<string> Notes,
+        List<string> ResourceAcquiredIds,
+        List<FhirQueryInfo> FhirQueries);
+
     public record StatusCountInfo(string Status, int Count);
     public record ResourceTypeCountInfo(string ResourceType, int Count);
     public record AcquisitionSummaryInfo(
@@ -311,6 +321,8 @@ public class PipelineDataReader
             results.AddRange(records.Select(log => new AcquisitionLogInfo(
                 log.Id,
                 log.PatientId,
+                log.CorrelationId,
+                log.ReportTrackingId,
                 log.Status?.ToString(),
                 log.QueryPhase?.ToString(),
                 log.Notes?.ToList() ?? [],

@@ -333,14 +333,18 @@ public sealed class NormalizationSuiteApplicationValidator
 
         if (string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(resourceId) || string.IsNullOrWhiteSpace(steps))
         {
-            var summaryRegex = new Regex(@"ResourceType=(?<resourceType>[^,]+),\s*ResourceId=(?<resourceId>[^,]+),\s*Steps=\[(?<steps>.*)\]", RegexOptions.Compiled);
-            var match = summaryRegex.Match(markerText);
-            if (match.Success)
-            {
-                resourceType = match.Groups["resourceType"].Value.Trim();
-                resourceId = match.Groups["resourceId"].Value.Trim();
-                steps = match.Groups["steps"].Value;
-            }
+            var resourceTypeMatch = Regex.Match(markerText, @"(?:^|,\s*)ResourceType=(?<value>[^,]+)", RegexOptions.Compiled);
+            var resourceIdMatch = Regex.Match(markerText, @"(?:^|,\s*)ResourceId=(?<value>[^,]+)", RegexOptions.Compiled);
+            var stepsMatch = Regex.Match(markerText, @"(?:^|,\s*)Steps=\[(?<value>.*)\]\s*$", RegexOptions.Compiled);
+
+            if (resourceTypeMatch.Success)
+                resourceType = resourceTypeMatch.Groups["value"].Value.Trim();
+
+            if (resourceIdMatch.Success)
+                resourceId = resourceIdMatch.Groups["value"].Value.Trim();
+
+            if (stepsMatch.Success)
+                steps = stepsMatch.Groups["value"].Value;
         }
 
         if (string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(resourceId) || string.IsNullOrWhiteSpace(steps))
