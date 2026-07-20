@@ -31,6 +31,12 @@ public class DataAcquisitionDbContext : DbContext
     {
     }
 
+    public DbSet<OrganizationLocationCondition> LocationConditions { get; set; }
+    public DbSet<OrganizationLocationConfiguration> LocationConfigurations { get; set; }
+    public virtual DbSet<OrganizationLocationMapping> OrganizationLocationMappings { get; set; }
+    public DbSet<EncounterMapping> EncounterMappings { get; set; }
+    public DbSet<EncounterLocation> EncounterLocations { get; set; }
+
     public DbSet<FhirQueryConfiguration> FhirQueryConfigurations { get; set; }
     public DbSet<FhirListConfiguration> FhirListConfigurations { get; set; }
     public DbSet<QueryPlan> QueryPlans { get; set; }
@@ -441,6 +447,81 @@ public class DataAcquisitionDbContext : DbContext
                     (c1, c2) => c1 != null && c2 != null && JsonSerializer.Serialize(c1, jsonOptions) == JsonSerializer.Serialize(c2, jsonOptions),
                     c => JsonSerializer.Serialize(c, jsonOptions).GetHashCode(),
                     c => JsonSerializer.Deserialize<List<SftpAcquisitionTypeConfiguration>>(JsonSerializer.Serialize(c, jsonOptions), jsonOptions) ?? new List<SftpAcquisitionTypeConfiguration>()));
+        });
+
+
+        //-------------------OrganizationLocationCondition-------------------
+        modelBuilder.Entity<OrganizationLocationCondition>(entity =>
+        {
+            entity.HasKey(e => e.ConditionId).HasName("PK_LocationCondition_ConditionId");
+
+            entity.Property(e => e.CreatedOn).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.Priority).HasDefaultValue(1);
+            entity.Property(e => e.ModifiedOn).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.Config).WithMany(p => p.LocationConditions)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_LocationCondition_ConfigId");
+        });
+
+        //-------------------OrganizationLocationConfiguration-------------------
+        modelBuilder.Entity<OrganizationLocationConfiguration>(entity =>
+        {
+            entity.HasKey(e => e.ConfigId).HasName("PK_LocationConfiguration_ConfigId");
+
+            entity.Property(e => e.FacilityId)
+                .IsRequired()
+                .HasMaxLength(255);
+
+            entity.Property(e => e.CreatedOn).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.ModifiedOn).HasDefaultValueSql("(getutcdate())");
+        });
+
+        //-------------------OrganizationLocationMapping-------------------
+        modelBuilder.Entity<OrganizationLocationMapping>(entity =>
+        {
+            entity.HasKey(e => e.LocationMappingId).HasName("PK_OrganizationLocationMapping_LocationMappingId");
+
+            entity.HasIndex(e => e.PartOfId, "IX_LocationMapping_PartOfId").HasFilter("([PartOfId] IS NOT NULL)");
+
+            // Supports the orphan-adoption backfill (SetPartOfIdForChildrenAsync), which filters on
+            // (FacilityId, PartOfValue) for rows whose PartOfId is not yet resolved. Filtered to the
+            // unresolved rows so the index stays small and the update is a seek rather than a scan.
+            entity.HasIndex(e => new { e.FacilityId, e.PartOfValue }, "IX_LocationMapping_FacilityId_PartOfValue")
+                .HasFilter("([PartOfId] IS NULL)");
+
+            entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.IsActive).HasDefaultValue(true);
+            entity.Property(e => e.ModifiedDate).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.PartOf).WithMany(p => p.InversePartOf).HasConstraintName("FK_LocationMapping_PartOf");
+        });
+
+        //-------------------EncounterMapping-------------------
+        modelBuilder.Entity<EncounterMapping>(entity =>
+        {
+            entity.HasKey(e => e.EncounterMappingId).HasName("PK_EncounterMapping_EncounterMappingId");
+
+            entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.ModifiedDate).HasDefaultValueSql("(getutcdate())");
+        });
+
+        //-------------------EncounterLocation-------------------
+        modelBuilder.Entity<EncounterLocation>(entity =>
+        {
+            entity.HasKey(e => e.EncounterLocationId).HasName("PK_EncounterLocation_EncounterLocationId");
+
+            entity.Property(e => e.CreateDate).HasDefaultValueSql("(getutcdate())");
+            entity.Property(e => e.ModifiedDate).HasDefaultValueSql("(getutcdate())");
+
+            entity.HasOne(d => d.EncounterMapping).WithMany(p => p.EncounterLocations)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_EncounterLocation_EncounterMapping");
+
+            entity.HasOne(d => d.OrganizationLocationMapping).WithMany(p => p.EncounterLocations)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("FK_EncounterLocation_OrganizationLocationMapping");
         });
 
         // Prefix and schema can be passed as parameters

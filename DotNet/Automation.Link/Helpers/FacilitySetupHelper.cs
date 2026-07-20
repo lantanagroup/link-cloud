@@ -127,17 +127,6 @@ public static class FacilitySetupHelper
         IDataAcquisitionServiceClient dataAcqClient,
         IAutomationOutput output,
         string facilityId,
-        string? measureId,
-        string ehrDescription)
-    {
-        await EnsureQueryPlansAsync(dataAcqClient, output, facilityId,
-            measureId != null ? [measureId] : [], ehrDescription);
-    }
-
-    public static async Task EnsureQueryPlansAsync(
-        IDataAcquisitionServiceClient dataAcqClient,
-        IAutomationOutput output,
-        string facilityId,
         List<string> measureIds,
         string ehrDescription,
         QueryPlanInput? externalQueryPlan = null)

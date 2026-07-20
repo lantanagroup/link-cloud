@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             _logger = logger;
         }
 
-        protected override async Task<OperationResult> ExecuteOperation(CodeMapOperation operation, DomainResource resource, CancellationToken cancellationToken = default)
+        protected override async Task<OperationResult> ExecuteOperation(CodeMapOperation operation, DomainResource resource, List<DomainResource>? supportingResources = null, CancellationToken cancellationToken = default)
         {
             //Daniel - 4/2026: I don't think we need this per execution. We should probably move a check like this in the Rest API and validate that it's a valid path.             
             //var result = await FhirPathValidator.IsFhirPathValidForResourceType(operation.FhirPath, resource.TypeName);

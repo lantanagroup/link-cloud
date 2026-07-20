@@ -1,8 +1,10 @@
 ﻿using System.Collections.Concurrent;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
@@ -20,6 +22,10 @@ public class CodeGroupCacheService(
     IMemoryCache cache,
     IOptions<TerminologyConfig> terminologyConfig) : ICodeGroupCacheService
 {
+    private static readonly Regex ScientificNotationPattern = new(
+        @"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)[eE][+-]?\d+$",
+        RegexOptions.CultureInvariant);
+
     private readonly MemoryCacheEntryOptions _cacheOptions = new MemoryCacheEntryOptions();
     private readonly ConcurrentBag<CacheKey> _cacheKeys = new ConcurrentBag<CacheKey>();
     private readonly TerminologyConfig _terminologyConfig = terminologyConfig.Value;
@@ -246,6 +252,8 @@ public class CodeGroupCacheService(
             string code = record.Code;
             string display = record.Display;
 
+            LogScientificNotationWarning(code, codeGroup.Id);
+
             if (system == null || (!string.IsNullOrEmpty(record.System) && system != record.System))
             {
                 if (string.IsNullOrEmpty(record.System))
@@ -306,6 +314,8 @@ public class CodeGroupCacheService(
             string display = record.Display;
             CodeStatus status = record.Status;
 
+            LogScientificNotationWarning(code, codeGroup.Id);
+
             if (!codeGroup.Codes.ContainsKey(system))
                 codeGroup.Codes.Add(system, new List<Code>());
 
@@ -319,6 +329,17 @@ public class CodeGroupCacheService(
 
         SetCodeGroup(codeGroup);
         logger.LogDebug("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes[system].Count);
+    }
+
+    private void LogScientificNotationWarning(string code, string? codeGroupId)
+    {
+        if (ScientificNotationPattern.IsMatch(code))
+        {
+            logger.LogWarning(
+                "Code {Code} in code group {CodeGroupId} appears to be in scientific notation. Verify that the code was not altered during CSV creation",
+                code.SanitizeForLog(),
+                codeGroupId.SanitizeForLog());
+        }
     }
 
     /// <summary>

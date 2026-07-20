@@ -42,10 +42,19 @@ public static class QueryPlanAcquisitionSimulator
         QueryPlanInput queryPlan,
         string? clinicalPeriodStart = null,
         string? clinicalPeriodEnd = null,
-        IAutomationOutput? output = null)
+        IAutomationOutput? output = null,
+        bool allowEncounterAnchoredDateOverrideForOutOfRange = true)
     {
         var hasStart = DateTimeOffset.TryParse(clinicalPeriodStart, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var start);
         var hasEnd = DateTimeOffset.TryParse(clinicalPeriodEnd, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var end);
+
+        // DataAcquisition variable substitution normalizes PeriodStart/PeriodEnd to day bounds
+        // (00:00:00Z / 23:59:59Z) before applying ge/le formatting. Mirror that behavior so
+        // simulator date filtering matches runtime acquisition semantics.
+        if (hasStart)
+            start = new DateTimeOffset(start.UtcDateTime.Date, TimeSpan.Zero);
+        if (hasEnd)
+            end = new DateTimeOffset(end.UtcDateTime.Date.AddDays(1).AddSeconds(-1), TimeSpan.Zero);
 
         // Track resource keys we've already emitted a "no recognized date" warning for, so
         // a single missing-date resource doesn't spam the log once per date-parameter iteration.
@@ -97,7 +106,15 @@ public static class QueryPlanAcquisitionSimulator
 
                 foreach (var resource in candidates)
                 {
-                    if (!MatchesParameterQuery(resource, query, hasStart ? start : null, hasEnd ? end : null, acquiredByType, warnedKeys, output))
+                    if (!MatchesParameterQuery(
+                            resource,
+                            query,
+                            hasStart ? start : null,
+                            hasEnd ? end : null,
+                            acquiredByType,
+                            warnedKeys,
+                            output,
+                            allowEncounterAnchoredDateOverrideForOutOfRange))
                         continue;
 
                     acquired.Add(resource.Key);
@@ -134,7 +151,8 @@ public static class QueryPlanAcquisitionSimulator
         DateTimeOffset? periodEnd,
         Dictionary<string, HashSet<string>> acquiredByType,
         HashSet<string> warnedKeys,
-        IAutomationOutput? output)
+        IAutomationOutput? output,
+        bool allowEncounterAnchoredDateOverrideForOutOfRange)
     {
         foreach (var p in query.Parameters)
         {
@@ -216,8 +234,11 @@ public static class QueryPlanAcquisitionSimulator
 
                     if (!matchedAny)
                     {
-                        if (HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                        if (allowEncounterAnchoredDateOverrideForOutOfRange
+                            && HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                        {
                             continue;
+                        }
 
                         return false;
                     }
@@ -254,7 +275,8 @@ public static class QueryPlanAcquisitionSimulator
 
                 if (isGe && resourceEnd < bound.Value)
                 {
-                    if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                    if (allowEncounterAnchoredDateOverrideForOutOfRange
+                        && string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
                         && HasEncounterAnchoredDateOverride(resource, acquiredByType))
                     {
                         continue;
@@ -265,7 +287,8 @@ public static class QueryPlanAcquisitionSimulator
 
                 if (isLe && resourceStart > bound.Value)
                 {
-                    if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                    if (allowEncounterAnchoredDateOverrideForOutOfRange
+                        && string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
                         && HasEncounterAnchoredDateOverride(resource, acquiredByType))
                     {
                         continue;
@@ -281,10 +304,12 @@ public static class QueryPlanAcquisitionSimulator
 
     /// <summary>
     /// Some DA query paths are encounter-anchored and can include resources linked to an
-    /// already-acquired encounter even when date predicate semantics differ from our strict
-    /// local interpretation (effective/issued boundary nuances). This targeted override is
-    /// restricted to date-filtered Observation/DiagnosticReport/Procedure resources and only
-    /// when their Encounter reference resolves to an acquired Encounter id.
+    /// already-acquired encounter. The simulator always uses this as a fallback when a
+    /// resource doesn't expose a recognizable date field, and can optionally apply it to
+    /// out-of-range recognized-date cases when enabled by the caller.
+    ///
+    /// This override is restricted to date-filtered Observation/DiagnosticReport/Procedure
+    /// resources and only when their Encounter reference resolves to an acquired Encounter id.
     /// </summary>
     private static bool HasEncounterAnchoredDateOverride(
         GeneratedResource resource,

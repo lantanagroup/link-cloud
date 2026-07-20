@@ -17,10 +17,11 @@ namespace IntegrationTests.Normalization
 {
     [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
-    public class OperationServiceTests
+    public class OperationServiceTests : IDisposable
     {
         private readonly ITestOutputHelper _output;
         private readonly NormalizationIntegrationTestFixture _fixture;
+        private readonly IServiceScope _scope;
         private readonly IDatabase _database;
         private readonly IOperationManager _operationManager;
         private readonly IOperationQueries _operationQueries;
@@ -35,15 +36,22 @@ namespace IntegrationTests.Normalization
             _fixture = fixture;
             _output = output;
 
-            _database = _fixture.ServiceProvider.GetRequiredService<IDatabase>();
-            _operationManager = _fixture.ServiceProvider.GetRequiredService<IOperationManager>();
-            _operationQueries = _fixture.ServiceProvider.GetRequiredService<IOperationQueries>();
-            _copyOperationService = _fixture.ServiceProvider.GetRequiredService<CopyPropertyOperationService>();
-            _codeMapOperationService = _fixture.ServiceProvider.GetRequiredService<CodeMapOperationService>();
-            _conditionalTransformService = _fixture.ServiceProvider.GetRequiredService<ConditionalTransformOperationService>();
-            _copyLocationOperationService = _fixture.ServiceProvider.GetRequiredService<CopyLocationOperationService>();
-            _removeExtensionsOperationService = _fixture.ServiceProvider.GetRequiredService<RemoveExtensionsOperationService>();
+            // Resolve scoped services from a per-test scope rather than the root provider, so the
+            // tests pass under DI scope validation (enabled when DOTNET_ENVIRONMENT=Development).
+            _scope = fixture.ServiceProvider.CreateScope();
+            var sp = _scope.ServiceProvider;
+
+            _database = sp.GetRequiredService<IDatabase>();
+            _operationManager = sp.GetRequiredService<IOperationManager>();
+            _operationQueries = sp.GetRequiredService<IOperationQueries>();
+            _copyOperationService = sp.GetRequiredService<CopyPropertyOperationService>();
+            _codeMapOperationService = sp.GetRequiredService<CodeMapOperationService>();
+            _conditionalTransformService = sp.GetRequiredService<ConditionalTransformOperationService>();
+            _copyLocationOperationService = sp.GetRequiredService<CopyLocationOperationService>();
+            _removeExtensionsOperationService = sp.GetRequiredService<RemoveExtensionsOperationService>();
         }
+
+        public void Dispose() => _scope.Dispose();
 
         [Fact]
         public async Task Integration_CopyPropertyOperation_Location_Identifier_To_Type_Create_TargetElement()

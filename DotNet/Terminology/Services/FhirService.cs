@@ -603,10 +603,10 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
             return CreateValidationParameters(false, "Display does not match code");
         }
 
-        // Prefer the code whose display matches (when a display was supplied); otherwise the first match.
+        // Select the last code whose display matches (when supplied); otherwise select the last match.
         var codeObject = !string.IsNullOrEmpty(display)
-            ? matches.First(c => c.Display == display)
-            : matches[0];
+            ? matches.Last(c => c.Display == display)
+            : matches[matches.Count - 1];
 
         var isActive = ResolveIsActive(codeObject, system);
 

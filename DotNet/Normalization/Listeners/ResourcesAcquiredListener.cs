@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Utility;
 using LantanaGroup.Link.Normalization.Application.Models.Exceptions;
 using LantanaGroup.Link.Normalization.Application.Models.Messages;
 using LantanaGroup.Link.Normalization.Application.Models.Operations;
@@ -11,14 +10,12 @@ using LantanaGroup.Link.Normalization.Application.Services;
 using LantanaGroup.Link.Normalization.Application.Services.Operations;
 using LantanaGroup.Link.Normalization.Application.Settings;
 using LantanaGroup.Link.Normalization.Domain.Queries;
-using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Telemetry;
-using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Application.Utilities;
 using System.Text;
@@ -44,6 +41,7 @@ public class ResourcesAcquiredListener : BackgroundService
     private readonly CodeMapOperationService _codeMapOperationService;
     private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
     private readonly CopyLocationOperationService _copyLocationOperationService;
+    private readonly CopyLocationAliasToTypeIterativelyOperationService _copyLocationAliasToTypeIterativelyOperationService;
     private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
     private readonly IResourceCache _resourceCache;
 
@@ -61,6 +59,7 @@ public class ResourcesAcquiredListener : BackgroundService
         CodeMapOperationService codeMapOperationService,
         ConditionalTransformOperationService conditionalTransformOperationService,
         CopyLocationOperationService copyLocationOperationService,
+        CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService,
         RemoveExtensionsOperationService removeExtensionsOperationService,
         IResourceCache resourceCache)
     {
@@ -86,6 +85,7 @@ public class ResourcesAcquiredListener : BackgroundService
         _codeMapOperationService = codeMapOperationService ?? throw new ArgumentNullException(nameof(codeMapOperationService));
         _conditionalTransformOperationService = conditionalTransformOperationService ?? throw new ArgumentNullException(nameof(conditionalTransformOperationService));
         _copyLocationOperationService = copyLocationOperationService ?? throw new ArgumentNullException(nameof(copyLocationOperationService));
+        _copyLocationAliasToTypeIterativelyOperationService = copyLocationAliasToTypeIterativelyOperationService ?? throw new ArgumentNullException(nameof(copyLocationAliasToTypeIterativelyOperationService));
         _removeExtensionsOperationService = removeExtensionsOperationService ?? throw new ArgumentNullException(nameof(removeExtensionsOperationService));
         _resourceCache = resourceCache ?? throw new ArgumentNullException(nameof(resourceCache));
     }
@@ -113,7 +113,7 @@ public class ResourcesAcquiredListener : BackgroundService
                 {
                     try
                     {
-                        await ProcessMessageAsync(result,  consumeCancellationToken);
+                        await ProcessMessageAsync(result, consumeCancellationToken);
                     }
                     catch (DeadLetterException ex)
                     {
@@ -199,68 +199,89 @@ public class ResourcesAcquiredListener : BackgroundService
                 var sequences = await operationSequenceQueries.Search(new OperationSequenceSearchModel()
                 {
                     FacilityId = result.Message.Key.FacilityId,
-                    ResourceType = resourceType.ToString(),
+                    ResourceType = resourceType.ToString()
                 }, cancellationToken: cancellationToken);
+
+                List<DomainResource> resources = resourceCache.Get(cacheKey);
 
                 if (sequences == null || sequences.Count == 0)
                 {
                     _logger.LogDebug("No operation sequences configured for {FacilityId}/{ResourceType}. Passing resource through without normalization.", result.Message.Key.FacilityId.SanitizeForLog(), resourceType.ToString().SanitizeForLog());
-                    resourceCache.Skipped(cacheKey, correlationId);
-                    continue;
                 }
-
-                List<DomainResource> resources = resourceCache.Get(cacheKey);
-
-                foreach (var resource in resources)
+                else
                 {
                     sequences.Sort((a, b) => a.Sequence.CompareTo(b.Sequence));
-
-                    foreach (var sequence in sequences)
+                    foreach (var resource in resources)
                     {
-                        var dbEntity = sequence.OperationResourceType.Operation;
+                        // IMPORTANT: step summary token format is consumed by Automation.UI
+                        // normalization validation evidence parsing. Keep each token as:
+                        //   "{Sequence}:{OperationType}:{OperationName}:{Outcome}"
+                        // and keep the overall separator " | " in the final summary log.
+                        var stepSummaries = new List<string>(sequences.Count);
 
-                        var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
-
-                        if (operation == null)
+                        foreach (var sequence in sequences)
                         {
-                            throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
-                        }
+                            var dbEntity = sequence.OperationResourceType.Operation;
 
-                        _logger.LogInformation("Normalizing {ResourceType}/{ResourceId} with {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
-
-                        var operationResult = operation.OperationType switch
-                        {
-                            OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource, cancellationToken),
-                            OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource, cancellationToken),
-                            OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource, cancellationToken),
-                            OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource, cancellationToken),
-                            OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, resource, cancellationToken),
-                            _ => null
-                        };
-
-                        if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
-                        {
-                            if (operationResult.SuccessCode == OperationStatus.Success)
+                            if(dbEntity != null && dbEntity.IsDisabled)
                             {
-                                _logger.LogInformation("Changed {ResourceType}/{ResourceId} as part of {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
-                            }
-                            else if (operationResult.SuccessCode == OperationStatus.NoAction)
-                            {
-                                _logger.LogInformation("No changes made to {ResourceType}/{ResourceId} as part of {OperationType} operation ({OperationName})", resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog(), operation.OperationType, operation.Name.SanitizeForLog());
+                                _logger.LogDebug("Skipping disabled operation {OperationType} ({OperationName}) for {FacilityId}/{ResourceType}/{ResourceId}.", dbEntity.OperationType, dbEntity.Name.SanitizeForLog(), result.Message.Key.FacilityId.SanitizeForLog(), resource.TypeName.SanitizeForLog(), resource.Id.SanitizeForLog());
+                                continue;
                             }
 
-                            _metrics.IncrementResourceChangedCounter(new List<KeyValuePair<string, object?>>() {
-                                                new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, result.Message.Key.FacilityId),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.PatientId, result.Message.Key.PatientId),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resource.TypeName),
-                                                new KeyValuePair<string, object?>(DiagnosticNames.OperationType, operation.OperationType.ToString())},
-                                                operationResult.SuccessCode == OperationStatus.Success);
+                            var operation = OperationHelper.GetOperation(dbEntity.OperationType, dbEntity.OperationJson);
+
+                            if (operation == null)
+                            {
+                                throw new TransientException("Operation Data Entity found, but the operation failed to deserialize");
+                            }
+
+                            var operationResult = operation.OperationType switch
+                            {
+                                OperationType.CopyProperty => await _copyPropertyOperationService.ProcessOperationAsync((CopyPropertyOperation)operation, resource, cancellationToken: cancellationToken),
+                                OperationType.CodeMap => await _codeMapOperationService.ProcessOperationAsync((CodeMapOperation)operation, resource, cancellationToken: cancellationToken),
+                                OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, resource, cancellationToken: cancellationToken),
+                                OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, resource, cancellationToken: cancellationToken),
+                                OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, resource, cancellationToken: cancellationToken),
+                                OperationType.CopyLocationAliasToTypeIteratively => await _copyLocationAliasToTypeIterativelyOperationService.ProcessOperationAsync((CopyLocationAliasToTypeIterativelyOperation)operation, resource, resources.OfType<Location>().ToList<DomainResource>(), cancellationToken),
+                                _ => null
+                            };
+
+                            if (operationResult != null && operationResult.SuccessCode != OperationStatus.Failure)
+                            {
+                                stepSummaries.Add($"{sequence.Sequence}:{operation.OperationType}:{operation.Name}:{operationResult.SuccessCode}");
+
+                                if (operationResult.SuccessCode == OperationStatus.Success)
+                                {
+                                    _metrics.IncrementResourceChangedCounter(new List<KeyValuePair<string, object?>>() {
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.FacilityId, result.Message.Key.FacilityId),
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.CorrelationId, correlationId),
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.PatientId, result.Message.Key.PatientId),
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.ResourceType, resource.TypeName),
+                                                    new KeyValuePair<string, object?>(DiagnosticNames.OperationType, operation.OperationType.ToString())},
+                                                        operationResult.SuccessCode == OperationStatus.Success);
+                                }
+                            }
+                            else
+                            {
+                                stepSummaries.Add($"{sequence.Sequence}:{operation.OperationType}:{operation.Name}:Failure");
+                                _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", result.Message.Key.FacilityId.SanitizeForLog(), correlationId.SanitizeForLog(), operation.OperationType.ToString().SanitizeForLog(), operationResult?.ErrorMessage?.SanitizeForLog() ?? "No Operation Result Error result");
+                            }
                         }
-                        else
-                        {
-                            _logger.LogWarning("Normalization Operation Failed ({FacilityId}, {CorrelationId}, {OperationType}): {ErrorMessage}", result.Message.Key.FacilityId.SanitizeForLog(), correlationId.SanitizeForLog(), operation.OperationType, operationResult?.ErrorMessage?.SanitizeForLog() ?? "No Operation Result Error result");
-                        }
+
+                        var stepSummaryText = string.Join(" | ", stepSummaries).SanitizeForLog();
+
+                        _logger.LogInformation(
+                            // IMPORTANT: this message shape is intentionally stable.
+                            // Automation validators query Loki for this marker and parse
+                            // FacilityId/ResourceType/ResourceId/Steps from the rendered line.
+                            "[NormalizationExecutionSummary] FacilityId={FacilityId}, CorrelationId={CorrelationId}, PatientId={PatientId}, ResourceType={ResourceType}, ResourceId={ResourceId}, Steps=[{Steps}]",
+                            result.Message.Key.FacilityId.SanitizeForLog(),
+                            correlationId.SanitizeForLog(),
+                            result.Message.Key.PatientId.SanitizeForLog(),
+                            resource.TypeName.SanitizeForLog(),
+                            resource.Id.SanitizeForLog(),
+                            stepSummaryText);
                     }
                 }
 
@@ -273,7 +294,8 @@ public class ResourcesAcquiredListener : BackgroundService
         }
     }
 
-    private void ValidateResourcesAcquiredEvent(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, out string correlationId) {
+    private void ValidateResourcesAcquiredEvent(ConsumeResult<ResourceKey, ResourcesAcquiredValue>? message, out string correlationId)
+    {
         if (message == null || message.Message == null)
         {
             throw new DeadLetterException("Event is null");

@@ -103,6 +103,16 @@ public sealed class GenerationManifest
         = new Dictionary<string, int>(StringComparer.Ordinal);
 
     /// <summary>
+    /// When true, predict one additional <c>Organization</c> resource per submitted patient
+    /// artifact in ABS to account for Report's <c>PatientAggregator:IncludeOrganizationResource</c>
+    /// behavior.
+    ///
+    /// This is count-level only: the organization ID is assigned by downstream services and
+    /// is not represented in key-level expectations.
+    /// </summary>
+    public bool IncludePatientAggregatorOrganizationResource { get; set; }
+
+    /// <summary>
     /// Optional explicit ABS scope: when populated, only these patients are expected
     /// to produce patient-{id}.ndjson artifacts.
     ///
@@ -326,6 +336,13 @@ public sealed class GenerationManifest
         {
             counts["OperationOutcome"] = ooCount;
         }
+
+        if (IncludePatientAggregatorOrganizationResource)
+        {
+            counts["Organization"] = counts.TryGetValue("Organization", out var orgCount)
+                ? orgCount + 1
+                : 1;
+        }
     }
 
     private int CountQualifyingMeasuresForPatient(string patientId)
@@ -333,6 +350,8 @@ public sealed class GenerationManifest
         var idx = PatientIds.ToList().IndexOf(patientId);
         if (idx < 0 || idx >= Profiles.Count) return 0;
         var profile = Profiles[idx];
+        if (!profile.IsExpectedInReportByCohortAndPattern())
+            return 0;
         return SelectedMeasures.Count(m => profile.QualifiesFor(m));
     }
 
@@ -340,7 +359,7 @@ public sealed class GenerationManifest
     {
         var idx = PatientIds.ToList().IndexOf(patientId);
         if (idx < 0 || idx >= Profiles.Count) return false;
-        return Profiles[idx].QualifiesForAny(SelectedMeasures);
+        return Profiles[idx].IsExpectedToBeSubmitted(SelectedMeasures);
     }
 
     private bool ShouldExpectAbsForPatient(string patientId)
@@ -373,9 +392,10 @@ public sealed class GenerationManifest
     public int QualifyingPatientCount(string measureId)
     {
         var idx = IndexOfMeasure(measureId);
-        if (idx < 0 || idx >= SelectedMeasures.Count) return Profiles.Count; // fallback: assume all qualify
+        if (idx < 0 || idx >= SelectedMeasures.Count)
+            return Profiles.Count(p => p.IsExpectedInReportByCohortAndPattern());
         var measureType = SelectedMeasures[idx];
-        return Profiles.Count(p => p.QualifiesFor(measureType));
+        return Profiles.Count(p => p.IsExpectedInReportByCohortAndPattern() && p.QualifiesFor(measureType));
     }
 
     private static string GetResourceTypeFromKey(string key)
@@ -399,7 +419,7 @@ public sealed class GenerationManifest
         var result = new List<string>();
         for (var i = 0; i < PatientIds.Count && i < Profiles.Count; i++)
         {
-            if (Profiles[i].QualifiesForAny(SelectedMeasures))
+            if (Profiles[i].IsExpectedToBeSubmitted(SelectedMeasures))
                 result.Add(PatientIds[i]);
         }
         return result;
@@ -439,6 +459,7 @@ public sealed class GenerationManifest
     public GenerationManifestSnapshot ToSnapshot()
     {
         var eligibility = new Dictionary<string, List<string>>();
+        var inpatientPatterns = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var i = 0; i < PatientIds.Count && i < Profiles.Count; i++)
         {
             var qualifying = new List<string>();
@@ -448,6 +469,10 @@ public sealed class GenerationManifest
                     qualifying.Add(measure.ToString());
             }
             eligibility[PatientIds[i]] = qualifying;
+
+            var pattern = Profiles[i].ScheduledInpatientPattern
+                ?? ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
+            inpatientPatterns[PatientIds[i]] = pattern.ToString();
         }
 
         // Build predicted ABS counts per patient (generated ? acquired ? CQL-referenced)
@@ -483,6 +508,7 @@ public sealed class GenerationManifest
                 .Where(kv => !string.IsNullOrEmpty(kv.Key))
                 .ToDictionary(kv => kv.Key, kv => new Dictionary<string, int>(kv.Value)),
             PatientEligibility = eligibility,
+            PatientInpatientPatterns = inpatientPatterns,
             ExpectedAbsCountsByPatient = expectedAbsByPatient,
             ExpectedAbsTotalCountsByType = expectedAbsTotals
         };

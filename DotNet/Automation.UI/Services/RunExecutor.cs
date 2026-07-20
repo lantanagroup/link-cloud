@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Models;
 using LantanaGroup.Automation;
+using Automation.UI.Models;
 using LantanaGroup.Link.Automation.Link;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
@@ -11,7 +12,10 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Models.Integration.DataAcquisition;
+using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
 using Microsoft.Extensions.Options;
+using Task = System.Threading.Tasks.Task;
 
 namespace Automation.UI.Services;
 
@@ -30,12 +34,18 @@ namespace Automation.UI.Services;
 /// </summary>
 internal sealed class RunExecutor
 {
+    private const ScheduledInpatientPattern DefaultScheduledInpatientPattern = ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod;
+
     private readonly AutomationConfig _automationConfig;
     private readonly IServiceProvider _hostServices;
     private readonly ISnapshotStore _snapshotStore;
     private readonly RunSnapshotOrchestrator _orchestrator;
     private readonly QueryPlanTemplateResolver _queryPlanResolver;
+    private readonly NormalizationSuiteResolver _normalizationSuiteResolver;
+    private readonly OrganizationResourceMapTemplateResolver _organizationResourceMapResolver;
     private readonly bool _suppressExternalManifest;
+    private readonly bool _includePatientAggregatorOrganizationResource;
+    private readonly string _includePatientAggregatorOrganizationResourceSource;
     private readonly ILogger _logger;
 
     public RunExecutor(
@@ -44,6 +54,8 @@ internal sealed class RunExecutor
         ISnapshotStore snapshotStore,
         RunSnapshotOrchestrator orchestrator,
         QueryPlanTemplateResolver queryPlanResolver,
+        NormalizationSuiteResolver normalizationSuiteResolver,
+        OrganizationResourceMapTemplateResolver organizationResourceMapResolver,
         IConfiguration configuration,
         ILogger logger)
     {
@@ -52,8 +64,31 @@ internal sealed class RunExecutor
         _snapshotStore = snapshotStore;
         _orchestrator = orchestrator;
         _queryPlanResolver = queryPlanResolver;
+        _normalizationSuiteResolver = normalizationSuiteResolver;
+        _organizationResourceMapResolver = organizationResourceMapResolver;
         _suppressExternalManifest = configuration.GetValue<bool>("ExternalBlobStorage:SuppressManifest");
+        var includeOrg = ResolveIncludePatientAggregatorOrganizationResource(configuration);
+        _includePatientAggregatorOrganizationResource = includeOrg.Value;
+        _includePatientAggregatorOrganizationResourceSource = includeOrg.Source;
         _logger = logger;
+    }
+
+    private static (bool Value, string Source) ResolveIncludePatientAggregatorOrganizationResource(IConfiguration configuration)
+    {
+        var shared = TryGetBool(configuration, "PatientAggregator:IncludeOrganizationResource");
+        if (shared.HasValue)
+            return (shared.Value, "PatientAggregator:IncludeOrganizationResource");
+
+        return (false, "default(false)");
+    }
+
+    private static bool? TryGetBool(IConfiguration configuration, string key)
+    {
+        var raw = configuration[key];
+        if (string.IsNullOrWhiteSpace(raw))
+            return null;
+
+        return bool.TryParse(raw, out var parsed) ? parsed : null;
     }
 
     /// <summary>
@@ -81,9 +116,11 @@ internal sealed class RunExecutor
         {
             var scenarioConfig = ScenarioConfigBuilder.Build(state.Scenario, state.Options);
 
-            // For scheduled-report, compute the active window immediately so generation
+            var usesScheduledWorkflow = state.Options.ReportMethod is ReportMethod.ScheduledReport or ReportMethod.RegenerateReport;
+
+            // For scheduled-style runs, compute the active window immediately so generation
             // uses the correct clinical period boundaries (scenarioConfig.StartDate/EndDate).
-            if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+            if (usesScheduledWorkflow)
             {
                 // Use a clinically meaningful report window for generation so scheduled
                 // inpatient patterns produce rich in-period evidence (not minute-scale data).
@@ -119,12 +156,14 @@ internal sealed class RunExecutor
             var reportAbsValidator = services.GetRequiredService<ReportAbsManifestValidator>();
             var dataAcqValidator = services.GetRequiredService<DataAcquisitionDatabaseValidator>();
             var normalizationValidator = services.GetRequiredService<NormalizationDatabaseValidator>();
+            var normalizationSuiteApplicationValidator = new NormalizationSuiteApplicationValidator(output);
             var tenantValidator = services.GetRequiredService<TenantDatabaseValidator>();
             var validationResultsValidator = services.GetRequiredService<ValidationResultsValidator>();
             var pipelineSnapshot = services.GetRequiredService<PipelineSnapshot>();
 
             output.WriteLine($"Starting {state.Scenario} run: {state.RunId}");
             output.WriteLine($"Measure context: {string.Join(", ", state.Options.SelectedMeasures.Select(m => $"{ProfiledMeasureCatalog.GetDisplayName(m)} ({m})"))}");
+            output.WriteLine($"NHSN Organization ID: {state.Options.NhsnOrganizationId}");
             output.WriteLine($"Generation config: patients={state.Options.PatientCount}, resourcesPerPatient={state.Options.ResourcesPerPatient}, seed={state.Options.Seed}");
 
             List<string> patientIds;
@@ -136,6 +175,9 @@ internal sealed class RunExecutor
             // the criteria of each). For multi-measure, the pipeline handles the union.
             var primaryMeasure = state.Options.SelectedMeasures[0];
             var generationConfig = ResolveFhirGenerationConfig(_automationConfig);
+            var normalizationResolution = await _normalizationSuiteResolver.ResolveAsync(state.Options.NormalizationSuiteId, cancellationToken);
+            var organizationResourceMapTemplate = await _organizationResourceMapResolver.ResolveAsync(state.Options.OrganizationResourceMapTemplateId, cancellationToken);
+            var generationRequirementsPlan = BuildGenerationRequirementsPlan(normalizationResolution, organizationResourceMapTemplate);
 
             await fhirDataLoader.WaitForServerAsync(output);
 
@@ -146,6 +188,19 @@ internal sealed class RunExecutor
             var effectiveQueryPlan = queryPlanInput ?? QueryPlanDefaults.GetDefaultAsInput();
             if (!string.IsNullOrWhiteSpace(queryPlanResolution.Name))
                 output.WriteLine($"Using query plan: {queryPlanResolution.Name}");
+
+            var locationQueryCount = effectiveQueryPlan.InitialQueries.Concat(effectiveQueryPlan.SupplementalQueries)
+                .Count(q => string.Equals(q.ResourceType, "Location", StringComparison.OrdinalIgnoreCase));
+            var expectLocationResources = locationQueryCount > 0;
+            var encounterQueryCount = effectiveQueryPlan.InitialQueries.Concat(effectiveQueryPlan.SupplementalQueries)
+                .Count(q => string.Equals(q.ResourceType, "Encounter", StringComparison.OrdinalIgnoreCase));
+            var expectEncounterResources = encounterQueryCount > 0;
+            output.WriteLine($"Query plan Location queries: {locationQueryCount}");
+            output.WriteLine($"Query plan Encounter queries: {encounterQueryCount}");
+            if (locationQueryCount == 0)
+                output.WriteLine("WARNING: Query plan has no Location query entries; org-location mapping cannot be exercised for this run.");
+            if (encounterQueryCount == 0)
+                output.WriteLine("WARNING: Query plan has no Encounter query entries; encounter mapping checks will be limited for this run.");
 
             if (state.Options.PatientProfiles is { Count: > 0 }
                 || state.Options.ImportedPatientIds.Count > 0
@@ -209,11 +264,20 @@ internal sealed class RunExecutor
                     state.Options.ResourcesPerPatient,
                     state.Options.Seed,
                     generationConfig,
+                    generationRequirementsPlan,
                     acquisitionSimulation: new FhirGenerationPipeline.AcquisitionSimulationConfig
                     {
                         QueryPlan = effectiveQueryPlan,
                         ClinicalPeriodStart = scenarioConfig.StartDate,
-                        ClinicalPeriodEnd = scenarioConfig.EndDate
+                        ClinicalPeriodEnd = scenarioConfig.EndDate,
+                        OrganizationLocationConditionFhirPaths = organizationResourceMapTemplate?.Conditions
+                            ?.Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
+                            .OrderBy(c => c.Priority)
+                            .Select(c => NormalizeOrgLocationFhirPathForDataAcquisition(c.FhirPath))
+                            .ToList(),
+                        AllowEncounterAnchoredDateOverrideForOutOfRange =
+                            state.Options.ReportMethod == ReportMethod.ScheduledReport
+                            || state.Options.ReportMethod == ReportMethod.RegenerateReport
                     },
                     importedPatients: importedPatients.Count > 0 ? importedPatients : null);
 
@@ -224,7 +288,7 @@ internal sealed class RunExecutor
                 // Use the manifest's parallel PatientIds + Profiles arrays as the source of truth.
                 expectedSubmittedPatientIds = generationManifest.PatientIds
                     .Where((_, idx) => idx < generationManifest.Profiles.Count
-                                       && generationManifest.Profiles[idx].QualifiesForAny(selectedMeasures))
+                                       && generationManifest.Profiles[idx].IsExpectedToBeSubmitted(selectedMeasures))
                     .ToList();
 
                 if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
@@ -239,7 +303,8 @@ internal sealed class RunExecutor
             {
                 var (genPatientIds, bundles) = FhirBundleGenerator.Generate(
                     output, state.Options.PatientCount, state.Options.ResourcesPerPatient, state.Options.Seed,
-                    generationConfig);
+                    generationConfig,
+                    generationRequirementsPlan);
 
                 patientIds = genPatientIds;
                 expectedSubmittedPatientIds = patientIds.ToList();
@@ -274,6 +339,8 @@ internal sealed class RunExecutor
                 generationManifest.AcquiredResourceTypes = QueryPlanDefaults.GetAcquiredResourceTypes(effectiveQueryPlan);
                 generationManifest.ParameterQueryResourceTypes = QueryPlanDefaults.GetParameterQueryResourceTypes(effectiveQueryPlan);
                 generationManifest.CqlReferencedResourceTypes = CqlResourceTypeExtractor.ExtractForMeasures(state.Options.SelectedMeasures);
+                generationManifest.IncludePatientAggregatorOrganizationResource = _includePatientAggregatorOrganizationResource;
+                output.WriteLine($"[Manifest] IncludePatientAggregatorOrganizationResource={_includePatientAggregatorOrganizationResource} (source={_includePatientAggregatorOrganizationResourceSource})");
 
                 // Persist a lightweight manifest snapshot for the UI.
                 await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
@@ -282,9 +349,9 @@ internal sealed class RunExecutor
             await FacilitySetupHelper.EnsureFacilityAsync(
                 services.GetRequiredService<IFacilityServiceClient>(),
                 output, facilityId, measureIds);
-            await FacilitySetupHelper.EnsureNormalizationConfigAsync(
+            normalizationResolution = await EnsureNormalizationFromSuiteAsync(
                 services.GetRequiredService<INormalizationServiceClient>(),
-                output, facilityId);
+                output, facilityId, state.Options.NormalizationSuiteId, cancellationToken, normalizationResolution);
             await FacilitySetupHelper.EnsureQueryPlansAsync(
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 output, facilityId, measureIds, "Epic", queryPlanInput);
@@ -292,20 +359,33 @@ internal sealed class RunExecutor
                 services.GetRequiredService<IDataAcquisitionServiceClient>(),
                 services.GetRequiredService<AutomationConfig>(),
                 output, facilityId);
+            await EnsureOrganizationLocationConfigurationFromTemplateAsync(
+                services.GetRequiredService<IDataAcquisitionServiceClient>(),
+                output,
+                facilityId,
+                organizationResourceMapTemplate,
+                cancellationToken);
             await FacilitySetupHelper.EnsureQueryDispatchConfigAsync(
                 services.GetRequiredService<IQueryDispatchServiceClient>(),
                 output,
                 facilityId);
+            await WriteOrganizationLocationMappingStatusAsync(
+                services.GetRequiredService<IDataAcquisitionServiceClient>(),
+                output,
+                facilityId,
+                cancellationToken);
 
             // Census config + FHIR list config are required so the Census service accepts the
             // explicit PatientListsAcquired snapshots this workflow publishes (ProcessList
-            // rejects facilities without a census config). For scheduled reports we DISABLE the
-            // background census Quartz job: this run drives census entirely through explicit
-            // snapshots, and letting the cron-scheduled PatientCensusScheduled job fire would
-            // (a) attempt to read FHIR List resources that do not exist on the synthetic server
-            // — surfacing spurious "configuration missing" errors — and (b) publish empty
-            // snapshots that auto-discharge our still-admitted patients out of turn.
-            var enableBackgroundCensusJobs = state.Options.ReportMethod != ReportMethod.ScheduledReport;
+            // rejects facilities without a census config).
+            //
+            // For Automation runs, disable the background census Quartz job for all report
+            // methods. The automation workflow drives patient-list ingestion explicitly when
+            // needed, while the scheduled background job can attempt to read non-existent
+            // synthetic FHIR List resources (census-{facility}-...) and emit noisy
+            // DataAcquisition "Error retrieving patient list" exceptions that do not represent
+            // true pipeline failures.
+            var enableBackgroundCensusJobs = false;
             await FacilitySetupHelper.EnsureCensusConfigAsync(
                 services.GetRequiredService<ICensusServiceClient>(),
                 output,
@@ -319,7 +399,7 @@ internal sealed class RunExecutor
 
             Frequency? scheduledRunFrequency = null;
             string reportId;
-            if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+            if (usesScheduledWorkflow)
             {
                 var scheduledWorkflowState = await ExecuteScheduledReportWorkflowAsync(
                     reportHelper,
@@ -368,7 +448,7 @@ internal sealed class RunExecutor
                     throw new InvalidOperationException($"Expected report with id {reportId} to be submitted but it was not.");
             }
 
-            if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+            if (usesScheduledWorkflow)
             {
                 // Scheduled runs can briefly report Submitted while entry-level state is still
                 // converging. Reconcile against terminal report truth (entries + submission
@@ -441,7 +521,11 @@ internal sealed class RunExecutor
                 output.WriteLine("Regenerated report submitted successfully.");
             }
 
-            await pipelineSnapshot.WriteFullSnapshotAsync(output, facilityId, reportId);
+            await pipelineSnapshot.WriteFullSnapshotAsync(
+                output,
+                facilityId,
+                reportId,
+                BuildNormalizationSuiteSnapshot(normalizationResolution));
 
             var downloadedResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig);
             var internalAbsResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig, external: false);
@@ -497,6 +581,7 @@ internal sealed class RunExecutor
                 {
                     throw new InvalidOperationException("Expected report to include manifest.ndjson but it was not");
                 }
+
             }
             else if (!string.Equals(manifestKey, "manifest.ndjson", StringComparison.Ordinal))
             {
@@ -601,10 +686,31 @@ internal sealed class RunExecutor
                     manifest: generationManifest));
 
             await RunValidator("DATA ACQUISITION DATABASE VALIDATION", () =>
-                dataAcqValidator.ValidateAllAsync(facilityId, reportId, measureIds[0], expectedReportEntryPatientIds, expectDataAcquisitionData: expectDataAcquisitionData));
+                dataAcqValidator.ValidateAllAsync(
+                    facilityId,
+                    reportId,
+                    measureIds[0],
+                    state.Options.ReportMethod == ReportMethod.ScheduledReport
+                        ? expectedReportEntryPatientIds
+                        : expectedAllPatientIds,
+                    expectDataAcquisitionData: expectDataAcquisitionData,
+                    expectLocationResources: expectLocationResources,
+                    expectEncounterResources: expectEncounterResources));
 
             await RunValidator("NORMALIZATION DATABASE VALIDATION", () =>
                 normalizationValidator.ValidateAllAsync(facilityId));
+
+            var normalizationSummaryLogs = await lokiScraper.QueryServiceLogsAsync(
+                LokiScraper.Components.Normalization,
+                "[NormalizationExecutionSummary]",
+                scenarioConfig.LokiScrapeWindow,
+                facilityId: null,
+                structuredFieldName: "FacilityId",
+                structuredFieldValue: facilityId,
+                limit: 5000);
+
+            await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", () =>
+                normalizationSuiteApplicationValidator.ValidateAllAsync(internalAbsResources, normalizationResolution, normalizationSummaryLogs));
 
             await RunValidator("TENANT DATABASE VALIDATION", () =>
                 tenantValidator.ValidateAllAsync(facilityId, measureId));
@@ -665,20 +771,13 @@ internal sealed class RunExecutor
         for (var i = 0; i < count; i++)
         {
             var profile = profiles[i];
-            if (!profile.QualifiesForAny(selectedMeasures))
+            if (!profile.IsExpectedToBeSubmitted(selectedMeasures))
                 continue;
 
-            if (IsExpectedInScheduledReport(profile.ScheduledInpatientPattern))
-                expected.Add(patientIds[i]);
+            expected.Add(patientIds[i]);
         }
 
         return expected;
-    }
-
-    private static bool IsExpectedInScheduledReport(ScheduledInpatientPattern? pattern)
-    {
-        var effective = pattern ?? ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod;
-        return effective.GetCensusBehavior().ExpectedInReport;
     }
 
     private static string ToZulu(DateTimeOffset value)
@@ -690,7 +789,7 @@ internal sealed class RunExecutor
     // Keep scheduled test runtimes bounded while still allowing long clinical windows.
     // Admin.BFF computes EndDate using current-time + delay, so this controls how long
     // the run waits for end-of-period execution.
-    private static readonly TimeSpan ScheduledRuntimeDelay = TimeSpan.FromMinutes(4);
+    private static readonly TimeSpan ScheduledRuntimeDelay = TimeSpan.FromMinutes(2);
 
     private static ScheduledReportWindow DeriveScheduledReportWindow(TestScenarioConfig scenarioConfig)
     {
@@ -731,7 +830,7 @@ internal sealed class RunExecutor
         for (var i = 0; i < count; i++)
         {
             var pattern = profiles[i].ScheduledInpatientPattern
-                ?? ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod;
+                ?? DefaultScheduledInpatientPattern;
             var behavior = pattern.GetCensusBehavior();
 
             // Patterns whose entire stay sits outside the report period emit no census events;
@@ -816,6 +915,50 @@ internal sealed class RunExecutor
         return new ScheduledWorkflowState(reportTrackingId, persistedSchedule.Frequency);
     }
 
+    private static async Task WriteOrganizationLocationMappingStatusAsync(
+        IDataAcquisitionServiceClient dataAcqClient,
+        IAutomationOutput output,
+        string facilityId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var configsResp = await dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
+            if (!configsResp.IsSuccessStatusCode)
+            {
+                output.WriteLine($"Org-location mapping status: unable to read configurations (HTTP {configsResp.StatusCode}).");
+                return;
+            }
+
+            var configs = configsResp.Body ?? [];
+            var activeConfigs = configs.Count(c => c.IsActive);
+            var activeConditions = configs.Where(c => c.IsActive).Sum(c => c.Conditions?.Count ?? 0);
+
+            var mappingsResp = await dataAcqClient.GetOrganizationLocationMappingsAsync(facilityId, cancellationToken);
+            var mappings = mappingsResp.IsSuccessStatusCode
+                ? mappingsResp.Body ?? []
+                : [];
+            var activeMappings = mappings.Count(m => m.IsActive);
+            var orgMappings = mappings.Count(m => m.IsActive && m.IsOrgLocation);
+
+            var encounterMappingsResp = await dataAcqClient.GetEncounterMappingsAsync(facilityId, cancellationToken);
+            var encounterMappings = encounterMappingsResp.IsSuccessStatusCode
+                ? encounterMappingsResp.Body ?? []
+                : [];
+            var orgEncounterMappings = encounterMappings.Count(m => m.MappedToOrg);
+
+            output.WriteLine(
+                $"Org-location mapping status: activeConfigs={activeConfigs}, activeConditions={activeConditions}, activeMappings={activeMappings}, orgMappings={orgMappings}, encounterMappings={encounterMappings.Count}, orgEncounterMappings={orgEncounterMappings}");
+
+            if (activeConfigs == 0 || activeConditions == 0)
+                output.WriteLine("  WARNING: Org-location mapping is not effectively enabled (missing active config/conditions).");
+        }
+        catch (Exception ex)
+        {
+            output.WriteLine($"Org-location mapping status: failed to query mapping state ({ex.GetType().Name}: {ex.Message}).");
+        }
+    }
+
     private static FhirGenerationConfig ResolveFhirGenerationConfig(AutomationConfig automationConfig)
     {
         var includeLowValueOptionalReferences = automationConfig.FhirGeneration?.IncludeLowValueOptionalReferences ?? true;
@@ -831,6 +974,73 @@ internal sealed class RunExecutor
             IncludeLowValueOptionalReferences = includeLowValueOptionalReferences,
             ResourceDistribution = new Dictionary<string, double>(distribution, StringComparer.OrdinalIgnoreCase)
         };
+    }
+
+    private static async Task EnsureOrganizationLocationConfigurationFromTemplateAsync(
+        IDataAcquisitionServiceClient dataAcqClient,
+        IAutomationOutput output,
+        string facilityId,
+        OrganizationResourceMapTemplate? template,
+        CancellationToken cancellationToken)
+    {
+        if (template == null)
+        {
+            output.WriteLine($"No Organization Resource Map template resolved for facility '{facilityId}'. Skipping org-location configuration create.");
+            return;
+        }
+
+        var conditions = template.Conditions
+            .Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
+            .OrderBy(c => c.Priority)
+            .Select(c => new CreateOrganizationLocationConditionApiModel
+            {
+                FhirPath = NormalizeOrgLocationFhirPathForDataAcquisition(c.FhirPath),
+                Priority = c.Priority
+            })
+            .ToList();
+
+        if (conditions.Count == 0)
+            throw new InvalidOperationException($"Organization resource map template '{template.Name}' has no valid conditions.");
+
+        var existing = await dataAcqClient.GetOrganizationLocationConfigurationsAsync(facilityId, cancellationToken);
+        if (existing.IsSuccessStatusCode && existing.Body != null)
+        {
+            var normalizedTemplate = string.Join("\n", conditions.Select(c => $"{c.Priority}:{c.FhirPath}"));
+            var hasMatchingActive = existing.Body.Any(cfg =>
+                cfg.IsActive
+                && string.Join("\n", cfg.Conditions.OrderBy(c => c.Priority).Select(c => $"{c.Priority}:{c.FhirPath}")) == normalizedTemplate);
+
+            if (hasMatchingActive)
+            {
+                output.WriteLine($"Org-location configuration for facility '{facilityId}' already matches template '{template.Name}'. Skipping create.");
+                return;
+            }
+        }
+
+        var create = await dataAcqClient.CreateOrganizationLocationConfigurationAsync(
+            facilityId,
+            new CreateOrganizationLocationConfigurationApiModel
+            {
+                Description = template.Description ?? $"Automation org-location mapping from template '{template.Name}'",
+                IsActive = true,
+                Conditions = conditions
+            },
+            cancellationToken);
+
+        if (!create.IsSuccessStatusCode)
+            throw new InvalidOperationException(
+                $"Failed to create organization location configuration for facility '{facilityId}' from template '{template.Name}'. HTTP {create.StatusCode}: {create.RawBody ?? "(no body)"}");
+
+        output.WriteLine($"Ensured org-location configuration for facility '{facilityId}' from template '{template.Name}'.");
+    }
+
+    private static string NormalizeOrgLocationFhirPathForDataAcquisition(string fhirPath)
+    {
+        var path = (fhirPath ?? string.Empty).Trim();
+        if (path.StartsWith("Location.", StringComparison.OrdinalIgnoreCase))
+            return path["Location.".Length..];
+
+        return path;
     }
 
     private ServiceProvider BuildRunServiceProvider(IAutomationOutput output)
@@ -882,5 +1092,321 @@ internal sealed class RunExecutor
                 out var dto))
             return dto.UtcDateTime;
         return null;
+    }
+
+    private static PipelineSnapshot.NormalizationSuiteSnapshot BuildNormalizationSuiteSnapshot(NormalizationSuiteResolution resolution)
+    {
+        var sequences = resolution.Sequences
+            .Select(s => new PipelineSnapshot.NormalizationSequenceSnapshot(
+                s.SequenceName,
+                s.Operations
+                    .OrderBy(o => o.Sequence)
+                    .Select(o => new PipelineSnapshot.NormalizationSequenceOperationSnapshot(
+                        o.Sequence,
+                        o.Operation.OperationType,
+                        o.Operation.Name,
+                        o.Operation.ResourceTypes))
+                    .ToList()))
+            .ToList();
+
+        var standaloneOperations = resolution.StandaloneOperations
+            .Select(o => new PipelineSnapshot.NormalizationSequenceOperationSnapshot(
+                Sequence: 0,
+                OperationType: o.OperationType,
+                OperationName: o.Name,
+                ResourceTypes: o.ResourceTypes))
+            .ToList();
+
+        return new PipelineSnapshot.NormalizationSuiteSnapshot(
+            resolution.SuiteName,
+            sequences,
+            standaloneOperations);
+    }
+
+    private static GenerationRequirementsPlan BuildGenerationRequirementsPlan(
+        NormalizationSuiteResolution resolution,
+        OrganizationResourceMapTemplate? organizationResourceMapTemplate)
+    {
+        var plan = new GenerationRequirementsPlan
+        {
+            PlanName = resolution.SuiteName,
+            Requirements = []
+        };
+
+        foreach (var op in resolution.Operations)
+        {
+            plan.Requirements.Add(new GenerationRequirement
+            {
+                Name = op.Name,
+                RequirementType = op.OperationType,
+                ResourceTypes = op.ResourceTypes.ToList(),
+                SourceFhirPath = op.SourceFhirPath,
+                CodeMapFhirPath = op.CodeMapFhirPath,
+                ExtensionUrls = op.ExtensionUrls.ToList(),
+                Conditions = op.Conditions.Select(c => new GenerationRequirementCondition
+                {
+                    FhirPathSource = c.FhirPathSource,
+                    Operator = c.Operator,
+                    Value = c.Value
+                }).ToList(),
+                CodeSystemMaps = op.CodeSystemMaps.Select(m => new GenerationRequirementCodeSystemMap
+                {
+                    SourceSystem = m.SourceSystem,
+                    SourceCodes = m.CodeMaps.Keys.ToDictionary(k => k, _ => string.Empty, StringComparer.Ordinal)
+                }).ToList()
+            });
+        }
+
+        if (organizationResourceMapTemplate?.Conditions is { Count: > 0 })
+        {
+            foreach (var condition in organizationResourceMapTemplate.Conditions
+                         .Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
+                         .OrderBy(c => c.Priority))
+            {
+                plan.Requirements.Add(new GenerationRequirement
+                {
+                    Name = $"Organization Resource Map Condition {condition.Priority}",
+                    RequirementType = "OrganizationLocationMapping",
+                    ResourceTypes = ["Location"],
+                    SourceFhirPath = condition.FhirPath.Trim()
+                });
+            }
+        }
+
+        return plan;
+    }
+
+    /// <summary>
+    /// Resolves the normalization suite and creates the appropriate operations and sequences
+    /// via the Normalization API for the given facility. Replaces the legacy
+    /// <c>FacilitySetupHelper.EnsureNormalizationConfigAsync</c> which only created a single
+    /// hard-coded CopyProperty operation.
+    /// </summary>
+    private async Task<NormalizationSuiteResolution> EnsureNormalizationFromSuiteAsync(
+        INormalizationServiceClient normalizationClient,
+        IAutomationOutput output,
+        string facilityId,
+        Guid? suiteId,
+        CancellationToken cancellationToken,
+        NormalizationSuiteResolution? preResolved = null)
+    {
+        static string[] GetPlannedResourceTypes(NormalizationOperationDefinition planned)
+            => planned.ResourceTypes
+                .Where(r => !string.IsNullOrWhiteSpace(r))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(r => r, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+        static List<NormalizationOperationApiModel> BuildKeyedOperationPool(
+            List<NormalizationOperationApiModel> operations,
+            string name,
+            string operationType)
+            => operations
+                .Where(op => string.Equals(op.Name ?? string.Empty, name, StringComparison.Ordinal)
+                             && string.Equals(op.OperationType ?? string.Empty, operationType, StringComparison.Ordinal))
+                .ToList();
+
+        static bool TryTakeMatchingOperation(
+            List<NormalizationOperationApiModel> candidates,
+            string[] plannedResourceTypes,
+            out NormalizationOperationApiModel? matched)
+        {
+            matched = candidates.FirstOrDefault(op =>
+            {
+                var returnedResourceTypes = op.OperationResourceTypes
+                    .Select(ort => ort.Resource?.ResourceName)
+                    .Where(r => !string.IsNullOrWhiteSpace(r))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(r => r, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                return plannedResourceTypes.SequenceEqual(returnedResourceTypes, StringComparer.OrdinalIgnoreCase);
+            }) ?? candidates.FirstOrDefault();
+
+            if (matched == null)
+                return false;
+
+            candidates.Remove(matched);
+            return true;
+        }
+
+        async Task<List<NormalizationOperationApiModel>> FetchAllFacilityOperationsAsync()
+        {
+            var all = new List<NormalizationOperationApiModel>();
+            const int pageSize = 100;
+            var pageNumber = 1;
+
+            while (true)
+            {
+                var resp = await normalizationClient.SearchFacilityOperationsAsync(
+                    facilityId,
+                    pageSize: pageSize,
+                    pageNumber: pageNumber,
+                    cancellationToken: cancellationToken);
+
+                if (!resp.IsSuccessStatusCode || resp.Body?.Records == null)
+                    throw new InvalidOperationException($"Failed to search normalization operations for facility '{facilityId}' on page {pageNumber}. HTTP {(int)resp.StatusCode}");
+
+                all.AddRange(resp.Body.Records);
+
+                var totalPages = resp.Body.Metadata?.TotalPages ?? 1;
+                if (pageNumber >= totalPages)
+                    break;
+
+                pageNumber++;
+            }
+
+            return all;
+        }
+
+        var resolution = preResolved ?? await _normalizationSuiteResolver.ResolveAsync(suiteId, cancellationToken);
+
+        var existingOperations = await FetchAllFacilityOperationsAsync();
+        if (existingOperations.Count > 0)
+            output.WriteLine($"Normalization config for facility '{facilityId}' already has {existingOperations.Count} operation(s). Reconciling suite configuration idempotently.");
+
+        output.WriteLine($"Using normalization suite: {resolution.SuiteName} ({resolution.Operations.Count} operation(s))");
+
+        if (resolution.Operations.Count == 0)
+        {
+            output.WriteLine("Normalization suite has no operations — skipping normalization configuration.");
+            return resolution;
+        }
+
+        // Track sequence intent in suite order; operation IDs are resolved after reconciliation.
+        var createdOpsByResourceType = new Dictionary<string, List<(Guid OpId, int Order)>>(StringComparer.OrdinalIgnoreCase);
+
+        var existingPoolByKey = existingOperations
+            .GroupBy(op => (op.Name ?? string.Empty, op.OperationType ?? string.Empty), EqualityComparer<(string Name, string Type)>.Default)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        foreach (var opDef in resolution.Operations)
+        {
+            var plannedResourceTypes = GetPlannedResourceTypes(opDef);
+            var key = (opDef.Name ?? string.Empty, opDef.OperationType ?? string.Empty);
+            if (existingPoolByKey.TryGetValue(key, out var existingCandidates)
+                && TryTakeMatchingOperation(existingCandidates, plannedResourceTypes, out var existingMatch)
+                && existingMatch != null)
+            {
+                output.WriteLine($"  Using existing operation: {opDef.Name} ({opDef.OperationType}) for [{string.Join(", ", plannedResourceTypes)}]");
+                continue;
+            }
+
+            var apiOp = new CreateNormalizationOperationDetailsApiModel
+            {
+                OperationType = opDef.OperationType,
+                Name = opDef.Name,
+                Description = opDef.Description ?? string.Empty,
+                SourceFhirPath = opDef.SourceFhirPath ?? string.Empty,
+                TargetFhirPath = opDef.TargetFhirPath ?? string.Empty
+            };
+
+            // Populate type-specific fields.
+            switch (opDef.OperationType)
+            {
+                case "ConditionalTransform":
+                    apiOp.TargetFhirPath = opDef.ConditionTargetFhirPath ?? string.Empty;
+                    apiOp.TargetValue = opDef.ConditionTargetValue;
+                    apiOp.Conditions = opDef.Conditions.Select(c => new CreateNormalizationConditionApiModel
+                    {
+                        FhirPathSource = c.FhirPathSource,
+                        Operator = c.Operator,
+                        Value = c.Value
+                    }).ToList();
+                    break;
+                case "CodeMap":
+                    apiOp.FhirPath = opDef.CodeMapFhirPath;
+                    apiOp.CodeSystemMaps = opDef.CodeSystemMaps.Select(csm => new CreateNormalizationCodeSystemMapApiModel
+                    {
+                        SourceSystem = csm.SourceSystem,
+                        TargetSystem = csm.TargetSystem,
+                        CodeMaps = csm.CodeMaps.ToDictionary(
+                            kvp => kvp.Key,
+                            kvp => new CreateNormalizationCodeMapEntryApiModel { Code = kvp.Value.Code, Display = kvp.Value.Display })
+                    }).ToList();
+                    break;
+                case "RemoveExtensions":
+                    apiOp.ExtensionUrls = opDef.ExtensionUrls;
+                    break;
+                case "CopyLocationAliasToTypeIteratively":
+                    apiOp.MaxIterations = opDef.MaxIterations;
+                    apiOp.SplitOnComma = opDef.SplitOnComma;
+                    break;
+            }
+
+            var createResp = await normalizationClient.CreateOperationAsync(new CreateNormalizationOperationRequestApiModel
+            {
+                ResourceTypes = opDef.ResourceTypes,
+                FacilityId = facilityId,
+                Operation = apiOp,
+                Description = opDef.Description ?? string.Empty,
+                VendorIds = []
+            }, cancellationToken);
+
+            if (!createResp.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException($"Failed to create normalization operation '{opDef.Name}' ({opDef.OperationType}) for facility '{facilityId}'. HTTP {(int)createResp.StatusCode}");
+            }
+
+            output.WriteLine($"  Created operation: {opDef.Name} ({opDef.OperationType}) for [{string.Join(", ", opDef.ResourceTypes)}]");
+
+        }
+
+        // Create sequences per resource type.
+        // We need to get operations back from the API since the create response may not give IDs directly.
+        // Instead, re-search to find newly created ops and build sequences.
+        var allReturnedOperations = await FetchAllFacilityOperationsAsync();
+
+        if (allReturnedOperations.Count > 0)
+        {
+            var availableByKey = allReturnedOperations
+                .GroupBy(op => (op.Name ?? string.Empty, op.OperationType ?? string.Empty),
+                    EqualityComparer<(string Name, string Type)>.Default)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            for (var i = 0; i < resolution.Operations.Count; i++)
+            {
+                var planned = resolution.Operations[i];
+                var key = (planned.Name ?? string.Empty, planned.OperationType ?? string.Empty);
+                if (!availableByKey.TryGetValue(key, out var candidates) || candidates.Count == 0)
+                {
+                    throw new InvalidOperationException($"Could not map normalization operation '{planned.Name}' ({planned.OperationType}) from API search results for facility '{facilityId}'.");
+                }
+
+                var plannedResourceTypes = GetPlannedResourceTypes(planned);
+                if (!TryTakeMatchingOperation(candidates, plannedResourceTypes, out var matched) || matched == null)
+                    throw new InvalidOperationException($"Could not map normalization operation '{planned.Name}' ({planned.OperationType}) from API search results for facility '{facilityId}'.");
+
+                foreach (var resourceType in plannedResourceTypes)
+                {
+                    if (!createdOpsByResourceType.TryGetValue(resourceType, out var mapped))
+                    {
+                        mapped = [];
+                        createdOpsByResourceType[resourceType] = mapped;
+                    }
+
+                    mapped.Add((matched.Id, i + 1));
+                }
+            }
+
+            foreach (var (resourceType, ops) in createdOpsByResourceType)
+            {
+                var sequences = ops
+                    .OrderBy(o => o.Order)
+                    .Select((o, idx) => new CreateNormalizationOperationSequenceApiModel
+                    {
+                        OperationId = o.OpId,
+                        Sequence = idx + 1
+                    })
+                    .ToList();
+
+                var seqResp = await normalizationClient.CreateOperationSequencesAsync(facilityId, resourceType, sequences, cancellationToken);
+                if (seqResp.IsSuccessStatusCode)
+                    output.WriteLine($"  Created operation sequence for resource type: {resourceType} ({sequences.Count} op(s))");
+                else
+                    throw new InvalidOperationException($"Failed to create normalization sequence for resource type '{resourceType}' in facility '{facilityId}'. HTTP {(int)seqResp.StatusCode}");
+            }
+        }
+
+        return resolution;
     }
 }

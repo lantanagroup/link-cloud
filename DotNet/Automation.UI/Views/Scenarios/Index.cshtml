@@ -32,12 +32,17 @@
                 <tbody>
                     @foreach (var s in Model)
                     {
-                        var resourceRange = s.ResourcesPerPatientMin == s.ResourcesPerPatientMax
-                            ? s.ResourcesPerPatientMin.ToString()
-                            : $"{s.ResourcesPerPatientMin}\u2013{s.ResourcesPerPatientMax}";
                         var patientCount = s.PatientCohorts.Count > 0
                             ? s.PatientCohorts.Sum(c => c.PatientCount)
                             : s.PatientCount;
+                        var resourceRange = s.PatientCohorts.Count > 0
+                            ? string.Join(", ",
+                                s.PatientCohorts
+                                    .Select(c => c.ResourcesPerPatientMin == c.ResourcesPerPatientMax
+                                        ? c.ResourcesPerPatientMin.ToString()
+                                        : $"{c.ResourcesPerPatientMin}\u2013{c.ResourcesPerPatientMax}")
+                                    .Distinct())
+                            : "-";
 
                         <tr data-id="@s.Id">
                             <td>
