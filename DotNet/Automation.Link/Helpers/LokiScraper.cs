@@ -9,17 +9,21 @@ public class LokiScraper
 {
     private readonly IAutomationOutput _output;
     private readonly IRestClient _lokiClient;
+    private readonly string _lokiAppLabel;
     private DateTime _lastQueryTime = DateTime.UtcNow;
 
     public LokiScraper(IAutomationOutput output, AutomationConfig config)
-        : this(output, new RestClient(config.LokiBaseUrl))
+        : this(output, new RestClient(config.LokiBaseUrl), config.LokiAppLabel)
     {
     }
 
-    public LokiScraper(IAutomationOutput output, IRestClient lokiClient)
+    public LokiScraper(IAutomationOutput output, IRestClient lokiClient, string? lokiAppLabel = null)
     {
         _output = output;
         _lokiClient = lokiClient;
+        _lokiAppLabel = string.IsNullOrWhiteSpace(lokiAppLabel)
+            ? "link-cloud"
+            : lokiAppLabel.Trim();
     }
 
     public static class Components
@@ -59,7 +63,7 @@ public class LokiScraper
             ? $" |= \"{facilityId}\""
             : "";
         await ScrapeQueryAsync(
-            $"{{app=\"link-cloud\"}} |~ \"(?i)(error|exception)\" !~ \"(?i)({HarmlessPatterns})\"{correlationFilter}",
+            $"{{app=\"{_lokiAppLabel}\"}} |~ \"(?i)(error|exception)\" !~ \"(?i)({HarmlessPatterns})\"{correlationFilter}",
             "LOKI ERROR");
     }
 
@@ -86,7 +90,7 @@ public class LokiScraper
                 var correlationFilter = !string.IsNullOrWhiteSpace(facilityId)
                     ? $" |= \"{facilityId}\""
                     : "";
-                var query = $"{{app=\"link-cloud\", component=\"{component}\"}} |~ \"(?i)(error|exception|fail|timeout|disconnect)\" !~ \"(?i)({HarmlessPatterns})\"{correlationFilter}";
+                var query = $"{{app=\"{_lokiAppLabel}\", component=\"{component}\"}} |~ \"(?i)(error|exception|fail|timeout|disconnect)\" !~ \"(?i)({HarmlessPatterns})\"{correlationFilter}";
                 var request = new RestRequest("/loki/api/v1/query_range");
                 request.AddParameter("query", query);
                 request.AddParameter("start", startUnix.ToString());
@@ -188,7 +192,7 @@ public class LokiScraper
             }
         }
 
-        var query = $"{{app=\"link-cloud\", component=\"{componentName}\"}} |= \"{escapedIncludePattern}\"{containsFilter}";
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{componentName}\"}} |= \"{escapedIncludePattern}\"{containsFilter}";
 
         var lines = new List<string>();
         var pageSize = Math.Max(1, limit);
@@ -313,7 +317,7 @@ public class LokiScraper
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        var query = $"{{app=\"link-cloud\", component=\"{componentName}\"}} |~ \"(?i)(error|warn|exception|fail|timeout|duration|evaluated|validated|submitted|generated|measure.?report)\" !~ \"(?i)({HarmlessPatterns})\"";
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{componentName}\"}} |~ \"(?i)(error|warn|exception|fail|timeout|duration|evaluated|validated|submitted|generated|measure.?report)\" !~ \"(?i)({HarmlessPatterns})\"";
         var request = new RestRequest("/loki/api/v1/query_range");
         request.AddParameter("query", query);
         request.AddParameter("start", startUnix.ToString());
@@ -617,7 +621,7 @@ public class LokiScraper
         var correlationFilter = !string.IsNullOrWhiteSpace(facilityId)
             ? $" |= \"{facilityId}\""
             : "";
-        var query = $"{{app=\"link-cloud\", component=\"{componentName}\"}} |~ \"(?i)(exception|fatal|unhandled|stack\\s*trace|critical)\" !~ \"(?i)({HarmlessPatterns}|Unknown message ID)\"{correlationFilter}";
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{componentName}\"}} |~ \"(?i)(exception|fatal|unhandled|stack\\s*trace|critical)\" !~ \"(?i)({HarmlessPatterns}|Unknown message ID)\"{correlationFilter}";
 
         var request = new RestRequest("/loki/api/v1/query_range");
         request.AddParameter("query", query);
@@ -670,7 +674,7 @@ public class LokiScraper
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
         // Focus on ReadyForValidation processing lines emitted by the consumer.
-        var query = $"{{app=\"link-cloud\", component=\"{Components.Validation}\"}} |= \"Processing\" |= \"patient\" |= \"report\" !~ \"(?i)({HarmlessPatterns})\"";
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Validation}\"}} |= \"Processing\" |= \"patient\" |= \"report\" !~ \"(?i)({HarmlessPatterns})\"";
         var request = new RestRequest("/loki/api/v1/query_range");
         request.AddParameter("query", query);
         request.AddParameter("start", startUnix.ToString());
@@ -740,7 +744,7 @@ public class LokiScraper
         var startUnix = ((DateTimeOffset)start).ToUnixTimeMilliseconds() * 1000000;
         var endUnix = ((DateTimeOffset)end).ToUnixTimeMilliseconds() * 1000000;
 
-        var query = $"{{app=\"link-cloud\", component=\"{Components.Normalization}\"}} |~ \"(?i)(ResourceNormalized|Producing|Normalization Operation|Acquisition Complete)\" !~ \"(?i)({HarmlessPatterns})\"";
+        var query = $"{{app=\"{_lokiAppLabel}\", component=\"{Components.Normalization}\"}} |~ \"(?i)(ResourceNormalized|Producing|Normalization Operation|Acquisition Complete)\" !~ \"(?i)({HarmlessPatterns})\"";
         var request = new RestRequest("/loki/api/v1/query_range");
         request.AddParameter("query", query);
         request.AddParameter("start", startUnix.ToString());
