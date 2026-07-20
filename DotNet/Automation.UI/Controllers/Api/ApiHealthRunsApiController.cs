@@ -1,10 +1,18 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Automation.UI.Controllers.Api;
 
+/// <summary>
+/// API for triggering and monitoring API Health (endpoint stability) runs.
+/// The browser UI continues to use the antiforgery-protected start-all endpoint.
+/// Service-to-service callers (ADO pipeline, etc.) use the bearer-authenticated
+/// start-all-for-pipeline endpoint and poll GetStatus.
+/// Notifications are left to the caller.
+/// </summary>
 [ApiController]
 [Route("api/api-health-runs")]
 public sealed class ApiHealthRunsApiController(ApiHealthExecutionRunManager runManager) : ControllerBase
@@ -14,9 +22,28 @@ public sealed class ApiHealthRunsApiController(ApiHealthExecutionRunManager runM
         PropertyNameCaseInsensitive = true
     };
 
+    /// <summary>
+    /// UI entry point (antiforgery required). Starts a full API Health run.
+    /// </summary>
     [HttpPost("start-all")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> StartAll(CancellationToken cancellationToken)
+    {
+        return await StartAllCore(cancellationToken);
+    }
+
+    /// <summary>
+    /// Service-to-service entry point (bearer token required). Starts a full API Health run.
+    /// Used by the ADO multi-suite smoke pipeline.
+    /// </summary>
+    [HttpPost("start-all-for-pipeline")]
+    [Authorize(Policy = "ApiBearerPolicy")]
+    public async Task<IActionResult> StartAllForPipeline(CancellationToken cancellationToken)
+    {
+        return await StartAllCore(cancellationToken);
+    }
+
+    private async Task<IActionResult> StartAllCore(CancellationToken cancellationToken)
     {
         var runId = await runManager.StartAllAsync();
         cancellationToken.ThrowIfCancellationRequested();
