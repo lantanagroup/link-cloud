@@ -14,22 +14,18 @@ public class FacilityAdministrationService : IFacilityAdministrationService
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyCollection<FacilitySummaryResponse>> GetFacilitiesAsync(CancellationToken cancellationToken = default)
+    public async Task<FacilitySummaryResponse?> UpdateFacilityOnboardingAsync(string facilityId, string actingFacilityId, bool isFacilityAdmin, UpdateFacilityOnboardingRequest request, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Facilities
-            .AsNoTracking()
-            .OrderBy(x => x.FacilityId)
-            .Select(x => new FacilitySummaryResponse
-            {
-                Id = x.Id,
-                FacilityId = x.FacilityId,
-                IsOnboarded = x.IsOnboarded
-            })
-            .ToListAsync(cancellationToken);
-    }
+        if (!isFacilityAdmin)
+        {
+            throw new InvalidOperationException("FACADMIN is required to update facility onboarding.");
+        }
 
-    public async Task<FacilitySummaryResponse?> UpdateFacilityOnboardingAsync(string facilityId, UpdateFacilityOnboardingRequest request, CancellationToken cancellationToken = default)
-    {
+        if (!string.Equals(facilityId, actingFacilityId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Facility onboarding may only be updated for the authenticated facility context.");
+        }
+
         var facility = await _dbContext.Facilities.SingleOrDefaultAsync(x => x.FacilityId == facilityId, cancellationToken);
         if (facility is null)
         {
@@ -38,10 +34,6 @@ public class FacilityAdministrationService : IFacilityAdministrationService
 
         facility.IsOnboarded = request.IsOnboarded;
         await _dbContext.SaveChangesAsync(cancellationToken);
-
-        await _dbContext.Users
-            .Where(x => x.FacilityId == facilityId)
-            .ExecuteUpdateAsync(setters => setters.SetProperty(user => user.IsOnboarded, request.IsOnboarded), cancellationToken);
 
         return new FacilitySummaryResponse
         {

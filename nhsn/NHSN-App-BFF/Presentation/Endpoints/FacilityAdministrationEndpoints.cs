@@ -1,5 +1,7 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces;
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Models;
+using LantanaGroup.Link.Nhsn.App.Bff.Settings;
+using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
@@ -11,22 +13,30 @@ public class FacilityAdministrationEndpoints : IApi
             .WithTags("NHSN App BFF")
             .RequireAuthorization("AuthenticatedUser");
 
-        group.MapGet(string.Empty, async (IFacilityAdministrationService facilityAdministrationService, CancellationToken cancellationToken) =>
+        group.MapPut("/{facilityId}/onboarding", async (string facilityId, UpdateFacilityOnboardingRequest request, HttpContext httpContext, IFacilityAdministrationService facilityAdministrationService, IOptions<NhsnJwtSettings> jwtOptions, CancellationToken cancellationToken) =>
             {
-                var facilities = await facilityAdministrationService.GetFacilitiesAsync(cancellationToken);
-                return facilities.Count == 0 ? Results.NoContent() : Results.Ok(facilities);
-            })
-            .WithName("GetNhsnFacilities")
-            .Produces(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status204NoContent);
+                var actingFacilityId = httpContext.User.FindFirst(jwtOptions.Value.FacilityIdClaimType)?.Value;
+                var groups = httpContext.User.FindAll(jwtOptions.Value.GroupsClaimType).Select(x => x.Value);
+                var isFacilityAdmin = groups.Contains("FACADMIN", StringComparer.OrdinalIgnoreCase);
 
-        group.MapPut("/{facilityId}/onboarding", async (string facilityId, UpdateFacilityOnboardingRequest request, IFacilityAdministrationService facilityAdministrationService, CancellationToken cancellationToken) =>
-            {
-                var updated = await facilityAdministrationService.UpdateFacilityOnboardingAsync(facilityId, request, cancellationToken);
-                return updated is null ? Results.NotFound() : Results.Ok(updated);
+                if (string.IsNullOrWhiteSpace(actingFacilityId))
+                {
+                    return Results.BadRequest(new { message = "Facility context is required." });
+                }
+
+                try
+                {
+                    var updated = await facilityAdministrationService.UpdateFacilityOnboardingAsync(facilityId, actingFacilityId, isFacilityAdmin, request, cancellationToken);
+                    return updated is null ? Results.NotFound() : Results.Ok(updated);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return Results.BadRequest(new { message = ex.Message });
+                }
             })
             .WithName("UpdateFacilityOnboarding")
             .Produces(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
     }
 }

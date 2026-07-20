@@ -163,7 +163,7 @@ export function App() {
         </div>
 
         <div className="shell__card">
-          <h2>{editor.id ? 'Update test user' : 'Who are you simulating?'}</h2>
+          <h2>{editor.id ? 'Update test profile' : 'Create a lower-environment JWT test profile'}</h2>
           <form onSubmit={handleSubmit}>
             <div className="shell__row">
               <label htmlFor="label">Friendly label</label>
@@ -198,7 +198,7 @@ export function App() {
               <textarea id="privateKeyPem" value={editor.privateKeyPem} onChange={event => setEditor({ ...editor, privateKeyPem: event.target.value })} rows={8} placeholder="-----BEGIN PRIVATE KEY-----" />
             </div>
             <div className="shell__row">
-              <button type="submit">Save and activate user</button>
+              <button type="submit">Save and activate test profile</button>
             </div>
             {editor.id && (
               <div className="shell__row">
@@ -215,10 +215,10 @@ export function App() {
         ) : (
           <div style={{ padding: '2rem' }}>
             <div style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
-              <h2>Select or create a test user</h2>
+              <h2>Select or create a test profile</h2>
               <p>
-                The standalone shell only initializes NHSNLink after a signed-JWT test user has been selected. Use the shell controls on the left to answer
-                �who are you simulating?� and configure the issuer, key id, and private key used by the harness to sign the bearer token.
+                The standalone shell only initializes NHSNLink after a signed-JWT test profile has been selected. Use the shell controls on the left to
+                configure the test identity, issuer, key id, and private key used by the lower-environment harness to sign the bearer token.
               </p>
             </div>
           </div>

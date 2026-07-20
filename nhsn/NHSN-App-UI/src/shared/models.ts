@@ -12,12 +12,11 @@ export interface TestUserProfile {
 }
 
 export interface UserInfoResponse {
+  AccessState: 'Allowed' | 'MissingFacility' | 'MissingRequiredRole';
   Email: string;
   Name: string;
-  Roles: string[];
-  IsSystemAdmin: boolean;
+  IsFacilityAdmin: boolean;
   IsOnboarded: boolean;
-  IsActive: boolean;
   HasFacility: boolean;
   FacilityId?: string;
   Groups: string[];
@@ -30,15 +29,4 @@ export interface FacilitySummaryResponse {
   Id: string;
   FacilityId: string;
   IsOnboarded: boolean;
-}
-
-export interface UserRoleSummaryResponse {
-  Id: string;
-  Email: string;
-  Name: string;
-  FacilityId?: string;
-  IsOnboarded: boolean;
-  IsActive: boolean;
-  IsAdmin: boolean;
-  Groups: string[];
 }

@@ -58,13 +58,13 @@ Instead, `NHSNLink` initializes by calling the BFF using `apiBaseUrl`:
 
 - `GET /api/nhsn-app-bff/userinfo`
 
-The BFF resolves who the user is, what NHSNLink role they have, and whether they are in onboarding or maintenance mode.
+The BFF resolves who the user is, whether their JWT includes `FACADMIN`, whether a facility claim is present, and whether the facility is in onboarding or maintenance mode.
 
 The `/userinfo` response also drives:
 
-- whether the user is active or disabled
+- whether the user has the required `FACADMIN` role
+- whether a facility context is present
 - whether onboarding is required
-- whether the user is a System Administrator
 - the navigation options that should be available
 
 ## Shell signed-JWT model
@@ -72,9 +72,7 @@ The `/userinfo` response also drives:
 The standalone shell is designed for lower-environment testing.
 
 ### First launch
-If there are no saved test users, the shell asks:
-
-> “Who are you simulating?”
+If there are no saved test profiles, the shell asks the tester to create a lower-environment JWT test profile.
 
 It captures:
 
@@ -87,12 +85,12 @@ It captures:
 - private key PEM
 
 ### Saved profile library
-The shell stores a library of previously used test-user profiles in browser local storage so the tester can easily switch among user contexts.
+The shell stores a library of previously used test profiles in browser local storage so the tester can easily switch among JWT contexts.
 
 The shell tracks:
 
-- multiple saved test users
-- the currently active test user
+- multiple saved test profiles
+- the currently active test profile
 - last-used timestamps
 
 ### Request behavior
@@ -104,9 +102,10 @@ This mimics the production request shape as closely as possible while still allo
 
 `NHSNLink` uses the `/userinfo` response to determine whether to render:
 
+- no-access messaging when `FACADMIN` is missing
+- missing-facility messaging when no facility claim is present
 - onboarding navigation
 - maintenance/configuration navigation
-- system-administrator-specific navigation
 
 This is the initial framework/foundation behavior. It is intentionally light-weight but establishes the long-term UI shape.
 
@@ -147,7 +146,6 @@ Important file:
 Other key components:
 - `src/components/NavigationRail.tsx`
 - `src/components/OnboardingScreen.tsx`
-- `src/components/SystemAdminUsersScreen.tsx`
 - `src/components/notifications/NotificationProvider.tsx`
 
 ### `src/services`
