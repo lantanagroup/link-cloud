@@ -399,6 +399,7 @@ internal sealed class RunExecutor
 
             Frequency? scheduledRunFrequency = null;
             string reportId;
+            string normalizationEvidenceReportId;
             if (usesScheduledWorkflow)
             {
                 var scheduledWorkflowState = await ExecuteScheduledReportWorkflowAsync(
@@ -413,11 +414,13 @@ internal sealed class RunExecutor
                     cancellationToken);
 
                 reportId = scheduledWorkflowState.ReportTrackingId;
+                normalizationEvidenceReportId = reportId;
                 scheduledRunFrequency = scheduledWorkflowState.Frequency;
             }
             else
             {
                 reportId = await reportHelper.GenerateReportAsync(facilityId, measureIds, scenarioConfig);
+                normalizationEvidenceReportId = reportId;
             }
             lock (state.Sync)
             {
@@ -488,8 +491,10 @@ internal sealed class RunExecutor
                 // Flush stale domain data so the regenerated report starts fresh.
                 services.GetRequiredService<PipelineDataReader>().InvalidateCache();
 
+                var originalReportId = reportId;
                 var regeneratedReportId = await reportHelper.RegenerateReportAsync(facilityId, reportId);
                 reportId = regeneratedReportId;
+                normalizationEvidenceReportId = originalReportId;
                 lock (state.Sync)
                 {
                     state.ReportId = reportId;
@@ -700,14 +705,78 @@ internal sealed class RunExecutor
             await RunValidator("NORMALIZATION DATABASE VALIDATION", () =>
                 normalizationValidator.ValidateAllAsync(facilityId));
 
-            var normalizationSummaryLogs = await lokiScraper.QueryServiceLogsAsync(
-                LokiScraper.Components.Normalization,
-                "[NormalizationExecutionSummary]",
-                scenarioConfig.LokiScrapeWindow,
-                facilityId: null,
-                structuredFieldName: "FacilityId",
-                structuredFieldValue: facilityId,
-                limit: 5000);
+            var normalizationSummaryMarker = "[NormalizationExecutionSummary]";
+            var evidenceRequiredResourceTypes = normalizationResolution.Sequences
+                .SelectMany(s => s.Operations)
+                .Where(s => !string.Equals(s.Operation.OperationType, "RemoveExtensions", StringComparison.OrdinalIgnoreCase))
+                .SelectMany(s => s.Operation.ResourceTypes)
+                .Concat(
+                    normalizationResolution.StandaloneOperations
+                        .Where(o => !string.Equals(o.OperationType, "RemoveExtensions", StringComparison.OrdinalIgnoreCase))
+                        .SelectMany(o => o.ResourceTypes))
+                .Where(rt => !string.IsNullOrWhiteSpace(rt))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var runScopeFilters = new List<string> { facilityId, normalizationEvidenceReportId };
+
+            async Task<List<string>> QueryNormalizationSummaryLogsAsync()
+            {
+                var logs = new List<string>();
+
+                if (evidenceRequiredResourceTypes.Count > 0)
+                {
+                    foreach (var resourceType in evidenceRequiredResourceTypes)
+                    {
+                        var logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
+                            LokiScraper.Components.Normalization,
+                            normalizationSummaryMarker,
+                            scenarioConfig.LokiScrapeWindow,
+                            additionalContainsFilters: [.. runScopeFilters, resourceType],
+                            limit: 5000,
+                            maxPages: 20);
+
+                        logs.AddRange(logsForResourceType);
+                    }
+                }
+                else
+                {
+                    logs = await lokiScraper.QueryServiceLogsAsync(
+                        LokiScraper.Components.Normalization,
+                        normalizationSummaryMarker,
+                        scenarioConfig.LokiScrapeWindow,
+                        additionalContainsFilters: runScopeFilters,
+                        limit: 5000,
+                        maxPages: 20);
+                }
+
+                return logs
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+            }
+
+            var normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync();
+            var retryAttemptsUsed = 0;
+
+            if (normalizationSummaryLogs.Count == 0)
+            {
+                const int retryAttempts = 6;
+                var retryDelay = TimeSpan.FromSeconds(5);
+
+                output.WriteLine("[Normalization Suite] No summary logs found on first attempt. Retrying for up to 30s...");
+
+                for (var attempt = 1; attempt <= retryAttempts; attempt++)
+                {
+                    await Task.Delay(retryDelay, cancellationToken);
+                    normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync();
+                    retryAttemptsUsed = attempt;
+
+                    if (normalizationSummaryLogs.Count > 0)
+                        break;
+                }
+            }
+
+            output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation (firstAttempt={(retryAttemptsUsed == 0 ? normalizationSummaryLogs.Count : 0)}, retryAttempts={retryAttemptsUsed}).");
 
             await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", () =>
                 normalizationSuiteApplicationValidator.ValidateAllAsync(internalAbsResources, normalizationResolution, normalizationSummaryLogs));
