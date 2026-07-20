@@ -715,38 +715,63 @@ internal sealed class RunExecutor
 
             var runScopeFilters = new List<string> { facilityId, reportId };
 
-            var normalizationSummaryLogs = new List<string>();
-            if (evidenceRequiredResourceTypes.Count > 0)
+            async Task<List<string>> QueryNormalizationSummaryLogsAsync()
             {
-                foreach (var resourceType in evidenceRequiredResourceTypes)
+                var logs = new List<string>();
+
+                if (evidenceRequiredResourceTypes.Count > 0)
                 {
-                    var logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
+                    foreach (var resourceType in evidenceRequiredResourceTypes)
+                    {
+                        var logsForResourceType = await lokiScraper.QueryServiceLogsAsync(
+                            LokiScraper.Components.Normalization,
+                            normalizationSummaryMarker,
+                            scenarioConfig.LokiScrapeWindow,
+                            additionalContainsFilters: [.. runScopeFilters, resourceType],
+                            limit: 5000,
+                            maxPages: 20);
+
+                        logs.AddRange(logsForResourceType);
+                    }
+                }
+                else
+                {
+                    logs = await lokiScraper.QueryServiceLogsAsync(
                         LokiScraper.Components.Normalization,
                         normalizationSummaryMarker,
                         scenarioConfig.LokiScrapeWindow,
-                        additionalContainsFilters: [.. runScopeFilters, resourceType],
+                        additionalContainsFilters: runScopeFilters,
                         limit: 5000,
                         maxPages: 20);
+                }
 
-                    normalizationSummaryLogs.AddRange(logsForResourceType);
+                return logs
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+            }
+
+            var normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync();
+            var retryAttemptsUsed = 0;
+
+            if (normalizationSummaryLogs.Count == 0)
+            {
+                const int retryAttempts = 6;
+                var retryDelay = TimeSpan.FromSeconds(5);
+
+                output.WriteLine("[Normalization Suite] No summary logs found on first attempt. Retrying for up to 30s...");
+
+                for (var attempt = 1; attempt <= retryAttempts; attempt++)
+                {
+                    await Task.Delay(retryDelay, cancellationToken);
+                    normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync();
+                    retryAttemptsUsed = attempt;
+
+                    if (normalizationSummaryLogs.Count > 0)
+                        break;
                 }
             }
-            else
-            {
-                normalizationSummaryLogs = await lokiScraper.QueryServiceLogsAsync(
-                    LokiScraper.Components.Normalization,
-                    normalizationSummaryMarker,
-                    scenarioConfig.LokiScrapeWindow,
-                    additionalContainsFilters: runScopeFilters,
-                    limit: 5000,
-                    maxPages: 20);
-            }
 
-            normalizationSummaryLogs = normalizationSummaryLogs
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-
-            output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
+            output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation (firstAttempt={(retryAttemptsUsed == 0 ? normalizationSummaryLogs.Count : 0)}, retryAttempts={retryAttemptsUsed}).");
 
             await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", () =>
                 normalizationSuiteApplicationValidator.ValidateAllAsync(internalAbsResources, normalizationResolution, normalizationSummaryLogs));

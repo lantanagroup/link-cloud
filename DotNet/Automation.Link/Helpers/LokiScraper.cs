@@ -43,7 +43,7 @@ public class LokiScraper
         Components.Tenant
     ];
 
-    private const string HarmlessPatterns = "healthcheck|health-check|actuator|AppInfoParser|InstanceAlreadyExistsException";
+    private const string HarmlessPatterns = "healthcheck|health-check|actuator|AppInfoParser|InstanceAlreadyExistsException|UQ_LocationMapping_Facility_Location|Cannot insert duplicate key row in object 'dbo.OrganizationLocationMapping'";
 
     public async Task ScrapeErrorsAsync(string? facilityId = null, string? reportId = null)
     {
