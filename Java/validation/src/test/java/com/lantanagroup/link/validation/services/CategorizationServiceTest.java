@@ -1,9 +1,7 @@
 package com.lantanagroup.link.validation.services;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.CategoryRule;
-import com.lantanagroup.link.validation.entities.CategorySnapshot;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.entities.ResultField;
 import com.lantanagroup.link.validation.matchers.CompositeMatcher;
@@ -16,9 +14,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -260,28 +256,9 @@ public class CategorizationServiceTest {
         assertFalse(result.getCategories().contains(category));
     }
 
-    /**
-     * Loads the categories that actually ship in categories.json so the tests below exercise the real
-     * inactive_code matcher rather than a hand-copied regex (guards against drift between the shipped
-     * category and the message the validation service emits).
-     */
-    private List<Category> loadShippedCategories() throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        try (InputStream stream = Thread.currentThread().getContextClassLoader().getResourceAsStream("categories.json")) {
-            CategorySnapshot[] snapshots = mapper.readValue(stream, CategorySnapshot[].class);
-            return Arrays.stream(snapshots)
-                    .map(snapshot -> {
-                        Category category = snapshot.toCategory();
-                        category.setRules(List.of(snapshot.toCategoryRule(category)));
-                        return category;
-                    })
-                    .toList();
-        }
-    }
-
     @Test
     void categorizeAssignsInactiveCodeCategoryForInactiveMessage() throws IOException {
-        when(categoryRepository.findAll()).thenReturn(loadShippedCategories());
+        when(categoryRepository.findAll()).thenReturn(CategoryFixtures.loadShippedCategories());
 
         Result result = new Result();
         // Exactly what RemoteTermServiceValidation emits for an inactive code, located on Encounter.type.
@@ -302,7 +279,7 @@ public class CategorizationServiceTest {
 
     @Test
     void categorizeDoesNotAssignInactiveCodeCategoryForOtherMessage() throws IOException {
-        when(categoryRepository.findAll()).thenReturn(loadShippedCategories());
+        when(categoryRepository.findAll()).thenReturn(CategoryFixtures.loadShippedCategories());
 
         Result result = new Result();
         result.setMessage("Some other rule");

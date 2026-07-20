@@ -8,7 +8,6 @@ import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.validation.entities.Category;
-import com.lantanagroup.link.validation.entities.CategorySnapshot;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ValidationComplete;
@@ -28,9 +27,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.support.SendResult;
 
-import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -271,7 +268,7 @@ public class ReadyForValidationConsumerTest {
         // Wire a real CategorizationService backed by the shipped categories.json so this exercises the
         // actual message -> inactive_code category -> saveAll path for an inactive-code finding.
         CategoryRepository categoryRepository = mock(CategoryRepository.class);
-        when(categoryRepository.findAll()).thenReturn(loadShippedCategories());
+        when(categoryRepository.findAll()).thenReturn(CategoryFixtures.loadShippedCategories());
         CategorizationService realCategorizationService = new CategorizationService(
                 new ObjectMapper(), categoryRepository, mock(CategoryRuleRepository.class), resultRepository);
 
@@ -291,21 +288,6 @@ public class ReadyForValidationConsumerTest {
                 inactiveResult.getCategories().stream().anyMatch(c -> "missing_active_encounter_type_code".equals(c.getId())),
                 "Inactive-code result should be categorized as inactive_code");
         verify(resultRepository).saveAll(List.of(inactiveResult));
-    }
-
-    /** Loads the categories that actually ship in categories.json (real inactive_code matcher). */
-    private List<Category> loadShippedCategories() throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        try (InputStream stream = Thread.currentThread().getContextClassLoader().getResourceAsStream("categories.json")) {
-            CategorySnapshot[] snapshots = mapper.readValue(stream, CategorySnapshot[].class);
-            return Arrays.stream(snapshots)
-                    .map(snapshot -> {
-                        Category category = snapshot.toCategory();
-                        category.setRules(List.of(snapshot.toCategoryRule(category)));
-                        return category;
-                    })
-                    .toList();
-        }
     }
 
     // -------------------------------------------------------------------------
