@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LantanaGroup.Link.Nhsn.App.Bff.Persistence.Migrations
 {
     [DbContext(typeof(NhsnAppDbContext))]
-    [Migration("20260720210554_RemoveAdminStateAndTrackLastAccess")]
-    partial class RemoveAdminStateAndTrackLastAccess
+    [Migration("20260720220529_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

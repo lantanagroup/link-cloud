@@ -125,7 +125,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddTransient<IApi, UserInfoEndpoints>();
     builder.Services.AddTransient<IApi, SimulationEndpoints>();
     builder.Services.AddTransient<IApi, FacilityAdministrationEndpoints>();
-    builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>();
+    builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>(name: "database");
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
     {
