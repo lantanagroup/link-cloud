@@ -1,11 +1,13 @@
-﻿namespace LantanaGroup.Link.Terminology.Services;
+﻿using LantanaGroup.Link.Terminology.Application.Interfaces;
+
+namespace LantanaGroup.Link.Terminology.Services;
 
 /// <summary>
 /// A hosted service responsible for managing the application's startup and shutdown events.
-/// Utilizes the <see cref="CodeGroupCacheService"/> to initialize necessary cache data during the startup phase.
+/// Utilizes the <see cref="ICodeGroupCacheService"/> to initialize necessary cache data during the startup phase.
 /// Implements the <see cref="IHostedService"/> interface.
 /// </summary>
-public class Startup(CodeGroupCacheService codeGroupCacheService) : IHostedService
+public class Startup(ICodeGroupCacheService codeGroupCacheService) : IHostedService
 {
     /// <summary>
     /// Starts the asynchronous processing for initializing the application.

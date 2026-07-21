@@ -38,6 +38,7 @@ public class AutomationConfig
     public string FacilityFhirServerBase { get; set; } = "http://fhir-server:8080/fhir";
 
     public string LokiBaseUrl { get; set; } = "http://localhost:3100";
+    public string LokiAppLabel { get; set; } = "link-cloud";
     public string GrafanaBaseUrl { get; set; } = "http://localhost:3000";
     public string? DownloadPath { get; set; }
 
