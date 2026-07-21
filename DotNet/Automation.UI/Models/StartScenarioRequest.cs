@@ -73,10 +73,28 @@ public class StartScenarioRequest : IValidatableObject
     public DateTimeOffset? ReportPeriodEnd { get; set; }
 
     /// <summary>
+    /// Configured NHSN reporting Organization ID for this run.
+    /// </summary>
+    public string? NhsnOrganizationId { get; set; }
+
+    /// <summary>
     /// Optional query plan template ID. When set, the run uses this template's
     /// query plan instead of the built-in defaults. When null, the system default is used.
     /// </summary>
     public Guid? QueryPlanTemplateId { get; set; }
+
+    /// <summary>
+    /// Optional normalization suite ID. When set, the run uses this suite's
+    /// operations for normalization configuration. When null, the system default suite is used.
+    /// </summary>
+    public Guid? NormalizationSuiteId { get; set; }
+
+    /// <summary>
+    /// Optional organization-resource-map template ID. When set, the run uses this
+    /// template's DataAcquisition organization-location mapping conditions.
+    /// When null, the system default template is used.
+    /// </summary>
+    public Guid? OrganizationResourceMapTemplateId { get; set; }
 
     /// <summary>
     /// Cross-field validation. Rejects inverted report windows
@@ -103,7 +121,6 @@ public class StartScenarioRequest : IValidatableObject
         ReportMethod = scenario.ReportMethod,
         Seed = scenario.Seed,
         PatientCount = scenario.PatientCount,
-        ResourcesPerPatient = scenario.ResourcesPerPatientMax,
         CleanupServiceData = scenario.CleanupServiceData,
         CleanupFhirData = scenario.CleanupFhirData,
         SelectedMeasures = scenario.SelectedMeasures,
@@ -112,7 +129,10 @@ public class StartScenarioRequest : IValidatableObject
         ImportedPatientBundles = scenario.ImportedPatientBundles,
         ReportPeriodStart = scenario.ReportPeriodStart,
         ReportPeriodEnd = scenario.ReportPeriodEnd,
+        NhsnOrganizationId = scenario.NhsnOrganizationId,
         QueryPlanTemplateId = scenario.QueryPlanTemplateId,
+        NormalizationSuiteId = scenario.NormalizationSuiteId,
+        OrganizationResourceMapTemplateId = scenario.OrganizationResourceMapTemplateId,
     };
 
     private static string SerializeScenarioConfiguration(TestScenarioDefinition scenario)

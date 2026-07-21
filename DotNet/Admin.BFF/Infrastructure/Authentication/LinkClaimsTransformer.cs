@@ -36,6 +36,12 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Authentication
         {
             if (principal.Identity is not ClaimsIdentity identity) { return principal; }
 
+            var subject = identity.FindFirst(LinkAuthorizationConstants.LinkSystemClaims.Subject)?.Value;
+            if (string.Equals(subject, LinkAuthorizationConstants.LinkUserClaims.LinkSystemAccount, StringComparison.Ordinal))
+            {
+                return principal;
+            }
+
             var accountId = identity.FindFirst(LinkAuthorizationConstants.LinkSystemClaims.Email)?.Value;
 
             if (accountId == null) { return principal; }

@@ -19,7 +19,7 @@ public partial class FhirQueryResourceType
 
     [Required]
     [StringLength(255)]
-    public ResourceType ResourceType { get; set; }
+    public ResourceType? ResourceType { get; set; } = 0;
 
     [ForeignKey("FhirQueryId")]
     [InverseProperty("FhirQueryResourceTypes")]

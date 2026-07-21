@@ -135,6 +135,7 @@
     'use strict';
 
     const runId = '@runId';
+    const runConfigurationJson = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(run.RunConfigurationJson ?? string.Empty));
     const manifestDataUrl = '@Url.Action("ManifestData", "Runs")';
     const absDataUrl = '@Url.Action("AbsUploadData", "Runs")';
     const isComplete = @(isComplete ? "true" : "false");
@@ -144,6 +145,16 @@
         NhsnAcuteCareHospitalDailyInitialPopulation: 'ACH Daily',
         NhsnGlycemicControlHypoglycemicInitialPopulation: 'Hypoglycemic'
     };
+
+    const scheduledPatternShortNames = {
+        AdmittedBeforePeriodRemainsInpatientAfterPeriod: 'Before → Remains after',
+        AdmittedBeforePeriodDischargedDuringPeriod: 'Before → Discharged during',
+        AdmittedDuringPeriodRemainsInpatientAfterPeriod: 'During → Remains after',
+        AdmittedDuringPeriodDischargedDuringPeriod: 'During → Discharged during',
+        AdmittedAndDischargedBeforePeriod: 'Before → Before',
+        AdmittedAndDischargedAfterPeriod: 'After → After'
+    };
+    const defaultScheduledPattern = 'AdmittedBeforePeriodRemainsInpatientAfterPeriod';
 
     const chartColors = [
         '#4da3ff','#28a745','#ffc107','#dc3545','#6f42c1','#20c997','#fd7e14',
@@ -157,6 +168,21 @@
         return d.innerHTML;
     }
 
+    function formatScheduledPattern(value) {
+        if (value === null || value === undefined || value === '')
+            return escapeHtml(scheduledPatternShortNames[defaultScheduledPattern]);
+        const key = String(value).trim();
+        if (!key) return escapeHtml(scheduledPatternShortNames[defaultScheduledPattern]);
+        if (scheduledPatternShortNames[key]) return escapeHtml(scheduledPatternShortNames[key]);
+        if (/^\d+$/.test(key)) {
+            const index = Number.parseInt(key, 10);
+            const keys = Object.keys(scheduledPatternShortNames);
+            if (index >= 0 && index < keys.length)
+                return escapeHtml(scheduledPatternShortNames[keys[index]]);
+        }
+        return escapeHtml(key.replace(/([a-z])([A-Z])/g, '$1 $2'));
+    }
+
     function renderBadgeSet(items) {
         if (!items?.length) return '<span class="text-muted small">None</span>';
         return '<div class="d-flex flex-wrap gap-1">' +
@@ -166,6 +192,7 @@
 
     // ─── Fetch & Render ────────────────────────────────────────────
     let manifestData = null;
+    let fallbackInpatientPatternByPatient = null;
 
     fetch(`${manifestDataUrl}?id=${runId}`)
         .then(r => r.ok && r.status !== 204 ? r.json() : null)
@@ -302,6 +329,8 @@
             return;
         }
 
+        fallbackInpatientPatternByPatient = buildFallbackInpatientPatternMap(m);
+
         // Bar chart: total resources per patient (top 50)
         const patientTotals = patients.map(([pid, counts]) => ({
             pid,
@@ -353,14 +382,18 @@
         }
 
         // Compact table view for many patients
-        let html = '<table class="au-table table table-sm small mb-0"><thead><tr><th>Patient</th><th class="text-end">Total</th><th>Resource Types</th></tr></thead><tbody>';
+        let html = '<table class="au-table table table-sm small mb-0"><thead><tr><th>Patient</th><th>Inpatient Pattern</th><th class="text-end">Total</th><th>Resource Types</th></tr></thead><tbody>';
         patients.forEach(([pid, counts]) => {
             const total = Object.values(counts).reduce((s, c) => s + c, 0);
+            const inpatientPattern = manifestData?.patientInpatientPatterns?.[pid]
+                || fallbackInpatientPatternByPatient?.[pid]
+                || defaultScheduledPattern;
             const types = Object.entries(counts).sort(([,a],[,b]) => b - a)
                 .map(([t, c]) => `<span class="badge me-1 mb-1" style="background:#e8f4ff;color:var(--au-dark);border:1px solid #c5ddf5;font-weight:500;" data-bs-toggle="tooltip" title="${c} ${t}">${escapeHtml(t)}: ${c}</span>`)
                 .join('');
             html += `<tr>
                 <td><code>${escapeHtml(pid)}</code></td>
+                <td>${formatScheduledPattern(inpatientPattern)}</td>
                 <td class="text-end fw-semibold">${total.toLocaleString()}</td>
                 <td style="max-width:500px;">${types}</td>
             </tr>`;
@@ -369,6 +402,47 @@
         container.innerHTML = html;
         // Re-init tooltips for new elements
         container.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+    }
+
+    function normalizePatternForDisplay(value) {
+        if (value === null || value === undefined || value === '') return defaultScheduledPattern;
+        const key = String(value).trim();
+        if (!key) return defaultScheduledPattern;
+        if (scheduledPatternShortNames[key]) return key;
+        if (/^\d+$/.test(key)) {
+            const index = Number.parseInt(key, 10);
+            const keys = Object.keys(scheduledPatternShortNames);
+            if (index >= 0 && index < keys.length) return keys[index];
+        }
+        return key;
+    }
+
+    function buildFallbackInpatientPatternMap(m) {
+        const map = {};
+        if (!m?.patientIds?.length) return map;
+
+        try {
+            const cfg = runConfigurationJson ? JSON.parse(runConfigurationJson) : null;
+            const cohorts = Array.isArray(cfg?.patientCohorts) ? cfg.patientCohorts : [];
+            if (!cohorts.length) return map;
+
+            const expandedPatterns = [];
+            cohorts.forEach(c => {
+                const count = Number.parseInt(String(c?.patientCount ?? 0), 10);
+                const safeCount = Number.isFinite(count) && count > 0 ? count : 0;
+                const pattern = normalizePatternForDisplay(c?.scheduledInpatientPattern);
+                for (let i = 0; i < safeCount; i++) expandedPatterns.push(pattern);
+            });
+
+            const max = Math.min(m.patientIds.length, expandedPatterns.length);
+            for (let i = 0; i < max; i++) {
+                map[m.patientIds[i]] = expandedPatterns[i];
+            }
+        } catch {
+            // Ignore parse failures; caller will use manifest map/default fallback.
+        }
+
+        return map;
     }
 
     // ─── COMPARISON TAB ────────────────────────────────────────────
@@ -410,18 +484,27 @@
         let html = '';
 
         // ── Pipeline explanation ──
-        html += `<div class="alert alert-light border small mb-3" style="background:#f8fafc;">
-            <strong><i class="bi bi-diagram-3 me-1"></i>Prediction Pipeline</strong><br>
-            A resource is expected in ABS only if it passes <b>all three</b> gates:<br>
-            <span class="badge bg-primary me-1">1</span><strong>Generated</strong> — uploaded to FHIR server
-            <span class="mx-2">→</span>
-            <span class="badge bg-info me-1">2</span><strong>Query Plan Acquires</strong> — DA fetches types matching Parameter + Reference queries
-            <span class="mx-2">→</span>
-            <span class="badge bg-success me-1">3</span><strong>CQL References</strong> — HAPI CQL engine only places resources into <code>MeasureReport.contained</code> when a <code>[ResourceType]</code> retrieve touches them; MeasureEval's <code>normalize()</code> writes only <code>contained</code> resources to the <code>.mr</code> file
-            <span class="mx-2">→</span>
-            <span class="badge bg-dark me-1">4</span><strong>Expected in ABS</strong> — our prediction (= Generated ∩ QP Acquired ∩ CQL Referenced)
-            <span class="mx-2">vs</span>
-            <span class="badge bg-secondary me-1">5</span><strong>Actual ABS</strong> — what PatientAggregator wrote from the <code>.mr</code> files
+        html += `<div class="alert border small mb-3" style="background:#f8fafc;border-color:#dbe4f0;">
+            <div class="d-flex align-items-center mb-2">
+                <i class="bi bi-diagram-3 me-2" style="color:var(--au-accent);"></i>
+                <strong>Prediction Pipeline</strong>
+            </div>
+            <div class="mb-2 text-muted">A resource is predicted to appear in ABS when it passes all prediction filters below.</div>
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <span class="badge bg-primary">1</span><span><strong>Generated</strong></span>
+                <i class="bi bi-arrow-right text-muted"></i>
+                <span class="badge bg-info text-dark">2</span><span><strong>Query Plan Acquires</strong></span>
+                <i class="bi bi-arrow-right text-muted"></i>
+                <span class="badge bg-success">3</span><span><strong>CQL References</strong></span>
+                <i class="bi bi-arrow-right text-muted"></i>
+                <span class="badge bg-dark">4</span><span><strong>Prediction (Expected in ABS)</strong></span>
+                <span class="mx-1 text-muted">vs</span>
+                <span class="badge bg-secondary">5</span><span><strong>Actual ABS</strong></span>
+            </div>
+            <div class="text-muted">
+                <strong>Prediction</strong> includes Organization Resource Map scope when configured (org-location filtering),
+                in addition to query-plan and CQL-based filtering.
+            </div>
         </div>`;
 
         // ── Summary stat tiles ──

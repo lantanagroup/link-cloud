@@ -34,8 +34,9 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly ConditionalTransformOperationService _conditionalTransformOperationService;
         private readonly CopyLocationOperationService _copyLocationOperationService;
         private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
+        private readonly CopyLocationAliasToTypeIterativelyOperationService _copyLocationAliasToTypeIterativelyOperationService;
 
-        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IVendorQueries vendorQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService, RemoveExtensionsOperationService removeExtensionsOperationService)
+        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IVendorQueries vendorQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService, RemoveExtensionsOperationService removeExtensionsOperationService, CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService)
         {
             _operationManager = operationManager;
             _operationQueries = operationQueries;
@@ -47,6 +48,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
             _conditionalTransformOperationService = conditionalTransformOperationService;
             _copyLocationOperationService = copyLocationOperationService;
             _removeExtensionsOperationService = removeExtensionsOperationService;
+            _copyLocationAliasToTypeIterativelyOperationService = copyLocationAliasToTypeIterativelyOperationService;
         }
 
         [HttpGet("")]
@@ -408,6 +410,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operationImplementation, domainResource),
                     OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operationImplementation, domainResource),
                     OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operationImplementation, domainResource),
+                    OperationType.CopyLocationAliasToTypeIteratively => await _copyLocationAliasToTypeIterativelyOperationService.ProcessOperationAsync((CopyLocationAliasToTypeIterativelyOperation)operationImplementation, domainResource),
                     _ => null
                 };
 
@@ -456,6 +459,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationType.ConditionalTransform => await _conditionalTransformOperationService.ProcessOperationAsync((ConditionalTransformOperation)operation, domainResource),
                     OperationType.CopyLocation => await _copyLocationOperationService.ProcessOperationAsync((CopyLocationOperation)operation, domainResource),
                     OperationType.RemoveExtensions => await _removeExtensionsOperationService.ProcessOperationAsync((RemoveExtensionsOperation)operation, domainResource),
+                    OperationType.CopyLocationAliasToTypeIteratively => await _copyLocationAliasToTypeIterativelyOperationService.ProcessOperationAsync((CopyLocationAliasToTypeIterativelyOperation)operation, domainResource),
                     _ => null
                 };
 

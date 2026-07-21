@@ -95,6 +95,7 @@ namespace IntegrationTests.Normalization
             // Register CopyPropertyOperationService as a singleton and hosted service
             builder.Services.AddSingleton<CopyPropertyOperationService>();
             builder.Services.AddSingleton<CopyLocationOperationService>();
+            builder.Services.AddSingleton<CopyLocationAliasToTypeIterativelyOperationService>();
             builder.Services.AddSingleton<CodeMapOperationService>();
             builder.Services.AddSingleton<ConditionalTransformOperationService>();
             builder.Services.AddSingleton<RemoveExtensionsOperationService>();

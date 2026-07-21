@@ -1,29 +1,73 @@
 # =========================================
-#  Azure DevOps - Automation.UI Smoke Pipeline (TEST)
+#  Azure DevOps - Automation.UI Multi-Suite Smoke Pipeline
 #
-#  Replaces the old API_Integration / VSTest pipeline.
-#  Triggers a saved Automation.UI scenario by ID via HTTP, polls /status
-#  until terminal, and posts the result to Slack.
+#  Triggers one or more Automation.UI system sanity suites via HTTP after
+#  deployments (or on a schedule / manual run), polls each to completion,
+#  and posts a consolidated result to the testautomation Slack channel.
 #
-#  Currently only the Test environment is wired up. The targetEnvironment
-#  parameter is kept so other envs (e.g. dev) can be added later without
-#  restructuring the pipeline -- just fill in their base URL below.
+#  Supported suites (selectable via pipeline parameters):
+#    - API Stability Suite          -> POST /api/api-health-runs/start-all-for-pipeline
+#    - Ad Hoc Report Generation     -> system scenario "Adhoc Report Test"
+#    - Ad Hoc Report Re-generation  -> system scenario "Regenerate Report Test"
+#    - Scheduled Report Generation  -> system scenario "Scheduled Report Test"
+#
+#  System scenario IDs are deterministic (seeded by ScenarioSeedService) and
+#  identical across environments.
+#
+#  -----------------------------------------
+#  How to use / configure
+#  -----------------------------------------
+#  1. Target environment
+#     - Set the "Target environment" parameter at queue time.
+#     - Available values match the Kubernetes namespaces used by Deploy All
+#       Services:  dev-scale | scale-test | scale-qa
+#     - These are normalized internally to canonical keys (dev / test / qa)
+#       for base-URL lookup. To add a new environment:
+#         a. Add AUTOMATION_UI_BASE_URL_<canonical> under variables.
+#         b. Add the K8s-style name to the targetEnvironment values list.
+#         c. Extend Normalize-EnvironmentName if the name needs aliasing.
+#
+#  2. Which suites to run
+#     - Four boolean parameters control the suites. Defaults are all true.
+#     - Uncheck any suite you want to skip for a particular run.
+#
+#  3. Scheduling
+#     - Edit the "schedules" section below. The current entry runs weekdays
+#       at 6 AM CT against the dev branch.
+#     - Cron format is standard (minute hour day-of-month month day-of-week).
+#     - You can add additional schedule entries for different cadences
+#       (nightly, hourly, etc.). Set always: true if you want the schedule
+#       to fire even when there are no new commits.
+#
+#  4. Resource trigger (post-deploy)
+#     - The pipeline is wired to the "Deploy All Services" pipeline
+#       (definitionId 226 in project nhsnlink). When that pipeline finishes,
+#       this one is triggered and will only proceed if the triggering build
+#       targeted the same environment as the selected targetEnvironment.
+#     - Manual and scheduled runs always proceed (gate is bypassed).
+#
+#  5. Slack
+#     - Webhook is read at runtime from Azure App Configuration
+#       (key Automation:SlackWebhookUrl, label "Link Automation UI").
+#     - Results include per-suite status, duration, error (if any), and deep
+#       links into Automation.UI (Runs/Details for scenarios, ApiHealth for
+#       the stability suite). Failed suites are called out explicitly.
+#
+#  6. Timeouts / polling
+#     - pollIntervalSeconds   : how often to query /status (default 15 s)
+#     - completionTimeoutMinutes : max wait *per suite* (default 45 min)
 # =========================================
 
-trigger:
-  branches:
-    include:
-      - main
-      - feature/*
+trigger: none
 
 pr: none
 
 schedules:
-  - cron: "0 11 * * 1-5"   # 6AM CT
+  - cron: "0 11 * * 1-5"   # 6AM CT (UTC-5 / UTC-6 depending on DST)
     displayName: "Weekday 6AM CT Build"
     branches:
       include:
-        - main
+        - dev
     always: "true"
     batch: "false"
 
@@ -33,25 +77,37 @@ resources:
     - pipeline: DeployAll
       source: 'Deploy All Services'
       project: nhsnlink
-      trigger:
-        branches:
-          include:
-            - dev
+      trigger: true
 
 parameters:
   - name: targetEnvironment
     displayName: "Target environment"
     type: string
-    default: "test"
+    default: "scale-test"
     values:
-      - "test"
+      - "dev-scale"
+      - "scale-test"
+      - "scale-qa"
 
-  - name: scenario
-    displayName: "Scenario to run"
-    type: string
-    default: "AdHocReport"
-    values:
-      - "AdHocReport"
+  - name: runApiStabilitySuite
+    displayName: "Run API Stability Suite"
+    type: boolean
+    default: true
+
+  - name: runAdHocReportSuite
+    displayName: "Run Ad Hoc Report Generation Suite"
+    type: boolean
+    default: true
+
+  - name: runRegenerateReportSuite
+    displayName: "Run Ad Hoc Report Re-generation Suite"
+    type: boolean
+    default: true
+
+  - name: runScheduledReportSuite
+    displayName: "Run Scheduled Report Generation Suite"
+    type: boolean
+    default: true
 
   - name: pollIntervalSeconds
     displayName: "Status poll interval (seconds)"
@@ -59,30 +115,32 @@ parameters:
     default: 15
 
   - name: completionTimeoutMinutes
-    displayName: "Max minutes to wait for the run to finish"
+    displayName: "Max minutes to wait per suite"
     type: number
     default: 45
 
 variables:
   # Per-environment Automation.UI base URL.
-  # Only test is configured for now; add other envs as they come online.
+  # Keys are the *canonical* names produced by Normalize-EnvironmentName
+  # (dev-scale → dev, scale-test → test, scale-qa → qa).
+  # Confirm the actual hostnames for dev and qa before first use.
   AUTOMATION_UI_BASE_URL_test: "https://test-automation.nhsnlink.org"
-  # AUTOMATION_UI_BASE_URL_dev: "https://dev-automation.nhsnlink.org"
+  AUTOMATION_UI_BASE_URL_dev:  "https://dev-automation.nhsnlink.org"
+  AUTOMATION_UI_BASE_URL_qa:   "https://qa-automation.nhsnlink.org"
 
   # Automation.UI API audience (App Registration expose API URI).
   # The pipeline acquires an app-only token for "{audience}/.default".
-  AUTOMATION_UI_API_AUDIENCE: "api://4250b90e-2740-41e1-b6e4-b90ccc2bed5a" 
+  AUTOMATION_UI_API_AUDIENCE: "api://4250b90e-2740-41e1-b6e4-b90ccc2bed5a"
 
   # System scenario IDs are deterministic and seeded by Automation.UI's
   # ScenarioSeedService -- same value in every environment.
-  SCENARIO_ID_AdHocReport: "00000000-0000-0000-0000-000000000001"
+  SCENARIO_ID_AdHocReport:       "00000000-0000-0000-0000-000000000001"
+  SCENARIO_ID_ScheduledReport:   "00000000-0000-0000-0000-000000000004"
+  SCENARIO_ID_RegenerateReport:  "00000000-0000-0000-0000-000000000005"
 
   # Slack webhook is fetched at runtime from Azure App Configuration so the
   # value never lives in source. Key 'Automation:SlackWebhookUrl' (label
   # 'Link Automation UI') in the 'nhnslink-ac-test' App Config resource.
-  # The fetch step uses the ADO service connection below; update it to
-  # whatever connection has at least 'App Configuration Data Reader' on
-  # that resource.
   AZURE_SERVICE_CONNECTION: "NHSNLink-RG ARM"
   APP_CONFIG_NAME:          "nhnslink-ac-test"
   APP_CONFIG_SLACK_KEY:     "Automation:SlackWebhookUrl"
@@ -91,18 +149,18 @@ variables:
   TESTRAIL_RUN_URL: 'https://lantanagroup.testrail.io/index.php?/runs/view/171&group_by=cases:section_id&group_order=asc&display=tree'
 
 stages:
-  - stage: TriggerAutomationRun
-    displayName: "Trigger Automation.UI scenario"
+  - stage: TriggerAutomationSuites
+    displayName: "Trigger Automation.UI suites"
     jobs:
       - job: Trigger
-        displayName: "Start scenario, poll for completion, notify Slack"
+        displayName: "Start selected suites, poll, notify Slack"
         pool:
           vmImage: "windows-latest"
         steps:
 
           # -------------------------------------------------------------
-          # Resolve per-environment base URL & scenario id, gate on
-          # Deploy_All_Services for the same environment.
+          # Resolve per-environment base URL, gate on Deploy_All_Services
+          # for the same environment, and surface selected suite flags.
           # -------------------------------------------------------------
           - task: PowerShell@2
             displayName: "Resolve target & gate on Deploy_All_Services"
@@ -111,40 +169,75 @@ stages:
             inputs:
               targetType: "inline"
               script: |
-                $envName  = "${{ parameters.targetEnvironment }}"
-                $scenName = "${{ parameters.scenario }}"
+                $envNameRaw = "${{ parameters.targetEnvironment }}"
+
+                function Normalize-EnvironmentName([string]$value) {
+                  if (-not $value) { return "" }
+                  $v = $value.Trim().ToLowerInvariant()
+                  if ($v -eq "scale-test" -or $v -eq "test-scale" -or $v -eq "test") { return "test" }
+                  if ($v -eq "dev-scale"  -or $v -eq "scale-dev"  -or $v -eq "dev")  { return "dev" }
+                  if ($v -eq "scale-qa"   -or $v -eq "qa-scale"   -or $v -eq "qa")   { return "qa" }
+                  return $v
+                }
+
+                # Canonical key used for base-URL variable lookup (dev / test / qa)
+                $envName = Normalize-EnvironmentName $envNameRaw
+                Write-Host "Selected environment : $envNameRaw  (canonical: $envName)"
 
                 # Per-env base URL lookup (avoid macro expansion against undefined names)
-                $baseVar     = "AUTOMATION_UI_BASE_URL_$envName"
-                $scenarioVar = "SCENARIO_ID_$scenName"
-                $base        = (Get-Item -Path "env:$baseVar"     -ErrorAction SilentlyContinue).Value
-                $scenarioId  = (Get-Item -Path "env:$scenarioVar" -ErrorAction SilentlyContinue).Value
+                $baseVar = "AUTOMATION_UI_BASE_URL_$envName"
+                $base    = (Get-Item -Path "env:$baseVar" -ErrorAction SilentlyContinue).Value
 
-                if (-not $base)       { Write-Error "Variable '$baseVar' is not defined.";     exit 1 }
-                if (-not $scenarioId) { Write-Error "Variable '$scenarioVar' is not defined."; exit 1 }
+                if (-not $base) {
+                  Write-Error "Variable '$baseVar' is not defined. Add the base URL for environment '$envNameRaw' (canonical '$envName')."
+                  exit 1
+                }
 
                 Write-Host "Target base URL : $base"
-                Write-Host "Scenario id     : $scenarioId"
-
                 Write-Host "##vso[task.setvariable variable=AUTOMATION_UI_BASE_URL]$base"
-                Write-Host "##vso[task.setvariable variable=SCENARIO_ID]$scenarioId"
+                Write-Host "##vso[task.setvariable variable=TARGET_ENV_RAW]$envNameRaw"
+                Write-Host "##vso[task.setvariable variable=TARGET_ENV_CANONICAL]$envName"
 
-                # ----- Gate on latest succeeded Deploy_All_Services for this env -----
-                $org          = "$(System.CollectionUri)"
-                $project      = "nhsnlink"
-                $definitionId = 226
-                $shouldRun    = $false
-                $commitSha    = ""
-                $buildReason  = "$(Build.Reason)"
+                # Surface the deterministic scenario IDs so later steps can use them
+                Write-Host "##vso[task.setvariable variable=SCENARIO_ID_AdHocReport]$(SCENARIO_ID_AdHocReport)"
+                Write-Host "##vso[task.setvariable variable=SCENARIO_ID_ScheduledReport]$(SCENARIO_ID_ScheduledReport)"
+                Write-Host "##vso[task.setvariable variable=SCENARIO_ID_RegenerateReport]$(SCENARIO_ID_RegenerateReport)"
 
-                # Manual runs are explicit operator intent; do not gate them on
-                # Deploy_All_Services discovery.
+                # ----- Gate behavior by run reason -----
+                # Manual + schedule should always run.
+                # ResourceTrigger should only run when the *triggering* Deploy_All_Services
+                # build targeted the requested environment.
+                $org           = "$(System.CollectionUri)"
+                $project       = "nhsnlink"
+                $definitionId  = 226
+                $shouldRun     = $false
+                $commitSha     = ""
+                $buildReason   = "$(Build.Reason)"
+                $resourceRunId = "$(resources.pipeline.DeployAll.runID)"
+
+                Write-Host "Build reason: $buildReason"
+                Write-Host "DeployAll resource run id: $resourceRunId"
+
                 if ($buildReason -ieq "Manual") {
                   $shouldRun = $true
                   Write-Host "Manual run detected. Bypassing Deploy_All_Services gate."
                 }
+                elseif ($buildReason -ieq "Schedule") {
+                  $shouldRun = $true
+                  Write-Host "Scheduled run detected. Bypassing Deploy_All_Services gate."
+                }
 
                 function Get-EnvFromBuild($Build) {
+                  if ($Build.parameters) {
+                    try {
+                      $bp = $Build.parameters | ConvertFrom-Json
+                      if ($bp.PSObject.Properties.Name -contains "environment") {
+                        return ([string]$bp.environment).Trim()
+                      }
+                      $bpEnvProp = $bp.PSObject.Properties | Where-Object { $_.Name -match "env" } | Select-Object -First 1
+                      if ($bpEnvProp) { return ([string]$bp.($bpEnvProp.Name)).Trim() }
+                    } catch {}
+                  }
                   if (-not $Build.templateParameters) { return $null }
                   $tp = $Build.templateParameters
                   if ($tp.PSObject.Properties.Name -contains "environment") {
@@ -155,41 +248,53 @@ stages:
                   return $null
                 }
 
-                if (-not $shouldRun) {
+                if (-not $shouldRun -and $buildReason -ieq "ResourceTrigger" -and $resourceRunId) {
                   try {
-                    $u = "$org$project/_apis/build/builds?definitions=$definitionId&resultFilter=succeeded&`$top=50&api-version=7.1-preview.7"
+                    $u = "$org$project/_apis/build/builds/$($resourceRunId)?api-version=7.1-preview.7"
                     $h = @{ Authorization = "Bearer $env:SYSTEM_ACCESSTOKEN" }
-                    $resp = Invoke-RestMethod -Uri $u -Headers $h -Method Get
-                    $sorted = $resp.value | Sort-Object -Property finishTime -Descending
-                    foreach ($b in $sorted) {
-                      $envVal = Get-EnvFromBuild $b
-                      if ($envVal -ieq $envName) {
-                        $commitSha = $b.sourceVersion
-                        $shouldRun = $true
-                        Write-Host "Matched Deploy_All_Services build $($b.id) for env '$envName' commit $commitSha."
-                        break
-                      }
+                    $b = Invoke-RestMethod -Uri $u -Headers $h -Method Get
+                    $deployEnvRaw = Get-EnvFromBuild $b
+                    $deployEnv    = Normalize-EnvironmentName $deployEnvRaw
+                    $targetEnv    = Normalize-EnvironmentName $envName
+
+                    if ($deployEnv -eq $targetEnv) {
+                      $commitSha = $b.sourceVersion
+                      $shouldRun = $true
+                      Write-Host "Matched triggering Deploy_All_Services build $($b.id) for env '$deployEnvRaw' (normalized '$deployEnv') commit $commitSha."
+                    }
+                    else {
+                      Write-Host "Triggering Deploy_All_Services build $($b.id) env '$deployEnvRaw' (normalized '$deployEnv') does not match target '$targetEnv'. Skipping."
                     }
                   } catch {
-                    Write-Host "Failed to query Deploy_All_Services: $_"
+                    Write-Host "Failed to query triggering Deploy_All_Services build $($resourceRunId): $_"
                   }
+                }
+
+                if (-not $shouldRun -and $buildReason -ieq "ResourceTrigger" -and -not $resourceRunId) {
+                  Write-Host "ResourceTrigger run did not expose resources.pipeline.DeployAll.runID; skipping."
                 }
 
                 if (-not $commitSha) { $commitSha = "$(Build.SourceVersion)" }
                 $commitShort = if ($commitSha.Length -ge 7) { $commitSha.Substring(0,7) } else { $commitSha }
 
                 if (-not $shouldRun) {
-                  Write-Host "No succeeded Deploy_All_Services for env '$envName'. Skipping."
+                  Write-Host "No succeeded Deploy_All_Services for env '$envNameRaw' (canonical '$envName'). Skipping."
                   Write-Host "##vso[task.setvariable variable=SKIP_RUN]true"
                 }
 
                 Write-Host "##vso[task.setvariable variable=COMMIT]$commitSha"
                 Write-Host "##vso[task.setvariable variable=COMMIT_SHORT]$commitShort"
 
+                # Log which suites were requested (parameters are compile-time expanded)
+                Write-Host "Requested suites:"
+                Write-Host "  API Stability          : ${{ parameters.runApiStabilitySuite }}"
+                Write-Host "  Ad Hoc Report          : ${{ parameters.runAdHocReportSuite }}"
+                Write-Host "  Regenerate Report      : ${{ parameters.runRegenerateReportSuite }}"
+                Write-Host "  Scheduled Report       : ${{ parameters.runScheduledReportSuite }}"
+
           # -------------------------------------------------------------
           # Acquire an app-only AAD token for Automation.UI API.
-          # Uses the Azure DevOps service connection identity (service principal
-          # or workload identity federation) - no interactive sign-in.
+          # Uses the Azure DevOps service connection identity.
           # -------------------------------------------------------------
           - task: AzureCLI@2
             displayName: "Acquire Automation.UI API access token"
@@ -253,7 +358,7 @@ stages:
                     try {
                       $expUtc = [DateTimeOffset]::FromUnixTimeSeconds([long]$claims.exp).UtcDateTime
                       $remainingMin = [math]::Round(($expUtc - (Get-Date).ToUniversalTime()).TotalMinutes, 1)
-                      Write-Host ("  exp   : {0} UTC  (? {1} minutes remaining)" -f $expUtc.ToString("yyyy-MM-dd HH:mm:ss"), $remainingMin)
+                      Write-Host ("  exp   : {0} UTC  (~ {1} minutes remaining)" -f $expUtc.ToString("yyyy-MM-dd HH:mm:ss"), $remainingMin)
                     } catch {
                       Write-Host ("  exp   : {0}" -f $claims.exp)
                     }
@@ -265,21 +370,20 @@ stages:
                 Write-Host "##vso[task.setvariable variable=AUTOMATION_UI_API_ACCESS_TOKEN;issecret=true]$accessToken"
 
           # -------------------------------------------------------------
-          # POST /api/runs/start - returns 202 with { runId }.
-          # Includes Authorization bearer token from App Registration.
+          # Execute every selected suite sequentially, collect results.
           # -------------------------------------------------------------
           - task: PowerShell@2
-            displayName: "Start Automation.UI run"
+            displayName: "Execute selected Automation.UI suites"
             condition: and(succeeded(), ne(variables.SKIP_RUN, 'true'))
             inputs:
               targetType: "inline"
               script: |
+                $ErrorActionPreference = "Stop"
+
                 function Get-JwtPayloadObject {
                   param([Parameter(Mandatory=$true)][string]$Jwt)
-
                   $parts = $Jwt.Split('.')
                   if ($parts.Length -lt 2) { return $null }
-
                   $payload = $parts[1].Replace('-', '+').Replace('_', '/')
                   switch ($payload.Length % 4) {
                     2 { $payload += '==' }
@@ -287,223 +391,317 @@ stages:
                     0 { }
                     default { return $null }
                   }
-
                   try {
                     $bytes = [System.Convert]::FromBase64String($payload)
                     $json  = [System.Text.Encoding]::UTF8.GetString($bytes)
                     return ($json | ConvertFrom-Json)
-                  } catch {
-                    return $null
-                  }
+                  } catch { return $null }
                 }
 
                 function Get-Preview {
-                  param([string]$Value, [int]$Max = 1200)
+                  param([string]$Value, [int]$Max = 800)
                   if (-not $Value) { return "" }
                   if ($Value.Length -le $Max) { return $Value }
                   return $Value.Substring(0, $Max) + " ... [truncated]"
                 }
 
-                $base = "$(AUTOMATION_UI_BASE_URL)".TrimEnd('/')
-                $url  = "$base/api/runs/start"
-                $token = "$(AUTOMATION_UI_API_ACCESS_TOKEN)"
-
-                if (-not $token) { Write-Error "AUTOMATION_UI_API_ACCESS_TOKEN is missing."; exit 1 }
-
-                $claims = Get-JwtPayloadObject -Jwt $token
-                if ($claims -ne $null) {
-                  $expUtc = $null
-                  if ($claims.exp) {
-                    try { $expUtc = [DateTimeOffset]::FromUnixTimeSeconds([long]$claims.exp).UtcDateTime.ToString("o") } catch { }
+                function Invoke-JsonRequest {
+                  param(
+                    [string]$Method,
+                    [string]$Uri,
+                    [hashtable]$Headers,
+                    [string]$Body = $null
+                  )
+                  $params = @{
+                    Uri             = $Uri
+                    Method          = $Method
+                    Headers         = $Headers
+                    UseBasicParsing = $true
+                    ErrorAction     = "Stop"
                   }
-
-                  Write-Host "Token diagnostics:"
-                  Write-Host ("  aud   : {0}" -f $claims.aud)
-                  Write-Host ("  iss   : {0}" -f $claims.iss)
-                  Write-Host ("  tid   : {0}" -f $claims.tid)
-                  Write-Host ("  appid : {0}" -f $claims.appid)
-                  Write-Host ("  azp   : {0}" -f $claims.azp)
-                  Write-Host ("  oid   : {0}" -f $claims.oid)
-                  Write-Host ("  roles : {0}" -f (($claims.roles -join ", ")))
-                  Write-Host ("  scp   : {0}" -f $claims.scp)
-                  Write-Host ("  exp   : {0}" -f $expUtc)
-                } else {
-                  Write-Host "Token diagnostics: unable to decode JWT payload."
-                }
-
-                $body = @{
-                  scenarioId = "$(SCENARIO_ID)"
-                  source     = "ADO pipeline ${{ parameters.targetEnvironment }} (commit $(COMMIT_SHORT))"
-                } | ConvertTo-Json -Compress
-
-                Write-Host "POST $url"
-                Write-Host "Body: $body"
-
-                $statusCode = $null
-                $contentType = $null
-                $rawBody = ""
-
-                try {
-                  $resp = Invoke-WebRequest `
-                    -Uri $url `
-                    -Method Post `
-                    -Headers @{ Authorization = "Bearer $token"; Accept = "application/json" } `
-                    -ContentType "application/json" `
-                    -Body $body `
-                    -UseBasicParsing `
-                    -ErrorAction Stop
-
-                  $statusCode = [int]$resp.StatusCode
-                  $contentType = $resp.Headers["Content-Type"]
-                  $rawBody = $resp.Content
-
-                  Write-Host ("Start API HTTP status: {0}" -f $statusCode)
-                  if ($contentType) { Write-Host ("Start API content-type: {0}" -f $contentType) }
-                  if ($resp.Headers.Location -ne $null) {
-                    Write-Host ("Start API redirect/location: {0}" -f $resp.Headers.Location)
+                  if ($Body) {
+                    $params.ContentType = "application/json"
+                    $params.Body        = $Body
                   }
-                  if ($rawBody) {
-                    Write-Host "Start API response preview:"
-                    Write-Host (Get-Preview -Value $rawBody)
-                  }
-
-                  if ($statusCode -lt 200 -or $statusCode -ge 300) {
-                    Write-Error ("Start API call failed with HTTP {0}." -f $statusCode)
-                    exit 1
-                  }
-                } catch {
-                  $webResp = $_.Exception.Response
-                  if ($webResp -ne $null) {
-                    try { $statusCode = [int]$webResp.StatusCode } catch { }
-                    try { $contentType = $webResp.Headers["Content-Type"] } catch { }
-                    try {
-                      $loc = $webResp.Headers["Location"]
-                      if ($loc) { Write-Host ("Start API redirect/location: {0}" -f $loc) }
-                    } catch { }
-
-                    try {
-                      $stream = $webResp.GetResponseStream()
-                      if ($stream) {
-                        $reader = New-Object System.IO.StreamReader($stream)
-                        $rawBody = $reader.ReadToEnd()
-                        $reader.Dispose()
-                        $stream.Dispose()
-                      }
-                    } catch { }
-
-                    if ($statusCode -ne $null) { Write-Host ("Start API HTTP status: {0}" -f $statusCode) }
-                    if ($contentType) { Write-Host ("Start API content-type: {0}" -f $contentType) }
-                    if ($rawBody) {
-                      Write-Host "Start API response preview:"
-                      Write-Host (Get-Preview -Value $rawBody)
-                    }
-
-                    Write-Error ("Start API call failed with HTTP {0}." -f $statusCode)
-                    exit 1
-                  }
-
-                  Write-Host ("Start API exception type: {0}" -f $_.Exception.GetType().FullName)
-                  if ($_.Exception.InnerException -ne $null) {
-                    Write-Host ("Start API inner exception: {0}" -f $_.Exception.InnerException.Message)
-                  }
-                  if ($_.ScriptStackTrace) {
-                    Write-Host "Start API script stack trace:"
-                    Write-Host $_.ScriptStackTrace
-                  }
-
-                  Write-Error ("Start API call failed before an HTTP response was captured: {0}" -f $_.Exception.Message)
-                  exit 1
-                }
-
-                $response = $null
-                try {
-                  if ($rawBody) {
-                    $response = $rawBody | ConvertFrom-Json -ErrorAction Stop
-                  }
-                } catch {
-                  Write-Error "Start API response body was not valid JSON."
-                  exit 1
-                }
-
-                $runId = $response.runId
-                if (-not $runId) {
-                  $props = if ($response) { ($response.PSObject.Properties.Name -join ", ") } else { "<none>" }
-                  Write-Error ("Start did not return a runId. JSON properties present: {0}" -f $props)
-                  exit 1
-                }
-
-                Write-Host "Started runId=$runId"
-                Write-Host "##vso[task.setvariable variable=RUN_ID]$runId"
-
-          # -------------------------------------------------------------
-          # Poll GET /api/runs/{id}/status until terminal or timeout.
-          # -------------------------------------------------------------
-          - task: PowerShell@2
-            displayName: "Wait for Automation.UI run to finish"
-            condition: and(succeeded(), ne(variables.SKIP_RUN, 'true'))
-            inputs:
-              targetType: "inline"
-              script: |
-                $base = "$(AUTOMATION_UI_BASE_URL)".TrimEnd('/')
-                $url  = "$base/api/runs/$(RUN_ID)/status"
-                $token = "$(AUTOMATION_UI_API_ACCESS_TOKEN)"
-
-                if (-not $token) { Write-Error "AUTOMATION_UI_API_ACCESS_TOKEN is missing."; exit 1 }
-
-                $headers = @{
-                  Authorization = "Bearer $token"
-                }
-
-                $headers = @{
-                  Authorization = "Bearer $token"
-                }
-
-                $deadline = (Get-Date).AddMinutes(${{ parameters.completionTimeoutMinutes }})
-                $finalStatus = "Unknown"
-                $finalError  = ""
-                $duration    = ""
-                $finishedAt  = ""
-
-                while ((Get-Date) -lt $deadline) {
                   try {
-                    $r = Invoke-RestMethod -Uri $url -Method Get -Headers $headers
-                    Write-Host ("status={0} isTerminal={1}" -f $r.status, $r.isTerminal)
-                    if ($r.isTerminal) {
-                      $finalStatus = "$($r.status)"
-                      $finalError  = "$($r.error)"
-                      $duration    = "$($r.duration)"
-                      $finishedAt  = "$($r.finishedAt)"
-                      break
+                    $resp = Invoke-WebRequest @params
+                    return @{
+                      StatusCode  = [int]$resp.StatusCode
+                      ContentType = $resp.Headers["Content-Type"]
+                      Body        = $resp.Content
+                      Location    = $resp.Headers["Location"]
+                      Success     = $true
                     }
                   } catch {
-                    Write-Host "Status check failed (will retry): $_"
+                    $webResp = $_.Exception.Response
+                    $statusCode = $null
+                    $rawBody = ""
+                    $contentType = $null
+                    $location = $null
+                    if ($webResp) {
+                      try { $statusCode = [int]$webResp.StatusCode } catch {}
+                      try { $contentType = $webResp.Headers["Content-Type"] } catch {}
+                      try { $location = $webResp.Headers["Location"] } catch {}
+                      try {
+                        $stream = $webResp.GetResponseStream()
+                        if ($stream) {
+                          $reader = New-Object System.IO.StreamReader($stream)
+                          $rawBody = $reader.ReadToEnd()
+                          $reader.Dispose()
+                          $stream.Dispose()
+                        }
+                      } catch {}
+                    }
+                    return @{
+                      StatusCode  = $statusCode
+                      ContentType = $contentType
+                      Body        = $rawBody
+                      Location    = $location
+                      Success     = $false
+                      Exception   = $_.Exception.Message
+                    }
                   }
-                  Start-Sleep -Seconds ${{ parameters.pollIntervalSeconds }}
                 }
 
-                if ($finalStatus -eq "Unknown") {
-                  $finalStatus = "TimedOut"
-                  $finalError  = "Pipeline timed out after ${{ parameters.completionTimeoutMinutes }} minutes waiting for run $(RUN_ID)."
+                $base        = "$(AUTOMATION_UI_BASE_URL)".TrimEnd('/')
+                $token       = "$(AUTOMATION_UI_API_ACCESS_TOKEN)"
+                $commitShort = "$(COMMIT_SHORT)"
+                $envName     = "${{ parameters.targetEnvironment }}"
+                $pollSeconds = ${{ parameters.pollIntervalSeconds }}
+                $timeoutMin  = ${{ parameters.completionTimeoutMinutes }}
+
+                if (-not $token) { Write-Error "AUTOMATION_UI_API_ACCESS_TOKEN is missing."; exit 1 }
+
+                # Quick token diagnostics
+                $claims = Get-JwtPayloadObject -Jwt $token
+                if ($claims) {
+                  Write-Host "Token diagnostics (aud=$($claims.aud), azp=$($claims.azp))"
                 }
 
-                Write-Host "Final status: $finalStatus"
-                Write-Host "##vso[task.setvariable variable=RUN_STATUS]$finalStatus"
-                Write-Host "##vso[task.setvariable variable=RUN_ERROR]$finalError"
-                Write-Host "##vso[task.setvariable variable=RUN_DURATION]$duration"
-                Write-Host "##vso[task.setvariable variable=RUN_FINISHED_AT]$finishedAt"
+                $headers = @{
+                  Authorization = "Bearer $token"
+                  Accept        = "application/json"
+                }
 
-                if ($finalStatus -ne "Succeeded") {
-                  Write-Host "##vso[task.complete result=Failed;]Run finished with status '$finalStatus'."
+                # Build the ordered list of suites the user selected
+                $suites = @()
+
+                if ("${{ parameters.runApiStabilitySuite }}" -eq "True") {
+                  $suites += [pscustomobject]@{
+                    Name     = "API Stability Suite"
+                    Type     = "ApiHealth"
+                    ScenarioId = $null
+                    StartPath  = "/api/api-health-runs/start-all-for-pipeline"
+                    StatusPathTemplate = "/api/api-health-runs/{0}/status"
+                    DetailsPathTemplate = "/ApiHealth"   # UI landing page for API Health
+                  }
+                }
+                if ("${{ parameters.runAdHocReportSuite }}" -eq "True") {
+                  $suites += [pscustomobject]@{
+                    Name     = "Ad Hoc Report Generation Suite"
+                    Type     = "Scenario"
+                    ScenarioId = "$(SCENARIO_ID_AdHocReport)"
+                    StartPath  = "/api/runs/start"
+                    StatusPathTemplate = "/api/runs/{0}/status"
+                    DetailsPathTemplate = "/Runs/Details/{0}"
+                  }
+                }
+                if ("${{ parameters.runRegenerateReportSuite }}" -eq "True") {
+                  $suites += [pscustomobject]@{
+                    Name     = "Ad Hoc Report Re-generation Suite"
+                    Type     = "Scenario"
+                    ScenarioId = "$(SCENARIO_ID_RegenerateReport)"
+                    StartPath  = "/api/runs/start"
+                    StatusPathTemplate = "/api/runs/{0}/status"
+                    DetailsPathTemplate = "/Runs/Details/{0}"
+                  }
+                }
+                if ("${{ parameters.runScheduledReportSuite }}" -eq "True") {
+                  $suites += [pscustomobject]@{
+                    Name     = "Scheduled Report Generation Suite"
+                    Type     = "Scenario"
+                    ScenarioId = "$(SCENARIO_ID_ScheduledReport)"
+                    StartPath  = "/api/runs/start"
+                    StatusPathTemplate = "/api/runs/{0}/status"
+                    DetailsPathTemplate = "/Runs/Details/{0}"
+                  }
+                }
+
+                if ($suites.Count -eq 0) {
+                  Write-Host "No suites selected. Nothing to execute."
+                  Write-Host "##vso[task.setvariable variable=SUITE_RESULTS_JSON][]"
+                  Write-Host "##vso[task.setvariable variable=OVERALL_STATUS]Succeeded"
+                  exit 0
+                }
+
+                Write-Host "Will execute $($suites.Count) suite(s): $($suites.Name -join ', ')"
+
+                $results = @()
+                $anyFailed = $false
+
+                foreach ($suite in $suites) {
+                  Write-Host ""
+                  Write-Host "============================================================"
+                  Write-Host "Starting suite: $($suite.Name)  [$($suite.Type)]"
+                  Write-Host "============================================================"
+
+                  $suiteResult = [ordered]@{
+                    SuiteName   = $suite.Name
+                    Type        = $suite.Type
+                    Status      = "Unknown"
+                    RunId       = $null
+                    Duration    = $null
+                    Error       = $null
+                    DetailsUrl  = $null
+                    Extra       = $null
+                  }
+
+                  try {
+                    # ----- Start -----
+                    $startUrl = "$base$($suite.StartPath)"
+                    $body = $null
+
+                    if ($suite.Type -eq "Scenario") {
+                      $body = @{
+                        scenarioId = $suite.ScenarioId
+                        source     = "ADO pipeline $envName (commit $commitShort)"
+                      } | ConvertTo-Json -Compress
+                    }
+
+                    Write-Host "POST $startUrl"
+                    if ($body) { Write-Host "Body: $body" }
+
+                    $startResp = Invoke-JsonRequest -Method Post -Uri $startUrl -Headers $headers -Body $body
+
+                    if (-not $startResp.Success -or $startResp.StatusCode -lt 200 -or $startResp.StatusCode -ge 300) {
+                      $msg = "Start failed with HTTP $($startResp.StatusCode). $($startResp.Exception)"
+                      if ($startResp.Body) { $msg += " Body: $(Get-Preview $startResp.Body)" }
+                      throw $msg
+                    }
+
+                    Write-Host "Start HTTP $($startResp.StatusCode)"
+                    if ($startResp.Body) { Write-Host (Get-Preview $startResp.Body) }
+
+                    $startJson = $null
+                    try { $startJson = $startResp.Body | ConvertFrom-Json } catch {
+                      throw "Start response was not valid JSON."
+                    }
+
+                    $runId = $startJson.runId
+                    if (-not $runId) {
+                      throw "Start did not return a runId. Properties: $($startJson.PSObject.Properties.Name -join ', ')"
+                    }
+
+                    $suiteResult.RunId = "$runId"
+                    $suiteResult.DetailsUrl = "$base$($suite.DetailsPathTemplate -f $runId)"
+                    Write-Host "Started runId=$runId"
+
+                    # ----- Poll until terminal or timeout -----
+                    $statusUrl = "$base$($suite.StatusPathTemplate -f $runId)"
+                    $deadline  = (Get-Date).AddMinutes($timeoutMin)
+                    $finalStatus = "Unknown"
+                    $finalError  = $null
+                    $duration    = $null
+                    $extraInfo   = $null
+                    $consecutiveStatusErrors = 0
+                    $maxConsecutiveStatusErrors = 5
+
+                    while ((Get-Date) -lt $deadline) {
+                      try {
+                        $r = Invoke-RestMethod -Uri $statusUrl -Method Get -Headers $headers
+                        $consecutiveStatusErrors = 0
+                        Write-Host ("  status={0} isTerminal={1}" -f $r.status, $r.isTerminal)
+
+                        if ($r.isTerminal) {
+                          $finalStatus = "$($r.status)"
+                          $finalError  = if ($r.error) { "$($r.error)" } else { $null }
+                          $duration    = if ($r.duration) { "$($r.duration)" } else { $null }
+
+                          # Capture extra diagnostic info for API Health
+                          if ($suite.Type -eq "ApiHealth") {
+                            $extraInfo = [ordered]@{
+                              TotalEndpoints   = $r.totalEndpoints
+                              PassedEndpoints  = $r.passedEndpoints
+                              FailedEndpoints  = $r.failedEndpoints
+                              SkippedEndpoints = $r.skippedEndpoints
+                            }
+                            if ($r.failedResults -and $r.failedResults.Count -gt 0) {
+                              $failedSummary = ($r.failedResults | Select-Object -First 5 | ForEach-Object {
+                                "$($_.serviceName)/$($_.endpointName): $($_.errorMessage)"
+                              }) -join "; "
+                              if ($r.failedResults.Count -gt 5) {
+                                $failedSummary += " ... (+$($r.failedResults.Count - 5) more)"
+                              }
+                              if (-not $finalError) { $finalError = $failedSummary }
+                              else { $finalError = "$finalError | $failedSummary" }
+                            }
+                          }
+                          break
+                        }
+                      } catch {
+                        $statusCode = $null
+                        try { $statusCode = [int]$_.Exception.Response.StatusCode } catch {}
+                        if ($statusCode -and $statusCode -ge 400 -and $statusCode -lt 500 -and $statusCode -ne 429) {
+                          throw "Status check failed with HTTP $statusCode for run $runId. $_"
+                        }
+
+                        $consecutiveStatusErrors++
+                        if ($consecutiveStatusErrors -ge $maxConsecutiveStatusErrors) {
+                          throw "Status check failed $consecutiveStatusErrors consecutive times for run $runId. Last error: $_"
+                        }
+
+                        Write-Host "  Status check failed (will retry): $_"
+                      }
+                      Start-Sleep -Seconds $pollSeconds
+                    }
+
+                    if ($finalStatus -eq "Unknown") {
+                      $finalStatus = "TimedOut"
+                      $finalError  = "Pipeline timed out after $timeoutMin minutes waiting for run $runId."
+                    }
+
+                    $suiteResult.Status   = $finalStatus
+                    $suiteResult.Duration = $duration
+                    $suiteResult.Error    = $finalError
+                    $suiteResult.Extra    = $extraInfo
+
+                    Write-Host "Suite '$($suite.Name)' finished with status: $finalStatus"
+                    if ($finalError) { Write-Host "Error: $finalError" }
+
+                    if ($finalStatus -ne "Succeeded") {
+                      $anyFailed = $true
+                    }
+                  }
+                  catch {
+                    Write-Host "Suite '$($suite.Name)' failed to start or complete: $_"
+                    $suiteResult.Status = "Failed"
+                    $suiteResult.Error  = "$_"
+                    $anyFailed = $true
+                  }
+
+                  $results += [pscustomobject]$suiteResult
+                }
+
+                # Persist results for the Slack + summary steps
+                $resultsJson = $results | ConvertTo-Json -Compress -Depth 6
+                Write-Host "##vso[task.setvariable variable=SUITE_RESULTS_JSON]$resultsJson"
+
+                $overall = if ($anyFailed) { "Failed" } else { "Succeeded" }
+                Write-Host "##vso[task.setvariable variable=OVERALL_STATUS]$overall"
+
+                Write-Host ""
+                Write-Host "All suites completed. Overall status: $overall"
+
+                if ($anyFailed) {
+                  Write-Host "##vso[task.complete result=Failed;]One or more suites did not succeed."
                 }
 
           # -------------------------------------------------------------
-          # Fetch Slack webhook from Azure App Configuration. Replaces the
-          # file-based webhook lookup the old pipeline used; the value
-          # never lives in source. Marked as a secret so it is masked in logs.
+          # Fetch Slack webhook from Azure App Configuration.
           # -------------------------------------------------------------
           - task: AzureCLI@2
             displayName: "Fetch Slack webhook from Azure App Configuration"
-            condition: always()
+            condition: and(always(), ne(variables.SKIP_RUN, 'true'))
             inputs:
               azureSubscription: "$(AZURE_SERVICE_CONNECTION)"
               scriptType: "pscore"
@@ -513,7 +711,22 @@ stages:
                   --name  "$(APP_CONFIG_NAME)" `
                   --key   "$(APP_CONFIG_SLACK_KEY)" `
                   --label "$(APP_CONFIG_SLACK_LABEL)" `
-                  --query value -o tsv
+                  --query value -o tsv 2>&1
+
+                $azExit = $LASTEXITCODE
+
+                if ($azExit -ne 0) {
+                  $azMessage = "$value"
+                  if ($azMessage -match "does not exist|not found") {
+                    Write-Host "Slack webhook key '$(APP_CONFIG_SLACK_KEY)' (label '$(APP_CONFIG_SLACK_LABEL)') not found in App Config '$(APP_CONFIG_NAME)'."
+                    Write-Host "##vso[task.setvariable variable=SLACK_WEBHOOK_URL]"
+                    exit 0
+                  }
+
+                  Write-Error "Failed to read Slack webhook from App Config (exit code: $azExit)."
+                  Write-Host "az output: $azMessage"
+                  exit 1
+                }
 
                 if (-not $value) {
                   Write-Host "Slack webhook key '$(APP_CONFIG_SLACK_KEY)' (label '$(APP_CONFIG_SLACK_LABEL)') not found in App Config '$(APP_CONFIG_NAME)'."
@@ -525,16 +738,14 @@ stages:
                 Write-Host "##vso[task.setvariable variable=SLACK_WEBHOOK_URL;issecret=true]$value"
 
           # -------------------------------------------------------------
-          # Slack notification - posts to the webhook fetched above.
+          # Slack notification - consolidated multi-suite report.
           # -------------------------------------------------------------
           - task: PowerShell@2
             displayName: "Send result to Slack"
-            condition: always()
+            condition: and(always(), ne(variables.SKIP_RUN, 'true'))
             env:
-              RUN_STATUS: $(RUN_STATUS)
-              RUN_ERROR: $(RUN_ERROR)
-              RUN_DURATION: $(RUN_DURATION)
-              RUN_ID: $(RUN_ID)
+              SUITE_RESULTS_JSON: $(SUITE_RESULTS_JSON)
+              OVERALL_STATUS: $(OVERALL_STATUS)
               COMMIT_SHORT: $(COMMIT_SHORT)
               SKIP_RUN: $(SKIP_RUN)
               AUTOMATION_UI_BASE_URL: $(AUTOMATION_UI_BASE_URL)
@@ -547,21 +758,19 @@ stages:
                   exit 0
                 }
 
-                $envName    = "${{ parameters.targetEnvironment }}"
-                $scenName   = "${{ parameters.scenario }}"
-                $status     = "$env:RUN_STATUS"
-                $err        = "$env:RUN_ERROR"
-                $duration   = "$env:RUN_DURATION"
-                $runId      = "$env:RUN_ID"
-                $commit     = "$env:COMMIT_SHORT"
-                $skipped    = "$env:SKIP_RUN"
-                $adoUrl     = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
-                $automation = "$env:AUTOMATION_UI_BASE_URL"
+                $envName   = "${{ parameters.targetEnvironment }}"
+                $commit    = "$env:COMMIT_SHORT"
+                $skipped   = "$env:SKIP_RUN"
+                $overall   = "$env:OVERALL_STATUS"
+                $adoUrl    = "$(System.TeamFoundationCollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId)"
+                $automation = "$env:AUTOMATION_UI_BASE_URL".TrimEnd('/')
 
-                if (-not $status) { $status = "NotStarted" }
-                if ($skipped -eq "true") { $status = "Skipped (no Deploy_All_Services build)" }
+                if ($skipped -eq "true") {
+                  $overall = "Skipped (no Deploy_All_Services build)"
+                }
+                if (-not $overall) { $overall = "NotStarted" }
 
-                $icon = switch ($status) {
+                $icon = switch ($overall) {
                   "Succeeded" { ":white_check_mark:" }
                   "Failed"    { ":x:" }
                   "Cancelled" { ":warning:" }
@@ -572,14 +781,50 @@ stages:
                 $lines = @()
                 $lines += "*Title: Automated Test Report :robot_face:*"
                 $lines += "*Environment:* $envName"
-                $lines += "*Scenario:* $scenName"
-                $lines += "*Status:* $icon $status"
-                if ($commit)   { $lines += "*Commit:* $commit" }
-                if ($duration) { $lines += "*Duration:* $duration" }
-                if ($runId)    { $lines += "*Run:* <$automation/Runs/Details/$runId|Open in Automation.UI>" }
+                $lines += "*Overall Status:* $icon $overall"
+                if ($commit) { $lines += "*Commit:* $commit" }
                 $lines += "*Pipeline:* <$adoUrl|View ADO build>"
                 $lines += "*TestRail:* <$(TESTRAIL_RUN_URL)|Open TestRail Run>"
-                if ($err)      { $lines += "*Error:* $err" }
+                $lines += ""
+                $lines += "*Suite Results:*"
+
+                $resultsJson = $env:SUITE_RESULTS_JSON
+                if ($resultsJson) {
+                  try {
+                    $suites = $resultsJson | ConvertFrom-Json
+                    # ConvertFrom-Json on array of objects may yield a single object when Count==1
+                    if ($suites -isnot [System.Array]) { $suites = @($suites) }
+
+                    foreach ($s in $suites) {
+                      $sIcon = switch ($s.Status) {
+                        "Succeeded" { ":white_check_mark:" }
+                        "Failed"    { ":x:" }
+                        "TimedOut"  { ":hourglass:" }
+                        "Cancelled" { ":warning:" }
+                        default     { ":grey_question:" }
+                      }
+                      $line = "• *$($s.SuiteName)*  $sIcon $($s.Status)"
+                      if ($s.Duration) { $line += "  ($($s.Duration))" }
+                      $lines += $line
+
+                      if ($s.DetailsUrl) {
+                        $lines += "    <$($s.DetailsUrl)|Open in Automation.UI>"
+                      }
+                      if ($s.Error) {
+                        $errPreview = if ($s.Error.Length -gt 300) { $s.Error.Substring(0,300) + "..." } else { $s.Error }
+                        $lines += "    *Error:* $errPreview"
+                      }
+                      if ($s.Extra) {
+                        $extra = $s.Extra
+                        $lines += "    Endpoints: $($extra.PassedEndpoints)/$($extra.TotalEndpoints) passed, $($extra.FailedEndpoints) failed, $($extra.SkippedEndpoints) skipped"
+                      }
+                    }
+                  } catch {
+                    $lines += "_Failed to parse suite results: ${_}_"
+                  }
+                } else {
+                  $lines += "_No suite results recorded._"
+                }
 
                 $payload = @{ text = ($lines -join "`n") } | ConvertTo-Json -Compress
                 try {
@@ -595,14 +840,39 @@ stages:
           - task: PowerShell@2
             displayName: "Pipeline summary"
             condition: always()
+            env:
+              SUITE_RESULTS_JSON: $(SUITE_RESULTS_JSON)
+              OVERALL_STATUS: $(OVERALL_STATUS)
+              COMMIT_SHORT: $(COMMIT_SHORT)
+              SKIP_RUN: $(SKIP_RUN)
             inputs:
               targetType: "inline"
               script: |
-                Write-Host "##[section]Automation.UI run summary"
+                Write-Host "##[section]Automation.UI multi-suite run summary"
                 Write-Host "Environment : ${{ parameters.targetEnvironment }}"
-                Write-Host "Scenario    : ${{ parameters.scenario }} ($(SCENARIO_ID))"
-                Write-Host "Run id      : $(RUN_ID)"
-                Write-Host "Status      : $(RUN_STATUS)"
-                Write-Host "Duration    : $(RUN_DURATION)"
-                Write-Host "Commit      : $(COMMIT_SHORT)"
-                Write-Host "Skipped     : $(SKIP_RUN)"
+                Write-Host "Overall     : $env:OVERALL_STATUS"
+                Write-Host "Commit      : $env:COMMIT_SHORT"
+                Write-Host "Skipped     : $env:SKIP_RUN"
+                Write-Host ""
+                Write-Host "Suite flags:"
+                Write-Host "  API Stability     : ${{ parameters.runApiStabilitySuite }}"
+                Write-Host "  Ad Hoc Report     : ${{ parameters.runAdHocReportSuite }}"
+                Write-Host "  Regenerate Report : ${{ parameters.runRegenerateReportSuite }}"
+                Write-Host "  Scheduled Report  : ${{ parameters.runScheduledReportSuite }}"
+                Write-Host ""
+
+                $resultsJson = $env:SUITE_RESULTS_JSON
+                if ($resultsJson) {
+                  try {
+                    $suites = $resultsJson | ConvertFrom-Json
+                    if ($suites -isnot [System.Array]) { $suites = @($suites) }
+                    foreach ($s in $suites) {
+                      Write-Host ("  [{0}] {1}  status={2}  duration={3}  runId={4}" -f $s.Type, $s.SuiteName, $s.Status, $s.Duration, $s.RunId)
+                      if ($s.Error) { Write-Host "      error: $($s.Error)" }
+                    }
+                  } catch {
+                    Write-Host "  (could not parse SUITE_RESULTS_JSON)"
+                  }
+                } else {
+                  Write-Host "  (no suite results)"
+                }

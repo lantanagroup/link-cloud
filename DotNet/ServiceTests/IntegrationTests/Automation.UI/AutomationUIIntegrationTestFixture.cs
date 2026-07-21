@@ -74,7 +74,9 @@ public sealed class AutomationUIIntegrationTestFixture : IAsyncLifetime, IDispos
             new ConfigurationBuilder().Build(),
             orchestrator,
             store,
-            Mock.Of<IQueryPlanTemplateStore>());
+            Mock.Of<IQueryPlanTemplateStore>(),
+            Mock.Of<INormalizationStore>(),
+            Mock.Of<IOrganizationResourceMapTemplateStore>());
     }
 
     public async Task InitializeAsync()

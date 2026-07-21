@@ -159,7 +159,7 @@ public class QueryListProcessor : IQueryListProcessor
             var fhirQuery = new CreateFhirQueryModel
             {
                 FacilityId = request.FacilityId,
-                ResourceReferenceTypes = referenceTypes.Select(x => new CreateResourceReferenceTypeModel { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase, ResourceType = x.ResourceType }).ToList(),
+                ResourceReferenceTypes = referenceTypes.Select(x => new CreateResourceReferenceTypeModel { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase.GetValueOrDefault(), ResourceType = x.ResourceType }).ToList(),
                 MeasureId = scheduledReport.ReportTypes.FirstOrDefault(),
             };
 
@@ -197,7 +197,7 @@ public class QueryListProcessor : IQueryListProcessor
                     var pagedFhirQuery = new CreateFhirQueryModel
                     {
                         FacilityId = request.FacilityId,
-                        ResourceReferenceTypes = referenceTypes.Select(x => new CreateResourceReferenceTypeModel { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase, ResourceType = x.ResourceType }).ToList(),
+                        ResourceReferenceTypes = referenceTypes.Select(x => new CreateResourceReferenceTypeModel { FacilityId = x.FacilityId, QueryPhase = x.QueryPhase.GetValueOrDefault(), ResourceType = x.ResourceType }).ToList(),
                         MeasureId = scheduledReport.ReportTypes.FirstOrDefault(),
                         ResourceTypes = new List<ResourceType> { Enum.Parse<ResourceType>(queryInfo.ResourceType) },
                         QueryParameters = searchParams.Select(x => $"{x.Key}={x.Value}").ToList(),

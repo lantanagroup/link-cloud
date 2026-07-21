@@ -16,7 +16,7 @@ public class ScheduledReportEntity
     public Guid ReportTrackingId { get; set; }
 
     [Required]
-    public Frequency Frequency { get; set; }
+    public Frequency? Frequency { get; set; } = 0;
 
     public DateTime StartDate { get; set; }
 

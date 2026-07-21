@@ -62,8 +62,9 @@ namespace IntegrationTests.Normalization
         [Fact]
         public async Task CreateVendorVersion_Valid_CreatesSuccessfully()
         {
-            var vendorManager = _fixture.ServiceProvider.GetRequiredService<IVendorManager>();
-            var vendorQueries = _fixture.ServiceProvider.GetRequiredService<IVendorQueries>();
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var vendorManager = scope.ServiceProvider.GetRequiredService<IVendorManager>();
+            var vendorQueries = scope.ServiceProvider.GetRequiredService<IVendorQueries>();
 
             string vendorName = Guid.NewGuid().ToString();
             var vendor = await vendorManager.CreateVendor(vendorName);
@@ -81,9 +82,10 @@ namespace IntegrationTests.Normalization
         {
             await EnsureResourcesCreated();
 
-            var vendorManager = _fixture.ServiceProvider.GetRequiredService<IVendorManager>();
-            var vendorQueries = _fixture.ServiceProvider.GetRequiredService<IVendorQueries>();
-            var operationManager = _fixture.ServiceProvider.GetRequiredService<IOperationManager>();
+            using var scope = _fixture.ServiceProvider.CreateScope();
+            var vendorManager = scope.ServiceProvider.GetRequiredService<IVendorManager>();
+            var vendorQueries = scope.ServiceProvider.GetRequiredService<IVendorQueries>();
+            var operationManager = scope.ServiceProvider.GetRequiredService<IOperationManager>();
 
             // Create vendor and version
             string vendorName = Guid.NewGuid().ToString();

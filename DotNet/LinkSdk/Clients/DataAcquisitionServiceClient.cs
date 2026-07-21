@@ -40,6 +40,24 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         SendAsync(() => Request($"data/{facilityId}/fhirQueryConfiguration")
             .DeleteAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse> GetFhirListConfigurationAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/{facilityId}/fhirQueryList")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> CreateFhirListConfigurationAsync(
+        object request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request("data/fhirQueryList")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteFhirListConfigurationAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"data/{facilityId}/fhirQueryList")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse> GetQueryPlanAsync(
         string facilityId,
         string type,
@@ -196,4 +214,29 @@ public class DataAcquisitionServiceClient : LinkApiClientBase, IDataAcquisitionS
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"data/acquisition-logs/facility/{facilityId}/restore")
             .PatchJsonAsync(new { }, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<OrganizationLocationConfigurationApiModel>>> GetOrganizationLocationConfigurationsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<List<OrganizationLocationConfigurationApiModel>>(() => Request($"data/location-config/facility/{facilityId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<OrganizationLocationConfigurationApiModel>> CreateOrganizationLocationConfigurationAsync(
+        string facilityId,
+        CreateOrganizationLocationConfigurationApiModel request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<OrganizationLocationConfigurationApiModel>(() => Request($"data/location-config/facility/{facilityId}")
+            .PostJsonAsync(request, cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<OrganizationLocationMappingApiModel>>> GetOrganizationLocationMappingsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<List<OrganizationLocationMappingApiModel>>(() => Request($"data/location-mappings/facility/{facilityId}")
+            .GetAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse<List<EncounterMappingApiModel>>> GetEncounterMappingsAsync(
+        string facilityId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<List<EncounterMappingApiModel>>(() => Request($"data/encounter-mappings/facilities/{facilityId}")
+            .GetAsync(cancellationToken: cancellationToken));
 }

@@ -42,10 +42,19 @@ public static class QueryPlanAcquisitionSimulator
         QueryPlanInput queryPlan,
         string? clinicalPeriodStart = null,
         string? clinicalPeriodEnd = null,
-        IAutomationOutput? output = null)
+        IAutomationOutput? output = null,
+        bool allowEncounterAnchoredDateOverrideForOutOfRange = true)
     {
         var hasStart = DateTimeOffset.TryParse(clinicalPeriodStart, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var start);
         var hasEnd = DateTimeOffset.TryParse(clinicalPeriodEnd, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var end);
+
+        // DataAcquisition variable substitution normalizes PeriodStart/PeriodEnd to day bounds
+        // (00:00:00Z / 23:59:59Z) before applying ge/le formatting. Mirror that behavior so
+        // simulator date filtering matches runtime acquisition semantics.
+        if (hasStart)
+            start = new DateTimeOffset(start.UtcDateTime.Date, TimeSpan.Zero);
+        if (hasEnd)
+            end = new DateTimeOffset(end.UtcDateTime.Date.AddDays(1).AddSeconds(-1), TimeSpan.Zero);
 
         // Track resource keys we've already emitted a "no recognized date" warning for, so
         // a single missing-date resource doesn't spam the log once per date-parameter iteration.
@@ -97,7 +106,15 @@ public static class QueryPlanAcquisitionSimulator
 
                 foreach (var resource in candidates)
                 {
-                    if (!MatchesParameterQuery(resource, query, hasStart ? start : null, hasEnd ? end : null, acquiredByType, warnedKeys, output))
+                    if (!MatchesParameterQuery(
+                            resource,
+                            query,
+                            hasStart ? start : null,
+                            hasEnd ? end : null,
+                            acquiredByType,
+                            warnedKeys,
+                            output,
+                            allowEncounterAnchoredDateOverrideForOutOfRange))
                         continue;
 
                     acquired.Add(resource.Key);
@@ -134,7 +151,8 @@ public static class QueryPlanAcquisitionSimulator
         DateTimeOffset? periodEnd,
         Dictionary<string, HashSet<string>> acquiredByType,
         HashSet<string> warnedKeys,
-        IAutomationOutput? output)
+        IAutomationOutput? output,
+        bool allowEncounterAnchoredDateOverrideForOutOfRange)
     {
         foreach (var p in query.Parameters)
         {
@@ -177,6 +195,57 @@ public static class QueryPlanAcquisitionSimulator
                 if (bound == null)
                     continue;
 
+                // FHIR Observation/DiagnosticReport `date` matching may consider either
+                // effective[x] or issued, while our generic extractor returns only one range.
+                // Evaluate both shapes and accept if any candidate satisfies the bound.
+                if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                    && (string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var matchedAny = false;
+                    var recognizedAny = false;
+
+                    if (TryGetEffective(resource.Resource, out var effStart, out var effEnd))
+                    {
+                        recognizedAny = true;
+                        matchedAny |= isGe ? effEnd >= bound.Value : effStart <= bound.Value;
+                    }
+
+                    if (TryGetInstant(resource.Resource, "issued", out var issuedStart, out var issuedEnd))
+                    {
+                        recognizedAny = true;
+                        matchedAny |= isGe ? issuedEnd >= bound.Value : issuedStart <= bound.Value;
+                    }
+
+                    if (!recognizedAny)
+                    {
+                        if (HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                            continue;
+
+                        if (output != null && warnedKeys.Add(resource.Key))
+                        {
+                            output.WriteLine(
+                                $"  [simulator] WARNING: {resource.Key} has no recognized date field for the " +
+                                $"'{resource.ResourceType}' Parameter query '{p.Name}' filter; excluding from " +
+                                "predicted-acquired set (fail-closed). Extend TryGetResourceDateRangeForParam to model this shape.");
+                        }
+                        return false;
+                    }
+
+                    if (!matchedAny)
+                    {
+                        if (allowEncounterAnchoredDateOverrideForOutOfRange
+                            && HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                        {
+                            continue;
+                        }
+
+                        return false;
+                    }
+
+                    continue;
+                }
+
                 // Only one bound is being checked per parameter. We need both ends of the
                 // resource's date range so we can compute correct FHIR overlap semantics:
                 //   ge{S}:  resource.End   >= S   (resource extends into [S, +inf))
@@ -185,6 +254,12 @@ public static class QueryPlanAcquisitionSimulator
                 if (!TryGetResourceDateRangeForParam(p.Name, resource.ResourceType, resource.Resource,
                         out var resourceStart, out var resourceEnd))
                 {
+                    if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                        && HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                    {
+                        continue;
+                    }
+
                     // Fail closed: the query has a date filter and we don't recognize the
                     // resource's date shape, so we can't honestly say it falls in-period.
                     // Drop it and warn once per resource key so unfamiliar shapes surface.
@@ -199,14 +274,59 @@ public static class QueryPlanAcquisitionSimulator
                 }
 
                 if (isGe && resourceEnd < bound.Value)
+                {
+                    if (allowEncounterAnchoredDateOverrideForOutOfRange
+                        && string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                        && HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                    {
+                        continue;
+                    }
+
                     return false;
+                }
 
                 if (isLe && resourceStart > bound.Value)
+                {
+                    if (allowEncounterAnchoredDateOverrideForOutOfRange
+                        && string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
+                        && HasEncounterAnchoredDateOverride(resource, acquiredByType))
+                    {
+                        continue;
+                    }
+
                     return false;
+                }
             }
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Some DA query paths are encounter-anchored and can include resources linked to an
+    /// already-acquired encounter. The simulator always uses this as a fallback when a
+    /// resource doesn't expose a recognizable date field, and can optionally apply it to
+    /// out-of-range recognized-date cases when enabled by the caller.
+    ///
+    /// This override is restricted to date-filtered Observation/DiagnosticReport/Procedure
+    /// resources and only when their Encounter reference resolves to an acquired Encounter id.
+    /// </summary>
+    private static bool HasEncounterAnchoredDateOverride(
+        GeneratedResource resource,
+        Dictionary<string, HashSet<string>> acquiredByType)
+    {
+        if (!(string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
+              || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)
+              || string.Equals(resource.ResourceType, "Procedure", StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        if (!acquiredByType.TryGetValue("Encounter", out var encounterIds) || encounterIds.Count == 0)
+            return false;
+
+        return TryGetReferencedResourceId(resource.Resource, "Encounter", out var encounterId)
+               && encounterIds.Contains(encounterId);
     }
 
     private static HashSet<string> CollectReferencedIds(
