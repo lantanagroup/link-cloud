@@ -4,6 +4,7 @@ import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
 import ca.uhn.fhir.context.support.IValidationSupport;
 import com.lantanagroup.link.validation.configs.LinkConfig;
+import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.providers.RemoteTermServiceValidation;
 import com.lantanagroup.link.validation.providers.ValidationCacheService;
 import org.hl7.fhir.common.hapi.validation.support.CommonCodeSystemsTerminologyService;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -93,5 +95,41 @@ class ValidationServiceTest {
         assertFalse(hasSupport(chain, RemoteTermServiceValidation.class), "no remote support when none configured");
         assertTrue(hasSupport(chain, CommonCodeSystemsTerminologyService.class), "CommonCodeSystems present");
         assertTrue(hasSupport(chain, InMemoryTerminologyServerValidationSupport.class), "InMemory present");
+    }
+
+    @Test
+    void deduplicateInactiveResults_collapsesDuplicateInactiveWarningsPerElement() {
+        // HAPI validates a bound coding against both its code system and its value set, so the same inactive
+        // code surfaces twice for one element -- differing only by a trailing "(for 'system#code')" suffix.
+        Result inactiveWithSuffix = result(
+                "Bundle.entry[1].resource.ofType(Patient).extension[0].extension[1].value.ofType(Coding)", "1:398",
+                "The concept '1004-1' has a status of inactive and its use should be reviewed. (for 'urn:oid:2.16.840.1.113883.6.238#1004-1')");
+        Result inactiveNoSuffix = result(
+                "Bundle.entry[1].resource.ofType(Patient).extension[0].extension[1].value.ofType(Coding)", "1:398",
+                "The concept '1004-1' has a status of inactive and its use should be reviewed.");
+        Result otherFinding = result(
+                "Bundle.entry[0].resource.ofType(Encounter).type[0]", "1:408",
+                "None of the codings provided are in the value set 'US Core Encounter Type'");
+        Result inactiveDifferentElement = result(
+                "Bundle.entry[0].resource.ofType(Encounter).class", "1:200",
+                "The concept 'SS' has a status of inactive and its use should be reviewed.");
+
+        List<Result> deduplicated = ValidationService.deduplicateInactiveResults(
+                List.of(inactiveWithSuffix, inactiveNoSuffix, otherFinding, inactiveDifferentElement));
+
+        // The two variants of the 1004-1 warning collapse to the first; unrelated findings are untouched.
+        assertEquals(3, deduplicated.size());
+        assertTrue(deduplicated.contains(inactiveWithSuffix), "first inactive variant kept");
+        assertFalse(deduplicated.contains(inactiveNoSuffix), "duplicate inactive variant dropped");
+        assertTrue(deduplicated.contains(otherFinding), "non-inactive finding preserved");
+        assertTrue(deduplicated.contains(inactiveDifferentElement), "inactive on a different element preserved");
+    }
+
+    private static Result result(String expression, String location, String message) {
+        Result result = new Result();
+        result.setExpression(expression);
+        result.setLocation(location);
+        result.setMessage(message);
+        return result;
     }
 }
