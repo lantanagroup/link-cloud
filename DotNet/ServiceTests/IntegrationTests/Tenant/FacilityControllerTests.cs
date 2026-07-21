@@ -27,10 +27,11 @@ namespace IntegrationTests.Tenant;
 
 [Collection("IntegrationTests")]
 [Trait("Category", "IntegrationTests")]
-public class FacilityControllerTests
+public class FacilityControllerTests : IDisposable
 {
     private readonly ITestOutputHelper _output;
     private readonly TenantIntegrationTestFixture _fixture;
+    private readonly IServiceScope _scope;
     private readonly FacilityController _controller;
 
     public FacilityControllerTests(TenantIntegrationTestFixture fixture, ITestOutputHelper output)
@@ -38,16 +39,26 @@ public class FacilityControllerTests
         _fixture = fixture;
         _output = output;
 
-        var logger = _fixture.ServiceProvider.GetRequiredService<ILogger<FacilityController>>();
-        var scheduleService = _fixture.ServiceProvider.GetRequiredService<ScheduleService>();
-        var producerFactory = _fixture.ServiceProvider.GetRequiredService<IKafkaProducerFactory<string, GenerateReportValue>>();
-        var serviceRegistry = _fixture.ServiceProvider.GetRequiredService<IOptions<ServiceRegistry>>();
-        var httpClientFactory = _fixture.ServiceProvider.GetRequiredService<IHttpClientFactory>();
-        var linkTokenServiceConfig = _fixture.ServiceProvider.GetRequiredService<IOptions<LinkTokenServiceSettings>>();
-        var createSystemToken = _fixture.ServiceProvider.GetRequiredService<ICreateSystemToken>();
-        var linkBearerServiceOptions = _fixture.ServiceProvider.GetRequiredService<IOptions<LinkBearerServiceOptions>>();
-        var queries = _fixture.ServiceProvider.GetRequiredService<IFacilityQueries>();
-        var manager = _fixture.ServiceProvider.GetRequiredService<IFacilityManager>();
+        // Resolve scoped services from a per-test scope rather than the root provider, so the
+        // tests pass under DI scope validation (enabled when DOTNET_ENVIRONMENT=Development).
+        _scope = fixture.ServiceProvider.CreateScope();
+        var sp = _scope.ServiceProvider;
+
+        var logger = sp.GetRequiredService<ILogger<FacilityController>>();
+        var scheduleService = sp.GetRequiredService<ScheduleService>();
+
+        // The controller calls into ScheduleService, whose Quartz scheduler is only initialized in
+        // StartAsync. Start it here so these tests don't depend on another test class (e.g.
+        // ScheduleServiceTests) having started the shared singleton first. StartAsync is idempotent.
+        scheduleService.StartAsync(CancellationToken.None).GetAwaiter().GetResult();
+        var producerFactory = sp.GetRequiredService<IKafkaProducerFactory<string, GenerateReportValue>>();
+        var serviceRegistry = sp.GetRequiredService<IOptions<ServiceRegistry>>();
+        var httpClientFactory = sp.GetRequiredService<IHttpClientFactory>();
+        var linkTokenServiceConfig = sp.GetRequiredService<IOptions<LinkTokenServiceSettings>>();
+        var createSystemToken = sp.GetRequiredService<ICreateSystemToken>();
+        var linkBearerServiceOptions = sp.GetRequiredService<IOptions<LinkBearerServiceOptions>>();
+        var queries = sp.GetRequiredService<IFacilityQueries>();
+        var manager = sp.GetRequiredService<IFacilityManager>();
 
         _controller = new FacilityController(logger, manager, queries, scheduleService, producerFactory, serviceRegistry, httpClientFactory, linkTokenServiceConfig, createSystemToken, linkBearerServiceOptions);
 
@@ -63,6 +74,8 @@ public class FacilityControllerTests
 
     }
 
+    public void Dispose() => _scope.Dispose();
+
     [Fact]
     public async Task GetFacilities_Success()
     {
@@ -75,7 +88,7 @@ public class FacilityControllerTests
             TimeZone = "America/Chicago",
             ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
-        await _fixture.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
+        await _scope.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
 
         var result = await _controller.GetFacilities(facilityId, facilityName, null, null, null, null, 10, 1, false, CancellationToken.None);
 
@@ -96,7 +109,7 @@ public class FacilityControllerTests
             TimeZone = "America/Chicago",
             ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
-        await _fixture.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
+        await _scope.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
 
         var result = await _controller.GetFacilityList(facilityId);
         var okResult = Assert.IsType<OkObjectResult>(result);
@@ -133,7 +146,7 @@ public class FacilityControllerTests
             TimeZone = "America/Chicago",
             ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
-        await _fixture.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
+        await _scope.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
 
         var updateConfig = new FacilityModel
         {
@@ -163,7 +176,7 @@ public class FacilityControllerTests
             TimeZone = "America/Chicago",
             ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
-        await _fixture.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
+        await _scope.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
 
         var result = await _controller.DeleteFacility(facilityId, CancellationToken.None);
         Assert.IsType<NoContentResult>(result);
@@ -181,7 +194,7 @@ public class FacilityControllerTests
             TimeZone = "America/Chicago",
             ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
-        await _fixture.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
+        await _scope.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
 
         var result = await _controller.SoftDeleteFacility(facilityId, CancellationToken.None);
         Assert.IsType<NoContentResult>(result);
@@ -210,7 +223,7 @@ public class FacilityControllerTests
             TimeZone = "America/Chicago",
             ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
-        var manager = _fixture.ServiceProvider.GetRequiredService<IFacilityManager>();
+        var manager = _scope.ServiceProvider.GetRequiredService<IFacilityManager>();
         await manager.CreateAsync(facility, CancellationToken.None);
 
         // Soft delete the facility first
@@ -244,7 +257,7 @@ public class FacilityControllerTests
             TimeZone = "America/Chicago",
             ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
-        await _fixture.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
+        await _scope.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
 
         // Try to restore a facility that is not deleted
         var result = await _controller.RestoreFacility(facilityId, CancellationToken.None);
@@ -265,7 +278,7 @@ public class FacilityControllerTests
             TimeZone = "America/Chicago",
             ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
-        await _fixture.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
+        await _scope.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
 
         var request = new AdHocReportRequest
         {
@@ -297,7 +310,7 @@ public class FacilityControllerTests
             TimeZone = "America/Chicago",
             ScheduledReports = new ScheduledReportModel { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
-        await _fixture.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
+        await _scope.ServiceProvider.GetRequiredService<IFacilityManager>().CreateAsync(facility, CancellationToken.None);
 
         // Stub HttpClient response
         var handler = new StubHttpMessageHandler(new HttpResponseMessage

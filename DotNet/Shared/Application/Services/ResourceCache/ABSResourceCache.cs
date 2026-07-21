@@ -3,13 +3,11 @@ using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using SharpCompress.Common;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
@@ -170,34 +168,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             if (cacheType != ResourceCacheType.ABS)
                 throw new NotSupportedException($"{nameof(ABSResourceCache)} does not support cache type '{cacheType}'.");
             return this;
-        }
-
-        public void Skipped(string sourceCache, string destinationCache)
-        {
-            BlockBlobClient sourceBlobClient = _containerClient.GetBlockBlobClient(GetBlobKey(sourceCache));
-
-            if (!sourceBlobClient.Exists())
-            {
-                _logger.LogWarning("ABS blob not found for Skipped. SourceKey='{SourceKey}', BlobPath='{BlobPath}', Container='{Container}', DestinationKey='{DestinationKey}'",
-                    sourceCache, GetBlobKey(sourceCache), _settings.BlobContainerName, destinationCache);
-                return;
-            }
-
-            AppendBlobClient destinationBlobClient = _containerClient.GetAppendBlobClient(GetBlobKey(destinationCache));
-            destinationBlobClient.CreateIfNotExists();
-
-            try
-            {
-                using (Stream sourceStream = sourceBlobClient.OpenRead(true))
-                using (Stream destinationStream = destinationBlobClient.OpenWrite(false))
-                {
-                    sourceStream.CopyTo(destinationStream);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Error when reading skipped ABS blob: Source Cache = {source}, Destination Cache = {destination}", sourceCache, destinationCache);
-            }
         }
 
         public void Delete(List<string> cacheKeys)

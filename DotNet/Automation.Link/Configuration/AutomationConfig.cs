@@ -37,12 +37,11 @@ public class AutomationConfig
     /// </summary>
     public string FacilityFhirServerBase { get; set; } = "http://fhir-server:8080/fhir";
 
-    public string AdminBffBase { get; set; } = "http://localhost:8063/api";
     public string LokiBaseUrl { get; set; } = "http://localhost:3100";
+    public string LokiAppLabel { get; set; } = "link-cloud";
     public string GrafanaBaseUrl { get; set; } = "http://localhost:3000";
     public string? DownloadPath { get; set; }
 
-    public OAuthConfig AdminBffOAuth { get; set; } = new();
     public OAuthConfig FhirServerOAuth { get; set; } = new();
     public BasicAuthConfig FhirServerBasicAuth { get; set; } = new();
 

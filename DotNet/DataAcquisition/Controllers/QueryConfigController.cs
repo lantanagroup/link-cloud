@@ -261,7 +261,7 @@ public class QueryConfigController : Controller
                 MaxConcurrentRequests = fhirQueryConfiguration.MaxConcurrentRequests,
                 MaxRetries = fhirQueryConfiguration.MaxRetries,
                 MinAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MinAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
-                MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone),
+                MaxAcquisitionPullTime = ConvertTimeOfDayToUtc(fhirQueryConfiguration.MaxAcquisitionPullTime, fhirQueryConfiguration.TimeZone)
             }, cancellationToken);
 
             if (result == null)

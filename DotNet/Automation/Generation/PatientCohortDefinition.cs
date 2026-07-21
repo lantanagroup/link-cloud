@@ -15,6 +15,19 @@ public class PatientCohortDefinition
     public int PatientCount { get; set; }
 
     /// <summary>
+    /// Concrete cohort-level expected qualification outcome used by prediction logic.
+    /// This allows scenarios to explicitly mark a cohort as qualifying vs non-qualifying
+    /// independent of per-measure checkbox drift in UI editing.
+    /// </summary>
+    public MeasureEligibility CohortQualification { get; set; } = MeasureEligibility.Qualifying;
+
+    /// <summary>
+    /// Optional scheduled-report inpatient behavior for patients in this cohort.
+    /// When set, scheduled-report automation uses this to decide admit/discharge timing.
+    /// </summary>
+    public ScheduledInpatientPattern? ScheduledInpatientPattern { get; set; }
+
+    /// <summary>
     /// Per-measure eligibility map. Every selected measure should have an entry.
     /// Drives encounter type (inpatient vs ambulatory) and measure-specific
     /// resource generation (e.g., diabetic medication for Hypo).
@@ -52,6 +65,7 @@ public class PatientCohortDefinition
     {
         var result = new List<PatientProfile>();
         var seedCursor = 0;
+        var cohortIndex = 0;
 
         foreach (var cohort in cohorts)
         {
@@ -66,15 +80,39 @@ public class PatientCohortDefinition
             {
                 var seedOffset = seedCursor;
                 var scenarioId = scenarios[seedCursor % scenarios.Count];
-                var resources = min == max ? min : min + ((seed + seedCursor) % (max - min + 1));
+                var resources = ComputeResourceTarget(seed, cohortIndex, i, min, max);
                 result.Add(new PatientProfile(
                     new Dictionary<ProfiledMeasureType, MeasureEligibility>(cohort.MeasureEligibilities),
-                    seedOffset, scenarioId, resources));
+                    seedOffset,
+                    scenarioId,
+                    resources,
+                    cohort.ScheduledInpatientPattern,
+                    cohort.CohortQualification));
                 seedCursor++;
             }
+
+            cohortIndex++;
         }
 
         return result;
+    }
+
+    private static int ComputeResourceTarget(int seed, int cohortIndex, int patientIndexInCohort, int min, int max)
+    {
+        if (max <= min)
+            return min;
+
+        var span = max - min + 1;
+
+        // Deterministic per-patient selection based on (seed, cohort #, patient #).
+        // Cantor pairing gives each (cohort,patient) tuple a stable unique ordinal so
+        // adjacent patients and same patient-number across cohorts distribute independently.
+        long sum = cohortIndex + patientIndexInCohort;
+        long pairedOrdinal = (sum * (sum + 1) / 2) + patientIndexInCohort;
+        long raw = seed + pairedOrdinal;
+        var offset = (int)((raw % span + span) % span);
+
+        return min + offset;
     }
 
     /// <summary>
@@ -89,6 +127,7 @@ public class PatientCohortDefinition
         return new PatientCohortDefinition
         {
             PatientCount = patientCount,
+            CohortQualification = MeasureEligibility.Qualifying,
             MeasureEligibilities = measures.ToDictionary(m => m, _ => MeasureEligibility.Qualifying),
             ResourcesPerPatientMin = resourcesMin,
             ResourcesPerPatientMax = resourcesMax
@@ -107,6 +146,7 @@ public class PatientCohortDefinition
         return new PatientCohortDefinition
         {
             PatientCount = patientCount,
+            CohortQualification = MeasureEligibility.NonQualifying,
             MeasureEligibilities = measures.ToDictionary(m => m, _ => MeasureEligibility.NonQualifying),
             ResourcesPerPatientMin = resourcesMin,
             ResourcesPerPatientMax = resourcesMax

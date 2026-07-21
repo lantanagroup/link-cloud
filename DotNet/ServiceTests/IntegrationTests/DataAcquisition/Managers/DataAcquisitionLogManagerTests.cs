@@ -171,14 +171,44 @@ public class DataAcquisitionLogManagerTests
     }
 
     [Fact]
+    public async Task UpdateStatusBatchAsync_ToCompleted_SetsCompletionDate()
+    {
+        using var scope = _fixture.ServiceProvider.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<DataAcquisitionDbContext>();
+
+        var log = new DataAcquisitionLog
+        {
+            FacilityId = $"TestFacility_{Guid.NewGuid():N}",
+            Status = RequestStatus.Processing,
+            CompletionDate = null
+        };
+        dbContext.DataAcquisitionLogs.Add(log);
+        await dbContext.SaveChangesAsync();
+
+        var beforeUpdate = DateTime.UtcNow.AddSeconds(-1);
+        var manager = CreateManager(scope);
+
+        var updated = await manager.UpdateStatusBatchAsync([log.Id], RequestStatus.Completed, incrementRetry: false);
+
+        Assert.Equal(1, updated);
+
+        await dbContext.Entry(log).ReloadAsync();
+        Assert.Equal(RequestStatus.Completed, log.Status);
+        Assert.NotNull(log.CompletionDate);
+        Assert.True(log.CompletionDate >= beforeUpdate, $"CompletionDate {log.CompletionDate} should be >= {beforeUpdate}");
+    }
+
+    [Fact]
     public async Task UpdateAsync_NoExistingLog_ThrowsNotFound()
     {
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
+        // Negative id is guaranteed absent: SQL Server identity values are always positive,
+        // so this stays "not found" regardless of how many logs prior tests left in the shared DB.
         var updateModel = new UpdateDataAcquisitionLogModel
         {
-            Id = 999,
+            Id = -1,
             Status = RequestStatus.Completed
         };
 
@@ -274,7 +304,9 @@ public class DataAcquisitionLogManagerTests
         // Arrange
         using var scope = _fixture.ServiceProvider.CreateScope();
         var manager = CreateManager(scope);
-        var logIds = new List<long> { 999 };
+        // Negative id is guaranteed absent: SQL Server identity values are always positive,
+        // so this stays "not found" regardless of how many logs prior tests left in the shared DB.
+        var logIds = new List<long> { -1 };
 
         // Act & Assert
         await Assert.ThrowsAsync<NotFoundException>(() => manager.UpdateTailFlagForFacilityCorrelationIdReportTrackingId(logIds, "TestFacility", "TestCorr", Guid.NewGuid().ToString()));
@@ -334,7 +366,9 @@ public class DataAcquisitionLogManagerTests
             new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Completed, CreateDate = DateTime.UtcNow.AddHours(-48) },
             new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.MaxRetriesReached, CreateDate = DateTime.UtcNow.AddHours(-48) },
             new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Skipped, CreateDate = DateTime.UtcNow.AddHours(-48) },
-            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Cancelled, CreateDate = DateTime.UtcNow.AddHours(-48) }
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Cancelled, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.ConfigurationMissing, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.NotReportable, CreateDate = DateTime.UtcNow.AddHours(-48) }
         };
         dbContext.DataAcquisitionLogs.AddRange(seeded);
         await dbContext.SaveChangesAsync();
@@ -649,7 +683,9 @@ public class DataAcquisitionLogManagerTests
 
         dbContext.DataAcquisitionLogs.AddRange(
             new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Completed, CreateDate = DateTime.UtcNow.AddHours(-48) },
-            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Cancelled, CreateDate = DateTime.UtcNow.AddHours(-48) }
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.Cancelled, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.ConfigurationMissing, CreateDate = DateTime.UtcNow.AddHours(-48) },
+            new DataAcquisitionLog { FacilityId = facilityId, Status = RequestStatus.NotReportable, CreateDate = DateTime.UtcNow.AddHours(-48) }
         );
         await dbContext.SaveChangesAsync();
 
@@ -660,7 +696,7 @@ public class DataAcquisitionLogManagerTests
             new SearchDataAcquisitionLogRequest { FacilityId = facilityId }, 24);
 
         // Assert
-        Assert.Equal(2, requested);
+        Assert.Equal(4, requested);
         Assert.Equal(0, cancelled);
     }
 

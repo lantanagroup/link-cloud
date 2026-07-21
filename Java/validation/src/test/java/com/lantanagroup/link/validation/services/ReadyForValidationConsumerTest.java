@@ -3,6 +3,7 @@ package com.lantanagroup.link.validation.services;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.parser.IParser;
 import com.azure.core.util.BinaryData;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.services.ReportClient;
@@ -10,6 +11,8 @@ import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
 import com.lantanagroup.link.validation.records.ValidationComplete;
+import com.lantanagroup.link.validation.repositories.CategoryRepository;
+import com.lantanagroup.link.validation.repositories.CategoryRuleRepository;
 import com.lantanagroup.link.validation.repositories.ResultRepository;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -258,6 +261,33 @@ public class ReadyForValidationConsumerTest {
         consumer.process(buildRecord(null));
 
         verify(resultRepository).saveAll(List.of(result));
+    }
+
+    @Test
+    void process_inactiveCodeResult_isCategorizedAsInactiveCodeAndPersisted() throws Exception {
+        // Wire a real CategorizationService backed by the shipped categories.json so this exercises the
+        // actual message -> inactive_code category -> saveAll path for an inactive-code finding.
+        CategoryRepository categoryRepository = mock(CategoryRepository.class);
+        when(categoryRepository.findAll()).thenReturn(CategoryFixtures.loadShippedCategories());
+        CategorizationService realCategorizationService = new CategorizationService(
+                new ObjectMapper(), categoryRepository, mock(CategoryRuleRepository.class), resultRepository);
+
+        ReadyForValidationConsumer consumerWithRealCategorization = new ReadyForValidationConsumer(
+                fhirContext, reportClient, validationService, realCategorizationService, resultRepository,
+                validationCompleteTemplate, validationMetrics, Optional.of(blobStorageService), recoverer);
+
+        Result inactiveResult = new Result();
+        inactiveResult.setMessage("The concept '423666004' has a status of inactive and its use should be reviewed.");
+        inactiveResult.setExpression("Bundle.entry[0].resource.ofType(Encounter).type[0].coding[0]");
+        stubRestRetrieval();
+        when(validationService.validate(bundle)).thenReturn(List.of(inactiveResult));
+
+        consumerWithRealCategorization.process(buildRecord(null));
+
+        assertTrue(
+                inactiveResult.getCategories().stream().anyMatch(c -> "missing_active_encounter_type_code".equals(c.getId())),
+                "Inactive-code result should be categorized as inactive_code");
+        verify(resultRepository).saveAll(List.of(inactiveResult));
     }
 
     // -------------------------------------------------------------------------

@@ -20,7 +20,7 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Application.Services.Auth;
 
 public class EpicAuth : IAuth
 {
-    private const string PemSecretSuffix = "-pem";
+    private const string PemSuffix = "-pem";
 
     private readonly HttpClient _httpClient;
     private readonly ILogger<EpicAuth> _logger;
@@ -157,12 +157,12 @@ public class EpicAuth : IAuth
             return authSettings.Key;
         }
 
-        var pemSecretName = $"{facilityId}{PemSecretSuffix}";
-        var resolvedPem = await _secretManager.GetSecretAsync(pemSecretName, CancellationToken.None);
+        var pemName = $"{facilityId}{PemSuffix}";
+        var resolvedPem = await _secretManager.GetSecretAsync(pemName, CancellationToken.None);
 
         if (string.IsNullOrWhiteSpace(resolvedPem))
             throw new InvalidOperationException(
-                $"No PEM found in secret manager for facility '{facilityId}' (expected secret '{pemSecretName}').");
+                $"No PEM found in secret manager for facility '{facilityId}' (expected secret '{pemName}').");
 
         return resolvedPem;
     }

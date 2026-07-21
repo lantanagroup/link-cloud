@@ -12,6 +12,8 @@ public class RunsController(
     ISnapshotStore snapshotStore,
     IScenarioStore scenarioStore,
     IQueryPlanTemplateStore queryPlanTemplateStore,
+    INormalizationStore normalizationStore,
+    IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
     IDataAcquisitionServiceClient dataAcqClient,
     IRunExportService runExportService,
     ILogger<RunsController> logger) : Controller
@@ -56,6 +58,8 @@ public class RunsController(
 
         // Populate query plan templates for the shared scenario editor modal embedded in this view.
         ViewBag.QueryPlanTemplates = await queryPlanTemplateStore.GetAllAsync(cancellationToken);
+        ViewBag.NormalizationSuites = await normalizationStore.GetAllSuitesAsync(cancellationToken);
+        ViewBag.OrganizationResourceMaps = await organizationResourceMapTemplateStore.GetAllAsync(cancellationToken);
 
         var vm = new RunDashboardViewModel
         {

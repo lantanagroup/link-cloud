@@ -19,7 +19,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             _operationTimeout = operationTimeout ?? TimeSpan.FromSeconds(120);
         }
 
-        public async Task<OperationResult> ProcessOperationAsync(TOperation operation, DomainResource resource, CancellationToken cancellationToken = default)
+        public async Task<OperationResult> ProcessOperationAsync(TOperation operation, DomainResource resource, List<DomainResource>? supportingResources = null, CancellationToken cancellationToken = default)
         {
             if (operation == null)
                 return OperationResult.Failure("Operation cannot be null.");
@@ -27,12 +27,12 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             if (resource == null)
                 return OperationResult.Failure("Resource cannot be null.");
 
-            var result = await ProcessOperation(operation, resource, cancellationToken);
+            var result = await ProcessOperation(operation, resource, supportingResources, cancellationToken);
 
             return result;
         }
 
-        protected virtual async Task<OperationResult> ProcessOperation(TOperation operation, DomainResource resource, CancellationToken cancellationToken = default)
+        protected virtual async Task<OperationResult> ProcessOperation(TOperation operation, DomainResource resource, List<DomainResource>? supportingResources = null, CancellationToken cancellationToken = default)
         {
             //Daniel - 4/2026: Do we need to perform a deep copy? Commented this out for now as it looks like the operations are being applied without it. 
             //var resourceCopy = resource.DeepCopy() as DomainResource;
@@ -42,7 +42,7 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             try
             {
                 //return await ExecuteOperation(operation, resourceCopy);
-                return await ExecuteOperation(operation, resource, cancellationToken);
+                return await ExecuteOperation(operation, resource, supportingResources, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -52,6 +52,6 @@ namespace LantanaGroup.Link.Normalization.Application.Services.Operations
             }
         }
 
-        protected abstract Task<OperationResult> ExecuteOperation(TOperation operation, DomainResource resource, CancellationToken cancellationToken = default);
+        protected abstract Task<OperationResult> ExecuteOperation(TOperation operation, DomainResource resource, List<DomainResource>? supportingResources = null, CancellationToken cancellationToken = default);
     }
 }
