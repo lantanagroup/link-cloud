@@ -12,5 +12,4 @@ public class UserInfoResponse
     public IReadOnlyCollection<string> Groups { get; set; } = [];
     public IReadOnlyCollection<string> AvailableNavigation { get; set; } = [];
     public string? AccessRequestUrl { get; set; }
-    public bool IsLowerEnvironmentTestingMode { get; set; }
 }

@@ -22,7 +22,6 @@ export interface UserInfoResponse {
   Groups: string[];
   AvailableNavigation: string[];
   AccessRequestUrl?: string;
-  IsLowerEnvironmentTestingMode: boolean;
 }
 
 export interface FacilitySummaryResponse {

@@ -14,4 +14,6 @@ public class NhsnJwtSettings
     public string FacilityIdClaimType { get; set; } = "facility";
     public string PublicCertificatePem { get; set; } = string.Empty;
     public string AccessRequestUrl { get; set; } = string.Empty;
+    public int? MaxTokenAgeMinutes { get; set; }
+    public string ExpiredTokenRedirectUrl { get; set; } = string.Empty;
 }

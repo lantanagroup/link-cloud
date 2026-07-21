@@ -88,6 +88,11 @@ static void RegisterServices(WebApplicationBuilder builder)
                 },
                 OnChallenge = context =>
                 {
+                    if (TryHandleTokenRenewalRedirect(context, jwtSettings))
+                    {
+                        return Task.CompletedTask;
+                    }
+
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("NhsnJwtAuth");
                     logger.LogWarning(
                         "JWT challenge triggered. Path={Path}; Error={Error}; ErrorDescription={ErrorDescription}; SigningKeyId={SigningKeyId}; AuthHeaderPresent={AuthHeaderPresent}",
@@ -100,6 +105,8 @@ static void RegisterServices(WebApplicationBuilder builder)
                 },
                 OnTokenValidated = context =>
                 {
+                    EnforceMaximumTokenAge(context, jwtSettings);
+
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("NhsnJwtAuth");
                     var subject = context.Principal?.FindFirstValue(jwtSettings.UserIdClaimType)
                                   ?? context.Principal?.FindFirstValue(jwtSettings.EmailClaimType)
@@ -123,7 +130,6 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddScoped<IFacilityAdministrationService, FacilityAdministrationService>();
 
     builder.Services.AddTransient<IApi, UserInfoEndpoints>();
-    builder.Services.AddTransient<IApi, SimulationEndpoints>();
     builder.Services.AddTransient<IApi, FacilityAdministrationEndpoints>();
     builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>(name: "database");
     builder.Services.AddEndpointsApiExplorer();
@@ -242,6 +248,73 @@ static TokenValidationParameters CreateValidationParameters(NhsnJwtSettings sett
         NameClaimType = settings.NameClaimType,
         RoleClaimType = ClaimTypes.Role
     };
+}
+
+static void EnforceMaximumTokenAge(TokenValidatedContext context, NhsnJwtSettings settings)
+{
+    if (!settings.MaxTokenAgeMinutes.HasValue || settings.MaxTokenAgeMinutes.Value <= 0)
+    {
+        return;
+    }
+
+    var iatValue = context.Principal?.FindFirstValue("iat");
+    if (string.IsNullOrWhiteSpace(iatValue) || !long.TryParse(iatValue, out var issuedAtUnixSeconds))
+    {
+        context.Fail(new SecurityTokenValidationException("JWT is missing a valid iat claim required for maximum token age validation."));
+        return;
+    }
+
+    var issuedAt = DateTimeOffset.FromUnixTimeSeconds(issuedAtUnixSeconds);
+    var maxTokenAge = TimeSpan.FromMinutes(settings.MaxTokenAgeMinutes.Value);
+    if (DateTimeOffset.UtcNow - issuedAt > maxTokenAge)
+    {
+        context.Fail(new SecurityTokenValidationException("JWT exceeds the configured maximum token age and must be refreshed."));
+    }
+}
+
+static bool TryHandleTokenRenewalRedirect(JwtBearerChallengeContext context, NhsnJwtSettings settings)
+{
+    if (string.IsNullOrWhiteSpace(settings.ExpiredTokenRedirectUrl))
+    {
+        return false;
+    }
+
+    if (!ShouldRedirectForTokenRenewal(context.AuthenticateFailure))
+    {
+        return false;
+    }
+
+    var redirectUrl = BuildTokenRenewalRedirectUrl(settings.ExpiredTokenRedirectUrl, context.Request);
+    context.HandleResponse();
+    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+    context.Response.Headers.Append("Location", redirectUrl);
+    context.Response.Headers.Append("X-Expired-Token-Redirect-Url", redirectUrl);
+    return true;
+}
+
+static bool ShouldRedirectForTokenRenewal(Exception? exception)
+{
+    if (exception is null)
+    {
+        return false;
+    }
+
+    return exception is SecurityTokenExpiredException
+           || exception is SecurityTokenValidationException;
+}
+
+static string BuildTokenRenewalRedirectUrl(string configuredUrl, HttpRequest request)
+{
+    var currentUrl = $"{request.Scheme}://{request.Host}{request.PathBase}{request.Path}{request.QueryString}";
+    var encodedCurrentUrl = Uri.EscapeDataString(currentUrl);
+
+    if (configuredUrl.Contains("{redirectUrl}", StringComparison.OrdinalIgnoreCase))
+    {
+        return configuredUrl.Replace("{redirectUrl}", encodedCurrentUrl, StringComparison.OrdinalIgnoreCase);
+    }
+
+    var separator = configuredUrl.Contains('?') ? '&' : '?';
+    return $"{configuredUrl}{separator}redirectUrl={encodedCurrentUrl}";
 }
 
 static SecurityKey CreateIssuerSigningKey(X509Certificate2 certificate)
