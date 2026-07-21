@@ -11,9 +11,9 @@ namespace LantanaGroup.Link.DataAcquisition.Domain.Infrastructure.Models;
 public class EhrPatientList
 {
     [Required]
-    public ListType Status { get; set; }
+    public ListType? Status { get; set; } = 0;
     [Required]
-    public TimeFrame TimeFrame { get; set; }
+    public TimeFrame? TimeFrame { get; set; } = 0;
     public string? InternalId { get; set; }
     [Required]
     public string FhirId { get; set; }
