@@ -18,11 +18,14 @@
 #  How to use / configure
 #  -----------------------------------------
 #  1. Target environment
-#     - Set the "Target environment" parameter at queue time (currently only
-#       "test" has a base URL defined).
-#     - To add another environment (e.g. dev):
-#         a. Uncomment / add AUTOMATION_UI_BASE_URL_<env> under variables.
-#         b. Add the value to the targetEnvironment parameter values list.
+#     - Set the "Target environment" parameter at queue time.
+#     - Available values match the Kubernetes namespaces used by Deploy All
+#       Services:  dev-scale | scale-test | scale-qa
+#     - These are normalized internally to canonical keys (dev / test / qa)
+#       for base-URL lookup. To add a new environment:
+#         a. Add AUTOMATION_UI_BASE_URL_<canonical> under variables.
+#         b. Add the K8s-style name to the targetEnvironment values list.
+#         c. Extend Normalize-EnvironmentName if the name needs aliasing.
 #
 #  2. Which suites to run
 #     - Four boolean parameters control the suites. Defaults are all true.
@@ -80,10 +83,11 @@ parameters:
   - name: targetEnvironment
     displayName: "Target environment"
     type: string
-    default: "test"
+    default: "scale-test"
     values:
-      - "test"
-      # - "dev"   # uncomment + add AUTOMATION_UI_BASE_URL_dev when ready
+      - "dev-scale"
+      - "scale-test"
+      - "scale-qa"
 
   - name: runApiStabilitySuite
     displayName: "Run API Stability Suite"
@@ -117,9 +121,12 @@ parameters:
 
 variables:
   # Per-environment Automation.UI base URL.
-  # Only test is configured for now; add other envs as they come online.
+  # Keys are the *canonical* names produced by Normalize-EnvironmentName
+  # (dev-scale → dev, scale-test → test, scale-qa → qa).
+  # Confirm the actual hostnames for dev and qa before first use.
   AUTOMATION_UI_BASE_URL_test: "https://test-automation.nhsnlink.org"
-  # AUTOMATION_UI_BASE_URL_dev: "https://dev-automation.nhsnlink.org"
+  AUTOMATION_UI_BASE_URL_dev:  "https://dev-automation.nhsnlink.org"
+  AUTOMATION_UI_BASE_URL_qa:   "https://qa-automation.nhsnlink.org"
 
   # Automation.UI API audience (App Registration expose API URI).
   # The pipeline acquires an app-only token for "{audience}/.default".
@@ -162,19 +169,34 @@ stages:
             inputs:
               targetType: "inline"
               script: |
-                $envName = "${{ parameters.targetEnvironment }}"
+                $envNameRaw = "${{ parameters.targetEnvironment }}"
+
+                function Normalize-EnvironmentName([string]$value) {
+                  if (-not $value) { return "" }
+                  $v = $value.Trim().ToLowerInvariant()
+                  if ($v -eq "scale-test" -or $v -eq "test-scale" -or $v -eq "test") { return "test" }
+                  if ($v -eq "dev-scale"  -or $v -eq "scale-dev"  -or $v -eq "dev")  { return "dev" }
+                  if ($v -eq "scale-qa"   -or $v -eq "qa-scale"   -or $v -eq "qa")   { return "qa" }
+                  return $v
+                }
+
+                # Canonical key used for base-URL variable lookup (dev / test / qa)
+                $envName = Normalize-EnvironmentName $envNameRaw
+                Write-Host "Selected environment : $envNameRaw  (canonical: $envName)"
 
                 # Per-env base URL lookup (avoid macro expansion against undefined names)
                 $baseVar = "AUTOMATION_UI_BASE_URL_$envName"
                 $base    = (Get-Item -Path "env:$baseVar" -ErrorAction SilentlyContinue).Value
 
                 if (-not $base) {
-                  Write-Error "Variable '$baseVar' is not defined. Add the base URL for environment '$envName'."
+                  Write-Error "Variable '$baseVar' is not defined. Add the base URL for environment '$envNameRaw' (canonical '$envName')."
                   exit 1
                 }
 
                 Write-Host "Target base URL : $base"
                 Write-Host "##vso[task.setvariable variable=AUTOMATION_UI_BASE_URL]$base"
+                Write-Host "##vso[task.setvariable variable=TARGET_ENV_RAW]$envNameRaw"
+                Write-Host "##vso[task.setvariable variable=TARGET_ENV_CANONICAL]$envName"
 
                 # Surface the deterministic scenario IDs so later steps can use them
                 Write-Host "##vso[task.setvariable variable=SCENARIO_ID_AdHocReport]$(SCENARIO_ID_AdHocReport)"
@@ -196,15 +218,6 @@ stages:
                 Write-Host "Build reason: $buildReason"
                 Write-Host "DeployAll resource run id: $resourceRunId"
 
-                function Normalize-EnvironmentName([string]$value) {
-                  if (-not $value) { return "" }
-                  $v = $value.Trim().ToLowerInvariant()
-                  if ($v -eq "scale-test" -or $v -eq "test-scale") { return "test" }
-                  if ($v -eq "dev-scale"  -or $v -eq "scale-dev")  { return "dev" }
-                  if ($v -eq "scale-qa"   -or $v -eq "qa-scale")   { return "qa" }
-                  return $v
-                }
-
                 if ($buildReason -ieq "Manual") {
                   $shouldRun = $true
                   Write-Host "Manual run detected. Bypassing Deploy_All_Services gate."
@@ -215,6 +228,16 @@ stages:
                 }
 
                 function Get-EnvFromBuild($Build) {
+                  if ($Build.parameters) {
+                    try {
+                      $bp = $Build.parameters | ConvertFrom-Json
+                      if ($bp.PSObject.Properties.Name -contains "environment") {
+                        return ([string]$bp.environment).Trim()
+                      }
+                      $bpEnvProp = $bp.PSObject.Properties | Where-Object { $_.Name -match "env" } | Select-Object -First 1
+                      if ($bpEnvProp) { return ([string]$bp.($bpEnvProp.Name)).Trim() }
+                    } catch {}
+                  }
                   if (-not $Build.templateParameters) { return $null }
                   $tp = $Build.templateParameters
                   if ($tp.PSObject.Properties.Name -contains "environment") {
@@ -255,7 +278,7 @@ stages:
                 $commitShort = if ($commitSha.Length -ge 7) { $commitSha.Substring(0,7) } else { $commitSha }
 
                 if (-not $shouldRun) {
-                  Write-Host "No succeeded Deploy_All_Services for env '$envName'. Skipping."
+                  Write-Host "No succeeded Deploy_All_Services for env '$envNameRaw' (canonical '$envName'). Skipping."
                   Write-Host "##vso[task.setvariable variable=SKIP_RUN]true"
                 }
 
@@ -580,10 +603,13 @@ stages:
                     $finalError  = $null
                     $duration    = $null
                     $extraInfo   = $null
+                    $consecutiveStatusErrors = 0
+                    $maxConsecutiveStatusErrors = 5
 
                     while ((Get-Date) -lt $deadline) {
                       try {
                         $r = Invoke-RestMethod -Uri $statusUrl -Method Get -Headers $headers
+                        $consecutiveStatusErrors = 0
                         Write-Host ("  status={0} isTerminal={1}" -f $r.status, $r.isTerminal)
 
                         if ($r.isTerminal) {
@@ -613,6 +639,17 @@ stages:
                           break
                         }
                       } catch {
+                        $statusCode = $null
+                        try { $statusCode = [int]$_.Exception.Response.StatusCode } catch {}
+                        if ($statusCode -and $statusCode -ge 400 -and $statusCode -lt 500 -and $statusCode -ne 429) {
+                          throw "Status check failed with HTTP $statusCode for run $runId. $_"
+                        }
+
+                        $consecutiveStatusErrors++
+                        if ($consecutiveStatusErrors -ge $maxConsecutiveStatusErrors) {
+                          throw "Status check failed $consecutiveStatusErrors consecutive times for run $runId. Last error: $_"
+                        }
+
                         Write-Host "  Status check failed (will retry): $_"
                       }
                       Start-Sleep -Seconds $pollSeconds
@@ -674,7 +711,22 @@ stages:
                   --name  "$(APP_CONFIG_NAME)" `
                   --key   "$(APP_CONFIG_SLACK_KEY)" `
                   --label "$(APP_CONFIG_SLACK_LABEL)" `
-                  --query value -o tsv
+                  --query value -o tsv 2>&1
+
+                $azExit = $LASTEXITCODE
+
+                if ($azExit -ne 0) {
+                  $azMessage = "$value"
+                  if ($azMessage -match "does not exist|not found") {
+                    Write-Host "Slack webhook key '$(APP_CONFIG_SLACK_KEY)' (label '$(APP_CONFIG_SLACK_LABEL)') not found in App Config '$(APP_CONFIG_NAME)'."
+                    Write-Host "##vso[task.setvariable variable=SLACK_WEBHOOK_URL]"
+                    exit 0
+                  }
+
+                  Write-Error "Failed to read Slack webhook from App Config (exit code: $azExit)."
+                  Write-Host "az output: $azMessage"
+                  exit 1
+                }
 
                 if (-not $value) {
                   Write-Host "Slack webhook key '$(APP_CONFIG_SLACK_KEY)' (label '$(APP_CONFIG_SLACK_LABEL)') not found in App Config '$(APP_CONFIG_NAME)'."
@@ -768,7 +820,7 @@ stages:
                       }
                     }
                   } catch {
-                    $lines += "_Failed to parse suite results: $_ _"
+                    $lines += "_Failed to parse suite results: ${_}_"
                   }
                 } else {
                   $lines += "_No suite results recorded._"
