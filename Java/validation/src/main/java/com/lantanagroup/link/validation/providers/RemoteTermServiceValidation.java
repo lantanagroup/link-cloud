@@ -58,6 +58,21 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
         return validationCacheService.cachedValidateCode(this, theCodeSystem, theCode, theDisplay, theValueSetUrl);
     }
 
+    /**
+     * HAPI calls this (rather than {@link #validateCode}) once it has resolved the bound ValueSet to a resource,
+     * which is the common case for loaded profiles. Delegating to the remote terminology service here ensures the
+     * inactive-code detection in {@link #invokeRemoteValidateCode} runs for value-set-bound codes instead of falling
+     * through to the in-memory support. When the ValueSet carries a canonical URL we route through the same cache as
+     * {@link #validateCode}; otherwise we send the ValueSet resource inline.
+     */
+    public IValidationSupport.CodeValidationResult validateCodeInValueSet(ValidationSupportContext theValidationSupportContext, ConceptValidationOptions theOptions, String theCodeSystem, String theCode, String theDisplay, IBaseResource theValueSet) {
+        String valueSetUrl = theValueSet instanceof org.hl7.fhir.r4.model.ValueSet valueSet ? valueSet.getUrl() : null;
+        if (StringUtils.isNotBlank(valueSetUrl)) {
+            return validationCacheService.cachedValidateCode(this, theCodeSystem, theCode, theDisplay, valueSetUrl);
+        }
+        return invokeRemoteValidateCode(theCodeSystem, theCode, theDisplay, null, theValueSet);
+    }
+
     @Nullable
     private IBaseResource fetchCodeSystem(String theSystem, @Nullable SummaryEnum theSummaryParam) {
         IGenericClient client = this.provideClient();
@@ -291,7 +306,7 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
         return RemoteTerminologyUtil.translateOutcomeToResults(fhirContext, outcome);
     }
 
-    private IGenericClient provideClient() {
+    protected IGenericClient provideClient() {
         IGenericClient retVal = this.myCtx.newRestfulGenericClient(this.myBaseUrl);
 
         for(Object next : this.myClientInterceptors) {
@@ -328,31 +343,98 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
                 return result;
             }
 
-            List<String> resultValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "result");
-            if (!resultValues.isEmpty() && !StringUtils.isBlank((CharSequence)resultValues.get(0))) {
-                Validate.isTrue(resultValues.size() == 1, "Response contained %d 'result' values", (long)resultValues.size());
-                boolean success = "true".equalsIgnoreCase((String)resultValues.get(0));
-                IValidationSupport.CodeValidationResult retVal = new IValidationSupport.CodeValidationResult();
-                if (success) {
-                    retVal.setSeverity(retVal.getSeverity() != null ? retVal.getSeverity() : IssueSeverity.INFORMATION);
-                    retVal.setCode(theCode);
-                    List<String> displayValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "display");
-                    if (!displayValues.isEmpty()) {
-                        retVal.setDisplay((String)displayValues.get(0));
-                    }
-                } else {
-                    retVal.setSeverity(IssueSeverity.ERROR);
-                    List<String> messageValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "message");
-                    if (!messageValues.isEmpty()) {
-                        retVal.setMessage((String)messageValues.get(0));
-                    }
-                }
+            CodeValidationResult codeResult = getCodeResult(output, theCode);
 
-                return retVal;
-            } else {
+            if (codeResult == null) {
                 return null;
             }
+
+            if (codeResult.getSeverity() != IssueSeverity.INFORMATION) {
+                // Invalid code
+                return codeResult;
+            } 
+
+            if (isInactiveIssue(output)) {
+                codeResult.setSeverity(IssueSeverity.WARNING);
+                codeResult.setMessage(String.format("The concept '%s' has a status of inactive and its use should be reviewed.", theCode));
+            }
+
+            return codeResult;
         }
+    }
+
+    /**
+     * Checks if the output contains an issue indicating that the code is inactive.
+     *
+     * @param output the operation output
+     * 
+     * @return true if the code is inactive, false otherwise
+     */
+    protected boolean isInactiveIssue(IBaseParameters output) {
+
+        if (!(output instanceof org.hl7.fhir.r4.model.Parameters parameters)) {
+            // Output is not an R4 Parameters resource, cannot evaluate for inactive code
+            return false;
+        }
+
+        org.hl7.fhir.r4.model.OperationOutcome outcome = parameters.getParameter().stream()
+                .filter(parameter -> "issues".equals(parameter.getName()))
+                .map(parameter -> parameter.getResource())              
+                .filter(org.hl7.fhir.r4.model.OperationOutcome.class::isInstance)
+                .map(org.hl7.fhir.r4.model.OperationOutcome.class::cast)
+                .findFirst()
+                .orElse(null);
+
+        if (outcome == null) {
+            // no issues parameter
+            return false;   
+        }        
+
+        org.hl7.fhir.r4.model.OperationOutcome.OperationOutcomeIssueComponent issue = outcome.getIssueFirstRep();
+
+        String message = issue.getDetails() != null ? issue.getDetails().getText() : issue.getDiagnostics();
+
+        if (issue.getCode() == org.hl7.fhir.r4.model.OperationOutcome.IssueType.BUSINESSRULE && 
+            issue.getSeverity() == org.hl7.fhir.r4.model.OperationOutcome.IssueSeverity.WARNING &&
+            "code is inactive.".equalsIgnoreCase(message)) {
+                return true;
+            }
+
+        return false;
+    }
+
+    /**
+     * Parses the response of a $validate-code operation into a {@link IValidationSupport.CodeValidationResult}.
+     * The result parameter is true if the code is valid, otherwise false. If the code is not valid, the message
+     * parameter will contain a human-readable error message.
+     *
+     * @return the parsed validation result, or {@code null} if the response contained no usable 'result' value
+     */
+    protected IValidationSupport.CodeValidationResult getCodeResult(IBaseParameters output, String theCode) {
+        List<String> resultValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "result");
+        if (resultValues.isEmpty() || StringUtils.isBlank((CharSequence)resultValues.get(0))) {
+            return null;
+        }
+
+        Validate.isTrue(resultValues.size() == 1, "Response contained %d 'result' values", (long)resultValues.size());
+        boolean success = "true".equalsIgnoreCase((String)resultValues.get(0));
+        IValidationSupport.CodeValidationResult retVal = new IValidationSupport.CodeValidationResult();
+        if (success) {
+            retVal.setSeverity(retVal.getSeverity() != null ? retVal.getSeverity() : IssueSeverity.INFORMATION);
+            retVal.setCode(theCode);
+            List<String> displayValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "display");
+            if (!displayValues.isEmpty()) {
+                retVal.setDisplay((String)displayValues.get(0));
+            }
+        } else {
+            retVal.setSeverity(IssueSeverity.ERROR);
+            List<String> messageValues = ParametersUtil.getNamedParameterValuesAsString(this.getFhirContext(), output, "message");
+            if (!messageValues.isEmpty()) {
+                retVal.setMessage((String)messageValues.get(0));
+            }
+        }
+
+        return retVal;
     }
 
     private String buildErrorMessage(String theCodeSystem, String theCode, String theValueSetUrl, IBaseResource theValueSet, String theServerUrl, String theServerMessage) {

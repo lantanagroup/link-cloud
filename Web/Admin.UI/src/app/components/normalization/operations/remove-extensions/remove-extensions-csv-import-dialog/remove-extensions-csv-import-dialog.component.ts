@@ -29,6 +29,7 @@ export interface CsvImportDialogData {
   facilityId?: string;
   isVendorMode: boolean;
   vendorIds: string[];
+  validResourceTypes: string[];
 }
 
 export interface CsvImportDialogResult {
@@ -48,6 +49,7 @@ export class RemoveExtensionsCsvImportDialogComponent {
   stage: 'upload' | 'preview' | 'submitting' | 'results' = 'upload';
   groups: CsvOperationGroup[] = [];
   conflicts: ConflictInfo[] = [];
+  invalidResourceTypes: string[] = [];
   isChecking = false;
   parseError = '';
   created = 0;
@@ -79,6 +81,7 @@ export class RemoveExtensionsCsvImportDialogComponent {
 
   onFileSelected(file: File | null): void {
     this.conflicts = [];
+    this.invalidResourceTypes = [];
     this.parseError = '';
     if (!file) {
       this.groups = [];
@@ -105,13 +108,27 @@ export class RemoveExtensionsCsvImportDialogComponent {
   }
 
   private processRows(rows: string[][]): void {
+    const canonicalMap = new Map<string, string>();
+    for (const rt of this.data.validResourceTypes) {
+      canonicalMap.set(rt.toLowerCase(), rt);
+    }
+
     const groupMap = new Map<string, string[]>();
+    const unknownSet = new Set<string>();
     for (const row of rows) {
-      const resourceType = (row[0] ?? '').trim();
+      const raw = (row[0] ?? '').trim();
       const url = (row[1] ?? '').trim();
-      if (!resourceType || !url) continue;
-      if (!groupMap.has(resourceType)) groupMap.set(resourceType, []);
-      groupMap.get(resourceType)!.push(url);
+      if (!raw || !url) continue;
+      const canonical = canonicalMap.get(raw.toLowerCase());
+      if (!canonical) { unknownSet.add(raw); continue; }
+      if (!groupMap.has(canonical)) groupMap.set(canonical, []);
+      groupMap.get(canonical)!.push(url);
+    }
+
+    if (unknownSet.size > 0) {
+      this.invalidResourceTypes = Array.from(unknownSet);
+      this.cdr.detectChanges();
+      return;
     }
 
     this.groups = Array.from(groupMap.entries()).map(([resourceType, urls]) => ({
@@ -235,6 +252,7 @@ export class RemoveExtensionsCsvImportDialogComponent {
     this.stage = 'upload';
     this.groups = [];
     this.conflicts = [];
+    this.invalidResourceTypes = [];
     this.parseError = '';
   }
 

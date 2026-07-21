@@ -53,6 +53,23 @@ if (!string.IsNullOrWhiteSpace(grafanaBaseUrlFallback))
     });
 }
 
+var lokiAppLabelFallback = builder.Configuration["/loki/app"]
+    ?? builder.Configuration["loki/app"]
+    ?? builder.Configuration["Loki:App"]
+    ?? builder.Configuration["Automation:LokiAppLabel"];
+
+if (!string.IsNullOrWhiteSpace(lokiAppLabelFallback))
+{
+    builder.Services.PostConfigure<AutomationConfig>(cfg =>
+    {
+        if (string.IsNullOrWhiteSpace(cfg.LokiAppLabel)
+            || string.Equals(cfg.LokiAppLabel, "link-cloud", StringComparison.OrdinalIgnoreCase))
+        {
+            cfg.LokiAppLabel = lokiAppLabelFallback.Trim();
+        }
+    });
+}
+
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection("LinkTokenService"));
 
@@ -89,6 +106,29 @@ var apiBearerEnabled = builder.Configuration.GetValue<bool>($"{ApiBearerConfigSe
 var apiBearerAuthority = builder.Configuration[$"{ApiBearerConfigSection}:Authority"];
 var apiBearerAudience = builder.Configuration[$"{ApiBearerConfigSection}:Audience"];
 
+static IReadOnlyCollection<string> BuildValidAudiences(string configuredAudience)
+{
+    var normalized = configuredAudience.Trim().TrimEnd('/');
+    var audiences = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        normalized
+    };
+
+    const string ApiUriPrefix = "api://";
+    if (normalized.StartsWith(ApiUriPrefix, StringComparison.OrdinalIgnoreCase))
+    {
+        var rawAudience = normalized[ApiUriPrefix.Length..].TrimEnd('/');
+        if (!string.IsNullOrWhiteSpace(rawAudience))
+            audiences.Add(rawAudience);
+    }
+    else
+    {
+        audiences.Add($"{ApiUriPrefix}{normalized}");
+    }
+
+    return audiences;
+}
+
 if (apiBearerEnabled)
 {
     if (string.IsNullOrWhiteSpace(apiBearerAuthority) || string.IsNullOrWhiteSpace(apiBearerAudience))
@@ -101,13 +141,16 @@ if (apiBearerEnabled)
         .AddAuthentication()
         .AddJwtBearer(ApiBearerSchemeName, options =>
         {
+            var validAudiences = BuildValidAudiences(apiBearerAudience);
+
             options.Authority = apiBearerAuthority;
             options.Audience = apiBearerAudience;
             options.RequireHttpsMetadata = true;
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
-                ValidAudience = apiBearerAudience,
+                ValidateAudience = true,
+                ValidAudiences = validAudiences,
             };
         });
 }
@@ -192,6 +235,8 @@ builder.Services.AddSingleton<MongoIndexManager>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
+builder.Services.AddSingleton<INormalizationStore, MongoNormalizationStore>();
+builder.Services.AddSingleton<IOrganizationResourceMapTemplateStore, MongoOrganizationResourceMapTemplateStore>();
 builder.Services.AddSingleton<IApiHealthRunStore, MongoApiHealthRunStore>();
 
 // -- API Health test suites --
@@ -230,6 +275,8 @@ builder.Services.AddScoped<PipelineDataReader>();
 // -- Seed system scenarios and query plan templates --
 builder.Services.AddHostedService<ScenarioSeedService>();
 builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
+builder.Services.AddHostedService<NormalizationSuiteSeedService>();
+builder.Services.AddHostedService<OrganizationResourceMapTemplateSeedService>();
 
 // -- Seed synthetic runs for dashboard verification.
 //    Gated on config (Dashboard:SeedFakeRuns). Used for Debugging Dashbhoard.

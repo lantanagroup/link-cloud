@@ -39,6 +39,17 @@ public sealed class DiscoveredReferenceAccumulator
         }
     }
 
+    public int Count
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return ByType.Sum(kvp => kvp.Value.Count);
+            }
+        }
+    }
+
     public void Add(string resourceType, string resourceId)
     {
         if (string.IsNullOrWhiteSpace(resourceType) || string.IsNullOrWhiteSpace(resourceId))

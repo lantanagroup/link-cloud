@@ -52,6 +52,16 @@ import {
   SftpConnectionTestDialogData
 } from '../../data-acquisition/sftp-connection-test-dialog/sftp-connection-test-dialog.component';
 import { ISftpConfigurationModel } from '../../../interfaces/data-acquisition/sftp-config-model.interface';
+import {
+  ReportingOrganizationConfigDialogComponent
+} from '../../data-acquisition/reporting-organization-config-dialog/reporting-organization-config-dialog.component';
+import {
+  ReportingOrganizationConfigFormComponent
+} from '../../data-acquisition/reporting-organization-config-form/reporting-organization-config-form.component';
+import {
+  IOrganizationLocationConfigurationModel
+} from '../../../interfaces/data-acquisition/organization-location-config-model.interface';
+import { Vendor } from '../../../interfaces/tenant/vendor.enum';
 import {IQueryPlanModel} from "../../../interfaces/data-acquisition/query-plan-model.interface";
 import {
   QueryPlanConfigDialogComponent
@@ -99,6 +109,7 @@ import {
     DataAcquisitionFhirQueryConfigFormComponent,
     DataAcquisitionFhirListConfigFormComponent,
     SftpConfigFormComponent,
+    ReportingOrganizationConfigFormComponent,
     QueryPlanConfigFormComponent,
     MatMenu,
     MatMenuTrigger,
@@ -117,7 +128,9 @@ export class FacilityEditComponent implements OnInit {
   facilityConfig!: IFacilityConfigModel;
   censusConfig!: ICensusConfiguration;
   queryDispatchConfig!: IQueryDispatchConfiguration;
+
   dataAcqFhirQueryConfig!: IDataAcquisitionQueryConfigModel;
+
   dataAcqFhirListConfig!: IDataAcquisitionFhirListConfigModel;
 
   linkNoConfigAlertType = LinkAlertType.info;
@@ -135,6 +148,10 @@ export class FacilityEditComponent implements OnInit {
   noSftpConfigAlertMessage = 'No SFTP configuration found for this facility.';
   showNoSftpConfigAlert: boolean = false;
   sftpConfig!: ISftpConfigurationModel;
+
+  reportingOrgConfig!: IOrganizationLocationConfigurationModel;
+  showNoReportingOrgConfigAlert: boolean = false;
+  noReportingOrgConfigAlertMessage = 'No reporting organization configuration found for this facility.';
 
   noDataAcqQueryPlanConfigAlertMessage = 'No FHIR query plan found for this facility and type';
   showNoDataAcqQueryPlanConfigAlert: boolean = false;
@@ -156,6 +173,10 @@ export class FacilityEditComponent implements OnInit {
 
   get displayReportDashboard() {
     return this._displayReportDashboard;
+  }
+
+  get facilityVendor(): Vendor | undefined {
+    return this.facilityConfig?.vendor;
   }
 
   constructor(
@@ -181,6 +202,7 @@ export class FacilityEditComponent implements OnInit {
     this.dialog.open(FacilityConfigDialogComponent,
       {
         width: '75%',
+        disableClose: true,
         data: {dialogTitle: 'Edit facility', viewOnly: false, facilityConfig: this.facilityConfig}
       }).afterClosed().subscribe(res => {
       console.log(res)
@@ -200,6 +222,7 @@ export class FacilityEditComponent implements OnInit {
     this.dialog.open(CensusConfigDialogComponent,
       {
         width: '75%',
+        disableClose: true,
         data: {
           dialogTitle: 'Census Configuration',
           formMode: this.showNoCensusConfigAlert ? FormMode.Create : FormMode.Edit,
@@ -229,6 +252,7 @@ export class FacilityEditComponent implements OnInit {
     this.dialog.open(QueryDispatchConfigDialogComponent,
       {
         width: '75%',
+        disableClose: true,
         data: {
           dialogTitle: 'Query Dispatch Configuration',
           formMode: this.showNoQueryDispatchConfigAlert ? FormMode.Create : FormMode.Edit,
@@ -335,6 +359,7 @@ export class FacilityEditComponent implements OnInit {
     this.dialog.open(DataAcquisitionFhirQueryConfigDialogComponent,
       {
         width: '75%',
+        disableClose: true,
         data: {
           dialogTitle: 'Fhir Query Configuration',
           formMode: this.showNoDataAcqFhirQueryConfigAlert ? FormMode.Create : FormMode.Edit,
@@ -366,6 +391,7 @@ export class FacilityEditComponent implements OnInit {
       {
         width: '50vw',
         maxWidth: '50vw',
+        disableClose: true,
         data: {
           dialogTitle: 'Fhir Query List Configuration',
           formMode: this.showNoDataAcqFhirListConfigAlert ? FormMode.Create : FormMode.Edit,
@@ -397,6 +423,7 @@ export class FacilityEditComponent implements OnInit {
       {
         width: '90%',
         maxWidth: '1200px',
+        disableClose: true,
         data: {
           dialogTitle: 'Query Plan',
           formMode: this.showNoDataAcqQueryPlanConfigAlert ? FormMode.Create : FormMode.Edit,
@@ -427,6 +454,7 @@ export class FacilityEditComponent implements OnInit {
     this.loadFhirQueryConfig();
     this.loadFhirListConfig();
     this.loadSftpConfig();
+    this.loadReportingOrgConfig();
     this.loadQueryPlan("Discharge", "Discharge")
   }
 
@@ -531,6 +559,7 @@ export class FacilityEditComponent implements OnInit {
       {
         width: '50vw',
         maxWidth: '50vw',
+        disableClose: true,
         data: {
           dialogTitle: 'SFTP Configuration',
           formMode: this.showNoSftpConfigAlert ? FormMode.Create : FormMode.Edit,
@@ -602,6 +631,165 @@ export class FacilityEditComponent implements OnInit {
           },
           error: () => {
             this.snackBar.open('Error deleting SFTP configuration', 'Close', {
+              duration: 3500,
+              panelClass: 'error-snackbar',
+              horizontalPosition: 'end',
+              verticalPosition: 'top'
+            });
+          }
+        });
+      }
+    });
+  }
+
+  loadReportingOrgConfig() {
+    if (!this.reportingOrgConfig) {
+      this.dataAcquisitionService.getLocationConfigurations(this.facilityId).subscribe((data: IOrganizationLocationConfigurationModel[]) => {
+        const selected = this.selectReportingOrgConfig(data);
+        if (selected) {
+          this.reportingOrgConfig = selected;
+          this.showNoReportingOrgConfigAlert = false;
+        } else {
+          this.reportingOrgConfig = {
+            facilityId: this.facilityId,
+            isActive: true,
+            conditions: []
+          } as IOrganizationLocationConfigurationModel;
+          this.showNoReportingOrgConfigAlert = true;
+        }
+      }, error => {
+        if (error.status == 404) {
+          this.reportingOrgConfig = {
+            facilityId: this.facilityId,
+            isActive: true,
+            conditions: []
+          } as IOrganizationLocationConfigurationModel;
+          this.showNoReportingOrgConfigAlert = true;
+        } else {
+          this.snackBar.open(`Failed to load reporting organization configuration for the facility, see error for details.`, '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+        }
+      });
+    }
+  }
+
+  // A facility may hold several configs but at most one is active. Surface the active one so the
+  // dialog toggles the config that actually matters. If none is active, fall back to the newest
+  // (highest configId) so the Active toggle can turn one back on. (A full list view comes later.)
+  private selectReportingOrgConfig(
+    data: IOrganizationLocationConfigurationModel[]
+  ): IOrganizationLocationConfigurationModel | null {
+    if (!data || data.length === 0) {
+      return null;
+    }
+    return data.find(c => c.isActive)
+      ?? [...data].sort((a, b) => (b.configId ?? 0) - (a.configId ?? 0))[0];
+  }
+
+  showReportingOrgDialog(): void {
+    // Resolve the facility's current config from the server *before* opening the dialog, so it
+    // always edits the existing row (when one exists) instead of inserting a duplicate. The
+    // cached showNoReportingOrgConfigAlert flag can be stale and open Create mode over an
+    // existing config — that is what produced multiple configuration rows per facility.
+    this.dataAcquisitionService.getLocationConfigurations(this.facilityId).subscribe({
+      next: (data: IOrganizationLocationConfigurationModel[]) =>
+        this.openReportingOrgDialog(this.selectReportingOrgConfig(data)),
+      error: (error) => {
+        if (error?.status === 404) {
+          this.openReportingOrgDialog(null);
+        } else {
+          this.snackBar.open(`Failed to load reporting organization configuration for the facility, see error for details.`, '', {
+            duration: 3500,
+            panelClass: 'error-snackbar',
+            horizontalPosition: 'end',
+            verticalPosition: 'top'
+          });
+        }
+      }
+    });
+  }
+
+  private openReportingOrgDialog(existing: IOrganizationLocationConfigurationModel | null): void {
+    this.showNoReportingOrgConfigAlert = existing == null;
+    this.reportingOrgConfig = existing ?? ({
+      facilityId: this.facilityId,
+      isActive: true,
+      conditions: []
+    } as IOrganizationLocationConfigurationModel);
+
+    this.dialog.open(ReportingOrganizationConfigDialogComponent,
+      {
+        width: '90%',
+        maxWidth: '1400px',
+        disableClose: true,
+        data: {
+          dialogTitle: 'Reporting Organization Configuration',
+          formMode: existing != null ? FormMode.Edit : FormMode.Create,
+          viewOnly: false,
+          vendor: this.facilityVendor,
+          reportingOrgConfig: this.reportingOrgConfig
+        }
+      }).afterClosed().subscribe(res => {
+      if (res) {
+        this.dataAcquisitionService.getLocationConfigurations(this.facilityId).subscribe((data: IOrganizationLocationConfigurationModel[]) => {
+          const selected = this.selectReportingOrgConfig(data);
+          if (selected) {
+            this.showNoReportingOrgConfigAlert = false;
+            this.reportingOrgConfig = selected;
+          }
+        });
+        this.snackBar.open(`${res}`, '', {
+          duration: 3500,
+          panelClass: 'success-snackbar',
+          horizontalPosition: 'end',
+          verticalPosition: 'top'
+        });
+      }
+    });
+  }
+
+  onDeleteReportingOrgConfig(): void {
+    const dialogRef = this.dialog.open(DeleteConfirmationDialogComponent, {
+      width: '400px',
+      data: {
+        message: `Are you sure you want to delete this reporting organization configuration?`
+      }
+    });
+    dialogRef.afterClosed().subscribe(result => {
+      if (result) {
+        this.dataAcquisitionService.deleteLocationConfiguration(this.reportingOrgConfig.configId!).subscribe({
+          next: () => {
+            this.dataAcquisitionService.getLocationConfigurations(this.facilityId).subscribe({
+              next: (data: IOrganizationLocationConfigurationModel[] | null) => {
+                const selected = this.selectReportingOrgConfig(data ?? []);
+                if (selected) {
+                  this.showNoReportingOrgConfigAlert = false;
+                  this.reportingOrgConfig = selected;
+                } else {
+                  this.showNoReportingOrgConfigAlert = true;
+                  this.reportingOrgConfig = {
+                    facilityId: this.facilityId,
+                    isActive: true,
+                    conditions: []
+                  } as IOrganizationLocationConfigurationModel;
+                }
+              },
+              error: () => {
+                this.showNoReportingOrgConfigAlert = true;
+                this.reportingOrgConfig = {
+                  facilityId: this.facilityId,
+                  isActive: true,
+                  conditions: []
+                } as IOrganizationLocationConfigurationModel;
+              }
+            });
+          },
+          error: () => {
+            this.snackBar.open('Error deleting reporting organization configuration', 'Close', {
               duration: 3500,
               panelClass: 'error-snackbar',
               horizontalPosition: 'end',
@@ -935,5 +1123,5 @@ export class FacilityEditComponent implements OnInit {
     });
   }
 
-
 }
+

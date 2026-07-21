@@ -3,13 +3,11 @@ using Azure.Storage.Blobs.Specialized;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using SharpCompress.Common;
 using System.Text.Json;
 
 namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
@@ -30,20 +28,70 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private string GetBlobKey(string key) =>
             string.IsNullOrEmpty(_settings.BlobRoot) ? key : $"{_settings.BlobRoot}/{key}";
 
+        private string GetBlobIdsKey(string key) =>
+            GetBlobKey(key) + "_ids";
+
         public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType)
         {
             string blobName = GetBlobKey(correlationId);
+            string idsBlobName = GetBlobIdsKey(correlationId);
+            
+            //First read the existing blob to get the list of resource references that are already in the cache. 
+            // This is necessary because we want to append new resources to the existing blob, 
+            // and we don't want to write duplicate resource references if there are multiple 
+            // resources of the same type in the same batch.
+            HashSet<string> existingIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var readBlobClient = _containerClient.GetBlobClient(idsBlobName);
+            if(readBlobClient.Exists())
+            {
+                using (Stream read_stream = readBlobClient.OpenRead())
+                using (StreamReader reader = new StreamReader(read_stream))
+                {
+                    while (reader.Peek() >= 0)
+                    {
+                        string? id = reader.ReadLine();
+                        if(!string.IsNullOrEmpty(id))
+                        {
+                            existingIds.Add(id);
+                        }
+                    }
+                }
+            }
+
+            var resourcesToWrite = new Dictionary<string, DomainResource>();
+            foreach(var resource in resources)
+            {
+                var referenceId = resource.TypeName + "/" + resource.Id;
+                if (!existingIds.Contains(referenceId))
+                {
+                    resourcesToWrite[referenceId] = resource;
+                }
+            }
+
+            if(!resourcesToWrite.Any())
+                return;
 
             AppendBlobClient writeBlobClient = _containerClient.GetAppendBlobClient(blobName);
+            AppendBlobClient writeIdsBlobClient = _containerClient.GetAppendBlobClient(idsBlobName);
             writeBlobClient.CreateIfNotExists();
-
+            writeIdsBlobClient.CreateIfNotExists();
+            
             using (Stream write_stream = writeBlobClient.OpenWrite(false))
             using (StreamWriter writer = new StreamWriter(write_stream)) 
             {
-                foreach (var resource in resources) 
+                foreach (var resourceToWrite in resourcesToWrite)
                 {
-                    writer.WriteLine(resource.TypeName + "/" + resource.Id);
-                    writer.WriteLine(resource.ToJson());
+                    writer.WriteLine(resourceToWrite.Key);
+                    writer.WriteLine(resourceToWrite.Value.ToJson());
+                }
+            }
+
+            using (Stream ids_write_stream = writeIdsBlobClient.OpenWrite(false))
+            using (StreamWriter ids_writer = new StreamWriter(ids_write_stream))
+            {
+                foreach(var id in resourcesToWrite.Keys)
+                {
+                    ids_writer.WriteLine(id);
                 }
             }
         }
@@ -122,39 +170,12 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return this;
         }
 
-        public void Skipped(string sourceCache, string destinationCache)
-        {
-            BlockBlobClient sourceBlobClient = _containerClient.GetBlockBlobClient(GetBlobKey(sourceCache));
-
-            if (!sourceBlobClient.Exists())
-            {
-                _logger.LogWarning("ABS blob not found for Skipped. SourceKey='{SourceKey}', BlobPath='{BlobPath}', Container='{Container}', DestinationKey='{DestinationKey}'",
-                    sourceCache, GetBlobKey(sourceCache), _settings.BlobContainerName, destinationCache);
-                return;
-            }
-
-            AppendBlobClient destinationBlobClient = _containerClient.GetAppendBlobClient(GetBlobKey(destinationCache));
-            destinationBlobClient.CreateIfNotExists();
-
-            try
-            {
-                using (Stream sourceStream = sourceBlobClient.OpenRead(true))
-                using (Stream destinationStream = destinationBlobClient.OpenWrite(false))
-                {
-                    sourceStream.CopyTo(destinationStream);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Error when reading skipped ABS blob: Source Cache = {source}, Destination Cache = {destination}", sourceCache, destinationCache);
-            }
-        }
-
         public void Delete(List<string> cacheKeys)
         {
             foreach (var cacheKey in cacheKeys)
             {
                 _containerClient.DeleteBlobIfExists(GetBlobKey(cacheKey));
+                _containerClient.DeleteBlobIfExists(GetBlobIdsKey(cacheKey));
             }
         }
     }

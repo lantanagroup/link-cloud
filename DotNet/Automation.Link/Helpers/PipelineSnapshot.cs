@@ -6,6 +6,21 @@
 /// </summary>
 public class PipelineSnapshot
 {
+    public sealed record NormalizationSuiteSnapshot(
+        string SuiteName,
+        IReadOnlyList<NormalizationSequenceSnapshot> Sequences,
+        IReadOnlyList<NormalizationSequenceOperationSnapshot> StandaloneOperations);
+
+    public sealed record NormalizationSequenceSnapshot(
+        string SequenceName,
+        IReadOnlyList<NormalizationSequenceOperationSnapshot> Operations);
+
+    public sealed record NormalizationSequenceOperationSnapshot(
+        int Sequence,
+        string OperationType,
+        string OperationName,
+        IReadOnlyList<string> ResourceTypes);
+
     private readonly PipelineDataReader _reader;
 
     public PipelineSnapshot(PipelineDataReader reader)
@@ -15,12 +30,13 @@ public class PipelineSnapshot
 
     /// <summary>
     /// Writes a complete, non-asserting pipeline snapshot to test output.
-    /// Safe to call at any point — never throws.
+    /// Safe to call at any point ï¿½ never throws.
     /// </summary>
     public async Task WriteFullSnapshotAsync(
         IAutomationOutput output,
         string facilityId,
-        string reportId)
+        string reportId,
+        NormalizationSuiteSnapshot? normalizationSuiteSnapshot = null)
     {
         output.WriteLine("\n=== PIPELINE DIAGNOSTIC SNAPSHOT ===\n");
 
@@ -28,7 +44,7 @@ public class PipelineSnapshot
 
         await WriteReportSnapshot(output, facilityId, scheduleId);
         await WriteDataAcquisitionSnapshot(output, facilityId, reportId);
-        await WriteNormalizationSnapshot(output, facilityId);
+        await WriteNormalizationSnapshot(output, facilityId, normalizationSuiteSnapshot);
         await WriteTenantSnapshot(output, facilityId);
         await WriteValidationSnapshot(output, facilityId, reportId);
 
@@ -130,7 +146,10 @@ public class PipelineSnapshot
         }
     }
 
-    private async Task WriteNormalizationSnapshot(IAutomationOutput output, string facilityId)
+    private async Task WriteNormalizationSnapshot(
+        IAutomationOutput output,
+        string facilityId,
+        NormalizationSuiteSnapshot? normalizationSuiteSnapshot)
     {
         try
         {
@@ -160,19 +179,47 @@ public class PipelineSnapshot
 
             var sequences = await _reader.GetOperationSequencesAsync(facilityId);
 
-            if (sequences.Count == 0)
+            if (normalizationSuiteSnapshot is not null)
             {
-                output.WriteLine("[Snapshot][NormSequence]        0 rows");
+                output.WriteLine($"[Snapshot][NormSequence]        {normalizationSuiteSnapshot.Sequences.Count} sequence(s) from suite '{normalizationSuiteSnapshot.SuiteName}'");
+
+                foreach (var sequence in normalizationSuiteSnapshot.Sequences)
+                {
+                    output.WriteLine($"[Snapshot][NormSequence]          {sequence.SequenceName} ({sequence.Operations.Count} op(s))");
+
+                    foreach (var operation in sequence.Operations.OrderBy(o => o.Sequence))
+                    {
+                        output.WriteLine($"[Snapshot][NormSequence]            Sequence={operation.Sequence}, OperationType={operation.OperationType}, Name={operation.OperationName}, ResourceTypes=[{string.Join(", ", operation.ResourceTypes)}]");
+                    }
+                }
+
+                if (normalizationSuiteSnapshot.StandaloneOperations.Count > 0)
+                {
+                    output.WriteLine($"[Snapshot][NormSequence]          Standalone Operations ({normalizationSuiteSnapshot.StandaloneOperations.Count} op(s))");
+                    foreach (var operation in normalizationSuiteSnapshot.StandaloneOperations.OrderBy(o => o.Sequence))
+                    {
+                        output.WriteLine($"[Snapshot][NormSequence]            Sequence={operation.Sequence}, OperationType={operation.OperationType}, Name={operation.OperationName}, ResourceTypes=[{string.Join(", ", operation.ResourceTypes)}]");
+                    }
+                }
+
+                output.WriteLine($"[Snapshot][NormSequenceRow]     {sequences.Count} operation-sequence row(s) in Normalization service");
             }
             else
             {
-                output.WriteLine($"[Snapshot][NormSequence]        {sequences.Count} sequence(s)");
-                foreach (var seq in sequences)
+                if (sequences.Count == 0)
                 {
-                    var opType = seq.OperationType ?? "(unknown)";
-                    var resType = seq.ResourceType ?? "(unknown)";
-                    output.WriteLine($"[Snapshot][NormSequence]          Id={seq.Id}, Sequence={seq.Sequence}, " +
-                                     $"OperationType={opType}, ResourceType={resType}");
+                    output.WriteLine("[Snapshot][NormSequence]        0 rows");
+                }
+                else
+                {
+                    output.WriteLine($"[Snapshot][NormSequence]        {sequences.Count} sequence(s)");
+                    foreach (var seq in sequences)
+                    {
+                        var opType = seq.OperationType ?? "(unknown)";
+                        var resType = seq.ResourceType ?? "(unknown)";
+                        output.WriteLine($"[Snapshot][NormSequence]          Id={seq.Id}, Sequence={seq.Sequence}, " +
+                                         $"OperationType={opType}, ResourceType={resType}");
+                    }
                 }
             }
         }

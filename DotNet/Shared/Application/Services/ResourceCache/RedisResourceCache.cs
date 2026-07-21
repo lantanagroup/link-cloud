@@ -1,7 +1,6 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Enums;
-using LantanaGroup.Link.Shared.Application.Error.Exceptions;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
@@ -84,13 +83,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
 
             _db.HashSet(correlationId, correlationHash.ToArray());
-        }
-
-        public void Skipped(string sourceCache, string correlationId)
-        {
-            var hashEntries = _db.HashGetAll(sourceCache);
-
-            _db.HashSet(correlationId, hashEntries);
         }
 
         public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
