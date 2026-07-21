@@ -1,6 +1,3 @@
-﻿using System.Diagnostics;
-using System.Net;
-using System.Reflection;
 using Confluent.Kafka;
 using DataAcquisition.Domain.Application.Queries;
 using FluentValidation;
@@ -30,6 +27,7 @@ using LantanaGroup.Link.Shared.Application.Error.Handlers;
 using LantanaGroup.Link.Shared.Application.Error.Interfaces;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Extensions.Caching;
+using LantanaGroup.Link.Shared.Application.Extensions.ExternalServices;
 using LantanaGroup.Link.Shared.Application.Extensions.Quartz;
 using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Interfaces;
@@ -51,6 +49,10 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Enrichers.Span;
 using Serilog.Settings.Configuration;
+using Serilog.Sinks.SystemConsole.Themes;
+using System.Diagnostics;
+using System.Net;
+using System.Reflection;
 using IHostingEnvironment = Microsoft.Extensions.Hosting.IHostingEnvironment;
 using LantanaGroup.Link.Shared.Application.Extensions;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
@@ -58,6 +60,11 @@ using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 namespace LantanaGroup.Link.DataAcquisition.Domain.Extensions;
 public static class GeneralStartupExtensions
 {
+    // Shared (not per-service) Redis key prefix for ICacheService. The DataAcquisition service and the
+    // AcquisitionWorker must use the SAME value so their keys resolve identically for cross-process
+    // sharing; isolating it from other services on the same Redis instance is the goal.
+    private const string CacheKeyPrefix = "DataAcquisition:";
+
     public static void RegisterAll(
         this WebApplicationBuilder builder,
         string serviceName,
@@ -85,7 +92,7 @@ public static class GeneralStartupExtensions
 
         builder.Services.RegisterSecretManager(builder.Configuration);
 
-        builder.Services.RegisterInMemoryCache();
+        builder.RegisterCacheService();
         builder.Services.RegisterHittpClient();
         builder.Services.RegisterFhirAuthHandlers();
         builder.Services.RegisterExceptionHandlers();
@@ -183,6 +190,47 @@ public static class GeneralStartupExtensions
         services.AddSingleton<ICacheService, InMemoryCacheService>();
     }
 
+    /// <summary>
+    /// Registers the <see cref="ICacheService"/> backend selected by the <c>Cache:Type</c> config key
+    /// (defaults to <c>InMemory</c>). Set <c>Cache:Type=Redis</c> to back it with the shared Redis cache
+    /// so that the DataAcquisition service and the AcquisitionWorker — separate processes — see each
+    /// other's writes/evictions (e.g. the org-location conditions cache invalidated on a config change),
+    /// instead of each keeping its own per-process copy until the entry's TTL expires.
+    /// </summary>
+    public static void RegisterCacheService(this WebApplicationBuilder builder)
+    {
+        var cacheType = builder.Configuration.GetValue<string>("Cache:Type") ?? "InMemory";
+
+        if (!string.Equals(cacheType, "Redis", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Services.RegisterInMemoryCache();
+            return;
+        }
+
+        builder.Services.AddRedisCache(options =>
+        {
+            options.Environment = builder.Environment;
+
+            var redisConnection = builder.Configuration
+                .GetConnectionString(ConfigurationConstants.DatabaseConnections.RedisConnection);
+            if (string.IsNullOrEmpty(redisConnection))
+                throw new InvalidOperationException(
+                    $"ConnectionStrings:{ConfigurationConstants.DatabaseConnections.RedisConnection} is required when Cache:Type is Redis.");
+
+            options.ConnectionString = redisConnection;
+            options.Password = builder.Configuration.GetValue<string>("Redis:Password");
+
+            // Namespace this service's ICacheService keys so they can't collide with other
+            // services sharing the same Redis instance (notably the bare "{facilityId}" auth-token
+            // key). This prefix is deliberately a single fixed value — NOT per-service — because the
+            // DataAcquisition service and the AcquisitionWorker must resolve to the same Redis keys
+            // for cross-process sharing (e.g. org-location conditions invalidation) to work.
+            options.InstanceName = CacheKeyPrefix;
+        });
+
+        builder.Services.AddSingleton<ICacheService, RedisCacheService>();
+    }
+
     public static void RegisterHittpClient(this IServiceCollection services)
     {
         services.AddHttpClient("FhirHttpClient")
@@ -213,16 +261,21 @@ public static class GeneralStartupExtensions
     public static void RegisterRepositories(this IServiceCollection services)
     {
         //Repositories
-        services.AddTransient<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<SftpAcquisitionLog>, EntityRepository<SftpAcquisitionLog, DataAcquisitionDbContext>>();
-        services.AddTransient<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<FhirListConfiguration>, EntityRepository<FhirListConfiguration, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<FhirQueryConfiguration>, EntityRepository<FhirQueryConfiguration, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<QueryPlan>, EntityRepository<QueryPlan, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<ResourceReferenceType>, EntityRepository<ResourceReferenceType, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<ReferenceResources>, EntityRepository<ReferenceResources, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<FhirQuery>, EntityRepository<FhirQuery, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<DataAcquisitionLog>, EntityRepository<DataAcquisitionLog, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<FhirQueryResourceType>, EntityRepository<FhirQueryResourceType, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<SftpAcquisitionLog>, EntityRepository<SftpAcquisitionLog, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<SftpConfiguration>, EntityRepository<SftpConfiguration, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<OrganizationLocationConfiguration>, EntityRepository<OrganizationLocationConfiguration, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<OrganizationLocationCondition>, EntityRepository<OrganizationLocationCondition, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<OrganizationLocationMapping>, EntityRepository<OrganizationLocationMapping, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<EncounterMapping>, EntityRepository<EncounterMapping, DataAcquisitionDbContext>>();
+        services.AddScoped<IEntityRepository<EncounterLocation>, EntityRepository<EncounterLocation, DataAcquisitionDbContext>>();
 
         //Database
         services.AddScoped<IDatabase, Database>();
@@ -231,26 +284,32 @@ public static class GeneralStartupExtensions
     public static void RegisterManagers(this IServiceCollection services)
     {
         //Queries
-        services.AddTransient<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
-        services.AddTransient<IDataAcquisitionLogNotesQueries, DataAcquisitionLogNotesQueries>();
-        services.AddTransient<ISftpAcquisitionLogQueries, SftpAcquisitionLogQueries>();
-        services.AddTransient<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
-        services.AddTransient<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
-        services.AddTransient<IFhirQueryQueries, FhirQueryQueries>();
-        services.AddTransient<IQueryPlanQueries, QueryPlanQueries>();
-        services.AddTransient<IReferenceResourcesQueries, ReferenceResourcesQueries>();
-        services.AddTransient<ISftpConfigurationQueries, SftpConfigurationQueries>();
+        services.AddScoped<IDataAcquisitionLogQueries, DataAcquisitionLogQueries>();
+        services.AddScoped<IDataAcquisitionLogNotesQueries, DataAcquisitionLogNotesQueries>();
+        services.AddScoped<ISftpAcquisitionLogQueries, SftpAcquisitionLogQueries>();
+        services.AddScoped<IFhirQueryConfigurationQueries, FhirQueryConfigurationQueries>();
+        services.AddScoped<IFhirQueryListConfigurationQueries, FhirQueryListConfigurationQueries>();
+        services.AddScoped<IFhirQueryQueries, FhirQueryQueries>();
+        services.AddScoped<IQueryPlanQueries, QueryPlanQueries>();
+        services.AddScoped<IReferenceResourcesQueries, ReferenceResourcesQueries>();
+        services.AddScoped<ISftpConfigurationQueries, SftpConfigurationQueries>();
+        services.AddScoped<IOrganizationLocationConfigurationQueries, OrganizationLocationConfigurationQueries>();
+        services.AddScoped<IOrganizationLocationMappingQueries, OrganizationLocationMappingQueries>();
 
         //Managers
-        services.AddTransient<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
-        services.AddTransient<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
-        services.AddTransient<IQueryPlanManager, QueryPlanManager>();
-        services.AddTransient<IReferenceResourcesManager, ReferenceResourcesManager>();
-        services.AddTransient<IFhirQueryManager, FhirQueryManager>();
-        services.AddTransient<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
-        services.AddTransient<IScheduledReportManager, ScheduledReportManager>();
-        services.AddTransient<ISftpAcquisitionLogManager, SftpAcquisitionLogManager>();
-        services.AddTransient<ISftpConfigurationManager, SftpConfigurationManager>();
+        services.AddScoped<IFhirQueryConfigurationManager, FhirQueryConfigurationManager>();
+        services.AddScoped<IFhirListQueryConfigurationManager, FhirListQueryConfigurationManager>();
+        services.AddScoped<IQueryPlanManager, QueryPlanManager>();
+        services.AddScoped<IReferenceResourcesManager, ReferenceResourcesManager>();
+        services.AddScoped<IFhirQueryManager, FhirQueryManager>();
+        services.AddScoped<IDataAcquisitionLogManager, DataAcquisitionLogManager>();
+        services.AddScoped<IScheduledReportManager, ScheduledReportManager>();
+        services.AddScoped<ISftpAcquisitionLogManager, SftpAcquisitionLogManager>();
+        services.AddScoped<ISftpConfigurationManager, SftpConfigurationManager>();
+        services.AddScoped<IOrganizationLocationConfigurationManager, OrganizationLocationConfigurationManager>();
+        services.AddScoped<IOrganizationLocationMappingManager, OrganizationLocationMappingManager>();
+        services.AddScoped<IEncounterMappingManager, EncounterMappingManager>();
+        services.AddScoped<IEncounterMappingQueries, EncounterMappingQueries>();
     }
 
     public static void RegisterServices(this IServiceCollection services)
@@ -259,6 +318,7 @@ public static class GeneralStartupExtensions
         services.AddTransient<ITenantApiService, TenantApiService>();
         services.AddTransient<IValidateFacilityConnectionService, ValidateFacilityConnectionService>();
         services.AddTransient<IFhirApiService, FhirApiService>();
+        services.AddTransient<ILocationMappingService, LocationMappingService>();
         services.AddTransient<IPatientDataService, PatientDataService>();
         services.AddTransient<IPatientCensusService, PatientCensusService>();
         services.AddTransient<IReferenceResourceService, ReferenceResourceService>();
@@ -316,6 +376,7 @@ public static class GeneralStartupExtensions
         //Validation
         services.AddValidatorsFromAssemblyContaining<UpdateDataAcquisitionLogModelValidator>();
         services.AddScoped<IQueryPlanValidator, QueryPlanValidator>();
+        services.AddScoped<ILocationResolutionValidator, LocationResolutionValidator>();
 
         //Factories - Producer
         var kafkaConnection = configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>() ?? throw new Exception("Missing Kafka Connection Settings");

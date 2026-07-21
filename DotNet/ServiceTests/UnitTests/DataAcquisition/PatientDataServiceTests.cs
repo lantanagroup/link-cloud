@@ -59,6 +59,7 @@ public class PatientDataServiceTests
     private readonly Mock<IScheduledReportManager> _mockScheduledReportManager;
     private readonly Mock<IDataAcquisitionServiceMetrics> _mockMetrics;
     private readonly Mock<IOptionsMonitor<TelemetrySettings>> _mockTelemetrySettings;
+    private readonly Mock<ILocationMappingService> _mockLocationMappingService;
 
     private readonly PatientDataService _service;
 
@@ -85,10 +86,15 @@ public class PatientDataServiceTests
         _mockScheduledReportManager = new Mock<IScheduledReportManager>();
         _mockMetrics = new Mock<IDataAcquisitionServiceMetrics>();
         _mockTelemetrySettings = new Mock<IOptionsMonitor<TelemetrySettings>>();
+        _mockLocationMappingService = new Mock<ILocationMappingService>();
 
         _mockTelemetrySettings
             .SetupGet(x => x.CurrentValue)
             .Returns(new TelemetrySettings { PatientTags = false });
+
+        _mockLocationMappingService
+            .Setup(x => x.IsConfigured(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
 
         // Mock the semaphore and handle
         var mockSemaphore = new Mock<IDistributedSemaphore>();
@@ -113,6 +119,7 @@ public class PatientDataServiceTests
             _mockReadFhirCommand.Object,
             _mockLogManager.Object,
             _mockLogQueries.Object,
+            _mockLocationMappingService.Object,
             _mockFhirApiService.Object,
             _mockRefService.Object,
             _mockDistributedSemaphoreProvider.Object,
@@ -319,6 +326,106 @@ public class PatientDataServiceTests
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentNullException>(() => _service.CreateLogEntries(request, cancellationToken));
+    }
+
+    [Fact]
+    public async Task CreateLogEntries_ShouldPrioritizeEncounterAndLocationInitialQueries_WhenOrganizationLocationConfigurationIsActive()
+    {
+        var dataAcqRequested = new DataAcquisitionRequested
+        {
+            PatientId = "patient-123",
+            ReportableEvent = ReportableEvent.Discharge,
+            QueryType = "Initial",
+            ScheduledReports =
+            [
+                new ScheduledReport
+                {
+                    ReportTypes = ["measure-1"],
+                    Frequency = Frequency.Discharge,
+                    StartDate = DateTime.UtcNow,
+                    EndDate = DateTime.UtcNow.AddDays(1),
+                    ReportTrackingId = Guid.NewGuid().ToString()
+                }
+            ]
+        };
+
+        var request = new GetPatientDataRequest
+        {
+            ConsumeResult = new ConsumeResult<string, DataAcquisitionRequested>
+            {
+                Message = new Message<string, DataAcquisitionRequested> { Value = dataAcqRequested }
+            },
+            FacilityId = "facility-1",
+            CorrelationId = "corr-1",
+            QueryPlanType = QueryPlanType.Initial
+        };
+
+        var fhirQueryConfig = new FhirQueryConfigurationModel
+        {
+            FacilityId = "facility-1",
+            FhirServerBaseUrl = "http://example.com"
+        };
+
+        var queryPlan = new QueryPlanModel
+        {
+            FacilityId = "facility-1",
+            Type = Frequency.Discharge,
+            InitialQueries = new Dictionary<string, IQueryConfig>
+            {
+                ["1"] = new ParameterQueryConfig { ResourceType = ResourceType.Observation.ToString() },
+                ["2"] = new ReferenceQueryConfig { ResourceType = ResourceType.Location.ToString() },
+                ["3"] = new ParameterQueryConfig { ResourceType = ResourceType.Condition.ToString() },
+                ["4"] = new ParameterQueryConfig { ResourceType = ResourceType.Encounter.ToString() }
+            },
+            SupplementalQueries = []
+        };
+
+        _mockFhirQueryQueries
+            .Setup(m => m.GetByFacilityIdAsync("facility-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(fhirQueryConfig);
+
+        _mockQueryPlanQueries
+            .Setup(m => m.SearchAsync(It.IsAny<SearchQueryPlanModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new PagedConfigModel<QueryPlanModel> { Records = [queryPlan] });
+
+        _mockLogManager
+            .Setup(manager => manager.CreateAsync(It.IsAny<CreateDataAcquisitionLogModel>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new DataAcquisitionLogModel());
+
+        _mockLocationMappingService
+            .Setup(x => x.IsConfigured("facility-1", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+
+        List<string> orderedResourceTypes = [];
+        _mockQueryListProcessor
+            .Setup(p => p.Process(
+                It.IsAny<IOrderedEnumerable<KeyValuePair<string, IQueryConfig>>>(),
+                It.IsAny<GetPatientDataRequest>(),
+                It.IsAny<FhirQueryConfigurationModel>(),
+                It.IsAny<QueryPlanModel>(),
+                It.IsAny<List<ResourceReferenceType>>(),
+                It.IsAny<string>(),
+                It.IsAny<ScheduledReport>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<IOrderedEnumerable<KeyValuePair<string, IQueryConfig>>, GetPatientDataRequest, FhirQueryConfigurationModel, QueryPlanModel, List<ResourceReferenceType>, string, ScheduledReport, CancellationToken>(
+                (queries, _, _, _, _, _, _, _) =>
+                {
+                    orderedResourceTypes = queries
+                        .Select(q => q.Value switch
+                        {
+                            ParameterQueryConfig parameter => parameter.ResourceType,
+                            ReferenceQueryConfig reference => reference.ResourceType,
+                            _ => string.Empty
+                        })
+                        .ToList();
+                })
+            .ReturnsAsync(0);
+
+        await _service.CreateLogEntries(request, CancellationToken.None);
+
+        Assert.Equal(
+            [ResourceType.Encounter.ToString(), ResourceType.Location.ToString(), ResourceType.Observation.ToString(), ResourceType.Condition.ToString()],
+            orderedResourceTypes);
     }
 
     [Fact]

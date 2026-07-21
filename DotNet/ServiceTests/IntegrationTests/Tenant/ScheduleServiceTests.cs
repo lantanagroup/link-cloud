@@ -14,10 +14,11 @@ namespace IntegrationTests.Tenant
 {
     [Collection("IntegrationTests")]
     [Trait("Category", "IntegrationTests")]
-    public class ScheduleServiceTests
+    public class ScheduleServiceTests : IDisposable
     {
         private readonly ITestOutputHelper _output;
         private readonly TenantIntegrationTestFixture _fixture;
+        private readonly IServiceScope _scope;
         private readonly ScheduleService _service;
         private readonly TenantDbContext _dbContext;
         private readonly ISchedulerFactory _schedulerFactory;
@@ -27,11 +28,18 @@ namespace IntegrationTests.Tenant
             _fixture = fixture;
             _output = output;
 
-            _service = _fixture.ServiceProvider.GetRequiredService<ScheduleService>();
+            // Resolve scoped services from a per-test scope rather than the root provider, so the
+            // tests pass under DI scope validation (enabled when DOTNET_ENVIRONMENT=Development).
+            _scope = fixture.ServiceProvider.CreateScope();
+            var sp = _scope.ServiceProvider;
+
+            _service = sp.GetRequiredService<ScheduleService>();
             _service.StartAsync(CancellationToken.None).Wait();
-            _dbContext = _fixture.ServiceProvider.GetRequiredService<TenantDbContext>();
-            _schedulerFactory = _fixture.ServiceProvider.GetRequiredService<ISchedulerFactory>();
+            _dbContext = sp.GetRequiredService<TenantDbContext>();
+            _schedulerFactory = sp.GetRequiredService<ISchedulerFactory>();
         }
+
+        public void Dispose() => _scope.Dispose();
 
         [Fact]
         public async Task StartAsync_LoadsFacilitiesAndAddsJobs()

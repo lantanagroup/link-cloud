@@ -51,6 +51,10 @@
         }
       </div>
 
+      @if (parameters.hasError('minLengthArray') && parameters.touched) {
+        <div class="parameters-error">At least one parameter is required for a Parameter query.</div>
+      }
+
       <div formArrayName="parameters">
         @for (param of parameters.controls; track $index) {
           <div [formGroupName]="$index" class="parameter-row">

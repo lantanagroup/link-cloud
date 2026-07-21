@@ -1,7 +1,13 @@
-﻿using CsvHelper.Configuration.Attributes;
+using CsvHelper.Configuration.Attributes;
 
 namespace LantanaGroup.Link.Terminology.Application.Models;
 
+/// <summary>
+/// Represents a record in a CSV code system import or export operation.
+/// </summary>
+/// <remarks>
+/// This model maps CSV columns to terminology code system fields used by the application.
+/// </remarks>
 public class CsvCodeSystemRecord
 {
     /// <summary>
@@ -23,4 +29,12 @@ public class CsvCodeSystemRecord
     /// </remarks>
     [Index(1)]
     public required string Display { get; set; }
+
+    /// <summary>
+    /// Indicates the status of the code item, Active or Inactive
+    /// </summary>
+    [Index(2)]
+    [Default(CodeStatus.Active)]
+    [EnumIgnoreCase]
+    public CodeStatus Status { get; set; } = CodeStatus.Active;
 }

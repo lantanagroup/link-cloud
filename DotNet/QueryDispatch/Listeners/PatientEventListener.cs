@@ -166,7 +166,7 @@ namespace LantanaGroup.Link.QueryDispatch.Listeners
                                     _transientExceptionHandler.HandleException(consumeResult, ex, HtmlInputSanitizer.Sanitize(consumeResult.Key));
                                     _patientEventConsumer.Commit(consumeResult);
                                 }
-                                catch (OperationCanceledException)
+                                catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                                 {
                                     throw;
                                 }

@@ -36,6 +36,7 @@ public static class ExternalConfigurationExtension
                     builder.Configuration.AddAzureAppConfiguration(options =>
                     {
                         const string patientTagsKey = "Telemetry:PatientTags";
+                        const string includeOrgResourceKey = "PatientAggregator:IncludeOrganizationResource";
 
                         string? connectionString =
                             builder.Configuration.GetConnectionString(ConfigurationConstants.DatabaseConnections.AzureAppConfiguration);
@@ -65,6 +66,7 @@ public static class ExternalConfigurationExtension
                             options.ConfigureRefresh(refresh =>
                             {
                                 refresh.Register(patientTagsKey, refreshAll: true);
+                                refresh.Register(includeOrgResourceKey, refreshAll: true);
                             });
 
                             builder.Services.AddSingleton(options.GetRefresher());
