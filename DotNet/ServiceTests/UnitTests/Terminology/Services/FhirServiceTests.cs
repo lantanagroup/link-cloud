@@ -1,5 +1,6 @@
 ﻿using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Shared.Application.SerDes;
+using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Application.Settings;
 using LantanaGroup.Link.Terminology.Services;
@@ -13,26 +14,14 @@ namespace UnitTests.Terminology;
 
 public class FhirServiceTests
 {
-    private readonly Mock<CodeGroupCacheService> _mockCacheService;
+    private readonly Mock<ICodeGroupCacheService> _mockCacheService;
     private readonly Mock<ILogger<FhirService>> _mockLogger;
     private readonly FhirService _service;
     private readonly List<ValueSet> _mockValueSets;
 
     public FhirServiceTests()
     {
-        Mock<ILogger<CodeGroupCacheService>> mockCacheLogger = new Mock<ILogger<CodeGroupCacheService>>()
-        {
-            CallBase = true
-        };
-        TerminologyConfig config = new TerminologyConfig()
-        {
-            Path = "/test/path"
-        };
-        Mock<IMemoryCache> mockCache = new Mock<IMemoryCache>();
-        Mock<IOptions<TerminologyConfig>> mockConfig = new Mock<IOptions<TerminologyConfig>>();
-        mockConfig.Setup(x => x.Value).Returns(config);
-
-        _mockCacheService = new Mock<CodeGroupCacheService>(mockCacheLogger.Object, mockCache.Object, mockConfig.Object);
+        _mockCacheService = new Mock<ICodeGroupCacheService>();
         _mockLogger = new Mock<ILogger<FhirService>>();
         _service = new FhirService(_mockCacheService.Object, _mockLogger.Object);
 
@@ -197,6 +186,225 @@ public class FhirServiceTests
         var resultParameter = result.GetSingleValue<FhirBoolean>("result");
         Assert.NotNull(resultParameter);
         Assert.True(resultParameter.Value);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithInactiveMemberCode_ReturnsInactiveIssueOutcome()
+    {
+        // Arrange
+        var valueSetId = "test-vs-inactive-member";
+        var code = "inactive-code";
+        var system = "http://test.system";
+        var display = "Inactive Code";
+
+        // ValueSet members are plain Codes with no status; the CodeSystem carries the inactive status.
+        var valueSetGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new() { Value = code, Display = display } } }
+            }
+        };
+        var codeSystemGroup = new CodeGroup
+        {
+            Url = system,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new CodeSystemCode { Value = code, Display = display, Status = CodeStatus.Inactive } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(valueSetGroup);
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system, It.IsAny<string>()))
+            .Returns(codeSystemGroup);
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, system, code, display, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        var issuesParameter = result.Parameter.FirstOrDefault(p => p.Name == "issues");
+        Assert.NotNull(issuesParameter);
+        var outcome = Assert.IsType<OperationOutcome>(issuesParameter.Resource);
+        var issue = Assert.Single(outcome.Issue);
+        Assert.Equal(OperationOutcome.IssueSeverity.Warning, issue.Severity);
+        Assert.Equal(OperationOutcome.IssueType.BusinessRule, issue.Code);
+        Assert.Equal("Code is inactive.", issue.Details?.Text);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithActiveMemberCode_ReturnsNoIssue()
+    {
+        // Arrange
+        var valueSetId = "test-vs-active-member";
+        var code = "active-code";
+        var system = "http://test.system";
+        var display = "Active Code";
+
+        var valueSetGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new() { Value = code, Display = display } } }
+            }
+        };
+        var codeSystemGroup = new CodeGroup
+        {
+            Url = system,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new CodeSystemCode { Value = code, Display = display, Status = CodeStatus.Active } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(valueSetGroup);
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system, It.IsAny<string>()))
+            .Returns(codeSystemGroup);
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, system, code, display, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        Assert.Null(result.Parameter.FirstOrDefault(p => p.Name == "issues"));
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithCodeSystemNotLoaded_ReturnsActiveNoIssue()
+    {
+        // Arrange
+        var valueSetId = "test-vs-no-cs";
+        var code = "some-code";
+        var system = "http://unloaded.system";
+        var display = "Some Code";
+
+        var valueSetGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new() { Value = code, Display = display } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(valueSetGroup);
+        // GetCodeGroup(CodeSystem, ...) is left unstubbed -> Moq returns null (CodeSystem not loaded).
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, system, code, display, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        Assert.Null(result.Parameter.FirstOrDefault(p => p.Name == "issues"));
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_MultiSystem_InactiveInMatchedSystem_ReturnsInactiveIssue()
+    {
+        // Arrange
+        var valueSetId = "test-vs-multi";
+        var code = "shared-code";
+        var systemA = "http://system.a";
+        var systemB = "http://system.b";
+        var display = "Shared Code";
+
+        // The code only exists under systemB; passing system=null forces the across-systems path,
+        // which must thread the matched systemKey (systemB) into the CodeSystem rejoin.
+        var valueSetGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { systemA, new List<Code> { new() { Value = "other", Display = "Other" } } },
+                { systemB, new List<Code> { new() { Value = code, Display = display } } }
+            }
+        };
+        var codeSystemB = new CodeGroup
+        {
+            Url = systemB,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { systemB, new List<Code> { new CodeSystemCode { Value = code, Display = display, Status = CodeStatus.Inactive } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(valueSetGroup);
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, systemB, It.IsAny<string>()))
+            .Returns(codeSystemB);
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, null, code, display, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        var issuesParameter = result.Parameter.FirstOrDefault(p => p.Name == "issues");
+        Assert.NotNull(issuesParameter);
+        var outcome = Assert.IsType<OperationOutcome>(issuesParameter.Resource);
+        Assert.Equal("Code is inactive.", Assert.Single(outcome.Issue).Details?.Text);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_MemberAbsentFromCodeSystem_ReturnsActiveNoIssue()
+    {
+        // Arrange
+        var valueSetId = "test-vs-absent";
+        var code = "vs-only-code";
+        var system = "http://test.system";
+        var display = "VS Only";
+
+        var valueSetGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new() { Value = code, Display = display } } }
+            }
+        };
+        // CodeSystem is loaded but does not contain the code.
+        var codeSystemGroup = new CodeGroup
+        {
+            Url = system,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new CodeSystemCode { Value = "different", Display = "Different", Status = CodeStatus.Inactive } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(valueSetGroup);
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system, It.IsAny<string>()))
+            .Returns(codeSystemGroup);
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, system, code, display, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        Assert.Null(result.Parameter.FirstOrDefault(p => p.Name == "issues"));
     }
 
     [Fact]
