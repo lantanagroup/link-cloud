@@ -14,11 +14,14 @@ import {ConditionalTransformationComponent} from "../conditional-transformation/
 import {CodeMapComponent} from "../code-map/code-map.component";
 import {CopyLocationComponent} from "../copy-location/copy-location.component";
 import {RemoveExtensionsComponent} from "../remove-extensions/remove-extensions.component";
+import {
+  CopyLocationAliasToTypeIterativelyComponent
+} from "../copy-location-alias-to-type-iteratively/copy-location-alias-to-type-iteratively.component";
 
 @Component({
   selector: 'app-normalization-dialog',
   standalone: true,
-  imports: [MatDialogModule, MatButtonModule, MatIconModule, CopyPropertyComponent, ConditionalTransformationComponent, CodeMapComponent, CopyLocationComponent, RemoveExtensionsComponent],
+  imports: [MatDialogModule, MatButtonModule, MatIconModule, CopyPropertyComponent, ConditionalTransformationComponent, CodeMapComponent, CopyLocationComponent, CopyLocationAliasToTypeIterativelyComponent, RemoveExtensionsComponent],
   templateUrl: './operation-dialog.component.html',
   styleUrl: './operation-dialog.component.scss'
 })
@@ -28,6 +31,7 @@ export class OperationDialogComponent implements OnInit {
   @ViewChild(ConditionalTransformationComponent) conditionalTransformForm!: ConditionalTransformationComponent;
   @ViewChild(CodeMapComponent) codeMapForm!: CodeMapComponent;
   @ViewChild(CopyLocationComponent) copyLocationForm!: CopyLocationComponent;
+  @ViewChild(CopyLocationAliasToTypeIterativelyComponent) copyLocationAliasToTypeIterativelyForm!: CopyLocationAliasToTypeIterativelyComponent;
   @ViewChild(RemoveExtensionsComponent) removeExtensionsForm!: RemoveExtensionsComponent;
 
   dialogTitle: string = '';
@@ -92,6 +96,9 @@ export class OperationDialogComponent implements OnInit {
         break;
       case OperationType.CopyLocation:
         this.copyLocationForm?.submitConfiguration();
+        break;
+      case OperationType.CopyLocationAliasToTypeIteratively:
+        this.copyLocationAliasToTypeIterativelyForm?.submitConfiguration();
         break;
       case OperationType.RemoveExtensions:
         this.removeExtensionsForm?.submitConfiguration();

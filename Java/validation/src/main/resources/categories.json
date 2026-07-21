@@ -1,4 +1,4 @@
-﻿[
+[
   {
     "id": "incorrect_display_value_for_code",
     "title": "Incorrect Display Value for Code",
@@ -220,8 +220,17 @@
     "matcher": {
       "children": [
         {
-          "field": "MESSAGE",
-          "regex": "^Unknown Code '.*' in the system '.*'; The provided code .* is not in the value set '.*'"
+          "children": [
+            {
+              "field": "MESSAGE",
+              "regex": "^Unknown Code '.*' in the system '.*'; The provided code .* is not in the value set '.*'"
+            },
+            {
+              "field": "MESSAGE",
+              "regex": "Unknown code '.*' for in-memory expansion of ValueSet '.*'"
+            }
+          ],
+          "requiresAllChildren": false
         },
         {
           "field": "MESSAGE",
@@ -237,13 +246,9 @@
           "field": "MESSAGE",
           "regex": "Unknown code 'urn:oid:1\\.2\\.840\\.114350\\..*' for in-memory expansion of ValueSet",
           "inverted": true
-        },
-        {
-          "field": "MESSAGE",
-          "regex": "Unknown code '.*' for in-memory expansion of ValueSet '.*'"
         }
       ],
-      "requiresAllChildren": false
+      "requiresAllChildren": true
     }
   },
   {
@@ -485,24 +490,29 @@
     "matcher": {
       "children": [
         {
-          "field": "MESSAGE",
-          "regex": "None of the codings provided are in the value set '.*' \\(.*\\), and a coding should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
-        },
-        {
-          "field": "MESSAGE",
-          "regex": "The value provided \\('[^']*'\\) is not in the value set 'USPS Two Letter Alphabetic Codes' \\(http:\\/\\/hl7\\.org\\/fhir\\/us\\/core\\/ValueSet\\/us-core-usps-state\\|(?:\\d+\\.\\d+\\.\\d+)?\\), and a code should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
-        },
-        {
-          "field": "MESSAGE",
-          "regex": "Could not confirm that the codes provided are in the value set \\'.*\\' \\(http\\:\\/\\/terminology\\.hl7\\.org\\/ValueSet\\/.*\\)\\, and a code should come from this value set unless it has no suitable code .*"
-        },
-        {
-          "field": "MESSAGE",
-          "regex": "The Coding provided \\(.*\\) is not in the value set '.*' \\(.*\\), and a code should come from this value set unless it has no suitable code (note that the validator cannot judge what is suitable).*'http://terminology.hl7.org/ValueSet/v3-ActEncounterCode'"
-        },
-        {
-          "field": "MESSAGE",
-          "regex": "^None of the codings provided are in the value set '.*' .*, and a coding should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
+          "children": [
+            {
+              "field": "MESSAGE",
+              "regex": "None of the codings provided are in the value set '.*' \\(.*\\), and a coding should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
+            },
+            {
+              "field": "MESSAGE",
+              "regex": "The value provided \\('[^']*'\\) is not in the value set 'USPS Two Letter Alphabetic Codes' \\(http:\\/\\/hl7\\.org\\/fhir\\/us\\/core\\/ValueSet\\/us-core-usps-state\\|(?:\\d+\\.\\d+\\.\\d+)?\\), and a code should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
+            },
+            {
+              "field": "MESSAGE",
+              "regex": "Could not confirm that the codes provided are in the value set \\'.*\\' \\(http\\:\\/\\/terminology\\.hl7\\.org\\/ValueSet\\/.*\\)\\, and a code should come from this value set unless it has no suitable code .*"
+            },
+            {
+              "field": "MESSAGE",
+              "regex": "The Coding provided \\(.*\\) is not in the value set '.*' \\(.*\\), and a code should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\).*'http:\\/\\/terminology\\.hl7\\.org\\/ValueSet\\/v3-ActEncounterCode'"
+            },
+            {
+              "field": "MESSAGE",
+              "regex": "^None of the codings provided are in the value set '.*' .*, and a coding should come from this value set unless it has no suitable code \\(note that the validator cannot judge what is suitable\\)"
+            }
+          ],
+          "requiresAllChildren": false
         },
         {
           "field": "MESSAGE",
@@ -510,7 +520,7 @@
           "inverted": true
         }
       ],
-      "requiresAllChildren": false
+      "requiresAllChildren": true
     }
   },
   {
@@ -864,6 +874,846 @@
     "matcher": {
       "field": "MESSAGE",
       "regex": "^Patient\\.link\\.other: minimum required = 1, but only found 0 \\(from http\\://www\\.cdc\\.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/cross-measure-patient\\|[0-9.]+\\)$"
+    }
+  },
+  {
+    "id": "missing_active_condition_category_code",
+    "title": "Missing active Condition category code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Condition.category contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Condition\\)(\\.where\\(id = '[^']*'\\))?\\.category\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_condition_code",
+    "title": "Missing active Condition code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Condition.code contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Condition\\)(\\.where\\(id = '[^']*'\\))?\\.code\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_coverage_relationship_code",
+    "title": "Missing active Coverage relationship code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Coverage.relationship contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Coverage\\)(\\.where\\(id = '[^']*'\\))?\\.relationship\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_coverage_class_type_code",
+    "title": "Missing active Coverage class type code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "External: Coverage.class.type contains an inactive code that is no longer valid in the bound value set. Update the class type to use a currently active code. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Coverage\\)(\\.where\\(id = '[^']*'\\))?\\.class\\.type\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_coverage_status_code",
+    "title": "Missing active Coverage status code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Coverage.status contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Coverage\\)(\\.where\\(id = '[^']*'\\))?\\.status\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_coverage_type_code",
+    "title": "Missing active Coverage type code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Coverage.type contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Coverage\\)(\\.where\\(id = '[^']*'\\))?\\.type\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_diagnosticreport_category_code",
+    "title": "Missing active DiagnosticReport category code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "DiagnosticReport.category contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(DiagnosticReport\\)(\\.where\\(id = '[^']*'\\))?\\.category\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_diagnosticreport_code",
+    "title": "Missing active DiagnosticReport code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "DiagnosticReport.code contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(DiagnosticReport\\)(\\.where\\(id = '[^']*'\\))?\\.code\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_encounter_class_code",
+    "title": "Missing active Encounter class code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Encounter.class contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Encounter\\)(\\.where\\(id = '[^']*'\\))?\\.class\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_encounter_hospitalization_admitsource_code",
+    "title": "Missing active Encounter hospitalization admitSource code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Encounter.hospitalization.admitSource contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Encounter\\)(\\.where\\(id = '[^']*'\\))?\\.hospitalization\\.admitSource\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_encounter_hospitalization_dischargedisposition_code",
+    "title": "Missing active Encounter hospitalization dischargeDisposition code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Encounter.hospitalization.dischargeDisposition contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Encounter\\)(\\.where\\(id = '[^']*'\\))?\\.hospitalization\\.dischargeDisposition\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_encounter_type_code",
+    "title": "Missing active Encounter type code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Encounter.type contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Encounter\\)(\\.where\\(id = '[^']*'\\))?\\.type\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_location_physicaltype_code",
+    "title": "Missing active Location physicalType code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Location.physicalType contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Location\\)(\\.where\\(id = '[^']*'\\))?\\.physicalType\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_location_type_code",
+    "title": "Missing active Location type code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Location.type contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Location\\)(\\.where\\(id = '[^']*'\\))?\\.type\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_medication_code",
+    "title": "Missing active Medication code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Medication.code contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Medication\\)(\\.where\\(id = '[^']*'\\))?\\.code\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_medicationadministration_dosage_route_code",
+    "title": "Missing active MedicationAdministration dosage route code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "MedicationAdministration.dosage.route contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(MedicationAdministration\\)(\\.where\\(id = '[^']*'\\))?\\.dosage\\.route\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_medicationadministration_medicationcodeableconcept_code",
+    "title": "Missing active MedicationAdministration medicationCodeableConcept code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "MedicationAdministration.medicationCodeableConcept contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(MedicationAdministration\\)(\\.where\\(id = '[^']*'\\))?\\.medicationCodeableConcept\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_medicationrequest_category_code",
+    "title": "Missing active MedicationRequest category code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "MedicationRequest.category contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(MedicationRequest\\)(\\.where\\(id = '[^']*'\\))?\\.category\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_medicationrequest_dosageinstruction_timing_repeat_code",
+    "title": "Missing active MedicationRequest dosageInstruction timing repeat code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "MedicationRequest.dosageInstruction.timing.repeat contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(MedicationRequest\\)(\\.where\\(id = '[^']*'\\))?\\.dosageInstruction\\.timing\\.repeat\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_medicationrequest_dosageinstruction_route_code",
+    "title": "Missing active MedicationRequest dosageInstruction route code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "MedicationRequest.dosageInstruction.route contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(MedicationRequest\\)(\\.where\\(id = '[^']*'\\))?\\.dosageInstruction\\.route\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_medicationrequest_intent_code",
+    "title": "Missing active MedicationRequest intent code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "MedicationRequest.intent contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(MedicationRequest\\)(\\.where\\(id = '[^']*'\\))?\\.intent\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_medicationrequest_medicationcodeableconcept_code",
+    "title": "Missing active MedicationRequest medicationCodeableConcept code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "MedicationRequest.medicationCodeableConcept contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(MedicationRequest\\)(\\.where\\(id = '[^']*'\\))?\\.medicationCodeableConcept\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_medicationrequest_priority_code",
+    "title": "Missing active MedicationRequest priority code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "MedicationRequest.priority contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(MedicationRequest\\)(\\.where\\(id = '[^']*'\\))?\\.priority\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_medicationrequest_reasoncode",
+    "title": "Missing active MedicationRequest reasoncode",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "MedicationRequest.reasonCode contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(MedicationRequest\\)(\\.where\\(id = '[^']*'\\))?\\.reasonCode\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_medicationrequest_status_code",
+    "title": "Missing active MedicationRequest status code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "MedicationRequest.status contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(MedicationRequest\\)(\\.where\\(id = '[^']*'\\))?\\.status\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_observation_bodysite_code",
+    "title": "Missing active Observation bodySite code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Observation.bodySite contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Observation\\)(\\.where\\(id = '[^']*'\\))?\\.bodySite\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_observation_code",
+    "title": "Missing active Observation code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Observation.code contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Observation\\)(\\.where\\(id = '[^']*'\\))?\\.code\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_observation_component_code",
+    "title": "Missing active Observation component code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Observation.component.code contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Observation\\)(\\.where\\(id = '[^']*'\\))?\\.component\\.code\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_observation_method_code",
+    "title": "Missing active Observation method code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Observation.method contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Observation\\)(\\.where\\(id = '[^']*'\\))?\\.method\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_observation_interpretation_code",
+    "title": "Missing active Observation interpretation code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Observation.interpretation contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Observation\\)(\\.where\\(id = '[^']*'\\))?\\.interpretation\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_observation_status_code",
+    "title": "Missing active Observation status code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Observation.status contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Observation\\)(\\.where\\(id = '[^']*'\\))?\\.status\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_observation_value_code",
+    "title": "Missing active Observation value code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Observation.value contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Observation\\)(\\.where\\(id = '[^']*'\\))?\\.value\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_specimen_collection_bodysite_code",
+    "title": "Missing active Specimen collection bodySite code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Specimen.collection.bodySite contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Specimen\\)(\\.where\\(id = '[^']*'\\))?\\.collection\\.bodySite\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_specimen_type_code",
+    "title": "Missing active Specimen type code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Specimen.type contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Specimen\\)(\\.where\\(id = '[^']*'\\))?\\.type\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_servicerequest_category_code",
+    "title": "Missing active ServiceRequest category code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "ServiceRequest.category contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(ServiceRequest\\)(\\.where\\(id = '[^']*'\\))?\\.category\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_servicerequest_code",
+    "title": "Missing active ServiceRequest code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "ServiceRequest.code contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(ServiceRequest\\)(\\.where\\(id = '[^']*'\\))?\\.code\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_servicerequest_intent_code",
+    "title": "Missing active ServiceRequest intent code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "ServiceRequest.intent contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(ServiceRequest\\)(\\.where\\(id = '[^']*'\\))?\\.intent\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_servicerequest_status_code",
+    "title": "Missing active ServiceRequest status code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "ServiceRequest.status contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(ServiceRequest\\)(\\.where\\(id = '[^']*'\\))?\\.status\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_procedure_code",
+    "title": "Missing active Procedure code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Procedure.code contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Procedure\\)(\\.where\\(id = '[^']*'\\))?\\.code\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_patient_communication_language_code",
+    "title": "Missing active Patient communication language code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Patient.communication.language contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Patient\\)(\\.where\\(id = '[^']*'\\))?\\.communication\\.language\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_patient_gender_code",
+    "title": "Missing active Patient gender code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Patient.gender contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Patient\\)(\\.where\\(id = '[^']*'\\))?\\.gender\\b"
+        }
+      ],
+      "requiresAllChildren": true
+    }
+  },
+  {
+    "id": "missing_active_patient_address_state_code",
+    "title": "Missing active Patient address state code",
+    "severity": "WARNING",
+    "acceptable": true,
+    "guidance": "Patient.address.state contains a code that is no longer active. An active code is required for reporting to NHSN. If you believe this is a data entry issue that can/should be rectified by a user in the EHR, please resolve and re-submit. For all other inquiries, please submit an NHSN ServiceNow ticket.",
+    "matcher": {
+      "children": [
+        {
+          "field": "MESSAGE",
+          "regex": "The concept '[^']+' has a status of inactive and its use should be reviewed\\."
+        },
+        {
+          "field": "EXPRESSION",
+          "regex": "resource\\.ofType\\(Patient\\)(\\.where\\(id = '[^']*'\\))?\\.address\\.state\\b"
+        }
+      ],
+      "requiresAllChildren": true
     }
   }
 ]

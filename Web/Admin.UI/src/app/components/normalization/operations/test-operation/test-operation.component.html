@@ -177,6 +177,21 @@
             </div>
           }
 
+          @if (operation.operationType === OperationType.CopyLocationAliasToTypeIteratively) {
+            <div class="operations-details-row">
+              <div class="data-label">Name</div>
+              <div class="data-value selectable-value">{{ operation.parsedOperationJson.Name }}</div>
+            </div>
+            <div class="operations-details-row">
+              <div class="data-label">Max Iterations</div>
+              <div class="data-value selectable-value">{{ operation.parsedOperationJson.MaxIterations }}</div>
+            </div>
+            <div class="operations-details-row">
+              <div class="data-label">Split On Comma</div>
+              <div class="data-value selectable-value">{{ operation.parsedOperationJson.SplitOnComma ? 'Yes' : 'No' }}</div>
+            </div>
+          }
+
           @if (operation.operationType === OperationType.RemoveExtensions) {
             <div class="operations-details-row">
               <div class="data-label">Name</div>
@@ -190,7 +205,7 @@
             }
           }
 
-          @if (operation.operationType !== OperationType.CopyProperty && operation.operationType !== OperationType.ConditionalTransform && operation.operationType !== OperationType.CodeMap && operation.operationType !== OperationType.CopyLocation && operation.operationType !== OperationType.RemoveExtensions) {
+          @if (operation.operationType !== OperationType.CopyProperty && operation.operationType !== OperationType.ConditionalTransform && operation.operationType !== OperationType.CodeMap && operation.operationType !== OperationType.CopyLocation && operation.operationType !== OperationType.CopyLocationAliasToTypeIteratively && operation.operationType !== OperationType.RemoveExtensions) {
             <p class="no-results-subtext">
               Unknown operation type: {{ operation.operationType }}. No additional details available.
             </p>

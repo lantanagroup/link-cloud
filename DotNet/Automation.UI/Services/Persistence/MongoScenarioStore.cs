@@ -1,9 +1,9 @@
-using System.Text.Json;
-using Automation.UI.Models;
-using LantanaGroup.Automation.Generation;
+ï»¿using Automation.UI.Models;
 using MongoDB.Driver;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Automation.UI.Services.Persistence;
 
@@ -47,8 +47,18 @@ namespace Automation.UI.Services.Persistence;
 /// </summary>
 public sealed class MongoScenarioStore : IScenarioStore
 {
+    private static readonly JsonSerializerOptions CohortJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly IMongoCollection<TestScenarioDocument> _scenarios;
     private readonly IMongoCollection<ImportedBundleDocument> _bundles;
+
+    static MongoScenarioStore()
+    {
+        CohortJsonOptions.Converters.Add(new JsonStringEnumConverter());
+    }
 
     public MongoScenarioStore(IMongoDatabase database)
     {
@@ -144,7 +154,7 @@ public sealed class MongoScenarioStore : IScenarioStore
             }
 
             if (string.IsNullOrWhiteSpace(input.BundleJson))
-                continue; // ID-only entry mistakenly placed in the bundle list — nothing to externalize.
+                continue; // ID-only entry mistakenly placed in the bundle list â€” nothing to externalize.
 
             var hash = ComputeContentHash(input.BundleJson!);
             var byteCount = Encoding.UTF8.GetByteCount(input.BundleJson!);
@@ -314,7 +324,9 @@ public sealed class MongoScenarioStore : IScenarioStore
             ResourcesPerPatientMin = model.ResourcesPerPatientMin,
             ResourcesPerPatientMax = model.ResourcesPerPatientMax,
             PatientCohortsJson = JsonSerializer.Serialize(model.PatientCohorts),
+            NhsnOrganizationId = model.NhsnOrganizationId,
             QueryPlanTemplateId = model.QueryPlanTemplateId,
+            OrganizationResourceMapTemplateId = model.OrganizationResourceMapTemplateId,
             CleanupServiceData = model.CleanupServiceData,
             CleanupFhirData = model.CleanupFhirData,
             ReportPeriodStart = model.ReportPeriodStart?.UtcDateTime,
@@ -344,7 +356,9 @@ public sealed class MongoScenarioStore : IScenarioStore
             ResourcesPerPatientMin = doc.ResourcesPerPatientMin,
             ResourcesPerPatientMax = doc.ResourcesPerPatientMax,
             PatientCohorts = DeserializeCohorts(doc.PatientCohortsJson),
+            NhsnOrganizationId = string.IsNullOrWhiteSpace(doc.NhsnOrganizationId) ? string.Empty : doc.NhsnOrganizationId,
             QueryPlanTemplateId = doc.QueryPlanTemplateId,
+            OrganizationResourceMapTemplateId = doc.OrganizationResourceMapTemplateId,
             CleanupServiceData = doc.CleanupServiceData,
             CleanupFhirData = doc.CleanupFhirData,
             ReportPeriodStart = doc.ReportPeriodStart.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(doc.ReportPeriodStart.Value, DateTimeKind.Utc)) : null,
@@ -386,7 +400,7 @@ public sealed class MongoScenarioStore : IScenarioStore
         foreach (var input in inputs)
         {
             if (!string.IsNullOrEmpty(input.BundleJson))
-                continue; // already inline (legacy doc) — leave as-is
+                continue; // already inline (legacy doc) â€” leave as-is
 
             var key = input.PatientId ?? string.Empty;
             if (refsByPatient.TryGetValue(key, out var queue) && queue.Count > 0)
@@ -408,7 +422,33 @@ public sealed class MongoScenarioStore : IScenarioStore
 
         try
         {
-            return JsonSerializer.Deserialize<List<PatientCohortDefinition>>(json) ?? [];
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                return JsonSerializer.Deserialize<List<PatientCohortDefinition>>(json, CohortJsonOptions) ?? [];
+
+            var cohorts = new List<PatientCohortDefinition>();
+            foreach (var cohortElement in doc.RootElement.EnumerateArray())
+            {
+                var cohort = JsonSerializer.Deserialize<PatientCohortDefinition>(cohortElement.GetRawText(), CohortJsonOptions);
+                if (cohort == null)
+                    continue;
+
+                var hasExplicitCohortQualification = cohortElement.ValueKind == JsonValueKind.Object
+                    && cohortElement.EnumerateObject().Any(p =>
+                        string.Equals(p.Name, nameof(PatientCohortDefinition.CohortQualification), StringComparison.OrdinalIgnoreCase));
+
+                if (!hasExplicitCohortQualification)
+                {
+                    var allNonQualifying = cohort.MeasureEligibilities.Count > 0
+                        && cohort.MeasureEligibilities.Values.All(v => v == MeasureEligibility.NonQualifying);
+                    if (allNonQualifying)
+                        cohort.CohortQualification = MeasureEligibility.NonQualifying;
+                }
+
+                cohorts.Add(cohort);
+            }
+
+            return cohorts;
         }
         catch
         {
