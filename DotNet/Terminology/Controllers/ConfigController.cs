@@ -1,5 +1,6 @@
 using System.Net;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -13,7 +14,7 @@ namespace LantanaGroup.Link.Terminology.Controllers;
 /// </summary>
 [Route("api/terminology/config")]
 [SwaggerTag("Configuration")]
-public class ConfigController(CodeGroupCacheService cacheService, ILogger<ConfigController> logger) : Controller
+public class ConfigController(ICodeGroupCacheService cacheService, ILogger<ConfigController> logger) : Controller
 {
     /// <summary>
     /// Reloads the cache by clearing the existing data and repopulating it

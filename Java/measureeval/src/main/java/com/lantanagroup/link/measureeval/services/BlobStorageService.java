@@ -98,7 +98,7 @@ public class BlobStorageService {
         try {
             // Upload to ABS
             blobName = this.upload(patientPayloadUri, sb.toString());
-            logger.info("Uploaded patient {} payload for report {} to blob storage: {}", status.getPatientId(), report.getReportTrackingId(), patientPayloadUri);
+            logger.info("Uploaded patient payload for report {} to blob storage: {}", report.getReportTrackingId(), patientPayloadUri);
         } catch (Exception ex) {
             logger.error("Failed to upload patient payload to blob storage: {}", ex.getMessage(), ex);
             throw ex;

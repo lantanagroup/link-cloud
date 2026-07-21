@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Middleware;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Terminology.Application.Extensions;
 using LantanaGroup.Link.Terminology.Application.Formatters;
+using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Settings;
 using LantanaGroup.Link.Terminology.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -121,6 +122,7 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddMemoryCache();
     builder.Services.AddSingleton<CodeGroupCacheService>();
+    builder.Services.AddSingleton<ICodeGroupCacheService>(sp => sp.GetRequiredService<CodeGroupCacheService>());
     builder.Services.AddSingleton<FhirService>();
 
     builder.Services.AddOptions<TerminologyConfig>()

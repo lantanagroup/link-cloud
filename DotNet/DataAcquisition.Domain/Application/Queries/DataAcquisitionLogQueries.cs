@@ -246,7 +246,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             join resourceTypeEntry in _dbContext.FhirQueryResourceTypes on query.Id equals resourceTypeEntry.FhirQueryId
             where log.FacilityId == facilityId
                   && log.CorrelationId == correlationId
-                  && parsedTypes.Contains(resourceTypeEntry.ResourceType)
+                  && parsedTypes.Contains(resourceTypeEntry.ResourceType.HasValue ? resourceTypeEntry.ResourceType.Value : default)
             select new { resourceTypeEntry.ResourceType, log.Status })
             .ToListAsync(cancellationToken);
 
@@ -259,7 +259,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             var hasNonTerminal = grouping.Any(g =>
                 g.Status is null || !terminalStatuses.Contains(g.Status.Value));
             if (hasNonTerminal)
-                blocking.Add(grouping.Key);
+                blocking.Add(grouping.Key.HasValue ? grouping.Key.Value : default);
         }
 
         return parsed
@@ -290,7 +290,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .Select(l => new DataAcquisitionLogModel
             {
                 Id = l.Id,
-                Priority = l.Priority,
+                Priority = l.Priority.HasValue ? l.Priority.Value : default,
                 FacilityId = l.FacilityId,
                 IsCensus = l.IsCensus,
                 PatientId = l.PatientId,
@@ -307,8 +307,8 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     FacilityId = q.FacilityId,
                     MeasureId = q.MeasureId,
                     IsReference = q.IsReference,
-                    QueryType = q.QueryType,
-                    ResourceTypes = q.FhirQueryResourceTypes.Select(r => r.ResourceType).ToList(),
+                    QueryType = q.QueryType.HasValue ? q.QueryType.Value : default,
+                    ResourceTypes = q.FhirQueryResourceTypes.Select(r => r.ResourceType.HasValue ? r.ResourceType.Value : default).ToList(),
                     QueryParameters = q.QueryParameters,
                     Paged = q.Paged,
                     DataAcquisitionLogId = q.DataAcquisitionLogId,
@@ -319,7 +319,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     {
                         Id = rt.Id,
                         FacilityId = rt.FacilityId,
-                        QueryPhase = rt.QueryPhase,
+                        QueryPhase = rt.QueryPhase.HasValue ? rt.QueryPhase.Value : default,
                         ResourceType = rt.ResourceType,
                         FhirQueryId = rt.FhirQueryId,
                         CreateDate = rt.CreateDate,
@@ -339,7 +339,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                 ScheduledReport = l.ScheduledReportEntity != null ? new ScheduledReport
                 {
                     ReportTrackingId = l.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
-                    Frequency = l.ScheduledReportEntity.Frequency,
+                    Frequency = l.ScheduledReportEntity.Frequency.HasValue ? l.ScheduledReportEntity.Frequency.Value : default,
                     StartDate = DateTime.SpecifyKind(l.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                     EndDate = DateTime.SpecifyKind(l.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
                     ReportTypes = l.ScheduledReportEntity.ReportTypes != null
@@ -429,7 +429,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         ScheduledReport = log.ScheduledReportEntity != null ? new ScheduledReport
                         {
                             ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
-                            Frequency = log.ScheduledReportEntity.Frequency,
+                            Frequency = log.ScheduledReportEntity.Frequency.HasValue ? log.ScheduledReportEntity.Frequency.Value : default,
                             StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                             EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
                             ReportTypes = log.ScheduledReportEntity.ReportTypes != null
@@ -620,7 +620,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     return new QueryLogSummaryModel
                     {
                         Id = log.Id,
-                        Priority = log.Priority,
+                        Priority = log.Priority.HasValue ? log.Priority.Value : default,
                         FacilityId = log.FacilityId,
                         PatientId = log.PatientId,
                         ResourceTypes = resourceTypes,
@@ -665,7 +665,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
             .Select(l => new DataAcquisitionLogSummaryModel
             {
                 Id = l.Id,
-                Priority = l.Priority,
+                Priority = l.Priority.HasValue ? l.Priority.Value : default,
                 FacilityId = l.FacilityId,
                 IsCensus = l.IsCensus,
                 PatientId = l.PatientId,
@@ -1109,7 +1109,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                     select new DataAcquisitionLogModel
                     {
                         Id = log.Id,
-                        Priority = log.Priority,
+                        Priority = log.Priority.HasValue ? log.Priority.Value : default,
                         FacilityId = log.FacilityId,
                         IsCensus = log.IsCensus,
                         PatientId = log.PatientId,
@@ -1131,7 +1131,7 @@ public class DataAcquisitionLogQueries : IDataAcquisitionLogQueries
                         ScheduledReport = log.ScheduledReportEntity != null ? new ScheduledReport
                         {
                             ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString().ToLower(),
-                            Frequency = log.ScheduledReportEntity.Frequency,
+                            Frequency = log.ScheduledReportEntity.Frequency.HasValue ? log.ScheduledReportEntity.Frequency.Value : default,
                             StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                             EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
                             ReportTypes = log.ScheduledReportEntity.ReportTypes != null
