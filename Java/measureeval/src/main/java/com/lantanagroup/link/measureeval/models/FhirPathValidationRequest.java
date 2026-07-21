@@ -1,5 +1,6 @@
 package com.lantanagroup.link.measureeval.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,6 +9,7 @@ import lombok.Setter;
  */
 @Getter
 @Setter
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class FhirPathValidationRequest {
     /**
      * The FHIR resource type the expression is rooted at (e.g. "Location").

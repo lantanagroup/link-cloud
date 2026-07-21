@@ -7,5 +7,5 @@ namespace LantanaGroup.Link.DataAcquisition.Models;
 public class UpdateEncounterMappingApiModel
 {
     [Required]
-    public required bool MappedToOrg { get; set; }
+    public required bool? MappedToOrg { get; set; } = false;
 }
