@@ -127,13 +127,13 @@ The UI currently supports component-controlled routes relative to `baseUrl`:
 
 - `/` ? Home
 - `/onboard` ? Onboarding
-- `/admin/users` ? System administrator user management
+- `/configuration` ? Configuration
 
 Under an embedded base of `/nhsnlink`, those resolve as:
 
 - `/nhsnlink`
 - `/nhsnlink/onboard`
-- `/nhsnlink/admin/users`
+- `/nhsnlink/configuration`
 
 ## Project structure
 
@@ -223,7 +223,7 @@ npm run build
 
 For signed JWT mode:
 
-- configure a test user with the JWT issuer that matches `NhsnJwt:Issuer` in the BFF config
+- configure a test profile with the JWT issuer that matches `NhsnJwt:Issuer` in the BFF config
 - configure the `kid` that matches the key id/thumbprint expected by the BFF signing certificate
 - provide the matching PKCS#8 private key PEM used to sign the token
 - configure the matching public certificate PEM in `NHSN-App-BFF` development/docker appsettings
@@ -234,7 +234,7 @@ The shell runtime server also supports these environment variables for default h
 - `NHSN_APP_UI_DEFAULT_JWT_KEY_ID`
 - `NHSN_APP_UI_DEFAULT_JWT_PRIVATE_KEY_PEM`
 
-These are exposed to the lower-environment shell through `/shell-config.js` so testers can avoid pasting the key information repeatedly. Saved test-user profiles may still override any of these values for negative testing.
+These are exposed to the lower-environment shell through `/shell-config.js` so testers can avoid pasting the key information repeatedly. Saved test profiles may still override any of these values for negative testing.
 
 ## Docker usage
 
@@ -242,7 +242,7 @@ The Dockerfile builds and publishes the **standalone shell only**.
 
 That container is intended for lower-environment deployment where testers need to:
 
-- save multiple signed-JWT test users
+- save multiple signed-JWT test profiles
 - switch among them
 - re-run the same shared `NHSNLink` component against the BFF
 

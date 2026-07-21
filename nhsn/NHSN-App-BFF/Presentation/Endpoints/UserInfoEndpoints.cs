@@ -1,5 +1,4 @@
 using LantanaGroup.Link.Nhsn.App.Bff.Application.Interfaces;
-using Microsoft.OpenApi.Models;
 
 namespace LantanaGroup.Link.Nhsn.App.Bff.Presentation.Endpoints;
 
@@ -24,7 +23,7 @@ public class UserInfoEndpoints : IApi
             .WithOpenApi(operation =>
             {
                 operation.Summary = "Get the resolved NHSNLink user context.";
-                operation.Description = "Returns the authenticated or simulated lower-environment user information including NHSNLink roles and onboarding state.";
+                operation.Description = "Returns the authenticated NHSN App user context including FACADMIN-derived access state, facility context, and onboarding state.";
                 return operation;
             });
     }

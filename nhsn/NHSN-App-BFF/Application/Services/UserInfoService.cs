@@ -102,8 +102,7 @@ public class UserInfoService : IUserInfoService
             FacilityId = user.FacilityId,
             Groups = effectiveGroups,
             AvailableNavigation = availableNavigation,
-            AccessRequestUrl = _jwtSettings.AccessRequestUrl,
-            IsLowerEnvironmentTestingMode = true
+            AccessRequestUrl = _jwtSettings.AccessRequestUrl
         };
     }
 

@@ -20,11 +20,10 @@ This project is intentionally separate from the existing Link `Account` service.
 
 The NHSN App integration needs a backend that can answer a question like:
 
-> �Who is the current NHSNLink user and what role should they have inside NHSNLink?�
+> Who is the current NHSNLink user and do they have facility-facing access inside NHSNLink?
 
 That cannot be solved entirely in the UI because:
 
-- the App Gateway injects the JWT on the backend request path,
 - the App Gateway injects the JWT on the backend request path,
 - the FACADMIN role and facility context come from the validated JWT,
 - the UI needs a server-shaped user context anyway.
@@ -120,7 +119,18 @@ This allows the BFF to start with local file-based configuration and later move 
 - `NhsnJwt:PublicCertificatePem`
 - `NhsnJwt:Issuer`
 - optional `NhsnJwt:Audience`
+- optional `NhsnJwt:MaxTokenAgeMinutes`
+- optional `NhsnJwt:ExpiredTokenRedirectUrl`
 - claim mapping keys such as `EmailClaimType`, `UserIdClaimType`, etc.
+
+### Token renewal behavior
+
+The BFF validates JWT signature, issuer, lifetime, and optionally a maximum token age when `NhsnJwt:MaxTokenAgeMinutes` is configured.
+
+If the JWT is expired or exceeds the configured maximum token age, the BFF can emit a configurable renewal redirect URL using `NhsnJwt:ExpiredTokenRedirectUrl`.
+
+- If the configured URL contains `{redirectUrl}`, the BFF replaces that token with the current request URL.
+- Otherwise, the BFF appends `redirectUrl=<current request url>` as a query parameter.
 
 ## EF Core migrations
 

@@ -13,6 +13,8 @@ export class UserInfoService {
       credentials: 'include'
     });
 
+    this.handleExpiredTokenRedirect(response);
+
     if (!response.ok) {
       throw new Error(`Unable to load user context (${response.status}).`);
     }
@@ -27,6 +29,8 @@ export class UserInfoService {
       credentials: 'include',
       body: JSON.stringify({ isOnboarded })
     });
+
+    this.handleExpiredTokenRedirect(response);
 
     if (!response.ok) {
       throw new Error(`Unable to update facility onboarding (${response.status}).`);
@@ -99,6 +103,20 @@ export class UserInfoService {
       .setIssuedAt()
       .setExpirationTime('15m')
       .sign(privateKey);
+  }
+
+  private handleExpiredTokenRedirect(response: Response): void {
+    if (response.status !== 401) {
+      return;
+    }
+
+    const redirectUrl = response.headers.get('X-Expired-Token-Redirect-Url') ?? response.headers.get('Location');
+    if (!redirectUrl) {
+      return;
+    }
+
+    window.location.assign(redirectUrl);
+    throw new Error('JWT expired or requires refresh. Redirecting for token renewal.');
   }
 }
 

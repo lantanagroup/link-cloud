@@ -134,11 +134,6 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
 
   return (
     <div className="nhsn-link">
-      {userInfo.IsLowerEnvironmentTestingMode && (
-        <div className="nhsn-link__testing-banner" role="alert">
-          This system is configured for lower environment testing. Do not use this configuration in production.
-        </div>
-      )}
       <div className="nhsn-link__layout">
         <NavigationRail
           title="NHSNLink"
