@@ -24,7 +24,7 @@ public class ReferenceResourceModel
             ResourceId = referenceResource.ResourceId,
             ResourceType = referenceResource.ResourceType,
             ReferenceResource = referenceResource.ReferenceResource,
-            QueryPhase = referenceResource.QueryPhase
+            QueryPhase = referenceResource.QueryPhase.GetValueOrDefault()
         };
     }
 }
