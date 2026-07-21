@@ -48,6 +48,9 @@ public class FhirConfig {
      */
     // Package-private for testing.
     static CloseableHttpClient buildHttpClient(int maxAttempts, long backoffMillis) {
+        if (backoffMillis < 0) {
+            throw new IllegalArgumentException("backoffMillis must be non-negative");
+        }
         PoolingHttpClientConnectionManager connectionManager =
                 new PoolingHttpClientConnectionManager(5000, TimeUnit.MILLISECONDS);
         connectionManager.setMaxTotal(IRestfulClientFactory.DEFAULT_POOL_MAX);
