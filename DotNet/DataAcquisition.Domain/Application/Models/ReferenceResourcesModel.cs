@@ -30,7 +30,7 @@ public class ReferenceResourcesModel
             ReferenceResource = entity.ReferenceResource,
             CreateDate = entity.CreateDate,
             ModifyDate = entity.ModifyDate,
-            QueryPhase = entity.QueryPhase
+            QueryPhase = entity.QueryPhase.GetValueOrDefault()
         };
     }
 }

@@ -210,6 +210,42 @@
             }
           </mat-action-row>
         </mat-tab>
+        <mat-tab [disabled]="!facilityConfig?.vendor">
+          <ng-template mat-tab-label>
+            <span matTooltip="Select an EHR vendor for this facility to enable reporting organization configuration."
+              [matTooltipDisabled]="!!facilityConfig?.vendor"
+              style="pointer-events: auto;">
+              Reporting Organization
+            </span>
+          </ng-template>
+          @if (facilityConfig?.vendor) {
+            @if (showNoReportingOrgConfigAlert) {
+              <app-link-alert [type]="linkNoConfigAlertType" [message]="noReportingOrgConfigAlertMessage"
+              ></app-link-alert>
+            }
+            <app-reporting-organization-config-form [item]="reportingOrgConfig" [vendor]="facilityConfig.vendor!"
+            [viewOnly]="true"></app-reporting-organization-config-form>
+            <mat-action-row>
+              @if (showNoReportingOrgConfigAlert) {
+                <button mat-mini-fab aria-label="Add reporting organization configuration" matTooltip="Add reporting organization configuration"
+                  (click)="showReportingOrgDialog()">
+                  <mat-icon>add</mat-icon>
+                </button>
+              }
+              @if (!showNoReportingOrgConfigAlert) {
+                <button mat-mini-fab aria-label="Edit reporting organization configuration" matTooltip="Edit reporting organization configuration"
+                  (click)="showReportingOrgDialog()">
+                  <mat-icon>edit</mat-icon>
+                </button>
+                <button mat-mini-fab aria-label="Delete reporting organization configuration" color="warn" (click)="onDeleteReportingOrgConfig()">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              }
+            </mat-action-row>
+          } @else {
+            <app-link-alert [type]="linkNoConfigAlertType" [message]="'Select an EHR vendor for this facility to configure its reporting organization.'"></app-link-alert>
+          }
+        </mat-tab>
       </mat-tab-group>
     </mat-expansion-panel>
 
@@ -239,6 +275,10 @@
           <button mat-menu-item (click)="showOperationDialog(OperationType.CopyLocation)">
             <mat-icon>content_copy</mat-icon>
             <span>Add Copy Location</span>
+          </button>
+          <button mat-menu-item (click)="showOperationDialog(OperationType.CopyLocationAliasToTypeIteratively)">
+            <mat-icon>account_tree</mat-icon>
+            <span>Add Copy Location Alias to Type Iteratively</span>
           </button>
           <button mat-menu-item (click)="showOperationDialog(OperationType.RemoveExtensions)">
             <mat-icon>filter_list_off</mat-icon>

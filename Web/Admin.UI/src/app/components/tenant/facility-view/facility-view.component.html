@@ -71,6 +71,8 @@
     </div>
 
   <div class="link-card" style="margin-top: 2em;">
+    <mat-tab-group>
+    <mat-tab label="Facility Reports">
     <div class="link-card-header">
       <div class="split-container" style="margin-bottom: 0;">
         <div class="left-pane">
@@ -313,6 +315,18 @@
       </p>
     </div>
     }
+    </mat-tab>
+    <mat-tab label="Locations">
+      <ng-template matTabContent>
+        <app-locations-list [facilityId]="facilityId"></app-locations-list>
+      </ng-template>
+    </mat-tab>
+    <mat-tab label="Encounters">
+      <ng-template matTabContent>
+        <app-encounters-list [facilityId]="facilityId"></app-encounters-list>
+      </ng-template>
+    </mat-tab>
+    </mat-tab-group>
   </div>
 
       </div>
