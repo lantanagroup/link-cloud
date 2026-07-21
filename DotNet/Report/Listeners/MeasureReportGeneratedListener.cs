@@ -99,7 +99,7 @@ namespace LantanaGroup.Link.Report.Listeners
                             {
                                 _transientExceptionHandler.HandleException(result, ex, facilityId);
                             }
-                            catch (OperationCanceledException)
+                            catch (OperationCanceledException) when (consumeCancellationToken.IsCancellationRequested)
                             {
                                 throw;
                             }

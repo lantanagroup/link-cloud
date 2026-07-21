@@ -1,4 +1,4 @@
-using Hl7.Fhir.Model;
+﻿using Hl7.Fhir.Model;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
@@ -52,13 +52,6 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         {
             var cache = ResolveFromKey(cacheKey);
             return cache.Get(cacheKey);
-        }
-
-        /// <inheritdoc/>
-        public void Skipped(string sourceCache, string correlationId)
-        {
-            var cache = ResolveFromKey(sourceCache);
-            cache.Skipped(sourceCache, correlationId);
         }
 
         /// <inheritdoc/>

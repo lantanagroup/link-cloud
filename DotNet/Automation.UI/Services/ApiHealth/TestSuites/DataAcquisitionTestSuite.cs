@@ -1,5 +1,6 @@
 ﻿using Automation.UI.Models.ApiHealth;
 using Automation.UI.Services.ApiHealth.Seeding;
+using Automation.UI.Services.Persistence;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
@@ -22,18 +23,21 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
     private readonly IFacilityServiceClient _facilityClient;
     private readonly IApiHealthSeedContextAccessor _seedContext;
     private readonly IOptions<AutomationConfig> _automationConfig;
+    private readonly IOrganizationResourceMapTemplateStore _organizationResourceMapTemplateStore;
 
     public override string ServiceName => "DataAcquisition";
     public DataAcquisitionTestSuite(
         IDataAcquisitionServiceClient client,
         IFacilityServiceClient facilityClient,
         IApiHealthSeedContextAccessor seedContext,
-        IOptions<AutomationConfig> automationConfig)
+        IOptions<AutomationConfig> automationConfig,
+        IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore)
     {
         _client = client;
         _facilityClient = facilityClient;
         _seedContext = seedContext;
         _automationConfig = automationConfig;
+        _organizationResourceMapTemplateStore = organizationResourceMapTemplateStore;
     }
 
     public override IReadOnlyList<ApiHealthSeedRequirement> GetSeedRequirements() =>
@@ -78,6 +82,7 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
         var facilityCreated = false;
         var queryConfigCreated = false;
         var dischargePlanCreated = false;
+        var fhirListCreated = false;
 
         try
         {
@@ -166,6 +171,45 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             await CreateFacilityAsync(facilityId, ct);
             facilityCreated = true;
 
+            // Org-location configuration lifecycle checks
+            results.Add(await RunStepAsync(StepNames.OrgLocationConfigGet200, 200, async () =>
+                await _client.GetOrganizationLocationConfigurationsAsync(facilityId, ct), ct: ct));
+
+            var defaultOrgMap = await _organizationResourceMapTemplateStore.GetDefaultAsync(ct);
+            var mapConditions = defaultOrgMap?.Conditions
+                .Where(c => !string.IsNullOrWhiteSpace(c.FhirPath))
+                .OrderBy(c => c.Priority)
+                .Select(c => new CreateOrganizationLocationConditionApiModel
+                {
+                    FhirPath = c.FhirPath,
+                    Priority = c.Priority
+                })
+                .ToList()
+                ?? [];
+
+            if (mapConditions.Count == 0)
+                throw new InvalidOperationException("Default Organization Resource Map template is missing or has no conditions.");
+
+            results.Add(await RunStepAsync(StepNames.OrgLocationConfigPost201, 201, async () =>
+                await _client.CreateOrganizationLocationConfigurationAsync(
+                    facilityId,
+                    new CreateOrganizationLocationConfigurationApiModel
+                    {
+                        Description = defaultOrgMap?.Description ?? "ApiHealth org-location config",
+                        IsActive = true,
+                        Conditions = mapConditions
+                    },
+                    ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.OrgLocationConfigGet200AfterPost, 200, async () =>
+                await _client.GetOrganizationLocationConfigurationsAsync(facilityId, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.OrgLocationMappingsGet200, 200, async () =>
+                await _client.GetOrganizationLocationMappingsAsync(facilityId, ct), ct: ct));
+
+            results.Add(await RunStepAsync(StepNames.EncounterMappingsGet200, 200, async () =>
+                await _client.GetEncounterMappingsAsync(facilityId, ct), ct: ct));
+
             // CREATE FHIR Query Config
             results.Add(await RunStepAsync(StepNames.FhirConfigPost201, 201, async () =>
             {
@@ -224,7 +268,37 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
             results.Add(await RunStepAsync(StepNames.FhirConfigGet404, 404, async () =>
                 await _client.GetFhirQueryConfigurationAsync(facilityId, ct), ct: ct));
 
-            // --- Read-only operations (non-existent resources � prove reachability) ---
+            // --- FHIR List Configuration CRUD ---
+
+            // POST FHIR List Config → 200
+            results.Add(await RunStepAsync(StepNames.FhirListConfigPost200, 200, async () =>
+            {
+                var resp = await _client.CreateFhirListConfigurationAsync(BuildFhirListConfigRequest(facilityId), ct);
+                if (resp.IsSuccessStatusCode) fhirListCreated = true;
+                return resp;
+            }, ct: ct));
+
+            // GET FHIR List Config → 200
+            results.Add(await RunStepAsync(StepNames.FhirListConfigGet200, 200, async () =>
+                await _client.GetFhirListConfigurationAsync(facilityId, ct), ct: ct));
+
+            // POST FHIR List Config → 409 (duplicate)
+            results.Add(await RunStepAsync(StepNames.FhirListConfigPost409, 409, async () =>
+                await _client.CreateFhirListConfigurationAsync(BuildFhirListConfigRequest(facilityId), ct), ct: ct));
+
+            // DELETE FHIR List Config → 200
+            results.Add(await RunStepAsync(StepNames.FhirListConfigDelete200, 200, async () =>
+            {
+                var resp = await _client.DeleteFhirListConfigurationAsync(facilityId, ct);
+                if (resp.IsSuccessStatusCode) fhirListCreated = false;
+                return resp;
+            }, ct: ct));
+
+            // GET FHIR List Config → 404 (after delete)
+            results.Add(await RunStepAsync(StepNames.FhirListConfigGet404, 404, async () =>
+                await _client.GetFhirListConfigurationAsync(facilityId, ct), ct: ct));
+
+            // --- Read-only operations (non-existent resources — prove reachability) ---
             var fakeReportId = Guid.NewGuid().ToString();
 
             results.Add(await RunStepAsync(StepNames.AcquisitionLogsGet200, 200, async () =>
@@ -336,6 +410,7 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
         {
             if (dischargePlanCreated) await TryCleanupAsync(() => _client.DeleteQueryPlanAsync(facilityId, "Discharge", ct));
             if (queryConfigCreated) await TryCleanupAsync(() => _client.DeleteFhirQueryConfigurationAsync(facilityId, ct));
+            if (fhirListCreated) await TryCleanupAsync(() => _client.DeleteFhirListConfigurationAsync(facilityId, ct));
             if (facilityCreated) await TryCleanupAsync(() => _facilityClient.DeleteAsync(facilityId, ct));
         }
 
@@ -372,11 +447,38 @@ public sealed class DataAcquisitionTestSuite : ServiceTestSuiteBase
         Type = "Discharge",
         InitialQueries = new Dictionary<string, object>
         {
-            ["0"] = new { QueryConfigType = "Parameter", ResourceType = "Patient", Parameters = new[] { new { ParameterType = "Variable", Name = "_id", Variable = 0 } } }
+            ["0"] = new { QueryConfigType = "Parameter", ResourceType = "Patient", Parameters = new[] { new { ParameterType = "Variable", Name = "_id", Variable = 0 } } },
+            ["1"] = new { QueryConfigType = "Parameter", ResourceType = "Encounter", Parameters = new[] { new { ParameterType = "Variable", Name = "subject", Variable = 0 } } },
+            ["2"] = new { QueryConfigType = "Parameter", ResourceType = "Location", Parameters = new[] { new { ParameterType = "ResourceIds", Name = "_id", Resource = "Encounter", Paged = "100" } } }
         },
         SupplementalQueries = new Dictionary<string, object>
         {
             ["0"] = new { QueryConfigType = "Reference", ResourceType = "Condition", OperationType = 2, Paged = 100 }
         }
     };
+
+    private object BuildFhirListConfigRequest(string facilityId)
+    {
+        var listConfigs = new[]
+        {
+            new { Status = "Admit", TimeFrame = "LessThan24Hours", FhirId = $"census-{facilityId}-admit-lt24" },
+            new { Status = "Admit", TimeFrame = "Between24To48Hours", FhirId = $"census-{facilityId}-admit-24to48" },
+            new { Status = "Admit", TimeFrame = "MoreThan48Hours", FhirId = $"census-{facilityId}-admit-gt48" },
+            new { Status = "Discharge", TimeFrame = "LessThan24Hours", FhirId = $"census-{facilityId}-discharge-lt24" },
+            new { Status = "Discharge", TimeFrame = "Between24To48Hours", FhirId = $"census-{facilityId}-discharge-24to48" },
+            new { Status = "Discharge", TimeFrame = "MoreThan48Hours", FhirId = $"census-{facilityId}-discharge-gt48" }
+        };
+
+        return new
+        {
+            FacilityId = facilityId,
+            FhirBaseServerUrl = _automationConfig.Value.FacilityFhirServerBase,
+            EHRPatientLists = listConfigs.Select(c => new
+            {
+                c.Status,
+                c.TimeFrame,
+                c.FhirId
+            }).ToList()
+        };
+    }
 }

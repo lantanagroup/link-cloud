@@ -202,6 +202,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.AddSingleton<CodeMapOperationService>();
     builder.Services.AddSingleton<ConditionalTransformOperationService>();
     builder.Services.AddSingleton<CopyLocationOperationService>();
+    builder.Services.AddSingleton<CopyLocationAliasToTypeIterativelyOperationService>();
     builder.Services.AddSingleton<RemoveExtensionsOperationService>();
     
     if (consumerSettings != null && !consumerSettings.DisableConsumer)

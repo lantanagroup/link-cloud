@@ -16,7 +16,7 @@ public partial class ResourceReferenceType
     public string FacilityId { get; set; }
 
     [Required]
-    public QueryPhase QueryPhase { get; set; }
+    public QueryPhase? QueryPhase { get; set; } = 0;
 
     public string ResourceType { get; set; }
 

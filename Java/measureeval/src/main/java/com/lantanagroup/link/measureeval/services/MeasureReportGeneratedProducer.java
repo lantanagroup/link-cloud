@@ -34,10 +34,7 @@ public class MeasureReportGeneratedProducer {
         }
 
         logger.info(
-                "PRODUCING MeasureReportGenerated: FACILITY=[{}] PATIENT=[{}] CORRELATION=[{}] REPORT_TYPE=[{}] REPORT_TRACKING_ID=[{}] REPORTABLE=[{}]",
-                patientStatus.getFacilityId(),
-                patientStatus.getPatientId(),
-                patientStatus.getCorrelationId(),
+                "PRODUCING MeasureReportGenerated: REPORT_TYPE=[{}] REPORT_TRACKING_ID=[{}] REPORTABLE=[{}]",
                 report.getReportType(),
                 report.getReportTrackingId(),
                 report.getReportable());

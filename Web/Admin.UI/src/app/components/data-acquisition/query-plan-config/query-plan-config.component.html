@@ -1,5 +1,13 @@
 <form [formGroup]="planForm" class="dialog-form">
 
+  @if (saveError) {
+    <div class="save-error" role="alert">{{ saveError }}</div>
+  }
+
+  @if (locationResolutionViolation) {
+    <div class="save-error" role="alert">{{ locationResolutionMessage }}</div>
+  }
+
   <div>
     <mat-form-field class="form-select" appearance="outline">
       <mat-label>Type</mat-label>
