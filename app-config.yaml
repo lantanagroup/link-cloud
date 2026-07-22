@@ -134,16 +134,21 @@ global:
   - key: "ConsumerSettings:DisableConsumer"
     description: "Boolean flag to disable the Kafka consumer entirely for the service."
     required: true
-  # One setting governing both runtimes, so it is stored as a SINGLE Azure App Configuration row with
-  # NO label: '/pre-qualification/write-pre-qual-operation-outcome' (App Config's '/'-separated
-  # convention, as with '/link/report/base-url'). Spring maps '/' to '.', so Validation sees it as
-  # 'pre-qualification.write-pre-qual-operation-outcome'; the .NET provider passes keys through
-  # verbatim, so Report reads the slashed name directly and falls back to the dotted name used by
-  # appsettings.json and docker-compose. Both services' label selectors include the null label, so one
-  # unlabelled row reaches both. Do not add a PreQualification:* variant — a second spelling is what
-  # lets the two runtimes drift apart.
+  # PAIRED KEYS — one decision, one key per runtime, and they MUST be set to the same value.
+  # Enabling only the Java side puts two OperationOutcomes in the patient NDJSON; enabling only the
+  # .NET side puts none there. Neither failure is loud, so treat these as a single change.
+  # They are separate keys because Spring cannot bind a colon-separated key, and the Java services are
+  # being retired: a shared key would leave the surviving .NET services carrying a translation layer
+  # for a platform that no longer exists. When Validation is retired, drop the dotted key below and
+  # keep the .NET one.
+  # In Azure App Configuration these are two rows, each in its runtime's convention:
+  #   PreQualification:WritePreQualOperationOutcome        (.NET, as with other Section:Key rows)
+  #   /pre-qualification/write-pre-qual-operation-outcome  (Java, as with /link/report/base-url)
+  - key: "PreQualification:WritePreQualOperationOutcome"
+    description: "Boolean flag (default false), read by the .NET Report service. When true, Report skips its legacy 'Patient has failed Validation' OperationOutcome append to the patient NDJSON, because the Validation service is the sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as pre-qualification.write-pre-qual-operation-outcome."
+    required: false
   - key: "pre-qualification.write-pre-qual-operation-outcome"
-    description: "Boolean flag (default false). When true, the Java Validation service writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON as its sole writer, and the .NET Report service skips its legacy 'Patient has failed Validation' append (LEGLINK-425/LEGLINK-466). Stored in Azure App Configuration as the unlabelled row '/pre-qualification/write-pre-qual-operation-outcome', which both services read, so a single value governs both."
+    description: "Boolean flag (default false), read by the Java Validation service. When true, Validation writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is its sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as PreQualification:WritePreQualOperationOutcome."
     required: false
 services:
   Account:
