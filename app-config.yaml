@@ -134,6 +134,13 @@ global:
   - key: "ConsumerSettings:DisableConsumer"
     description: "Boolean flag to disable the Kafka consumer entirely for the service."
     required: true
+  # Pre-qualification OperationOutcome ownership is a single cross-runtime decision with one
+  # key per runtime convention. Both must be set to the same value: with only the Java side on,
+  # the patient NDJSON gets both the detailed OperationOutcome and Report's legacy flat one;
+  # with only the .NET side on, it gets neither.
+  - key: "pre-qualification.write-pre-qual-operation-outcome"
+    description: "Boolean flag (default false), read by the Java Validation service. When true, Validation writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is its sole writer (LEGLINK-425/LEGLINK-466). .NET counterpart: PreQualification:WritePreQualOperationOutcome."
+    required: false
 services:
   Account:
     - key: "UserManagement:EnableAutomaticUserActivation"
@@ -355,9 +362,9 @@ services:
     - key: "link.terminology-service-url"
       description: "The base URL for the Terminology Service used for validation."
       required: true
-    - key: "pre-qualification.write-pre-qual-operation-outcome"
-      description: "Boolean flag (default false). When true, the Validation service is the sole writer of the pre-qualification OperationOutcome to the patient NDJSON. This is the Java side of a cross-runtime concept; the .NET Report service reads the equivalent 'PreQualification:WritePreQualOperationOutcome' key (LEGLINK-466) and skips its legacy write when set."
-      required: false
+    # pre-qualification.write-pre-qual-operation-outcome is registered under global, not here —
+    # it is one cross-runtime decision with a key per runtime convention, and the .NET Report
+    # service reads the counterpart PreQualification:WritePreQualOperationOutcome (LEGLINK-466).
     - key: "pre-qualification.write-expressions-in-operation-outcome"
       description: "Boolean flag (default true). When false, the expression[] of each issue is omitted from the pre-qualification OperationOutcome written by the Validation service."
       required: false
