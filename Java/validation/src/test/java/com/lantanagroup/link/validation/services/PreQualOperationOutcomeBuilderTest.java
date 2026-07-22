@@ -189,7 +189,7 @@ class PreQualOperationOutcomeBuilderTest {
     }
 
     @Test
-    void build_nullMeasureReportId_omitsLocatorButKeepsResultExpressions() {
+    void build_noMeasureReportRef_omitsLocatorButKeepsResultExpressions() {
         Result r1 = result("msg", "result-expr", category("inactive_code", false));
 
         OperationOutcome oo = builder.build(List.of(r1), null, true).orElseThrow();
@@ -198,9 +198,39 @@ class PreQualOperationOutcomeBuilderTest {
         assertEquals(List.of("result-expr"), expressions);
     }
 
+    @Test
+    void build_measureReportWithNullId_omitsLocatorButKeepsResultExpressions() {
+        // A MeasureReport with no id resolves to a non-null ref whose id is null. Formatting that would
+        // emit where(id = 'null') — valid FHIRPath that resolves to nothing, i.e. a silently dead locator
+        // in submitted output. The locator must be omitted instead.
+        Result r1 = result("msg", "result-expr", category("inactive_code", false));
+        PreQualOperationOutcomeBuilder.MeasureReportRef ref =
+                new PreQualOperationOutcomeBuilder.MeasureReportRef(0, null);
+
+        OperationOutcome oo = builder.build(List.of(r1), ref, true).orElseThrow();
+
+        List<String> expressions = expressionStrings(oo.getIssueFirstRep());
+        assertEquals(List.of("result-expr"), expressions);
+        assertFalse(expressions.stream().anyMatch(e -> e.contains("null")),
+                "Locator must not be emitted with a null id");
+    }
+
     // -------------------------------------------------------------------------
     // MeasureReport resolution (index + id)
     // -------------------------------------------------------------------------
+
+    @Test
+    void resolveMeasureReport_measureReportWithoutId_yieldsRefWithNullId() {
+        // Pins the source of the null id the builder has to defend against.
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(new MeasureReport());
+
+        PreQualOperationOutcomeBuilder.MeasureReportRef ref = builder.resolveMeasureReport(bundle);
+
+        assertNotNull(ref);
+        assertEquals(0, ref.index());
+        assertNull(ref.id());
+    }
 
     @Test
     void resolveMeasureReport_returnsIndexAndIdWhenFirstEntry() {

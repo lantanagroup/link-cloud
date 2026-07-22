@@ -94,11 +94,14 @@ public class PreQualOperationOutcomeBuilder {
             issue.addExtension(new Extension(PQ_ISSUE_CAT_URL, new CodeType(categoryId)));
 
             if (writeExpressions) {
-                if (measureReport != null) {
+                // The id is checked as well as the ref: a MeasureReport carrying no id yields a non-null
+                // ref with a null id, and formatting that produces where(id = 'null') — valid FHIRPath
+                // that silently resolves to nothing. Omitting the locator is the honest outcome.
+                if (measureReport != null && measureReport.id() != null) {
                     issue.addExpression(
                             String.format(MEASURE_REPORT_LOCATOR, measureReport.index(), measureReport.id()));
                 } else {
-                    _logger.warn("No MeasureReport in the bundle; omitting the MeasureReport locator expression");
+                    _logger.warn("No identifiable MeasureReport in the bundle; omitting the MeasureReport locator expression");
                 }
                 categoryResults.forEach(r -> issue.addExpression(r.getExpression()));
             }
