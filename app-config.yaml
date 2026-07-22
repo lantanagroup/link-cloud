@@ -349,6 +349,12 @@ services:
     - key: "link.terminology-service-url"
       description: "The base URL for the Terminology Service used for validation."
       required: true
+    - key: "pre-qualification.write-pre-qual-operation-outcome"
+      description: "Boolean flag (default false). When true, the Validation service is the sole writer of the pre-qualification OperationOutcome to the patient NDJSON. This is the Java side of a cross-runtime concept; the .NET Report service reads the equivalent 'PreQualification:WritePreQualOperationOutcome' key (LEGLINK-466) and skips its legacy write when set."
+      required: false
+    - key: "pre-qualification.write-expressions-in-operation-outcome"
+      description: "Boolean flag (default true). When false, the expression[] of each issue is omitted from the pre-qualification OperationOutcome written by the Validation service."
+      required: false
 $defs:
   configEntry:
     type: "object"

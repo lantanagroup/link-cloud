@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.shared.entities.PatientSubmissionModel;
 import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.services.ReportClient;
+import com.lantanagroup.link.validation.configs.PreQualificationConfig;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
@@ -61,11 +62,18 @@ public class ReadyForValidationConsumerTest {
     private ReadyForValidationConsumer consumer;
     private ReadyForValidationConsumer consumerWithoutBlobStorage;
 
+    // Real instances (no deps); the flag defaults to false so the append path is off by default.
+    private PreQualificationConfig preQualificationConfig;
+    private PreQualOperationOutcomeBuilder preQualOperationOutcomeBuilder;
+
     private Bundle bundle;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() throws Exception {
+        preQualificationConfig = new PreQualificationConfig();
+        preQualOperationOutcomeBuilder = new PreQualOperationOutcomeBuilder();
+
         consumer = new ReadyForValidationConsumer(
                 fhirContext,
                 reportClient,
@@ -75,6 +83,8 @@ public class ReadyForValidationConsumerTest {
                 validationCompleteTemplate,
                 validationMetrics,
                 Optional.of(blobStorageService),
+                preQualificationConfig,
+                preQualOperationOutcomeBuilder,
                 recoverer);
 
         consumerWithoutBlobStorage = new ReadyForValidationConsumer(
@@ -86,6 +96,8 @@ public class ReadyForValidationConsumerTest {
                 validationCompleteTemplate,
                 validationMetrics,
                 Optional.empty(),
+                preQualificationConfig,
+                preQualOperationOutcomeBuilder,
                 recoverer);
 
         bundle = new Bundle();
@@ -274,7 +286,8 @@ public class ReadyForValidationConsumerTest {
 
         ReadyForValidationConsumer consumerWithRealCategorization = new ReadyForValidationConsumer(
                 fhirContext, reportClient, validationService, realCategorizationService, resultRepository,
-                validationCompleteTemplate, validationMetrics, Optional.of(blobStorageService), recoverer);
+                validationCompleteTemplate, validationMetrics, Optional.of(blobStorageService),
+                preQualificationConfig, preQualOperationOutcomeBuilder, recoverer);
 
         Result inactiveResult = new Result();
         inactiveResult.setMessage("The concept '423666004' has a status of inactive and its use should be reviewed.");
@@ -453,5 +466,74 @@ public class ReadyForValidationConsumerTest {
 
         verify(validationMetrics).addToValidationCounter(any());
         verify(validationMetrics).recordValidationDuration(anyDouble(), any());
+    }
+
+    // -------------------------------------------------------------------------
+    // Pre-qualification OperationOutcome append
+    // -------------------------------------------------------------------------
+
+    /** Stubs the blob download path so the bundle is retrieved from ABS (not REST). */
+    private void stubBlobDownload() {
+        IParser parser = mock(IParser.class);
+        when(fhirContext.newNDJsonParser()).thenReturn(parser);
+        when(parser.parseResource(eq(Bundle.class), (InputStream) any())).thenReturn(bundle);
+        when(blobStorageService.download("myfile.ndjson")).thenReturn(BinaryData.fromBytes(new byte[0]));
+    }
+
+    @Test
+    void process_flagOn_unacceptableFindings_appendsOperationOutcomeToSameBlob() throws Exception {
+        preQualificationConfig.setWritePreQualOperationOutcome(true);
+        stubBlobDownload();
+
+        IParser jsonParser = mock(IParser.class);
+        when(fhirContext.newJsonParser()).thenReturn(jsonParser);
+        when(jsonParser.encodeResourceToString(any()))
+                .thenReturn("{\"resourceType\":\"OperationOutcome\"}");
+
+        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        result.setMessage("Code is inactive.");
+        when(validationService.validate(bundle)).thenReturn(List.of(result));
+
+        consumer.process(buildRecord(PAYLOAD_URI));
+
+        verify(blobStorageService).appendResource("myfile.ndjson", "{\"resourceType\":\"OperationOutcome\"}");
+    }
+
+    @Test
+    void process_flagOff_unacceptableFindings_doesNotAppend() throws Exception {
+        stubBlobDownload(); // flag defaults to false
+
+        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        when(validationService.validate(bundle)).thenReturn(List.of(result));
+
+        consumer.process(buildRecord(PAYLOAD_URI));
+
+        verify(blobStorageService, never()).appendResource(anyString(), anyString());
+    }
+
+    @Test
+    void process_flagOn_noUnacceptableFindings_doesNotAppend() throws Exception {
+        preQualificationConfig.setWritePreQualOperationOutcome(true);
+        stubBlobDownload();
+
+        Result result = resultWithCategories(List.of(categoryWithAcceptable(true)));
+        when(validationService.validate(bundle)).thenReturn(List.of(result));
+
+        consumer.process(buildRecord(PAYLOAD_URI));
+
+        verify(blobStorageService, never()).appendResource(anyString(), anyString());
+    }
+
+    @Test
+    void process_flagOn_noBlobService_doesNotAppend() throws Exception {
+        preQualificationConfig.setWritePreQualOperationOutcome(true);
+        stubRestRetrieval(); // no blob service -> bundle comes via REST, append is skipped
+
+        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        when(validationService.validate(bundle)).thenReturn(List.of(result));
+
+        consumerWithoutBlobStorage.process(buildRecord(PAYLOAD_URI));
+
+        verify(blobStorageService, never()).appendResource(anyString(), anyString());
     }
 }

@@ -1,0 +1,204 @@
+package com.lantanagroup.link.validation.services;
+
+import com.lantanagroup.link.validation.entities.Category;
+import com.lantanagroup.link.validation.entities.Result;
+import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.CodeType;
+import org.hl7.fhir.r4.model.IntegerType;
+import org.hl7.fhir.r4.model.MeasureReport;
+import org.hl7.fhir.r4.model.OperationOutcome;
+import org.hl7.fhir.r4.model.StringType;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class PreQualOperationOutcomeBuilderTest {
+
+    private static final String MEASURE_REPORT_ID = "mr-1";
+
+    private PreQualOperationOutcomeBuilder builder;
+
+    @BeforeEach
+    void setUp() {
+        builder = new PreQualOperationOutcomeBuilder();
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private Category category(String id, boolean acceptable) {
+        Category category = new Category();
+        category.setId(id);
+        category.setAcceptable(acceptable);
+        return category;
+    }
+
+    private Result result(String message, String expression, Category... categories) {
+        Result result = new Result();
+        result.setMessage(message);
+        result.setExpression(expression);
+        result.setCategories(new ArrayList<>(Arrays.asList(categories)));
+        return result;
+    }
+
+    private List<String> expressionStrings(OperationOutcome.OperationOutcomeIssueComponent issue) {
+        return issue.getExpression().stream().map(StringType::getValue).toList();
+    }
+
+    // -------------------------------------------------------------------------
+    // Grouping / issue content
+    // -------------------------------------------------------------------------
+
+    @Test
+    void build_oneIssuePerUnacceptableCategory_withOoTotal() {
+        Result r1 = result("Code is inactive.", "expr1", category("inactive_code", false));
+        Result r2 = result("Unable to validate.", "expr2", category("unable_to_validate_code", false));
+
+        OperationOutcome oo = builder.build(List.of(r1, r2), MEASURE_REPORT_ID, true).orElseThrow();
+
+        assertEquals(2, oo.getIssue().size());
+        int total = ((IntegerType) oo.getExtensionByUrl(PreQualOperationOutcomeBuilder.OO_TOTAL_URL).getValue()).getValue();
+        assertEquals(2, total);
+    }
+
+    @Test
+    void build_issueCarriesSeverityCodeMessageAndCategoryExtension() {
+        Result r1 = result("Code is inactive.", "expr1", category("inactive_code", false));
+
+        OperationOutcome oo = builder.build(List.of(r1), MEASURE_REPORT_ID, true).orElseThrow();
+        OperationOutcome.OperationOutcomeIssueComponent issue = oo.getIssueFirstRep();
+
+        assertEquals(OperationOutcome.IssueSeverity.ERROR, issue.getSeverity());
+        assertEquals(OperationOutcome.IssueType.PROCESSING, issue.getCode());
+        assertEquals("Code is inactive.", issue.getDetails().getText());
+        CodeType cat = (CodeType) issue.getExtensionByUrl(PreQualOperationOutcomeBuilder.PQ_ISSUE_CAT_URL).getValue();
+        assertEquals("inactive_code", cat.getValue());
+    }
+
+    @Test
+    void build_detailsTextUsesFirstResultMessageForCategory() {
+        Category shared = category("inactive_code", false);
+        Result first = result("first message", "expr1", shared);
+        Result second = result("second message", "expr2", shared);
+
+        OperationOutcome oo = builder.build(List.of(first, second), MEASURE_REPORT_ID, true).orElseThrow();
+
+        assertEquals(1, oo.getIssue().size());
+        assertEquals("first message", oo.getIssueFirstRep().getDetails().getText());
+    }
+
+    @Test
+    void build_oneResultMappingToMultipleUnacceptableCategories_producesAnIssuePerCategory() {
+        Result r = result("msg", "expr", category("cat_a", false), category("cat_b", false));
+
+        OperationOutcome oo = builder.build(List.of(r), MEASURE_REPORT_ID, true).orElseThrow();
+
+        assertEquals(2, oo.getIssue().size());
+    }
+
+    @Test
+    void build_excludesAcceptableCategories() {
+        Result unacceptable = result("bad", "expr1", category("inactive_code", false));
+        Result acceptable = result("ok", "expr2", category("incorrect_display_value_for_code", true));
+
+        OperationOutcome oo = builder.build(List.of(unacceptable, acceptable), MEASURE_REPORT_ID, true).orElseThrow();
+
+        assertEquals(1, oo.getIssue().size());
+        CodeType cat = (CodeType) oo.getIssueFirstRep()
+                .getExtensionByUrl(PreQualOperationOutcomeBuilder.PQ_ISSUE_CAT_URL).getValue();
+        assertEquals("inactive_code", cat.getValue());
+    }
+
+    @Test
+    void build_noUnacceptableFindings_returnsEmpty() {
+        Result acceptable = result("ok", "expr", category("incorrect_display_value_for_code", true));
+
+        assertTrue(builder.build(List.of(acceptable), MEASURE_REPORT_ID, true).isEmpty());
+    }
+
+    @Test
+    void build_resultWithNullCategories_isIgnored() {
+        Result result = new Result();
+        result.setCategories(null);
+
+        assertTrue(builder.build(List.of(result), MEASURE_REPORT_ID, true).isEmpty());
+    }
+
+    // -------------------------------------------------------------------------
+    // Expressions (WriteExpressionsInOperationOutcome)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void build_writeExpressionsTrue_addsMeasureReportLocatorThenResultExpressions() {
+        Category shared = category("inactive_code", false);
+        Result r1 = result("msg1", "Bundle.entry[14].resource.ofType(Condition).code.coding[0]", shared);
+        Result r2 = result("msg2", "Bundle.entry[27].resource.ofType(Observation).code.coding[0]", shared);
+
+        OperationOutcome oo = builder.build(List.of(r1, r2), MEASURE_REPORT_ID, true).orElseThrow();
+
+        List<String> expressions = expressionStrings(oo.getIssueFirstRep());
+        assertEquals(3, expressions.size());
+        assertEquals(String.format(PreQualOperationOutcomeBuilder.MEASURE_REPORT_LOCATOR, MEASURE_REPORT_ID),
+                expressions.get(0));
+        assertEquals("Bundle.entry[14].resource.ofType(Condition).code.coding[0]", expressions.get(1));
+        assertEquals("Bundle.entry[27].resource.ofType(Observation).code.coding[0]", expressions.get(2));
+    }
+
+    @Test
+    void build_writeExpressionsFalse_omitsAllExpressions() {
+        Result r1 = result("msg", "expr", category("inactive_code", false));
+
+        OperationOutcome oo = builder.build(List.of(r1), MEASURE_REPORT_ID, false).orElseThrow();
+
+        assertTrue(oo.getIssueFirstRep().getExpression().isEmpty());
+    }
+
+    @Test
+    void build_nullMeasureReportId_omitsLocatorButKeepsResultExpressions() {
+        Result r1 = result("msg", "result-expr", category("inactive_code", false));
+
+        OperationOutcome oo = builder.build(List.of(r1), null, true).orElseThrow();
+
+        List<String> expressions = expressionStrings(oo.getIssueFirstRep());
+        assertEquals(List.of("result-expr"), expressions);
+    }
+
+    // -------------------------------------------------------------------------
+    // MeasureReport id extraction
+    // -------------------------------------------------------------------------
+
+    @Test
+    void extractMeasureReportId_returnsIdWhenPresent() {
+        Bundle bundle = new Bundle();
+        MeasureReport measureReport = new MeasureReport();
+        measureReport.setId("report-abc");
+        bundle.addEntry().setResource(measureReport);
+
+        assertEquals("report-abc", builder.extractMeasureReportId(bundle));
+    }
+
+    @Test
+    void extractMeasureReportId_returnsNullWhenNoMeasureReport() {
+        Bundle bundle = new Bundle();
+        bundle.addEntry().setResource(new org.hl7.fhir.r4.model.Patient());
+
+        assertNull(builder.extractMeasureReportId(bundle));
+    }
+
+    @Test
+    void extractMeasureReportId_nullBundle_returnsNull() {
+        assertNull(builder.extractMeasureReportId(null));
+    }
+
+    @Test
+    void build_emptyResults_returnsEmpty() {
+        assertTrue(builder.build(Collections.emptyList(), MEASURE_REPORT_ID, true).isEmpty());
+    }
+}

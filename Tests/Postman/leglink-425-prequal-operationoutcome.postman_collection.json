@@ -1,0 +1,341 @@
+{
+  "info": {
+    "_postman_id": "b7e41d2a-5c93-4f18-9a62-3d5e7c1f8a04",
+    "name": "LEGLINK-425 Pre-Qual OperationOutcome (local stack)",
+    "description": "Manual end-to-end test for LEGLINK-425: the Validation service writes a category-grouped pre-qualification OperationOutcome to the patient NDJSON in ABS.\n\nWHAT THIS DOES\n1. Preflight: confirms the measure is loaded in MeasureEval.\n2. Ensures a test facility exists, with a Discharge query plan and a FHIR query config pointing at the in-network HAPI server.\n3. Seeds a patient into the local HAPI FHIR server. The Patient deliberately OMITS `gender` so validation produces a finding in the `missing_patient_gender` category, which is `acceptable: false` in categories.json and therefore SHOWS UP in the pre-qual OperationOutcome. (The LEGLINK-424 inactive-code categories are `acceptable: true` and would produce an EMPTY OperationOutcome.)\n4. Triggers an ad-hoc report, which drives the full pipeline and ends with the Validation service appending the OperationOutcome to the patient NDJSON.\n5. Observation requests to confirm what happened.\n\nPREREQUISITES\n- The docker-compose stack is up and healthy.\n- The flag is ON for the validation container. Set VALIDATION_WRITE_PREQUAL_OO=true in the root .env, then:\n    docker compose up -d --build validation\n  (--build, not just recreate, or the image keeps the old code.)\n- Measure NHSNAcuteCareHospitalMonthlyInitialPopulation is loaded in MeasureEval (step 0 verifies this).\n\nSETUP REQUESTS ARE IDEMPOTENT: facility / query plan / FHIR query config all accept an 'already exists' response, so you can re-run this collection freely.\n\nFINAL VERIFICATION IS MANUAL: Postman cannot read Azure Blob Storage. After the run, open the patient NDJSON in Azurite (127.0.0.1:10000, internal container, path <report>/patient-<patientId>.ndjson) and confirm the appended OperationOutcome resource on the last line.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "bff", "value": "http://localhost:8063", "type": "string" },
+    { "key": "fhirHost", "value": "http://localhost:6157", "type": "string" },
+    { "key": "fhirInternal", "value": "http://fhir-server:8080/fhir", "type": "string" },
+    { "key": "validationBase", "value": "http://localhost:8075", "type": "string" },
+    { "key": "facilityId", "value": "leglink-425-test", "type": "string" },
+    { "key": "reportType", "value": "NHSNAcuteCareHospitalMonthlyInitialPopulation", "type": "string" },
+    { "key": "patientId", "value": "patient-425", "type": "string" },
+    { "key": "startDate", "value": "2026-06-01T00:00:00Z", "type": "string" },
+    { "key": "endDate", "value": "2026-07-01T00:00:00Z", "type": "string" },
+    { "key": "encounterStart", "value": "2026-06-15T08:00:00Z", "type": "string" },
+    { "key": "encounterEnd", "value": "2026-06-16T12:00:00Z", "type": "string" },
+    { "key": "reportId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "0 - Preflight",
+      "item": [
+        {
+          "name": "Verify measure is loaded in MeasureEval",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Measure ' + pm.collectionVariables.get('reportType') + ' is loaded in MeasureEval', function () {",
+                  "    pm.expect(pm.response.code, 'If this is 404, load the measure first: PUT {{bff}}/api/measureeval/measure-definition with the bundle from DotNet/Automation/measures/NHSNAcuteCareHospitalMonthlyInitialPopulation.json').to.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bff}}/api/measureeval/measure-definition/{{reportType}}",
+              "host": ["{{bff}}"],
+              "path": ["api", "measureeval", "measure-definition", "{{reportType}}"]
+            },
+            "description": "The ad-hoc trigger validates each reportType against MeasureEval and returns 500 if it is missing, so fail fast here with a clearer message."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1 - Facility setup (idempotent)",
+      "item": [
+        {
+          "name": "Ensure facility exists",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// 201/200 = created, 409/400 = already exists. Both are success for an 'ensure'.",
+                  "pm.test('Facility exists or was created', function () {",
+                  "    pm.expect([200, 201, 400, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"facilityId\": \"{{facilityId}}\",\n  \"facilityName\": \"{{facilityId}}\",\n  \"timeZone\": \"America/Chicago\",\n  \"vendor\": \"Epic\",\n  \"scheduledReports\": {\n    \"daily\": [],\n    \"weekly\": [],\n    \"monthly\": []\n  }\n}"
+            },
+            "url": {
+              "raw": "{{bff}}/api/Facility",
+              "host": ["{{bff}}"],
+              "path": ["api", "Facility"]
+            },
+            "description": "scheduledReports arrays are left EMPTY on purpose: any measure id placed there is validated against MeasureEval at facility-save time."
+          },
+          "response": []
+        },
+        {
+          "name": "Ensure Discharge query plan",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Query plan exists or was created', function () {",
+                  "    pm.expect([200, 201, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"PlanName\": \"{{reportType}}\",\n  \"FacilityId\": \"{{facilityId}}\",\n  \"EHRDescription\": \"Epic\",\n  \"LookBack\": \"P0D\",\n  \"Type\": \"Discharge\",\n  \"InitialQueries\": {\n    \"0\": {\n      \"ResourceType\": \"Encounter\",\n      \"QueryConfigType\": \"Parameter\",\n      \"Parameters\": [\n        { \"ParameterType\": \"Variable\", \"Name\": \"patient\", \"Variable\": 0, \"Format\": null },\n        { \"ParameterType\": \"Variable\", \"Name\": \"date\", \"Variable\": 1, \"Format\": \"ge{0}\" },\n        { \"ParameterType\": \"Variable\", \"Name\": \"date\", \"Variable\": 3, \"Format\": \"le{0}\" }\n      ]\n    },\n    \"1\": {\n      \"QueryConfigType\": \"Reference\",\n      \"ResourceType\": \"Location\",\n      \"OperationType\": 1,\n      \"Paged\": 100\n    }\n  },\n  \"SupplementalQueries\": {\n    \"0\": {\n      \"QueryConfigType\": \"Parameter\",\n      \"ResourceType\": \"Condition\",\n      \"Parameters\": [\n        { \"ParameterType\": \"Variable\", \"Name\": \"patient\", \"Variable\": 0, \"Format\": null },\n        { \"ParameterType\": \"ResourceIds\", \"Name\": \"encounter\", \"Resource\": \"Encounter\", \"Paged\": \"100\" }\n      ]\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{bff}}/api/data/{{facilityId}}/QueryPlan",
+              "host": ["{{bff}}"],
+              "path": ["api", "data", "{{facilityId}}", "QueryPlan"]
+            },
+            "description": "Type MUST be Discharge: an ad-hoc report maps ReportableEvent.Adhoc -> Frequency.Discharge when selecting the query plan.\n\nParameter Variable enum: 0=PatientId, 1=LookbackStart, 2=PeriodStart, 3=PeriodEnd.\nParameter queries must precede Reference queries within a dictionary."
+          },
+          "response": []
+        },
+        {
+          "name": "Ensure FHIR query configuration",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('FHIR query config exists or was created', function () {",
+                  "    pm.expect([200, 201, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"FacilityId\": \"{{facilityId}}\",\n  \"FhirServerBaseUrl\": \"{{fhirInternal}}\",\n  \"Authentication\": null,\n  \"MaxConcurrentRequests\": 8,\n  \"MaxRetries\": 3,\n  \"TimeZone\": \"UTC\"\n}"
+            },
+            "url": {
+              "raw": "{{bff}}/api/data/fhirQueryConfiguration",
+              "host": ["{{bff}}"],
+              "path": ["api", "data", "fhirQueryConfiguration"]
+            },
+            "description": "FhirServerBaseUrl uses the DOCKER-INTERNAL name (fhir-server:8080), because DataAcquisition dials it from inside the network. Postman seeds via localhost:6157 instead."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2 - Seed FHIR patient",
+      "item": [
+        {
+          "name": "POST patient transaction bundle",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('FHIR transaction accepted', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "pm.test('All entries succeeded', function () {",
+                  "    var body = pm.response.json();",
+                  "    (body.entry || []).forEach(function (e) {",
+                  "        pm.expect(String(e.response.status)).to.match(/^(200|201)/);",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/fhir+json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resourceType\": \"Bundle\",\n  \"type\": \"transaction\",\n  \"entry\": [\n    {\n      \"resource\": {\n        \"resourceType\": \"Location\",\n        \"id\": \"loc-425\",\n        \"status\": \"active\",\n        \"name\": \"LEGLINK-425 Test Hospital\",\n        \"identifier\": [{ \"system\": \"http://hospital.example.org/locations\", \"value\": \"loc-425\" }]\n      },\n      \"request\": { \"method\": \"PUT\", \"url\": \"Location/loc-425\" }\n    },\n    {\n      \"resource\": {\n        \"resourceType\": \"Patient\",\n        \"id\": \"{{patientId}}\",\n        \"name\": [{ \"family\": \"Prequal\", \"given\": [\"Test\"] }],\n        \"birthDate\": \"1970-01-01\"\n      },\n      \"request\": { \"method\": \"PUT\", \"url\": \"Patient/{{patientId}}\" }\n    },\n    {\n      \"resource\": {\n        \"resourceType\": \"Encounter\",\n        \"id\": \"enc-425\",\n        \"status\": \"finished\",\n        \"class\": { \"system\": \"http://terminology.hl7.org/CodeSystem/v3-ActCode\", \"code\": \"EMER\" },\n        \"subject\": { \"reference\": \"Patient/{{patientId}}\" },\n        \"period\": { \"start\": \"{{encounterStart}}\", \"end\": \"{{encounterEnd}}\" },\n        \"location\": [{ \"location\": { \"reference\": \"Location/loc-425\" }, \"status\": \"completed\" }]\n      },\n      \"request\": { \"method\": \"PUT\", \"url\": \"Encounter/enc-425\" }\n    },\n    {\n      \"resource\": {\n        \"resourceType\": \"Condition\",\n        \"id\": \"cond-425\",\n        \"clinicalStatus\": { \"coding\": [{ \"system\": \"http://terminology.hl7.org/CodeSystem/condition-clinical\", \"code\": \"active\" }] },\n        \"code\": { \"coding\": [{ \"system\": \"http://snomed.info/sct\", \"code\": \"44054006\" }] },\n        \"subject\": { \"reference\": \"Patient/{{patientId}}\" },\n        \"encounter\": { \"reference\": \"Encounter/enc-425\" }\n      },\n      \"request\": { \"method\": \"PUT\", \"url\": \"Condition/cond-425\" }\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{fhirHost}}/fhir",
+              "host": ["{{fhirHost}}"],
+              "path": ["fhir"]
+            },
+            "description": "NOTE: the Patient deliberately has NO `gender` element. That trips the `missing_patient_gender` category, which is `acceptable: false` in categories.json, so it produces an issue in the pre-qual OperationOutcome.\n\nIf you seed a fully-valid patient instead, the OperationOutcome will legitimately be EMPTY and nothing is appended (that is the documented behavior: 'a patient with no unacceptable-category findings produces no OperationOutcome').\n\nThe Encounter period must fall inside startDate/endDate, since the Encounter query filters on date ge/le."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3 - Trigger the pipeline",
+      "item": [
+        {
+          "name": "POST AdHocReport",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Ad-hoc report accepted', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var body = {};",
+                  "try { body = pm.response.json(); } catch (e) {}",
+                  "if (body.reportId) {",
+                  "    pm.collectionVariables.set('reportId', body.reportId);",
+                  "    console.log('reportId = ' + body.reportId);",
+                  "}",
+                  "pm.test('reportId captured', function () {",
+                  "    pm.expect(pm.collectionVariables.get('reportId')).to.not.eql('');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientIds\": [\"{{patientId}}\"],\n  \"reportTypes\": [\"{{reportType}}\"],\n  \"startDate\": \"{{startDate}}\",\n  \"endDate\": \"{{endDate}}\",\n  \"bypassSubmission\": true\n}"
+            },
+            "url": {
+              "raw": "{{bff}}/api/Facility/{{facilityId}}/AdHocReport",
+              "host": ["{{bff}}"],
+              "path": ["api", "Facility", "{{facilityId}}", "AdHocReport"]
+            },
+            "description": "Passing patientIds explicitly short-circuits the Census service entirely (Report.GenerateReportListener only calls Census when patientIds is null/empty), so no census config is needed.\n\nbypassSubmission=true keeps the run out of the external container; the internal patient NDJSON (which is what we care about) is still written.\n\nAfter this returns, WAIT ~60-90s for the pipeline to reach Validation before running the observation requests."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4 - Observe (run after ~60-90s)",
+      "item": [
+        {
+          "name": "Report schedule status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bff}}/api/schedules/{{reportId}}",
+              "host": ["{{bff}}"],
+              "path": ["api", "schedules", "{{reportId}}"]
+            },
+            "description": "Watch `status`. With bypassSubmission=true the run will not reach 'Submitted'; validation completing is what matters here."
+          },
+          "response": []
+        },
+        {
+          "name": "Report entries for patient",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{bff}}/api/entries/patients/{{patientId}}",
+              "host": ["{{bff}}"],
+              "path": ["api", "entries", "patients", "{{patientId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Validation results for report",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Validation produced results', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var results = pm.response.json();",
+                  "    pm.expect(results.length, 'No results yet - validation may not have run. Wait and retry.').to.be.above(0);",
+                  "});",
+                  "",
+                  "// Surface which categories are UNACCEPTABLE - these are exactly the issues that",
+                  "// should appear in the appended pre-qual OperationOutcome (one issue per category).",
+                  "try {",
+                  "    var results = pm.response.json();",
+                  "    var unacceptable = {};",
+                  "    results.forEach(function (r) {",
+                  "        (r.categories || []).forEach(function (c) {",
+                  "            if (c.acceptable === false) { unacceptable[c.id] = (unacceptable[c.id] || 0) + 1; }",
+                  "        });",
+                  "    });",
+                  "    var ids = Object.keys(unacceptable);",
+                  "    console.log('Unacceptable categories (expect one OO issue each): ' + (ids.length ? JSON.stringify(unacceptable) : 'NONE -> OperationOutcome will be empty and nothing is appended'));",
+                  "} catch (e) { console.log('Could not summarize categories: ' + e); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{validationBase}}/api/validation/result/{{facilityId}}/{{reportId}}",
+              "host": ["{{validationBase}}"],
+              "path": ["api", "validation", "result", "{{facilityId}}", "{{reportId}}"]
+            },
+            "description": "Reads the PERSISTED validation results. The test script logs which categories came back `acceptable: false` - that set should match the issues in the OperationOutcome appended to the NDJSON (one issue per unacceptable category).\n\nThis reads the database, NOT the NDJSON. Confirming the actual appended OperationOutcome requires opening the blob in Azurite."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5 - Optional: preview categorization without the pipeline",
+      "item": [
+        {
+          "name": "POST $validate?categorize=true",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resourceType\": \"Patient\",\n  \"id\": \"{{patientId}}\",\n  \"name\": [{ \"family\": \"Prequal\", \"given\": [\"Test\"] }],\n  \"birthDate\": \"1970-01-01\"\n}"
+            },
+            "url": {
+              "raw": "{{validationBase}}/api/validation/$validate?categorize=true",
+              "host": ["{{validationBase}}"],
+              "path": ["api", "validation", "$validate"],
+              "query": [{ "key": "categorize", "value": "true" }]
+            },
+            "description": "Runs the SAME validation + categorization core the consumer uses, and returns the categorized results directly - handy for checking which categories a resource trips before running the whole pipeline.\n\nIt does NOT build the OperationOutcome and does NOT write to the blob: that code path exists only in ReadyForValidationConsumer."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

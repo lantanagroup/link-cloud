@@ -10,6 +10,7 @@ import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
+import com.lantanagroup.link.validation.configs.PreQualificationConfig;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
 import com.lantanagroup.link.validation.records.ReadyForValidation;
@@ -40,6 +41,8 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
     private final KafkaTemplate<String, ValidationComplete> validationCompleteTemplate;
     private final ValidationMetrics validationMetrics;
     private final BlobStorageService blobStorageService;
+    private final PreQualificationConfig preQualificationConfig;
+    private final PreQualOperationOutcomeBuilder preQualOperationOutcomeBuilder;
 
     public ReadyForValidationConsumer(
             FhirContext fhirContext,
@@ -50,6 +53,8 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             KafkaTemplate<String, ValidationComplete> validationCompleteTemplate,
             ValidationMetrics validationMetrics,
             Optional<BlobStorageService> blobStorageService,
+            PreQualificationConfig preQualificationConfig,
+            PreQualOperationOutcomeBuilder preQualOperationOutcomeBuilder,
             ConsumerRecordRecoverer recoverer) {
         super(recoverer);
         this.fhirContext = fhirContext;
@@ -60,6 +65,8 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         this.validationCompleteTemplate = validationCompleteTemplate;
         this.validationMetrics = validationMetrics;
         this.blobStorageService = blobStorageService.orElse(null);
+        this.preQualificationConfig = preQualificationConfig;
+        this.preQualOperationOutcomeBuilder = preQualOperationOutcomeBuilder;
     }
 
     @Override
@@ -70,12 +77,39 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         String facilityId = record.key().getFacilityId();
         String patientId = record.value().getPatientId();
         String reportId = record.value().getReportTrackingId();
-        Bundle bundle = getBundleFromBlobStorage(record.value().getPayloadUri());
+        String payloadUri = record.value().getPayloadUri();
+        Bundle bundle = getBundleFromBlobStorage(payloadUri);
         if (bundle == null) {
             bundle = getBundleViaRest(facilityId, patientId, reportId);
         }
         List<Result> results = validate(correlationId, facilityId, patientId, reportId, bundle);
+        appendPreQualOperationOutcome(bundle, results, payloadUri);
         produceValidationCompleteRecord(correlationId, facilityId, patientId, reportId, results);
+    }
+
+    /**
+     * When enabled, builds the pre-qualification OperationOutcome for the patient's unacceptable-category
+     * findings and appends it to the same patient NDJSON blob in ABS. No-op when the flag is off, when
+     * there is no blob storage or payload URI (e.g. local/dev), or when there are no unacceptable findings.
+     */
+    private void appendPreQualOperationOutcome(Bundle bundle, List<Result> results, String payloadUri) {
+        if (!preQualificationConfig.isWritePreQualOperationOutcome()) {
+            return;
+        }
+        if (blobStorageService == null || payloadUri == null) {
+            _logger.debug("Pre-qual OperationOutcome enabled but no blob storage or payload URI; skipping append");
+            return;
+        }
+        String measureReportId = preQualOperationOutcomeBuilder.extractMeasureReportId(bundle);
+        preQualOperationOutcomeBuilder
+                .build(results, measureReportId, preQualificationConfig.isWriteExpressionsInOperationOutcome())
+                .ifPresent(operationOutcome -> {
+                    String line = fhirContext.newJsonParser().encodeResourceToString(operationOutcome);
+                    String blobName = BlobUrlParts.parse(payloadUri).getBlobName();
+                    _logger.debug("Appending pre-qual OperationOutcome ({} issues) to blob {}",
+                            operationOutcome.getIssue().size(), blobName);
+                    blobStorageService.appendResource(blobName, line);
+                });
     }
 
     private Bundle getBundleFromBlobStorage(String payloadUri) {
