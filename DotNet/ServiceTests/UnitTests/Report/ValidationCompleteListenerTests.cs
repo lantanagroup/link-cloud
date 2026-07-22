@@ -25,7 +25,7 @@ using Task = System.Threading.Tasks.Task;
 namespace UnitTests.Report;
 
 /// <summary>
-/// Covers the PreQualification:WritePreQualOperationOutcome gate (LEGLINK-466). With the flag
+/// Covers the pre-qualification.write-pre-qual-operation-outcome gate (LEGLINK-466). With the flag
 /// set, the Validation service is the sole writer of the pre-qualification OperationOutcome
 /// (LEGLINK-425) and Report must not append its own.
 /// </summary>

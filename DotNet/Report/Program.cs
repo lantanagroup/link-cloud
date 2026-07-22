@@ -96,7 +96,15 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(BlobStorageSettings.Key));
     builder.Services.Configure<PatientAggregatorSettings>(builder.Configuration.GetSection(PatientAggregatorSettings.Key));
-    builder.Services.Configure<PreQualificationSettings>(builder.Configuration.GetSection(PreQualificationSettings.Key));
+    // Bound by explicit key rather than GetSection: this flag is one cross-runtime decision shared
+    // with the Java Validation service, so both runtimes read a single Azure App Configuration row.
+    // App Config's convention is '/'-separated, which Spring maps to '.' but .NET passes through
+    // verbatim, so the slashed form is checked first and the dotted form (appsettings / compose env,
+    // where a leading-slash name is not usable) is the fallback. See PreQualificationSettings.
+    builder.Services.Configure<PreQualificationSettings>(options =>
+        options.WritePreQualOperationOutcome =
+            builder.Configuration.GetValue<bool?>(PreQualificationSettings.AppConfigurationKey)
+            ?? builder.Configuration.GetValue<bool>(PreQualificationSettings.WritePreQualOperationOutcomeKey));
 
 
     string? connectionString = builder.Configuration.GetConnectionString("DatabaseConnection");
