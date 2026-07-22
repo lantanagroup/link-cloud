@@ -111,6 +111,12 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
         // pre-qual OperationOutcome already present in it means we appended one previously and must not
         // append a second. Keyed on the oo-total extension, which only this writer emits: the Report
         // service's legacy flat OperationOutcome does not carry it and is correctly ignored here.
+        //
+        // This narrows the window rather than closing it, and the remaining gaps are tracked in
+        // LEGLINK-800: the REST fallback supplies a bundle with no previously appended OperationOutcome
+        // so the check is blind, concurrent consumers can both observe it as absent, and the check and
+        // the append are not atomic. The same replay also duplicates the Result rows written by
+        // validate().
         if (hasPreQualOperationOutcome(bundle)) {
             _logger.info("Pre-qual OperationOutcome already present in the patient NDJSON; skipping append (replay)");
             return;
