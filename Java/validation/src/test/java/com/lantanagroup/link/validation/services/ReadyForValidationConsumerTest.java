@@ -585,4 +585,21 @@ public class ReadyForValidationConsumerTest {
 
         verify(blobStorageService, never()).appendResource(anyString(), anyString());
     }
+
+    @Test
+    void process_flagOn_nullPayloadUri_doesNotAppend() throws Exception {
+        // Blob storage IS configured here, unlike the test above; only the payloadUri is missing. This
+        // covers the second operand of the append guard on its own - drop it and BlobUrlParts.parse(null)
+        // throws, so the two operands need separate coverage.
+        preQualificationConfig.setWritePreQualOperationOutcome(true);
+        stubRestRetrieval(); // no payload URI -> bundle comes via REST
+
+        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        result.setMessage("Code is inactive.");
+        when(validationService.validate(bundle)).thenReturn(List.of(result));
+
+        consumer.process(buildRecord(null));
+
+        verify(blobStorageService, never()).appendResource(anyString(), anyString());
+    }
 }
