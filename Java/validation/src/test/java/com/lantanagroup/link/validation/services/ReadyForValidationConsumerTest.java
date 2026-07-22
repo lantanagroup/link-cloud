@@ -525,6 +525,55 @@ public class ReadyForValidationConsumerTest {
     }
 
     @Test
+    void process_flagOn_bundleAlreadyHasPreQualOperationOutcome_doesNotAppendAgain() throws Exception {
+        // Replay: AsyncListener acknowledges the offset even when process() throws, so a failure after the
+        // append (producing ValidationComplete, say) routes the record to the retry topic and process()
+        // runs again. The re-read bundle then already contains the OperationOutcome we appended, and we
+        // must not append a second one.
+        preQualificationConfig.setWritePreQualOperationOutcome(true);
+
+        org.hl7.fhir.r4.model.OperationOutcome existing = new org.hl7.fhir.r4.model.OperationOutcome();
+        existing.addExtension(new org.hl7.fhir.r4.model.Extension(
+                PreQualOperationOutcomeBuilder.OO_TOTAL_URL, new org.hl7.fhir.r4.model.IntegerType(1)));
+        bundle.addEntry().setResource(existing);
+
+        stubBlobDownload();
+
+        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        result.setMessage("Code is inactive.");
+        when(validationService.validate(bundle)).thenReturn(List.of(result));
+
+        consumer.process(buildRecord(PAYLOAD_URI));
+
+        verify(blobStorageService, never()).appendResource(anyString(), anyString());
+    }
+
+    @Test
+    void process_flagOn_bundleHasUnrelatedOperationOutcome_stillAppends() throws Exception {
+        // The Report service's legacy flat OperationOutcome carries no oo-total extension, so it must not
+        // be mistaken for ours and suppress the append.
+        preQualificationConfig.setWritePreQualOperationOutcome(true);
+
+        org.hl7.fhir.r4.model.OperationOutcome legacy = new org.hl7.fhir.r4.model.OperationOutcome();
+        legacy.addIssue().setDiagnostics("Patient has failed Validation");
+        bundle.addEntry().setResource(legacy);
+
+        stubBlobDownload();
+
+        IParser jsonParser = mock(IParser.class);
+        when(fhirContext.newJsonParser()).thenReturn(jsonParser);
+        when(jsonParser.encodeResourceToString(any())).thenReturn("{\"resourceType\":\"OperationOutcome\"}");
+
+        Result result = resultWithCategories(List.of(categoryWithAcceptable(false)));
+        result.setMessage("Code is inactive.");
+        when(validationService.validate(bundle)).thenReturn(List.of(result));
+
+        consumer.process(buildRecord(PAYLOAD_URI));
+
+        verify(blobStorageService).appendResource("myfile.ndjson", "{\"resourceType\":\"OperationOutcome\"}");
+    }
+
+    @Test
     void process_flagOn_noBlobService_doesNotAppend() throws Exception {
         preQualificationConfig.setWritePreQualOperationOutcome(true);
         stubRestRetrieval(); // no blob service -> bundle comes via REST, append is skipped

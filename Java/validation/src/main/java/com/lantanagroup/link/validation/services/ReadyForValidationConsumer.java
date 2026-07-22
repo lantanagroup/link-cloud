@@ -21,6 +21,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.hl7.fhir.r4.model.Bundle;
+import org.hl7.fhir.r4.model.OperationOutcome;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -100,6 +101,16 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             _logger.debug("Pre-qual OperationOutcome enabled but no blob storage or payload URI; skipping append");
             return;
         }
+        // Replay guard. The offset is acknowledged even when process() throws (AsyncListener), so a
+        // failure after this append - producing ValidationComplete, say - sends the record to the retry
+        // topic and process() runs again. The bundle is re-read from the same blob on that replay, so a
+        // pre-qual OperationOutcome already present in it means we appended one previously and must not
+        // append a second. Keyed on the oo-total extension, which only this writer emits: the Report
+        // service's legacy flat OperationOutcome does not carry it and is correctly ignored here.
+        if (hasPreQualOperationOutcome(bundle)) {
+            _logger.info("Pre-qual OperationOutcome already present in the patient NDJSON; skipping append (replay)");
+            return;
+        }
         PreQualOperationOutcomeBuilder.MeasureReportRef measureReport =
                 preQualOperationOutcomeBuilder.resolveMeasureReport(bundle);
         preQualOperationOutcomeBuilder
@@ -111,6 +122,21 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
                             operationOutcome.getIssue().size(), blobName);
                     blobStorageService.appendResource(blobName, line);
                 });
+    }
+
+    /**
+     * True when the bundle already carries a pre-qualification OperationOutcome written by this service,
+     * identified by the {@code oo-total} extension that only this writer emits.
+     */
+    private boolean hasPreQualOperationOutcome(Bundle bundle) {
+        if (bundle == null) {
+            return false;
+        }
+        return bundle.getEntry().stream()
+                .map(Bundle.BundleEntryComponent::getResource)
+                .filter(resource -> resource instanceof OperationOutcome)
+                .anyMatch(resource -> ((OperationOutcome) resource)
+                        .getExtensionByUrl(PreQualOperationOutcomeBuilder.OO_TOTAL_URL) != null);
     }
 
     private Bundle getBundleFromBlobStorage(String payloadUri) {
