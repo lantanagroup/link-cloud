@@ -15,7 +15,7 @@ namespace UnitTests.Submission
         public void GetExternalBlobName_ReturnsExpectedPath(
             string? blobRoot, string reportName, string bundleName, bool flatten, string expected)
         {
-            var result = BlobStorageService.GetExternalBlobName(blobRoot, reportName, bundleName, flatten);
+            var result = BlobStorageService.GetExternalBlobName(blobRoot, null, reportName, bundleName, flatten);
 
             Assert.Equal(expected, result);
         }
@@ -23,7 +23,7 @@ namespace UnitTests.Submission
         [Fact]
         public void GetExternalBlobName_FlattenFalse_ProducesThreeSlashSegments()
         {
-            var result = BlobStorageService.GetExternalBlobName("root", "report", "bundle.ndjson", false);
+            var result = BlobStorageService.GetExternalBlobName("root", null, "report", "bundle.ndjson", false);
 
             Assert.Equal(3, result.Split('/').Length);
             Assert.EndsWith("/bundle.ndjson", result);
@@ -32,7 +32,7 @@ namespace UnitTests.Submission
         [Fact]
         public void GetExternalBlobName_FlattenTrue_ProducesTwoSlashSegments()
         {
-            var result = BlobStorageService.GetExternalBlobName("root", "report", "bundle.ndjson", true);
+            var result = BlobStorageService.GetExternalBlobName("root", null, "report", "bundle.ndjson", true);
 
             Assert.Equal(2, result.Split('/').Length);
             Assert.EndsWith("_bundle.ndjson", result);

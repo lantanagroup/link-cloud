@@ -29,14 +29,18 @@ namespace LantanaGroup.Link.Submission.Application.Services
             return new BlobContainerClient(settings.ConnectionString, settings.BlobContainerName);
         }
 
-        internal static string GetExternalBlobName(string? blobRoot, string reportName, string bundleName, bool flatten) =>
+        internal static string GetExternalBlobName(string? blobRoot, string? measurePrefix, string reportName, string bundleName, bool flatten) =>
             flatten
-                ? GetBlobName(blobRoot, $"{reportName}_{bundleName}")
-                : GetBlobName(blobRoot, reportName, bundleName);
+                ? GetBlobName(blobRoot, measurePrefix, $"{reportName}_{bundleName}")
+                : GetBlobName(blobRoot, measurePrefix, reportName, bundleName);
 
-        private static string GetBlobName(string? blobRoot, params string[] segments)
+        private static string GetBlobName(string? blobRoot, string? measurePrefix, params string[] segments)
         {
             IEnumerable<string> enumerable = segments;
+            if (!string.IsNullOrEmpty(measurePrefix))
+            {
+                enumerable = enumerable.Prepend(measurePrefix);
+            }
             if (!string.IsNullOrEmpty(blobRoot))
             {
                 enumerable = enumerable.Prepend(blobRoot);
@@ -56,7 +60,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             _externalContainerClient = GetContainerClient(_externalSettings);
         }
 
-        private string ChangeBlobRoot(string blobName)
+        private string ChangeBlobRoot(string? measurePrefix, string blobName)
         {
             if (_internalSettings.BlobRoot != null && blobName.StartsWith(_internalSettings.BlobRoot))
             {
@@ -70,7 +74,27 @@ namespace LantanaGroup.Link.Submission.Application.Services
                     blobName = $"{blobName[..index]}_{blobName[(index + 1)..]}";
                 }
             }
-            return GetBlobName(_externalSettings.BlobRoot, blobName);
+            return GetBlobName(_externalSettings.BlobRoot, measurePrefix, blobName);
+        }
+
+        private string? GetMeasurePrefix(ICollection<string> reportTypes)
+        {
+            if (!_externalSettings.UseMeasurePrefix)
+            {
+                return null;
+            }
+            if (_externalSettings.MeasurePrefixesByReportType == null)
+            {
+                return reportTypes.FirstOrDefault();
+            }
+            foreach (string reportType in reportTypes)
+            {
+                if (_externalSettings.MeasurePrefixesByReportType.TryGetValue(reportType, out string? measurePrefix))
+                {
+                    return measurePrefix;
+                }
+            }
+            return reportTypes.FirstOrDefault();
         }
 
         public bool HasInternalClient()
@@ -116,6 +140,7 @@ namespace LantanaGroup.Link.Submission.Application.Services
             {
                 throw new InvalidOperationException("Not configured for external blob storage.");
             }
+            string? measurePrefix = GetMeasurePrefix(value.ReportTypes);
             string blobName;
             if (string.IsNullOrEmpty(value.PayloadUri))
             {
@@ -126,12 +151,12 @@ namespace LantanaGroup.Link.Submission.Application.Services
                     PayloadType.ReportSchedule => "manifest.ndjson",
                     _ => $"{Guid.NewGuid()}.ndjson"
                 };
-                blobName = GetExternalBlobName(_externalSettings.BlobRoot, reportName, bundleName, _externalSettings.FlattenHierarchy);
+                blobName = GetExternalBlobName(_externalSettings.BlobRoot, measurePrefix, reportName, bundleName, _externalSettings.FlattenHierarchy);
             }
             else
             {
                 BlobUriBuilder uriBuilder = new(new Uri(value.PayloadUri));
-                blobName = ChangeBlobRoot(uriBuilder.BlobName);
+                blobName = ChangeBlobRoot(measurePrefix, uriBuilder.BlobName);
             }
             _logger.LogDebug("Uploading: {}", blobName);
             BlockBlobClient blobClient = _externalContainerClient.GetBlockBlobClient(blobName);
@@ -174,14 +199,15 @@ namespace LantanaGroup.Link.Submission.Application.Services
             return DownloadAsync(_internalContainerClient, prefix, cancellationToken);
         }
 
-        public Task<IDictionary<string, byte[]>> DownloadFromExternalAsync(string payloadRootUri, CancellationToken cancellationToken = default)
+        public Task<IDictionary<string, byte[]>> DownloadFromExternalAsync(ICollection<string> reportTypes, string payloadRootUri, CancellationToken cancellationToken = default)
         {
             if (!HasExternalClient())
             {
                 throw new InvalidOperationException("Not configured for external blob storage.");
             }
+            string? measurePrefix = GetMeasurePrefix(reportTypes);
             BlobUriBuilder uriBuilder = new(new Uri(payloadRootUri));
-            string prefix = ChangeBlobRoot(uriBuilder.BlobName);
+            string prefix = ChangeBlobRoot(measurePrefix, uriBuilder.BlobName);
             return DownloadAsync(_externalContainerClient, prefix, cancellationToken);
         }
     }
