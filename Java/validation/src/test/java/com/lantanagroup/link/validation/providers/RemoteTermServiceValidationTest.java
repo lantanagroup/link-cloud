@@ -22,9 +22,11 @@ import org.mockito.ArgumentCaptor;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
@@ -32,6 +34,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -307,5 +310,75 @@ class RemoteTermServiceValidationTest {
                 result.getMessage());
         // The inline path targets the ValueSet resource, not CodeSystem.
         verify(operation).onType("ValueSet");
+    }
+
+    // ---------- isCodeSystemSupported / isValueSetSupported delegation to cache ----------
+    // These methods are hit per-system per-chain-traversal by HAPI's ValidationSupportChain, so the
+    // remote lookup has to go through ValidationCacheService. The tests below verify the delegation
+    // and confirm the fast pre-cache checks (null input, whitelist regex) short-circuit before the
+    // cache is consulted at all.
+
+    @Test
+    void isCodeSystemSupported_delegatesToCacheService() {
+        ValidationCacheService cacheService = mock(ValidationCacheService.class);
+        RemoteTermServiceValidation subject = new RemoteTermServiceValidation(
+                cacheService, fhirContext, "http://tx.example.org/fhir", List.of(), List.of());
+        when(cacheService.cachedIsCodeSystemSupported(subject, CODE_SYSTEM_URL)).thenReturn(true);
+
+        assertTrue(subject.isCodeSystemSupported(null, CODE_SYSTEM_URL));
+        verify(cacheService).cachedIsCodeSystemSupported(subject, CODE_SYSTEM_URL);
+    }
+
+    @Test
+    void isCodeSystemSupported_nullSystem_returnsFalseWithoutTouchingCache() {
+        ValidationCacheService cacheService = mock(ValidationCacheService.class);
+        RemoteTermServiceValidation subject = new RemoteTermServiceValidation(
+                cacheService, fhirContext, "http://tx.example.org/fhir", List.of(), List.of());
+
+        assertFalse(subject.isCodeSystemSupported(null, null));
+        verifyNoInteractions(cacheService);
+    }
+
+    @Test
+    void isCodeSystemSupported_matchesWhitelist_returnsFalseWithoutTouchingCache() {
+        ValidationCacheService cacheService = mock(ValidationCacheService.class);
+        RemoteTermServiceValidation subject = new RemoteTermServiceValidation(
+                cacheService, fhirContext, "http://tx.example.org/fhir",
+                List.of("^http://open\\.epic\\.com/.*"), List.of());
+
+        assertFalse(subject.isCodeSystemSupported(null, "http://open.epic.com/FHIR/foo"));
+        verifyNoInteractions(cacheService);
+    }
+
+    @Test
+    void isValueSetSupported_delegatesToCacheService() {
+        ValidationCacheService cacheService = mock(ValidationCacheService.class);
+        RemoteTermServiceValidation subject = new RemoteTermServiceValidation(
+                cacheService, fhirContext, "http://tx.example.org/fhir", List.of(), List.of());
+        when(cacheService.cachedIsValueSetSupported(subject, VALUE_SET_URL)).thenReturn(true);
+
+        assertTrue(subject.isValueSetSupported(null, VALUE_SET_URL));
+        verify(cacheService).cachedIsValueSetSupported(subject, VALUE_SET_URL);
+    }
+
+    @Test
+    void isValueSetSupported_nullUrl_returnsFalseWithoutTouchingCache() {
+        ValidationCacheService cacheService = mock(ValidationCacheService.class);
+        RemoteTermServiceValidation subject = new RemoteTermServiceValidation(
+                cacheService, fhirContext, "http://tx.example.org/fhir", List.of(), List.of());
+
+        assertFalse(subject.isValueSetSupported(null, null));
+        verifyNoInteractions(cacheService);
+    }
+
+    @Test
+    void isValueSetSupported_matchesWhitelist_returnsFalseWithoutTouchingCache() {
+        ValidationCacheService cacheService = mock(ValidationCacheService.class);
+        RemoteTermServiceValidation subject = new RemoteTermServiceValidation(
+                cacheService, fhirContext, "http://tx.example.org/fhir",
+                List.of(), List.of("^http://example\\.org/ValueSet/.*"));
+
+        assertFalse(subject.isValueSetSupported(null, "http://example.org/ValueSet/vs"));
+        verifyNoInteractions(cacheService);
     }
 }
