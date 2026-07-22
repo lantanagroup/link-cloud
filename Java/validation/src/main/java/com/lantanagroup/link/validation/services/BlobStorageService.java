@@ -20,6 +20,14 @@ public class BlobStorageService {
         containerClient = serviceClient.getBlobContainerClient(blobContainerName);
     }
 
+    /**
+     * Visible for testing: takes an already-built container client so the append behaviour can be
+     * exercised against mocks without constructing a real Azure client.
+     */
+    BlobStorageService(BlobContainerClient containerClient) {
+        this.containerClient = containerClient;
+    }
+
     public BinaryData download(String blobName) {
         BlobClient client = containerClient.getBlobClient(blobName);
         return client.downloadContent();
