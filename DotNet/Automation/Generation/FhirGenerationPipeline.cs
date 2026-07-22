@@ -243,7 +243,9 @@ public static class FhirGenerationPipeline
                     imported,
                     measures,
                     sharedSimEntries,
-                    acquisitionSimulation);
+                    acquisitionSimulation,
+                    generationClinicalPeriodStart,
+                    generationClinicalPeriodEnd);
 
                 importedPatientIds.Add(patientId);
                 totalBundlesUploaded += bundleCount;
@@ -316,6 +318,35 @@ public static class FhirGenerationPipeline
             generationClinicalPeriodEnd);
 
         var encounterId = $"{patientId}-Enc-001";
+        // Compute per-resource CQL SDE filter exclusions from the actual generated resources
+        // (inspects in-memory Encounter + Condition attributes — no seed replay).
+        //
+        // Filter rules apply only for measures this patient qualifies for. A non-qualifying
+        // measure's MeasureReport does not contain the patient's resources, so its SDE
+        // semantics do not contribute to the intersection of exclusions that determines
+        // whether a resource reaches ABS.
+        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
+        var effectiveProfile = profile;
+
+        if (cqlInput != null)
+        {
+            effectiveProfile = ApplyMeasurementPeriodEligibilityOracle(
+                patientId,
+                profile,
+                measures,
+                cqlInput,
+                generationClinicalPeriodStart,
+                generationClinicalPeriodEnd,
+                output);
+
+            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
+            if (qualifyingMeasures.Count > 0)
+            {
+                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+            }
+        }
+
         var measureEligibilityLabel = string.Join(", ", measures.Select(m =>
         {
             var shortName = m switch
@@ -325,7 +356,7 @@ public static class FhirGenerationPipeline
                 ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => "Hypo",
                 _ => m.ToString()
             };
-            var eligible = profile.QualifiesFor(m) ? "Q" : "NQ";
+            var eligible = effectiveProfile.QualifiesFor(m) ? "Q" : "NQ";
             return $"{shortName}={eligible}";
         }));
 
@@ -333,26 +364,8 @@ public static class FhirGenerationPipeline
                          $"encounter={encounterId} ({encStart:yyyy-MM-dd} ? {encEnd:yyyy-MM-dd})");
 
         // Record patient in manifest builder
-        manifestBuilder.AddPatient(patientId, profile);
+        manifestBuilder.AddPatient(patientId, effectiveProfile);
         manifestBuilder.AddEntries(patientId, entries);
-
-        // Compute per-resource CQL SDE filter exclusions from the actual generated resources
-        // (inspects in-memory Encounter + Condition attributes — no seed replay).
-        //
-        // Filter rules apply only for measures this patient qualifies for. A non-qualifying
-        // measure's MeasureReport does not contain the patient's resources, so its SDE
-        // semantics do not contribute to the intersection of exclusions that determines
-        // whether a resource reaches ABS.
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
-        if (cqlInput != null)
-        {
-            var qualifyingMeasures = measures.Where(profile.QualifiesFor).ToList();
-            if (qualifyingMeasures.Count > 0)
-            {
-                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
-                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
-            }
-        }
 
         // Run acquisition simulation BEFORE we serialize and discard
         if (acquisitionSimulation != null)
@@ -409,7 +422,9 @@ public static class FhirGenerationPipeline
         ImportedPatientInput imported,
         IReadOnlyList<ProfiledMeasureType> measures,
         List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedSimEntries,
-        AcquisitionSimulationConfig? acquisitionSimulation)
+        AcquisitionSimulationConfig? acquisitionSimulation,
+        DateTime? generationClinicalPeriodStart,
+        DateTime? generationClinicalPeriodEnd)
     {
         if (imported == null)
             throw new ArgumentNullException(nameof(imported));
@@ -469,6 +484,28 @@ public static class FhirGenerationPipeline
 
         var profile = new PatientProfile(eligibilities, ClinicalScenarioId: imported.DetectedClinicalScenarioId);
 
+        // 3. CQL filter simulation + period-aware eligibility oracle
+        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
+        var effectiveProfile = profile;
+        if (cqlInput != null)
+        {
+            effectiveProfile = ApplyMeasurementPeriodEligibilityOracle(
+                patientId,
+                profile,
+                measures,
+                cqlInput,
+                generationClinicalPeriodStart,
+                generationClinicalPeriodEnd,
+                output);
+
+            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
+            if (qualifyingMeasures.Count > 0)
+            {
+                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+            }
+        }
+
         var measureLabel = string.Join(", ", measures.Select(m =>
         {
             var shortName = m switch
@@ -478,25 +515,13 @@ public static class FhirGenerationPipeline
                 ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => "Hypo",
                 _ => m.ToString()
             };
-            return $"{shortName}={(profile.QualifiesFor(m) ? "Q" : "NQ")}";
+            return $"{shortName}={(effectiveProfile.QualifiesFor(m) ? "Q" : "NQ")}";
         }));
         output.WriteLine($"  [imported] Patient {patientId}: {entries.Count} entries [{measureLabel}] | source={imported.Source}");
 
-        // 3. Manifest
-        manifestBuilder.AddPatient(patientId, profile);
+        // 4. Manifest
+        manifestBuilder.AddPatient(patientId, effectiveProfile);
         manifestBuilder.AddEntries(patientId, entries);
-
-        // 4. CQL filter simulation (same as generated path)
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
-        if (cqlInput != null)
-        {
-            var qualifyingMeasures = measures.Where(profile.QualifiesFor).ToList();
-            if (qualifyingMeasures.Count > 0)
-            {
-                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
-                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
-            }
-        }
 
         // 5. Acquisition simulation (same as generated path)
         if (acquisitionSimulation != null)
@@ -538,6 +563,52 @@ public static class FhirGenerationPipeline
         }
 
         return (patientId, bundleCount);
+    }
+
+    private static PatientProfile ApplyMeasurementPeriodEligibilityOracle(
+        string patientId,
+        PatientProfile profile,
+        IReadOnlyList<ProfiledMeasureType> measures,
+        CqlFilterSimulator.PatientCqlInput cqlInput,
+        DateTime? measurementPeriodStart,
+        DateTime? measurementPeriodEnd,
+        IAutomationOutput output)
+    {
+        if (!measurementPeriodStart.HasValue || !measurementPeriodEnd.HasValue)
+            return profile;
+
+        var constrainedInput = cqlInput with
+        {
+            MeasurementPeriodStart = measurementPeriodStart.Value,
+            MeasurementPeriodEnd = measurementPeriodEnd.Value
+        };
+
+        var adjusted = new Dictionary<ProfiledMeasureType, MeasureEligibility>(profile.MeasureEligibilities);
+        var downgraded = new List<string>();
+
+        foreach (var measure in measures)
+        {
+            if (!adjusted.TryGetValue(measure, out var eligibility)
+                || eligibility != MeasureEligibility.Qualifying)
+            {
+                continue;
+            }
+
+            var hasInPeriodIpOverlap = MeasureInitialPopulationResolver.Resolve([measure], constrainedInput).Count > 0;
+            if (hasInPeriodIpOverlap)
+                continue;
+
+            adjusted[measure] = MeasureEligibility.NonQualifying;
+            downgraded.Add(measure.ToString());
+        }
+
+        if (downgraded.Count > 0)
+        {
+            output.WriteLine(
+                $"  [prediction] Patient {patientId}: downgraded to NQ for {string.Join(", ", downgraded)} due to no initial-population encounter overlap with report period.");
+        }
+
+        return profile with { MeasureEligibilities = adjusted };
     }
 
     /// <summary>
@@ -626,7 +697,9 @@ public static class FhirGenerationPipeline
             encStart, encEnd, scenario, anchors, encounter,
             sharedPractitionerIds, sharedMedicationIds, config, ids,
             generationRequirementsPlan,
-            addHypoglycemicMedicationPair: profile.RequiresHypoglycemicMedication());
+            addHypoglycemicMedicationPair: profile.RequiresHypoglycemicMedication(),
+            measurementPeriodStart: generationClinicalPeriodStart,
+            measurementPeriodEnd: generationClinicalPeriodEnd);
 
         return entries;
     }

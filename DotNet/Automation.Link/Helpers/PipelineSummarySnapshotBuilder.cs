@@ -201,7 +201,7 @@ public class PipelineSummarySnapshotBuilder
             ? null
             : new ReportScheduleSnapshot
             {
-                ReportName = schedule.FacilityId,
+                ReportName = reportId,
                 StartDate = schedule.ReportStartDate?.ToString("u"),
                 EndDate = schedule.ReportEndDate?.ToString("u"),
                 AdHocType = schedule.AdHocType,

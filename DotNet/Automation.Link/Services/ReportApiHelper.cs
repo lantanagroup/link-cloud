@@ -1,12 +1,15 @@
 ﻿using Hl7.Fhir.Model;
+using Confluent.Kafka;
 using LantanaGroup.Link.Automation.Link.Configuration;
 using LantanaGroup.Link.Automation.Link.Helpers;
 using LantanaGroup.Link.Sdk.Clients;
+using LantanaGroup.Link.Shared.Application.Factories;
 using LantanaGroup.Link.Shared.Application.Enums;
 using LantanaGroup.Link.Shared.Application.Models.DataAcq;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Report;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using System.Net;
@@ -27,6 +30,7 @@ public class ReportApiHelper
     private readonly IAdminBffIntegrationClient _adminBffClient;
     private readonly IAutomationOutput _output;
     private readonly AutomationConfig _automationConfig;
+    private readonly KafkaConnection _kafkaConnection;
 
     public ReportApiHelper(
         IReportServiceClient reportClient,
@@ -34,7 +38,8 @@ public class ReportApiHelper
         ISubmissionServiceClient submissionClient,
         IAdminBffIntegrationClient adminBffClient,
         IAutomationOutput output,
-        AutomationConfig config)
+        AutomationConfig config,
+        KafkaConnection kafkaConnection)
     {
         _reportClient = reportClient;
         _facilityClient = facilityClient;
@@ -42,6 +47,7 @@ public class ReportApiHelper
         _adminBffClient = adminBffClient;
         _output = output;
         _automationConfig = config;
+        _kafkaConnection = kafkaConnection;
     }
 
     public async Task<string> GenerateReportAsync(string facilityId, string measureId, TestScenarioConfig config)
@@ -110,20 +116,51 @@ public class ReportApiHelper
             ? Guid.NewGuid().ToString()
             : reportTrackingId.Trim();
 
-        var delayMinutes = Math.Max(1, (int)Math.Ceiling(reportDuration.TotalMinutes));
+        if (!Guid.TryParse(trackingId, out var trackingGuid))
+            throw new ArgumentException("reportTrackingId must be a valid Guid.", nameof(reportTrackingId));
 
-        var response = await _adminBffClient.CreateReportScheduledAsync(
-            facilityId,
-            frequency,
-            reportTypes,
-            startDateUtc.UtcDateTime,
-            delayMinutes,
-            trackingId);
+        if (reportDuration <= TimeSpan.Zero)
+            throw new ArgumentException("reportDuration must be greater than zero.", nameof(reportDuration));
 
-        AutomationInvariant.Require(response.IsSuccessStatusCode,
-            $"Failed to produce ReportScheduled event for report '{trackingId}'. HTTP {response.StatusCode}: {response.RawBody}");
+        var endDateUtc = startDateUtc.UtcDateTime.Add(reportDuration);
+        if (endDateUtc <= startDateUtc.UtcDateTime)
+            throw new ArgumentException("Scheduled report end date must be later than start date.", nameof(reportDuration));
 
-        _output.WriteLine($"Scheduled report event produced: reportTrackingId={trackingId}, start={startDateUtc:O}, delayMinutes={delayMinutes}");
+        var producerConfig = new ProducerConfig
+        {
+            Acks = Acks.All,
+            EnableIdempotence = true
+        };
+
+        var producerFactory = new KafkaProducerFactory<string, ReportScheduledValue>(_kafkaConnection);
+        using var producer = producerFactory.CreateProducer(producerConfig, useOpenTelemetry: false);
+
+        var value = new ReportScheduledValue
+        {
+            ReportTypes = reportTypes.ToList(),
+            Frequency = frequency,
+            StartDate = startDateUtc,
+            EndDate = new DateTimeOffset(DateTime.SpecifyKind(endDateUtc, DateTimeKind.Utc)),
+            ReportTrackingId = trackingGuid
+        };
+
+        await producer.ProduceAsync(
+            nameof(KafkaTopic.ReportScheduled),
+            new Message<string, ReportScheduledValue>
+            {
+                Key = facilityId,
+                Value = value,
+                Headers = new Headers
+                {
+                    { "X-Correlation-Id", System.Text.Encoding.ASCII.GetBytes(trackingId) }
+                }
+            });
+
+        producer.Flush(TimeSpan.FromSeconds(5));
+
+        _output.WriteLine(
+            $"Scheduled report event produced via Kafka: reportTrackingId={trackingId}, " +
+            $"start={startDateUtc:O}, end={endDateUtc:O}, durationMinutes={reportDuration.TotalMinutes:F0}");
         return trackingId;
     }
 
@@ -272,6 +309,20 @@ public class ReportApiHelper
                     break;
                 }
 
+                // Entryless scheduled runs are valid when oracle prediction says no
+                // patients should participate. In that case the report can transition
+                // to Submitted without ever emitting ReportEntriesCreated.
+                var scheduleProbe = await _reportClient.GetScheduleAsync(reportId);
+                if (scheduleProbe.IsSuccessStatusCode
+                    && scheduleProbe.Body?.Status == ScheduleStatus.Submitted)
+                {
+                    milestoneReached = true;
+                    var elapsed = (DateTime.UtcNow - milestonePhaseStart).TotalSeconds;
+                    _output.WriteLine(
+                        $"Milestone '{milestoneToAwait}' was not observed, but report is already Submitted after {elapsed:F0}s. Continuing.");
+                    break;
+                }
+
                 await Task.Delay(pollingInterval);
             }
 
@@ -370,6 +421,7 @@ public class ReportApiHelper
     public async Task<ReportTerminalState> WaitForTerminalReportStateAsync(
         string reportId,
         TimeSpan? timeout = null,
+        bool allowEntrylessTerminal = false,
         CancellationToken cancellationToken = default)
     {
         var effectiveTimeout = timeout ?? TimeSpan.FromMinutes(2);
@@ -393,6 +445,14 @@ public class ReportApiHelper
             var entriesResponse = await _reportClient.GetEntriesByScheduleAsync(reportId, cancellationToken);
             if (!entriesResponse.IsSuccessStatusCode || entriesResponse.Body == null)
             {
+                if (allowEntrylessTerminal
+                    && scheduleResponse.Body.Status == ScheduleStatus.Submitted)
+                {
+                    _output.WriteLine(
+                        $"Report {reportId} reached Submitted with no report-entry payload available; treating as terminal entryless report.");
+                    return new ReportTerminalState([], []);
+                }
+
                 await Task.Delay(pollingInterval, cancellationToken);
                 continue;
             }

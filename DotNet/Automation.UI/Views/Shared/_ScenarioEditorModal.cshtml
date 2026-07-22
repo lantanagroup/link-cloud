@@ -135,6 +135,9 @@
                             <label class="form-label" for="ReportPeriodEnd">Report Period End</label>
                             <input class="form-control" type="date" id="ReportPeriodEnd" />
                         </div>
+                        <div class="col-12">
+                            <div id="reportPeriodPolicyHint" class="small text-muted"></div>
+                        </div>
                         <div class="col-12 d-flex gap-3">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="CleanupFhirData" checked />
@@ -643,11 +646,60 @@
         document.querySelectorAll('.measure-checkbox').forEach(function (cb) {
             cb.addEventListener('change', function () { Array.prototype.forEach.call(cohortRows.children, function (r) { rerenderEditor(r); }); });
         });
-        document.getElementById('ReportMethod').addEventListener('change', syncPatternColumns);
+        document.getElementById('ReportMethod').addEventListener('change', function () {
+            syncPatternColumns();
+            syncReportPeriodPolicyUi();
+        });
 
         // ---- Imported Patients ----
         var importedRows = document.getElementById('importedRows');
         var importedSummary = document.getElementById('importedSummary');
+
+        function hasImportedRows() {
+            return importedRows && importedRows.children && importedRows.children.length > 0;
+        }
+
+        function isScheduledLikeMethod() {
+            var method = (document.getElementById('ReportMethod').value || '').trim();
+            return method === 'ScheduledReport' || method === 'RegenerateReport';
+        }
+
+        function syncReportPeriodPolicyUi() {
+            var startEl = document.getElementById('ReportPeriodStart');
+            var endEl = document.getElementById('ReportPeriodEnd');
+            var hintEl = document.getElementById('reportPeriodPolicyHint');
+            if (!startEl || !endEl || !hintEl) return;
+
+            var scheduledLike = isScheduledLikeMethod();
+            var hasImported = hasImportedRows();
+
+            if (!scheduledLike) {
+                startEl.disabled = false;
+                endEl.disabled = false;
+                startEl.required = false;
+                endEl.required = false;
+                hintEl.textContent = 'Optional. When empty, default period behavior is used for this run type.';
+                return;
+            }
+
+            if (hasImported) {
+                startEl.disabled = false;
+                endEl.disabled = false;
+                startEl.required = true;
+                endEl.required = true;
+                hintEl.textContent = 'Required for imported-patient scheduled/regenerate runs. The configured period will be used exactly.';
+                return;
+            }
+
+            // Generated-only scheduled/regenerate runs use an automatic rolling window.
+            startEl.value = '';
+            endEl.value = '';
+            startEl.disabled = true;
+            endEl.disabled = true;
+            startEl.required = false;
+            endEl.required = false;
+            hintEl.textContent = 'Generated-only scheduled/regenerate runs use an automatic rolling report window. Import a patient to set an explicit period.';
+        }
 
         // Auto-suggest a Report Period that encloses the supplied encounter dates, but only
         // when the period inputs are currently empty (never overwrite a user-set value).
@@ -711,6 +763,7 @@
             // Imported rows feed the total Patient Count alongside cohort sums, so any change
             // to the imported list must re-sync the read-only Patient Count field.
             syncCount();
+            syncReportPeriodPolicyUi();
         }
         function reindexImported() {
             Array.prototype.forEach.call(importedRows.children, function (r, i) { r.querySelector('td:first-child').textContent = i + 1; });
@@ -799,12 +852,14 @@
 
             var label = fmt(s) + (e && e !== s ? ' &rarr; ' + fmt(e) : '');
             var status = compareEncounterToPeriod(s, e);
-            var badge = status === 'inside'
-                ? '<span class="badge bg-success-subtle text-success border border-success ms-1" title="Inside report period">&#10003; in period</span>'
-                : status === 'outside'
-                    ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning ms-1" title="Outside report period — measure-eval may filter resources">&#9888; outside period</span>'
-                    : '';
-            cell.innerHTML = '<div>' + label + '</div>' + badge;
+            var badge = status === 'overlap'
+                ? '<span class="badge rounded-pill text-bg-success mt-1 px-2 py-1" title="Encounter overlaps the report period">&#10003; overlaps period</span>'
+                : status === 'outside-before'
+                    ? '<span class="badge rounded-pill text-bg-warning mt-1 px-2 py-1" title="Encounter ends before report period start">&#9888; before period</span>'
+                    : status === 'outside-after'
+                        ? '<span class="badge rounded-pill text-bg-warning mt-1 px-2 py-1" title="Encounter starts after report period end">&#9888; after period</span>'
+                        : '';
+            cell.innerHTML = '<div>' + label + '</div>' + (badge ? '<div>' + badge + '</div>' : '');
         }
 
         function compareEncounterToPeriod(encStartIso, encEndIso) {
@@ -812,13 +867,18 @@
             var pe = (document.getElementById('ReportPeriodEnd').value || '').trim();
             if (!ps && !pe) return 'unknown';
             var encS = encStartIso ? new Date(encStartIso) : null;
-            var encE = encEndIso ? new Date(encEndIso) : encS;
+            var encE = encEndIso ? new Date(encEndIso) : null;
             if (!encS) return 'unknown';
             var pStart = ps ? new Date(ps + 'T00:00:00Z') : null;
             var pEnd = pe ? new Date(pe + 'T23:59:59Z') : null;
-            if (pStart && encS < pStart) return 'outside';
-            if (pEnd && (encE || encS) > pEnd) return 'outside';
-            return 'inside';
+
+            // Overlap semantics:
+            // - Outside-before: encounter has a known end that is before period start.
+            // - Outside-after: encounter starts after period end.
+            // - Otherwise overlap/possibly-overlap (including in-progress with no end).
+            if (pStart && encE && encE < pStart) return 'outside-before';
+            if (pEnd && encS > pEnd) return 'outside-after';
+            return 'overlap';
         }
 
         function rerenderImportedEncounterCells() {
@@ -956,6 +1016,7 @@
             var imported = getImportedPatients();
             var importedIds = imported.filter(function (p) { return p.source === 'ExistingId'; });
             var importedBundles = imported.filter(function (p) { return p.source === 'Bundle'; });
+            var useRollingWindow = isScheduledLikeMethod() && imported.length === 0;
             return {
                 id: idInput.value || null,
                 name: document.getElementById('ScenarioName').value,
@@ -975,8 +1036,12 @@
                 queryPlanTemplateId: document.getElementById('QueryPlanTemplate').value || null,
                 normalizationSuiteId: document.getElementById('NormalizationSuite').value || null,
                 organizationResourceMapTemplateId: document.getElementById('OrganizationResourceMap').value || null,
-                reportPeriodStart: (document.getElementById('ReportPeriodStart').value || '').trim() ? (document.getElementById('ReportPeriodStart').value + 'T00:00:00Z') : null,
-                reportPeriodEnd: (document.getElementById('ReportPeriodEnd').value || '').trim() ? (document.getElementById('ReportPeriodEnd').value + 'T23:59:59Z') : null,
+                reportPeriodStart: useRollingWindow
+                    ? null
+                    : ((document.getElementById('ReportPeriodStart').value || '').trim() ? (document.getElementById('ReportPeriodStart').value + 'T00:00:00Z') : null),
+                reportPeriodEnd: useRollingWindow
+                    ? null
+                    : ((document.getElementById('ReportPeriodEnd').value || '').trim() ? (document.getElementById('ReportPeriodEnd').value + 'T23:59:59Z') : null),
                 importedPatientIds: importedIds,
                 importedPatientBundles: importedBundles
             };
@@ -1071,6 +1136,7 @@
             updateImportedSummary();
             syncCount();
             syncNhsnOrganizationFromUploadedPatients();
+            syncReportPeriodPolicyUi();
         }
 
         // ---- Open modal ----
@@ -1115,6 +1181,7 @@
                 updateImportedSummary();
                 syncCount();
                 syncNhsnOrganizationFromUploadedPatients();
+                syncReportPeriodPolicyUi();
                 openModal();
             }
         }
@@ -1133,6 +1200,10 @@
             var hasImported = (model.importedPatientIds && model.importedPatientIds.length > 0)
                 || (model.importedPatientBundles && model.importedPatientBundles.length > 0);
             if (!model.patientCohorts.length && !hasImported) { showError('At least one cohort with patients > 0 (or one imported patient) is required.'); valid = false; }
+            if (hasImported) {
+                if (!model.reportPeriodStart) { markFieldError('ReportPeriodStart', 'Report Period Start is required when imported patients are used.'); valid = false; }
+                if (!model.reportPeriodEnd) { markFieldError('ReportPeriodEnd', 'Report Period End is required when imported patients are used.'); valid = false; }
+            }
             // Imported-by-ID rows must have a non-empty patient id.
             var badId = (model.importedPatientIds || []).find(function (p) { return !(p.patientId || '').trim(); });
             if (badId) { showError('Every imported-by-ID row must have a Patient ID.'); valid = false; }

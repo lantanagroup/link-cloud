@@ -43,9 +43,9 @@
         "ServiceRegistry__AdminBffServiceUrl": "http://localhost:8063",
         "Automation__FhirServerBase": "http://localhost:6157/fhir",
         "Automation__FacilityFhirServerBase": "http://fhir-server:8080/fhir",
-        "Automation__LokiBaseUrl": "http://localhost:3100",
-        "Automation__Database__Server": "localhost,1433",
-        "Automation__Kafka__BootstrapServers": "localhost:9094",
+        "Loki__Url": "http://localhost:3100",
+        "Loki__App": "link-cloud",
+        "KafkaConnection__BootstrapServers__0": "localhost:9094",
         "Automation__Kafka__RestProxyBaseUrl": "http://localhost:8082",
         "MongoDB__ConnectionString": "mongodb://localhost:17017/?replicaSet=rs0&directConnection=true"
       }

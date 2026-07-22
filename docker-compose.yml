@@ -698,7 +698,10 @@ services:
     container_name: link-automation-ui
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      Automation__LokiBaseUrl: http://loki:3100
+      KafkaConnection__BootstrapServers__0: kafka_b:9092
+      KafkaConnection__SaslProtocolEnabled: true
+      KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}
+      KafkaConnection__SaslPassword: ${KAFKA_SASL_CLIENT_PASSWORD}
       Authentication__UseBearerForServiceCalls: ${LOCAL_AUTOMATION_UI_USE_BEARER_FOR_SERVICE_CALLS:-false}
       LinkTokenService__Authority: ${LOCAL_LINK_TOKEN_AUTHORITY:-LinkServiceAdmin}
       LinkTokenService__SigningKey: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}

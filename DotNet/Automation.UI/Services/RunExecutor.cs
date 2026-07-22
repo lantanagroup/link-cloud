@@ -117,28 +117,41 @@ internal sealed class RunExecutor
             var scenarioConfig = ScenarioConfigBuilder.Build(state.Scenario, state.Options);
 
             var usesScheduledWorkflow = state.Options.ReportMethod is ReportMethod.ScheduledReport or ReportMethod.RegenerateReport;
+            var hasImportedPatients = state.Options.ImportedPatientIds.Count > 0 || state.Options.ImportedPatientBundles.Count > 0;
 
             // For scheduled-style runs, compute the active window immediately so generation
             // uses the correct clinical period boundaries (scenarioConfig.StartDate/EndDate).
             if (usesScheduledWorkflow)
             {
-                // Use a clinically meaningful report window for generation so scheduled
-                // inpatient patterns produce rich in-period evidence (not minute-scale data).
-                //
-                // End-of-period runtime is kept short separately in the scheduled workflow by
-                // publishing a small delay value to Admin.BFF (without changing Admin.BFF logic).
-                var now = DateTimeOffset.UtcNow;
-                var alignedNow = new DateTimeOffset(
-                    now.Year, now.Month, now.Day,
-                    now.Hour, now.Minute, 0,
-                    TimeSpan.Zero);
-                // 5-day clinical window gives scheduled inpatient patterns enough LOS
-                // for ACH monthly IP criteria while runtime remains bounded by the
-                // short scheduled delay sent to Admin.BFF.
-                var start = alignedNow.AddDays(-5);
-                var end = alignedNow.AddMinutes(2);
-                scenarioConfig.StartDate = ToZulu(start);
-                scenarioConfig.EndDate = ToZulu(end);
+                // Imported-patient scheduled/regenerate runs must use an explicit
+                // configured report period so eligibility expectations remain deterministic.
+                if (hasImportedPatients)
+                {
+                    if (!state.Options.ReportPeriodStart.HasValue || !state.Options.ReportPeriodEnd.HasValue)
+                    {
+                        throw new InvalidOperationException(
+                            "Report period start and end are required for scheduled/regenerate runs that include imported patients.");
+                    }
+
+                    scenarioConfig.StartDate = ToZulu(state.Options.ReportPeriodStart.Value);
+                    scenarioConfig.EndDate = ToZulu(state.Options.ReportPeriodEnd.Value);
+                }
+                else
+                {
+                    // Use a clinically meaningful rolling window for generation so scheduled
+                    // inpatient patterns produce rich in-period evidence (not minute-scale data).
+                    // End-of-period runtime is kept short separately by publishing a small
+                    // delay value to Admin.BFF.
+                    var now = DateTimeOffset.UtcNow;
+                    var alignedNow = new DateTimeOffset(
+                        now.Year, now.Month, now.Day,
+                        now.Hour, now.Minute, 0,
+                        TimeSpan.Zero);
+                    var start = alignedNow.AddDays(-5);
+                    var end = alignedNow.AddMinutes(2);
+                    scenarioConfig.StartDate = ToZulu(start);
+                    scenarioConfig.EndDate = ToZulu(end);
+                }
             }
 
             using var services = BuildRunServiceProvider(output);
@@ -284,20 +297,14 @@ internal sealed class RunExecutor
                 patientIds = pipelineResult.PatientIds;
                 generationManifest = pipelineResult.Manifest;
 
-                // Manifest preserves order: generated profiles first, imported patients appended.
-                // Use the manifest's parallel PatientIds + Profiles arrays as the source of truth.
+                // Manifest carries explicit patient/profile pairs. Build the initial expected
+                // submitted set from those pairs; scheduled runs are recomputed later after
+                // profiles are aligned to the canonical patient ID order.
                 expectedSubmittedPatientIds = generationManifest.PatientIds
                     .Where((_, idx) => idx < generationManifest.Profiles.Count
                                        && generationManifest.Profiles[idx].IsExpectedToBeSubmitted(selectedMeasures))
                     .ToList();
 
-                if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
-                {
-                    expectedSubmittedPatientIds = ComputeExpectedScheduledSubmittedPatientIds(
-                        generationManifest.PatientIds,
-                        generationManifest.Profiles,
-                        selectedMeasures);
-                }
             }
             else
             {
@@ -314,6 +321,23 @@ internal sealed class RunExecutor
 
             if (scenarioConfig.PatientIds.Count == 0)
                 scenarioConfig.PatientIds = patientIds;
+
+            IReadOnlyList<PatientProfile>? profilesAlignedToPatientIds = null;
+            if (generationManifest != null)
+            {
+                profilesAlignedToPatientIds = AlignProfilesToPatientIds(
+                    patientIds,
+                    generationManifest.PatientIds,
+                    generationManifest.Profiles);
+
+                if (state.Options.ReportMethod == ReportMethod.ScheduledReport)
+                {
+                    expectedSubmittedPatientIds = ComputeExpectedScheduledSubmittedPatientIds(
+                        patientIds,
+                        profilesAlignedToPatientIds,
+                        state.Options.SelectedMeasures);
+                }
+            }
 
             var expectedAllPatientIds = scenarioConfig.PatientIds;
             var expectedReportEntryPatientIds = expectedAllPatientIds.ToList();
@@ -410,7 +434,7 @@ internal sealed class RunExecutor
                     state.Options.SelectedMeasures,
                     scenarioConfig,
                     patientIds,
-                    state.Options.PatientProfiles,
+                    profilesAlignedToPatientIds ?? generationManifest?.Profiles ?? state.Options.PatientProfiles,
                     cancellationToken);
 
                 reportId = scheduledWorkflowState.ReportTrackingId;
@@ -438,7 +462,8 @@ internal sealed class RunExecutor
                 output,
                 lokiScraper,
                 _automationConfig,
-                scenarioConfig.PatientIds.Count,
+                kafkaConnection: services.GetRequiredService<KafkaConnection>(),
+                expectedPatientCount: scenarioConfig.PatientIds.Count,
                 pollInterval: diagnosticsPollInterval,
                 forwardInternalLogsToOutput: true,
                 pipelineReader: services.GetRequiredService<PipelineDataReader>()))
@@ -453,27 +478,33 @@ internal sealed class RunExecutor
 
             if (usesScheduledWorkflow)
             {
-                // Scheduled runs can briefly report Submitted while entry-level state is still
-                // converging. Reconcile against terminal report truth (entries + submission
-                // statuses) so validators and artifact expectations are aligned with reality.
-                var terminalState = await reportHelper.WaitForTerminalReportStateAsync(reportId, cancellationToken: cancellationToken);
+                // Scheduled runs can report Submitted before all entry-level states have
+                // reached terminal values. Wait for terminal completion before snapshots
+                // and validators run. This wait is synchronization only; expected sets
+                // remain oracle-driven and are not overwritten from terminal-state output.
+                await reportHelper.WaitForTerminalReportStateAsync(
+                    reportId,
+                    allowEntrylessTerminal: expectedSubmittedPatientIds.Count == 0,
+                    cancellationToken: cancellationToken);
 
-                expectedReportEntryPatientIds = terminalState.EntryPatientIds;
-                expectedManifestPatientListIds = terminalState.EntryPatientIds;
-                expectedSubmittedPatientIds = terminalState.SubmittedPatientIds;
-
-                output.WriteLine(
-                    $"Scheduled expected sets reconciled from terminal report state: " +
-                    $"entry-patients={expectedReportEntryPatientIds.Count}, submitted-patients={expectedSubmittedPatientIds.Count}.");
-
-                // Refresh cached pipeline reads after terminal-state reconciliation so
-                // snapshots/validators use the same committed state we just polled.
+                // Refresh cached reads after the terminal-state wait so downstream
+                // snapshots/validators see committed entry statuses.
                 services.GetRequiredService<PipelineDataReader>().InvalidateCache();
             }
 
             // Scope ABS prediction to the same submitted-patient truth used by validators.
             // This prevents dashboard/manifest prediction from counting non-submitted
             // patients (e.g., scheduled cohorts outside report inclusion).
+            if (usesScheduledWorkflow)
+            {
+                expectedReportEntryPatientIds = expectedSubmittedPatientIds.ToList();
+            }
+
+            // Report manifest patient List is sourced from ReportEntry rows, not strictly from
+            // submitted-patient rows. Keep this expectation aligned with the ReportEntry scope
+            // so non-submitted entries present in the manifest List do not produce false failures.
+            expectedManifestPatientListIds = expectedReportEntryPatientIds;
+
             if (generationManifest != null)
             {
                 generationManifest.ExpectedAbsPatientIdsOverride =
@@ -510,7 +541,8 @@ internal sealed class RunExecutor
                     output,
                     lokiScraper,
                     _automationConfig,
-                    scenarioConfig.PatientIds.Count,
+                    kafkaConnection: services.GetRequiredService<KafkaConnection>(),
+                    expectedPatientCount: scenarioConfig.PatientIds.Count,
                     pollInterval: diagnosticsPollInterval,
                     forwardInternalLogsToOutput: true,
                     pipelineReader: services.GetRequiredService<PipelineDataReader>(),
@@ -700,7 +732,8 @@ internal sealed class RunExecutor
                         : expectedAllPatientIds,
                     expectDataAcquisitionData: expectDataAcquisitionData,
                     expectLocationResources: expectLocationResources,
-                    expectEncounterResources: expectEncounterResources));
+                    expectEncounterResources: expectEncounterResources,
+                    manifest: generationManifest));
 
             await RunValidator("NORMALIZATION DATABASE VALIDATION", () =>
                 normalizationValidator.ValidateAllAsync(facilityId));
@@ -756,27 +789,7 @@ internal sealed class RunExecutor
             }
 
             var normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync();
-            var retryAttemptsUsed = 0;
-
-            if (normalizationSummaryLogs.Count == 0)
-            {
-                const int retryAttempts = 6;
-                var retryDelay = TimeSpan.FromSeconds(5);
-
-                output.WriteLine("[Normalization Suite] No summary logs found on first attempt. Retrying for up to 30s...");
-
-                for (var attempt = 1; attempt <= retryAttempts; attempt++)
-                {
-                    await Task.Delay(retryDelay, cancellationToken);
-                    normalizationSummaryLogs = await QueryNormalizationSummaryLogsAsync();
-                    retryAttemptsUsed = attempt;
-
-                    if (normalizationSummaryLogs.Count > 0)
-                        break;
-                }
-            }
-
-            output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation (firstAttempt={(retryAttemptsUsed == 0 ? normalizationSummaryLogs.Count : 0)}, retryAttempts={retryAttemptsUsed}).");
+            output.WriteLine($"[Normalization Suite] Collected {normalizationSummaryLogs.Count} normalization summary log line(s) for evidence validation.");
 
             await RunValidator("NORMALIZATION SUITE APPLICATION VALIDATION", () =>
                 normalizationSuiteApplicationValidator.ValidateAllAsync(internalAbsResources, normalizationResolution, normalizationSummaryLogs));
@@ -849,16 +862,36 @@ internal sealed class RunExecutor
         return expected;
     }
 
+    private static IReadOnlyList<PatientProfile> AlignProfilesToPatientIds(
+        IReadOnlyList<string> patientIds,
+        IReadOnlyList<string> manifestPatientIds,
+        IReadOnlyList<PatientProfile> manifestProfiles)
+    {
+        var map = new Dictionary<string, PatientProfile>(StringComparer.Ordinal);
+        var count = Math.Min(manifestPatientIds.Count, manifestProfiles.Count);
+
+        for (var i = 0; i < count; i++)
+        {
+            map[manifestPatientIds[i]] = manifestProfiles[i];
+        }
+
+        var aligned = new List<PatientProfile>(patientIds.Count);
+        foreach (var patientId in patientIds)
+        {
+            if (!map.TryGetValue(patientId, out var profile))
+                throw new InvalidOperationException($"Missing profile mapping for patient '{patientId}'.");
+
+            aligned.Add(profile);
+        }
+
+        return aligned;
+    }
+
     private static string ToZulu(DateTimeOffset value)
         => value.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ssZ");
 
     private readonly record struct ScheduledReportWindow(DateTimeOffset Start, TimeSpan Duration);
     private readonly record struct ScheduledWorkflowState(string ReportTrackingId, Frequency Frequency);
-
-    // Keep scheduled test runtimes bounded while still allowing long clinical windows.
-    // Admin.BFF computes EndDate using current-time + delay, so this controls how long
-    // the run waits for end-of-period execution.
-    private static readonly TimeSpan ScheduledRuntimeDelay = TimeSpan.FromMinutes(2);
 
     private static ScheduledReportWindow DeriveScheduledReportWindow(TestScenarioConfig scenarioConfig)
     {
@@ -895,10 +928,22 @@ internal sealed class RunExecutor
         var remainInpatient = new List<string>();
         var dischargeDuringWindow = new List<string>();
 
-        var count = Math.Min(patientIds.Count, profiles.Count);
-        for (var i = 0; i < count; i++)
+        if (profiles.Count < patientIds.Count)
         {
-            var pattern = profiles[i].ScheduledInpatientPattern
+            output.WriteLine(
+                $"[WARN] Scheduled workflow profile count ({profiles.Count}) is smaller than patient id count ({patientIds.Count}). " +
+                "Missing profiles will use default scheduled inpatient behavior.");
+        }
+
+        for (var i = 0; i < patientIds.Count; i++)
+        {
+            var profile = i < profiles.Count ? profiles[i] : null;
+            var participatesInScheduledFlow = profile?.IsExpectedToBeSubmitted(selectedMeasures) ?? true;
+
+            if (!participatesInScheduledFlow)
+                continue;
+
+            var pattern = profile?.ScheduledInpatientPattern
                 ?? DefaultScheduledInpatientPattern;
             var behavior = pattern.GetCensusBehavior();
 
@@ -922,7 +967,7 @@ internal sealed class RunExecutor
             facilityId,
             measureIds,
             window.Start,
-            ScheduledRuntimeDelay,
+            window.Duration,
             scheduleFrequency,
             reportTrackingId: Guid.NewGuid().ToString());
 
@@ -1124,16 +1169,18 @@ internal sealed class RunExecutor
         services.AddSingleton(_hostServices.GetRequiredService<IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions>>());
         services.AddSingleton(_hostServices.GetRequiredService<IOptions<LinkTokenServiceSettings>>());
         services.AddSingleton(_hostServices.GetRequiredService<ICreateSystemToken>());
+
+        var hostKafkaConnection = _hostServices.GetRequiredService<KafkaConnection>();
+        services.AddSingleton(hostKafkaConnection);
+
         services.AddHttpClient();
         services.AddHttpClient<LokiScraper>((sp, client) =>
         {
             var cfg = sp.GetRequiredService<AutomationConfig>();
-            var configuredBaseUrl = string.IsNullOrWhiteSpace(cfg.LokiBaseUrl)
-                ? "http://localhost:3100"
-                : cfg.LokiBaseUrl;
+            if (!Uri.TryCreate(cfg.LokiBaseUrl, UriKind.Absolute, out var baseUri))
+                throw new InvalidOperationException("Loki:Url must be an absolute URI.");
 
-            if (Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var baseUri))
-                client.BaseAddress = baseUri;
+            client.BaseAddress = baseUri;
         });
 
         services.AddLinkSdk();

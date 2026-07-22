@@ -795,7 +795,8 @@ Key sections:
 
 | Section | Purpose |
 |---|---|
-| `Automation` | Runtime orchestration settings (FHIR / AdminBFF / Loki / query behavior). |
+| `Automation` | Runtime orchestration settings (FHIR, run behavior, and automation-specific integration settings). |
+| `Loki` | Shared log-query settings consumed by automation diagnostics (`Url`, `App`). |
 | `ServiceRegistry` | Base URLs for Link services used by `LinkSdk` clients. |
 | `MongoDB` | Connection/database for UI persistence. |
 | `Authentication` | Outbound bearer toggle. |
