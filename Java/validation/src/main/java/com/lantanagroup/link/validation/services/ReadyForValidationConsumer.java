@@ -10,6 +10,7 @@ import com.lantanagroup.link.shared.kafka.Headers;
 import com.lantanagroup.link.shared.kafka.Topics;
 import com.lantanagroup.link.shared.services.ReportClient;
 import com.lantanagroup.link.shared.utils.DiagnosticNames;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import com.lantanagroup.link.validation.configs.PreQualificationConfig;
 import com.lantanagroup.link.validation.entities.Category;
 import com.lantanagroup.link.validation.entities.Result;
@@ -74,7 +75,10 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
     protected void process(ConsumerRecord<ReadyForValidation.Key, ReadyForValidation> record) {
         String correlationId = Headers.getCorrelationId(record.headers());
         _logger.debug("Processing {} message for facility {}, patient {}, report {}",
-                record.topic(), record.key().getFacilityId(), record.value().getPatientId(), record.value().getReportTrackingId());
+                LogUtils.sanitize(record.topic()),
+                LogUtils.sanitize(record.key().getFacilityId()),
+                LogUtils.sanitize(record.value().getPatientId()),
+                LogUtils.sanitize(record.value().getReportTrackingId()));
         String facilityId = record.key().getFacilityId();
         String patientId = record.value().getPatientId();
         String reportId = record.value().getReportTrackingId();
@@ -118,8 +122,10 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
                 .ifPresent(operationOutcome -> {
                     String line = fhirContext.newJsonParser().encodeResourceToString(operationOutcome);
                     String blobName = BlobUrlParts.parse(payloadUri).getBlobName();
+                    // blobName derives from the payloadUri carried on the Kafka record, so sanitize it
+                    // before logging. The append uses the original, unmodified value.
                     _logger.debug("Appending pre-qual OperationOutcome ({} issues) to blob {}",
-                            operationOutcome.getIssue().size(), blobName);
+                            operationOutcome.getIssue().size(), LogUtils.sanitize(blobName));
                     blobStorageService.appendResource(blobName, line);
                 });
     }
@@ -252,8 +258,8 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             // Use .get() to make the send synchronous and wait for broker confirmation
             validationCompleteTemplate.send(new ProducerRecord<>(Topics.VALIDATION_COMPLETE, null, facilityId, value, headers)).get();
         } catch (Exception e) {
-            _logger.error("Failed to send ValidationComplete record for patient {} in report {}: {}",
-                    patientId, reportId, e.getMessage(), e);
+            _logger.error("Failed to send ValidationComplete record for patient {} in report {}",
+                    LogUtils.sanitize(patientId), LogUtils.sanitize(reportId), e);
             // Throwing the exception ensures AsyncListener's catch block handles it
             // (e.g., sending the source record to the Error topic)
             throw new RuntimeException("Failed to produce ValidationComplete message", e);
