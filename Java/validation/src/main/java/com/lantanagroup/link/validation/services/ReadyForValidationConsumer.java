@@ -100,9 +100,10 @@ public class ReadyForValidationConsumer extends AsyncListener<ReadyForValidation
             _logger.debug("Pre-qual OperationOutcome enabled but no blob storage or payload URI; skipping append");
             return;
         }
-        String measureReportId = preQualOperationOutcomeBuilder.extractMeasureReportId(bundle);
+        PreQualOperationOutcomeBuilder.MeasureReportRef measureReport =
+                preQualOperationOutcomeBuilder.resolveMeasureReport(bundle);
         preQualOperationOutcomeBuilder
-                .build(results, measureReportId, preQualificationConfig.isWriteExpressionsInOperationOutcome())
+                .build(results, measureReport, preQualificationConfig.isWriteExpressionsInOperationOutcome())
                 .ifPresent(operationOutcome -> {
                     String line = fhirContext.newJsonParser().encodeResourceToString(operationOutcome);
                     String blobName = BlobUrlParts.parse(payloadUri).getBlobName();
