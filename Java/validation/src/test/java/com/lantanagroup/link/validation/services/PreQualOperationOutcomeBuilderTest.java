@@ -97,6 +97,32 @@ class PreQualOperationOutcomeBuilderTest {
     }
 
     @Test
+    void build_distinctCategoryInstancesWithSameId_produceASingleIssue() {
+        // Category defines no equals/hashCode, so grouping by the entity would treat these two instances
+        // as different categories and emit a duplicate issue, inflating oo-total. Each category(...) call
+        // deliberately returns a NEW instance, mimicking categories loaded in separate persistence
+        // contexts.
+        Result r1 = result("first message", "expr1", category("inactive_code", false));
+        Result r2 = result("second message", "expr2", category("inactive_code", false));
+
+        OperationOutcome oo = builder.build(List.of(r1, r2), MEASURE_REPORT, true).orElseThrow();
+
+        assertEquals(1, oo.getIssue().size(), "Same category id must yield exactly one issue");
+        int total = ((IntegerType) oo.getExtensionByUrl(PreQualOperationOutcomeBuilder.OO_TOTAL_URL).getValue()).getValue();
+        assertEquals(1, total);
+
+        OperationOutcome.OperationOutcomeIssueComponent issue = oo.getIssueFirstRep();
+        CodeType cat = (CodeType) issue.getExtensionByUrl(PreQualOperationOutcomeBuilder.PQ_ISSUE_CAT_URL).getValue();
+        assertEquals("inactive_code", cat.getValue());
+        assertEquals("first message", issue.getDetails().getText());
+
+        // Both results' findings must aggregate onto the single issue.
+        List<String> expressions = expressionStrings(issue);
+        assertTrue(expressions.contains("expr1"));
+        assertTrue(expressions.contains("expr2"));
+    }
+
+    @Test
     void build_oneResultMappingToMultipleUnacceptableCategories_producesAnIssuePerCategory() {
         Result r = result("msg", "expr", category("cat_a", false), category("cat_b", false));
 

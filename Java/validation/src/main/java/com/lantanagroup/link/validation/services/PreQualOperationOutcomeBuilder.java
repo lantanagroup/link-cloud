@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,8 +58,12 @@ public class PreQualOperationOutcomeBuilder {
      */
     public Optional<OperationOutcome> build(List<Result> results, MeasureReportRef measureReport, boolean writeExpressions) {
         // Group findings by unacceptable category (acceptable == false); a Result may map to several
-        // categories. LinkedHashMap keeps issue order deterministic (first-seen category order).
-        Map<Category, List<Result>> byCategory = new LinkedHashMap<>();
+        // categories. Keyed by category id, not by the Category entity: Category defines no
+        // equals/hashCode, so two instances of the same logical category (loaded in different
+        // persistence contexts, say) would otherwise land in separate groups and emit a duplicate issue
+        // for that category, inflating oo-total. LinkedHashMap keeps issue order deterministic
+        // (first-seen category order).
+        Map<String, List<Result>> byCategoryId = new LinkedHashMap<>();
         for (Result result : results) {
             List<Category> categories = result.getCategories();
             if (categories == null) {
@@ -66,19 +71,19 @@ public class PreQualOperationOutcomeBuilder {
             }
             for (Category category : categories) {
                 if (!category.isAcceptable()) {
-                    byCategory.computeIfAbsent(category, c -> new java.util.ArrayList<>()).add(result);
+                    byCategoryId.computeIfAbsent(category.getId(), id -> new ArrayList<>()).add(result);
                 }
             }
         }
 
-        if (byCategory.isEmpty()) {
+        if (byCategoryId.isEmpty()) {
             return Optional.empty();
         }
 
         OperationOutcome operationOutcome = new OperationOutcome();
 
-        for (Map.Entry<Category, List<Result>> entry : byCategory.entrySet()) {
-            Category category = entry.getKey();
+        for (Map.Entry<String, List<Result>> entry : byCategoryId.entrySet()) {
+            String categoryId = entry.getKey();
             List<Result> categoryResults = entry.getValue();
 
             OperationOutcome.OperationOutcomeIssueComponent issue = operationOutcome.addIssue()
@@ -86,7 +91,7 @@ public class PreQualOperationOutcomeBuilder {
                     .setCode(OperationOutcome.IssueType.PROCESSING)
                     .setDetails(new CodeableConcept().setText(categoryResults.get(0).getMessage()));
 
-            issue.addExtension(new Extension(PQ_ISSUE_CAT_URL, new CodeType(category.getId())));
+            issue.addExtension(new Extension(PQ_ISSUE_CAT_URL, new CodeType(categoryId)));
 
             if (writeExpressions) {
                 if (measureReport != null) {
