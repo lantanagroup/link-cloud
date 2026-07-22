@@ -279,8 +279,7 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
             }
         }
 
-        IBaseResource codeSystem = this.fetchCodeSystem(theSystem, SummaryEnum.TRUE);
-        return codeSystem != null;
+        return validationCacheService.cachedIsCodeSystemSupported(this, theSystem);
     }
 
     public boolean isValueSetSupported(ValidationSupportContext theValidationSupportContext, String theValueSetUrl) {
@@ -294,8 +293,24 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
             }
         }
 
-        IBaseResource valueSet = this.fetchValueSet(theValueSetUrl, SummaryEnum.TRUE);
-        return valueSet != null;
+        return validationCacheService.cachedIsValueSetSupported(this, theValueSetUrl);
+    }
+
+    /**
+     * Remote lookup for {@link #isCodeSystemSupported}, extracted so the result can be cached at the
+     * {@link ValidationCacheService} layer. Package-private so the cache service can invoke it via the
+     * delegate reference passed into the {@code @Cacheable} method.
+     */
+    boolean invokeIsCodeSystemSupported(String theSystem) {
+        return this.fetchCodeSystem(theSystem, SummaryEnum.TRUE) != null;
+    }
+
+    /**
+     * Remote lookup for {@link #isValueSetSupported}, extracted for the same reason as
+     * {@link #invokeIsCodeSystemSupported}.
+     */
+    boolean invokeIsValueSetSupported(String theValueSetUrl) {
+        return this.fetchValueSet(theValueSetUrl, SummaryEnum.TRUE) != null;
     }
 
     public TranslateConceptResults translateConcept(IValidationSupport.TranslateCodeRequest theRequest) {
