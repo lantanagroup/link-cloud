@@ -313,6 +313,12 @@ services:
     - key: "ExternalBlobStorage:SuppressManifest"
       description: "Whether to suppress submission of manifest bundles."
       required: false
+    - key: "ExternalBlobStorage:UseMeasurePrefix"
+      description: "Whether to use a measure prefix (i.e., dQM-specific directory following the blob root) for external blobs."
+      required: false
+    - key: "ExternalBlobStorage:MeasurePrefixesByReportType"
+      description: "Mapping of report types to measure prefixes."
+      required: false
   Tenant:
     - key: "FacilityIdSettings:NumericOnlyFacilityId"
       description: "Boolean flag to restrict facility IDs to numeric values only."
