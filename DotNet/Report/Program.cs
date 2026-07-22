@@ -97,6 +97,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(BlobStorageSettings.Key));
     builder.Services.Configure<PatientAggregatorSettings>(builder.Configuration.GetSection(PatientAggregatorSettings.Key));
     builder.Services.Configure<PreQualificationSettings>(builder.Configuration.GetSection(PreQualificationSettings.Key));
+    WarnOnPreQualificationFlagMismatch(builder.Configuration);
 
 
     string? connectionString = builder.Configuration.GetConnectionString("DatabaseConnection");
@@ -269,6 +270,36 @@ static void RegisterServices(WebApplicationBuilder builder)
     });
 
     builder.Services.AddSingleton<IReportServiceMetrics, ReportServiceMetrics>();
+}
+
+/// <summary>
+/// Logs when the two halves of the pre-qualification OperationOutcome flag disagree (LEGLINK-466).
+/// Deliberately logs rather than throws: a mismatch produces wrong content in submitted artifacts,
+/// which is serious, but refusing to start would take reporting down entirely for a condition the
+/// service can still operate under. Error level so it surfaces in Loki and alerting rather than
+/// scrolling past.
+/// </summary>
+static void WarnOnPreQualificationFlagMismatch(IConfiguration configuration)
+{
+    var reportValue = configuration
+        .GetSection(PreQualificationSettings.Key)
+        .Get<PreQualificationSettings>()?.WritePreQualOperationOutcome ?? false;
+
+    if (!PreQualificationFlagConsistency.TryDetectMismatch(configuration, reportValue, out var validationValue))
+    {
+        return;
+    }
+
+    Log.Error(
+        "Pre-qualification OperationOutcome flags disagree: {ReportKey}={ReportValue} but {ValidationKey}={ValidationValue}. " +
+        "Submitted patient NDJSON will contain {Consequence}. Both must be set to the same value.",
+        PreQualificationSettings.Key + ":" + nameof(PreQualificationSettings.WritePreQualOperationOutcome),
+        reportValue,
+        PreQualificationSettings.ValidationServiceAppConfigurationKey,
+        validationValue,
+        validationValue
+            ? "two OperationOutcomes per failed patient"
+            : "no pre-qualification OperationOutcome");
 }
 
 static void SetupMiddleware(WebApplication app)

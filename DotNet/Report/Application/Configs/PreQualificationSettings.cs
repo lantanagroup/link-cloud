@@ -19,6 +19,15 @@ namespace LantanaGroup.Link.Report.Application.Options
         public const string ValidationServiceKey = "pre-qualification.write-pre-qual-operation-outcome";
 
         /// <summary>
+        /// The Validation service's row as it is stored in Azure App Configuration, in that store's
+        /// '/'-separated convention. Report can read this row directly — its selector loads every
+        /// null-label key and the .NET provider passes key names through verbatim — which is what
+        /// makes the startup drift check possible. Spring maps the '/' to '.', so Validation binds the
+        /// same row as <see cref="ValidationServiceKey"/>.
+        /// </summary>
+        public const string ValidationServiceAppConfigurationKey = "/pre-qualification/write-pre-qual-operation-outcome";
+
+        /// <summary>
         /// When true, the Validation service is the sole writer of the pre-qualification
         /// OperationOutcome to the patient NDJSON (LEGLINK-425) and Report skips its own
         /// legacy "Patient has failed Validation" append. When false, Report retains that write.
