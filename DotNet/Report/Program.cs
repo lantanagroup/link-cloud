@@ -96,6 +96,7 @@ static void RegisterServices(WebApplicationBuilder builder)
     builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection(ConfigurationConstants.AppSettings.LinkTokenService));
     builder.Services.Configure<BlobStorageSettings>(builder.Configuration.GetSection(BlobStorageSettings.Key));
     builder.Services.Configure<PatientAggregatorSettings>(builder.Configuration.GetSection(PatientAggregatorSettings.Key));
+    builder.Services.Configure<PreQualificationSettings>(builder.Configuration.GetSection(PreQualificationSettings.Key));
 
 
     string? connectionString = builder.Configuration.GetConnectionString("DatabaseConnection");

@@ -171,7 +171,7 @@ namespace LantanaGroup.Link.Report.Application.Core
             return aggregateResult;
         }
 
-        public async System.Threading.Tasks.Task AppendResourceToBlob(string uri, DomainResource domainResource)
+        public virtual async System.Threading.Tasks.Task AppendResourceToBlob(string uri, DomainResource domainResource)
         {
             AppendBlobClient appendBlobClient = _containerClient.GetAppendBlobClient(uri);
 

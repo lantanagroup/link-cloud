@@ -141,6 +141,9 @@ global:
   - key: "pre-qualification.write-pre-qual-operation-outcome"
     description: "Boolean flag (default false), read by the Java Validation service. When true, Validation writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is its sole writer (LEGLINK-425/LEGLINK-466). .NET counterpart: PreQualification:WritePreQualOperationOutcome."
     required: false
+  - key: "PreQualification:WritePreQualOperationOutcome"
+    description: "Boolean flag (default false), read by the .NET Report service. When true, Report skips its legacy 'Patient has failed Validation' OperationOutcome append to the patient NDJSON because the Validation service is the sole writer (LEGLINK-425/LEGLINK-466). Java counterpart: pre-qualification.write-pre-qual-operation-outcome."
+    required: false
 services:
   Account:
     - key: "UserManagement:EnableAutomaticUserActivation"
