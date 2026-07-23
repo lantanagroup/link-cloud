@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Hl7.Fhir.Model;
+using Hl7.Fhir.Serialization;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
@@ -11,6 +12,7 @@ using LantanaGroup.Link.Terminology.Application.Settings;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Terminology.Services;
 
@@ -205,7 +207,7 @@ public class CodeGroupCacheService(
 
         // Read the JSON file and parse it as a FHIR resource
         var jsonContent = await ReadAllTextAsync(jsonFilePath);
-        codeGroup.Resource = new Hl7.Fhir.Serialization.FhirJsonParser().Parse<Resource>(jsonContent);
+        codeGroup.Resource = new FhirJsonParser().Parse<Resource>(jsonContent);
 
         if (codeGroup.Resource is CodeSystem codeSystem)
         {
@@ -246,13 +248,15 @@ public class CodeGroupCacheService(
         var records = csv.GetRecords<CsvValueSetRecord>();
         string? system = null;
         List<Code>? systemCodes = null;
+        int scientificNotationCodeCount = 0;
 
         foreach (var record in records)
         {
             string code = record.Code;
             string display = record.Display;
 
-            LogScientificNotationWarning(code, codeGroup.Id);
+            if (ScientificNotationPattern.IsMatch(code))
+                scientificNotationCodeCount++;
 
             if (system == null || (!string.IsNullOrEmpty(record.System) && system != record.System))
             {
@@ -284,6 +288,8 @@ public class CodeGroupCacheService(
             });
         }
 
+        LogScientificNotationWarning(scientificNotationCodeCount, codeGroup.Id);
+
         SetCodeGroup(codeGroup);
         logger.LogDebug("Value set {ValueSet} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes.Values.SelectMany(c => c).Count());
     }
@@ -307,6 +313,7 @@ public class CodeGroupCacheService(
 
         var records = csv.GetRecords<CsvCodeSystemRecord>();
         string system = codeGroup.Url;
+        int scientificNotationCodeCount = 0;
 
         foreach (var record in records)
         {
@@ -314,7 +321,8 @@ public class CodeGroupCacheService(
             string display = record.Display;
             CodeStatus status = record.Status;
 
-            LogScientificNotationWarning(code, codeGroup.Id);
+            if (ScientificNotationPattern.IsMatch(code))
+                scientificNotationCodeCount++;
 
             if (!codeGroup.Codes.ContainsKey(system))
                 codeGroup.Codes.Add(system, new List<Code>());
@@ -327,17 +335,19 @@ public class CodeGroupCacheService(
             });
         }
 
+        LogScientificNotationWarning(scientificNotationCodeCount, codeGroup.Id);
+
         SetCodeGroup(codeGroup);
         logger.LogDebug("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes[system].Count);
     }
 
-    private void LogScientificNotationWarning(string code, string? codeGroupId)
+    private void LogScientificNotationWarning(int scientificNotationCodeCount, string? codeGroupId)
     {
-        if (ScientificNotationPattern.IsMatch(code))
+        if (scientificNotationCodeCount > 0)
         {
             logger.LogWarning(
-                "Code {Code} in code group {CodeGroupId} appears to be in scientific notation. Verify that the code was not altered during CSV creation",
-                code.SanitizeForLog(),
+                "Found {Count} code(s) in code group {CodeGroupId} that appear to be in scientific notation. Verify that codes were not altered during CSV creation",
+                scientificNotationCodeCount,
                 codeGroupId.SanitizeForLog());
         }
     }
@@ -348,7 +358,7 @@ public class CodeGroupCacheService(
     /// Logs the number of successfully loaded code groups and warnings for directories
     /// that could not be processed.
     /// </summary>
-    public async System.Threading.Tasks.Task LoadCache()
+    public async Task LoadCache()
     {
         this.ClearCache();
 

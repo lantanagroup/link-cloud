@@ -344,6 +344,9 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
             String resourceType = "ValueSet";
             if (theValueSet == null && theValueSetUrl == null) {
                 resourceType = "CodeSystem";
+                ourLog.debug("Invoking remote validate-code on CodeSystem for code system {} and code {}", theCodeSystem, theCode);
+            } else {
+                ourLog.debug("Invoking remote validate-code on ValueSet for value set {} and code {}", theValueSetUrl, theCode);
             }
 
             IBaseParameters output;
