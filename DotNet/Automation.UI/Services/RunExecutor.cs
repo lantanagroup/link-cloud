@@ -614,6 +614,14 @@ internal sealed class RunExecutor
 
             var validatorResults = new List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>();
 
+            // Validator failures are collected rather than thrown immediately, and re-thrown together
+            // once every validator has run. Failing on the first one hid the evidence needed to
+            // localise a discrepancy: the ABS manifest validator runs first, so when it reported a
+            // missing resource the DataAcquisition and Normalization validators never executed, and
+            // there was no way to tell whether the resource had been lost upstream of the aggregation
+            // or by it. The layers are only diagnostic when read together.
+            var validatorFailures = new List<string>();
+
             async Task RunValidator(string name, Func<Task> action)
             {
                 try
@@ -641,8 +649,10 @@ internal sealed class RunExecutor
                         Outcome = "Failed",
                         IssueCount = issueCount
                     });
-                    // Re-throw so the run still fails as before.
-                    throw;
+
+                    // Collected, not thrown: the remaining validators still run, and the run fails
+                    // with all of their findings once they have.
+                    validatorFailures.Add($"{name}: {ex.Message}");
                 }
                 finally
                 {
@@ -786,6 +796,15 @@ internal sealed class RunExecutor
 
             await RunValidator("VALIDATION RESULTS (API)", () =>
                 validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow));
+
+            // Thrown before cleanup, matching the previous behaviour of leaving a failed run's data in
+            // place for inspection.
+            if (validatorFailures.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"{validatorFailures.Count} validator(s) failed:{Environment.NewLine}" +
+                    string.Join(Environment.NewLine, validatorFailures.Select(failure => "  - " + failure)));
+            }
 
             await RunCleanupHelper.CleanupAfterRunAsync(
                 scenarioConfig,
