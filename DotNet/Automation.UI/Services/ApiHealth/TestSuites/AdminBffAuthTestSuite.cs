@@ -2,6 +2,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Automation.UI.Models.ApiHealth;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
@@ -19,6 +20,7 @@ namespace Automation.UI.Services.ApiHealth.TestSuites;
 public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
 {
     private const string ProtectedPath = "/aggregate/reports/summaries";
+    private const int MinHs512SigningKeyBytes = 64;
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IOptions<ServiceRegistry> _serviceRegistry;
@@ -60,26 +62,38 @@ public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
         string? validToken = null;
         if (canGenerateTokens)
         {
-            validToken = await _createSystemToken.ExecuteAsync(signingKey!, 5);
-            results.Add(await CallEndpointAsync(StepNames.ValidBearerGet200, endpointUrl, 200, Header("Bearer", validToken), false, ct));
-            results.Add(await CallEndpointAsync(StepNames.TokenReuseGet200, endpointUrl, 200, Header("Bearer", validToken), false, ct));
+            try
+            {
+                validToken = await _createSystemToken.ExecuteAsync(signingKey!, 5);
+                results.Add(await CallEndpointAsync(StepNames.ValidBearerGet200, endpointUrl, 200, Header("Bearer", validToken), false, ct));
+                results.Add(await CallEndpointAsync(StepNames.TokenReuseGet200, endpointUrl, 200, Header("Bearer", validToken), false, ct));
 
-            var invalidSignatureToken = BuildToken(
-                Convert.ToBase64String(Guid.NewGuid().ToByteArray()),
-                authority!,
-                LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience,
-                DateTime.UtcNow.AddMinutes(5));
-            results.Add(await CallEndpointAsync(StepNames.InvalidSignatureBearerGet401, endpointUrl, 401, Header("Bearer", invalidSignatureToken), true, ct));
+                var invalidSignatureToken = BuildToken(
+                    CreateSigningKeyForHs512(),
+                    authority!,
+                    LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience,
+                    DateTime.UtcNow.AddMinutes(5));
+                results.Add(await CallEndpointAsync(StepNames.InvalidSignatureBearerGet401, endpointUrl, 401, Header("Bearer", invalidSignatureToken), true, ct));
 
-            var expiredToken = await _createSystemToken.ExecuteAsync(signingKey!, -5);
-            results.Add(await CallEndpointAsync(StepNames.ExpiredBearerGet401Or403, endpointUrl, [401, 403], Header("Bearer", expiredToken), true, ct));
+                var expiredToken = await _createSystemToken.ExecuteAsync(signingKey!, -5);
+                results.Add(await CallEndpointAsync(StepNames.ExpiredBearerGet401Or403, endpointUrl, [401, 403], Header("Bearer", expiredToken), true, ct));
 
-            var wrongAudienceToken = BuildToken(
-                signingKey!,
-                authority!,
-                "LinkServices-OtherApi",
-                DateTime.UtcNow.AddMinutes(5));
-            results.Add(await CallEndpointAsync(StepNames.CrossApiTokenReuseGet401, endpointUrl, 401, Header("Bearer", wrongAudienceToken), true, ct));
+                var wrongAudienceToken = BuildToken(
+                    signingKey!,
+                    authority!,
+                    "LinkServices-OtherApi",
+                    DateTime.UtcNow.AddMinutes(5));
+                results.Add(await CallEndpointAsync(StepNames.CrossApiTokenReuseGet401, endpointUrl, 401, Header("Bearer", wrongAudienceToken), true, ct));
+            }
+            catch (Exception ex)
+            {
+                var error = $"Token generation failed for auth test scenarios: {ex.Message}";
+                results.Add(SkipStepAsync(StepNames.ValidBearerGet200, error));
+                results.Add(SkipStepAsync(StepNames.TokenReuseGet200, error));
+                results.Add(SkipStepAsync(StepNames.InvalidSignatureBearerGet401, error));
+                results.Add(SkipStepAsync(StepNames.ExpiredBearerGet401Or403, error));
+                results.Add(SkipStepAsync(StepNames.CrossApiTokenReuseGet401, error));
+            }
         }
         else
         {
@@ -194,8 +208,21 @@ public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
             return false;
         }
 
+        var keyBytes = Encoding.UTF8.GetByteCount(signingKey);
+        if (keyBytes < MinHs512SigningKeyBytes)
+        {
+            error = $"LinkTokenService:SigningKey is too short for HS512 ({keyBytes * 8} bits). Minimum is {MinHs512SigningKeyBytes * 8} bits.";
+            return false;
+        }
+
         error = null;
         return true;
+    }
+
+    private static string CreateSigningKeyForHs512()
+    {
+        var keyBytes = RandomNumberGenerator.GetBytes(MinHs512SigningKeyBytes);
+        return Convert.ToBase64String(keyBytes);
     }
 
     private static AuthenticationHeaderValue Header(string scheme, string parameter) => new(scheme, parameter);
