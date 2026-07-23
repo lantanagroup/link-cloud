@@ -367,7 +367,9 @@ public static class FhirBundleGenerator
         ScenarioResourceGeneration.AddPatientCoreAndScenarioResources(
             entries, patientId, patientSeed, 0, patientSeed, totalResourcesPerPatient,
             encStart, encEnd, scenario, anchors, encounter,
-            sharedPractitionerIds, sharedMedicationIds, config, ids, generationRequirementsPlan);
+            sharedPractitionerIds, sharedMedicationIds, config, ids, generationRequirementsPlan,
+            measurementPeriodStart: clinicalPeriodStart,
+            measurementPeriodEnd: clinicalPeriodEnd);
 
         return entries;
     }
