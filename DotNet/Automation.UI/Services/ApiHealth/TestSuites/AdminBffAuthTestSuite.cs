@@ -51,13 +51,39 @@ public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
 
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
-            results.Add(MakeFailedResult(StepNames.MissingAuthHeaderGet401,
-                "ServiceRegistry:AdminBffServiceApiUrl is not configured."));
+            const string missingAdminBffConfigError = "ServiceRegistry:AdminBffServiceApiUrl is not configured.";
+            results.Add(MakeFailedResult(StepNames.MissingAuthHeaderGet401, missingAdminBffConfigError));
+
+            var remainingSteps = new[]
+            {
+                StepNames.ValidBearerGet200,
+                StepNames.TokenReuseGet200,
+                StepNames.InvalidSignatureBearerGet401,
+                StepNames.ExpiredBearerGet401Or403,
+                StepNames.EmptyBearerGet401,
+                StepNames.MalformedBearerGet401,
+                StepNames.InvalidAuthSchemeGet401,
+                StepNames.CrossApiTokenReuseGet401
+            };
+
+            foreach (var step in remainingSteps)
+                results.Add(SkipStepAsync(step, missingAdminBffConfigError));
+
             return results;
         }
 
         var endpointUrl = $"{baseUrl}{ProtectedPath}";
         var canGenerateTokens = TryGetTokenGenerationInputs(out var signingKey, out var authority, out var tokenConfigError);
+
+        var tokenScenarioSteps = new[]
+        {
+            StepNames.ValidBearerGet200,
+            StepNames.TokenReuseGet200,
+            StepNames.InvalidSignatureBearerGet401,
+            StepNames.ExpiredBearerGet401Or403,
+            StepNames.CrossApiTokenReuseGet401
+        };
+        var completedTokenScenarioSteps = new HashSet<string>(StringComparer.Ordinal);
 
         string? validToken = null;
         if (canGenerateTokens)
@@ -65,34 +91,42 @@ public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
             try
             {
                 validToken = await _createSystemToken.ExecuteAsync(signingKey!, 5);
-                results.Add(await CallEndpointAsync(StepNames.ValidBearerGet200, endpointUrl, 200, Header("Bearer", validToken), false, ct));
-                results.Add(await CallEndpointAsync(StepNames.TokenReuseGet200, endpointUrl, 200, Header("Bearer", validToken), false, ct));
+                var validTokenResult = await CallEndpointAsync(StepNames.ValidBearerGet200, endpointUrl, 200, Header("Bearer", validToken), false, ct);
+                results.Add(validTokenResult);
+                completedTokenScenarioSteps.Add(StepNames.ValidBearerGet200);
+
+                var tokenReuseResult = await CallEndpointAsync(StepNames.TokenReuseGet200, endpointUrl, 200, Header("Bearer", validToken), false, ct);
+                results.Add(tokenReuseResult);
+                completedTokenScenarioSteps.Add(StepNames.TokenReuseGet200);
 
                 var invalidSignatureToken = BuildToken(
                     CreateSigningKeyForHs512(),
                     authority!,
                     LinkAuthorizationConstants.LinkBearerService.LinkBearerAudience,
                     DateTime.UtcNow.AddMinutes(5));
-                results.Add(await CallEndpointAsync(StepNames.InvalidSignatureBearerGet401, endpointUrl, 401, Header("Bearer", invalidSignatureToken), true, ct));
+                var invalidSignatureResult = await CallEndpointAsync(StepNames.InvalidSignatureBearerGet401, endpointUrl, 401, Header("Bearer", invalidSignatureToken), true, ct);
+                results.Add(invalidSignatureResult);
+                completedTokenScenarioSteps.Add(StepNames.InvalidSignatureBearerGet401);
 
                 var expiredToken = await _createSystemToken.ExecuteAsync(signingKey!, -5);
-                results.Add(await CallEndpointAsync(StepNames.ExpiredBearerGet401Or403, endpointUrl, [401, 403], Header("Bearer", expiredToken), true, ct));
+                var expiredTokenResult = await CallEndpointAsync(StepNames.ExpiredBearerGet401Or403, endpointUrl, [401, 403], Header("Bearer", expiredToken), true, ct);
+                results.Add(expiredTokenResult);
+                completedTokenScenarioSteps.Add(StepNames.ExpiredBearerGet401Or403);
 
                 var wrongAudienceToken = BuildToken(
                     signingKey!,
                     authority!,
                     "LinkServices-OtherApi",
                     DateTime.UtcNow.AddMinutes(5));
-                results.Add(await CallEndpointAsync(StepNames.CrossApiTokenReuseGet401, endpointUrl, 401, Header("Bearer", wrongAudienceToken), true, ct));
+                var crossApiTokenReuseResult = await CallEndpointAsync(StepNames.CrossApiTokenReuseGet401, endpointUrl, 401, Header("Bearer", wrongAudienceToken), true, ct);
+                results.Add(crossApiTokenReuseResult);
+                completedTokenScenarioSteps.Add(StepNames.CrossApiTokenReuseGet401);
             }
             catch (Exception ex)
             {
                 var error = $"Token generation failed for auth test scenarios: {ex.Message}";
-                results.Add(SkipStepAsync(StepNames.ValidBearerGet200, error));
-                results.Add(SkipStepAsync(StepNames.TokenReuseGet200, error));
-                results.Add(SkipStepAsync(StepNames.InvalidSignatureBearerGet401, error));
-                results.Add(SkipStepAsync(StepNames.ExpiredBearerGet401Or403, error));
-                results.Add(SkipStepAsync(StepNames.CrossApiTokenReuseGet401, error));
+                foreach (var step in tokenScenarioSteps.Where(step => !completedTokenScenarioSteps.Contains(step)))
+                    results.Add(SkipStepAsync(step, error));
             }
         }
         else
@@ -165,18 +199,18 @@ public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
             sw.Stop();
             result.DurationMs = sw.ElapsedMilliseconds;
             result.ActualStatusCode = (int)response.StatusCode;
-            result.ExpectedStatusCode = expectedStatusCodes.Contains(result.ActualStatusCode.Value)
+            var responseCodeMatchesExpected = expectedStatusCodes.Contains(result.ActualStatusCode.Value);
+            result.ExpectedStatusCode = responseCodeMatchesExpected
                 ? result.ActualStatusCode.Value
                 : expectedStatusCodes[0];
-            result.Passed = expectedStatusCodes.Contains(result.ActualStatusCode.Value);
+            result.Passed = responseCodeMatchesExpected;
             result.ResponseBody = string.IsNullOrWhiteSpace(responseBody)
                 ? $"No response body was returned (HTTP {(int)response.StatusCode})."
                 : (responseBody.Length > 500 ? responseBody[..500] : responseBody);
             result.TraceId = ExtractTraceId(response);
 
-            if (result.Passed && validateAuthErrorMessage && !LooksLikeAuthError(result.ResponseBody))
+            if (!responseCodeMatchesExpected && validateAuthErrorMessage && !LooksLikeAuthError(result.ResponseBody))
             {
-                result.Passed = false;
                 result.ErrorMessage = "Denied response did not include an authentication/authorization error message.";
             }
 
