@@ -1,7 +1,6 @@
 ﻿using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
-using Hl7.Fhir.Serialization;
 using Hl7.Fhir.Support;
 using LantanaGroup.Link.Report.Application.Core;
 using LantanaGroup.Link.Report.Domain.Managers;
@@ -185,12 +184,9 @@ namespace LantanaGroup.Link.Report.Listeners
                 throw new DeadLetterException($"No patient report entry records were found (ReportId = {schedule.Id}, FacilityId = {facilityId})");
             }
 
-            if (!value.IsValid)
+            if (!value.IsValid && reportEntry.ReportingStatus != ReportingStatus.FailedValidation)
             {
                 var operationOutcome = GetOperationOutcome();
-
-                var serializer = new FhirJsonSerializer();
-                string json = serializer.SerializeToString(operationOutcome);
 
                 await patientAggregator.AppendResourceToBlob(reportEntry.AggregateReportBlobName, operationOutcome);
             }

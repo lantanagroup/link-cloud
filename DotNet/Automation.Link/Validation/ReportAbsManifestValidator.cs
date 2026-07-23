@@ -138,6 +138,36 @@ public class ReportAbsManifestValidator
                     .Select(mr => mr.MeasureReportId)
                     .Where(id => !string.IsNullOrWhiteSpace(id))
                     .ToHashSet(StringComparer.Ordinal);
+
+                if (manifest != null)
+                {
+                    foreach (var entry in entries)
+                    {
+                        if (string.IsNullOrWhiteSpace(entry.PatientId)
+                            || !expectedSubmittedPatientSet.Contains(entry.PatientId)
+                            || !string.Equals(entry.SubmissionStatus, "Submitted", StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
+                        var reportable = entry.MeasureReports
+                            .Where(mr => IsReadyForValidation(mr.Status))
+                            .ToList();
+
+                        var actualReportableCount = reportable.Count;
+                        var predictedCounts = manifest.GetExpectedAbsCountsForPatient(entry.PatientId);
+                        var predictedMeasureReportCount = 0;
+                        if (predictedCounts != null)
+                            predictedCounts.TryGetValue("MeasureReport", out predictedMeasureReportCount);
+
+                        if (predictedMeasureReportCount != actualReportableCount)
+                        {
+                            AddError(
+                                errors,
+                                $"ABS patient={entry.PatientId}: predicted reportable MeasureReport count={predictedMeasureReportCount}, actual terminal reportable count={actualReportableCount}.");
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -172,7 +202,11 @@ public class ReportAbsManifestValidator
                 await PopulateExpectedOperationOutcomesFromReportEntriesAsync(manifest, scheduleId);
             }
 
-            ValidateAbsResourceCountsAgainstManifest(manifest, parsedPatientResources, expectedSubmittedPatientIds, errors);
+            ValidateAbsResourceCountsAgainstManifest(
+                manifest,
+                parsedPatientResources,
+                expectedSubmittedPatientIds,
+                errors);
         }
 
         await FailIfNeededAsync(errors);
@@ -456,7 +490,12 @@ public class ReportAbsManifestValidator
         var absNonDerivedKeys = patientResources
             .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
             .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
-            .Where(k => !IsDerivedType(k.Split('/')[0]))
+            .Where(k =>
+            {
+                var resourceType = k.Split('/')[0];
+                return !IsDerivedType(resourceType)
+                    && !string.Equals(resourceType, "Organization", StringComparison.OrdinalIgnoreCase);
+            })
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var missingFromGenerated = absNonDerivedKeys
@@ -464,16 +503,12 @@ public class ReportAbsManifestValidator
             .Take(50)
             .ToList();
 
-        if (missingFromGenerated.Count > 0)
-        {
-            _output.WriteLine($"[WARN] ABS contains {missingFromGenerated.Count} resource(s) not present in the generated FHIR bundles:");
-            foreach (var missing in missingFromGenerated)
-                _output.WriteLine($"  [WARN] {missing}");
-        }
+        foreach (var missing in missingFromGenerated)
+            AddError(errors, $"ABS contains resource not present in generated FHIR bundles: {missing}");
     }
 
     /// <summary>
-    /// Warning-only reconciliation of ABS against the in-memory <see cref="GenerationManifest"/>.
+    /// Reconciliation of ABS against the in-memory <see cref="GenerationManifest"/>.
     /// Used when the caller has a manifest but did not retain serialized bundles (streaming pipeline).
     /// </summary>
     private void ValidateGeneratedManifestReconciliation(
@@ -489,7 +524,12 @@ public class ReportAbsManifestValidator
         var absNonDerivedKeys = patientResources
             .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
             .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
-            .Where(k => !IsDerivedType(k.Split('/')[0]))
+            .Where(k =>
+            {
+                var resourceType = k.Split('/')[0];
+                return !IsDerivedType(resourceType)
+                    && !string.Equals(resourceType, "Organization", StringComparison.OrdinalIgnoreCase);
+            })
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var missingFromGenerated = absNonDerivedKeys
@@ -497,12 +537,8 @@ public class ReportAbsManifestValidator
             .Take(50)
             .ToList();
 
-        if (missingFromGenerated.Count > 0)
-        {
-            _output.WriteLine($"[WARN] ABS contains {missingFromGenerated.Count} resource(s) not present in the generation manifest:");
-            foreach (var missing in missingFromGenerated)
-                _output.WriteLine($"  [WARN] {missing}");
-        }
+        foreach (var missing in missingFromGenerated)
+            AddError(errors, $"ABS contains resource not present in generation manifest: {missing}");
     }
 
     /// <summary>
@@ -549,9 +585,11 @@ public class ReportAbsManifestValidator
 
         foreach (var patientId in expectedSubmittedPatientIds)
         {
-            var expectedCounts = manifest.GetExpectedAbsCountsForPatient(patientId);
-            if (expectedCounts == null)
+            var manifestExpectedCounts = manifest.GetExpectedAbsCountsForPatient(patientId);
+            if (manifestExpectedCounts == null)
                 continue;
+
+            var expectedCounts = new Dictionary<string, int>(manifestExpectedCounts, StringComparer.OrdinalIgnoreCase);
 
             absCountsByPatientType.TryGetValue(patientId, out var actualCounts);
             actualCounts ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -792,6 +830,9 @@ public class ReportAbsManifestValidator
 
     private static bool IsDerivedType(string resourceType) =>
         DerivedResourceTypes.Contains(resourceType, StringComparer.OrdinalIgnoreCase);
+
+    private static bool IsReadyForValidation(string? status) =>
+        string.Equals(status, "ReadyForValidation", StringComparison.OrdinalIgnoreCase);
 
     private sealed record AbsResourceRecord(string SourceFile, string PatientId, string ResourceType, string ResourceId, JsonElement Resource);
 }

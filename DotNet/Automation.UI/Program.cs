@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -36,39 +37,31 @@ if (!string.IsNullOrEmpty(externalConfigSource))
 // -- Bind options --
 builder.Services.Configure<AutomationConfig>(builder.Configuration.GetSection("Automation"));
 
-var grafanaBaseUrlFallback =
-    builder.Configuration["GRAFANA_URL"]
-    ?? builder.Configuration["GRAFANA_BASE_URL"]
-    ?? builder.Configuration["GrafanaBaseUrl"];
-
-if (!string.IsNullOrWhiteSpace(grafanaBaseUrlFallback))
+var lokiUrl = builder.Configuration["Loki:Url"];
+if (string.IsNullOrWhiteSpace(lokiUrl))
 {
-    builder.Services.PostConfigure<AutomationConfig>(cfg =>
-    {
-        if (string.IsNullOrWhiteSpace(cfg.GrafanaBaseUrl)
-            || string.Equals(cfg.GrafanaBaseUrl, "http://localhost:3000", StringComparison.OrdinalIgnoreCase))
-        {
-            cfg.GrafanaBaseUrl = grafanaBaseUrlFallback.TrimEnd('/');
-        }
-    });
+    throw new InvalidOperationException("Loki:Url is required.");
 }
 
-var lokiAppLabelFallback = builder.Configuration["/loki/app"]
-    ?? builder.Configuration["loki/app"]
-    ?? builder.Configuration["Loki:App"]
-    ?? builder.Configuration["Automation:LokiAppLabel"];
-
-if (!string.IsNullOrWhiteSpace(lokiAppLabelFallback))
+var lokiAppLabel = builder.Configuration["Loki:App"];
+if (string.IsNullOrWhiteSpace(lokiAppLabel))
 {
-    builder.Services.PostConfigure<AutomationConfig>(cfg =>
-    {
-        if (string.IsNullOrWhiteSpace(cfg.LokiAppLabel)
-            || string.Equals(cfg.LokiAppLabel, "link-cloud", StringComparison.OrdinalIgnoreCase))
-        {
-            cfg.LokiAppLabel = lokiAppLabelFallback.Trim();
-        }
-    });
+    throw new InvalidOperationException("Loki:App is required.");
 }
+
+builder.Services.PostConfigure<AutomationConfig>(cfg =>
+{
+    cfg.LokiBaseUrl = lokiUrl.TrimEnd('/');
+    cfg.LokiAppLabel = lokiAppLabel.Trim();
+});
+
+var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>()
+                      ?? throw new InvalidOperationException($"{KafkaConstants.SectionName} configuration is required.");
+
+if (kafkaConnection.BootstrapServers.Count == 0)
+    throw new InvalidOperationException($"{KafkaConstants.SectionName}:BootstrapServers must include at least one broker.");
+
+builder.Services.AddSingleton(kafkaConnection);
 
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection("LinkTokenService"));

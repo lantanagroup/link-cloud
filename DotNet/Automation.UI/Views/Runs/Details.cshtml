@@ -7,7 +7,9 @@
     <div class="d-flex justify-content-between align-items-start mb-3">
         <div>
             <h3 class="fw-bold mb-0" id="runName">@Model.RunName</h3>
-            <code class="text-muted small">@Model.RunId</code>
+            <div class="small text-muted">
+                Report ID: <code id="headerReportId">@(string.IsNullOrWhiteSpace(Model.ReportId) ? "-" : Model.ReportId)</code>
+            </div>
         </div>
         <div class="d-flex gap-2 align-items-center" id="runHeaderActions">
             @if (Model.Status is AutomationRunStatus.Queued or AutomationRunStatus.Running)
@@ -85,7 +87,7 @@
                                 <div class="small text-muted mb-2">Report Schedule</div>
                                 <div class="row g-2">
                                     <div class="col-md-12"><strong>Facility ID:</strong> <code id="scheduleFacilityId">@(Model.FacilityId ?? "-")</code></div>
-                                    <div class="col-md-6"><strong>Test:</strong> <span id="scheduleReportName">-</span></div>
+                                    <div class="col-md-6"><strong>Report ID:</strong> <code id="scheduleReportName">@(string.IsNullOrWhiteSpace(Model.ReportId) ? "-" : Model.ReportId)</code></div>
                                     <div class="col-md-6"><strong>Frequency:</strong> <span id="scheduleFrequency">-</span></div>
                                     <div class="col-md-6"><strong>Start:</strong> <span id="scheduleStart">-</span></div>
                                     <div class="col-md-6"><strong>End:</strong> <span id="scheduleEnd">-</span></div>
@@ -1310,9 +1312,11 @@
                 renderValidatorResults(snapshot.validatorResults || []);
 
                 const schedule = snapshot.report?.schedule;
-                const effectiveFacilityId = snapshot.facilityId || snapshot.FacilityId || schedule?.reportName || '-';
+                const effectiveFacilityId = snapshot.facilityId || snapshot.FacilityId || '-';
+                const effectiveReportId = snapshot.reportId || snapshot.ReportId || '-';
                 document.getElementById('scheduleFacilityId').textContent = effectiveFacilityId;
-                document.getElementById('scheduleReportName').textContent = schedule?.reportName || '-';
+                document.getElementById('scheduleReportName').textContent = effectiveReportId;
+                document.getElementById('headerReportId').textContent = effectiveReportId;
                 document.getElementById('scheduleFrequency').textContent = schedule?.frequency || '-';
                 document.getElementById('scheduleStart').textContent = schedule?.startDate || '-';
                 document.getElementById('scheduleEnd').textContent = schedule?.endDate || '-';
@@ -1443,6 +1447,9 @@
             document.getElementById('runName').textContent = run.runName;
             document.getElementById('facilityId').textContent = run.facilityId || '-';
             document.getElementById('scheduleFacilityId').textContent = run.facilityId || '-';
+            const reportIdFromStatus = run.reportId || '-';
+            document.getElementById('scheduleReportName').textContent = reportIdFromStatus;
+            document.getElementById('headerReportId').textContent = reportIdFromStatus;
             document.getElementById('status').textContent = run.status;
             document.getElementById('error').textContent = run.error || '-';
             document.getElementById('started').textContent = run.startedAt || '-';
