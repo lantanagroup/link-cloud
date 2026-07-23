@@ -59,7 +59,7 @@ public class ReportAbsManifestValidatorTests
     }
 
     [Fact]
-    public async Task ValidateAllAsync_WhenTerminalReportabilityDiffers_UsesReportCountsAndSkipsKeyLevelMismatch()
+    public async Task ValidateAllAsync_WhenTerminalReportabilityDiffers_FailsOnCountMismatches()
     {
         var output = new BufferingAutomationOutput();
         var patientId = "Patient-UT-001";
@@ -143,18 +143,23 @@ public class ReportAbsManifestValidatorTests
 
         var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader(reportClient.Object));
 
-        await validator.ValidateAllAsync(
-            internalAbsResources,
-            new[] { patientId },
-            new[] { achMeasureId, hypoMeasureId },
-            ExpectedStart,
-            ExpectedEnd,
-            facilityId: "Facility-UT",
-            reportId: scheduleId.ToString(),
-            generatedBundles: null,
-            expectedManifestPatientListIds: new[] { patientId },
-            expectDataAcquisitionData: true,
-            manifest: manifest);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            validator.ValidateAllAsync(
+                internalAbsResources,
+                new[] { patientId },
+                new[] { achMeasureId, hypoMeasureId },
+                ExpectedStart,
+                ExpectedEnd,
+                facilityId: "Facility-UT",
+                reportId: scheduleId.ToString(),
+                generatedBundles: null,
+                expectedManifestPatientListIds: new[] { patientId },
+                expectDataAcquisitionData: true,
+                manifest: manifest));
+
+        Assert.Contains("predicted reportable MeasureReport count=2, actual terminal reportable count=1", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("type=Condition: expected=3", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("type=MeasureReport: expected=2", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
