@@ -52,6 +52,18 @@ public sealed class ValidatorRunner
                 IssueCount = 0
             });
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Cancellation is not a validator finding. Without this, cancelling a run would make every
+            // remaining validator throw, each would be recorded as Failed, and the run would report
+            // "N validator(s) failed" instead of cancelled — RunExecutor's OperationCanceledException
+            // handler would never see it.
+            //
+            // Filtered on the token so that a timeout surfacing as TaskCanceledException, with no
+            // cancellation actually requested, is still reported as the validator failure it is rather
+            // than quietly ending the run.
+            throw;
+        }
         catch (Exception ex)
         {
             var issueCount = 0;
@@ -72,7 +84,10 @@ public sealed class ValidatorRunner
         }
         finally
         {
-            if (_persistAsync != null)
+            // Skipped once cancellation is requested: the call would fail anyway, and an exception
+            // thrown from a finally block replaces the one propagating out of it — masking the
+            // cancellation this method just took care to surface.
+            if (_persistAsync != null && !cancellationToken.IsCancellationRequested)
             {
                 await _persistAsync(_results, cancellationToken);
             }

@@ -116,6 +116,62 @@ public class ValidatorRunnerTests
     }
 
     [Fact]
+    public async Task CancellationPropagatesInsteadOfBeingRecordedAsAFailure()
+    {
+        // A cancelled run must not be reported as a failed one. Without this, every remaining
+        // validator would throw, each would be recorded as Failed, and the run would surface as
+        // "N validator(s) failed" rather than cancelled.
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        var runner = new ValidatorRunner();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            runner.RunAsync("ABS MANIFEST", () => throw new OperationCanceledException(cts.Token), cts.Token));
+
+        Assert.Empty(runner.Failures);
+        Assert.Empty(runner.Results);
+
+        // And nothing was collected, so the run does not additionally fail validation.
+        runner.ThrowIfAnyFailed();
+    }
+
+    [Fact]
+    public async Task CancellationExceptionWithoutCancellationRequestedIsStillAFailure()
+    {
+        // A timeout surfaces as TaskCanceledException while no cancellation was requested. That is a
+        // genuine validator failure and must not be mistaken for the run being cancelled.
+        var runner = new ValidatorRunner();
+
+        await runner.RunAsync("TENANT DATABASE", () => throw new TaskCanceledException("HTTP timeout"));
+
+        Assert.Single(runner.Failures);
+        Assert.Contains("TENANT DATABASE: HTTP timeout", runner.Failures.Single());
+        Assert.Equal("Failed", runner.Results.Single().Outcome);
+    }
+
+    [Fact]
+    public async Task PersistIsSkippedOnceCancellationIsRequested()
+    {
+        // An exception thrown from the finally block would replace the propagating
+        // OperationCanceledException, masking the cancellation.
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        var persistCalled = false;
+        var runner = new ValidatorRunner((_, _) =>
+        {
+            persistCalled = true;
+            throw new InvalidOperationException("snapshot store rejected a cancelled write");
+        });
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            runner.RunAsync("ABS MANIFEST", () => throw new OperationCanceledException(cts.Token), cts.Token));
+
+        Assert.False(persistCalled);
+    }
+
+    [Fact]
     public async Task PassesTheCancellationTokenToThePersistCallback()
     {
         using var cts = new CancellationTokenSource();
