@@ -10,6 +10,7 @@ import ca.uhn.fhir.rest.gclient.IOperationUntyped;
 import ca.uhn.fhir.rest.gclient.IOperationUntypedWithInputAndPartialOutput;
 import ca.uhn.fhir.rest.server.exceptions.InvalidRequestException;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import org.hl7.fhir.r4.model.BooleanType;
 import org.hl7.fhir.r4.model.CodeableConcept;
 import org.hl7.fhir.r4.model.OperationOutcome;
@@ -18,6 +19,7 @@ import org.hl7.fhir.r4.model.StringType;
 import org.hl7.fhir.r4.model.ValueSet;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 
 import java.util.List;
 
@@ -31,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -380,5 +383,63 @@ class RemoteTermServiceValidationTest {
 
         assertFalse(subject.isValueSetSupported(null, "http://example.org/ValueSet/vs"));
         verifyNoInteractions(cacheService);
+    }
+
+    // ---------- log-sanitization tests ----------
+
+    @Test
+    void invokeRemoteValidateCode_codeSystemBranch_sanitizesLogArguments() {
+        try (MockedStatic<LogUtils> logUtils = mockStatic(LogUtils.class, org.mockito.Answers.CALLS_REAL_METHODS)) {
+            RemoteTermServiceValidation subject = newSpy();
+            stubClientChain(subject, validateCodeResponse(true, "display", "Glucose"), false);
+
+            subject.invokeRemoteValidateCode(CODE_SYSTEM_URL, CODE, null, null, null);
+
+            logUtils.verify(() -> LogUtils.sanitize(CODE_SYSTEM_URL));
+            logUtils.verify(() -> LogUtils.sanitize(CODE));
+        }
+    }
+
+    @Test
+    void invokeRemoteValidateCode_valueSetBranch_sanitizesLogArguments() {
+        try (MockedStatic<LogUtils> logUtils = mockStatic(LogUtils.class, org.mockito.Answers.CALLS_REAL_METHODS)) {
+            RemoteTermServiceValidation subject = newSpy();
+            stubClientChain(subject, validateCodeResponse(true, "display", "Glucose"), false);
+
+            subject.invokeRemoteValidateCode(CODE_SYSTEM_URL, CODE, null, VALUE_SET_URL, null);
+
+            logUtils.verify(() -> LogUtils.sanitize(VALUE_SET_URL));
+            logUtils.verify(() -> LogUtils.sanitize(CODE));
+        }
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void invokeLookupCode_catchBlock_sanitizesLogArguments() {
+        RemoteTermServiceValidation subject = newSpy();
+
+        IGenericClient client = mock(IGenericClient.class);
+        IOperation operation = mock(IOperation.class);
+        IOperationUnnamed unnamed = mock(IOperationUnnamed.class);
+        IOperationUntyped untyped = mock(IOperationUntyped.class);
+        IOperationUntypedWithInputAndPartialOutput withInput = mock(IOperationUntypedWithInputAndPartialOutput.class);
+
+        doReturn(client).when(subject).provideClient();
+        when(client.getFhirContext()).thenReturn(fhirContext);
+        when(client.operation()).thenReturn(operation);
+        when(operation.onType(any(Class.class))).thenReturn(unnamed);
+        when(unnamed.named(anyString())).thenReturn(untyped);
+        when(untyped.withParameters(any())).thenReturn(withInput);
+        when(withInput.useHttpGet()).thenReturn(withInput);
+        InvalidRequestException exception = new InvalidRequestException("bad request\nInjected");
+        when(withInput.execute()).thenThrow(exception);
+
+        try (MockedStatic<LogUtils> logUtils = mockStatic(LogUtils.class, org.mockito.Answers.CALLS_REAL_METHODS)) {
+            subject.invokeLookupCode(CODE, CODE_SYSTEM_URL, null, "");
+
+            logUtils.verify(() -> LogUtils.sanitize(CODE));
+            logUtils.verify(() -> LogUtils.sanitize(CODE_SYSTEM_URL));
+            logUtils.verify(() -> LogUtils.sanitize(exception.getMessage()));
+        }
     }
 }

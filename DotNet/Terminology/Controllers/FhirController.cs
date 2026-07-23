@@ -210,6 +210,7 @@ public class FhirController(FhirService fhirService) : Controller
     /// </summary>
     [HttpGet("CodeSystem/$lookup")]
     [HttpGet("CodeSystem/{id}/$lookup")]
+    [ValidateAntiForgeryToken]
     public ActionResult<Parameters> LookupCodeInCodeSystem([FromQuery] string? system, [FromRoute] string? id,
         [FromQuery] string? code, [FromQuery] string? version)
     {

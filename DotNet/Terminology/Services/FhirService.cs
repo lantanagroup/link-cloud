@@ -4,6 +4,7 @@ using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
+using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
 
 namespace LantanaGroup.Link.Terminology.Services;
 
@@ -505,6 +506,12 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
                     Name = "validate-code",
                     Definition = "http://hl7.org/fhir/OperationDefinition/CodeSystem-validate-code",
                     Documentation = "Validate a code in a code system"
+                },
+                new()
+                {
+                    Name = "lookup",
+                    Definition = "http://hl7.org/fhir/OperationDefinition/CodeSystem-lookup",
+                    Documentation = "Lookup a code in a code system"
                 }
             }
         };
@@ -688,7 +695,7 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
     /// Builds the validation result for a set of codes that share the requested value, applying the
     /// display check and surfacing an inactive-code warning when the matched code is inactive.
     /// </summary>
-    private Parameters BuildMatchResult(List<Application.Models.Code> matches, string? system, string? display)
+    private Parameters BuildMatchResult(List<Code> matches, string? system, string? display)
     {
         if (!string.IsNullOrEmpty(display) && matches.All(c => c.Display != display))
         {
@@ -710,7 +717,7 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
     /// are plain codes with no status, so their status is rejoined from the CodeSystem identified by <paramref name="system"/>.
     /// Defaults to active when the code cannot be resolved to a loaded CodeSystem, preserving prior behavior.
     /// </summary>
-    private bool ResolveIsActive(Application.Models.Code codeObject, string? system)
+    private bool ResolveIsActive(Code codeObject, string? system)
     {
         if (codeObject is CodeSystemCode codeSystemCode)
         {

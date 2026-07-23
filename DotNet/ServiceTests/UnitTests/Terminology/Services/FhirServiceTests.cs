@@ -2,11 +2,8 @@
 using LantanaGroup.Link.Shared.Application.SerDes;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
-using LantanaGroup.Link.Terminology.Application.Settings;
 using LantanaGroup.Link.Terminology.Services;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Moq;
 using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
 
@@ -1144,6 +1141,22 @@ public class FhirServiceTests
         // Act / Assert
         Assert.Throws<ArgumentException>(() =>
             _service.LookupCodeInCodeSystem(null, null, "http://lookup.system", "lookup-code", null, parameters));
+    }
+
+    [Fact]
+    public void GetMetaData_CodeSystemOperations_IncludesLookupOperation()
+    {
+        // Act
+        var result = _service.GetMetaData();
+
+        // Assert
+        var codeSystemResource = result.Rest
+            .SelectMany(rest => rest.Resource)
+            .First(resource => resource.Type == "CodeSystem");
+
+        Assert.Contains(codeSystemResource.Operation, operation =>
+            operation.Name == "lookup" &&
+            operation.Definition == "http://hl7.org/fhir/OperationDefinition/CodeSystem-lookup");
     }
 
     #endregion
