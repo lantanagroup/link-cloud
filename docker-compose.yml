@@ -698,6 +698,8 @@ services:
     container_name: link-automation-ui
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
+      Automation__LokiBaseUrl: http://loki:3100
+      ApiHealth__EnableAdminBffAuthSuite: ${LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE:-true}
       KafkaConnection__BootstrapServers__0: kafka_b:9092
       KafkaConnection__SaslProtocolEnabled: true
       KafkaConnection__SaslUsername: ${KAFKA_SASL_CLIENT_USER}

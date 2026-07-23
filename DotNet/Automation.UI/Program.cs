@@ -243,6 +243,13 @@ builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServi
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.MeasureEvalTestSuite>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.ValidationServiceTestSuite>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.AdminBffTestSuite>();
+
+var enableAdminBffAuthSuite = builder.Configuration.GetValue<bool>("ApiHealth:EnableAdminBffAuthSuite");
+if (enableAdminBffAuthSuite)
+{
+    builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.AdminBffAuthTestSuite>();
+}
+
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiEndpointRegistry>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiHealthExecutionRunManager>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedContextAccessor, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedContextAccessor>();
