@@ -612,55 +612,15 @@ internal sealed class RunExecutor
             // Pipeline-built manifest already has all metadata; no need to re-parse bundles.
             // For non-profile runs (no pipeline), generationManifest remains null.
 
-            var validatorResults = new List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>();
+            // Failures are collected and re-thrown together once every validator has run — see
+            // ValidatorRunner for why failing on the first one destroyed the evidence needed to
+            // localise a discrepancy. Results are persisted after each validator so partial results
+            // stay visible in the dashboard even when a later validator fails.
+            var validatorRunner = new ValidatorRunner((results, ct) =>
+                _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", results, ct));
 
-            // Validator failures are collected rather than thrown immediately, and re-thrown together
-            // once every validator has run. Failing on the first one hid the evidence needed to
-            // localise a discrepancy: the ABS manifest validator runs first, so when it reported a
-            // missing resource the DataAcquisition and Normalization validators never executed, and
-            // there was no way to tell whether the resource had been lost upstream of the aggregation
-            // or by it. The layers are only diagnostic when read together.
-            var validatorFailures = new List<string>();
-
-            async Task RunValidator(string name, Func<Task> action)
-            {
-                try
-                {
-                    await action();
-                    validatorResults.Add(new PipelineSummarySnapshotBuilder.ValidatorResultSnapshot
-                    {
-                        Name = name,
-                        Outcome = "Passed",
-                        IssueCount = 0
-                    });
-                }
-                catch (Exception ex)
-                {
-                    // Extract issue count from the conventional message format:
-                    // "... failed with N issue(s)."
-                    var issueCount = 0;
-                    var match = System.Text.RegularExpressions.Regex.Match(ex.Message, @"(\d+)\s+issue\(s\)");
-                    if (match.Success)
-                        int.TryParse(match.Groups[1].Value, out issueCount);
-
-                    validatorResults.Add(new PipelineSummarySnapshotBuilder.ValidatorResultSnapshot
-                    {
-                        Name = name,
-                        Outcome = "Failed",
-                        IssueCount = issueCount
-                    });
-
-                    // Collected, not thrown: the remaining validators still run, and the run fails
-                    // with all of their findings once they have.
-                    validatorFailures.Add($"{name}: {ex.Message}");
-                }
-                finally
-                {
-                    // Persist after each validator so partial results are visible
-                    // in the dashboard even if a later validator throws.
-                    await _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", validatorResults, cancellationToken);
-                }
-            }
+            Task RunValidator(string name, Func<Task> action) =>
+                validatorRunner.RunAsync(name, action, cancellationToken);
 
             await RunValidator("REPORT INTERNAL ABS MANIFEST VALIDATION", () =>
                 reportAbsValidator.ValidateAllAsync(
@@ -799,12 +759,7 @@ internal sealed class RunExecutor
 
             // Thrown before cleanup, matching the previous behaviour of leaving a failed run's data in
             // place for inspection.
-            if (validatorFailures.Count > 0)
-            {
-                throw new InvalidOperationException(
-                    $"{validatorFailures.Count} validator(s) failed:{Environment.NewLine}" +
-                    string.Join(Environment.NewLine, validatorFailures.Select(failure => "  - " + failure)));
-            }
+            validatorRunner.ThrowIfAnyFailed();
 
             await RunCleanupHelper.CleanupAfterRunAsync(
                 scenarioConfig,
