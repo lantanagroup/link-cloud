@@ -19,12 +19,6 @@ public class ReportAbsManifestValidator
         "OperationOutcome"
     ];
 
-    private static readonly HashSet<string> RuntimeDerivedCountTypes =
-    [
-        "OperationOutcome",
-        "Organization"
-    ];
-
     private readonly IAutomationOutput _output;
     private readonly PipelineDataReader _reader;
 
@@ -112,8 +106,6 @@ public class ReportAbsManifestValidator
 
         var parsedPatientResources = new List<AbsResourceRecord>();
         var patientMeasureReportIds = new HashSet<string>(StringComparer.Ordinal);
-        Dictionary<string, Dictionary<string, int>>? absCountOverridesByPatient = null;
-        HashSet<string>? skipExpectedKeyValidationPatientIds = null;
 
         foreach (var patientId in expectedSubmittedPatientIds)
         {
@@ -149,9 +141,6 @@ public class ReportAbsManifestValidator
 
                 if (manifest != null)
                 {
-                    absCountOverridesByPatient = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
-                    skipExpectedKeyValidationPatientIds = new HashSet<string>(StringComparer.Ordinal);
-
                     foreach (var entry in entries)
                     {
                         if (string.IsNullOrWhiteSpace(entry.PatientId)
@@ -172,41 +161,12 @@ public class ReportAbsManifestValidator
                             predictedCounts.TryGetValue("MeasureReport", out predictedMeasureReportCount);
 
                         if (predictedMeasureReportCount != actualReportableCount)
-                            skipExpectedKeyValidationPatientIds.Add(entry.PatientId);
-
-                        // When terminal report state shows exactly one reportable measure for
-                        // this submitted patient, use that row's resource-count map as the
-                        // concrete type-count expectation baseline.
-                        if (actualReportableCount == 1)
                         {
-                            var overrideCounts = reportable[0].ResourceCounts
-                                .Where(rc => !string.IsNullOrWhiteSpace(rc.ResourceType))
-                                .GroupBy(rc => rc.ResourceType, StringComparer.OrdinalIgnoreCase)
-                                .ToDictionary(g => g.Key, g => g.Last().ResourceCount, StringComparer.OrdinalIgnoreCase);
-
-                            overrideCounts["MeasureReport"] = 1;
-                            absCountOverridesByPatient[entry.PatientId] = overrideCounts;
+                            AddError(
+                                errors,
+                                $"ABS patient={entry.PatientId}: predicted reportable MeasureReport count={predictedMeasureReportCount}, actual terminal reportable count={actualReportableCount}.");
                         }
                     }
-
-                    if (skipExpectedKeyValidationPatientIds.Count > 0)
-                    {
-                        var sample = string.Join(", ", skipExpectedKeyValidationPatientIds.Take(5));
-                        var suffix = skipExpectedKeyValidationPatientIds.Count > 5
-                            ? $" (+{skipExpectedKeyValidationPatientIds.Count - 5} more)"
-                            : string.Empty;
-
-                        _output.WriteLine(
-                            $"[ABS][WARN] Skipping key-level expected-resource reconciliation for " +
-                            $"{skipExpectedKeyValidationPatientIds.Count} patient(s) due to terminal " +
-                            $"reportable-measure mismatch vs profile prediction: {sample}{suffix}.");
-                    }
-
-                    if (absCountOverridesByPatient.Count == 0)
-                        absCountOverridesByPatient = null;
-
-                    if (skipExpectedKeyValidationPatientIds.Count == 0)
-                        skipExpectedKeyValidationPatientIds = null;
                 }
             }
             catch (Exception ex)
@@ -246,8 +206,6 @@ public class ReportAbsManifestValidator
                 manifest,
                 parsedPatientResources,
                 expectedSubmittedPatientIds,
-                absCountOverridesByPatient,
-                skipExpectedKeyValidationPatientIds,
                 errors);
         }
 
@@ -532,7 +490,12 @@ public class ReportAbsManifestValidator
         var absNonDerivedKeys = patientResources
             .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
             .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
-            .Where(k => !IsDerivedType(k.Split('/')[0]))
+            .Where(k =>
+            {
+                var resourceType = k.Split('/')[0];
+                return !IsDerivedType(resourceType)
+                    && !string.Equals(resourceType, "Organization", StringComparison.OrdinalIgnoreCase);
+            })
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var missingFromGenerated = absNonDerivedKeys
@@ -540,16 +503,12 @@ public class ReportAbsManifestValidator
             .Take(50)
             .ToList();
 
-        if (missingFromGenerated.Count > 0)
-        {
-            _output.WriteLine($"[WARN] ABS contains {missingFromGenerated.Count} resource(s) not present in the generated FHIR bundles:");
-            foreach (var missing in missingFromGenerated)
-                _output.WriteLine($"  [WARN] {missing}");
-        }
+        foreach (var missing in missingFromGenerated)
+            AddError(errors, $"ABS contains resource not present in generated FHIR bundles: {missing}");
     }
 
     /// <summary>
-    /// Warning-only reconciliation of ABS against the in-memory <see cref="GenerationManifest"/>.
+    /// Reconciliation of ABS against the in-memory <see cref="GenerationManifest"/>.
     /// Used when the caller has a manifest but did not retain serialized bundles (streaming pipeline).
     /// </summary>
     private void ValidateGeneratedManifestReconciliation(
@@ -565,7 +524,12 @@ public class ReportAbsManifestValidator
         var absNonDerivedKeys = patientResources
             .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
             .Select(r => ToResourceKey(r.ResourceType, r.ResourceId))
-            .Where(k => !IsDerivedType(k.Split('/')[0]))
+            .Where(k =>
+            {
+                var resourceType = k.Split('/')[0];
+                return !IsDerivedType(resourceType)
+                    && !string.Equals(resourceType, "Organization", StringComparison.OrdinalIgnoreCase);
+            })
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var missingFromGenerated = absNonDerivedKeys
@@ -573,12 +537,8 @@ public class ReportAbsManifestValidator
             .Take(50)
             .ToList();
 
-        if (missingFromGenerated.Count > 0)
-        {
-            _output.WriteLine($"[WARN] ABS contains {missingFromGenerated.Count} resource(s) not present in the generation manifest:");
-            foreach (var missing in missingFromGenerated)
-                _output.WriteLine($"  [WARN] {missing}");
-        }
+        foreach (var missing in missingFromGenerated)
+            AddError(errors, $"ABS contains resource not present in generation manifest: {missing}");
     }
 
     /// <summary>
@@ -612,8 +572,6 @@ public class ReportAbsManifestValidator
         GenerationManifest manifest,
         List<AbsResourceRecord> parsedPatientResources,
         IReadOnlyCollection<string> expectedSubmittedPatientIds,
-        IReadOnlyDictionary<string, Dictionary<string, int>>? absCountOverridesByPatient,
-        IReadOnlySet<string>? skipExpectedKeyValidationPatientIds,
         List<string> errors)
     {
         var absCountsByPatientType = parsedPatientResources
@@ -632,21 +590,6 @@ public class ReportAbsManifestValidator
                 continue;
 
             var expectedCounts = new Dictionary<string, int>(manifestExpectedCounts, StringComparer.OrdinalIgnoreCase);
-
-            if (absCountOverridesByPatient != null
-                && absCountOverridesByPatient.TryGetValue(patientId, out var overrideCounts)
-                && overrideCounts.Count > 0)
-            {
-                var reconciled = new Dictionary<string, int>(overrideCounts, StringComparer.OrdinalIgnoreCase);
-
-                foreach (var derivedType in RuntimeDerivedCountTypes)
-                {
-                    if (manifestExpectedCounts.TryGetValue(derivedType, out var derivedCount) && derivedCount > 0)
-                        reconciled[derivedType] = derivedCount;
-                }
-
-                expectedCounts = reconciled;
-            }
 
             absCountsByPatientType.TryGetValue(patientId, out var actualCounts);
             actualCounts ??= new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -696,12 +639,6 @@ public class ReportAbsManifestValidator
         var expectedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var patientId in expectedSubmittedPatientIds)
         {
-            if (skipExpectedKeyValidationPatientIds != null
-                && skipExpectedKeyValidationPatientIds.Contains(patientId))
-            {
-                continue;
-            }
-
             foreach (var key in manifest.GetExpectedAbsKeysForPatient(patientId))
                 expectedKeys.Add(key);
         }

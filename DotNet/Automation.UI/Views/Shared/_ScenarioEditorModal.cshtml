@@ -853,11 +853,11 @@
             var label = fmt(s) + (e && e !== s ? ' &rarr; ' + fmt(e) : '');
             var status = compareEncounterToPeriod(s, e);
             var badge = status === 'overlap'
-                ? '<span class="badge rounded-pill text-bg-success mt-1 px-2 py-1" title="Encounter overlaps the report period">&#10003; overlaps period</span>'
+                ? '<span class="badge rounded-pill au-badge-success mt-1 px-2 py-1" title="Encounter overlaps the report period">&#10003; overlaps period</span>'
                 : status === 'outside-before'
-                    ? '<span class="badge rounded-pill text-bg-warning mt-1 px-2 py-1" title="Encounter ends before report period start">&#9888; before period</span>'
+                    ? '<span class="badge rounded-pill au-badge-warning mt-1 px-2 py-1" title="Encounter ends before report period start">&#9888; before period</span>'
                     : status === 'outside-after'
-                        ? '<span class="badge rounded-pill text-bg-warning mt-1 px-2 py-1" title="Encounter starts after report period end">&#9888; after period</span>'
+                        ? '<span class="badge rounded-pill au-badge-warning mt-1 px-2 py-1" title="Encounter starts after report period end">&#9888; after period</span>'
                         : '';
             cell.innerHTML = '<div>' + label + '</div>' + (badge ? '<div>' + badge + '</div>' : '');
         }

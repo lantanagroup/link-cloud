@@ -309,7 +309,7 @@ public class ReportApiHelper
                     break;
                 }
 
-                // Entryless scheduled runs are valid when oracle prediction says no
+                // Entryless scheduled runs are valid when prediction says no
                 // patients should participate. In that case the report can transition
                 // to Submitted without ever emitting ReportEntriesCreated.
                 var scheduleProbe = await _reportClient.GetScheduleAsync(reportId);

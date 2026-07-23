@@ -481,7 +481,7 @@ internal sealed class RunExecutor
                 // Scheduled runs can report Submitted before all entry-level states have
                 // reached terminal values. Wait for terminal completion before snapshots
                 // and validators run. This wait is synchronization only; expected sets
-                // remain oracle-driven and are not overwritten from terminal-state output.
+                // remain prediction-driven and are not overwritten from terminal-state output.
                 await reportHelper.WaitForTerminalReportStateAsync(
                     reportId,
                     allowEntrylessTerminal: expectedSubmittedPatientIds.Count == 0,
@@ -500,15 +500,24 @@ internal sealed class RunExecutor
                 expectedReportEntryPatientIds = expectedSubmittedPatientIds.ToList();
             }
 
-            // Report manifest patient List is sourced from ReportEntry rows, not strictly from
-            // submitted-patient rows. Keep this expectation aligned with the ReportEntry scope
-            // so non-submitted entries present in the manifest List do not produce false failures.
-            expectedManifestPatientListIds = expectedReportEntryPatientIds;
+            // Manifest patient-list entries are report-entry scoped in Report service.
+            // Adhoc runs create report entries from the full scenario patient set, while
+            // scheduled/regenerate runs can scope report entries to the scheduled
+            // participant set. Keep manifest-list expectations aligned to that mode-specific
+            // report-entry scope; patient artifact file expectations remain
+            // submission-prediction scoped.
+            expectedManifestPatientListIds = usesScheduledWorkflow
+                ? expectedReportEntryPatientIds
+                : expectedAllPatientIds;
 
             if (generationManifest != null)
             {
                 generationManifest.ExpectedAbsPatientIdsOverride =
                     new HashSet<string>(expectedSubmittedPatientIds, StringComparer.Ordinal);
+
+                // Persist the submitted-patient override before validators run so the
+                // dashboard reflects prediction scope even when a later validator fails.
+                await _snapshotStore.SetDomainAsync(state.RunId, "generationManifest", generationManifest.ToSnapshot(), cancellationToken);
             }
 
             // RegenerateReport: the first report is just a prerequisite.

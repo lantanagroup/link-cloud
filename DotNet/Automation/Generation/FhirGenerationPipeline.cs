@@ -330,7 +330,7 @@ public static class FhirGenerationPipeline
 
         if (cqlInput != null)
         {
-            effectiveProfile = ApplyMeasurementPeriodEligibilityOracle(
+            effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
                 patientId,
                 profile,
                 measures,
@@ -484,12 +484,12 @@ public static class FhirGenerationPipeline
 
         var profile = new PatientProfile(eligibilities, ClinicalScenarioId: imported.DetectedClinicalScenarioId);
 
-        // 3. CQL filter simulation + period-aware eligibility oracle
+        // 3. CQL filter simulation + period-aware eligibility prediction
         var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
         var effectiveProfile = profile;
         if (cqlInput != null)
         {
-            effectiveProfile = ApplyMeasurementPeriodEligibilityOracle(
+            effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
                 patientId,
                 profile,
                 measures,
@@ -565,7 +565,7 @@ public static class FhirGenerationPipeline
         return (patientId, bundleCount);
     }
 
-    private static PatientProfile ApplyMeasurementPeriodEligibilityOracle(
+    private static PatientProfile ApplyMeasurementPeriodEligibilityPrediction(
         string patientId,
         PatientProfile profile,
         IReadOnlyList<ProfiledMeasureType> measures,

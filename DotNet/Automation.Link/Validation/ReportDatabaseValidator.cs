@@ -226,7 +226,7 @@ public class ReportDatabaseValidator
             var measureHasQualifyingPatients = true;
 
             // expectedSubmittedPatientIds is the authoritative expectation produced by
-            // run-planning oracle logic (profile expectations plus imported-patient
+            // run-planning prediction logic (profile expectations plus imported-patient
             // period-aware checks). When none are expected to be submitted,
             // ReportPopulation rows may be present but not contain valid
             // group/measure-report population rows.
