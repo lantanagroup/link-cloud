@@ -209,10 +209,11 @@ public sealed class AdminBffAuthTestSuite : ServiceTestSuiteBase
                 : (responseBody.Length > 500 ? responseBody[..500] : responseBody);
             result.TraceId = ExtractTraceId(response);
 
-            if (!responseCodeMatchesExpected && validateAuthErrorMessage && !LooksLikeAuthError(result.ResponseBody))
-            {
-                result.ErrorMessage = "Denied response did not include an authentication/authorization error message.";
-            }
+if (validateAuthErrorMessage && responseCodeMatchesExpected && !LooksLikeAuthError(result.ResponseBody))
+{
+    result.Passed = false;
+    result.ErrorMessage = "Denied response did not include an authentication/authorization error message.";
+}
 
             if (!result.Passed && string.IsNullOrWhiteSpace(result.ErrorMessage))
             {
