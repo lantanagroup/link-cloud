@@ -426,6 +426,65 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         return CreateValidationParameters(false, "No valid code found in parameters");
     }
 
+    public Parameters LookupCodeInCodeSystem(string? url, string? id, string? system, string? code, string? version, Parameters? parameters)
+    {
+        var codeComponent = parameters?.Get("code").FirstOrDefault()?.Value?.ToString();
+        var systemComponent = parameters?.Get("system").FirstOrDefault()?.Value?.ToString();
+        var versionComponent = parameters?.Get("version").FirstOrDefault()?.Value?.ToString();
+        var coding = parameters?.Get("coding").FirstOrDefault()?.Value as Coding;
+
+        code ??= codeComponent;
+        system ??= systemComponent;
+        version ??= versionComponent;
+
+        var hasCodeAndSystem = !string.IsNullOrWhiteSpace(code) && !string.IsNullOrWhiteSpace(system);
+        var hasCoding = coding != null;
+
+        if (hasCodeAndSystem == hasCoding)
+        {
+            throw new ArgumentException("Specify either code+system, or coding (in Parameters), but not both");
+        }
+
+        string codeToLookup;
+        string systemIdentifier;
+
+        if (hasCoding)
+        {
+            codeToLookup = coding!.Code;
+            systemIdentifier = coding.System;
+
+            if (string.IsNullOrWhiteSpace(codeToLookup) || string.IsNullOrWhiteSpace(systemIdentifier))
+            {
+                throw new ArgumentException("Parameters.coding must include both code and system");
+            }
+        }
+        else
+        {
+            codeToLookup = code!;
+            systemIdentifier = system!;
+        }
+
+        var codeGroup = ResolveCodeSystemForLookup(id, systemIdentifier, version);
+
+        if (!codeGroup.Codes.TryGetValue(systemIdentifier, out var codes))
+        {
+            throw new KeyNotFoundException($"Code system '{systemIdentifier}' was not found in the requested code system");
+        }
+
+        var matchedCode = codes.LastOrDefault(c => c.Value == codeToLookup);
+        if (matchedCode == null)
+        {
+            throw new KeyNotFoundException($"Code '{codeToLookup}' was not found in code system '{systemIdentifier}'");
+        }
+
+        var response = new Parameters();
+        response.Add("name", new FhirString(codeGroup.Name ?? string.Empty));
+        response.Add("version", new FhirString(codeGroup.Version ?? string.Empty));
+        response.Add("display", new FhirString(matchedCode.Display ?? string.Empty));
+
+        return response;
+    }
+
     public CapabilityStatement GetMetaData()
     {
         var codeSystemResource = new CapabilityStatement.ResourceComponent()
@@ -552,6 +611,39 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         return string.IsNullOrEmpty(system)
             ? ValidateCodeAcrossSystems(codeGroup, code, display)
             : ValidateCodeInSystem(codeGroup, code, system, display);
+    }
+
+    private CodeGroup ResolveCodeSystemForLookup(string? id, string system, string? version)
+    {
+        if (!string.IsNullOrEmpty(id))
+        {
+            var byId = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, id, version);
+
+            if (byId == null)
+            {
+                if (!string.IsNullOrEmpty(version))
+                {
+                    throw new KeyNotFoundException($"Code system version '{version}' could not be found");
+                }
+
+                throw new KeyNotFoundException($"Code system with id '{id}' was not found");
+            }
+
+            return byId;
+        }
+
+        var bySystem = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system, version);
+        if (bySystem == null || (!string.IsNullOrEmpty(version) && !string.Equals(bySystem.Version, version, StringComparison.CurrentCultureIgnoreCase)))
+        {
+            if (!string.IsNullOrEmpty(version))
+            {
+                throw new KeyNotFoundException($"Code system version '{version}' could not be found");
+            }
+
+            throw new KeyNotFoundException($"Code system '{system}' was not found");
+        }
+
+        return bySystem;
     }
 
     /// <summary>

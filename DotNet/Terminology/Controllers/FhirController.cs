@@ -206,6 +206,62 @@ public class FhirController(FhirService fhirService) : Controller
     }
 
     /// <summary>
+    /// Looks up details for a code in a specific CodeSystem using query parameters.
+    /// </summary>
+    [HttpGet("CodeSystem/$lookup")]
+    [HttpGet("CodeSystem/{id}/$lookup")]
+    public ActionResult<Parameters> LookupCodeInCodeSystem([FromQuery] string? system, [FromRoute] string? id,
+        [FromQuery] string? code, [FromQuery] string? version)
+    {
+        try
+        {
+            return Ok(fhirService.LookupCodeInCodeSystem(
+                null,
+                id?.Sanitize(),
+                system?.Sanitize(),
+                code?.Sanitize(),
+                version?.Sanitize(),
+                null));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Looks up details for a code in a specific CodeSystem using query/body parameters.
+    /// </summary>
+    [HttpPost("CodeSystem/$lookup")]
+    [HttpPost("CodeSystem/{id}/$lookup")]
+    public ActionResult<Parameters> LookupCodeInCodeSystem([FromQuery] string? system, [FromRoute] string? id,
+        [FromQuery] string? code, [FromQuery] string? version, [FromBody] Parameters? parameters)
+    {
+        try
+        {
+            return Ok(fhirService.LookupCodeInCodeSystem(
+                null,
+                id?.Sanitize(),
+                system?.Sanitize(),
+                code?.Sanitize(),
+                version?.Sanitize(),
+                parameters));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Validates a given code, optionally with its system and display, against a specified ValueSet.
     /// </summary>
     /// <param name="url">The canonical URL of the ValueSet to validate against. This parameter is optional if the id is provided.</param>
