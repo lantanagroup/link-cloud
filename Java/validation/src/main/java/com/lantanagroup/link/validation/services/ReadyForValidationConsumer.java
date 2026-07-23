@@ -50,7 +50,7 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
             ValidationService validationService,
             CategorizationService categorizationService,
             ResultRepository resultRepository,
-            KafkaTemplate<String, ValidationComplete> validationCompleteTemplate,
+            @Qualifier("defaultKafkaTemplate") KafkaTemplate<String, ValidationComplete> validationCompleteTemplate,
             ValidationMetrics validationMetrics,
             Optional<BlobStorageService> blobStorageService,
             @Qualifier("readyForValidationRecoverer") ConsumerRecordRecoverer recoverer) {
