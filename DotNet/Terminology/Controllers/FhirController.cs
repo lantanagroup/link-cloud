@@ -210,7 +210,6 @@ public class FhirController(FhirService fhirService) : Controller
     /// </summary>
     [HttpGet("CodeSystem/$lookup")]
     [HttpGet("CodeSystem/{id}/$lookup")]
-    [ValidateAntiForgeryToken]
     public ActionResult<Parameters> LookupCodeInCodeSystem([FromQuery] string? system, [FromRoute] string? id,
         [FromQuery] string? code, [FromQuery] string? version)
     {
@@ -239,18 +238,21 @@ public class FhirController(FhirService fhirService) : Controller
     /// </summary>
     [HttpPost("CodeSystem/$lookup")]
     [HttpPost("CodeSystem/{id}/$lookup")]
+    [ValidateAntiForgeryToken]
     public ActionResult<Parameters> LookupCodeInCodeSystem([FromQuery] string? system, [FromRoute] string? id,
         [FromQuery] string? code, [FromQuery] string? version, [FromBody] Parameters? parameters)
     {
         try
         {
+            var sanitizedParameters = SanitizeLookupCodeParameters(parameters);
+
             return Ok(fhirService.LookupCodeInCodeSystem(
                 null,
                 id?.Sanitize(),
                 system?.Sanitize(),
                 code?.Sanitize(),
                 version?.Sanitize(),
-                parameters));
+                sanitizedParameters));
         }
         catch (ArgumentException ex)
         {
@@ -260,6 +262,33 @@ public class FhirController(FhirService fhirService) : Controller
         {
             return NotFound(ex.Message);
         }
+    }
+
+    private static Parameters? SanitizeLookupCodeParameters(Parameters? parameters)
+    {
+        if (parameters == null)
+        {
+            return null;
+        }
+
+        foreach (var parameter in parameters.Parameter)
+        {
+            if (parameter.Name is "code" or "system" or "version")
+            {
+                var sanitizedValue = parameter.Value?.ToString()?.Sanitize();
+                parameter.Value = sanitizedValue == null ? null : new FhirString(sanitizedValue);
+                continue;
+            }
+
+            if (parameter.Name == "coding" && parameter.Value is Coding coding)
+            {
+                coding.Code = coding.Code?.Sanitize();
+                coding.System = coding.System?.Sanitize();
+                coding.Version = coding.Version?.Sanitize();
+            }
+        }
+
+        return parameters;
     }
 
     /// <summary>
