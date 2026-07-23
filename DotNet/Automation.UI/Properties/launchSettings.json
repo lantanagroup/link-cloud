@@ -28,6 +28,7 @@
       "applicationUrl": "http://localhost:5255",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Docker",
+        "ApiHealth__EnableAdminBffAuthSuite": "true",
         "Authentication__UseBearerForServiceCalls": "true",
         "LinkTokenService__Authority": "LinkServiceAdmin",
         "LinkTokenService__SigningKey": "local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes",
