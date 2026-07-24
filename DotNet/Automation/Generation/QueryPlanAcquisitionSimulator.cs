@@ -473,7 +473,7 @@ public static class QueryPlanAcquisitionSimulator
     /// <summary>
     /// Determines whether a FHIR search parameter name is a temporal (date-like) filter.
     /// Recognized names: <c>date</c>, <c>authoredon</c>, <c>authored</c>, <c>issued</c>,
-    /// <c>effective</c>, <c>onset-date</c>, <c>recorded-date</c>.
+    /// <c>effective</c>, <c>effective-time</c>, <c>onset-date</c>, <c>recorded-date</c>.
     /// </summary>
     private static bool IsTemporalSearchParam(string paramName)
         => string.Equals(paramName, "date", StringComparison.OrdinalIgnoreCase)
@@ -481,6 +481,7 @@ public static class QueryPlanAcquisitionSimulator
            || string.Equals(paramName, "authored", StringComparison.OrdinalIgnoreCase)
            || string.Equals(paramName, "issued", StringComparison.OrdinalIgnoreCase)
            || string.Equals(paramName, "effective", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(paramName, "effective-time", StringComparison.OrdinalIgnoreCase)
            || string.Equals(paramName, "onset-date", StringComparison.OrdinalIgnoreCase)
            || string.Equals(paramName, "recorded-date", StringComparison.OrdinalIgnoreCase);
 
@@ -504,7 +505,8 @@ public static class QueryPlanAcquisitionSimulator
             return TryGetInstant(resource, "issued", out start, out end);
         }
 
-        if (string.Equals(paramName, "effective", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(paramName, "effective", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(paramName, "effective-time", StringComparison.OrdinalIgnoreCase))
         {
             return TryGetEffective(resource, out start, out end);
         }

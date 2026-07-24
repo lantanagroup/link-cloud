@@ -295,6 +295,15 @@
                             <input class="form-control" id="OpCodeMapFhirPath" />
                         </div>
                         <div class="col-12 op-field op-field-CodeMap">
+                            <label class="form-label">Code System Maps</label>
+                            <div id="opCodeSystemMapRows"></div>
+                            <div class="d-flex gap-2 mt-2">
+                                <button type="button" class="btn btn-sm btn-outline-success" id="btnAddCodeSystemMap"><i class="bi bi-plus-lg me-1"></i>Add Code System Map</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCodeMapLoadFromJson">Load from JSON</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCodeMapSyncJson">Sync JSON from Controls</button>
+                            </div>
+                        </div>
+                        <div class="col-12 op-field op-field-CodeMap">
                             <label class="form-label">Code System Maps <small class="text-muted">(JSON)</small></label>
                             <textarea class="form-control font-monospace" id="OpCodeSystemMaps" rows="6" style="font-size:.8rem;"></textarea>
                         </div>
@@ -306,11 +315,11 @@
                         </div>
 
                         @* --- CopyLocationAliasToTypeIteratively fields --- *@
-                        <div class="col-md-6 op-field op-field-CopyLocationAliasToTypeIteratively">
+                        <div class="col-md-6 op-field op-field-CopyLocationAliasToTypeIteratively" id="OpCopyIterativeMaxIterationsWrap">
                             <label class="form-label" for="OpMaxIterations">Max Iterations</label>
                             <input class="form-control" type="number" min="1" id="OpMaxIterations" value="15" />
                         </div>
-                        <div class="col-md-6 op-field op-field-CopyLocationAliasToTypeIteratively d-flex align-items-end">
+                        <div class="col-md-6 op-field op-field-CopyLocationAliasToTypeIteratively align-items-end" id="OpCopyIterativeSplitOnCommaWrap">
                             <div class="form-check mb-2">
                                 <input class="form-check-input" type="checkbox" id="OpSplitOnComma" />
                                 <label class="form-check-label" for="OpSplitOnComma">Split Alias Entries on Comma</label>
@@ -498,9 +507,113 @@
         const t = document.getElementById('OpType').value;
         document.querySelectorAll('.op-field').forEach(el => el.style.display = 'none');
         document.querySelectorAll('.op-field-' + t).forEach(el => el.style.display = '');
+
+        const copyIterativeVisible = t === 'CopyLocationAliasToTypeIteratively';
+        document.getElementById('OpCopyIterativeMaxIterationsWrap').style.display = copyIterativeVisible ? '' : 'none';
+        document.getElementById('OpCopyIterativeSplitOnCommaWrap').style.display = copyIterativeVisible ? 'flex' : 'none';
     }
 
     document.getElementById('OpType').addEventListener('change', toggleOpFields);
+
+    function addCodeMapEntryRow(entriesHost, key, value) {
+        const row = document.createElement('div');
+        row.className = 'row g-2 mb-1 code-map-entry-row';
+        row.innerHTML =
+            '<div class="col-md-4"><input class="form-control form-control-sm code-map-source-key" placeholder="Source Code" /></div>'
+            + '<div class="col-md-3"><input class="form-control form-control-sm code-map-target-code" placeholder="Target Code" /></div>'
+            + '<div class="col-md-4"><input class="form-control form-control-sm code-map-target-display" placeholder="Display" /></div>'
+            + '<div class="col-md-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i></button></div>';
+
+        row.querySelector('.code-map-source-key').value = key || '';
+        row.querySelector('.code-map-target-code').value = value?.code || value?.Code || '';
+        row.querySelector('.code-map-target-display').value = value?.display || value?.Display || '';
+        row.querySelector('button').addEventListener('click', () => row.remove());
+        entriesHost.appendChild(row);
+    }
+
+    function addCodeSystemMapCard(item) {
+        const host = document.getElementById('opCodeSystemMapRows');
+        const card = document.createElement('div');
+        card.className = 'card mb-2 p-2 code-system-map-card';
+        card.innerHTML =
+            '<div class="d-flex justify-content-between align-items-center mb-2">'
+            + '<span class="fw-semibold">Code System Map</span>'
+            + '<button type="button" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i></button>'
+            + '</div>'
+            + '<div class="row g-2 mb-2">'
+            + '<div class="col-md-6"><label class="form-label mb-1 small">Source System</label><input class="form-control form-control-sm csm-source-system" /></div>'
+            + '<div class="col-md-6"><label class="form-label mb-1 small">Target System</label><input class="form-control form-control-sm csm-target-system" /></div>'
+            + '</div>'
+            + '<div class="small text-muted mb-1">Code Maps</div>'
+            + '<div class="csm-code-maps"></div>'
+            + '<button type="button" class="btn btn-sm btn-outline-success mt-2 csm-add-code-map"><i class="bi bi-plus-lg me-1"></i>Add Code Map</button>';
+
+        card.querySelector('button.btn-outline-danger').addEventListener('click', () => card.remove());
+        const entriesHost = card.querySelector('.csm-code-maps');
+        card.querySelector('.csm-add-code-map').addEventListener('click', () => addCodeMapEntryRow(entriesHost, '', { code: '', display: '' }));
+
+        card.querySelector('.csm-source-system').value = item?.sourceSystem || item?.SourceSystem || '';
+        card.querySelector('.csm-target-system').value = item?.targetSystem || item?.TargetSystem || '';
+
+        const maps = item?.codeMaps || item?.CodeMaps || {};
+        const entries = Object.entries(maps);
+        if (entries.length === 0) {
+            addCodeMapEntryRow(entriesHost, '', { code: '', display: '' });
+        } else {
+            entries.forEach(([key, value]) => addCodeMapEntryRow(entriesHost, key, value));
+        }
+
+        host.appendChild(card);
+    }
+
+    function clearCodeSystemMapCards() {
+        document.getElementById('opCodeSystemMapRows').innerHTML = '';
+    }
+
+    function setCodeSystemMapCards(items) {
+        clearCodeSystemMapCards();
+        (items || []).forEach(item => addCodeSystemMapCard(item));
+    }
+
+    function buildCodeSystemMapsFromCardsOrError() {
+        const cards = Array.from(document.querySelectorAll('#opCodeSystemMapRows .code-system-map-card'));
+        if (cards.length === 0) return null;
+
+        return cards.map((card, index) => {
+            const sourceSystem = (card.querySelector('.csm-source-system').value || '').trim();
+            const targetSystem = (card.querySelector('.csm-target-system').value || '').trim();
+            if (!sourceSystem) throw new Error(`Code System Map #${index + 1} requires Source System.`);
+            if (!targetSystem) throw new Error(`Code System Map #${index + 1} requires Target System.`);
+
+            const codeMaps = {};
+            const rows = Array.from(card.querySelectorAll('.code-map-entry-row'));
+            if (rows.length === 0) throw new Error(`Code System Map #${index + 1} requires at least one Code Map entry.`);
+
+            rows.forEach((row, rowIndex) => {
+                const key = (row.querySelector('.code-map-source-key').value || '').trim();
+                const code = (row.querySelector('.code-map-target-code').value || '').trim();
+                const display = (row.querySelector('.code-map-target-display').value || '').trim();
+
+                if (!key && !code && !display) return;
+                if (!key) throw new Error(`Code System Map #${index + 1}, entry #${rowIndex + 1} requires Source Code.`);
+                if (!code) throw new Error(`Code System Map #${index + 1}, entry #${rowIndex + 1} requires Target Code.`);
+
+                codeMaps[key] = {
+                    code: code,
+                    display: display || code
+                };
+            });
+
+            if (Object.keys(codeMaps).length === 0)
+                throw new Error(`Code System Map #${index + 1} requires at least one non-empty Code Map entry.`);
+
+            return {
+                sourceSystem,
+                targetSystem,
+                codeMaps
+            };
+        });
+    }
 
     function openOpEditor(data, mode) {
         document.getElementById('OpId').value = data?.id || '';
@@ -515,6 +628,7 @@
         document.getElementById('OpCondTargetValue').value = data?.conditionTargetValue || '';
         document.getElementById('OpCodeMapFhirPath').value = data?.codeMapFhirPath || '';
         document.getElementById('OpCodeSystemMaps').value = data?.codeSystemMaps ? JSON.stringify(data.codeSystemMaps, null, 2) : '';
+        setCodeSystemMapCards(data?.codeSystemMaps || []);
         document.getElementById('OpExtensionUrls').value = (data?.extensionUrls || []).join('\n');
         document.getElementById('OpMaxIterations').value = data?.maxIterations ?? 15;
         document.getElementById('OpSplitOnComma').checked = !!data?.splitOnComma;
@@ -613,6 +727,20 @@
         return parsed;
     }
 
+    document.getElementById('btnAddCodeSystemMap').addEventListener('click', () => {
+        addCodeSystemMapCard(null);
+    });
+
+    document.getElementById('btnCodeMapLoadFromJson').addEventListener('click', () => {
+        const parsed = parseCodeSystemMapsOrError();
+        setCodeSystemMapCards(parsed);
+    });
+
+    document.getElementById('btnCodeMapSyncJson').addEventListener('click', () => {
+        const built = buildCodeSystemMapsFromCardsOrError();
+        document.getElementById('OpCodeSystemMaps').value = JSON.stringify(built || [], null, 2);
+    });
+
     function collectOpData() {
         const conditions = [];
         document.querySelectorAll('#opConditionsContainer .row').forEach(row => {
@@ -623,7 +751,8 @@
             });
         });
 
-        const codeSystemMaps = parseCodeSystemMapsOrError();
+        const codeSystemMapsFromCards = buildCodeSystemMapsFromCardsOrError();
+        const codeSystemMaps = codeSystemMapsFromCards ?? parseCodeSystemMapsOrError();
 
         return {
             id: document.getElementById('OpId').value || crypto.randomUUID(),
