@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Architecture Export</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({{startOnLoad:true}});
+
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
+        window.copyMermaidSource = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            const source = getMermaidSourceFromContainer(container);
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
+            if (!svg) return;
+
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            const viewBox = svg.viewBox.baseVal;
+            const width = viewBox.width || svg.width.baseVal.value || 800;
+            const height = viewBox.height || svg.height.baseVal.value || 600;
+            
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            img.onload = function() {{
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = 'diagram.png';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }};
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
+        }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
+    </script>
+    <style>
+        .sidebar {{
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            overflow-y: auto;
+        }}
+        .main-content {{
+            margin-left: 240px;
+            padding: 20px;
+        }}
+        .sidebar .nav-link {{ color: #333; }}
+        .sidebar .nav-link:hover {{ color: #007bff; }}
+        .mermaid-container {{
+            position: relative;
+            min-height: 50px;
+            max-height: 500px;
+            overflow: auto;
+            background-color: #fff;
+        }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
+        .mermaid-actions {{
+            position: absolute;
+            display: none;
+            gap: 5px;
+            z-index: 10;
+        }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
+        .mermaid-container:hover .mermaid-actions {{
+            display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
+        }}
+        .mermaid-actions .btn {{
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #dee2e6;
+            padding: 2px 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
+        }}
+        /* Custom Purple Utilities */
+        .text-purple {{ color: #6f42c1 !important; }}
+        .bg-purple-subtle {{ background-color: #e2d9f3 !important; color: #6f42c1 !important; }}
+        .bg-primary-subtle {{ background-color: #cfe2ff !important; color: #052c65 !important; }}
+        .bg-success-subtle {{ background-color: #d1e7dd !important; color: #0a3622 !important; }}
+    </style>
+</head>
+<body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+  <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-report.html">Report</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-tenant.html">Tenant</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="events.html">Events</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-auditableeventoccurred.html">Auditable Event Occurred</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-cernerpatientsacquired.html">Cerner Patients Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-measurereportgenerated.html">Measure Report Generated</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientcensusscheduled.html">Patient Census Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientevent.html">Patient Event</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientlistsacquired.html">Patient Lists Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-payloadsubmitted.html">Payload Submitted</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-dataacquisitionrequested.html">Data Acquisition Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-evaluationrequested.html">Evaluation Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-generatereportrequested.html">Generate Report Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatecodesystemcode.html">Validate CodeSystem Code</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatevaluesetcode.html">Validate ValueSet Code</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="queries.html">Queries</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilitieslist.html">Get Facilities List</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilityconfig.html">Get Facility Configuration</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getserviceinfo.html">Get Service Info</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="services.html">Services</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-accountservice.html">Account Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminbff.html">Admin Backend-for-Frontend</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminui.html">Admin UI (front-end)</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-auditservice.html">Audit Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-censusservice.html">Census Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-submissionservice.html">Submission Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-tenantservice.html">Tenant Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-terminologyservice.html">Terminology Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-validationservice.html">Validation Service</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="designs.html">Designs</a></strong></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > config</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dotnet.html">Configuring .NET Services</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-java.html">Configuring Java Services</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
+</ul>
+
+                </div>
+            </nav>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>EHR Authentication</h1>
+<div class="row">
+    <div class="col-md-8">
+        
+        <h2 id="purpose" class="content-heading">Purpose <a id="purpose" href="#purpose" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Purpose"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>This design explains how Link authenticates to EHR vendor APIs when acquiring data from facility systems.</p>
+<p>The scope of this design is EHR authentication for data acquisition. It does not describe Link user login, Admin UI authentication, service-to-service authentication within Link, or authorization policies for Link users.</p>
+<p>For EHR vendors that expose FHIR APIs, Link authenticates as an application registered in the vendor's system. The application registration represents the Link integration for that vendor environment. Link uses that registration to request access tokens before making data acquisition requests.</p>
+<h2 id="scope" class="content-heading">Scope <a id="scope" href="#scope" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scope"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>This design covers:</p>
+<ul>
+<li>How Link obtains OAuth2 access tokens from EHR vendors.</li>
+<li>How Link uses JWT client assertions for EHR token requests.</li>
+<li>How Link signs JWTs using private keys stored in Key Vault.</li>
+<li>How EHRs validate Link's signed JWTs using public keys.</li>
+<li>How Link will support vendor-specific key/certificate pairs.</li>
+<li>How the key association model should remain flexible for future tenant/facility-level overrides.</li>
+</ul>
+<p>This design does not cover:</p>
+<ul>
+<li>Link Admin UI user authentication.</li>
+<li>Link BFF session management.</li>
+<li>Link internal service authentication.</li>
+<li>General user authorization or role-based access control.</li>
+</ul>
+<h2 id="oauth2-jwt-client-assertion-pattern" class="content-heading">OAuth2 JWT Client Assertion Pattern <a id="oauth2-jwt-client-assertion-pattern" href="#oauth2-jwt-client-assertion-pattern" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: OAuth2 JWT Client Assertion Pattern"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>All supported EHR vendors so far use a form of OAuth2-based authentication. The exact vendor requirements vary, but the high-level workflow is consistent:</p>
+<ol>
+<li>Link generates a JWT client assertion using the configured client ID.</li>
+<li>Link signs the JWT using a private key.</li>
+<li>Link sends the signed JWT to the vendor's authorization endpoint.</li>
+<li>The EHR validates the JWT signature and returns an access token.</li>
+<li>Link sends the access token as an <code>Authorization: Bearer &lt;token&gt;</code> header on each EHR data acquisition request.</li>
+</ol>
+<p>The client ID represents the Link app registration in the vendor's system. The private key is held by Link and used only for signing JWT client assertions. The corresponding public key is made available to the EHR so the EHR can verify that the JWT was signed by Link.</p>
+<h2 id="public-key-distribution" class="content-heading">Public Key Distribution <a id="public-key-distribution" href="#public-key-distribution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Public Key Distribution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="current-manual-public-key-registration" class="content-heading">Current Manual Public Key Registration <a id="current-manual-public-key-registration" href="#current-manual-public-key-registration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Current Manual Public Key Registration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Historically, Link has provided the public key as part of each facility's request to access the Link app registration.</p>
+<p>In practice, this means the public key associated with each facility using the app is copied into the vendor's app registration or access request process. This approach works, but it creates a manual onboarding step for each facility and makes key rotation more operationally difficult.</p>
+<h3 id="jwks-based-public-key-discovery" class="content-heading">JWKS-Based Public Key Discovery <a id="jwks-based-public-key-discovery" href="#jwks-based-public-key-discovery" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: JWKS-Based Public Key Discovery"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Vendors are moving toward validating JWT signatures through a JWKS document.</p>
+<p>With this approach, Link publishes public keys at a public JWKS endpoint. The EHR retrieves the JWKS document and uses the matching public key to validate JWT client assertions signed by Link.</p>
+<p>This reduces manual public key copy/paste during facility onboarding and creates a cleaner path for key rotation.</p>
+<p>In the JWKS-based approach:</p>
+<ol>
+<li>Link maintains one or more private signing keys.</li>
+<li>Link publishes the corresponding public keys through a JWKS endpoint.</li>
+<li>Link includes a <code>kid</code> header in the signed JWT so the EHR can identify which public key should be used for verification.</li>
+<li>The EHR retrieves the JWKS document from Link.</li>
+<li>The EHR validates the JWT signature using the public key associated with the JWT's <code>kid</code>.</li>
+<li>If validation succeeds, the EHR returns an access token.</li>
+<li>Link uses the access token for FHIR API requests during data acquisition.</li>
+</ol>
+<h2 id="jwks-based-authentication-flow" class="content-heading">JWKS-Based Authentication Flow <a id="jwks-based-authentication-flow" href="#jwks-based-authentication-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: JWKS-Based Authentication Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<pre class="mermaid">sequenceDiagram
+    participant Lnk as "Link Data Acquisition"
+    participant VC as "Vendor Configuration"
+    participant KV as "Key Vault"
+    participant JWKS as "Link JWKS Endpoint"
+    participant Auth as "EHR Authorization Server"
+    participant API as "EHR FHIR API"
+
+    Lnk-->>VC: Resolve facility EHR vendor and configured key/kid
+    VC-->>Lnk: Return vendor auth settings and key/kid reference
+    Lnk->>KV: Request signing key or signing operation
+    KV-->>Lnk: Return signing capability or private key material
+    Lnk->>Lnk: Create JWT client assertion with client_id
+    Lnk->>Lnk: Sign JWT and include kid in JWT header
+    Lnk->>Auth: POST token request with signed JWT
+    Auth->>JWKS: GET Link JWKS document
+    JWKS-->>Auth: Return public keys
+    Auth->>Auth: Select key by kid and validate JWT signature
+    Auth-->>Lnk: Return OAuth2 access token
+    Lnk->>API: Request FHIR data with "Authorization: Bearer token"
+    API-->>Lnk: Return FHIR response
+</pre>
+<h2 id="key-storage" class="content-heading">Key Storage <a id="key-storage" href="#key-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>JWT signing keys are stored in Key Vault. Link does not store private signing key material directly in tenant, facility, vendor, or data acquisition configuration records.</p>
+<p>When Link needs to generate a signed JWT, it resolves the applicable key identifier from configuration and requests the key from Key Vault.</p>
+<p>The implementation may either retrieve private key material for in-process signing or use a Key Vault-backed signing capability, depending on the deployment and SDK support.</p>
+<p>The JWKS endpoint exposes only public key material needed by EHRs to validate signatures. Private keys must never be exposed through the JWKS endpoint, admin UI screens, configuration APIs, logs, or exported architecture documentation.</p>
+<h2 id="vendor-specific-key-strategy" class="content-heading">Vendor-Specific Key Strategy <a id="vendor-specific-key-strategy" href="#vendor-specific-key-strategy" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Vendor-Specific Key Strategy"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Link will maintain a separate key/certificate pair per EHR vendor.</p>
+<p>Examples:</p>
+<table>
+<thead>
+<tr>
+<th>Vendor</th>
+<th>Signing Key Strategy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Epic</td>
+<td>Epic-specific key/certificate pair</td>
+</tr>
+<tr>
+<td>Cerner</td>
+<td>Cerner-specific key/certificate pair</td>
+</tr>
+<tr>
+<td>Oracle</td>
+<td>Oracle-specific key/certificate pair</td>
+</tr>
+</tbody>
+</table>
+<p>A single shared key would technically be sufficient for multiple vendors when the same algorithm is supported. However, vendor-specific keys reduce the blast radius if a private key is compromised. If one vendor-specific key is breached, only facilities using that vendor's key are impacted.</p>
+<p>Vendor-specific keys are also required when vendors have different signing algorithm requirements. Oracle requires a different algorithm than Epic and Cerner, so Oracle must have its own key regardless of the preferred blast-radius reduction strategy.</p>
+<h2 id="vendor-key-association" class="content-heading">Vendor Key Association <a id="vendor-key-association" href="#vendor-key-association" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Vendor Key Association"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Link has a concept of <code>Vendor</code> and supports vendor-level configuration through the vendor configuration screen.</p>
+<p>The current plan is to associate each vendor with a specific Key Vault key and <code>kid</code>.</p>
+<p>For example:</p>
+<table>
+<thead>
+<tr>
+<th>Vendor</th>
+<th>Configuration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Epic</td>
+<td>Key Vault key reference and <code>kid</code> used for Epic JWT client assertions</td>
+</tr>
+<tr>
+<td>Cerner</td>
+<td>Key Vault key reference and <code>kid</code> used for Cerner JWT client assertions</td>
+</tr>
+<tr>
+<td>Oracle</td>
+<td>Key Vault key reference, <code>kid</code>, and algorithm required for Oracle JWT client assertions</td>
+</tr>
+</tbody>
+</table>
+<p>At runtime, Link should resolve the signing key from the vendor associated with the facility's EHR configuration. This keeps key management centralized at the vendor level and avoids requiring every facility to independently configure key material when the vendor-level key is sufficient.</p>
+<h2 id="runtime-key-resolution" class="content-heading">Runtime Key Resolution <a id="runtime-key-resolution" href="#runtime-key-resolution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Runtime Key Resolution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>At runtime, Link resolves the signing key based on the facility's configured EHR vendor.</p>
+<p>The initial resolution model is:</p>
+<ol>
+<li>Determine the facility's EHR vendor from data acquisition configuration.</li>
+<li>Retrieve the vendor-level authentication configuration.</li>
+<li>Resolve the Key Vault key reference and <code>kid</code> associated with that vendor.</li>
+<li>Use that key/kid when creating and signing the JWT client assertion.</li>
+<li>Include the <code>kid</code> in the JWT header so the EHR can select the matching public key from Link's JWKS document.</li>
+</ol>
+<p>The configuration model should allow a future facility-level override without requiring a major redesign.</p>
+<p>A future resolution order may be:</p>
+<ol>
+<li>Use a facility-specific key/kid override, when configured.</li>
+<li>Otherwise, use the vendor-level key/kid.</li>
+</ol>
+<h2 id="future-facility-level-key-overrides" class="content-heading">Future Facility-Level Key Overrides <a id="future-facility-level-key-overrides" href="#future-facility-level-key-overrides" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Future Facility-Level Key Overrides"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The initial implementation should associate keys at the vendor level. However, the design should remain flexible enough to support tenant/facility-level key overrides in the future.</p>
+<p>A facility-level override may be needed if vendor-level keying is not sufficient for a specific facility. For example, a facility may have a policy requiring a unique key/certificate pair for that facility's app registration or authorization workflow.</p>
+<p>Tenant/facility-level overrides are not part of the initial implementation, but the configuration model should avoid assumptions that would make this difficult to add later.</p>
+<h2 id="operational-considerations" class="content-heading">Operational Considerations <a id="operational-considerations" href="#operational-considerations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Operational Considerations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="key-rotation" class="content-heading">Key Rotation <a id="key-rotation" href="#key-rotation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Rotation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Key rotation should be supported without disrupting active facilities.</p>
+<p>A typical rotation process is:</p>
+<ol>
+<li>Generate a new vendor-specific key/certificate pair in Key Vault.</li>
+<li>Publish the new public key in the Link JWKS document.</li>
+<li>Update the vendor configuration to reference the new Key Vault key and <code>kid</code>.</li>
+<li>Begin signing new JWT client assertions with the new private key and <code>kid</code>.</li>
+<li>Allow EHR systems to validate the new key through the JWKS endpoint.</li>
+<li>Retire the old key after all affected vendor integrations have moved to the new key.</li>
+</ol>
+<p>If tenant/facility-level key overrides are introduced later, the same rotation model should apply to those overrides.</p>
+<h3 id="key-identification" class="content-heading">Key Identification <a id="key-identification" href="#key-identification" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Identification"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Each public key in the JWKS document must include a stable <code>kid</code>.</p>
+<p>The JWT signed by Link must include the same <code>kid</code> in its header so the EHR can select the correct public key.</p>
+<p>Vendor configuration should persist the Key Vault key reference and the <code>kid</code> that should be used for JWT signing. The <code>kid</code> used in signed JWTs must align with the corresponding public key published in the JWKS document.</p>
+<h3 id="private-key-protection" class="content-heading">Private Key Protection <a id="private-key-protection" href="#private-key-protection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Private Key Protection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Private keys must remain secret and must not be exposed through configuration APIs, logs, JWKS documents, admin UI screens, or exported architecture documentation.</p>
+<p>The JWKS endpoint exposes only public key material.</p>
+<h3 id="facility-onboarding" class="content-heading">Facility Onboarding <a id="facility-onboarding" href="#facility-onboarding" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Facility Onboarding"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>When a vendor supports JWKS validation, facility onboarding should reference the Link-hosted JWKS endpoint instead of requiring public key material to be manually copied into each facility's app registration request.</p>
+<p>When a vendor or facility still requires manual public key registration, Link may continue supporting that workflow as a vendor-specific onboarding requirement.</p>
+<h3 id="token-caching" class="content-heading">Token Caching <a id="token-caching" href="#token-caching" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Token Caching"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<p>Token responses may be cached according to the vendor-provided expiration period to avoid requesting a new token for every FHIR request.</p>
+<p>Token caching should be scoped in a way that avoids cross-facility or cross-vendor token reuse. At minimum, the cache key should account for the facility, vendor, token endpoint, client ID, requested scopes/audience, and any other vendor-specific token request parameters that influence the issued token.</p>
+<h2 id="data-acquisition-integration" class="content-heading">Data Acquisition Integration <a id="data-acquisition-integration" href="#data-acquisition-integration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Integration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>EHR authentication is used by Link's data acquisition workflow whenever Link needs to query an EHR FHIR endpoint.</p>
+<p>Before issuing FHIR requests, Link obtains an access token from the vendor authorization server. Once the token is received, Link attaches it to each outbound EHR API request:</p>
+<pre><code class="language-http">Authorization: Bearer &lt;access-token&gt;
+</code></pre>
+<p>The access token is used only for EHR API requests associated with the relevant facility/vendor authentication context.</p>
+<h2 id="open-questions" class="content-heading">Open Questions <a id="open-questions" href="#open-questions" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Open Questions"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>The following implementation details should be confirmed as the design is implemented:</p>
+<ol>
+<li>What public URL path will Link expose for the JWKS document?</li>
+<li>Will Link retrieve private key material from Key Vault for in-process signing, or will it use a Key Vault-backed signing operation?</li>
+<li>What are the exact JWT signing algorithm requirements for Epic, Cerner, and Oracle?</li>
+<li>How long do each of the EHR vendors cache JWKS responses, and how should that affect key rotation timing?</li>
+<li>Do any facilities require facility-specific keys at launch, or is vendor-level keying sufficient for the initial implementation?</li>
+</ol>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+nehr_auth_FAA739A["Design: EHR Authentication"]</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>            </main>
+        </div>
+    </div>
+</body>
+</html>

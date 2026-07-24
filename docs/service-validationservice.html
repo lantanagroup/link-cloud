@@ -4,14 +4,137 @@
     <title>Architecture Export</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
         mermaid.initialize({{startOnLoad:true}});
 
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
         window.copyMermaidSource = function(btn) {{
             const container = btn.closest('.mermaid-container');
-            const pre = container.querySelector('pre.mermaid');
-            const source = pre.dataset.source || pre.textContent.trim();
+            const source = getMermaidSourceFromContainer(container);
             if (source) {{
                 navigator.clipboard.writeText(source).then(() => {{
                     const originalHtml = btn.innerHTML;
@@ -21,9 +144,8 @@
             }}
         }};
 
-        window.downloadMermaidPng = function(btn) {{
-            const container = btn.closest('.mermaid-container');
-            const svg = container.querySelector('svg');
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
             if (!svg) return;
 
             const svgData = new XMLSerializer().serializeToString(svg);
@@ -51,7 +173,82 @@
                 document.body.removeChild(downloadLink);
             }};
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
         }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
     </script>
     <style>
         .sidebar {{
@@ -73,25 +270,101 @@
         .mermaid-container {{
             position: relative;
             min-height: 50px;
+            max-height: 500px;
             overflow: auto;
             background-color: #fff;
         }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
         .mermaid-actions {{
             position: absolute;
-            top: 10px;
-            right: 10px;
             display: none;
             gap: 5px;
             z-index: 10;
         }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
         .mermaid-container:hover .mermaid-actions {{
             display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
         }}
         .mermaid-actions .btn {{
             background-color: rgba(255, 255, 255, 0.8);
             border: 1px solid #dee2e6;
             padding: 2px 6px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
         }}
         /* Custom Purple Utilities */
         .text-purple {{ color: #6f42c1 !important; }}
@@ -101,6 +374,37 @@
     </style>
 </head>
 <body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="container-fluid">
         <div class="row">
             <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
@@ -108,6 +412,7 @@
                     <ul class="nav flex-column">
   <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
@@ -124,8 +429,8 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourceacquired.html">Resource Acquired</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourcenormalized.html">Resource Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
@@ -161,22 +466,26 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -185,21 +494,25 @@
 <h1>Validation Service</h1>
 <div class="row">
     <div class="col-md-8">
-        <div class="mb-3"><strong>Produces:</strong> <a href="event-validationcomplete.html">Validation Complete [event]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="event-readyforvalidation.html">Ready for Validation [event]</a></div>
-        <h2 id="overview">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <div class="mb-3"><strong>Produces:</strong> <a href="event-validationcomplete.html">Validation Complete [event]</a>, <a href="command-validatevaluesetcode.html">Validate ValueSet Code [command]</a>, <a href="command-validatecodesystemcode.html">Validate CodeSystem Code [command]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="event-readyforvalidation.html">Ready for Validation [event]</a></div>
+        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Validation service is a Java based application that is responsible for validating FHIR resources against the FHIR specification and any additional constraints defined by the Link Cloud tenant. The service utilizes the <a href="https://hapifhir.io/">HAPI FHIR library</a> to perform the validation.</p>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nValidationService_BB320DE["Service: Validation Service"]
-  nValidationService_BB320DE -->|produces| nValidationComplete_1D443CBA["Event: ValidationComplete"]
-  nReadyForValidation_130DB389["Event: ReadyForValidation"] -->|consumed by| nValidationService_BB320DE
-  subgraph nCompliance_1DB932AE_domain["Domain: Compliance"]
-    nReadyForValidation_130DB389
-    nValidationComplete_1D443CBA
-    nValidationService_BB320DE
+nValidationService_20F4F748["Service: Validation Service"]
+  nValidationService_20F4F748 -->|produces| nValidationComplete_7F3C0D47["Event: ValidationComplete"]
+  nReadyForValidation_293CC34C["Event: ReadyForValidation"] -->|consumed by| nValidationService_20F4F748
+  nValidationService_20F4F748 -->|sends| nValidateValueSetCode_2E2BA8B0["Command: ValidateValueSetCode"]
+  nValidationService_20F4F748 -->|sends| nValidateCodeSystemCode_15D077E8["Command: ValidateCodeSystemCode"]
+  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
+    nReadyForValidation_293CC34C
+    nValidateCodeSystemCode_15D077E8
+    nValidateValueSetCode_2E2BA8B0
+    nValidationComplete_7F3C0D47
+    nValidationService_20F4F748
   end
 </pre></div>
-<h2 id="common-configurations">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="common-configurations" class="content-heading">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li><a href="Entities/Details?type=design&amp;id=java#azure-app-config">Azure App Config</a></li>
 <li><a href="Entities/Details?type=design&amp;id=java#telemetry">Telemetry</a></li>
@@ -208,7 +521,7 @@ nValidationService_BB320DE["Service: Validation Service"]
 <li><a href="Entities/Details?type=design&amp;id=java#kafka">Kafka</a></li>
 <li><a href="Entities/Details?type=design&amp;id=java#service-authentication">Service Authentication</a></li>
 </ul>
-<h2 id="environment-variables">Environment Variables <a id="environment-variables" href="#environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="environment-variables" class="content-heading">Environment Variables <a id="environment-variables" href="#environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -227,7 +540,7 @@ nValidationService_BB320DE["Service: Validation Service"]
 </tr>
 </tbody>
 </table>
-<h2 id="custom-configurations">Custom Configurations <a id="custom-configurations" href="#custom-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Custom Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="custom-configurations" class="content-heading">Custom Configurations <a id="custom-configurations" href="#custom-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Custom Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -300,15 +613,15 @@ nValidationService_BB320DE["Service: Validation Service"]
 </tr>
 </tbody>
 </table>
-<h2 id="features-and-functionality">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="new-installation-notes">New Installation Notes <a id="new-installation-notes" href="#new-installation-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: New Installation Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="new-installation-notes" class="content-heading">New Installation Notes <a id="new-installation-notes" href="#new-installation-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: New Installation Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>After a new installation of the validation service, the following should be run/executed:</p>
 <ul>
 <li><code>/api/aritfact/$initialize</code> endpoint should be run to initialize the database with artifacts that are embedded in the validation service.</li>
 <li><code>/api/category/$initialize</code> endpoint should be run to initialize the database with default categories stored in <code>/src/main/resources/categories.json</code> (within the code-base)</li>
 </ul>
 <p>PENDING: This functionality is going to be altered so that they are automatically initialized on service startup when no artifacts or categories already exist in the service's database.</p>
-<h3 id="upload-storage">Upload &amp; Storage <a id="upload-amp-storage" href="#upload-amp-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Upload &amp;amp; Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="upload-storage" class="content-heading">Upload &amp; Storage <a id="upload-amp-storage" href="#upload-amp-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Upload &amp;amp; Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Artifacts are uploaded either individual or as an NPM package (preferred).</p>
 <ul>
 <li>Individually: <code>PUT /api/validation/artifact/:type/:name</code></li>
@@ -321,41 +634,43 @@ nValidationService_BB320DE["Service: Validation Service"]
 <blockquote>
 <p>Note: The Admin UI currently only supports uploading a FHIR <code>Bundle</code> of resources. Doing so implies that the Admin UI can only upload individual resources from that Bundle to the validation service. We may consider using NPM packages in the Admin UI and aligning the MeasureEval service and the Validation service to use just NPM packages.</p>
 </blockquote>
-<h3 id="process-flow">Process Flow <a id="process-flow" href="#process-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Process Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
-<AccordionGroup>
-  <Accordion title="1. Measure Evaluation Completion">
-    - The Measure Evaluation Service evaluates a patient.
-    - Once evaluation is complete, it produces a Kafka `ResourceEvaluated` message for each resource returned by measure evaluation (including the MeasureReport).
-  </Accordion>
-  <Accordion title="2. Report Services Persists MeasureReport">
-    The report service consumes `ResourceEvaluated` and persists the resources.
-    * When the `MeasureReport` is processed by the Report service, it uses that to determine when it has received and persisted *all* resources.
-    * After all resources are persisted, the status of the patient for the submission changes to `ReadyToValidate`.
-    * After the status of the patient's submission changes, it produces a `ReadyForValidation` event.
-  </Accordion>
-  <Accordion title="3. Validation Service Consumption">
-    - The Validation Service consumes the Kafka `ReadyForValidation` event.
-    - It retrieves the **MeasureReport** for the specified patient from the Report Service.
-    - It extracts all contained FHIR resources and constructs a **Bundle** for validation.
-  </Accordion>
-  <Accordion title="4. Validation Execution">
-    - Each resource in the bundle is validated individually.
-    - The validation process includes:
-    - **FHIR Core Specification Validation**: Ensures compliance with the base FHIR standard.
-    - **Profile Validation**: Each resource is checked against the profiles asserted in `meta.profile`.
-    - If a required **StructureDefinition** (profile) is missing, a **warning** is generated:
-    *"Can't find profile http://.../us-core-observation"*
-    - **ValueSet and CodeSystem Validation**: Ensures that coded elements conform to the expected ValueSets and CodeSystems.
-    - If a required **ValueSet** or **CodeSystem** is missing, a **warning** is generated:
-    *"Can't find value set XXX"*
-    - All validation results are aggregated into a single **OperationOutcome**, capturing any validation issues.
-    - The **OperationOutcome** containing all validation issues is stored for further processing or review.
-    - The categorization process is initiated against the validation issues found, and each issue is matched (if possible) to a category.
-    - Categorized results are persisted in the database.
-    - The validation service produces a `ValidationComplete` Kafka event and includes an indication of whether the patient's submission is valid.
-  </Accordion>
-</AccordionGroup>
-<h3 id="configuration">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="process-flow" class="content-heading">Process Flow <a id="process-flow" href="#process-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Process Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h4 id="measure-evaluation-completion" class="content-heading">Measure Evaluation Completion <a id="measure-evaluation-completion" href="#measure-evaluation-completion" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Measure Evaluation Completion"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<ul>
+<li>The Measure Evaluation Service evaluates a patient.</li>
+<li>Once evaluation is complete, it produces a Kafka <code>ResourceEvaluated</code> message for each resource returned by measure evaluation (including the MeasureReport).</li>
+</ul>
+<h4 id="report-service-persists-measurereport" class="content-heading">Report Service Persists MeasureReport <a id="report-service-persists-measurereport" href="#report-service-persists-measurereport" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Service Persists MeasureReport"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<p>The report service consumes <code>ResourceEvaluated</code> and persists the resources.</p>
+<ul>
+<li>When the <code>MeasureReport</code> is processed by the Report service, it uses that to determine when it has received and persisted <em>all</em> resources.</li>
+<li>After all resources are persisted, the status of the patient for the submission changes to <code>ReadyToValidate</code>.</li>
+<li>After the status of the patient's submission changes, it produces a <code>ReadyForValidation</code> event.</li>
+</ul>
+<h4 id="validation-service-consumption" class="content-heading">Validation Service Consumption <a id="validation-service-consumption" href="#validation-service-consumption" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Service Consumption"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<ul>
+<li>The Validation Service consumes the Kafka <code>ReadyForValidation</code> event.</li>
+<li>It retrieves the <strong>MeasureReport</strong> for the specified patient from the Report Service.</li>
+<li>It extracts all contained FHIR resources and constructs a <strong>Bundle</strong> for validation.</li>
+</ul>
+<h4 id="validation-execution" class="content-heading">Validation Execution <a id="validation-execution" href="#validation-execution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Execution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<ul>
+<li>Each resource in the bundle is validated individually.</li>
+<li>The validation process includes:</li>
+<li><strong>FHIR Core Specification Validation</strong>: Ensures compliance with the base FHIR standard.</li>
+<li><strong>Profile Validation</strong>: Each resource is checked against the profiles asserted in <code>meta.profile</code>.</li>
+<li>If a required <strong>StructureDefinition</strong> (profile) is missing, a <strong>warning</strong> is generated:
+<em>&quot;Can't find profile http://.../us-core-observation&quot;</em></li>
+<li><strong>ValueSet and CodeSystem Validation</strong>: Ensures that coded elements conform to the expected ValueSets and CodeSystems.</li>
+<li>If a required <strong>ValueSet</strong> or <strong>CodeSystem</strong> is missing, a <strong>warning</strong> is generated:
+<em>&quot;Can't find value set XXX&quot;</em></li>
+<li>All validation results are aggregated into a single <strong>OperationOutcome</strong>, capturing any validation issues.</li>
+<li>The <strong>OperationOutcome</strong> containing all validation issues is stored for further processing or review.</li>
+<li>The categorization process is initiated against the validation issues found, and each issue is matched (if possible) to a category.</li>
+<li>Categorized results are persisted in the database.</li>
+<li>The validation service produces a <code>ValidationComplete</code> Kafka event and includes an indication of whether the patient's submission is valid.</li>
+</ul>
+<h3 id="configuration" class="content-heading">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The Validation Service supports two types of artifacts that define validation rules:</p>
 <ol>
 <li><strong>Package (<code>package.tgz</code> format)</strong></li>
@@ -370,9 +685,9 @@ nValidationService_BB320DE["Service: Validation Service"]
 <li>Individual <strong>StructureDefinitions</strong>, <strong>ValueSets</strong>, and <strong>CodeSystems</strong> can be provided.</li>
 </ul>
 <p>In addition to artifacts, categories must be initialized/specified in order to have categorized results. Otherwise, all validation results end up being &quot;uncategorized&quot;.</p>
-<h3 id="validation-categories">Validation Categories <a id="validation-categories" href="#validation-categories" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Categories"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="validation-categories" class="content-heading">Validation Categories <a id="validation-categories" href="#validation-categories" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Validation Categories"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Validation categories are used to group similar validation issues together, providing a way to manage and prioritize them. Each category defines a set of rules (matchers) that determine which validation issues belong to it.</p>
-<h4 id="category-properties">Category Properties <a id="category-properties" href="#category-properties" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Category Properties"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="category-properties" class="content-heading">Category Properties <a id="category-properties" href="#category-properties" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Category Properties"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Each category consists of the following properties:</p>
 <ul>
 <li><strong>ID</strong>: A unique identifier for the category (e.g., <code>Incorrect_display_value_for_code</code>).</li>
@@ -386,7 +701,7 @@ nValidationService_BB320DE["Service: Validation Service"]
 <li><strong>Guidance</strong>: Instructions or information on how to resolve the issues in this category.</li>
 <li><strong>Matcher</strong>: A rule or set of rules used to match validation issues.</li>
 </ul>
-<h4 id="rule-matching-fields">Rule Matching Fields <a id="rule-matching-fields" href="#rule-matching-fields" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Rule Matching Fields"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="rule-matching-fields" class="content-heading">Rule Matching Fields <a id="rule-matching-fields" href="#rule-matching-fields" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Rule Matching Fields"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Rules can be keyed on the following fields of a validation result (OperationOutcome.issue):</p>
 <ul>
 <li><strong>MESSAGE</strong>: Matches against the human-readable description of the issue.</li>
@@ -394,14 +709,14 @@ nValidationService_BB320DE["Service: Validation Service"]
 <li><strong>CODE</strong>: Matches against the FHIR issue type code (e.g., <code>code-invalid</code>, <code>value</code>).</li>
 <li><strong>EXPRESSION</strong>: Matches against the FHIRPath expression pointing to the element in the resource that caused the issue.</li>
 </ul>
-<h4 id="matcher-types">Matcher Types <a id="matcher-types" href="#matcher-types" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Matcher Types"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="matcher-types" class="content-heading">Matcher Types <a id="matcher-types" href="#matcher-types" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Matcher Types"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Validation matchers are used to define the rules for a category. All matchers support an <code>inverted</code> property, which allows for logical negation of the match result.</p>
 <ul>
 <li><strong>RegexMatcher</strong>: The primary matcher used for field-level matching. It evaluates a regular expression against a specific field of a validation issue.</li>
 <li><strong>InvertibleMatcher</strong>: This is the base abstract implementation for other matchers. While not used directly, it provides the <code>inverted</code> property to its subclasses (<code>RegexMatcher</code> and <code>CompositeMatcher</code>), allowing any rule to be negated.</li>
 <li><strong>CompositeMatcher</strong>: A powerful matcher that allows grouping multiple other matchers (including other composite matchers) to create complex matching logic. It uses a <code>requiresAllChildren</code> flag to determine if it should act as a logical AND (true) or logical OR (false).</li>
 </ul>
-<h4 id="detailed-matcher-examples">Detailed Matcher Examples <a id="detailed-matcher-examples" href="#detailed-matcher-examples" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Detailed Matcher Examples"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="detailed-matcher-examples" class="content-heading">Detailed Matcher Examples <a id="detailed-matcher-examples" href="#detailed-matcher-examples" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Detailed Matcher Examples"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p>Below are more detailed examples showing the differences and use cases for each matcher implementation.</p>
 <p><strong>1. RegexMatcher</strong></p>
 <p>The <code>RegexMatcher</code> is the most straightforward way to match a validation issue. It targets a specific field of the <code>OperationOutcome.issue</code>.</p>
@@ -472,7 +787,7 @@ Matches if the severity is <code>error</code> AND the issue does NOT have a code
   ]
 }
 </code></pre>
-<h4 id="example-categories">Example Categories <a id="example-categories" href="#example-categories" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Categories"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
+<h4 id="example-categories" class="content-heading">Example Categories <a id="example-categories" href="#example-categories" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Categories"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h4>
 <p><strong>Example 1: Incorrect Display Value (Acceptable)</strong></p>
 <p>This category matches issues where a code's display name is incorrect. It is marked as <code>acceptable: true</code>.</p>
 <pre><code class="language-json">{
@@ -503,7 +818,7 @@ Matches if the severity is <code>error</code> AND the issue does NOT have a code
 </code></pre>
 <p>The system reserves a category with an ID of &quot;uncategorized&quot; for any validation issues within a report that are not mapped or associated with a defined category. This ensures that all validation issues are always captured, even when they don't match any of the configured category rules.</p>
 <p>Categories can be configured individually or in bulk via the API.</p>
-<h3 id="example-profile-validation">Example: Profile Validation <a id="example-profile-validation" href="#example-profile-validation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example: Profile Validation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="example-profile-validation" class="content-heading">Example: Profile Validation <a id="example-profile-validation" href="#example-profile-validation" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example: Profile Validation"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>When the validation service encounters an Observation resource like the following:</p>
 <pre><code class="language-jsonc">{
   &quot;resourceType&quot;: &quot;Observation&quot;,
@@ -521,7 +836,7 @@ Matches if the severity is <code>error</code> AND the issue does NOT have a code
 </ul>
 <p>Similarly, for properties bound to a ValueSet or CodeSystem, the service expects these artifacts to be provided. If they
 are missing, it will issue warnings.</p>
-<h3 id="sequence-diagram">Sequence Diagram <a id="sequence-diagram" href="#sequence-diagram" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Sequence Diagram"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="sequence-diagram" class="content-heading">Sequence Diagram <a id="sequence-diagram" href="#sequence-diagram" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Sequence Diagram"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The following diagram illustrates the relationship between the Measure Evaluation Service, Kafka, and the Validation Service:</p>
 <pre class="mermaid">sequenceDiagram
     participant MES as Measure Evaluation Service
@@ -560,7 +875,7 @@ are missing, it will issue warnings.</p>
     VS->>Storage: Store OperationOutcome
     VS->>RS: Produces ValidationComplete event
 </pre>
-<h3 id="terminology-service-integration-and-caching">Terminology Service Integration and Caching <a id="terminology-service-integration-and-caching" href="#terminology-service-integration-and-caching" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Terminology Service Integration and Caching"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="terminology-service-integration-and-caching" class="content-heading">Terminology Service Integration and Caching <a id="terminology-service-integration-and-caching" href="#terminology-service-integration-and-caching" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Terminology Service Integration and Caching"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The Validation Service validates coded elements using either a remote terminology capability or local in-memory supports, depending on how the service is configured.</p>
 <p>Terminology resolution options (in order of precedence):</p>
 <ul>
@@ -581,13 +896,13 @@ are missing, it will issue warnings.</p>
 <li>If using the Link Terminology Service, the service automatically targets its FHIR endpoint.</li>
 <li>If no terminology endpoint is configured, the validator will not make network calls for terminology; only built-in/common supports are used.</li>
 </ul>
-<h3 id="known-deficiencies">Known Deficiencies <a id="known-deficiencies" href="#known-deficiencies" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Known Deficiencies"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="known-deficiencies" class="content-heading">Known Deficiencies <a id="known-deficiencies" href="#known-deficiencies" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Known Deficiencies"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Global scope</strong>: All stored artifacts are always loaded; there is no filtering or scoping based on tenant or package.</li>
 <li><strong>No tenant-specific configuration</strong>: There is no ability to configure validation behavior per tenant or per package version.</li>
 <li>Use of the HAPI FHIR validation libraries only supports <code>CodeSystem</code>, <code>ValueSet</code>, and <code>StructureDefinition</code> resources.</li>
 </ul>
-<h2 id="future-considerations">Future Considerations <a id="future-considerations" href="#future-considerations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Future Considerations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="future-considerations" class="content-heading">Future Considerations <a id="future-considerations" href="#future-considerations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Future Considerations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li>Operation to bulk <em>retrieve</em> categories and their rules that can be updated in an text editor and then provided back to the <em>bulk save</em> operation.</li>
 <li>Operation to validate <em>and</em> categorize a resource (or Bundle) and return a composite response of the validation results and associated categories.</li>
@@ -1153,20 +1468,38 @@ are missing, it will issue warnings.</p>
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nValidationService_BB320DE["Service: Validation Service"]
-  nValidationService_BB320DE -->|produces| nValidationComplete_1D443CBA["Event: ValidationComplete"]
-  nReadyForValidation_130DB389["Event: ReadyForValidation"] -->|consumed by| nValidationService_BB320DE
-  subgraph nCompliance_1DB932AE_domain["Domain: Compliance"]
-    nReadyForValidation_130DB389
-    nValidationComplete_1D443CBA
-    nValidationService_BB320DE
+nValidationService_20F4F748["Service: Validation Service"]
+  nValidationService_20F4F748 -->|produces| nValidationComplete_7F3C0D47["Event: ValidationComplete"]
+  nReadyForValidation_293CC34C["Event: ReadyForValidation"] -->|consumed by| nValidationService_20F4F748
+  nValidationService_20F4F748 -->|sends| nValidateValueSetCode_2E2BA8B0["Command: ValidateValueSetCode"]
+  nValidationService_20F4F748 -->|sends| nValidateCodeSystemCode_15D077E8["Command: ValidateCodeSystemCode"]
+  subgraph nCompliance_DBAE25D_domain["Domain: Compliance"]
+    nReadyForValidation_293CC34C
+    nValidateCodeSystemCode_15D077E8
+    nValidateValueSetCode_2E2BA8B0
+    nValidationComplete_7F3C0D47
+    nValidationService_20F4F748
   end</pre>
-            <div class="mermaid-actions no-print">
+            <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>
                 </button>
                 <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
                     <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
                 </button>
             </div>
         </div>
