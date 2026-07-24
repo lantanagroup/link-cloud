@@ -216,7 +216,13 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
                 {
                     logger.LogDebug("Search performed without summary mode for code system {Url}", url.SanitizeAndRemove());
 
-                    foreach (var codeGroupCode in codeGroup.Codes[codeGroup.Codes.Keys.First()])
+                    // A CSV may list the same code more than once; emit each code once, keeping the
+                    // last occurrence's display so the read agrees with last-one-wins (LEGLINK-814).
+                    var lastByValue = codeGroup.Codes[codeGroup.Codes.Keys.First()]
+                        .GroupBy(c => c.Value)
+                        .Select(g => g.Last());
+
+                    foreach (var codeGroupCode in lastByValue)
                     {
                         clone.Concept.Add(new CodeSystem.ConceptDefinitionComponent()
                         {
@@ -631,10 +637,12 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         }
 
         var codeSystemGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system);
+        // When the CodeSystem lists the code more than once with differing status, the last
+        // occurrence wins (LEGLINK-599/814), matching BuildMatchResult's last-match selection.
         var match = codeSystemGroup?.Codes.Values
             .SelectMany(codes => codes)
             .OfType<CodeSystemCode>()
-            .FirstOrDefault(c => c.Value == codeObject.Value);
+            .LastOrDefault(c => c.Value == codeObject.Value);
 
         return match == null || match.Status == CodeStatus.Active;
     }
