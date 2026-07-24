@@ -390,6 +390,8 @@ public class FhirDataLoader
         if (string.IsNullOrWhiteSpace(patientId))
             throw new ArgumentException("Patient ID is required.", nameof(patientId));
 
+        var currentPageRequestUri = new Uri(_baseUriForRelativeResolution, $"Patient/{patientId}/$everything");
+
         // Page 1: anchored at the operation URL relative to the configured server base.
         var firstPage = await GetPageAsync(
             $"Patient/{patientId}/$everything",
@@ -427,13 +429,20 @@ public class FhirDataLoader
                     $"Patient/{patientId}/$everything exceeded the {MaxPages}-page safety cap; refusing to continue.");
             }
 
-            var validatedNextUrl = ResolveAndValidateSameOrigin(nextUrl!, $"Patient/{patientId}/$everything (page {pageCount})");
+            var validatedNextUrl = ResolveAndValidateSameOrigin(
+                nextUrl!,
+                currentPageRequestUri,
+                $"Patient/{patientId}/$everything (page {pageCount})");
 
             var pageJson = await GetPageAsync(
                 validatedNextUrl.AbsoluteUri,
                 useFullUrl: true,
                 descriptionForError: $"Patient/{patientId}/$everything (page {pageCount})",
                 ct);
+
+            // Advance only after the page request succeeds so subsequent relative links
+            // are resolved against the URI that actually produced this page.
+            currentPageRequestUri = validatedNextUrl;
 
             var pageNode = JsonNode.Parse(pageJson);
             if (pageNode?["entry"] is JsonArray pageEntries)
@@ -525,7 +534,7 @@ public class FhirDataLoader
     /// silently following an attacker-controlled link (and potentially forwarding the
     /// configured Authorization header to it).
     /// </summary>
-    private Uri ResolveAndValidateSameOrigin(string nextLink, string descriptionForError)
+    private Uri ResolveAndValidateSameOrigin(string nextLink, Uri currentPageRequestUri, string descriptionForError)
     {
         if (!Uri.TryCreate(nextLink, UriKind.RelativeOrAbsolute, out var parsed))
         {
@@ -533,7 +542,7 @@ public class FhirDataLoader
                 $"Refusing to follow Bundle next link for {descriptionForError}: '{nextLink}' is not a valid URI.");
         }
 
-        var absolute = parsed.IsAbsoluteUri ? parsed : new Uri(_baseUriForRelativeResolution, parsed);
+        var absolute = parsed.IsAbsoluteUri ? parsed : new Uri(currentPageRequestUri, parsed);
 
         if (!absolute.IsAbsoluteUri)
         {
