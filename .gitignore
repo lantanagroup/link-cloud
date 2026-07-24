@@ -415,3 +415,8 @@ FodyWeavers.xsd
 /DotNet/Census/appsettings.Local.json
 /DotNet/Normalization/efpt.config.json
 /Java/**/application-dev.yml
+
+## Playwright (Admin.UI e2e)
+/Web/Admin.UI/playwright-report/
+/Web/Admin.UI/test-results/
+/Web/Admin.UI/blob-report/
