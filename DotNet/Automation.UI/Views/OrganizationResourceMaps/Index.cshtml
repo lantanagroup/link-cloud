@@ -126,11 +126,23 @@
     function hide(){ modal.style.display='none'; backdrop.style.display='none'; }
     async function post(url,body){ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','RequestVerificationToken':af()},body:JSON.stringify(body)}); if(!r.ok) throw new Error(await r.text()||('Server '+r.status)); return r.headers.get('content-type')?.includes('json')? r.json():null; }
     function escapeFhirLiteral(value){
-        return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        return String(value || '').replace(/\\/g, '\\\\');
+    }
+
+    function normalizeQuotedInput(value){
+        return String(value || '').replace(/[’‘`´]/g, "'").trim();
+    }
+
+    function hasSingleQuote(value){
+        return normalizeQuotedInput(value).includes("'");
     }
 
     function buildIdentifierFhirPath(system, code){
-        return "Location.identifier.exists(system = '" + escapeFhirLiteral(system) + "' and value = '" + escapeFhirLiteral(code) + "')";
+        const cleanSystem = normalizeQuotedInput(system);
+        const cleanCode = normalizeQuotedInput(code);
+        if (hasSingleQuote(cleanSystem) || hasSingleQuote(cleanCode))
+            throw new Error('Identifier System and Identifier Code cannot contain apostrophes.');
+        return "Location.identifier.exists(system = '" + escapeFhirLiteral(cleanSystem) + "' and value = '" + escapeFhirLiteral(cleanCode) + "')";
     }
 
     function parseIdentifierCondition(path){
@@ -152,9 +164,15 @@
         return btn;
     }
 
-    function buildLocationTypeFhirPath(typeCode, alias){
-        let path = "Location.type.coding.exists(code = '" + escapeFhirLiteral(typeCode) + "')";
-        const cleanAlias = String(alias || '').trim();
+    function buildLocationTypeFhirPath(typeSystem, typeCode, alias){
+        const cleanSystem = normalizeQuotedInput(typeSystem);
+        const cleanCode = normalizeQuotedInput(typeCode);
+        const cleanAlias = normalizeQuotedInput(alias);
+
+        if (hasSingleQuote(cleanSystem) || hasSingleQuote(cleanCode) || hasSingleQuote(cleanAlias))
+            throw new Error('Location Type System, Location Type Code, and Alias cannot contain apostrophes.');
+
+        let path = "Location.type.coding.exists(system = '" + escapeFhirLiteral(cleanSystem) + "' and code = '" + escapeFhirLiteral(cleanCode) + "')";
         if(cleanAlias) path += " and Location.alias = '" + escapeFhirLiteral(cleanAlias) + "'";
         return path;
     }
@@ -162,8 +180,8 @@
     function parseLocationTypeCondition(path){
         if(!path) return null;
         const text = String(path).trim();
-        let m = text.match(/^Location\.type\.coding\.(?:exists|where)\(\s*code\s*=\s*'([^']+)'\s*\)(?:\s+and\s+Location\.alias\s*=\s*'([^']*)'\s*)?$/i);
-        if(m) return { typeCode:m[1], alias:m[2] || '' };
+        let m = text.match(/^Location\.type\.coding\.(?:exists|where)\(\s*system\s*=\s*'([^']+)'\s+and\s+code\s*=\s*'([^']+)'\s*\)(?:\s+and\s+Location\.alias\s*=\s*'([^']*)'\s*)?$/i);
+        if(m) return { typeSystem:m[1], typeCode:m[2], alias:m[3] || '' };
         return null;
     }
 
@@ -190,7 +208,7 @@
             return;
         }
         if(matchType === 'LocationType') {
-            hint.textContent = 'Location Type rows generate FHIRPath from type code (and optional alias).';
+            hint.textContent = 'Location Type rows generate FHIRPath from type system + type code (and optional alias).';
             return;
         }
         hint.textContent = 'Custom rows let you enter raw Location-scoped FHIRPath.';
@@ -218,9 +236,11 @@
         const generatedInput = row.querySelector('.map-generated-fhirpath');
 
         function refreshGenerated(){
-            var s = (systemInput.value || '').trim();
-            var c = (codeInput.value || '').trim();
-            generatedInput.value = (s && c) ? buildIdentifierFhirPath(s, c) : '';
+            var s = normalizeQuotedInput(systemInput.value);
+            var c = normalizeQuotedInput(codeInput.value);
+            generatedInput.value = '';
+            if (!s || !c || hasSingleQuote(s) || hasSingleQuote(c)) return;
+            generatedInput.value = buildIdentifierFhirPath(s, c);
         }
         systemInput.addEventListener('input', refreshGenerated);
         codeInput.addEventListener('input', refreshGenerated);
@@ -242,26 +262,33 @@
             + '<div class="d-flex gap-1 map-match-actions"></div>'
             + '</div>'
             + '<div class="row g-2">'
-            + '<div class="col-md-5"><label class="form-label mb-1 small">Location Type Code</label><input class="form-control form-control-sm map-location-type-code" placeholder="783" /></div>'
-            + '<div class="col-md-5"><label class="form-label mb-1 small">Location Alias (optional)</label><input class="form-control form-control-sm map-location-alias" /></div>'
-            + '<div class="col-md-2 d-flex align-items-end"><small class="text-muted w-100 text-center">Auto-generated</small></div>'
+            + '<div class="col-md-4"><label class="form-label mb-1 small">Location Type System</label><input class="form-control form-control-sm map-location-type-system" placeholder="http://terminology.hl7.org/CodeSystem/v3-RoleCode" /></div>'
+            + '<div class="col-md-4"><label class="form-label mb-1 small">Location Type Code</label><input class="form-control form-control-sm map-location-type-code" placeholder="783" /></div>'
+            + '<div class="col-md-3"><label class="form-label mb-1 small">Location Alias (optional)</label><input class="form-control form-control-sm map-location-alias" /></div>'
+            + '<div class="col-md-1 d-flex align-items-end"><small class="text-muted w-100 text-center">Auto-generated</small></div>'
             + '<div class="col-12"><label class="form-label mb-1 small">Generated FHIRPath</label><input class="form-control form-control-sm map-generated-fhirpath font-monospace" readonly /></div>'
             + '</div>';
         attachMatchCardControls(row);
 
+        const typeSystemInput = row.querySelector('.map-location-type-system');
         const typeCodeInput = row.querySelector('.map-location-type-code');
         const aliasInput = row.querySelector('.map-location-alias');
         const generatedInput = row.querySelector('.map-generated-fhirpath');
 
         function refreshGenerated(){
-            const typeCode = (typeCodeInput.value || '').trim();
-            const alias = (aliasInput.value || '').trim();
-            generatedInput.value = typeCode ? buildLocationTypeFhirPath(typeCode, alias) : '';
+            const typeSystem = normalizeQuotedInput(typeSystemInput.value);
+            const typeCode = normalizeQuotedInput(typeCodeInput.value);
+            const alias = normalizeQuotedInput(aliasInput.value);
+            generatedInput.value = '';
+            if (!typeSystem || !typeCode || hasSingleQuote(typeSystem) || hasSingleQuote(typeCode) || hasSingleQuote(alias)) return;
+            generatedInput.value = buildLocationTypeFhirPath(typeSystem, typeCode, alias);
         }
 
+        typeSystemInput.addEventListener('input', refreshGenerated);
         typeCodeInput.addEventListener('input', refreshGenerated);
         aliasInput.addEventListener('input', refreshGenerated);
 
+        typeSystemInput.value = match?.typeSystem || '';
         typeCodeInput.value = match?.typeCode || '783';
         aliasInput.value = match?.alias || '';
         refreshGenerated();
@@ -308,17 +335,21 @@
             const type = row.dataset.matchType || 'Custom';
 
             if(type === 'Identifier') {
-                const system = (row.querySelector('.map-id-system').value || '').trim();
-                const code = (row.querySelector('.map-id-code').value || '').trim();
+                const system = normalizeQuotedInput(row.querySelector('.map-id-system').value);
+                const code = normalizeQuotedInput(row.querySelector('.map-id-code').value);
                 if(!system || !code) throw new Error(`Identifier match #${idx + 1} requires both Identifier System and Identifier Code.`);
+                if(hasSingleQuote(system) || hasSingleQuote(code)) throw new Error(`Identifier match #${idx + 1} cannot contain apostrophes in Identifier System or Identifier Code.`);
                 return { fhirPath: buildIdentifierFhirPath(system, code), priority: idx + 1 };
             }
 
             if(type === 'LocationType') {
-                const typeCode = (row.querySelector('.map-location-type-code').value || '').trim();
-                const alias = (row.querySelector('.map-location-alias').value || '').trim();
+                const typeSystem = normalizeQuotedInput(row.querySelector('.map-location-type-system').value);
+                const typeCode = normalizeQuotedInput(row.querySelector('.map-location-type-code').value);
+                const alias = normalizeQuotedInput(row.querySelector('.map-location-alias').value);
+                if(!typeSystem) throw new Error(`Location Type match #${idx + 1} requires a Location Type System.`);
                 if(!typeCode) throw new Error(`Location Type match #${idx + 1} requires a Location Type Code.`);
-                return { fhirPath: buildLocationTypeFhirPath(typeCode, alias), priority: idx + 1 };
+                if(hasSingleQuote(typeSystem) || hasSingleQuote(typeCode) || hasSingleQuote(alias)) throw new Error(`Location Type match #${idx + 1} cannot contain apostrophes in Type System, Type Code, or Alias.`);
+                return { fhirPath: buildLocationTypeFhirPath(typeSystem, typeCode, alias), priority: idx + 1 };
             }
 
             const fhirPath = (row.querySelector('.map-custom-fhirpath').value || '').trim();
@@ -419,7 +450,7 @@
         btn.addEventListener('click', () => {
             const type = btn.dataset.matchType || 'Identifier';
             if(type === 'Identifier') addIdentifierMatchRow({ system:'', code:'' });
-            else if(type === 'LocationType') addLocationTypeMatchRow({ typeCode:'783', alias:'' });
+            else if(type === 'LocationType') addLocationTypeMatchRow({ typeSystem:'', typeCode:'783', alias:'' });
             else addCustomMatchRow({ fhirPath:'' });
 
             setMapBuilderHint(type);

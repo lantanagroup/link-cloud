@@ -631,7 +631,52 @@ public static class QueryPlanAcquisitionSimulator
     {
         return TryGetInstant(resource, "effectiveDateTime", out start, out end)
             || TryGetInstant(resource, "effectiveInstant", out start, out end)
-            || TryGetPeriod(resource, "effectivePeriod", out start, out end);
+            || TryGetPeriod(resource, "effectivePeriod", out start, out end)
+            || TryGetTiming(resource, "effectiveTiming", out start, out end);
+    }
+
+    /// <summary>
+    /// Reads a Timing-shaped property as (start, end) by using either event instants
+    /// (min..max) or repeat.boundsPeriod when events are absent.
+    /// </summary>
+    private static bool TryGetTiming(JsonElement element, string propertyName,
+        out DateTimeOffset start, out DateTimeOffset end)
+    {
+        start = default;
+        end = default;
+
+        if (!element.TryGetProperty(propertyName, out var timing) || timing.ValueKind != JsonValueKind.Object)
+            return false;
+
+        if (timing.TryGetProperty("event", out var events)
+            && events.ValueKind == JsonValueKind.Array)
+        {
+            var parsedEvents = events.EnumerateArray()
+                .Where(e => e.ValueKind == JsonValueKind.String)
+                .Select(e => e.GetString())
+                .Where(s => !string.IsNullOrWhiteSpace(s))
+                .Select(s => DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var parsed)
+                    ? (DateTimeOffset?)parsed
+                    : null)
+                .Where(d => d.HasValue)
+                .Select(d => d!.Value)
+                .ToList();
+
+            if (parsedEvents.Count > 0)
+            {
+                start = parsedEvents.Min();
+                end = parsedEvents.Max();
+                return true;
+            }
+        }
+
+        if (timing.TryGetProperty("repeat", out var repeat)
+            && repeat.ValueKind == JsonValueKind.Object)
+        {
+            return TryGetPeriod(repeat, "boundsPeriod", out start, out end);
+        }
+
+        return false;
     }
 
     private static void AddByType(Dictionary<string, HashSet<string>> acquiredByType, string resourceType, string resourceId)

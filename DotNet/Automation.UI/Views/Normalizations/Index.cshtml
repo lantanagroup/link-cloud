@@ -297,10 +297,13 @@
                         <div class="col-12 op-field op-field-CodeMap">
                             <label class="form-label">Code System Maps</label>
                             <div id="opCodeSystemMapRows"></div>
-                            <div class="d-flex gap-2 mt-2">
+                            <div class="d-flex gap-2 mt-2 align-items-center">
                                 <button type="button" class="btn btn-sm btn-outline-success" id="btnAddCodeSystemMap"><i class="bi bi-plus-lg me-1"></i>Add Code System Map</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCodeMapLoadFromJson">Load from JSON</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCodeMapSyncJson">Sync JSON from Controls</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCodeMapLoadFromJson" title="Load the current JSON textarea content into the visual controls (JSON → controls).">Load from JSON</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCodeMapSyncJson" title="Write the current visual controls into the JSON textarea (controls → JSON).">Sync JSON from Controls</button>
+                                <span class="text-muted" title="Use the textarea and controls independently: Load from JSON copies textarea JSON into controls, and Sync JSON from Controls copies controls into the textarea.">
+                                    <i class="bi bi-info-circle"></i>
+                                </span>
                             </div>
                         </div>
                         <div class="col-12 op-field op-field-CodeMap">
@@ -570,6 +573,11 @@
         document.getElementById('opCodeSystemMapRows').innerHTML = '';
     }
 
+    function clearCodeMapEditorState() {
+        clearCodeSystemMapCards();
+        document.getElementById('OpCodeSystemMaps').value = '';
+    }
+
     function setCodeSystemMapCards(items) {
         clearCodeSystemMapCards();
         (items || []).forEach(item => addCodeSystemMapCard(item));
@@ -597,6 +605,8 @@
                 if (!key && !code && !display) return;
                 if (!key) throw new Error(`Code System Map #${index + 1}, entry #${rowIndex + 1} requires Source Code.`);
                 if (!code) throw new Error(`Code System Map #${index + 1}, entry #${rowIndex + 1} requires Target Code.`);
+                if (Object.prototype.hasOwnProperty.call(codeMaps, key))
+                    throw new Error(`Code System Map #${index + 1}, entry #${rowIndex + 1} duplicates Source Code '${key}'. Source Codes must be unique within a map.`);
 
                 codeMaps[key] = {
                     code: code,
