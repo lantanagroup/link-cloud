@@ -195,12 +195,13 @@ public static class QueryPlanAcquisitionSimulator
                 if (bound == null)
                     continue;
 
-                // FHIR Observation/DiagnosticReport `date` matching may consider either
-                // effective[x] or issued, while our generic extractor returns only one range.
-                // Evaluate both shapes and accept if any candidate satisfies the bound.
+                // Observation `date` can be represented by different effective shapes; keep
+                // a multi-shape check there. For DiagnosticReport, use effective[x] only.
+                // Including issued here can over-predict boundary resources (issued slightly
+                // after period start while effective is before it), which does not match the
+                // DataAcquisition behavior observed in scheduled runs.
                 if (string.Equals(p.Name, "date", StringComparison.OrdinalIgnoreCase)
-                    && (string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(resource.ResourceType, "DiagnosticReport", StringComparison.OrdinalIgnoreCase)))
+                    && string.Equals(resource.ResourceType, "Observation", StringComparison.OrdinalIgnoreCase))
                 {
                     var matchedAny = false;
                     var recognizedAny = false;
@@ -209,12 +210,6 @@ public static class QueryPlanAcquisitionSimulator
                     {
                         recognizedAny = true;
                         matchedAny |= isGe ? effEnd >= bound.Value : effStart <= bound.Value;
-                    }
-
-                    if (TryGetInstant(resource.Resource, "issued", out var issuedStart, out var issuedEnd))
-                    {
-                        recognizedAny = true;
-                        matchedAny |= isGe ? issuedEnd >= bound.Value : issuedStart <= bound.Value;
                     }
 
                     if (!recognizedAny)

@@ -18,6 +18,7 @@ public static class CqlFilterSimulator
         new HypoglycemicConditionFilterProfile(),
         new AchObservationFilterProfile(),
         new HypoglycemicObservationFilterProfile(),
+        new AchDiagnosticReportFilterProfile(),
         new AchProcedureFilterProfile(),
         new AchHypoMedicationRequestFilterProfile(),
         new HypoMedicationAdministrationFilterProfile(),
@@ -120,6 +121,7 @@ public static class CqlFilterSimulator
         IReadOnlyList<ConditionContext> Conditions,
         IReadOnlyList<ObservationContext> Observations)
     {
+        public IReadOnlyList<DiagnosticReportContext> DiagnosticReports { get; init; } = Array.Empty<DiagnosticReportContext>();
         public IReadOnlyList<ProcedureContext> Procedures { get; init; } = Array.Empty<ProcedureContext>();
         public IReadOnlyList<MedicationRequestContext> MedicationRequests { get; init; } = Array.Empty<MedicationRequestContext>();
         public IReadOnlyList<MedicationAdministrationContext> MedicationAdministrations { get; init; } = Array.Empty<MedicationAdministrationContext>();
@@ -361,6 +363,55 @@ public static class CqlFilterSimulator
             // Hypoglycemic uses "start of effective during IP" — point-in-IP semantics.
             return ipWindows.AnyContains(o.EffectiveStart);
         }
+    }
+
+    // -------------------------------------------------------------------
+    //  DiagnosticReport profiles
+    // -------------------------------------------------------------------
+
+    /// <summary>
+    /// CQL-relevant attributes of a generated DiagnosticReport resource.
+    /// Effective start/end normalize both effectiveDateTime and effectivePeriod.
+    /// </summary>
+    public sealed record DiagnosticReportContext(
+        string ResourceId,
+        DateTime EffectiveStart,
+        DateTime EffectiveEnd)
+    {
+        public bool OverlapsPeriod(DateTime periodStart, DateTime periodEnd) =>
+            EffectiveStart <= periodEnd && EffectiveEnd >= periodStart;
+    }
+
+    private abstract class DiagnosticReportFilterProfileBase : ICqlFilterProfile
+    {
+        public string TargetResourceType => "DiagnosticReport";
+        public abstract bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures);
+        protected abstract bool IncludeDiagnosticReport(DiagnosticReportContext d, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows);
+
+        public HashSet<string> ComputeExcludedKeys(PatientCqlInput input)
+        {
+            var excluded = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var d in input.DiagnosticReports)
+            {
+                if (!IncludeDiagnosticReport(d, input.IpWindows))
+                    excluded.Add($"DiagnosticReport/{d.ResourceId}");
+            }
+            return excluded;
+        }
+    }
+
+    /// <summary>
+    /// ACH Monthly + Daily SDE DiagnosticReport semantics:
+    /// include reports whose effective period overlaps any Initial Population encounter window.
+    /// </summary>
+    private sealed class AchDiagnosticReportFilterProfile : DiagnosticReportFilterProfileBase
+    {
+        public override bool AppliesToAny(IReadOnlyList<ProfiledMeasureType> measures) =>
+            measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
+            || measures.Contains(ProfiledMeasureType.NhsnAcuteCareHospitalDailyInitialPopulation);
+
+        protected override bool IncludeDiagnosticReport(DiagnosticReportContext d, IReadOnlyList<MeasureInitialPopulationResolver.IpWindow> ipWindows) =>
+            ipWindows.AnyOverlaps(d.EffectiveStart, d.EffectiveEnd);
     }
 
     // -------------------------------------------------------------------

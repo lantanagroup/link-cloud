@@ -46,6 +46,8 @@ internal sealed class RunExecutor
     private readonly bool _suppressExternalManifest;
     private readonly bool _includePatientAggregatorOrganizationResource;
     private readonly string _includePatientAggregatorOrganizationResourceSource;
+    private readonly ReportAbsManifestValidator.OperationOutcomeExpectationSettings _operationOutcomeExpectations;
+    private readonly string _operationOutcomeExpectationSource;
     private readonly ILogger _logger;
 
     public RunExecutor(
@@ -70,6 +72,9 @@ internal sealed class RunExecutor
         var includeOrg = ResolveIncludePatientAggregatorOrganizationResource(configuration);
         _includePatientAggregatorOrganizationResource = includeOrg.Value;
         _includePatientAggregatorOrganizationResourceSource = includeOrg.Source;
+        var ooExpectations = ResolveOperationOutcomeExpectations(configuration);
+        _operationOutcomeExpectations = ooExpectations.Settings;
+        _operationOutcomeExpectationSource = ooExpectations.Source;
         _logger = logger;
     }
 
@@ -89,6 +94,44 @@ internal sealed class RunExecutor
             return null;
 
         return bool.TryParse(raw, out var parsed) ? parsed : null;
+    }
+
+    private static (ReportAbsManifestValidator.OperationOutcomeExpectationSettings Settings, string Source)
+        ResolveOperationOutcomeExpectations(IConfiguration configuration)
+    {
+        var reportWritePreQual = TryGetBool(configuration, "PreQualification:WritePreQualOperationOutcome");
+
+        var validationCandidates = new[]
+        {
+            "/pre-qualification/write-pre-qual-operation-outcome",
+            "pre-qualification.write-pre-qual-operation-outcome"
+        };
+
+        bool? validationWritePreQual = null;
+        string validationSource = "default(false)";
+        foreach (var key in validationCandidates)
+        {
+            var value = TryGetBool(configuration, key);
+            if (!value.HasValue)
+                continue;
+
+            validationWritePreQual = value.Value;
+            validationSource = key;
+            break;
+        }
+
+        var reportWritesLegacyWhenInvalid = !(reportWritePreQual ?? false);
+        var validationWritesPreQualWhenInvalid = validationWritePreQual ?? false;
+
+        var source =
+            $"Report(PreQualification:WritePreQualOperationOutcome={(reportWritePreQual.HasValue ? reportWritePreQual.Value.ToString() : "default(false)")}), " +
+            $"Validation({validationSource}={(validationWritePreQual.HasValue ? validationWritePreQual.Value.ToString() : "default(false)")})";
+
+        return (
+            new ReportAbsManifestValidator.OperationOutcomeExpectationSettings(
+                ReportWritesLegacyOperationOutcomeWhenInvalid: reportWritesLegacyWhenInvalid,
+                ValidationWritesPreQualOperationOutcomeWhenInvalid: validationWritesPreQualWhenInvalid),
+            source);
     }
 
     /// <summary>
@@ -288,9 +331,14 @@ internal sealed class RunExecutor
                             .OrderBy(c => c.Priority)
                             .Select(c => NormalizeOrgLocationFhirPathForDataAcquisition(c.FhirPath))
                             .ToList(),
-                        AllowEncounterAnchoredDateOverrideForOutOfRange =
-                            state.Options.ReportMethod == ReportMethod.ScheduledReport
-                            || state.Options.ReportMethod == ReportMethod.RegenerateReport
+                        // Keep simulation strict for date-filtered resources. Encounter-anchored
+                        // out-of-range override can over-predict scheduled ABS content for
+                        // Observation/DiagnosticReport/Procedure, causing false expected-key
+                        // assertions (e.g. Observation-001 / DxRpt-042 class mismatches).
+                        // We still allow encounter anchoring when a resource has no recognized
+                        // date shape (handled inside the simulator), but not when its recognized
+                        // date is outside the reporting window.
+                        AllowEncounterAnchoredDateOverrideForOutOfRange = false
                     },
                     importedPatients: importedPatients.Count > 0 ? importedPatients : null);
 
@@ -577,6 +625,7 @@ internal sealed class RunExecutor
             var internalAbsResources = await reportHelper.DownloadReportAsync(facilityId, reportId, scenarioConfig, external: false);
 
             output.WriteLine($"External manifest suppression (ExternalBlobStorage:SuppressManifest) = {_suppressExternalManifest}.");
+            output.WriteLine($"[ABS] OperationOutcome expectation mode: failed-patient count={_operationOutcomeExpectations.ExpectedCountPerFailedValidationPatient} ({_operationOutcomeExpectationSource}).");
 
             // Capture a lightweight ABS upload snapshot for the manifest detail page.
             try
@@ -653,45 +702,15 @@ internal sealed class RunExecutor
             // Pipeline-built manifest already has all metadata; no need to re-parse bundles.
             // For non-profile runs (no pipeline), generationManifest remains null.
 
-            var validatorResults = new List<PipelineSummarySnapshotBuilder.ValidatorResultSnapshot>();
+            // Failures are collected and re-thrown together once every validator has run — see
+            // ValidatorRunner for why failing on the first one destroyed the evidence needed to
+            // localise a discrepancy. Results are persisted after each validator so partial results
+            // stay visible in the dashboard even when a later validator fails.
+            var validatorRunner = new ValidatorRunner((results, ct) =>
+                _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", results, ct));
 
-            async Task RunValidator(string name, Func<Task> action)
-            {
-                try
-                {
-                    await action();
-                    validatorResults.Add(new PipelineSummarySnapshotBuilder.ValidatorResultSnapshot
-                    {
-                        Name = name,
-                        Outcome = "Passed",
-                        IssueCount = 0
-                    });
-                }
-                catch (Exception ex)
-                {
-                    // Extract issue count from the conventional message format:
-                    // "... failed with N issue(s)."
-                    var issueCount = 0;
-                    var match = System.Text.RegularExpressions.Regex.Match(ex.Message, @"(\d+)\s+issue\(s\)");
-                    if (match.Success)
-                        int.TryParse(match.Groups[1].Value, out issueCount);
-
-                    validatorResults.Add(new PipelineSummarySnapshotBuilder.ValidatorResultSnapshot
-                    {
-                        Name = name,
-                        Outcome = "Failed",
-                        IssueCount = issueCount
-                    });
-                    // Re-throw so the run still fails as before.
-                    throw;
-                }
-                finally
-                {
-                    // Persist after each validator so partial results are visible
-                    // in the dashboard even if a later validator throws.
-                    await _snapshotStore.SetDomainAsync(state.RunId, "validatorResults", validatorResults, cancellationToken);
-                }
-            }
+            Task RunValidator(string name, Func<Task> action) =>
+                validatorRunner.RunAsync(name, action, cancellationToken);
 
             await RunValidator("REPORT INTERNAL ABS MANIFEST VALIDATION", () =>
                 reportAbsValidator.ValidateAllAsync(
@@ -705,7 +724,8 @@ internal sealed class RunExecutor
                     generatedBundles: null,
                     expectedManifestPatientListIds: expectedManifestPatientListIds,
                     expectDataAcquisitionData: expectDataAcquisitionData,
-                    manifest: generationManifest));
+                    manifest: generationManifest,
+                    operationOutcomeExpectations: _operationOutcomeExpectations));
 
             // The ABS manifest validator enriches the manifest with downstream-derived
             // predictions that are not known at generation time — most notably the
@@ -808,6 +828,10 @@ internal sealed class RunExecutor
 
             await RunValidator("VALIDATION RESULTS (API)", () =>
                 validationResultsValidator.ValidateAllAsync(facilityId, reportId, expectedAllPatientIds, scenarioConfig.LokiScrapeWindow));
+
+            // Thrown before cleanup, matching the previous behaviour of leaving a failed run's data in
+            // place for inspection.
+            validatorRunner.ThrowIfAnyFailed();
 
             await RunCleanupHelper.CleanupAfterRunAsync(
                 scenarioConfig,
