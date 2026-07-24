@@ -23,6 +23,7 @@ public class FhirDataLoader
     /// and the bearer/basic credential is never forwarded to a different host.
     /// </summary>
     private readonly Uri _baseUri;
+    private readonly Uri _baseUriForRelativeResolution;
     private readonly OAuthConfig? _oauthConfig;
     private readonly BasicAuthConfig? _basicAuthConfig;
 
@@ -36,6 +37,7 @@ public class FhirDataLoader
         _basicAuthConfig = basicAuthConfig;
         var trimmed = fhirServerBaseUrl.TrimEnd('/');
         _baseUri = new Uri(trimmed, UriKind.Absolute);
+        _baseUriForRelativeResolution = EnsureTrailingSlash(_baseUri);
         _restClient = new RestClient(trimmed);
         GetAuthorization();
     }
@@ -531,7 +533,7 @@ public class FhirDataLoader
                 $"Refusing to follow Bundle next link for {descriptionForError}: '{nextLink}' is not a valid URI.");
         }
 
-        var absolute = parsed.IsAbsoluteUri ? parsed : new Uri(_baseUri, parsed);
+        var absolute = parsed.IsAbsoluteUri ? parsed : new Uri(_baseUriForRelativeResolution, parsed);
 
         if (!absolute.IsAbsoluteUri)
         {
@@ -548,6 +550,19 @@ public class FhirDataLoader
         }
 
         return absolute;
+    }
+
+    private static Uri EnsureTrailingSlash(Uri uri)
+    {
+        if (uri.AbsolutePath.EndsWith('/'))
+            return uri;
+
+        var builder = new UriBuilder(uri)
+        {
+            Path = uri.AbsolutePath + "/"
+        };
+
+        return builder.Uri;
     }
 
     private static bool IsSameOrigin(Uri left, Uri right) =>
