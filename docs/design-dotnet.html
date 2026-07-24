@@ -4,14 +4,137 @@
     <title>Architecture Export</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
         mermaid.initialize({{startOnLoad:true}});
 
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
         window.copyMermaidSource = function(btn) {{
             const container = btn.closest('.mermaid-container');
-            const pre = container.querySelector('pre.mermaid');
-            const source = pre.dataset.source || pre.textContent.trim();
+            const source = getMermaidSourceFromContainer(container);
             if (source) {{
                 navigator.clipboard.writeText(source).then(() => {{
                     const originalHtml = btn.innerHTML;
@@ -21,9 +144,8 @@
             }}
         }};
 
-        window.downloadMermaidPng = function(btn) {{
-            const container = btn.closest('.mermaid-container');
-            const svg = container.querySelector('svg');
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
             if (!svg) return;
 
             const svgData = new XMLSerializer().serializeToString(svg);
@@ -51,7 +173,82 @@
                 document.body.removeChild(downloadLink);
             }};
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
         }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
     </script>
     <style>
         .sidebar {{
@@ -73,25 +270,101 @@
         .mermaid-container {{
             position: relative;
             min-height: 50px;
+            max-height: 500px;
             overflow: auto;
             background-color: #fff;
         }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
         .mermaid-actions {{
             position: absolute;
-            top: 10px;
-            right: 10px;
             display: none;
             gap: 5px;
             z-index: 10;
         }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
         .mermaid-container:hover .mermaid-actions {{
             display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
         }}
         .mermaid-actions .btn {{
             background-color: rgba(255, 255, 255, 0.8);
             border: 1px solid #dee2e6;
             padding: 2px 6px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
         }}
         /* Custom Purple Utilities */
         .text-purple {{ color: #6f42c1 !important; }}
@@ -101,6 +374,37 @@
     </style>
 </head>
 <body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="container-fluid">
         <div class="row">
             <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
@@ -108,6 +412,7 @@
                     <ul class="nav flex-column">
   <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
@@ -124,8 +429,8 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourceacquired.html">Resource Acquired</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourcenormalized.html">Resource Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
@@ -161,22 +466,26 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -186,7 +495,7 @@
 <div class="row">
     <div class="col-md-8">
         
-        <h1 id="swagger">Swagger <a id="swagger" href="#swagger" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Swagger"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+        <h1 id="swagger" class="content-heading">Swagger <a id="swagger" href="#swagger" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Swagger"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -207,7 +516,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="azure-app-config-environment-variables">Azure App Config Environment Variables <a id="azure-app-config-environment-variables" href="#azure-app-config-environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Azure App Config Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="azure-app-config-environment-variables" class="content-heading">Azure App Config Environment Variables <a id="azure-app-config-environment-variables" href="#azure-app-config-environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Azure App Config Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The following should be specified as environment variables when launching the service:</p>
 <table>
 <thead>
@@ -236,7 +545,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="blob-storage">Blob Storage <a id="blob-storage" href="#blob-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Blob Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="blob-storage" class="content-heading">Blob Storage <a id="blob-storage" href="#blob-storage" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Blob Storage"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -292,7 +601,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="kafka">Kafka <a id="kafka" href="#kafka" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="kafka" class="content-heading">Kafka <a id="kafka" href="#kafka" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -366,7 +675,7 @@
 <li>Ssl</li>
 <li>SaslSsl</li>
 </ul>
-<h2 id="sasl-plain-text-authentication">SASL Plain Text Authentication <a id="sasl-plain-text-authentication" href="#sasl-plain-text-authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SASL Plain Text Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="sasl-plain-text-authentication" class="content-heading">SASL Plain Text Authentication <a id="sasl-plain-text-authentication" href="#sasl-plain-text-authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SASL Plain Text Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Include the following configuration properties to connecto to Kafka that requires SASL_PLAINTEXT authentication:</p>
 <table>
 <thead>
@@ -394,7 +703,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="kafka-consumer-settings">Kafka Consumer Settings <a id="kafka-consumer-settings" href="#kafka-consumer-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Consumer Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="kafka-consumer-settings" class="content-heading">Kafka Consumer Settings <a id="kafka-consumer-settings" href="#kafka-consumer-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Kafka Consumer Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -421,7 +730,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="cors">CORS <a id="cors" href="#cors" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CORS"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="cors" class="content-heading">CORS <a id="cors" href="#cors" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CORS"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -477,7 +786,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="token-service-settings">Token Service Settings <a id="token-service-settings" href="#token-service-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Token Service Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="token-service-settings" class="content-heading">Token Service Settings <a id="token-service-settings" href="#token-service-settings" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Token Service Settings"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>TODO: Describe what the purpose of the token endpoint is</p>
 <table>
 <thead>
@@ -534,7 +843,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="service-authentication">Service Authentication <a id="service-authentication" href="#service-authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="service-authentication" class="content-heading">Service Authentication <a id="service-authentication" href="#service-authentication" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Authentication"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -576,7 +885,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="redis">Redis <a id="redis" href="#redis" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Redis"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="redis" class="content-heading">Redis <a id="redis" href="#redis" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Redis"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -607,7 +916,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="telemetry">Telemetry <a id="telemetry" href="#telemetry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Telemetry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="telemetry" class="content-heading">Telemetry <a id="telemetry" href="#telemetry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Telemetry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <table>
 <thead>
 <tr>
@@ -644,10 +953,10 @@
 </tr>
 </tbody>
 </table>
-<h1 id="service-registry">Service Registry <a id="service-registry" href="#service-registry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Registry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="service-registry" class="content-heading">Service Registry <a id="service-registry" href="#service-registry" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Registry"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The Service Registry section contains URLs and configurations for all microservices in the Link Cloud ecosystem. Configuration key: <code>ServiceRegistry</code></p>
 <p>Not all services use every URL. The configuration is provided for completeness and future-proofing. If using Azure App Configuration, all service URLs should be specified, and each service will use only the URLs it needs.</p>
-<h2 id="service-urls">Service URLs <a id="service-urls" href="#service-urls" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service URLs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="service-urls" class="content-heading">Service URLs <a id="service-urls" href="#service-urls" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service URLs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -799,7 +1108,7 @@
 </tr>
 </tbody>
 </table>
-<h3 id="example-configuration-in-json">Example Configuration in JSON <a id="example-configuration-in-json" href="#example-configuration-in-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Configuration in JSON"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="example-configuration-in-json" class="content-heading">Example Configuration in JSON <a id="example-configuration-in-json" href="#example-configuration-in-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Example Configuration in JSON"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-json">{
   &quot;ServiceRegistry&quot;: {
     &quot;AccountServiceUrl&quot;: &quot;http://localhost:8060&quot;,
@@ -822,7 +1131,7 @@
   }
 }
 </code></pre>
-<h2 id="tenant-service-configuration">Tenant Service Configuration <a id="tenant-service-configuration" href="#tenant-service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="tenant-service-configuration" class="content-heading">Tenant Service Configuration <a id="tenant-service-configuration" href="#tenant-service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Tenant Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <table>
 <thead>
 <tr>
@@ -859,7 +1168,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="data-acquisition-service-configuration">Data Acquisition Service Configuration <a id="data-acquisition-service-configuration" href="#data-acquisition-service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="data-acquisition-service-configuration" class="content-heading">Data Acquisition Service Configuration <a id="data-acquisition-service-configuration" href="#data-acquisition-service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Data Acquisition Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The following settings are specific to the Data Acquisition service.</p>
 <table>
 <thead>
@@ -881,8 +1190,8 @@
 </tr>
 </tbody>
 </table>
-<h2 id="databases">Databases <a id="databases" href="#databases" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Databases"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="sql-server-database">SQL Server Database <a id="sql-server-database" href="#sql-server-database" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SQL Server Database"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="databases" class="content-heading">Databases <a id="databases" href="#databases" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Databases"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="sql-server-database" class="content-heading">SQL Server Database <a id="sql-server-database" href="#sql-server-database" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: SQL Server Database"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <table>
 <thead>
 <tr>
@@ -917,7 +1226,7 @@
 </tr>
 </tbody>
 </table>
-<h3 id="mongo-database">Mongo Database <a id="mongo-database" href="#mongo-database" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Mongo Database"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="mongo-database" class="content-heading">Mongo Database <a id="mongo-database" href="#mongo-database" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Mongo Database"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <table>
 <thead>
 <tr>
@@ -948,7 +1257,7 @@
 </tr>
 </tbody>
 </table>
-<h1 id="service-information">Service Information <a id="service-information" href="#service-information" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Information"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="service-information" class="content-heading">Service Information <a id="service-information" href="#service-information" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Information"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The ServiceInformation configuration allows exposing build, version and deployment information through the <code>/api/XXX/info</code> (i.e. <code>/api/audit/info</code>) endpoint of each service. This information is automatically populated from assembly metadata and git information during build time.</p>
 <table>
 <thead>
@@ -999,9 +1308,9 @@
 </tbody>
 </table>
 <p>The service automatically extracts information from .NET assembly version in the AssemblyInfo.cs file or project file</p>
-<h1 id="ef-core-query-logging">EF Core Query Logging <a id="ef-core-query-logging" href="#ef-core-query-logging" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: EF Core Query Logging"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="ef-core-query-logging" class="content-heading">EF Core Query Logging <a id="ef-core-query-logging" href="#ef-core-query-logging" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: EF Core Query Logging"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>Configure EF Core to log queries, including sensitive data, by setting up the <code>appsettings.json</code> file and adjusting the <code>Program.cs</code> file. This allows dynamic adjustment of logging levels in Serilog based on the <code>EnableEnhancedQueryLogging</code> setting.</p>
-<h2 id="configuration-in-appsettings.json">Configuration in appsettings.json <a id="configuration-in-appsettings-json" href="#configuration-in-appsettings-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration in appsettings.json"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="configuration-in-appsettings.json" class="content-heading">Configuration in appsettings.json <a id="configuration-in-appsettings-json" href="#configuration-in-appsettings-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration in appsettings.json"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Add the following section to enable enhanced query logging:</p>
 <pre><code class="language-json">&quot;EnhancedQueryLoggingSettings&quot;: {
   &quot;EnableEnhancedQueryLogging&quot;: false
@@ -1027,7 +1336,7 @@
 </tr>
 </tbody>
 </table>
-<h2 id="configuration-in-program.cs">Configuration in Program.cs <a id="configuration-in-program-cs" href="#configuration-in-program-cs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration in Program.cs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="configuration-in-program.cs" class="content-heading">Configuration in Program.cs <a id="configuration-in-program-cs" href="#configuration-in-program-cs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration in Program.cs"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>In <code>Program.cs</code>, configure Serilog to dynamically set log levels for EF Core namespaces and enable EF Core logging in the DbContext setup.</p>
 <p>For Serilog configuration (e.g., in a <code>ConfigureLogging</code> method):</p>
 <pre><code class="language-csharp">// Bind the enhanced logging settings
@@ -1077,13 +1386,27 @@ builder.Logging.AddSerilog();
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-ndotnet_75431B2B["Design: Configuring .NET Services"]</pre>
-            <div class="mermaid-actions no-print">
+ndotnet_704D25B0["Design: Configuring .NET Services"]</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>
                 </button>
                 <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
                     <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
                 </button>
             </div>
         </div>
