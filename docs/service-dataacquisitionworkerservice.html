@@ -4,14 +4,137 @@
     <title>Architecture Export</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
         mermaid.initialize({{startOnLoad:true}});
 
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
         window.copyMermaidSource = function(btn) {{
             const container = btn.closest('.mermaid-container');
-            const pre = container.querySelector('pre.mermaid');
-            const source = pre.dataset.source || pre.textContent.trim();
+            const source = getMermaidSourceFromContainer(container);
             if (source) {{
                 navigator.clipboard.writeText(source).then(() => {{
                     const originalHtml = btn.innerHTML;
@@ -21,9 +144,8 @@
             }}
         }};
 
-        window.downloadMermaidPng = function(btn) {{
-            const container = btn.closest('.mermaid-container');
-            const svg = container.querySelector('svg');
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
             if (!svg) return;
 
             const svgData = new XMLSerializer().serializeToString(svg);
@@ -51,7 +173,82 @@
                 document.body.removeChild(downloadLink);
             }};
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
         }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
     </script>
     <style>
         .sidebar {{
@@ -73,25 +270,101 @@
         .mermaid-container {{
             position: relative;
             min-height: 50px;
+            max-height: 500px;
             overflow: auto;
             background-color: #fff;
         }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
         .mermaid-actions {{
             position: absolute;
-            top: 10px;
-            right: 10px;
             display: none;
             gap: 5px;
             z-index: 10;
         }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
         .mermaid-container:hover .mermaid-actions {{
             display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
         }}
         .mermaid-actions .btn {{
             background-color: rgba(255, 255, 255, 0.8);
             border: 1px solid #dee2e6;
             padding: 2px 6px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
         }}
         /* Custom Purple Utilities */
         .text-purple {{ color: #6f42c1 !important; }}
@@ -101,6 +374,37 @@
     </style>
 </head>
 <body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="container-fluid">
         <div class="row">
             <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
@@ -108,6 +412,7 @@
                     <ul class="nav flex-column">
   <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
@@ -124,8 +429,8 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourceacquired.html">Resource Acquired</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourcenormalized.html">Resource Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
@@ -161,22 +466,26 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -185,28 +494,32 @@
 <h1>Data Acquisition Worker Service</h1>
 <div class="row">
     <div class="col-md-8">
-        <div class="mb-3"><strong>Produces:</strong> <a href="event-patientlistsacquired.html">Patient Lists Acquired [event]</a>, <a href="event-cernerpatientsacquired.html">Cerner Patients Acquired [event]</a>, <a href="event-readytoacquire.html">Ready to Acquire [event]</a></div><div class="mb-3"><strong>Consumes:</strong> None</div>
-        <h2 id="overview">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <div class="mb-3"><strong>Produces:</strong> <a href="event-patientlistsacquired.html">Patient Lists Acquired [event]</a>, <a href="event-cernerpatientsacquired.html">Cerner Patients Acquired [event]</a>, <a href="event-resources-acquired.html">Resources Acquired [event]</a></div><div class="mb-3"><strong>Consumes:</strong> <a href="event-readytoacquire.html">Ready to Acquire [event]</a></div>
+        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The worker builds on the Data Acquisition service, which connects and queries a tenant's endpoint for FHIR resources that are needed to evaluate patients for a measure.</p>
 <ul>
 <li>When a log entry is marked ready, <code>DataAcquisitionLogService.StartRetrievalProcess</code> updates its status and produces a <code>ReadyToAcquire</code> event for the log and facility.</li>
 <li><code>Program.cs</code> registers hosted services such as <code>ReadyToAcquireListener</code>, <code>RetryListener</code>, and <code>RetryScheduleService</code> to consume these events and provide retry behavior if needed.</li>
 <li>Inside <code>ReadyToAcquireListener</code>, each message triggers <code>PatientDataService.ExecuteLogRequest</code>, which retrieves the patient data associated with the log and facility.</li>
+<li>As the service acquires FHIR resources, it will store them in a cache destination for downstream services to use for processing (Normalization, Evaluation). Depending on the configuration, the service is capable of caching to Azure Blob Storage and Redis.</li>
+<li>After all patient resources have been acquired and cached, the service produces a <code>ResourcesAcquired</code> event that contains metadata involving the patient, facility, reporting period and information on the destination of the cached resources.</li>
 </ul>
 <div class="mermaid-container"><pre class="mermaid">
 flowchart LR
-nDataAcquisitionWorkerService_7921C5E7["Service: Data Acquisition Worker Service"]
-  nDataAcquisitionWorkerService_7921C5E7 -->|produces| nPatientListsAcquired_81F1076["Event: PatientListsAcquired"]
-  nDataAcquisitionWorkerService_7921C5E7 -->|produces| nCernerPatientsAcquired_C0532A["Event: CernerPatientsAcquired"]
-  nDataAcquisitionWorkerService_7921C5E7 -->|produces| nReadyToAcquire_37BFEA79["Event: ReadyToAcquire"]
-  subgraph nDataAccess_3BCC4CFC_domain["Domain: Data Access"]
-    nCernerPatientsAcquired_C0532A
-    nDataAcquisitionWorkerService_7921C5E7
-    nPatientListsAcquired_81F1076
-    nReadyToAcquire_37BFEA79
+nDataAcquisitionWorkerService_1C09C8B6["Service: Data Acquisition Worker Service"]
+  nDataAcquisitionWorkerService_1C09C8B6 -->|produces| nPatientListsAcquired_4681892E["Event: PatientListsAcquired"]
+  nDataAcquisitionWorkerService_1C09C8B6 -->|produces| nCernerPatientsAcquired_3467767F["Event: CernerPatientsAcquired"]
+  nDataAcquisitionWorkerService_1C09C8B6 -->|produces| nresources_acquired_566EB692["Event: resources-acquired"]
+  nReadyToAcquire_7C2F519C["Event: ReadyToAcquire"] -->|consumed by| nDataAcquisitionWorkerService_1C09C8B6
+  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
+    nCernerPatientsAcquired_3467767F
+    nDataAcquisitionWorkerService_1C09C8B6
+    nPatientListsAcquired_4681892E
+    nReadyToAcquire_7C2F519C
+    nresources_acquired_566EB692
   end
 </pre></div>
-<h2 id="common-configurations">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="common-configurations" class="content-heading">Common Configurations <a id="common-configurations" href="#common-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#azure-app-config-environment-variables">Azure App Configuration</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#kafka">Kafka Configuration</a></li>
@@ -217,9 +530,25 @@ nDataAcquisitionWorkerService_7921C5E7["Service: Data Acquisition Worker Service
 <li><a href="Entities/Details?type=design&amp;id=dotnet#service-authentication">Service Authentication</a></li>
 <li><a href="Entities/Details?type=design&amp;id=dotnet#sql-server-database">SQL Server Database Configuration</a></li>
 </ul>
-<h2 id="features-and-functionality">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="service-configurations" class="content-heading">Service Configurations <a id="service-configurations" href="#service-configurations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Configurations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<ul>
+<li><strong>ResourceCache__CacheImplementation</strong>: Acquired FHIR resources a stored in a cache destination. The Data Acquisition Worker will store to different desintations depending on how this is set. The following cache implementation settings are supported:
+<ul>
+<li><strong>ABS</strong>: All acquired FHIR resources will be cached in Azure Blob Storage.</li>
+<li><strong>Redis</strong>: All acquired FHIR resources will be cached in Redis.</li>
+<li><strong>Hybrid</strong>: Acquired FHIR resources will be primarily cached in Redis. If capacity limits are met to store into Redis, the Data Acquisition service will store the resources into Azure Blob Storage.</li>
+</ul>
+</li>
+<li><strong>ResourceCache__Redis__ConnectionString</strong>: Connection string to access the deployed Redis environment.</li>
+<li><strong>ResourceCache__Redis__Password</strong>: Password for the deployed Redis environment.</li>
+<li><strong>ResourceCache__Redis__MemoryThresholdPercent</strong>: When <code>CacheImplementation</code> is set to <code>Hybrid</code>, the worker service will primarily store resources into Redis until it exceeds this threshold setting. When the capacity exceeds the set setting, the worker service will store resources into Azure Blob Storage. The defailt configuration of this setting is <code>80.0</code>.</li>
+<li><strong>ResourceCache__BlobStorage__ConnectionString</strong>: Connection string to access the deployed Azure Blob Storage environment.</li>
+<li><strong>ResourceCache__BlobStorage__BlobContainerName</strong>: The Azure Blob Storage container name where cached resources will be stored.</li>
+<li><strong>ResourceCache__BlobStorage__BlobRoot</strong>: Root Azure Blob Storage directory the cached resources will be located.</li>
+</ul>
+<h2 id="features-and-functionality" class="content-heading">Features and Functionality <a id="features-and-functionality" href="#features-and-functionality" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Features and Functionality"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The <strong>Data Acquisition Worker</strong> is responsible for the actual execution of FHIR queries defined by the <a href="domains/DataAccess/services/DataAcquisitionService">Data Acquisition Service</a>.</p>
-<h3 id="log-execution-flow">Log Execution Flow <a id="log-execution-flow" href="#log-execution-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Log Execution Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="log-execution-flow" class="content-heading">Log Execution Flow <a id="log-execution-flow" href="#log-execution-flow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Log Execution Flow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ol>
 <li><strong>Event Consumption</strong>: The worker listens for <code>ReadyToAcquire</code> events. Each event contains a <code>LogId</code> and <code>FacilityId</code>.</li>
 <li><strong>Log Claiming</strong>: When an event is received, the worker attempts to atomically transition the log's status from <code>Ready</code> to <code>Queued</code>. This ensures that even if multiple worker instances receive the same event, only one will process it.</li>
@@ -232,17 +561,17 @@ nDataAcquisitionWorkerService_7921C5E7["Service: Data Acquisition Worker Service
 <li>For <strong>Reference</strong> queries, it scans previously acquired resources for the specified references and fetches them.</li>
 </ul>
 </li>
-<li><strong>Data Normalization</strong>: As resources are acquired, they are sent to the normalization pipeline.</li>
-<li><strong>Completion</strong>: Once all resources for the log are processed, the log status is updated to <code>Completed</code>, and a <code>ResourceAcquired</code> event is published.</li>
+<li><strong>Resource Caching</strong>: As resources are acquired, they are cached in either Redis or Azure Blob Storage. Where they are stored depends on the app setting of the worker service.</li>
+<li><strong>Completion</strong>: Once all resources for the log are processed, the log status is updated to <code>Completed</code>, and a <code>ResourcesAcquired</code> event is published.</li>
 </ol>
-<h3 id="concurrency-and-performance">Concurrency and Performance <a id="concurrency-and-performance" href="#concurrency-and-performance" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Concurrency and Performance"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="concurrency-and-performance" class="content-heading">Concurrency and Performance <a id="concurrency-and-performance" href="#concurrency-and-performance" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Concurrency and Performance"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The worker is designed for high-throughput data acquisition:</p>
 <ul>
 <li><strong>Bounded Channel</strong>: The internal work queue has a configurable capacity (default 200) to provide backpressure.</li>
 <li><strong>Parallel Execution</strong>: The <code>AcquisitionProcessorBackgroundService</code> uses <code>Parallel.ForEachAsync</code> with a configurable <code>MaxDegreeOfParallelism</code> (default 8) to process multiple acquisition logs concurrently.</li>
 <li><strong>Throttling</strong>: The worker respects EHR-specific throttling limits if configured in the tenant's Query Config.</li>
 </ul>
-<h3 id="error-handling-and-retries">Error Handling and Retries <a id="error-handling-and-retries" href="#error-handling-and-retries" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Error Handling and Retries"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="error-handling-and-retries" class="content-heading">Error Handling and Retries <a id="error-handling-and-retries" href="#error-handling-and-retries" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Error Handling and Retries"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Transient Failures</strong>: If a query fails due to a network error or EHR timeout, the worker catches the exception and updates the log status to <code>Pending</code>. The <code>DataAcquisitionService</code> will then reschedule it for retry.</li>
 <li><strong>Poison Messages</strong>: If a message cannot be processed after multiple attempts, it is moved to a Dead Letter Queue (DLQ).</li>
@@ -277,22 +606,38 @@ nDataAcquisitionWorkerService_7921C5E7["Service: Data Acquisition Worker Service
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-nDataAcquisitionWorkerService_7921C5E7["Service: Data Acquisition Worker Service"]
-  nDataAcquisitionWorkerService_7921C5E7 -->|produces| nPatientListsAcquired_81F1076["Event: PatientListsAcquired"]
-  nDataAcquisitionWorkerService_7921C5E7 -->|produces| nCernerPatientsAcquired_C0532A["Event: CernerPatientsAcquired"]
-  nDataAcquisitionWorkerService_7921C5E7 -->|produces| nReadyToAcquire_37BFEA79["Event: ReadyToAcquire"]
-  subgraph nDataAccess_3BCC4CFC_domain["Domain: Data Access"]
-    nCernerPatientsAcquired_C0532A
-    nDataAcquisitionWorkerService_7921C5E7
-    nPatientListsAcquired_81F1076
-    nReadyToAcquire_37BFEA79
+nDataAcquisitionWorkerService_1C09C8B6["Service: Data Acquisition Worker Service"]
+  nDataAcquisitionWorkerService_1C09C8B6 -->|produces| nPatientListsAcquired_4681892E["Event: PatientListsAcquired"]
+  nDataAcquisitionWorkerService_1C09C8B6 -->|produces| nCernerPatientsAcquired_3467767F["Event: CernerPatientsAcquired"]
+  nDataAcquisitionWorkerService_1C09C8B6 -->|produces| nresources_acquired_566EB692["Event: resources-acquired"]
+  nReadyToAcquire_7C2F519C["Event: ReadyToAcquire"] -->|consumed by| nDataAcquisitionWorkerService_1C09C8B6
+  subgraph nDataAccess_2A523756_domain["Domain: Data Access"]
+    nCernerPatientsAcquired_3467767F
+    nDataAcquisitionWorkerService_1C09C8B6
+    nPatientListsAcquired_4681892E
+    nReadyToAcquire_7C2F519C
+    nresources_acquired_566EB692
   end</pre>
-            <div class="mermaid-actions no-print">
+            <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>
                 </button>
                 <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
                     <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
                 </button>
             </div>
         </div>
