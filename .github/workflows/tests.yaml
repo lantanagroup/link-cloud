@@ -37,7 +37,7 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED_FILES"
 
-          if echo "$CHANGED_FILES" | grep -Eq '^(DotNet/|Tests/|Java/|docker-compose\.yml|\.github/workflows/tests\.yaml)'; then
+          if echo "$CHANGED_FILES" | grep -Eq '^(DotNet/|Tests/|Java/|Web/|docker-compose\.yml|\.github/workflows/tests\.yaml)'; then
             echo "run_job=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_job=false" >> "$GITHUB_OUTPUT"
@@ -145,6 +145,52 @@ jobs:
         run: |
           chmod +x Scripts/check_health.sh
           Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
+
+      # ---- Admin UI live e2e (Playwright) ----
+      # Runs while the stack is otherwise idle — before the parallel dotnet categories
+      # mutate facilities/reports — so the UI roundtrip test cannot race them.
+
+      - name: Setup Node for Admin UI e2e
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Web/Admin.UI/package-lock.json
+
+      - name: Install Admin UI e2e dependencies
+        working-directory: Web/Admin.UI
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('Web/Admin.UI/package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        working-directory: Web/Admin.UI
+        run: npx playwright install --with-deps chromium
+
+      # check_health.sh treats containers without a healthcheck (admin-ui) as healthy,
+      # so wait for the UI to actually respond before pointing a browser at it.
+      - name: Wait for Admin UI (8066)
+        shell: bash
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsS -o /dev/null http://localhost:8066/ && exit 0
+            sleep 2
+          done
+          echo "Admin UI never became reachable on 8066"
+          docker compose logs --no-color --tail=100 admin-ui || true
+          exit 1
+
+      - name: Admin UI live e2e tests
+        id: ui_e2e
+        continue-on-error: true
+        working-directory: Web/Admin.UI
+        env:
+          UI_E2E_BASE_URL: http://localhost:8066
+        run: npx playwright test --project=live
 
       # Build the test project ONCE up front. The parallel `dotnet test`
       # invocations below all target the same assembly and transitively
@@ -265,6 +311,24 @@ jobs:
           name: adhoc-report-submission-zip
           path: ./Tests/BackendE2ETests/bin/**/adhoc-report-test-submission.zip
           if-no-files-found: ignore
+
+      - name: Upload Admin UI e2e report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-ui-e2e-report
+          path: |
+            Web/Admin.UI/playwright-report/
+            Web/Admin.UI/test-results/
+          if-no-files-found: ignore
+
+      # The UI step uses continue-on-error so a UI failure never suppresses backend
+      # results or artifacts; this gate still fails the job afterwards.
+      - name: Fail job if Admin UI e2e failed
+        if: ${{ steps.ui_e2e.outcome == 'failure' }}
+        run: |
+          echo "Admin UI live e2e tests failed — see the admin-ui-e2e-report artifact."
+          exit 1
 
       - name: Tear down services
         if: always()

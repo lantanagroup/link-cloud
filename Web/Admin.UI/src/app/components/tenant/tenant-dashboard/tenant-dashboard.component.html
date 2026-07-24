@@ -2,12 +2,13 @@
 
   <!-- Toolbar -->
   <p>
-    <mat-toolbar class="page-header-bar" color="primary">
+    <mat-toolbar class="page-header-bar" color="primary" data-testid="tenant-dashboard-header">
       <span>Tenant Dashboard</span>
       <button mat-mini-fab
               aria-label="Create tenant"
               title="Create tenant"
               matTooltip="Create Facility"
+              data-testid="facility-create-btn"
               (click)="showCreateFacilityDialog()">
         <mat-icon>add</mat-icon>
       </button>
@@ -22,7 +23,7 @@
       <div class="filter-bar">
         <mat-form-field appearance="outline" class="compact-filter">
           <mat-label>Facility</mat-label>
-          <input matInput [formControl]="facilityInputControl" [matAutocomplete]="facilityAuto" (input)="onFacilityInput()" placeholder="Search facilities...">
+          <input matInput [formControl]="facilityInputControl" [matAutocomplete]="facilityAuto" (input)="onFacilityInput()" placeholder="Search facilities..." data-testid="facility-search">
           <button *ngIf="facilityInputControl.value" matSuffix mat-icon-button aria-label="Clear facility" (click)="clearFacilityFilter()">
             <mat-icon>close</mat-icon>
           </button>
@@ -64,7 +65,7 @@
 
     <!-- Table -->
     <div class="table-container no-border">
-      <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" style="width:100%; background-color: transparent">
+      <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" style="width:100%; background-color: transparent" data-testid="facility-table">
 
         <!-- Facility ID -->
         <ng-container matColumnDef="facilityId">
@@ -139,7 +140,7 @@
         <!-- No data row -->
         <tr class="mat-row" *matNoDataRow>
           <td class="mat-cell" [attr.colspan]="getColumns().length">
-            <div class="no-data-message">
+            <div class="no-data-message" data-testid="facility-empty-state">
               <mat-icon>search_off</mat-icon>
               No tenants found.
             </div>
