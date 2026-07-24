@@ -1,4 +1,4 @@
-﻿using Confluent.Kafka;
+using Confluent.Kafka;
 using Confluent.Kafka.Extensions.Diagnostics;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Support;
@@ -191,8 +191,8 @@ namespace LantanaGroup.Link.Report.Listeners
 
             // When WritePreQualOperationOutcome is set, the Validation service is the sole writer of
             // the pre-qualification OperationOutcome (LEGLINK-425), so Report must not append its own
-            // flat one — two writers to the same NDJSON would duplicate the resource.
-            if (!value.IsValid && !_preQualificationSettings.WritePreQualOperationOutcome)
+            // flat one � two writers to the same NDJSON would duplicate the resource.
+            if (!value.IsValid && reportEntry.ReportingStatus != ReportingStatus.FailedValidation && !_preQualificationSettings.WritePreQualOperationOutcome)
             {
                 var operationOutcome = GetOperationOutcome();
 

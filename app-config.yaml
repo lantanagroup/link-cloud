@@ -194,6 +194,9 @@ services:
     - key: "MongoDB:DatabaseName"
       description: "The MongoDB database name for automation data."
       required: true
+    - key: "ApiHealth:EnableAdminBffAuthSuite"
+      description: "Boolean flag to enable the Admin BFF authentication API Health suite in Automation.UI."
+      required: false
   DataAcquisition:
     - key: "AcquisitionJobSettings:CronSchedule"
       description: "The cron expression defining how often data acquisition jobs should run."

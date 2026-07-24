@@ -366,6 +366,8 @@ public class StartScenarioRequestResolverTests
     {
         var json = """
             {
+                "reportPeriodStart": "2024-03-01T00:00:00Z",
+                "reportPeriodEnd":   "2024-03-31T23:59:59Z",
                 "importedPatientIds": [
                     { "source": "ExistingId", "patientId": "abc" }
                 ],
@@ -385,6 +387,27 @@ public class StartScenarioRequestResolverTests
             .Which.PatientId.Should().Be("abc");
         options.ImportedPatientBundles.Should().ContainSingle()
             .Which.PatientId.Should().Be("xyz");
+    }
+
+    [Fact]
+    public void Imported_patients_require_explicit_report_period()
+    {
+        var json = """
+            {
+                "importedPatientIds": [
+                    { "source": "ExistingId", "patientId": "abc" }
+                ]
+            }
+            """;
+
+        var act = () => StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            RunConfigurationJson = json,
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Report period start and end are required when imported patients are included in a run.*");
     }
 
     [Fact]

@@ -178,7 +178,7 @@ namespace LantanaGroup.Link.Report.Application.Core
             var serializer = new FhirJsonSerializer();
             string resourceString = serializer.SerializeToString(domainResource);
 
-            byte[] string_bytes = Encoding.UTF8.GetBytes(resourceString);
+            byte[] string_bytes = Encoding.UTF8.GetBytes(resourceString + Environment.NewLine);
 
             using (var stream = new MemoryStream(string_bytes))
             {
