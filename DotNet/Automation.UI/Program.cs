@@ -8,6 +8,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Services.Security.Token;
+using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -36,22 +37,31 @@ if (!string.IsNullOrEmpty(externalConfigSource))
 // -- Bind options --
 builder.Services.Configure<AutomationConfig>(builder.Configuration.GetSection("Automation"));
 
-var grafanaBaseUrlFallback =
-    builder.Configuration["GRAFANA_URL"]
-    ?? builder.Configuration["GRAFANA_BASE_URL"]
-    ?? builder.Configuration["GrafanaBaseUrl"];
-
-if (!string.IsNullOrWhiteSpace(grafanaBaseUrlFallback))
+var lokiUrl = builder.Configuration["Loki:Url"];
+if (string.IsNullOrWhiteSpace(lokiUrl))
 {
-    builder.Services.PostConfigure<AutomationConfig>(cfg =>
-    {
-        if (string.IsNullOrWhiteSpace(cfg.GrafanaBaseUrl)
-            || string.Equals(cfg.GrafanaBaseUrl, "http://localhost:3000", StringComparison.OrdinalIgnoreCase))
-        {
-            cfg.GrafanaBaseUrl = grafanaBaseUrlFallback.TrimEnd('/');
-        }
-    });
+    throw new InvalidOperationException("Loki:Url is required.");
 }
+
+var lokiAppLabel = builder.Configuration["Loki:App"];
+if (string.IsNullOrWhiteSpace(lokiAppLabel))
+{
+    throw new InvalidOperationException("Loki:App is required.");
+}
+
+builder.Services.PostConfigure<AutomationConfig>(cfg =>
+{
+    cfg.LokiBaseUrl = lokiUrl.TrimEnd('/');
+    cfg.LokiAppLabel = lokiAppLabel.Trim();
+});
+
+var kafkaConnection = builder.Configuration.GetRequiredSection(KafkaConstants.SectionName).Get<KafkaConnection>()
+                      ?? throw new InvalidOperationException($"{KafkaConstants.SectionName} configuration is required.");
+
+if (kafkaConnection.BootstrapServers.Count == 0)
+    throw new InvalidOperationException($"{KafkaConstants.SectionName}:BootstrapServers must include at least one broker.");
+
+builder.Services.AddSingleton(kafkaConnection);
 
 builder.Services.Configure<ServiceRegistry>(builder.Configuration.GetSection(ServiceRegistry.ConfigSectionName));
 builder.Services.Configure<LinkTokenServiceSettings>(builder.Configuration.GetSection("LinkTokenService"));
@@ -89,6 +99,29 @@ var apiBearerEnabled = builder.Configuration.GetValue<bool>($"{ApiBearerConfigSe
 var apiBearerAuthority = builder.Configuration[$"{ApiBearerConfigSection}:Authority"];
 var apiBearerAudience = builder.Configuration[$"{ApiBearerConfigSection}:Audience"];
 
+static IReadOnlyCollection<string> BuildValidAudiences(string configuredAudience)
+{
+    var normalized = configuredAudience.Trim().TrimEnd('/');
+    var audiences = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        normalized
+    };
+
+    const string ApiUriPrefix = "api://";
+    if (normalized.StartsWith(ApiUriPrefix, StringComparison.OrdinalIgnoreCase))
+    {
+        var rawAudience = normalized[ApiUriPrefix.Length..].TrimEnd('/');
+        if (!string.IsNullOrWhiteSpace(rawAudience))
+            audiences.Add(rawAudience);
+    }
+    else
+    {
+        audiences.Add($"{ApiUriPrefix}{normalized}");
+    }
+
+    return audiences;
+}
+
 if (apiBearerEnabled)
 {
     if (string.IsNullOrWhiteSpace(apiBearerAuthority) || string.IsNullOrWhiteSpace(apiBearerAudience))
@@ -101,13 +134,16 @@ if (apiBearerEnabled)
         .AddAuthentication()
         .AddJwtBearer(ApiBearerSchemeName, options =>
         {
+            var validAudiences = BuildValidAudiences(apiBearerAudience);
+
             options.Authority = apiBearerAuthority;
             options.Audience = apiBearerAudience;
             options.RequireHttpsMetadata = true;
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
-                ValidAudience = apiBearerAudience,
+                ValidateAudience = true,
+                ValidAudiences = validAudiences,
             };
         });
 }
@@ -192,6 +228,8 @@ builder.Services.AddSingleton<MongoIndexManager>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
+builder.Services.AddSingleton<INormalizationStore, MongoNormalizationStore>();
+builder.Services.AddSingleton<IOrganizationResourceMapTemplateStore, MongoOrganizationResourceMapTemplateStore>();
 builder.Services.AddSingleton<IApiHealthRunStore, MongoApiHealthRunStore>();
 
 // -- API Health test suites --
@@ -205,6 +243,13 @@ builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServi
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.MeasureEvalTestSuite>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.ValidationServiceTestSuite>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.AdminBffTestSuite>();
+
+var enableAdminBffAuthSuite = builder.Configuration.GetValue<bool>("ApiHealth:EnableAdminBffAuthSuite");
+if (enableAdminBffAuthSuite)
+{
+    builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.TestSuites.IServiceTestSuite, Automation.UI.Services.ApiHealth.TestSuites.AdminBffAuthTestSuite>();
+}
+
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiEndpointRegistry>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiHealthExecutionRunManager>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedContextAccessor, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedContextAccessor>();
@@ -230,6 +275,8 @@ builder.Services.AddScoped<PipelineDataReader>();
 // -- Seed system scenarios and query plan templates --
 builder.Services.AddHostedService<ScenarioSeedService>();
 builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
+builder.Services.AddHostedService<NormalizationSuiteSeedService>();
+builder.Services.AddHostedService<OrganizationResourceMapTemplateSeedService>();
 
 // -- Seed synthetic runs for dashboard verification.
 //    Gated on config (Dashboard:SeedFakeRuns). Used for Debugging Dashbhoard.

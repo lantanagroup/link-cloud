@@ -9,7 +9,7 @@
 		<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
 		<RootNamespace>LantanaGroup.Link.DataAcquisition</RootNamespace>
 		<AssemblyName>$(MSBuildProjectName)</AssemblyName>
-		<Version>0.6.0</Version>
+		<Version>0.7.0</Version>
 		<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
 	</PropertyGroup>
 

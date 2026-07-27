@@ -118,6 +118,12 @@ authentication:
 link:
   info-route: /api/validation/info
   terminology-service-url: ''
+  # Retry for all HAPI FHIR REST clients (terminology validate-code/$lookup/etc.).
+  # Transient failures only: connection IOExceptions, HTTP 429, and 5xx (e.g. Envoy
+  # "503 no healthy upstream" during a terminology-service rollout). 4xx never retries.
+  fhir-client-retry:
+    max-attempts: 5
+    backoff-millis: 5000
   report:
     base-url: http://localhost:5110
     routes:
@@ -133,3 +139,7 @@ link:
 internal-blob-storage:
   connection-string: ''
   blob-container-name: ''
+
+pre-qualification:
+  write-pre-qual-operation-outcome: false
+  write-expressions-in-operation-outcome: true

@@ -1,0 +1,484 @@
+@model List<OrganizationResourceMapTemplate>
+@{
+    ViewData["Title"] = "Organization Resource Maps";
+}
+
+<div class="container mt-4">
+    <h2 class="fw-bold mb-1"><i class="bi bi-diagram-2 me-2"></i>Organization Resource Maps</h2>
+    <p class="text-muted mb-3">Reusable templates for Data Acquisition location/encounter organization mapping conditions.</p>
+
+    <div class="au-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>All Templates</span>
+            <button type="button" class="btn btn-sm btn-success" id="btnNewMap">New</button>
+        </div>
+        <div class="card-body p-0">
+            <table class="table au-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Conditions</th>
+                        <th>Kind</th>
+                        <th>Updated</th>
+                        <th style="width:250px"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var t in Model)
+                {
+                    <tr>
+                        <td>
+                            <strong>@t.Name</strong>
+                            @if (t.IsDefault)
+                            {
+                                <span class="badge bg-success ms-1">Default</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(t.Description))
+                            {
+                                <br/><small class="text-muted">@t.Description</small>
+                            }
+                        </td>
+                        <td><small class="text-muted">@t.Conditions.Count condition(s)</small></td>
+                        <td>@(t.IsSystem ? "System" : "Custom")</td>
+                        <td class="small text-muted">@t.UpdatedAt.LocalDateTime.ToString("g")</td>
+                        <td class="text-nowrap">
+                            <button class="btn btn-sm btn-outline-primary btn-map-open" data-id="@t.Id" data-mode="@(t.IsSystem?"view":"edit")">@(t.IsSystem?"View":"Edit")</button>
+                            <button class="btn btn-sm btn-outline-secondary btn-map-clone" data-id="@t.Id">Clone</button>
+                            @if (!t.IsDefault)
+                            {
+                                <button class="btn btn-sm btn-outline-success btn-map-default" data-id="@t.Id">Default</button>
+                            }
+                            @if (!t.IsSystem)
+                            {
+                                <button class="btn btn-sm btn-outline-danger btn-map-delete" data-id="@t.Id">Delete</button>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="mapModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;">
+    <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
+        <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:900px;display:flex;flex-direction:column;max-height:90vh;">
+            <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;" class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0" id="mapModalTitle">Organization Resource Map</h5>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-success" id="btnMapSave">Save</button>
+                    <button type="button" class="btn btn-sm btn-outline-light" id="btnMapClose">Close</button>
+                </div>
+            </div>
+            <div id="mapFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
+            <div id="mapModalBody" style="flex:1;overflow-y:auto;padding:1.25rem;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="MapId"/>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="MapName">Name</label>
+                        <input class="form-control" id="MapName" maxlength="120" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="MapDescription">Description</label>
+                        <input class="form-control" id="MapDescription" maxlength="500" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Matches <i class="bi bi-info-circle text-muted" title="Add one or more match rows. Identifier and Location Type rows generate FHIRPath automatically; Custom rows let you enter raw FHIRPath."></i></label>
+                        <div class="d-flex gap-2 align-items-center mb-2">
+                            <div class="position-relative" id="addMatchMenuWrap" style="display:inline-block;">
+                                <button type="button" class="btn btn-sm btn-dark d-flex align-items-center justify-content-between" id="btnAddMapMatchMenu" style="min-width:210px;">
+                                    <span>Add Match</span>
+                                    <span class="ms-3">&gt;</span>
+                                </button>
+                                <div id="addMatchMenu" class="list-group position-absolute" style="display:none;left:100%;top:0;min-width:170px;z-index:20;">
+                                    <button type="button" class="list-group-item list-group-item-action add-match-option" data-match-type="Identifier">Identifier</button>
+                                    <button type="button" class="list-group-item list-group-item-action add-match-option" data-match-type="LocationType">Location Type</button>
+                                    <button type="button" class="list-group-item list-group-item-action add-match-option" data-match-type="Custom">Custom FHIRPath</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="mapBuilderHint" class="small text-muted mb-2"></div>
+                        <div id="mapMatchesContainer"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="mapBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
+
+@section Scripts {
+<script>
+(function(){
+    const modal = document.getElementById('mapModal');
+    const backdrop = document.getElementById('mapBackdrop');
+    const errs = document.getElementById('mapFormErrors');
+    const saveUrl='@Url.Action("SaveInline","OrganizationResourceMaps")';
+    const getUrl='@Url.Action("GetJson","OrganizationResourceMaps")';
+    const cloneUrl='@Url.Action("CloneInline","OrganizationResourceMaps")';
+    const delUrl='@Url.Action("DeleteInline","OrganizationResourceMaps")';
+    const defUrl='@Url.Action("SetDefaultInline","OrganizationResourceMaps")';
+    function af(){ const t=document.querySelector('input[name="__RequestVerificationToken"]'); return t?t.value:''; }
+    function show(){ modal.style.display=''; backdrop.style.display=''; }
+    function hide(){ modal.style.display='none'; backdrop.style.display='none'; }
+    async function post(url,body){ const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','RequestVerificationToken':af()},body:JSON.stringify(body)}); if(!r.ok) throw new Error(await r.text()||('Server '+r.status)); return r.headers.get('content-type')?.includes('json')? r.json():null; }
+    function escapeFhirLiteral(value){
+        return String(value || '').replace(/\\/g, '\\\\');
+    }
+
+    function normalizeQuotedInput(value){
+        return String(value || '').replace(/[’‘`´]/g, "'").trim();
+    }
+
+    function hasSingleQuote(value){
+        return normalizeQuotedInput(value).includes("'");
+    }
+
+    function buildIdentifierFhirPath(system, code){
+        const cleanSystem = normalizeQuotedInput(system);
+        const cleanCode = normalizeQuotedInput(code);
+        if (hasSingleQuote(cleanSystem) || hasSingleQuote(cleanCode))
+            throw new Error('Identifier System and Identifier Code cannot contain apostrophes.');
+        return "Location.identifier.exists(system = '" + escapeFhirLiteral(cleanSystem) + "' and value = '" + escapeFhirLiteral(cleanCode) + "')";
+    }
+
+    function parseIdentifierCondition(path){
+        if(!path) return null;
+        const text = String(path).trim();
+        let m = text.match(/^Location\.identifier\.exists\(\s*system\s*=\s*'([^']+)'\s+and\s+value\s*=\s*'([^']+)'\s*\)$/i);
+        if(m) return { system:m[1], code:m[2] };
+        m = text.match(/^identifier\.where\(\s*system\s*=\s*'([^']+)'\s+and\s+value\s*=\s*'([^']+)'\s*\)\.exists\(\s*\)$/i);
+        if(m) return { system:m[1], code:m[2] };
+        return null;
+    }
+
+    function makeRemoveButton(onClick){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-outline-danger';
+        btn.innerHTML = '<i class="bi bi-x-lg"></i>';
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    function buildLocationTypeFhirPath(typeSystem, typeCode, alias){
+        const cleanSystem = normalizeQuotedInput(typeSystem);
+        const cleanCode = normalizeQuotedInput(typeCode);
+        const cleanAlias = normalizeQuotedInput(alias);
+
+        if (hasSingleQuote(cleanSystem) || hasSingleQuote(cleanCode) || hasSingleQuote(cleanAlias))
+            throw new Error('Location Type System, Location Type Code, and Alias cannot contain apostrophes.');
+
+        let path = "Location.type.coding.exists(system = '" + escapeFhirLiteral(cleanSystem) + "' and code = '" + escapeFhirLiteral(cleanCode) + "')";
+        if(cleanAlias) path += " and Location.alias = '" + escapeFhirLiteral(cleanAlias) + "'";
+        return path;
+    }
+
+    function parseLocationTypeCondition(path){
+        if(!path) return null;
+        const text = String(path).trim();
+        let m = text.match(/^Location\.type\.coding\.(?:exists|where)\(\s*system\s*=\s*'([^']+)'\s+and\s+code\s*=\s*'([^']+)'\s*\)(?:\s+and\s+Location\.alias\s*=\s*'([^']*)'\s*)?$/i);
+        if(m) return { typeSystem:m[1], typeCode:m[2], alias:m[3] || '' };
+        return null;
+    }
+
+    function renumberMatches(){
+        document.querySelectorAll('#mapMatchesContainer .map-match-card')
+            .forEach((row, idx) => {
+                const label = row.querySelector('.map-match-title');
+                if(label) label.textContent = 'Match ' + (idx + 1);
+            });
+    }
+
+    function attachMatchCardControls(row){
+        const actions = row.querySelector('.map-match-actions');
+        if(!actions) return;
+        actions.appendChild(makeRemoveButton(() => { row.remove(); renumberMatches(); }));
+    }
+
+    function setMapBuilderHint(matchType){
+        const hint = document.getElementById('mapBuilderHint');
+        if(!hint) return;
+
+        if(matchType === 'Identifier') {
+            hint.textContent = 'Identifier rows generate FHIRPath from Identifier System + Identifier Code.';
+            return;
+        }
+        if(matchType === 'LocationType') {
+            hint.textContent = 'Location Type rows generate FHIRPath from type system + type code (and optional alias).';
+            return;
+        }
+        hint.textContent = 'Custom rows let you enter raw Location-scoped FHIRPath.';
+    }
+
+    function addIdentifierMatchRow(match){
+        const host = document.getElementById('mapMatchesContainer');
+        const row = document.createElement('div');
+        row.className = 'card mb-2 p-2 identifier-match-row map-match-card';
+        row.dataset.matchType = 'Identifier';
+        row.innerHTML = '<div class="d-flex justify-content-between align-items-center mb-2">'
+            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="badge bg-info text-dark ms-1">Identifier</span></div>'
+            + '<div class="d-flex gap-1 map-match-actions"></div>'
+            + '</div>'
+            + '<div class="row g-2">'
+            + '<div class="col-md-5"><label class="form-label mb-1 small">Identifier System</label><input class="form-control form-control-sm map-id-system" /></div>'
+            + '<div class="col-md-5"><label class="form-label mb-1 small">Identifier Code</label><input class="form-control form-control-sm map-id-code" /></div>'
+            + '<div class="col-md-2 d-flex align-items-end"><small class="text-muted w-100 text-center">Auto-generated</small></div>'
+            + '<div class="col-12"><label class="form-label mb-1 small">Generated FHIRPath</label><input class="form-control form-control-sm map-generated-fhirpath font-monospace" readonly /></div>'
+            + '</div>';
+        attachMatchCardControls(row);
+
+        const systemInput = row.querySelector('.map-id-system');
+        const codeInput = row.querySelector('.map-id-code');
+        const generatedInput = row.querySelector('.map-generated-fhirpath');
+
+        function refreshGenerated(){
+            var s = normalizeQuotedInput(systemInput.value);
+            var c = normalizeQuotedInput(codeInput.value);
+            generatedInput.value = '';
+            if (!s || !c || hasSingleQuote(s) || hasSingleQuote(c)) return;
+            generatedInput.value = buildIdentifierFhirPath(s, c);
+        }
+        systemInput.addEventListener('input', refreshGenerated);
+        codeInput.addEventListener('input', refreshGenerated);
+
+        systemInput.value = match?.system || '';
+        codeInput.value = match?.code || '';
+        refreshGenerated();
+        host.appendChild(row);
+        renumberMatches();
+    }
+
+    function addLocationTypeMatchRow(match){
+        const host = document.getElementById('mapMatchesContainer');
+        const row = document.createElement('div');
+        row.className = 'card mb-2 p-2 location-type-match-row map-match-card';
+        row.dataset.matchType = 'LocationType';
+        row.innerHTML = '<div class="d-flex justify-content-between align-items-center mb-2">'
+            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="badge bg-warning text-dark ms-1">Location Type</span></div>'
+            + '<div class="d-flex gap-1 map-match-actions"></div>'
+            + '</div>'
+            + '<div class="row g-2">'
+            + '<div class="col-md-4"><label class="form-label mb-1 small">Location Type System</label><input class="form-control form-control-sm map-location-type-system" placeholder="http://terminology.hl7.org/CodeSystem/v3-RoleCode" /></div>'
+            + '<div class="col-md-4"><label class="form-label mb-1 small">Location Type Code</label><input class="form-control form-control-sm map-location-type-code" placeholder="783" /></div>'
+            + '<div class="col-md-3"><label class="form-label mb-1 small">Location Alias (optional)</label><input class="form-control form-control-sm map-location-alias" /></div>'
+            + '<div class="col-md-1 d-flex align-items-end"><small class="text-muted w-100 text-center">Auto-generated</small></div>'
+            + '<div class="col-12"><label class="form-label mb-1 small">Generated FHIRPath</label><input class="form-control form-control-sm map-generated-fhirpath font-monospace" readonly /></div>'
+            + '</div>';
+        attachMatchCardControls(row);
+
+        const typeSystemInput = row.querySelector('.map-location-type-system');
+        const typeCodeInput = row.querySelector('.map-location-type-code');
+        const aliasInput = row.querySelector('.map-location-alias');
+        const generatedInput = row.querySelector('.map-generated-fhirpath');
+
+        function refreshGenerated(){
+            const typeSystem = normalizeQuotedInput(typeSystemInput.value);
+            const typeCode = normalizeQuotedInput(typeCodeInput.value);
+            const alias = normalizeQuotedInput(aliasInput.value);
+            generatedInput.value = '';
+            if (!typeSystem || !typeCode || hasSingleQuote(typeSystem) || hasSingleQuote(typeCode) || hasSingleQuote(alias)) return;
+            generatedInput.value = buildLocationTypeFhirPath(typeSystem, typeCode, alias);
+        }
+
+        typeSystemInput.addEventListener('input', refreshGenerated);
+        typeCodeInput.addEventListener('input', refreshGenerated);
+        aliasInput.addEventListener('input', refreshGenerated);
+
+        typeSystemInput.value = match?.typeSystem || '';
+        typeCodeInput.value = match?.typeCode || '783';
+        aliasInput.value = match?.alias || '';
+        refreshGenerated();
+        host.appendChild(row);
+        renumberMatches();
+    }
+
+    function addCustomMatchRow(match){
+        const host = document.getElementById('mapMatchesContainer');
+        const row = document.createElement('div');
+        row.className = 'card mb-2 p-2 custom-match-row map-match-card';
+        row.dataset.matchType = 'Custom';
+        row.innerHTML = '<div class="d-flex justify-content-between align-items-center mb-2">'
+            + '<div><span class="fw-semibold map-match-title">Match</span> <span class="badge bg-secondary ms-1">Custom FHIRPath</span></div>'
+            + '<div class="d-flex gap-1 map-match-actions"></div>'
+            + '</div>'
+            + '<label class="form-label mb-1 small">FHIRPath</label>'
+            + '<div class="small text-muted mb-1">Expression is evaluated against <code>Location</code>. Example: <code>Location.identifier.exists(system = \'http://hospital.example.org/locations\' and value = \'LOC-38660106\')</code></div>'
+            + '<div class="d-flex align-items-center gap-2 mb-1"><small class="text-muted">Custom mode</small><span class="small text-muted">Use precise predicates for deterministic mapping.</span></div>'
+            + '<textarea class="form-control form-control-sm map-custom-fhirpath font-monospace" rows="3" placeholder="Enter custom Location FHIRPath..."></textarea>'
+            + '<div class="small text-muted mt-1 map-custom-length"></div>';
+        attachMatchCardControls(row);
+        const textArea = row.querySelector('.map-custom-fhirpath');
+        const length = row.querySelector('.map-custom-length');
+        function syncLength(){ length.textContent = (textArea.value || '').trim().length + ' characters'; }
+        textArea.addEventListener('input', syncLength);
+        textArea.value = match?.fhirPath || '';
+        syncLength();
+        host.appendChild(row);
+        renumberMatches();
+    }
+
+    function addMatchByType(type, payload){
+        if(type === 'Identifier') return addIdentifierMatchRow(payload);
+        if(type === 'LocationType') return addLocationTypeMatchRow(payload);
+        return addCustomMatchRow(payload);
+    }
+
+    function collectConditions(){
+        const rows = Array.from(document.querySelectorAll('#mapMatchesContainer .map-match-card'));
+        if(!rows.length) throw new Error('At least one match is required.');
+
+        return rows.map((row, idx) => {
+            const type = row.dataset.matchType || 'Custom';
+
+            if(type === 'Identifier') {
+                const system = normalizeQuotedInput(row.querySelector('.map-id-system').value);
+                const code = normalizeQuotedInput(row.querySelector('.map-id-code').value);
+                if(!system || !code) throw new Error(`Identifier match #${idx + 1} requires both Identifier System and Identifier Code.`);
+                if(hasSingleQuote(system) || hasSingleQuote(code)) throw new Error(`Identifier match #${idx + 1} cannot contain apostrophes in Identifier System or Identifier Code.`);
+                return { fhirPath: buildIdentifierFhirPath(system, code), priority: idx + 1 };
+            }
+
+            if(type === 'LocationType') {
+                const typeSystem = normalizeQuotedInput(row.querySelector('.map-location-type-system').value);
+                const typeCode = normalizeQuotedInput(row.querySelector('.map-location-type-code').value);
+                const alias = normalizeQuotedInput(row.querySelector('.map-location-alias').value);
+                if(!typeSystem) throw new Error(`Location Type match #${idx + 1} requires a Location Type System.`);
+                if(!typeCode) throw new Error(`Location Type match #${idx + 1} requires a Location Type Code.`);
+                if(hasSingleQuote(typeSystem) || hasSingleQuote(typeCode) || hasSingleQuote(alias)) throw new Error(`Location Type match #${idx + 1} cannot contain apostrophes in Type System, Type Code, or Alias.`);
+                return { fhirPath: buildLocationTypeFhirPath(typeSystem, typeCode, alias), priority: idx + 1 };
+            }
+
+            const fhirPath = (row.querySelector('.map-custom-fhirpath').value || '').trim();
+            if(!fhirPath) throw new Error(`Custom FHIRPath match #${idx + 1} cannot be empty.`);
+            return { fhirPath: fhirPath, priority: idx + 1 };
+        });
+    }
+
+    function setModel(m,mode){
+        document.getElementById('MapId').value=m?.id||'';
+        document.getElementById('MapName').value=m?.name||'';
+        document.getElementById('MapDescription').value=m?.description||'';
+        document.getElementById('mapMatchesContainer').innerHTML='';
+
+        const conditions = (m?.conditions || []).slice().sort((a,b)=> (a.priority||1) - (b.priority||1));
+        if(conditions.length === 0){
+            addIdentifierMatchRow({ system:'', code:'' });
+        } else {
+            conditions.forEach(c => {
+                const parsedIdentifier = parseIdentifierCondition(c.fhirPath);
+                if(parsedIdentifier) {
+                    addIdentifierMatchRow(parsedIdentifier);
+                    return;
+                }
+
+                const parsedLocationType = parseLocationTypeCondition(c.fhirPath);
+                if(parsedLocationType) {
+                    addLocationTypeMatchRow(parsedLocationType);
+                    return;
+                }
+
+                addCustomMatchRow(c);
+            });
+        }
+
+        setMapBuilderHint('Identifier');
+
+        document.getElementById('btnMapSave').style.display=mode==='view'?'none':'';
+        document.getElementById('mapModalTitle').textContent=(mode==='view'?'View':'Edit')+' Organization Resource Map';
+        document.querySelectorAll('#btnAddMapMatchMenu,#addMatchMenu .add-match-option,#mapMatchesContainer input,#mapMatchesContainer textarea,#mapMatchesContainer button').forEach(el=>{
+            if(mode==='view') el.setAttribute('disabled','disabled'); else el.removeAttribute('disabled');
+        });
+
+        // Hide the hover menu when opening in either mode.
+        const addMatchMenu = document.getElementById('addMatchMenu');
+        if (addMatchMenu) addMatchMenu.style.display = 'none';
+
+        errs.style.display='none'; errs.textContent='';
+        show();
+    }
+    document.getElementById('btnNewMap').addEventListener('click',()=>setModel(null,'edit'));
+    document.getElementById('btnMapClose').addEventListener('click',hide);
+    backdrop.addEventListener('click',hide);
+
+    const addMatchMenuWrap = document.getElementById('addMatchMenuWrap');
+    const addMatchMenu = document.getElementById('addMatchMenu');
+    const btnAddMapMatchMenu = document.getElementById('btnAddMapMatchMenu');
+
+    function showAddMatchMenu(){
+        if (btnAddMapMatchMenu.hasAttribute('disabled')) return;
+        addMatchMenu.style.display = '';
+
+        // Keep the flyout visible inside the modal body even when the modal is short.
+        const body = document.getElementById('mapModalBody');
+        const wrapRect = addMatchMenuWrap.getBoundingClientRect();
+        const bodyRect = body.getBoundingClientRect();
+        const menuRect = addMatchMenu.getBoundingClientRect();
+
+        addMatchMenu.style.left = '100%';
+        addMatchMenu.style.right = 'auto';
+        addMatchMenu.style.top = '0';
+        addMatchMenu.style.bottom = 'auto';
+        addMatchMenu.style.maxHeight = '';
+        addMatchMenu.style.overflowY = '';
+
+        const availableBelow = bodyRect.bottom - wrapRect.top;
+        if (menuRect.height > availableBelow) {
+            addMatchMenu.style.top = 'auto';
+            addMatchMenu.style.bottom = '0';
+        }
+
+        const maxMenuHeight = Math.max(120, bodyRect.height - 16);
+        if (menuRect.height > maxMenuHeight) {
+            addMatchMenu.style.maxHeight = maxMenuHeight + 'px';
+            addMatchMenu.style.overflowY = 'auto';
+        }
+    }
+
+    function hideAddMatchMenu(){
+        addMatchMenu.style.display = 'none';
+    }
+
+    addMatchMenuWrap.addEventListener('mouseenter', showAddMatchMenu);
+    addMatchMenuWrap.addEventListener('mouseleave', hideAddMatchMenu);
+    btnAddMapMatchMenu.addEventListener('focus', showAddMatchMenu);
+
+    document.querySelectorAll('#addMatchMenu .add-match-option').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const type = btn.dataset.matchType || 'Identifier';
+            if(type === 'Identifier') addIdentifierMatchRow({ system:'', code:'' });
+            else if(type === 'LocationType') addLocationTypeMatchRow({ typeSystem:'', typeCode:'783', alias:'' });
+            else addCustomMatchRow({ fhirPath:'' });
+
+            setMapBuilderHint(type);
+            hideAddMatchMenu();
+        });
+    });
+    document.getElementById('btnMapSave').addEventListener('click', async ()=>{
+        try{
+            const conditions = collectConditions();
+            const model={
+                id: document.getElementById('MapId').value || crypto.randomUUID(),
+                name: document.getElementById('MapName').value,
+                description: document.getElementById('MapDescription').value || null,
+                conditions: conditions,
+                isSystem:false,
+                isDefault:false
+            };
+            await post(saveUrl,model);
+            location.reload();
+        }catch(e){ errs.textContent=e.message||'Save failed'; errs.style.display=''; }
+    });
+    document.querySelectorAll('.btn-map-open').forEach(b=>b.addEventListener('click',async()=>{
+        const r=await fetch(getUrl+'?id='+encodeURIComponent(b.dataset.id));
+        if(r.ok) setModel(await r.json(), b.dataset.mode||'edit');
+    }));
+    document.querySelectorAll('.btn-map-clone').forEach(b=>b.addEventListener('click',async()=>{ await post(cloneUrl,{id:b.dataset.id}); location.reload(); }));
+    document.querySelectorAll('.btn-map-default').forEach(b=>b.addEventListener('click',async()=>{ await post(defUrl,{id:b.dataset.id}); location.reload(); }));
+    document.querySelectorAll('.btn-map-delete').forEach(b=>b.addEventListener('click',async()=>{ if(confirm('Delete this template?')){ await post(delUrl,{id:b.dataset.id}); location.reload(); } }));
+})();
+</script>
+}

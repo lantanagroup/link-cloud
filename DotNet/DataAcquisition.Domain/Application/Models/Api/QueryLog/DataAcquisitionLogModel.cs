@@ -50,7 +50,7 @@ public class DataAcquisitionLogModel
         return new DataAcquisitionLogModel
         {
             Id = log.Id,
-            Priority = log.Priority,
+            Priority = log.Priority.GetValueOrDefault(),
             FacilityId = log.FacilityId,
             IsCensus = log.IsCensus,
             PatientId = log.PatientId,
@@ -68,8 +68,8 @@ public class DataAcquisitionLogModel
                 FacilityId = q.FacilityId,
                 MeasureId = q.MeasureId,
                 IsReference = q.IsReference,
-                QueryType = q.QueryType,
-                ResourceTypes = q.FhirQueryResourceTypes.Select(s => s.ResourceType).ToList(),
+                QueryType = q.QueryType.GetValueOrDefault(),
+                ResourceTypes = q.FhirQueryResourceTypes.Select(s => s.ResourceType.GetValueOrDefault()).ToList(),
                 QueryParameters = q.QueryParameters,
                 Paged = q.Paged,
                 DataAcquisitionLogId = q.DataAcquisitionLogId,
@@ -80,7 +80,7 @@ public class DataAcquisitionLogModel
                 {
                     Id = rt.Id,
                     FacilityId = rt.FacilityId,
-                    QueryPhase = rt.QueryPhase,
+                    QueryPhase = rt.QueryPhase.GetValueOrDefault(),
                     ResourceType = rt.ResourceType,
                     FhirQueryId = rt.FhirQueryId,
                     CreateDate = rt.CreateDate,
@@ -101,7 +101,7 @@ public class DataAcquisitionLogModel
                 ? new ScheduledReport
                 {
                     ReportTrackingId = log.ScheduledReportEntity.ReportTrackingId.ToString().ToLowerInvariant(),
-                    Frequency = log.ScheduledReportEntity.Frequency,
+                    Frequency = log.ScheduledReportEntity.Frequency.GetValueOrDefault(),
                     StartDate = DateTime.SpecifyKind(log.ScheduledReportEntity.StartDate, DateTimeKind.Utc),
                     EndDate = DateTime.SpecifyKind(log.ScheduledReportEntity.EndDate, DateTimeKind.Utc),
                     ReportTypes = log.ScheduledReportEntity.ReportTypes?.Split(',', StringSplitOptions.RemoveEmptyEntries).ToList() ?? new()

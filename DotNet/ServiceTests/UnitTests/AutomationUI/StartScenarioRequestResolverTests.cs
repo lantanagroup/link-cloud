@@ -62,26 +62,43 @@ public class StartScenarioRequestResolverTests
         {
             Scenario = AutomationScenarioKind.Custom,
             PatientCount = 7,
-            ResourcesPerPatient = 42,
             Seed = 12345,
             CleanupServiceData = true,
             CleanupFhirData = false,
             ReportMethod = ReportMethod.RegenerateReport,
             QueryPlanTemplateId = Guid.NewGuid(),
+            NhsnOrganizationId = "10756",
             SelectedMeasures = [ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation],
         };
 
         var options = StartScenarioRequestResolver.Resolve(request);
 
         options.PatientCount.Should().Be(7);
-        options.ResourcesPerPatient.Should().Be(42);
+        options.ResourcesPerPatient.Should().Be(250);
         options.Seed.Should().Be(12345);
         options.CleanupServiceData.Should().BeTrue();
         options.CleanupFhirData.Should().BeFalse();
         options.ReportMethod.Should().Be(ReportMethod.RegenerateReport);
         options.QueryPlanTemplateId.Should().Be(request.QueryPlanTemplateId);
+        options.NhsnOrganizationId.Should().Be("10756");
         options.SelectedMeasures.Should().ContainSingle()
             .Which.Should().Be(ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation);
+    }
+
+    [Theory]
+    [InlineData(AutomationScenarioKind.AdhocReportTest, "10756")]
+    [InlineData(AutomationScenarioKind.MultiPatientTest, "10758")]
+    [InlineData(AutomationScenarioKind.MegaPatientTest, "10759")]
+    public void Non_custom_scenarios_default_to_distinct_static_nhsn_organization_ids(
+        AutomationScenarioKind scenario,
+        string expectedNhsnOrganizationId)
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = scenario,
+        });
+
+        options.NhsnOrganizationId.Should().Be(expectedNhsnOrganizationId);
     }
 
     [Fact]
@@ -102,9 +119,107 @@ public class StartScenarioRequestResolverTests
         cohort.PatientCount.Should().Be(5);
         cohort.GetEligibility(ProfiledMeasureType.NhsnAcuteCareHospitalMonthlyInitialPopulation)
             .Should().Be(MeasureEligibility.Qualifying);
+        cohort.ResourcesPerPatientMin.Should().Be(250);
+        cohort.ResourcesPerPatientMax.Should().Be(250);
 
         // Synthesized cohort should expand to PatientCount profiles.
         options.PatientProfiles.Should().HaveCount(5);
+    }
+
+    [Fact]
+    public void Scheduled_report_defaults_missing_cohort_inpatient_pattern_to_first_pattern()
+    {
+        var json = """
+            {
+                "patientCohorts": [
+                    {
+                        "patientCount": 2,
+                        "resourcesPerPatientMin": 50,
+                        "resourcesPerPatientMax": 75,
+                        "measureEligibilities": {
+                            "NhsnAcuteCareHospitalMonthlyInitialPopulation": "Qualifying"
+                        }
+                    }
+                ]
+            }
+            """;
+
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            ReportMethod = ReportMethod.ScheduledReport,
+            RunConfigurationJson = json,
+        });
+
+        options.PatientCohorts.Should().ContainSingle();
+        options.PatientCohorts[0].ScheduledInpatientPattern
+            .Should().Be(ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod);
+
+        options.PatientProfiles.Should().HaveCount(2);
+        options.PatientProfiles.Should().OnlyContain(p =>
+            p.ScheduledInpatientPattern == ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod);
+    }
+
+    [Fact]
+    public void Adhoc_report_also_defaults_missing_cohort_inpatient_pattern_to_first_pattern()
+    {
+        var json = """
+            {
+                "patientCohorts": [
+                    {
+                        "patientCount": 1,
+                        "resourcesPerPatientMin": 50,
+                        "resourcesPerPatientMax": 75,
+                        "measureEligibilities": {
+                            "NhsnAcuteCareHospitalMonthlyInitialPopulation": "Qualifying"
+                        }
+                    }
+                ]
+            }
+            """;
+
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            ReportMethod = ReportMethod.Adhoc,
+            RunConfigurationJson = json,
+        });
+
+        options.PatientCohorts.Should().ContainSingle();
+        options.PatientCohorts[0].ScheduledInpatientPattern
+            .Should().Be(ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod);
+        options.PatientProfiles.Should().ContainSingle();
+        options.PatientProfiles[0].ScheduledInpatientPattern
+            .Should().Be(ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod);
+    }
+
+    [Fact]
+    public void Cohort_qualification_is_extracted_and_propagated_to_profiles()
+    {
+        var json = """
+            {
+                "patientCohorts": [
+                    {
+                        "patientCount": 1,
+                        "cohortQualification": "NonQualifying",
+                        "measureEligibilities": {
+                            "NhsnAcuteCareHospitalMonthlyInitialPopulation": "Qualifying"
+                        }
+                    }
+                ]
+            }
+            """;
+
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            RunConfigurationJson = json,
+        });
+
+        options.PatientCohorts.Should().ContainSingle();
+        options.PatientCohorts[0].CohortQualification.Should().Be(MeasureEligibility.NonQualifying);
+        options.PatientProfiles.Should().ContainSingle();
+        options.PatientProfiles[0].CohortQualification.Should().Be(MeasureEligibility.NonQualifying);
     }
 
     // ---------- Custom scenario: JSON fallback when typed properties are missing ----------
@@ -251,6 +366,8 @@ public class StartScenarioRequestResolverTests
     {
         var json = """
             {
+                "reportPeriodStart": "2024-03-01T00:00:00Z",
+                "reportPeriodEnd":   "2024-03-31T23:59:59Z",
                 "importedPatientIds": [
                     { "source": "ExistingId", "patientId": "abc" }
                 ],
@@ -273,6 +390,27 @@ public class StartScenarioRequestResolverTests
     }
 
     [Fact]
+    public void Imported_patients_require_explicit_report_period()
+    {
+        var json = """
+            {
+                "importedPatientIds": [
+                    { "source": "ExistingId", "patientId": "abc" }
+                ]
+            }
+            """;
+
+        var act = () => StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            RunConfigurationJson = json,
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Report period start and end are required when imported patients are included in a run.*");
+    }
+
+    [Fact]
     public void Custom_scenario_extracts_report_period_from_json_when_missing_on_request()
     {
         var json = """
@@ -290,6 +428,18 @@ public class StartScenarioRequestResolverTests
 
         options.ReportPeriodStart.Should().Be(DateTimeOffset.Parse("2024-03-01T00:00:00Z"));
         options.ReportPeriodEnd.Should().Be(DateTimeOffset.Parse("2024-03-31T23:59:59Z"));
+    }
+
+    [Fact]
+    public void Custom_scenario_extracts_nhsn_organization_id_from_json_when_missing_on_request()
+    {
+        var options = StartScenarioRequestResolver.Resolve(new StartScenarioRequest
+        {
+            Scenario = AutomationScenarioKind.Custom,
+            RunConfigurationJson = """{ "nhsnOrganizationId": "22001" }"""
+        });
+
+        options.NhsnOrganizationId.Should().Be("22001");
     }
 
     [Fact]

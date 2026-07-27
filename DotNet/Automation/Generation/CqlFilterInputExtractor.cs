@@ -27,6 +27,7 @@ public static class CqlFilterInputExtractor
         var encounters = new List<Encounter>();
         var conditions = new List<Condition>();
         var observations = new List<Observation>();
+        var diagnosticReports = new List<DiagnosticReport>();
         var procedures = new List<Procedure>();
         var medicationRequests = new List<MedicationRequest>();
         var medicationAdministrations = new List<MedicationAdministration>();
@@ -46,6 +47,9 @@ public static class CqlFilterInputExtractor
                     break;
                 case Observation obs:
                     observations.Add(obs);
+                    break;
+                case DiagnosticReport diagnosticReport:
+                    diagnosticReports.Add(diagnosticReport);
                     break;
                 case Procedure proc:
                     procedures.Add(proc);
@@ -82,6 +86,7 @@ public static class CqlFilterInputExtractor
         var encounterContexts = encounters.Select(BuildEncounterContext).ToList();
         var conditionContexts = conditions.Select(BuildConditionContext).ToList();
         var observationContexts = observations.Select(BuildObservationContext).ToList();
+        var diagnosticReportContexts = diagnosticReports.Select(BuildDiagnosticReportContext).ToList();
         var procedureContexts = procedures.Select(BuildProcedureContext).ToList();
         var medicationRequestContexts = medicationRequests.Select(BuildMedicationRequestContext).ToList();
         var medicationAdministrationContexts = medicationAdministrations.Select(BuildMedicationAdministrationContext).ToList();
@@ -98,6 +103,7 @@ public static class CqlFilterInputExtractor
             observationContexts)
         {
             Encounters = encounterContexts,
+            DiagnosticReports = diagnosticReportContexts,
             Procedures = procedureContexts,
             MedicationRequests = medicationRequestContexts,
             MedicationAdministrations = medicationAdministrationContexts,
@@ -190,6 +196,33 @@ public static class CqlFilterInputExtractor
             Status = obs.Status?.ToString() ?? string.Empty,
             SpecimenReference = obs.Specimen?.Reference ?? string.Empty
         };
+    }
+
+    private static CqlFilterSimulator.DiagnosticReportContext BuildDiagnosticReportContext(DiagnosticReport report)
+    {
+        DateTime effectiveStart;
+        DateTime effectiveEnd;
+
+        switch (report.Effective)
+        {
+            case Period p:
+                effectiveStart = ParseFhirDateTime(p.Start) ?? DateTime.MinValue;
+                effectiveEnd = ParseFhirDateTime(p.End) ?? effectiveStart;
+                break;
+            case FhirDateTime dt:
+                effectiveStart = ParseFhirDateTime(dt.Value) ?? DateTime.MinValue;
+                effectiveEnd = effectiveStart;
+                break;
+            default:
+                effectiveStart = DateTime.MinValue;
+                effectiveEnd = DateTime.MaxValue;
+                break;
+        }
+
+        return new CqlFilterSimulator.DiagnosticReportContext(
+            report.Id,
+            effectiveStart,
+            effectiveEnd);
     }
 
     // ---------- Procedure / MedicationRequest / MedicationAdministration / Coverage / ServiceRequest ----------

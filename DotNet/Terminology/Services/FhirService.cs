@@ -1,7 +1,8 @@
-﻿using Amazon.Runtime.Internal;
+using Amazon.Runtime.Internal;
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Shared.Application.Services.Security;
+using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 
 namespace LantanaGroup.Link.Terminology.Services;
@@ -12,17 +13,21 @@ namespace LantanaGroup.Link.Terminology.Services;
  * https://build.fhir.org/codesystem-operation-validate-code.html
  * https://build.fhir.org/valueset-operation-validate-code.html
  */
-public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService> logger)
+public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirService> logger)
 {
     public ValueSet GetValueSetById(string id)
     {
         if (string.IsNullOrEmpty(id))
+        {
             throw new ArgumentException("No id parameter specified", nameof(id));
+        }
 
         var codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, id);
 
         if (codeGroup == null)
+        {
             throw new KeyNotFoundException($"Value set not found with ID {id}");
+        }
 
         return codeGroup.Resource as ValueSet;
     }
@@ -109,14 +114,23 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
         CodeGroup? codeGroup = null;
 
         if (!string.IsNullOrEmpty(id))
+        {
             codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, id);
+        }
         else if (!string.IsNullOrEmpty(url))
+        {
             codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, url);
+        }
         else
+        {
             throw new ArgumentException("No id or url parameter specified");
+        }
 
         if (codeGroup == null)
-            throw new KeyNotFoundException($"Value set not found with ID {id}");
+        {
+            var lookup = !string.IsNullOrEmpty(id) ? $"ID {id}" : $"URL {url}";
+            throw new KeyNotFoundException($"Value set not found with {lookup}");
+        }
 
         var valueSet = codeGroup.Resource as ValueSet;
 
@@ -136,17 +150,19 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
 
         valueSetCopy.Compose = null;
 
+        valueSetCopy.Expansion = new ValueSet.ExpansionComponent();
+
         foreach (var systemKey in codeGroup.Codes.Keys)
         {
-            valueSetCopy.Expansion = new ValueSet.ExpansionComponent();
-
             foreach (var code in codeGroup.Codes[systemKey])
+            {
                 valueSetCopy.Expansion.Contains.Add(new ValueSet.ContainsComponent
                 {
                     System = systemKey,
                     Code = code.Value,
                     Display = code.Display
                 });
+            }
         }
 
         return valueSetCopy;
@@ -155,12 +171,16 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
     public CodeSystem GetCodeSystemById(string id)
     {
         if (string.IsNullOrEmpty(id))
+        {
             throw new ArgumentException("No id parameter specified", nameof(id));
+        }
 
         CodeGroup? codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.CodeSystem, id);
 
         if (codeGroup == null)
+        {
             throw new KeyNotFoundException($"Code system not found with ID {id}");
+        }
 
         return codeGroup.Resource as CodeSystem;
     }
@@ -196,7 +216,13 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
                 {
                     logger.LogDebug("Search performed without summary mode for code system {Url}", url.SanitizeAndRemove());
 
-                    foreach (var codeGroupCode in codeGroup.Codes[codeGroup.Codes.Keys.First()])
+                    // A CSV may list the same code more than once; emit each code once, keeping the
+                    // last occurrence's display so the read agrees with last-one-wins (LEGLINK-814).
+                    var lastByValue = codeGroup.Codes[codeGroup.Codes.Keys.First()]
+                        .GroupBy(c => c.Value)
+                        .Select(g => g.Last());
+
+                    foreach (var codeGroupCode in lastByValue)
                     {
                         clone.Concept.Add(new CodeSystem.ConceptDefinitionComponent()
                         {
@@ -238,11 +264,19 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
         var displayComponent = parameters?.Get("display").FirstOrDefault();
 
         if (urlComponent?.Value != null && string.IsNullOrEmpty(url))
+        {
             url = urlComponent.Value.ToString();
+        }
+
         if (codeComponent?.Value != null && string.IsNullOrEmpty(code))
+        {
             code = codeComponent.Value.ToString();
+        }
+
         if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
+        {
             display = displayComponent.Value.ToString();
+        }
 
         CodeGroup? codeGroup = null;
 
@@ -256,16 +290,23 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
             codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, url);
         }
         else
+        {
             throw new ArgumentException("No id or url parameter specified");
+        }
 
         if (codeGroup == null)
+        {
             return CreateValidationParameters(false, "Code system not found");
+        }
 
         // Priority 1: Direct parameters
         if (!string.IsNullOrEmpty(code))
         {
             if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
+            {
                 display = displayComponent.Value.ToString();
+            }
+
             return ValidateCodeInCodeGroup(codeGroup, code, url, display);
         }
 
@@ -273,7 +314,10 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
         if (codeComponent?.Value != null)
         {
             if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
+            {
                 display = displayComponent.Value.ToString();
+            }
+
             return ValidateCodeInCodeGroup(codeGroup, codeComponent.Value.ToString(), url, display);
         }
 
@@ -310,7 +354,9 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
         var displayComponent = parameters?.Get("display").FirstOrDefault();
 
         if (urlComponent?.Value != null && string.IsNullOrEmpty(url))
+        {
             url = urlComponent.Value.ToString();
+        }
 
         CodeGroup? codeGroup = null;
 
@@ -322,19 +368,26 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
         else
         {
             if (url == null)
+            {
                 return CreateValidationParameters(false, "url parameter is required");
+            }
 
             codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, url);
         }
 
         if (codeGroup == null)
+        {
             return CreateValidationParameters(false, "Value set not found");
+        }
 
         // Priority 1: Direct parameters
         if (!string.IsNullOrEmpty(code))
         {
             if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
+            {
                 display = displayComponent.Value.ToString();
+            }
+
             return ValidateCodeInCodeGroup(codeGroup, code, system, display);
         }
 
@@ -342,9 +395,15 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
         if (codeComponent?.Value != null)
         {
             if (systemComponent?.Value != null && string.IsNullOrEmpty(system))
+            {
                 system = systemComponent.Value.ToString();
+            }
+
             if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
+            {
                 display = displayComponent.Value.ToString();
+            }
+
             return ValidateCodeInCodeGroup(codeGroup, codeComponent.Value.ToString(), system, display);
         }
 
@@ -459,62 +518,132 @@ public class FhirService(CodeGroupCacheService cacheService, ILogger<FhirService
         };
     }
 
-    private static Parameters CreateValidationParameters(bool result, string? message = null)
+    private static Parameters CreateValidationParameters(bool result, string? message = null, bool isActive = true)
     {
         var parameters = new Parameters();
         parameters.Add("result", new FhirBoolean(result));
         if (message != null)
+        {
             parameters.Add("message", new FhirString(message));
+        }
+
+        if (!isActive)
+        {
+            parameters.Parameter.Add(new Parameters.ParameterComponent
+            {
+                Name = "issues",
+                Resource = new OperationOutcome
+                {
+                    Issue =
+                    {
+                        new OperationOutcome.IssueComponent
+                        {
+                            Severity = OperationOutcome.IssueSeverity.Warning,
+                            Code = OperationOutcome.IssueType.BusinessRule,
+                            Details = new CodeableConcept()
+                            {
+                                Text = "Code is inactive."
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
         return parameters;
     }
 
     private Parameters ValidateCodeInCodeGroup(CodeGroup codeGroup, string code, string? system, string? display)
     {
-        if (!string.IsNullOrEmpty(system))
+        return string.IsNullOrEmpty(system)
+            ? ValidateCodeAcrossSystems(codeGroup, code, display)
+            : ValidateCodeInSystem(codeGroup, code, system, display);
+    }
+
+    /// <summary>
+    /// Validates a code against a single, known code system within the group.
+    /// </summary>
+    private Parameters ValidateCodeInSystem(CodeGroup codeGroup, string code, string system, string? display)
+    {
+        if (!codeGroup.Codes.TryGetValue(system, out var codes))
         {
-            if (!codeGroup.Codes.ContainsKey(system))
-                return CreateValidationParameters(false, $"Code system not found in {codeGroup.Type}");
-
-            if (codeGroup.Codes[system].Any(c => c.Value == code))
-            {
-                if (display != null && !codeGroup.Codes[system].Any(c => c.Value == code && c.Display == display))
-                    return CreateValidationParameters(false, "Display does not match code");
-
-                return CreateValidationParameters(true);
-            }
-        }
-        else
-        {
-            var matchedCode = false;
-            var matchedDisplay = false;
-
-            foreach (var systemKey in codeGroup.Codes.Keys)
-            {
-                matchedCode = codeGroup.Codes[systemKey].Any(c => c.Value == code);
-
-                if (matchedCode)
-                {
-                    var codeObject = codeGroup.Codes[systemKey].First(c => c.Value == code);
-
-                    if (display != null && codeObject.Display == display)
-                        matchedDisplay = true;
-
-                    // If we got here, we found a code and can stop looking
-                    break;
-                }
-            }
-
-            if (matchedCode)
-            {
-                if (!string.IsNullOrEmpty(display) && !matchedDisplay)
-                    return CreateValidationParameters(false, "Display does not match code");
-
-                return CreateValidationParameters(true);
-            }
-
-            return CreateValidationParameters(false);
+            return CreateValidationParameters(false, $"Code system not found in {codeGroup.Type}");
         }
 
-        return CreateValidationParameters(false, $"Code not found in {codeGroup.Type}");
+        var matches = codes.Where(c => c.Value == code).ToList();
+
+        if (matches.Count == 0)
+        {
+            return CreateValidationParameters(false, $"Code not found in {codeGroup.Type}");
+        }
+
+        return BuildMatchResult(matches, system, display);
+    }
+
+    /// <summary>
+    /// Validates a code across every code system in the group (no system specified by the caller).
+    /// </summary>
+    private Parameters ValidateCodeAcrossSystems(CodeGroup codeGroup, string code, string? display)
+    {
+        foreach (var systemKey in codeGroup.Codes.Keys)
+        {
+            var matches = codeGroup.Codes[systemKey].Where(c => c.Value == code).ToList();
+
+            if (matches.Count > 0)
+            {
+                return BuildMatchResult(matches, systemKey, display);
+            }
+        }
+
+        return CreateValidationParameters(false);
+    }
+
+    /// <summary>
+    /// Builds the validation result for a set of codes that share the requested value, applying the
+    /// display check and surfacing an inactive-code warning when the matched code is inactive.
+    /// </summary>
+    private Parameters BuildMatchResult(List<Application.Models.Code> matches, string? system, string? display)
+    {
+        if (!string.IsNullOrEmpty(display) && matches.All(c => c.Display != display))
+        {
+            return CreateValidationParameters(false, "Display does not match code");
+        }
+
+        // Select the last code whose display matches (when supplied); otherwise select the last match.
+        var codeObject = !string.IsNullOrEmpty(display)
+            ? matches.Last(c => c.Display == display)
+            : matches[matches.Count - 1];
+
+        var isActive = ResolveIsActive(codeObject, system);
+
+        return CreateValidationParameters(true, isActive: isActive);
+    }
+
+    /// <summary>
+    /// Determines whether a matched code is active. CodeSystem members carry their own status; ValueSet members
+    /// are plain codes with no status, so their status is rejoined from the CodeSystem identified by <paramref name="system"/>.
+    /// Defaults to active when the code cannot be resolved to a loaded CodeSystem, preserving prior behavior.
+    /// </summary>
+    private bool ResolveIsActive(Application.Models.Code codeObject, string? system)
+    {
+        if (codeObject is CodeSystemCode codeSystemCode)
+        {
+            return codeSystemCode.Status == CodeStatus.Active;
+        }
+
+        if (string.IsNullOrEmpty(system))
+        {
+            return true;
+        }
+
+        var codeSystemGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system);
+        // When the CodeSystem lists the code more than once with differing status, the last
+        // occurrence wins (LEGLINK-599/814), matching BuildMatchResult's last-match selection.
+        var match = codeSystemGroup?.Codes.Values
+            .SelectMany(codes => codes)
+            .OfType<CodeSystemCode>()
+            .LastOrDefault(c => c.Value == codeObject.Value);
+
+        return match == null || match.Status == CodeStatus.Active;
     }
 }

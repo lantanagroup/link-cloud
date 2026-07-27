@@ -14,6 +14,7 @@ public static class ApiEndPointLibrary
         var services = new[]
         {
             ServiceNames.AdminBff,
+            ServiceNames.AdminBffAuth,
             ServiceNames.Census,
             ServiceNames.DataAcquisition,
             ServiceNames.MeasureEval,
@@ -68,6 +69,7 @@ public static class ApiEndPointLibrary
         serviceName switch
         {
             ServiceNames.AdminBff => BuildFromStepConstants(ServiceNames.AdminBff, typeof(AdminBffSteps)),
+            ServiceNames.AdminBffAuth => BuildFromStepConstants(ServiceNames.AdminBffAuth, typeof(AdminBffAuthSteps), BuildAdminBffAuthMetadata()),
             ServiceNames.Census => BuildFromStepConstants(ServiceNames.Census, typeof(CensusSteps), BuildCensusMetadata()),
             ServiceNames.DataAcquisition => BuildFromStepConstants(ServiceNames.DataAcquisition, typeof(DataAcquisitionSteps)),
             ServiceNames.MeasureEval => BuildFromStepConstants(ServiceNames.MeasureEval, typeof(MeasureEvalSteps)),
@@ -128,6 +130,19 @@ public static class ApiEndPointLibrary
         [ReportSteps.ResourceGet200HasData] = new EndpointMeta(ReportSteps.ResourceGet200HasData, "GET /api/resources/{id}", "Resource rows are intentionally not persisted for seeded runs in this environment, so no deterministic resource id exists.")
     };
 
+    private static IReadOnlyDictionary<string, EndpointMeta> BuildAdminBffAuthMetadata() => new Dictionary<string, EndpointMeta>(StringComparer.Ordinal)
+    {
+        [AdminBffAuthSteps.ValidBearerGet200] = new EndpointMeta("Valid Bearer token GET \u2192 200", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.TokenReuseGet200] = new EndpointMeta("Reused valid Bearer token GET \u2192 200", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.InvalidSignatureBearerGet401] = new EndpointMeta("Invalid-signature Bearer token GET \u2192 401", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.ExpiredBearerGet401Or403] = new EndpointMeta("Expired Bearer token GET \u2192 401/403", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.EmptyBearerGet401] = new EndpointMeta("Empty Bearer token GET \u2192 401", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.MalformedBearerGet401] = new EndpointMeta("Malformed Bearer token GET \u2192 401", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.MissingAuthHeaderGet401] = new EndpointMeta("Missing Authorization header GET \u2192 401", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.InvalidAuthSchemeGet401] = new EndpointMeta("Invalid auth scheme (Basic) GET \u2192 401", "GET /aggregate/reports/summaries (auth)"),
+        [AdminBffAuthSteps.CrossApiTokenReuseGet401] = new EndpointMeta("Cross-API token reuse GET \u2192 401", "GET /aggregate/reports/summaries (auth)")
+    };
+
     private sealed record EndpointMeta(string? Description, string? Group, string? SkipReason = null);
 
     private static ApiEndpointDefinition Step(string service, string name, string desc, string? group = null) => new()
@@ -152,6 +167,7 @@ public static class ApiEndPointLibrary
     public static class ServiceNames
     {
         public const string AdminBff = "AdminBff";
+        public const string AdminBffAuth = "AdminBffAuth";
         public const string Census = "Census";
         public const string DataAcquisition = "DataAcquisition";
         public const string MeasureEval = "MeasureEval";
@@ -177,6 +193,19 @@ public static class ApiEndPointLibrary
         public const string ReportDelete404 = "Report DELETE → 404";
         public const string ReportRestorePatch204 = "Report Restore PATCH → 204";
         public const string ReportRestorePatch404 = "Report Restore PATCH → 404";
+    }
+
+    public static class AdminBffAuthSteps
+    {
+        public const string ValidBearerGet200 = "Valid credentials/token → access granted";
+        public const string TokenReuseGet200 = "Valid token reuse → access granted";
+        public const string InvalidSignatureBearerGet401 = "Invalid credentials/token → access denied (401)";
+        public const string ExpiredBearerGet401Or403 = "Expired credentials/token → access denied (401/403)";
+        public const string EmptyBearerGet401 = "Missing access token (Bearer empty) → 401";
+        public const string MalformedBearerGet401 = "Invalid access token (malformed) → 401";
+        public const string MissingAuthHeaderGet401 = "Missing auth header → 401";
+        public const string InvalidAuthSchemeGet401 = "Invalid auth scheme (Basic) → 401";
+        public const string CrossApiTokenReuseGet401 = "Cross-API token reuse → 401";
     }
 
     public static class CensusSteps
@@ -223,11 +252,21 @@ public static class ApiEndPointLibrary
         public const string FhirConfigGet200 = "FhirConfig GET → 200";
         public const string FhirConfigGet404 = "FhirConfig GET → 404";
         public const string FhirConfigDelete202 = "FhirConfig DELETE → 202";
+        public const string FhirListConfigPost200 = "FhirListConfig POST → 200";
+        public const string FhirListConfigGet200 = "FhirListConfig GET → 200";
+        public const string FhirListConfigPost409 = "FhirListConfig POST → 409";
+        public const string FhirListConfigDelete200 = "FhirListConfig DELETE → 200";
+        public const string FhirListConfigGet404 = "FhirListConfig GET → 404";
         public const string QueryPlanPost201 = "QueryPlan POST → 201";
         public const string QueryPlanPost409 = "QueryPlan POST → 409";
         public const string QueryPlanGet200 = "QueryPlan GET → 200";
         public const string QueryPlanGet404 = "QueryPlan GET → 404";
         public const string QueryPlanDelete202 = "QueryPlan DELETE → 202";
+        public const string OrgLocationConfigGet200 = "OrgLocationConfig GET → 200";
+        public const string OrgLocationConfigPost201 = "OrgLocationConfig POST → 201";
+        public const string OrgLocationConfigGet200AfterPost = "OrgLocationConfig GET → 200 (after post)";
+        public const string OrgLocationMappingsGet200 = "OrgLocationMappings GET → 200";
+        public const string EncounterMappingsGet200 = "EncounterMappings GET → 200";
         public const string AcquisitionLogsGet200HasData = "AcquisitionLogs GET → 200 (has data)";
         public const string AcquisitionLogsGet200 = "AcquisitionLogs GET → 200";
         public const string GetLog200HasData = "GetLog → 200 (has data)";

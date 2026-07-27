@@ -33,6 +33,12 @@
   }
 }
 
+.parameters-error {
+  color: var(--mat-sys-error, #b3261e);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
 .parameter-row {
   display: flex;
   gap: 8px;

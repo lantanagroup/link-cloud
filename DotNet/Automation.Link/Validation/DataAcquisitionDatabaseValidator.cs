@@ -1,4 +1,5 @@
 ﻿using LantanaGroup.Link.Automation.Link.Helpers;
+using LantanaGroup.Automation.Generation;
 using LantanaGroup.Link.Shared.Application.Models;
 
 namespace LantanaGroup.Link.Automation.Link.Validation;
@@ -20,7 +21,10 @@ public class DataAcquisitionDatabaseValidator
         string reportId,
         string expectedMeasureId,
         List<string> expectedPatientIds,
-        bool expectDataAcquisitionData = true)
+        bool expectDataAcquisitionData = true,
+        bool expectLocationResources = false,
+        bool expectEncounterResources = false,
+        GenerationManifest? manifest = null)
     {
         var errors = new List<string>();
 
@@ -31,6 +35,14 @@ public class DataAcquisitionDatabaseValidator
             await ValidateDataAcquisitionLogs(facilityId, reportId, expectedPatientIds, errors, expectDataAcquisitionData);
             await ValidateFhirQueries(facilityId, reportId, errors, expectDataAcquisitionData);
             await ValidateReferenceResources(facilityId, reportId, errors, expectDataAcquisitionData);
+            await ValidateOrganizationLocationTracking(
+                facilityId,
+                reportId,
+                errors,
+                expectDataAcquisitionData,
+                expectLocationResources,
+                expectEncounterResources,
+                manifest);
         }
         catch (Exception ex)
         {
@@ -198,5 +210,256 @@ public class DataAcquisitionDatabaseValidator
             $"Expected ReferenceResources rows for the facility but found none. " +
             $"Diagnostics: totalLogs={logs.Count}, referentialLogs={referentialLogs.Count}, referentialCompleted={referentialCompleted}, " +
             $"referentialStatuses=[{string.Join(", ", statusSummary)}].");
+    }
+
+    private async Task ValidateOrganizationLocationTracking(
+        string facilityId,
+        string reportId,
+        List<string> errors,
+        bool expectDataAcquisitionData,
+        bool expectLocationResources,
+        bool expectEncounterResources,
+        GenerationManifest? manifest)
+    {
+        var configs = await _reader.GetOrganizationLocationConfigurationsAsync(facilityId);
+        var hasActiveConfiguredOrgLocation = configs.Any(c => c.IsActive && c.ConditionsCount > 0);
+
+        if (!hasActiveConfiguredOrgLocation)
+            return;
+
+        var logs = await _reader.GetAcquisitionLogsAsync(facilityId, reportId);
+        if (logs.Count == 0)
+            return;
+
+        var hasLocationResourceEvidence = logs.Any(l =>
+            (l.ResourceAcquiredIds?.Any(r => r.StartsWith("Location/", StringComparison.OrdinalIgnoreCase)) ?? false)
+            || l.FhirQueries.Any(q => q.ResourceTypes.Any(rt => string.Equals(rt, "Location", StringComparison.OrdinalIgnoreCase))));
+
+        if (!hasLocationResourceEvidence)
+        {
+            var acquiredResourceIds = await _reader.GetAcquiredResourceIdsForReportAsync(facilityId, reportId);
+            hasLocationResourceEvidence = acquiredResourceIds.Any(id =>
+                id.StartsWith("Location/", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!hasLocationResourceEvidence)
+        {
+            var manifestExpectsLocationEvidence = manifest == null || ManifestExpectsLocationEvidence(manifest);
+
+            if (expectDataAcquisitionData && expectLocationResources && manifestExpectsLocationEvidence)
+            {
+                AddError(errors,
+                    "Org-location mapping is enabled and Location resources are expected by the query plan, but no Location acquisition evidence was observed in DataAcquisition logs.");
+            }
+            else
+            {
+                _output.WriteLine(
+                    "  Org-location mapping configured, but no Location acquisition evidence was observed for this run; " +
+                    "skipping strict mapping-row assertions because generated submitted-patient expectations do not require Location evidence.");
+            }
+            return;
+        }
+
+        var mappings = await _reader.GetOrganizationLocationMappingsAsync(facilityId);
+        _output.WriteLine($"  Org-location mappings for facility '{facilityId}': {mappings.Count} total row(s).");
+        foreach (var mapping in mappings.OrderBy(m => m.LocationId, StringComparer.OrdinalIgnoreCase))
+        {
+            _output.WriteLine(
+                $"    - FacilityId={mapping.FacilityId ?? "(null)"}, LocationId={mapping.LocationId ?? "(null)"}, IsActive={mapping.IsActive}, IsOrgLocation={mapping.IsOrgLocation}, PartOfValue={mapping.PartOfValue ?? "(null)"}");
+        }
+
+        if (mappings.Count == 0)
+        {
+            AddError(errors, "Org-location mapping is configured and Location acquisition was observed, but no OrganizationLocationMapping rows were found.");
+            return;
+        }
+
+        var activeMappings = mappings.Where(m => m.IsActive).ToList();
+        if (activeMappings.Count == 0)
+            AddError(errors, "Org-location mapping is configured and Location acquisition was observed, but no active OrganizationLocationMapping rows were found.");
+
+        if (activeMappings.All(m => !string.Equals(m.FacilityId, facilityId, StringComparison.Ordinal)))
+            AddError(errors, $"OrganizationLocationMapping rows do not match facility '{facilityId}'.");
+
+        if (activeMappings.All(m => string.IsNullOrWhiteSpace(m.LocationId)))
+            AddError(errors, "OrganizationLocationMapping rows are missing LocationId values.");
+
+        if (expectDataAcquisitionData && activeMappings.All(m => !m.IsOrgLocation))
+            AddError(errors, "OrganizationLocationMapping rows exist but none are marked IsOrgLocation=true.");
+
+        ValidateLocationHierarchy(activeMappings, errors);
+        await ValidateEncounterMappingTracking(facilityId, reportId, logs, activeMappings, errors, expectDataAcquisitionData, expectEncounterResources);
+    }
+
+    private static bool ManifestExpectsLocationEvidence(GenerationManifest manifest)
+    {
+        var submittedPatients = manifest.ExpectedSubmittedPatientIds();
+        foreach (var patientId in submittedPatients)
+        {
+            var expectedCounts = manifest.GetExpectedAbsCountsForPatient(patientId);
+            if (expectedCounts != null
+                && expectedCounts.TryGetValue("Location", out var locationCount)
+                && locationCount > 0)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static readonly HashSet<string> AllowedWhenNotReportable =
+    [
+        "Patient",
+        "Encounter",
+        "Location"
+    ];
+
+    private static void ValidateLocationHierarchy(
+        List<PipelineDataReader.OrganizationLocationMappingInfo> activeMappings,
+        List<string> errors)
+    {
+        var byLocationId = activeMappings
+            .Where(m => !string.IsNullOrWhiteSpace(m.LocationId))
+            .ToDictionary(m => m.LocationId!, m => m, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var mapping in activeMappings)
+        {
+            if (string.IsNullOrWhiteSpace(mapping.LocationId) || string.IsNullOrWhiteSpace(mapping.PartOfValue))
+                continue;
+
+            if (!byLocationId.ContainsKey(mapping.PartOfValue))
+                AddError(errors,
+                    $"OrganizationLocationMapping hierarchy gap: Location '{mapping.LocationId}' references parent '{mapping.PartOfValue}', but no mapping row exists for that ancestor.");
+        }
+
+        foreach (var mapping in activeMappings.Where(m => m.IsOrgLocation && !string.IsNullOrWhiteSpace(m.LocationId)))
+        {
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var cursor = mapping;
+
+            while (!string.IsNullOrWhiteSpace(cursor.PartOfValue))
+            {
+                var parentId = cursor.PartOfValue!;
+                if (!visited.Add(parentId))
+                {
+                    AddError(errors,
+                        $"OrganizationLocationMapping hierarchy cycle detected while traversing ancestors for location '{mapping.LocationId}'.");
+                    break;
+                }
+
+                if (!byLocationId.TryGetValue(parentId, out var parent))
+                    break;
+
+                if (!parent.IsOrgLocation)
+                {
+                    AddError(errors,
+                        $"Org-location ancestor mismatch: location '{mapping.LocationId}' is IsOrgLocation=true but ancestor '{parent.LocationId}' is not marked org.");
+                    break;
+                }
+
+                cursor = parent;
+            }
+        }
+    }
+
+    private async Task ValidateEncounterMappingTracking(
+        string facilityId,
+        string reportId,
+        List<PipelineDataReader.AcquisitionLogInfo> logs,
+        List<PipelineDataReader.OrganizationLocationMappingInfo> activeLocationMappings,
+        List<string> errors,
+        bool expectDataAcquisitionData,
+        bool expectEncounterResources)
+    {
+        if (!expectDataAcquisitionData)
+            return;
+
+        var encounterMappings = await _reader.GetEncounterMappingsAsync(facilityId);
+        _output.WriteLine($"  Encounter mappings for facility '{facilityId}': {encounterMappings.Count} total row(s).");
+
+        if (expectEncounterResources && encounterMappings.Count == 0)
+        {
+            AddError(errors,
+                "Org-location mapping is enabled and Encounter resources are expected by the query plan, but no EncounterMapping rows were found.");
+            return;
+        }
+
+        var patientLogs = logs
+            .Where(l => !string.IsNullOrWhiteSpace(l.PatientId))
+            .GroupBy(l => l.PatientId!, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+
+        var mappingsByPatient = encounterMappings
+            .Where(m => !string.IsNullOrWhiteSpace(m.PatientId))
+            .GroupBy(m => m.PatientId!, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
+
+        var orgLocationIds = activeLocationMappings
+            .Where(m => m.IsOrgLocation && !string.IsNullOrWhiteSpace(m.LocationId))
+            .Select(m => m.LocationId!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (patientId, patientLogRows) in patientLogs)
+        {
+            mappingsByPatient.TryGetValue(patientId, out var patientMappings);
+            patientMappings ??= [];
+
+            if (expectEncounterResources && patientMappings.Count == 0)
+            {
+                AddError(errors,
+                    $"No EncounterMapping rows found for patient {patientId} despite Encounter queries being present.");
+                continue;
+            }
+
+            var hasMappedEncounter = patientMappings.Any(m => m.MappedToOrg);
+            var notReportableRows = patientLogRows.Count(l => string.Equals(l.Status, "NotReportable", StringComparison.OrdinalIgnoreCase));
+
+            var acquiredTypes = patientLogRows
+                .SelectMany(l => l.ResourceAcquiredIds ?? [])
+                .Where(id => !string.IsNullOrWhiteSpace(id) && id.Contains('/'))
+                .Select(id => id.Split('/')[0])
+                .Where(type => !string.IsNullOrWhiteSpace(type))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (!hasMappedEncounter)
+            {
+                if (notReportableRows == 0)
+                    AddError(errors,
+                        $"Patient {patientId} has no organization-mapped encounters but no DataAcquisition logs were marked NotReportable.");
+
+                var disallowedTypes = acquiredTypes
+                    .Where(t => !AllowedWhenNotReportable.Contains(t))
+                    .OrderBy(t => t, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (disallowedTypes.Count > 0)
+                {
+                    AddError(errors,
+                        $"Patient {patientId} has no organization-mapped encounters, but acquired additional resource type(s): {string.Join(", ", disallowedTypes)}.");
+                }
+            }
+
+            foreach (var mapping in patientMappings)
+            {
+                if (mapping.EncounterLocations.Count == 0)
+                    continue;
+
+                var hasOrgMappedLocationReference = mapping.EncounterLocations
+                    .Any(el => !string.IsNullOrWhiteSpace(el.LocationId) && orgLocationIds.Contains(el.LocationId));
+
+                if (mapping.MappedToOrg && !hasOrgMappedLocationReference)
+                {
+                    AddError(errors,
+                        $"EncounterMapping inconsistency for patient {patientId}, encounter {mapping.EncounterId}: MappedToOrg=true but no linked EncounterLocation references an org-mapped Location.");
+                }
+
+                if (!mapping.MappedToOrg && hasOrgMappedLocationReference)
+                {
+                    AddError(errors,
+                        $"EncounterMapping inconsistency for patient {patientId}, encounter {mapping.EncounterId}: MappedToOrg=false even though linked EncounterLocation references an org-mapped Location.");
+                }
+            }
+        }
     }
 }

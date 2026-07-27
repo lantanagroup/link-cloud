@@ -59,6 +59,14 @@ public static class FhirGenerationPipeline
         public required QueryPlanInput QueryPlan { get; init; }
         public string? ClinicalPeriodStart { get; init; }
         public string? ClinicalPeriodEnd { get; init; }
+        public IReadOnlyList<string>? OrganizationLocationConditionFhirPaths { get; init; }
+
+        /// <summary>
+        /// When true, the simulator may use encounter-anchored fallback for date-mismatch
+        /// cases (resource has a recognized date, but falls outside strict ge/le bounds).
+        /// Scheduled workflows rely on this to mirror downstream acquisition behavior.
+        /// </summary>
+        public bool AllowEncounterAnchoredDateOverrideForOutOfRange { get; init; }
     }
 
     /// <summary>
@@ -81,6 +89,7 @@ public static class FhirGenerationPipeline
         int totalResourcesPerPatient = FhirBundleGenerator.DefaultResourcesPerPatient,
         int? generationSeed = null,
         FhirGenerationConfig? config = null,
+        GenerationRequirementsPlan? generationRequirementsPlan = null,
         AcquisitionSimulationConfig? acquisitionSimulation = null,
         string? runId = null,
         IReadOnlyList<ImportedPatientInput>? importedPatients = null)
@@ -136,15 +145,19 @@ public static class FhirGenerationPipeline
         var qualifyingAllCount = profiles.Count(p => p.QualifiesForAll(measures));
         var nonQualifyingAllCount = profiles.Count(p => p.QualifiesForNone(measures));
         var mixedEligibilityCount = profiles.Count - qualifyingAllCount - nonQualifyingAllCount;
+        var profileResourceOverrides = profiles.Count(p => p.ResourcesPerPatient.HasValue);
+        var resourceShape = profileResourceOverrides > 0
+            ? $"run default ~{totalResourcesPerPatient} resources (per-profile overrides: {profileResourceOverrides})"
+            : $"~{totalResourcesPerPatient} resources each";
         output.WriteLine($"[Pipeline] Generating {profiles.Count} profiled patients ({qualifyingAllCount} qualifying-all, " +
                          $"{nonQualifyingAllCount} non-qualifying-all, {mixedEligibilityCount} mixed) " +
-                         $"with ~{totalResourcesPerPatient} resources each, runId='{effectiveRunId}'" +
+                         $"with {resourceShape}, runId='{effectiveRunId}'" +
                          (generationSeed.HasValue ? $", seed={generationSeed.Value}" : string.Empty) + "...");
 
         // ------------------------------------------------------------------
         // Shared infrastructure — generated once, uploaded first
         // ------------------------------------------------------------------
-        var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) = GenerateSharedInfrastructure();
+        var (sharedEntries, sharedPractitionerIds, sharedMedicationIds, ids) = GenerateSharedInfrastructure(generationRequirementsPlan);
 
         // Upload shared infrastructure first
         var sharedBundles = ChunkEntries(sharedEntries, "shared", 0);
@@ -195,6 +208,7 @@ public static class FhirGenerationPipeline
                         generationClinicalPeriodStart,
                         generationClinicalPeriodEnd,
                         config,
+                        generationRequirementsPlan,
                         ids);
 
                     patientIds[patientIndex] = patientId;
@@ -229,7 +243,9 @@ public static class FhirGenerationPipeline
                     imported,
                     measures,
                     sharedSimEntries,
-                    acquisitionSimulation);
+                    acquisitionSimulation,
+                    generationClinicalPeriodStart,
+                    generationClinicalPeriodEnd);
 
                 importedPatientIds.Add(patientId);
                 totalBundlesUploaded += bundleCount;
@@ -275,33 +291,62 @@ public static class FhirGenerationPipeline
         DateTime? generationClinicalPeriodStart,
         DateTime? generationClinicalPeriodEnd,
         FhirGenerationConfig? config,
+        GenerationRequirementsPlan? generationRequirementsPlan,
         FhirBundleGenerator.SharedIds ids)
     {
         var patientSeed = baseSeed + (profile.SeedOffset ?? patientIndex);
         var patientId = ids.PatientId(patientIndex);
 
+        // Respect per-profile resources override when present (e.g., cohort min/max expansion).
+        // Falls back to run-level default for profiles that do not specify a concrete target.
+        var effectiveResourcesPerPatient = profile.ResourcesPerPatient ?? totalResourcesPerPatient;
+
         // Generate entries using the same per-patient logic shared with FhirBundleGenerator.
         var entries = GeneratePatientEntries(
-            profile, patientIndex, baseSeed, totalResourcesPerPatient,
+            profile, patientIndex, baseSeed, effectiveResourcesPerPatient,
             sharedPractitionerIds, sharedMedicationIds, measures,
-            generationClinicalPeriodStart, generationClinicalPeriodEnd, config, ids);
+            generationClinicalPeriodStart, generationClinicalPeriodEnd, config, generationRequirementsPlan, ids);
 
         var scenario = FhirGenerationCodes.GetScenarioById(profile.ClinicalScenarioId)
                        ?? FhirGenerationCodes.GetScenarioBySeed(patientSeed);
 
         DateTime encStart, encEnd;
-        if (profile.RequiresInpatientEncounter())
-        {
-            (encStart, encEnd) = FhirBundleGenerator.DeriveInpatientEncounterWindow(
-                patientSeed, generationClinicalPeriodStart, generationClinicalPeriodEnd);
-        }
-        else
-        {
-            (encStart, encEnd) = FhirBundleGenerator.DeriveOutpatientEncounterWindow(
-                patientSeed, generationClinicalPeriodStart, generationClinicalPeriodEnd);
-        }
+        (encStart, encEnd) = DeriveEncounterWindowForProfile(
+            profile,
+            patientSeed,
+            generationClinicalPeriodStart,
+            generationClinicalPeriodEnd);
 
         var encounterId = $"{patientId}-Enc-001";
+        // Compute per-resource CQL SDE filter exclusions from the actual generated resources
+        // (inspects in-memory Encounter + Condition attributes — no seed replay).
+        //
+        // Filter rules apply only for measures this patient qualifies for. A non-qualifying
+        // measure's MeasureReport does not contain the patient's resources, so its SDE
+        // semantics do not contribute to the intersection of exclusions that determines
+        // whether a resource reaches ABS.
+        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
+        var effectiveProfile = profile;
+
+        if (cqlInput != null)
+        {
+            effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
+                patientId,
+                profile,
+                measures,
+                cqlInput,
+                generationClinicalPeriodStart,
+                generationClinicalPeriodEnd,
+                output);
+
+            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
+            if (qualifyingMeasures.Count > 0)
+            {
+                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+            }
+        }
+
         var measureEligibilityLabel = string.Join(", ", measures.Select(m =>
         {
             var shortName = m switch
@@ -311,7 +356,7 @@ public static class FhirGenerationPipeline
                 ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => "Hypo",
                 _ => m.ToString()
             };
-            var eligible = profile.QualifiesFor(m) ? "Q" : "NQ";
+            var eligible = effectiveProfile.QualifiesFor(m) ? "Q" : "NQ";
             return $"{shortName}={eligible}";
         }));
 
@@ -319,26 +364,8 @@ public static class FhirGenerationPipeline
                          $"encounter={encounterId} ({encStart:yyyy-MM-dd} ? {encEnd:yyyy-MM-dd})");
 
         // Record patient in manifest builder
-        manifestBuilder.AddPatient(patientId, profile);
+        manifestBuilder.AddPatient(patientId, effectiveProfile);
         manifestBuilder.AddEntries(patientId, entries);
-
-        // Compute per-resource CQL SDE filter exclusions from the actual generated resources
-        // (inspects in-memory Encounter + Condition attributes — no seed replay).
-        //
-        // Filter rules apply only for measures this patient qualifies for. A non-qualifying
-        // measure's MeasureReport does not contain the patient's resources, so its SDE
-        // semantics do not contribute to the intersection of exclusions that determines
-        // whether a resource reaches ABS.
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
-        if (cqlInput != null)
-        {
-            var qualifyingMeasures = measures.Where(profile.QualifiesFor).ToList();
-            if (qualifyingMeasures.Count > 0)
-            {
-                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
-                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
-            }
-        }
 
         // Run acquisition simulation BEFORE we serialize and discard
         if (acquisitionSimulation != null)
@@ -351,7 +378,13 @@ public static class FhirGenerationPipeline
                 acquisitionSimulation.QueryPlan,
                 acquisitionSimulation.ClinicalPeriodStart,
                 acquisitionSimulation.ClinicalPeriodEnd,
-                output);
+                output,
+                acquisitionSimulation.AllowEncounterAnchoredDateOverrideForOutOfRange);
+            acquiredKeys = OrgResourceMapPredictionFilter.Apply(
+                acquiredKeys,
+                patientSimEntries,
+                sharedSimEntries,
+                acquisitionSimulation.OrganizationLocationConditionFhirPaths);
             manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
             // patientSimEntries (JsonElement clones) are now eligible for GC
         }
@@ -389,7 +422,9 @@ public static class FhirGenerationPipeline
         ImportedPatientInput imported,
         IReadOnlyList<ProfiledMeasureType> measures,
         List<(string ResourceType, string ResourceId, string Key, JsonElement Resource)>? sharedSimEntries,
-        AcquisitionSimulationConfig? acquisitionSimulation)
+        AcquisitionSimulationConfig? acquisitionSimulation,
+        DateTime? generationClinicalPeriodStart,
+        DateTime? generationClinicalPeriodEnd)
     {
         if (imported == null)
             throw new ArgumentNullException(nameof(imported));
@@ -449,6 +484,28 @@ public static class FhirGenerationPipeline
 
         var profile = new PatientProfile(eligibilities, ClinicalScenarioId: imported.DetectedClinicalScenarioId);
 
+        // 3. CQL filter simulation + period-aware eligibility prediction
+        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
+        var effectiveProfile = profile;
+        if (cqlInput != null)
+        {
+            effectiveProfile = ApplyMeasurementPeriodEligibilityPrediction(
+                patientId,
+                profile,
+                measures,
+                cqlInput,
+                generationClinicalPeriodStart,
+                generationClinicalPeriodEnd,
+                output);
+
+            var qualifyingMeasures = measures.Where(effectiveProfile.QualifiesFor).ToList();
+            if (qualifyingMeasures.Count > 0)
+            {
+                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
+                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
+            }
+        }
+
         var measureLabel = string.Join(", ", measures.Select(m =>
         {
             var shortName = m switch
@@ -458,25 +515,13 @@ public static class FhirGenerationPipeline
                 ProfiledMeasureType.NhsnGlycemicControlHypoglycemicInitialPopulation => "Hypo",
                 _ => m.ToString()
             };
-            return $"{shortName}={(profile.QualifiesFor(m) ? "Q" : "NQ")}";
+            return $"{shortName}={(effectiveProfile.QualifiesFor(m) ? "Q" : "NQ")}";
         }));
         output.WriteLine($"  [imported] Patient {patientId}: {entries.Count} entries [{measureLabel}] | source={imported.Source}");
 
-        // 3. Manifest
-        manifestBuilder.AddPatient(patientId, profile);
+        // 4. Manifest
+        manifestBuilder.AddPatient(patientId, effectiveProfile);
         manifestBuilder.AddEntries(patientId, entries);
-
-        // 4. CQL filter simulation (same as generated path)
-        var cqlInput = CqlFilterInputExtractor.ExtractFromEntries(patientId, entries);
-        if (cqlInput != null)
-        {
-            var qualifyingMeasures = measures.Where(profile.QualifiesFor).ToList();
-            if (qualifyingMeasures.Count > 0)
-            {
-                var cqlFilteredKeys = CqlFilterSimulator.ComputeFilteredKeys(qualifyingMeasures, cqlInput);
-                manifestBuilder.SetCqlFilteredKeys(patientId, cqlFilteredKeys);
-            }
-        }
 
         // 5. Acquisition simulation (same as generated path)
         if (acquisitionSimulation != null)
@@ -489,7 +534,13 @@ public static class FhirGenerationPipeline
                 acquisitionSimulation.QueryPlan,
                 acquisitionSimulation.ClinicalPeriodStart,
                 acquisitionSimulation.ClinicalPeriodEnd,
-                output);
+                output,
+                acquisitionSimulation.AllowEncounterAnchoredDateOverrideForOutOfRange);
+            acquiredKeys = OrgResourceMapPredictionFilter.Apply(
+                acquiredKeys,
+                patientSimEntries,
+                sharedSimEntries,
+                acquisitionSimulation.OrganizationLocationConditionFhirPaths);
             manifestBuilder.SetSimulatedAcquiredKeys(patientId, acquiredKeys);
         }
 
@@ -514,6 +565,52 @@ public static class FhirGenerationPipeline
         return (patientId, bundleCount);
     }
 
+    private static PatientProfile ApplyMeasurementPeriodEligibilityPrediction(
+        string patientId,
+        PatientProfile profile,
+        IReadOnlyList<ProfiledMeasureType> measures,
+        CqlFilterSimulator.PatientCqlInput cqlInput,
+        DateTime? measurementPeriodStart,
+        DateTime? measurementPeriodEnd,
+        IAutomationOutput output)
+    {
+        if (!measurementPeriodStart.HasValue || !measurementPeriodEnd.HasValue)
+            return profile;
+
+        var constrainedInput = cqlInput with
+        {
+            MeasurementPeriodStart = measurementPeriodStart.Value,
+            MeasurementPeriodEnd = measurementPeriodEnd.Value
+        };
+
+        var adjusted = new Dictionary<ProfiledMeasureType, MeasureEligibility>(profile.MeasureEligibilities);
+        var downgraded = new List<string>();
+
+        foreach (var measure in measures)
+        {
+            if (!adjusted.TryGetValue(measure, out var eligibility)
+                || eligibility != MeasureEligibility.Qualifying)
+            {
+                continue;
+            }
+
+            var hasInPeriodIpOverlap = MeasureInitialPopulationResolver.Resolve([measure], constrainedInput).Count > 0;
+            if (hasInPeriodIpOverlap)
+                continue;
+
+            adjusted[measure] = MeasureEligibility.NonQualifying;
+            downgraded.Add(measure.ToString());
+        }
+
+        if (downgraded.Count > 0)
+        {
+            output.WriteLine(
+                $"  [prediction] Patient {patientId}: downgraded to NQ for {string.Join(", ", downgraded)} due to no initial-population encounter overlap with report period.");
+        }
+
+        return profile with { MeasureEligibilities = adjusted };
+    }
+
     /// <summary>
     /// Generates all FHIR bundle entries for a single patient using the same logic as
     /// Builds a single patient's FHIR bundle entries (profile-driven scenario + measure eligibility).
@@ -535,6 +632,7 @@ public static class FhirGenerationPipeline
         DateTime? generationClinicalPeriodStart,
         DateTime? generationClinicalPeriodEnd,
         FhirGenerationConfig? config,
+        GenerationRequirementsPlan? generationRequirementsPlan,
         FhirBundleGenerator.SharedIds ids)
     {
         var patientSeed = baseSeed + (profile.SeedOffset ?? patientIndex);
@@ -548,16 +646,11 @@ public static class FhirGenerationPipeline
         // fall back to the legacy seed-only schemes so existing callers keep
         // their stable 2023-anchored (inpatient) and 2020-anchored (outpatient) dates.
         DateTime encStart, encEnd;
-        if (profile.RequiresInpatientEncounter())
-        {
-            (encStart, encEnd) = FhirBundleGenerator.DeriveInpatientEncounterWindow(
-                patientSeed, generationClinicalPeriodStart, generationClinicalPeriodEnd);
-        }
-        else
-        {
-            (encStart, encEnd) = FhirBundleGenerator.DeriveOutpatientEncounterWindow(
-                patientSeed, generationClinicalPeriodStart, generationClinicalPeriodEnd);
-        }
+        (encStart, encEnd) = DeriveEncounterWindowForProfile(
+            profile,
+            patientSeed,
+            generationClinicalPeriodStart,
+            generationClinicalPeriodEnd);
 
         var entries = new List<Bundle.EntryComponent>();
 
@@ -603,7 +696,10 @@ public static class FhirGenerationPipeline
             entries, patientId, patientSeed, patientIndex, baseSeed, totalResourcesPerPatient,
             encStart, encEnd, scenario, anchors, encounter,
             sharedPractitionerIds, sharedMedicationIds, config, ids,
-            addHypoglycemicMedicationPair: profile.RequiresHypoglycemicMedication());
+            generationRequirementsPlan,
+            addHypoglycemicMedicationPair: profile.RequiresHypoglycemicMedication(),
+            measurementPeriodStart: generationClinicalPeriodStart,
+            measurementPeriodEnd: generationClinicalPeriodEnd);
 
         return entries;
     }
@@ -613,14 +709,98 @@ public static class FhirGenerationPipeline
     // ------------------------------------------------------------------
 
     private static (List<Bundle.EntryComponent> Entries, List<string> PractitionerIds, List<string> MedicationIds, FhirBundleGenerator.SharedIds Ids)
-        GenerateSharedInfrastructure()
+        GenerateSharedInfrastructure(GenerationRequirementsPlan? generationRequirementsPlan)
     {
         // All shared-infrastructure construction lives in ScenarioResourceGeneration so
         // FhirBundleGenerator (bulk path) and FhirGenerationPipeline (streaming path)
         // can never drift on shared-resource shape, IDs, or order.
         var ids = new FhirBundleGenerator.SharedIds();
-        var (entries, practitionerIds, medicationIds) = ScenarioResourceGeneration.BuildSharedInfrastructure(ids);
+        var (entries, practitionerIds, medicationIds) = ScenarioResourceGeneration.BuildSharedInfrastructure(ids, generationRequirementsPlan);
         return (entries, practitionerIds, medicationIds, ids);
+    }
+
+    private static (DateTime Start, DateTime End) DeriveEncounterWindowForProfile(
+        PatientProfile profile,
+        int seed,
+        DateTime? clinicalPeriodStart,
+        DateTime? clinicalPeriodEnd)
+    {
+        if (!profile.RequiresInpatientEncounter())
+        {
+            return FhirBundleGenerator.DeriveOutpatientEncounterWindow(seed, clinicalPeriodStart, clinicalPeriodEnd);
+        }
+
+        if (profile.ScheduledInpatientPattern.HasValue
+            && clinicalPeriodStart.HasValue
+            && clinicalPeriodEnd.HasValue
+            && clinicalPeriodEnd.Value > clinicalPeriodStart.Value)
+        {
+            return DeriveScheduledPatternInpatientWindow(
+                profile.ScheduledInpatientPattern.Value,
+                seed,
+                clinicalPeriodStart.Value,
+                clinicalPeriodEnd.Value);
+        }
+
+        return FhirBundleGenerator.DeriveInpatientEncounterWindow(seed, clinicalPeriodStart, clinicalPeriodEnd);
+    }
+
+    private static (DateTime Start, DateTime End) DeriveScheduledPatternInpatientWindow(
+        ScheduledInpatientPattern pattern,
+        int seed,
+        DateTime reportStart,
+        DateTime reportEnd)
+    {
+        var rs = DateTime.SpecifyKind(reportStart, DateTimeKind.Utc);
+        var re = DateTime.SpecifyKind(reportEnd, DateTimeKind.Utc);
+
+        if (re <= rs)
+            return FhirBundleGenerator.DeriveInpatientEncounterWindow(seed, rs, re);
+
+        var period = re - rs;
+        var totalMinutes = Math.Max(1, (int)period.TotalMinutes);
+
+        // Keep deterministic placement but avoid minute-scale stays that are too sparse to
+        // reliably satisfy downstream measure criteria in scheduled scenarios.
+        var admissionOffsetMinutes = Math.Max(5, (int)Math.Round(totalMinutes * 0.20));
+        var dischargeOffsetMinutes = Math.Max(admissionOffsetMinutes + 30, (int)Math.Round(totalMinutes * 0.75));
+
+        // Seed-driven jitter to prevent all scheduled patients from sharing identical timestamps.
+        var jitter = Math.Abs(seed % 20);
+
+        var inPeriodStart = rs.AddMinutes(Math.Min(totalMinutes - 1, admissionOffsetMinutes + jitter));
+        var inPeriodEnd = rs.AddMinutes(Math.Min(totalMinutes - 1, dischargeOffsetMinutes + jitter));
+        if (inPeriodEnd <= inPeriodStart)
+            inPeriodEnd = inPeriodStart.AddMinutes(30);
+
+        // Padding used for "before" / "after" patterns. Ensure at least 6h separation from
+        // report boundaries when the report window is reasonably sized.
+        var boundaryPad = period.TotalHours >= 12
+            ? TimeSpan.FromHours(6)
+            : TimeSpan.FromMinutes(Math.Max(60, totalMinutes / 6));
+
+        return pattern switch
+        {
+            ScheduledInpatientPattern.AdmittedBeforePeriodRemainsInpatientAfterPeriod
+                => (rs - boundaryPad, re + boundaryPad),
+
+            ScheduledInpatientPattern.AdmittedBeforePeriodDischargedDuringPeriod
+                => (rs - boundaryPad, inPeriodEnd),
+
+            ScheduledInpatientPattern.AdmittedDuringPeriodRemainsInpatientAfterPeriod
+                => (inPeriodStart, re + boundaryPad),
+
+            ScheduledInpatientPattern.AdmittedDuringPeriodDischargedDuringPeriod
+                => (inPeriodStart, inPeriodEnd),
+
+            ScheduledInpatientPattern.AdmittedAndDischargedBeforePeriod
+                => (rs - (boundaryPad + TimeSpan.FromHours(6)), rs - TimeSpan.FromHours(1)),
+
+            ScheduledInpatientPattern.AdmittedAndDischargedAfterPeriod
+                => (re + TimeSpan.FromHours(1), re + (boundaryPad + TimeSpan.FromHours(6))),
+
+            _ => FhirBundleGenerator.DeriveInpatientEncounterWindow(seed, rs, re)
+        };
     }
 
     // ------------------------------------------------------------------

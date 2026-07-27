@@ -1,0 +1,1043 @@
+@model List<NormalizationOperationDefinition>
+@{
+    ViewData["Title"] = "Normalizations";
+    var operations = (List<NormalizationOperationDefinition>?)ViewBag.Operations ?? [];
+    var sequences = (List<NormalizationSequenceDefinition>?)ViewBag.Sequences ?? [];
+    var suites = (List<NormalizationSuiteDefinition>?)ViewBag.Suites ?? [];
+}
+
+<div class="container mt-4">
+    <h2 class="fw-bold mb-1"><i class="bi bi-funnel me-2"></i>Normalizations</h2>
+    <p class="text-muted mb-3">Manage normalization operations, sequences, and suites. Suites are selectable on scenarios to control which normalizations run during a test.</p>
+
+    <ul class="nav nav-tabs mb-3" id="normTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-operations" data-bs-toggle="tab" data-bs-target="#pane-operations" type="button" role="tab">
+                <i class="bi bi-gear me-1"></i>Operations <span class="badge bg-secondary">@operations.Count</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-sequences" data-bs-toggle="tab" data-bs-target="#pane-sequences" type="button" role="tab">
+                <i class="bi bi-list-ol me-1"></i>Sequences <span class="badge bg-secondary">@sequences.Count</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-suites" data-bs-toggle="tab" data-bs-target="#pane-suites" type="button" role="tab">
+                <i class="bi bi-box me-1"></i>Suites <span class="badge bg-secondary">@suites.Count</span>
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        @* ===== Operations Tab ===== *@
+        <div class="tab-pane fade show active" id="pane-operations" role="tabpanel">
+            <div class="au-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-gear me-2"></i>All Operations</span>
+                    <button type="button" class="btn btn-sm btn-success" id="btnNewOp" aria-label="Create new normalization operation" title="Create new normalization operation"><i class="bi bi-plus-lg"></i></button>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table au-table mb-0" id="opTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Resource Types</th>
+                                <th>Kind</th>
+                                <th>Updated</th>
+                                <th style="width:200px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var op in operations)
+                            {
+                                <tr data-id="@op.Id">
+                                    <td>
+                                        <strong>@op.Name</strong>
+                                        @if (!string.IsNullOrWhiteSpace(op.Description))
+                                        {
+                                            <br /><small class="text-muted">@op.Description</small>
+                                        }
+                                    </td>
+                                    <td><span class="badge bg-info text-dark">@op.OperationType</span></td>
+                                    <td><small class="text-muted">@string.Join(", ", op.ResourceTypes)</small></td>
+                                    <td>
+                                        @if (op.IsSystem) { <span class="badge bg-dark">System</span> }
+                                        else { <span class="badge bg-light text-dark border">Custom</span> }
+                                    </td>
+                                    <td class="small text-muted">@op.UpdatedAt.LocalDateTime.ToString("g")</td>
+                                    <td class="text-nowrap">
+                                        <div class="d-inline-flex gap-1">
+                                            <button type="button" class="btn btn-sm btn-outline-primary btn-op-open" data-id="@op.Id" data-mode="@(op.IsSystem ? "view" : "edit")">
+                                                @(op.IsSystem ? "View" : "Edit")
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-op-clone" data-id="@op.Id">Clone</button>
+                                            @if (!op.IsSystem)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-danger btn-op-delete" data-id="@op.Id">Delete</button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    @if (operations.Count == 0)
+                    {
+                        <div class="text-center text-muted py-4">No operations yet. Click <strong>+</strong> to create one.</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* ===== Sequences Tab ===== *@
+        <div class="tab-pane fade" id="pane-sequences" role="tabpanel">
+            <div class="au-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-list-ol me-2"></i>All Sequences</span>
+                    <button type="button" class="btn btn-sm btn-success" id="btnNewSeq" aria-label="Create new normalization sequence" title="Create new normalization sequence"><i class="bi bi-plus-lg"></i></button>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table au-table mb-0" id="seqTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Operations</th>
+                                <th>Kind</th>
+                                <th>Updated</th>
+                                <th style="width:200px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var seq in sequences)
+                            {
+                                <tr data-id="@seq.Id">
+                                    <td>
+                                        <strong>@seq.Name</strong>
+                                        @if (!string.IsNullOrWhiteSpace(seq.Description))
+                                        {
+                                            <br /><small class="text-muted">@seq.Description</small>
+                                        }
+                                    </td>
+                                    <td><span class="badge bg-secondary">@seq.Entries.Count op(s)</span></td>
+                                    <td>
+                                        @if (seq.IsSystem) { <span class="badge bg-dark">System</span> }
+                                        else { <span class="badge bg-light text-dark border">Custom</span> }
+                                    </td>
+                                    <td class="small text-muted">@seq.UpdatedAt.LocalDateTime.ToString("g")</td>
+                                    <td class="text-nowrap">
+                                        <div class="d-inline-flex gap-1">
+                                            <button type="button" class="btn btn-sm btn-outline-primary btn-seq-open" data-id="@seq.Id" data-mode="@(seq.IsSystem ? "view" : "edit")">
+                                                @(seq.IsSystem ? "View" : "Edit")
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-seq-clone" data-id="@seq.Id">Clone</button>
+                                            @if (!seq.IsSystem)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-danger btn-seq-delete" data-id="@seq.Id">Delete</button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    @if (sequences.Count == 0)
+                    {
+                        <div class="text-center text-muted py-4">No sequences yet. Click <strong>+</strong> to create one.</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @* ===== Suites Tab ===== *@
+        <div class="tab-pane fade" id="pane-suites" role="tabpanel">
+            <div class="au-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-box me-2"></i>All Suites</span>
+                    <button type="button" class="btn btn-sm btn-success" id="btnNewSuite" aria-label="Create new normalization suite" title="Create new normalization suite"><i class="bi bi-plus-lg"></i></button>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table au-table mb-0" id="suiteTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Contents</th>
+                                <th>Kind</th>
+                                <th>Updated</th>
+                                <th style="width:260px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var suite in suites)
+                            {
+                                <tr data-id="@suite.Id">
+                                    <td>
+                                        <strong>@suite.Name</strong>
+                                        @if (suite.IsDefault)
+                                        {
+                                            <span class="badge bg-success ms-1">Default</span>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(suite.Description))
+                                        {
+                                            <br /><small class="text-muted">@suite.Description</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">@suite.SequenceIds.Count seq, @suite.OperationIds.Count op(s)</small>
+                                    </td>
+                                    <td>
+                                        @if (suite.IsSystem) { <span class="badge bg-dark">System</span> }
+                                        else { <span class="badge bg-light text-dark border">Custom</span> }
+                                    </td>
+                                    <td class="small text-muted">@suite.UpdatedAt.LocalDateTime.ToString("g")</td>
+                                    <td class="text-nowrap">
+                                        <div class="d-inline-flex gap-1">
+                                            <button type="button" class="btn btn-sm btn-outline-primary btn-suite-open" data-id="@suite.Id" data-mode="@(suite.IsSystem ? "view" : "edit")">
+                                                @(suite.IsSystem ? "View" : "Edit")
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary btn-suite-clone" data-id="@suite.Id">Clone</button>
+                                            @if (!suite.IsDefault)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-success btn-suite-default" data-id="@suite.Id" title="Set as default">
+                                                    <i class="bi bi-star"></i>
+                                                </button>
+                                            }
+                                            @if (!suite.IsSystem)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-danger btn-suite-delete" data-id="@suite.Id">Delete</button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    @if (suites.Count == 0)
+                    {
+                        <div class="text-center text-muted py-4">No suites yet. Click <strong>+</strong> to create one.</div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ========== Operation Editor Modal ========== *@
+<div id="opModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;" role="dialog" aria-modal="true" aria-labelledby="opModalTitle" tabindex="-1">
+    <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
+        <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:800px;display:flex;flex-direction:column;max-height:90vh;">
+            <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;flex-shrink:0;" class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0" id="opModalTitle"><i class="bi bi-gear me-2"></i>Operation</h5>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-sm btn-success" id="btnOpSave" style="display:none;"><i class="bi bi-floppy me-1"></i>Save</button>
+                    <button type="button" class="btn btn-sm btn-outline-light" id="btnOpClose">Close</button>
+                </div>
+            </div>
+            <div id="opFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
+            <div style="flex:1;overflow-y:auto;padding:1.25rem;" id="opModalBody">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="OpId" />
+                <input type="hidden" id="OpIsSystem" value="false" />
+                <div id="opConfigArea" class="position-relative">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="OpName">Name</label>
+                            <input class="form-control" id="OpName" maxlength="120" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="OpType">Operation Type</label>
+                            <select class="form-select" id="OpType">
+                                <option value="CopyProperty">CopyProperty</option>
+                                <option value="CopyLocation">CopyLocation</option>
+                                <option value="CopyLocationAliasToTypeIteratively">CopyLocationAliasToTypeIteratively</option>
+                                <option value="ConditionalTransform">ConditionalTransform</option>
+                                <option value="CodeMap">CodeMap</option>
+                                <option value="RemoveExtensions">RemoveExtensions</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="OpDescription">Description</label>
+                            <input class="form-control" id="OpDescription" maxlength="500" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="OpResourceTypes">Resource Types <small class="text-muted">(comma-separated)</small></label>
+                            <input class="form-control" id="OpResourceTypes" placeholder="e.g. Location, Encounter, Patient" />
+                        </div>
+
+                        @* --- CopyProperty fields --- *@
+                        <div class="col-md-6 op-field op-field-CopyProperty">
+                            <label class="form-label" for="OpSourceFhirPath">Source FhirPath</label>
+                            <input class="form-control" id="OpSourceFhirPath" placeholder="e.g. identifier.value" />
+                        </div>
+                        <div class="col-md-6 op-field op-field-CopyProperty">
+                            <label class="form-label" for="OpTargetFhirPath">Target FhirPath</label>
+                            <input class="form-control" id="OpTargetFhirPath" placeholder="e.g. type[0].coding.code" />
+                        </div>
+
+                        @* --- ConditionalTransform fields --- *@
+                        <div class="col-md-6 op-field op-field-ConditionalTransform">
+                            <label class="form-label" for="OpCondTargetFhirPath">Target FhirPath</label>
+                            <input class="form-control" id="OpCondTargetFhirPath" />
+                        </div>
+                        <div class="col-md-6 op-field op-field-ConditionalTransform">
+                            <label class="form-label" for="OpCondTargetValue">Target Value</label>
+                            <input class="form-control" id="OpCondTargetValue" />
+                        </div>
+                        <div class="col-12 op-field op-field-ConditionalTransform">
+                            <label class="form-label">Conditions</label>
+                            <div id="opConditionsContainer"></div>
+                            <button type="button" class="btn btn-sm btn-outline-success mt-1" id="btnAddCondition"><i class="bi bi-plus-lg me-1"></i>Add Condition</button>
+                        </div>
+
+                        @* --- CodeMap fields --- *@
+                        <div class="col-12 op-field op-field-CodeMap">
+                            <label class="form-label" for="OpCodeMapFhirPath">FhirPath</label>
+                            <input class="form-control" id="OpCodeMapFhirPath" />
+                        </div>
+                        <div class="col-12 op-field op-field-CodeMap">
+                            <label class="form-label">Code System Maps</label>
+                            <div id="opCodeSystemMapRows"></div>
+                            <div class="d-flex gap-2 mt-2 align-items-center">
+                                <button type="button" class="btn btn-sm btn-outline-success" id="btnAddCodeSystemMap"><i class="bi bi-plus-lg me-1"></i>Add Code System Map</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCodeMapLoadFromJson" title="Load the current JSON textarea content into the visual controls (JSON → controls).">Load from JSON</button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCodeMapSyncJson" title="Write the current visual controls into the JSON textarea (controls → JSON).">Sync JSON from Controls</button>
+                                <span class="text-muted" title="Use the textarea and controls independently: Load from JSON copies textarea JSON into controls, and Sync JSON from Controls copies controls into the textarea.">
+                                    <i class="bi bi-info-circle"></i>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-12 op-field op-field-CodeMap">
+                            <label class="form-label">Code System Maps <small class="text-muted">(JSON)</small></label>
+                            <textarea class="form-control font-monospace" id="OpCodeSystemMaps" rows="6" style="font-size:.8rem;"></textarea>
+                        </div>
+
+                        @* --- RemoveExtensions fields --- *@
+                        <div class="col-12 op-field op-field-RemoveExtensions">
+                            <label class="form-label" for="OpExtensionUrls">Extension URLs <small class="text-muted">(one per line)</small></label>
+                            <textarea class="form-control font-monospace" id="OpExtensionUrls" rows="4" style="font-size:.8rem;"></textarea>
+                        </div>
+
+                        @* --- CopyLocationAliasToTypeIteratively fields --- *@
+                        <div class="col-md-6 op-field op-field-CopyLocationAliasToTypeIteratively" id="OpCopyIterativeMaxIterationsWrap">
+                            <label class="form-label" for="OpMaxIterations">Max Iterations</label>
+                            <input class="form-control" type="number" min="1" id="OpMaxIterations" value="15" />
+                        </div>
+                        <div class="col-md-6 op-field op-field-CopyLocationAliasToTypeIteratively align-items-end" id="OpCopyIterativeSplitOnCommaWrap">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="OpSplitOnComma" />
+                                <label class="form-check-label" for="OpSplitOnComma">Split Alias Entries on Comma</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="opSystemOverlay" class="position-absolute top-0 start-0 w-100 h-100 au-system-overlay" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="opModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
+
+@* ========== Sequence Editor Modal ========== *@
+<div id="seqModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;" role="dialog" aria-modal="true" aria-labelledby="seqModalTitle" tabindex="-1">
+    <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
+        <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:800px;display:flex;flex-direction:column;max-height:90vh;">
+            <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;flex-shrink:0;" class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0" id="seqModalTitle"><i class="bi bi-list-ol me-2"></i>Sequence</h5>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-sm btn-success" id="btnSeqSave" style="display:none;"><i class="bi bi-floppy me-1"></i>Save</button>
+                    <button type="button" class="btn btn-sm btn-outline-light" id="btnSeqClose">Close</button>
+                </div>
+            </div>
+            <div id="seqFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
+            <div style="flex:1;overflow-y:auto;padding:1.25rem;" id="seqModalBody">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="SeqId" />
+                <input type="hidden" id="SeqIsSystem" value="false" />
+                <div id="seqConfigArea" class="position-relative">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="SeqName">Name</label>
+                            <input class="form-control" id="SeqName" maxlength="120" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="SeqDescription">Description</label>
+                            <input class="form-control" id="SeqDescription" maxlength="500" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Operations (in order)</label>
+                            <div id="seqEntriesContainer"></div>
+                            <button type="button" class="btn btn-sm btn-outline-success mt-2" id="btnAddSeqEntry"><i class="bi bi-plus-lg me-1"></i>Add Operation</button>
+                        </div>
+                    </div>
+                    <div id="seqSystemOverlay" class="position-absolute top-0 start-0 w-100 h-100 au-system-overlay" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="seqModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
+
+@* ========== Suite Editor Modal ========== *@
+<div id="suiteModal" style="display:none;position:fixed;inset:0;z-index:1055;overflow-y:auto;" role="dialog" aria-modal="true" aria-labelledby="suiteModalTitle" tabindex="-1">
+    <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;">
+        <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:800px;display:flex;flex-direction:column;max-height:90vh;">
+            <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;flex-shrink:0;" class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0" id="suiteModalTitle"><i class="bi bi-box me-2"></i>Suite</h5>
+                <div class="d-flex gap-2 align-items-center">
+                    <button type="button" class="btn btn-sm btn-success" id="btnSuiteSave" style="display:none;"><i class="bi bi-floppy me-1"></i>Save</button>
+                    <button type="button" class="btn btn-sm btn-outline-light" id="btnSuiteClose">Close</button>
+                </div>
+            </div>
+            <div id="suiteFormErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
+            <div style="flex:1;overflow-y:auto;padding:1.25rem;" id="suiteModalBody">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="SuiteId" />
+                <input type="hidden" id="SuiteIsSystem" value="false" />
+                <div id="suiteConfigArea" class="position-relative">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="SuiteName">Name</label>
+                            <input class="form-control" id="SuiteName" maxlength="120" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="SuiteDescription">Description</label>
+                            <input class="form-control" id="SuiteDescription" maxlength="500" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Sequences</label>
+                            <div id="suiteSequencesContainer"></div>
+                            <button type="button" class="btn btn-sm btn-outline-success mt-1" id="btnAddSuiteSeq"><i class="bi bi-plus-lg me-1"></i>Add Sequence</button>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Standalone Operations</label>
+                            <div id="suiteOpsContainer"></div>
+                            <button type="button" class="btn btn-sm btn-outline-success mt-1" id="btnAddSuiteOp"><i class="bi bi-plus-lg me-1"></i>Add Operation</button>
+                        </div>
+                    </div>
+                    <div id="suiteSystemOverlay" class="position-absolute top-0 start-0 w-100 h-100 au-system-overlay" style="display:none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="suiteModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
+
+@section Scripts {
+<script>
+    // -- Data from server --
+    const allOperations = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(operations, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+    const allSequences = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(sequences, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+    const allSuites = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(suites, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
+    const antiForgeryToken = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+
+    function postJson(url, body) {
+        return fetch(url, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'RequestVerificationToken': antiForgeryToken }, body: JSON.stringify(body)
+        });
+    }
+
+    // ============ OPERATION MODAL ============
+    const opModal = document.getElementById('opModal');
+    const opBackdrop = document.getElementById('opModalBackdrop');
+
+    const modalFocusState = new WeakMap();
+
+    function getFocusableElements(modal) {
+        return Array.from(modal.querySelectorAll('a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+            .filter(el => el.offsetParent !== null);
+    }
+
+    function onModalKeyDown(event) {
+        const modal = event.currentTarget;
+        const state = modalFocusState.get(modal);
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            if (state?.requestClose) state.requestClose();
+            return;
+        }
+
+        if (event.key !== 'Tab') return;
+
+        const focusable = getFocusableElements(modal);
+        if (!focusable.length) {
+            event.preventDefault();
+            modal.focus();
+            return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    }
+
+    function showCrudModal(modal, backdrop, requestClose) {
+        const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        modalFocusState.set(modal, { trigger, requestClose });
+
+        modal.style.display = '';
+        backdrop.style.display = '';
+        modal.addEventListener('keydown', onModalKeyDown);
+
+        const focusable = getFocusableElements(modal);
+        const focusTarget = focusable[0] || modal;
+        setTimeout(() => focusTarget.focus(), 0);
+    }
+
+    function hideCrudModal(modal, backdrop) {
+        modal.style.display = 'none';
+        backdrop.style.display = 'none';
+        modal.removeEventListener('keydown', onModalKeyDown);
+
+        const state = modalFocusState.get(modal);
+        if (state?.trigger && document.contains(state.trigger)) {
+            state.trigger.focus();
+        }
+        modalFocusState.delete(modal);
+    }
+
+    function showOpModal() { showCrudModal(opModal, opBackdrop, hideOpModal); }
+    function hideOpModal() { hideCrudModal(opModal, opBackdrop); }
+
+    function toggleOpFields() {
+        const t = document.getElementById('OpType').value;
+        document.querySelectorAll('.op-field').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.op-field-' + t).forEach(el => el.style.display = '');
+
+        const copyIterativeVisible = t === 'CopyLocationAliasToTypeIteratively';
+        document.getElementById('OpCopyIterativeMaxIterationsWrap').style.display = copyIterativeVisible ? '' : 'none';
+        document.getElementById('OpCopyIterativeSplitOnCommaWrap').style.display = copyIterativeVisible ? 'flex' : 'none';
+    }
+
+    document.getElementById('OpType').addEventListener('change', toggleOpFields);
+
+    function addCodeMapEntryRow(entriesHost, key, value) {
+        const row = document.createElement('div');
+        row.className = 'row g-2 mb-1 code-map-entry-row';
+        row.innerHTML =
+            '<div class="col-md-4"><input class="form-control form-control-sm code-map-source-key" placeholder="Source Code" /></div>'
+            + '<div class="col-md-3"><input class="form-control form-control-sm code-map-target-code" placeholder="Target Code" /></div>'
+            + '<div class="col-md-4"><input class="form-control form-control-sm code-map-target-display" placeholder="Display" /></div>'
+            + '<div class="col-md-1 d-flex align-items-center"><button type="button" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i></button></div>';
+
+        row.querySelector('.code-map-source-key').value = key || '';
+        row.querySelector('.code-map-target-code').value = value?.code || value?.Code || '';
+        row.querySelector('.code-map-target-display').value = value?.display || value?.Display || '';
+        row.querySelector('button').addEventListener('click', () => row.remove());
+        entriesHost.appendChild(row);
+    }
+
+    function addCodeSystemMapCard(item) {
+        const host = document.getElementById('opCodeSystemMapRows');
+        const card = document.createElement('div');
+        card.className = 'card mb-2 p-2 code-system-map-card';
+        card.innerHTML =
+            '<div class="d-flex justify-content-between align-items-center mb-2">'
+            + '<span class="fw-semibold">Code System Map</span>'
+            + '<button type="button" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i></button>'
+            + '</div>'
+            + '<div class="row g-2 mb-2">'
+            + '<div class="col-md-6"><label class="form-label mb-1 small">Source System</label><input class="form-control form-control-sm csm-source-system" /></div>'
+            + '<div class="col-md-6"><label class="form-label mb-1 small">Target System</label><input class="form-control form-control-sm csm-target-system" /></div>'
+            + '</div>'
+            + '<div class="small text-muted mb-1">Code Maps</div>'
+            + '<div class="csm-code-maps"></div>'
+            + '<button type="button" class="btn btn-sm btn-outline-success mt-2 csm-add-code-map"><i class="bi bi-plus-lg me-1"></i>Add Code Map</button>';
+
+        card.querySelector('button.btn-outline-danger').addEventListener('click', () => card.remove());
+        const entriesHost = card.querySelector('.csm-code-maps');
+        card.querySelector('.csm-add-code-map').addEventListener('click', () => addCodeMapEntryRow(entriesHost, '', { code: '', display: '' }));
+
+        card.querySelector('.csm-source-system').value = item?.sourceSystem || item?.SourceSystem || '';
+        card.querySelector('.csm-target-system').value = item?.targetSystem || item?.TargetSystem || '';
+
+        const maps = item?.codeMaps || item?.CodeMaps || {};
+        const entries = Object.entries(maps);
+        if (entries.length === 0) {
+            addCodeMapEntryRow(entriesHost, '', { code: '', display: '' });
+        } else {
+            entries.forEach(([key, value]) => addCodeMapEntryRow(entriesHost, key, value));
+        }
+
+        host.appendChild(card);
+    }
+
+    function clearCodeSystemMapCards() {
+        document.getElementById('opCodeSystemMapRows').innerHTML = '';
+    }
+
+    function clearCodeMapEditorState() {
+        clearCodeSystemMapCards();
+        document.getElementById('OpCodeSystemMaps').value = '';
+    }
+
+    function setCodeSystemMapCards(items) {
+        clearCodeSystemMapCards();
+        (items || []).forEach(item => addCodeSystemMapCard(item));
+    }
+
+    function buildCodeSystemMapsFromCardsOrError() {
+        const cards = Array.from(document.querySelectorAll('#opCodeSystemMapRows .code-system-map-card'));
+        if (cards.length === 0) return null;
+
+        return cards.map((card, index) => {
+            const sourceSystem = (card.querySelector('.csm-source-system').value || '').trim();
+            const targetSystem = (card.querySelector('.csm-target-system').value || '').trim();
+            if (!sourceSystem) throw new Error(`Code System Map #${index + 1} requires Source System.`);
+            if (!targetSystem) throw new Error(`Code System Map #${index + 1} requires Target System.`);
+
+            const codeMaps = {};
+            const rows = Array.from(card.querySelectorAll('.code-map-entry-row'));
+            if (rows.length === 0) throw new Error(`Code System Map #${index + 1} requires at least one Code Map entry.`);
+
+            rows.forEach((row, rowIndex) => {
+                const key = (row.querySelector('.code-map-source-key').value || '').trim();
+                const code = (row.querySelector('.code-map-target-code').value || '').trim();
+                const display = (row.querySelector('.code-map-target-display').value || '').trim();
+
+                if (!key && !code && !display) return;
+                if (!key) throw new Error(`Code System Map #${index + 1}, entry #${rowIndex + 1} requires Source Code.`);
+                if (!code) throw new Error(`Code System Map #${index + 1}, entry #${rowIndex + 1} requires Target Code.`);
+                if (Object.prototype.hasOwnProperty.call(codeMaps, key))
+                    throw new Error(`Code System Map #${index + 1}, entry #${rowIndex + 1} duplicates Source Code '${key}'. Source Codes must be unique within a map.`);
+
+                codeMaps[key] = {
+                    code: code,
+                    display: display || code
+                };
+            });
+
+            if (Object.keys(codeMaps).length === 0)
+                throw new Error(`Code System Map #${index + 1} requires at least one non-empty Code Map entry.`);
+
+            return {
+                sourceSystem,
+                targetSystem,
+                codeMaps
+            };
+        });
+    }
+
+    function openOpEditor(data, mode) {
+        document.getElementById('OpId').value = data?.id || '';
+        document.getElementById('OpIsSystem').value = data?.isSystem ? 'true' : 'false';
+        document.getElementById('OpName').value = data?.name || '';
+        document.getElementById('OpType').value = data?.operationType || 'CopyProperty';
+        document.getElementById('OpDescription').value = data?.description || '';
+        document.getElementById('OpResourceTypes').value = (data?.resourceTypes || []).join(', ');
+        document.getElementById('OpSourceFhirPath').value = data?.sourceFhirPath || '';
+        document.getElementById('OpTargetFhirPath').value = data?.targetFhirPath || '';
+        document.getElementById('OpCondTargetFhirPath').value = data?.conditionTargetFhirPath || '';
+        document.getElementById('OpCondTargetValue').value = data?.conditionTargetValue || '';
+        document.getElementById('OpCodeMapFhirPath').value = data?.codeMapFhirPath || '';
+        document.getElementById('OpCodeSystemMaps').value = data?.codeSystemMaps ? JSON.stringify(data.codeSystemMaps, null, 2) : '';
+        setCodeSystemMapCards(data?.codeSystemMaps || []);
+        document.getElementById('OpExtensionUrls').value = (data?.extensionUrls || []).join('\n');
+        document.getElementById('OpMaxIterations').value = data?.maxIterations ?? 15;
+        document.getElementById('OpSplitOnComma').checked = !!data?.splitOnComma;
+
+        // Conditions
+        const condContainer = document.getElementById('opConditionsContainer');
+        condContainer.innerHTML = '';
+        (data?.conditions || []).forEach(c => addConditionRow(c));
+
+        toggleOpFields();
+        document.getElementById('btnOpSave').style.display = mode === 'edit' ? '' : 'none';
+        document.getElementById('opSystemOverlay').style.display = mode === 'view' ? '' : 'none';
+        document.getElementById('opFormErrors').style.display = 'none';
+        showOpModal();
+    }
+
+    function addConditionRow(cond) {
+        const container = document.getElementById('opConditionsContainer');
+        const operators = ['Equal','NotEqual','GreaterThan','GreaterThanOrEqual','LessThan','LessThanOrEqual','Exists','NotExists'];
+        const row = document.createElement('div');
+        row.className = 'row g-2 mb-1 align-items-center';
+
+        const col1 = document.createElement('div');
+        col1.className = 'col-4';
+        const fhirPathInput = document.createElement('input');
+        fhirPathInput.className = 'form-control form-control-sm cond-fhirpath';
+        fhirPathInput.placeholder = 'FhirPath';
+        fhirPathInput.value = cond?.fhirPathSource || '';
+        col1.appendChild(fhirPathInput);
+
+        const col2 = document.createElement('div');
+        col2.className = 'col-3';
+        const operatorSelect = document.createElement('select');
+        operatorSelect.className = 'form-select form-select-sm cond-operator';
+        const selectedOperator = cond?.operator || 'Equal';
+        operators.forEach(o => {
+            const option = document.createElement('option');
+            option.value = o;
+            option.textContent = o;
+            if (o === selectedOperator) option.selected = true;
+            operatorSelect.appendChild(option);
+        });
+        col2.appendChild(operatorSelect);
+
+        const col3 = document.createElement('div');
+        col3.className = 'col-3';
+        const valueInput = document.createElement('input');
+        valueInput.className = 'form-control form-control-sm cond-value';
+        valueInput.placeholder = 'Value';
+        valueInput.value = cond?.value ?? '';
+        col3.appendChild(valueInput);
+
+        const col4 = document.createElement('div');
+        col4.className = 'col-2';
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'btn btn-sm btn-outline-danger';
+        removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
+        removeButton.addEventListener('click', () => row.remove());
+        col4.appendChild(removeButton);
+
+        row.appendChild(col1);
+        row.appendChild(col2);
+        row.appendChild(col3);
+        row.appendChild(col4);
+        container.appendChild(row);
+    }
+
+    document.getElementById('btnAddCondition').addEventListener('click', () => addConditionRow(null));
+
+    function parseCodeSystemMapsOrError() {
+        const csmText = document.getElementById('OpCodeSystemMaps').value.trim();
+        if (!csmText) return [];
+
+        let parsed;
+        try {
+            parsed = JSON.parse(csmText);
+        } catch (e) {
+            throw new Error('Code System Maps must be valid JSON.');
+        }
+
+        if (!Array.isArray(parsed))
+            throw new Error('Code System Maps JSON must be an array.');
+
+        parsed.forEach((m, i) => {
+            if (!m || typeof m !== 'object' || Array.isArray(m))
+                throw new Error(`Code System Maps entry #${i + 1} must be an object.`);
+            if (typeof m.sourceSystem !== 'string' || !m.sourceSystem.trim())
+                throw new Error(`Code System Maps entry #${i + 1} requires a non-empty sourceSystem.`);
+            if (typeof m.targetSystem !== 'string' || !m.targetSystem.trim())
+                throw new Error(`Code System Maps entry #${i + 1} requires a non-empty targetSystem.`);
+            if (!m.codeMaps || typeof m.codeMaps !== 'object' || Array.isArray(m.codeMaps))
+                throw new Error(`Code System Maps entry #${i + 1} requires a codeMaps object.`);
+        });
+
+        return parsed;
+    }
+
+    document.getElementById('btnAddCodeSystemMap').addEventListener('click', () => {
+        addCodeSystemMapCard(null);
+    });
+
+    document.getElementById('btnCodeMapLoadFromJson').addEventListener('click', () => {
+        const parsed = parseCodeSystemMapsOrError();
+        setCodeSystemMapCards(parsed);
+    });
+
+    document.getElementById('btnCodeMapSyncJson').addEventListener('click', () => {
+        const built = buildCodeSystemMapsFromCardsOrError();
+        document.getElementById('OpCodeSystemMaps').value = JSON.stringify(built || [], null, 2);
+    });
+
+    function collectOpData() {
+        const conditions = [];
+        document.querySelectorAll('#opConditionsContainer .row').forEach(row => {
+            conditions.push({
+                fhirPathSource: row.querySelector('.cond-fhirpath').value,
+                operator: row.querySelector('.cond-operator').value,
+                value: row.querySelector('.cond-value').value || null
+            });
+        });
+
+        const codeSystemMapsFromCards = buildCodeSystemMapsFromCardsOrError();
+        const codeSystemMaps = codeSystemMapsFromCards ?? parseCodeSystemMapsOrError();
+
+        return {
+            id: document.getElementById('OpId').value || crypto.randomUUID(),
+            name: document.getElementById('OpName').value,
+            operationType: document.getElementById('OpType').value,
+            description: document.getElementById('OpDescription').value,
+            resourceTypes: document.getElementById('OpResourceTypes').value.split(',').map(s => s.trim()).filter(Boolean),
+            sourceFhirPath: document.getElementById('OpSourceFhirPath').value || null,
+            targetFhirPath: document.getElementById('OpTargetFhirPath').value || null,
+            conditionTargetFhirPath: document.getElementById('OpCondTargetFhirPath').value || null,
+            conditionTargetValue: document.getElementById('OpCondTargetValue').value || null,
+            conditions: conditions,
+            codeMapFhirPath: document.getElementById('OpCodeMapFhirPath').value || null,
+            codeSystemMaps: codeSystemMaps,
+            extensionUrls: document.getElementById('OpExtensionUrls').value.split('\n').map(s => s.trim()).filter(Boolean),
+            maxIterations: parseInt(document.getElementById('OpMaxIterations').value || '15', 10),
+            splitOnComma: document.getElementById('OpSplitOnComma').checked,
+            isSystem: false
+        };
+    }
+
+    document.getElementById('btnOpSave').addEventListener('click', async () => {
+        const formErrors = document.getElementById('opFormErrors');
+        formErrors.style.display = 'none';
+        formErrors.textContent = '';
+
+        let data;
+        try {
+            data = collectOpData();
+        } catch (e) {
+            formErrors.textContent = e.message || 'Invalid operation form data.';
+            formErrors.style.display = '';
+            return;
+        }
+
+        const resp = await postJson('@Url.Action("SaveOperation", "Normalizations")', data);
+        if (resp.ok) { location.reload(); } else {
+            const err = await resp.text();
+            formErrors.textContent = err;
+            formErrors.style.display = '';
+        }
+    });
+
+    document.getElementById('btnOpClose').addEventListener('click', hideOpModal);
+    opBackdrop.addEventListener('click', hideOpModal);
+    document.getElementById('btnNewOp').addEventListener('click', () => openOpEditor(null, 'edit'));
+
+    document.querySelectorAll('.btn-op-open').forEach(btn => btn.addEventListener('click', async () => {
+        const resp = await fetch(`@Url.Action("GetOperationJson", "Normalizations")?id=${btn.dataset.id}`);
+        if (resp.ok) openOpEditor(await resp.json(), btn.dataset.mode);
+    }));
+    document.querySelectorAll('.btn-op-clone').forEach(btn => btn.addEventListener('click', async () => {
+        await postJson('@Url.Action("CloneOperation", "Normalizations")', { id: btn.dataset.id });
+        location.reload();
+    }));
+    document.querySelectorAll('.btn-op-delete').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm('Delete this operation?')) return;
+        await postJson('@Url.Action("DeleteOperation", "Normalizations")', { id: btn.dataset.id });
+        location.reload();
+    }));
+
+    // ============ SEQUENCE MODAL ============
+    const seqModal = document.getElementById('seqModal');
+    const seqBackdrop = document.getElementById('seqModalBackdrop');
+
+    function showSeqModal() { showCrudModal(seqModal, seqBackdrop, hideSeqModal); }
+    function hideSeqModal() { hideCrudModal(seqModal, seqBackdrop); }
+
+    function openSeqEditor(data, mode) {
+        document.getElementById('SeqId').value = data?.id || '';
+        document.getElementById('SeqIsSystem').value = data?.isSystem ? 'true' : 'false';
+        document.getElementById('SeqName').value = data?.name || '';
+        document.getElementById('SeqDescription').value = data?.description || '';
+
+        const container = document.getElementById('seqEntriesContainer');
+        container.innerHTML = '';
+        (data?.entries || []).sort((a,b) => a.sequence - b.sequence).forEach(e => addSeqEntryRow(e));
+
+        document.getElementById('btnSeqSave').style.display = mode === 'edit' ? '' : 'none';
+        document.getElementById('seqSystemOverlay').style.display = mode === 'view' ? '' : 'none';
+        document.getElementById('seqFormErrors').style.display = 'none';
+        showSeqModal();
+    }
+
+    function addSeqEntryRow(entry) {
+        const container = document.getElementById('seqEntriesContainer');
+        const seq = container.children.length + 1;
+        const options = allOperations.map(o => `<option value="${o.id}" ${o.id === entry?.operationId ? 'selected' : ''}>${o.name} (${o.operationType})</option>`).join('');
+        const row = document.createElement('div');
+        row.className = 'd-flex gap-2 mb-1 align-items-center';
+        row.innerHTML = `
+            <span class="badge bg-dark" style="width:28px;">${seq}</span>
+            <select class="form-select form-select-sm seq-op-select">${options}</select>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.d-flex').remove(); renumberSeqEntries();"><i class="bi bi-x-lg"></i></button>`;
+        container.appendChild(row);
+    }
+
+    function renumberSeqEntries() {
+        document.querySelectorAll('#seqEntriesContainer > div').forEach((row, idx) => {
+            row.querySelector('.badge').textContent = idx + 1;
+        });
+    }
+
+    document.getElementById('btnAddSeqEntry').addEventListener('click', () => addSeqEntryRow(null));
+
+    function collectSeqData() {
+        const entries = [];
+        document.querySelectorAll('#seqEntriesContainer > div').forEach((row, idx) => {
+            entries.push({ operationId: row.querySelector('.seq-op-select').value, sequence: idx + 1 });
+        });
+        return {
+            id: document.getElementById('SeqId').value || crypto.randomUUID(),
+            name: document.getElementById('SeqName').value,
+            description: document.getElementById('SeqDescription').value,
+            entries: entries,
+            isSystem: false
+        };
+    }
+
+    document.getElementById('btnSeqSave').addEventListener('click', async () => {
+        const data = collectSeqData();
+        const resp = await postJson('@Url.Action("SaveSequence", "Normalizations")', data);
+        if (resp.ok) { location.reload(); } else {
+            const err = await resp.text();
+            document.getElementById('seqFormErrors').textContent = err;
+            document.getElementById('seqFormErrors').style.display = '';
+        }
+    });
+
+    document.getElementById('btnSeqClose').addEventListener('click', hideSeqModal);
+    seqBackdrop.addEventListener('click', hideSeqModal);
+    document.getElementById('btnNewSeq').addEventListener('click', () => openSeqEditor(null, 'edit'));
+
+    document.querySelectorAll('.btn-seq-open').forEach(btn => btn.addEventListener('click', async () => {
+        const resp = await fetch(`@Url.Action("GetSequenceJson", "Normalizations")?id=${btn.dataset.id}`);
+        if (resp.ok) openSeqEditor(await resp.json(), btn.dataset.mode);
+    }));
+    document.querySelectorAll('.btn-seq-clone').forEach(btn => btn.addEventListener('click', async () => {
+        await postJson('@Url.Action("CloneSequence", "Normalizations")', { id: btn.dataset.id });
+        location.reload();
+    }));
+    document.querySelectorAll('.btn-seq-delete').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm('Delete this sequence?')) return;
+        await postJson('@Url.Action("DeleteSequence", "Normalizations")', { id: btn.dataset.id });
+        location.reload();
+    }));
+
+    // ============ SUITE MODAL ============
+    const suiteModal = document.getElementById('suiteModal');
+    const suiteBackdrop = document.getElementById('suiteModalBackdrop');
+
+    function showSuiteModal() { showCrudModal(suiteModal, suiteBackdrop, hideSuiteModal); }
+    function hideSuiteModal() { hideCrudModal(suiteModal, suiteBackdrop); }
+
+    function openSuiteEditor(data, mode) {
+        document.getElementById('SuiteId').value = data?.id || '';
+        document.getElementById('SuiteIsSystem').value = data?.isSystem ? 'true' : 'false';
+        document.getElementById('SuiteName').value = data?.name || '';
+        document.getElementById('SuiteDescription').value = data?.description || '';
+
+        const seqContainer = document.getElementById('suiteSequencesContainer');
+        seqContainer.innerHTML = '';
+        (data?.sequenceIds || []).forEach(sid => addSuiteSeqRow(sid));
+
+        const opContainer = document.getElementById('suiteOpsContainer');
+        opContainer.innerHTML = '';
+        (data?.operationIds || []).forEach(oid => addSuiteOpRow(oid));
+
+        document.getElementById('btnSuiteSave').style.display = mode === 'edit' ? '' : 'none';
+        document.getElementById('suiteSystemOverlay').style.display = mode === 'view' ? '' : 'none';
+        document.getElementById('suiteFormErrors').style.display = 'none';
+        showSuiteModal();
+    }
+
+    function addSuiteSeqRow(selectedId) {
+        const container = document.getElementById('suiteSequencesContainer');
+        const row = document.createElement('div');
+        row.className = 'd-flex gap-2 mb-1 align-items-center';
+
+        const sequenceSelect = document.createElement('select');
+        sequenceSelect.className = 'form-select form-select-sm suite-seq-select';
+        allSequences.forEach(s => {
+            const option = document.createElement('option');
+            option.value = s.id;
+            option.textContent = s.name;
+            if (s.id === selectedId) option.selected = true;
+            sequenceSelect.appendChild(option);
+        });
+
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'btn btn-sm btn-outline-danger';
+        removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
+        removeButton.addEventListener('click', () => row.remove());
+
+        row.appendChild(sequenceSelect);
+        row.appendChild(removeButton);
+        container.appendChild(row);
+    }
+
+    function addSuiteOpRow(selectedId) {
+        const container = document.getElementById('suiteOpsContainer');
+        const row = document.createElement('div');
+        row.className = 'd-flex gap-2 mb-1 align-items-center';
+
+        const operationSelect = document.createElement('select');
+        operationSelect.className = 'form-select form-select-sm suite-op-select';
+        allOperations.forEach(o => {
+            const option = document.createElement('option');
+            option.value = o.id;
+            option.textContent = `${o.name} (${o.operationType})`;
+            if (o.id === selectedId) option.selected = true;
+            operationSelect.appendChild(option);
+        });
+
+        const removeButton = document.createElement('button');
+        removeButton.type = 'button';
+        removeButton.className = 'btn btn-sm btn-outline-danger';
+        removeButton.innerHTML = '<i class="bi bi-x-lg"></i>';
+        removeButton.addEventListener('click', () => row.remove());
+
+        row.appendChild(operationSelect);
+        row.appendChild(removeButton);
+        container.appendChild(row);
+    }
+
+    document.getElementById('btnAddSuiteSeq').addEventListener('click', () => addSuiteSeqRow(null));
+    document.getElementById('btnAddSuiteOp').addEventListener('click', () => addSuiteOpRow(null));
+
+    function collectSuiteData() {
+        const sequenceIds = [];
+        document.querySelectorAll('#suiteSequencesContainer .suite-seq-select').forEach(sel => { if (sel.value) sequenceIds.push(sel.value); });
+        const operationIds = [];
+        document.querySelectorAll('#suiteOpsContainer .suite-op-select').forEach(sel => { if (sel.value) operationIds.push(sel.value); });
+        return {
+            id: document.getElementById('SuiteId').value || crypto.randomUUID(),
+            name: document.getElementById('SuiteName').value,
+            description: document.getElementById('SuiteDescription').value,
+            sequenceIds: sequenceIds,
+            operationIds: operationIds,
+            isSystem: false,
+            isDefault: false
+        };
+    }
+
+    document.getElementById('btnSuiteSave').addEventListener('click', async () => {
+        const data = collectSuiteData();
+        const resp = await postJson('@Url.Action("SaveSuite", "Normalizations")', data);
+        if (resp.ok) { location.reload(); } else {
+            const err = await resp.text();
+            document.getElementById('suiteFormErrors').textContent = err;
+            document.getElementById('suiteFormErrors').style.display = '';
+        }
+    });
+
+    document.getElementById('btnSuiteClose').addEventListener('click', hideSuiteModal);
+    suiteBackdrop.addEventListener('click', hideSuiteModal);
+    document.getElementById('btnNewSuite').addEventListener('click', () => openSuiteEditor(null, 'edit'));
+
+    document.querySelectorAll('.btn-suite-open').forEach(btn => btn.addEventListener('click', async () => {
+        const resp = await fetch(`@Url.Action("GetSuiteJson", "Normalizations")?id=${btn.dataset.id}`);
+        if (resp.ok) openSuiteEditor(await resp.json(), btn.dataset.mode);
+    }));
+    document.querySelectorAll('.btn-suite-clone').forEach(btn => btn.addEventListener('click', async () => {
+        await postJson('@Url.Action("CloneSuite", "Normalizations")', { id: btn.dataset.id });
+        location.reload();
+    }));
+    document.querySelectorAll('.btn-suite-default').forEach(btn => btn.addEventListener('click', async () => {
+        await postJson('@Url.Action("SetDefaultSuite", "Normalizations")', { id: btn.dataset.id });
+        location.reload();
+    }));
+    document.querySelectorAll('.btn-suite-delete').forEach(btn => btn.addEventListener('click', async () => {
+        if (!confirm('Delete this suite?')) return;
+        await postJson('@Url.Action("DeleteSuite", "Normalizations")', { id: btn.dataset.id });
+        location.reload();
+    }));
+</script>
+}
