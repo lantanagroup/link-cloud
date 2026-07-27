@@ -46,6 +46,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
     private final KafkaTemplate<String, ValidationComplete> validationCompleteTemplate;
     private final ValidationMetrics validationMetrics;
     private final BlobStorageService blobStorageService;
+    private final PreQualificationConfig preQualificationConfig;
+    private final PreQualOperationOutcomeBuilder preQualOperationOutcomeBuilder;
 
     public ReadyForValidationConsumer(
             FhirContext fhirContext,
@@ -68,6 +70,8 @@ public class ReadyForValidationConsumer extends AbstractAsyncConsumer<ReadyForVa
         this.validationCompleteTemplate = validationCompleteTemplate;
         this.validationMetrics = validationMetrics;
         this.blobStorageService = blobStorageService.orElse(null);
+        this.preQualificationConfig = preQualificationConfig;
+        this.preQualOperationOutcomeBuilder = preQualOperationOutcomeBuilder;
     }
 
     @KafkaListener(topics = Topics.READY_FOR_VALIDATION, containerFactory = "manualAckListenerContainerFactory")
