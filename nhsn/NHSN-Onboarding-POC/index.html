@@ -877,25 +877,20 @@
           </div>
         </div>
 
-        <div class="form-group">
-          <label>Min Acquisition Pull Time
-            <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">This setting specifies a window of time when NHSNLink is allowed to start querying your facility FHIR server for patient resources.</span>
-            </button>
-          </label>
-          <div class="triplet">
-            <div class="form-group"><label for="minPullHour">Hour</label><input type="number" id="minPullHour" min="0" max="23" placeholder="Hour"></div>
-            <div class="form-group"><label for="minPullMinute">Minute</label><input type="number" id="minPullMinute" min="0" max="59" placeholder="Minute"></div>
+        <div class="triplet">
+          <div class="form-group">
+            <label for="minPullTime">Min Acquisition Pull Time
+              <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">This setting specifies a window of time when NHSNLink is allowed to start querying your facility FHIR server for patient resources.</span>
+              </button>
+            </label>
+            <input type="text" id="minPullTime" placeholder="HH:MM" maxlength="5" inputmode="numeric" autocomplete="off">
           </div>
-        </div>
-
-        <div class="form-group">
-          <label>Max Acquisition Pull Time
-            <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">This setting specifies a window of time when NHSNLink stops querying your facility FHIR server for patient resources.</span>
-            </button>
-          </label>
-          <div class="triplet">
-            <div class="form-group"><label for="maxPullHour">Hour</label><input type="number" id="maxPullHour" min="0" max="23" placeholder="Hour"></div>
-            <div class="form-group"><label for="maxPullMinute">Minute</label><input type="number" id="maxPullMinute" min="0" max="59" placeholder="Minute"></div>
+          <div class="form-group">
+            <label for="maxPullTime">Max Acquisition Pull Time
+              <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">This setting specifies a window of time when NHSNLink stops querying your facility FHIR server for patient resources.</span>
+              </button>
+            </label>
+            <input type="text" id="maxPullTime" placeholder="HH:MM" maxlength="5" inputmode="numeric" autocomplete="off">
           </div>
         </div>
 
@@ -1862,10 +1857,8 @@
       { key: 'fhirBaseUrl', label: 'FHIR Server Base URL', description: 'The FHIR base URL used to access your facility FHIR resources. Example: https://FHIR-HOSTNAME/fhir' },
       { key: 'maxConcurrentRequests', label: 'Max Concurrent Requests', description: 'NHSNLink is capable of querying resources concurrently for reported patients. This setting will throttle how many requests will run concurrently against your facility FHIR server. An empty value will set the value to 1.' },
       { key: 'maxRetries', label: 'Max Retries', description: 'If NHSNLink experiences an issue while querying your facility FHIR server, NHSNLink is capable of retrying requests. This setting will determine the maximum amount of retries NHSNLink can attempt for a given FHIR resource request. The value must be between 0 and 10.' },
-      { key: 'minPullHour', label: 'Min Acquisition Pull Time - Hour', description: 'This setting specifies a window of time when NHSNLink is allowed to start querying your facility FHIR server for patient resources.' },
-      { key: 'minPullMinute', label: 'Min Acquisition Pull Time - Minute', description: 'This setting specifies a window of time when NHSNLink is allowed to start querying your facility FHIR server for patient resources.' },
-      { key: 'maxPullHour', label: 'Max Acquisition Pull Time - Hour', description: 'This setting specifies a window of time when NHSNLink stops querying your facility FHIR server for patient resources.' },
-      { key: 'maxPullMinute', label: 'Max Acquisition Pull Time - Minute', description: 'This setting specifies a window of time when NHSNLink stops querying your facility FHIR server for patient resources.' },
+      { key: 'minPullTime', label: 'Min Acquisition Pull Time', description: 'This setting specifies a window of time when NHSNLink is allowed to start querying your facility FHIR server for patient resources.' },
+      { key: 'maxPullTime', label: 'Max Acquisition Pull Time', description: 'This setting specifies a window of time when NHSNLink stops querying your facility FHIR server for patient resources.' },
       { key: 'patientLagDays', label: 'Patient Resource Acquisition Lag Duration - Days', description: LAG_DESCRIPTION },
       { key: 'patientLagHours', label: 'Patient Resource Acquisition Lag Duration - Hours', description: LAG_DESCRIPTION },
       { key: 'patientLagMinutes', label: 'Patient Resource Acquisition Lag Duration - Minutes', description: LAG_DESCRIPTION }
@@ -1982,10 +1975,8 @@
       case 'fhirBaseUrl': return f.fhir.baseUrl;
       case 'maxConcurrentRequests': return f.fhir.maxConcurrentRequests;
       case 'maxRetries': return f.fhir.maxRetries;
-      case 'minPullHour': return f.fhir.minPull.hour;
-      case 'minPullMinute': return f.fhir.minPull.minute;
-      case 'maxPullHour': return f.fhir.maxPull.hour;
-      case 'maxPullMinute': return f.fhir.maxPull.minute;
+      case 'minPullTime': return f.fhir.minPullTime;
+      case 'maxPullTime': return f.fhir.maxPullTime;
       case 'patientLagDays': return f.acquisitionFrequency.patientLag.days;
       case 'patientLagHours': return f.acquisitionFrequency.patientLag.hours;
       case 'patientLagMinutes': return f.acquisitionFrequency.patientLag.minutes;
@@ -2017,10 +2008,8 @@
       case 'fhirBaseUrl': facility.fhir.baseUrl = String(value).trim(); break;
       case 'maxConcurrentRequests': facility.fhir.maxConcurrentRequests = String(value).trim(); break;
       case 'maxRetries': facility.fhir.maxRetries = String(value).trim(); break;
-      case 'minPullHour': facility.fhir.minPull.hour = String(value).trim(); break;
-      case 'minPullMinute': facility.fhir.minPull.minute = String(value).trim(); break;
-      case 'maxPullHour': facility.fhir.maxPull.hour = String(value).trim(); break;
-      case 'maxPullMinute': facility.fhir.maxPull.minute = String(value).trim(); break;
+      case 'minPullTime': facility.fhir.minPullTime = String(value).trim(); break;
+      case 'maxPullTime': facility.fhir.maxPullTime = String(value).trim(); break;
       case 'patientLagDays': facility.acquisitionFrequency.patientLag.days = String(value).trim(); break;
       case 'patientLagHours': facility.acquisitionFrequency.patientLag.hours = String(value).trim(); break;
       case 'patientLagMinutes': facility.acquisitionFrequency.patientLag.minutes = String(value).trim(); break;
@@ -2662,8 +2651,8 @@
 
       fhir: {
         baseUrl: '', maxConcurrentRequests: '', maxRetries: '',
-        minPull: { hour: '', minute: '' },
-        maxPull: { hour: '', minute: '' },
+        minPullTime: '',
+        maxPullTime: '',
         testConnectionStatus: 'untested',
         otherTokenUrl: '', otherClientId: '', otherClientSecret: '', otherScope: ''
       },
@@ -2782,6 +2771,10 @@
   }
 
   function goTo(panelId, stepId) {
+    if (facility && panelId !== 'panel-census' && !$('panel-census').hidden) {
+      facility.census.selectedListKey = null;
+      facility.census.selectedSftpFile = null;
+    }
     document.querySelectorAll('.panel').forEach(function (p) { p.hidden = true; });
     $(panelId).hidden = false;
     currentStepId = stepId;
@@ -3001,13 +2994,30 @@
     }
   });
 
+  function attachPullTimeInput(id) {
+    var el = $(id);
+    el.addEventListener('input', function () {
+      var digits = el.value.replace(/[^0-9]/g, '').slice(0, 4);
+      el.value = digits.length > 2 ? digits.slice(0, 2) + ':' + digits.slice(2) : digits;
+    });
+    el.addEventListener('blur', function () {
+      var m = el.value.match(/^(\d{1,2}):?(\d{0,2})$/);
+      if (!m) { el.value = ''; return; }
+      var hh = Math.min(23, parseInt(m[1], 10) || 0);
+      var mm = Math.min(59, parseInt(m[2] || '0', 10) || 0);
+      el.value = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+    });
+  }
+  attachPullTimeInput('minPullTime');
+  attachPullTimeInput('maxPullTime');
+
   function collectFhirForm() {
     return {
       baseUrl: $('fhirBaseUrl').value.trim(),
       maxConcurrentRequests: $('maxConcurrent').value,
       maxRetries: $('maxRetries').value,
-      minPull: { hour: $('minPullHour').value, minute: $('minPullMinute').value },
-      maxPull: { hour: $('maxPullHour').value, minute: $('maxPullMinute').value },
+      minPullTime: $('minPullTime').value,
+      maxPullTime: $('maxPullTime').value,
       patientLag: { days: $('freqLagDays').value, hours: $('freqLagHours').value, minutes: $('freqLagMinutes').value }
     };
   }
@@ -3061,8 +3071,8 @@
     facility.fhir.baseUrl = form.baseUrl;
     facility.fhir.maxConcurrentRequests = form.maxConcurrentRequests;
     facility.fhir.maxRetries = form.maxRetries;
-    facility.fhir.minPull = form.minPull;
-    facility.fhir.maxPull = form.maxPull;
+    facility.fhir.minPullTime = form.minPullTime;
+    facility.fhir.maxPullTime = form.maxPullTime;
     facility.acquisitionFrequency.patientLag = form.patientLag;
     facility.fhir.otherTokenUrl = $('otherTokenUrl').value.trim();
     facility.fhir.otherClientId = $('otherClientId').value.trim();
@@ -6326,10 +6336,8 @@
     $('fhirBaseUrl').value = f.fhir.baseUrl || '';
     $('maxConcurrent').value = f.fhir.maxConcurrentRequests || '';
     $('maxRetries').value = f.fhir.maxRetries || '';
-    $('minPullHour').value = f.fhir.minPull.hour || '';
-    $('minPullMinute').value = f.fhir.minPull.minute || '';
-    $('maxPullHour').value = f.fhir.maxPull.hour || '';
-    $('maxPullMinute').value = f.fhir.maxPull.minute || '';
+    $('minPullTime').value = f.fhir.minPullTime || '';
+    $('maxPullTime').value = f.fhir.maxPullTime || '';
     $('otherTokenUrl').value = f.fhir.otherTokenUrl || '';
     $('otherClientId').value = f.fhir.otherClientId || '';
     $('otherClientSecret').value = f.fhir.otherClientSecret || '';
