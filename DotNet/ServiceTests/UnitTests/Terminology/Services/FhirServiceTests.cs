@@ -239,6 +239,59 @@ public class FhirServiceTests
     }
 
     [Fact]
+    public void ValidateCodeInValueSet_WithDuplicateCodeSystemEntries_RejoinsLastStatus()
+    {
+        // Arrange
+        // The CodeSystem lists the member code twice with differing status (Active then Inactive).
+        // The value-set rejoin must honor last-one-wins (LEGLINK-814) and report the code inactive.
+        var valueSetId = "test-vs-dup-rejoin";
+        var code = "ACCTRECEIVABLE";
+        var system = "http://test.system";
+        var display = "account receivable";
+
+        var valueSetGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new() { Value = code, Display = display } } }
+            }
+        };
+        var codeSystemGroup = new CodeGroup
+        {
+            Url = system,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    system,
+                    new List<Code>
+                    {
+                        new CodeSystemCode { Value = code, Display = display, Status = CodeStatus.Active },
+                        new CodeSystemCode { Value = code, Display = display, Status = CodeStatus.Inactive }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(valueSetGroup);
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system, It.IsAny<string>()))
+            .Returns(codeSystemGroup);
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, system, code, display, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        var outcome = Assert.IsType<OperationOutcome>(result.Parameter.Single(p => p.Name == "issues").Resource);
+        Assert.Equal("Code is inactive.", Assert.Single(outcome.Issue).Details?.Text);
+    }
+
+    [Fact]
     public void ValidateCodeInValueSet_WithActiveMemberCode_ReturnsNoIssue()
     {
         // Arrange
@@ -1111,6 +1164,53 @@ public class FhirServiceTests
         Assert.Equal(_mockValueSets[0].Id, result.Entry[0].Resource.Id);
         Assert.Equal("ValueSet", result.Entry[1].Resource.TypeName);
         Assert.Equal(_mockValueSets[1].Id, result.Entry[1].Resource.Id);
+    }
+
+    #endregion
+
+    #region GetCodeSystems Tests
+
+    [Fact]
+    public void GetCodeSystems_WithDuplicateCode_EmitsSingleConceptWithLastDisplay()
+    {
+        // Arrange
+        // The CSV lists the same code twice; a non-summary read must emit it once, keeping the
+        // last occurrence's display (LEGLINK-814 dedup for $expand/read).
+        var codeSystemId = "v3-ActCode";
+        var url = "http://terminology.hl7.org/CodeSystem/v3-ActCode";
+        var code = "ACCTRECEIVABLE";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = codeSystemId,
+            Url = url,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Resource = new CodeSystem { Id = codeSystemId, Url = url },
+            Codes = new Dictionary<string, List<Code>>
+            {
+                {
+                    url,
+                    new List<Code>
+                    {
+                        new CodeSystemCode { Value = code, Display = "first display", Status = CodeStatus.Active },
+                        new CodeSystemCode { Value = code, Display = "last display", Status = CodeStatus.Inactive }
+                    }
+                }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, url, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act (summary omitted -> concepts are materialized)
+        var result = _service.GetCodeSystems(url, null);
+
+        // Assert
+        var codeSystem = Assert.IsType<CodeSystem>(Assert.Single(result.Entry).Resource);
+        var concept = Assert.Single(codeSystem.Concept);
+        Assert.Equal(code, concept.Code);
+        Assert.Equal("last display", concept.Display);
     }
 
     #endregion
