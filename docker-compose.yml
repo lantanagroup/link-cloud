@@ -743,6 +743,7 @@ services:
       resource-cache.blob-storage.blob-root: resource-cache
       link.report.base-url: http://report:8072
       spring.data.redis.password: ${REDIS_PASS}
+      authentication.signing-key: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
     ports:
       - "8067:8067"
     build:
@@ -961,6 +962,7 @@ services:
       internal-blob-storage.connection-string: ${AZURITE_CONNECTION_STRING}
       internal-blob-storage.blob-container-name: ${INTERNAL_BLOB_CONTAINER_NAME}
       spring.data.redis.password: ${REDIS_PASS}
+      authentication.signing-key: ${LOCAL_LINK_TOKEN_SIGNING_KEY:-local-dev-link-bearer-signing-key-2026-automation-adminbff-shared-secret-min-64-bytes}
       pre-qualification.write-pre-qual-operation-outcome: ${VALIDATION_WRITE_PREQUAL_OO:-false}
       pre-qualification.write-expressions-in-operation-outcome: ${VALIDATION_WRITE_OO_EXPRESSIONS:-true}
     ports:
