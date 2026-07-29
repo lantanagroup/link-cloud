@@ -2,7 +2,7 @@
   <p>
     <mat-toolbar class="page-header-bar" color="primary">
       @if (facilityConfig) {
-        <span>Facility: {{ facilityConfig.facilityId }}</span>
+        <span data-testid="facility-edit-header">Facility: {{ facilityConfig.facilityId }}</span>
       }
       <button mat-raised-button aria-label="Navigate to Tenant Dashboard" matTooltip="Back to Tenant Dashboard"
         [routerLink]="['/tenant']">

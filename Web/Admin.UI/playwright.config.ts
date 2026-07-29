@@ -16,11 +16,29 @@ const liveBaseUrl = externalBaseUrl ?? 'http://localhost:8066';
 const liveOnly = /--project[= ]live/.test(process.argv.join(' '));
 const needsDevServer = !liveOnly || liveBaseUrl.includes(':4200');
 
+// Which monitor the `demo` project opens on. These are Windows virtual-desktop coordinates,
+// so a screen above/left of the primary has negative values — list yours with:
+//   Add-Type -AssemblyName System.Windows.Forms
+//   [System.Windows.Forms.Screen]::AllScreens | Select DeviceName,Primary,Bounds
+// Unset means "wherever Chromium wants".
+const demoWindowPosition = process.env['E2E_WINDOW_POSITION'];
+const [demoWidth, demoHeight] = (process.env['E2E_WINDOW_SIZE'] ?? '1600,1000')
+  .split(',')
+  .map((n) => Number(n.trim()));
+
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
+  // Generous per-test budget: `ng serve` compiles each route the first time it is hit, so a
+  // cold navigation can cost 10-15s on its own. The assertion timeout stays tight — a genuinely
+  // broken expectation should still fail fast rather than idle out the whole test.
+  timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: true,
+  // Every mocked worker shares one `ng serve`, which compiles routes on demand. The default
+  // (half the cores — 10 on a 20-core box) starves it: navigations stretch past 10s and the
+  // app's main thread misses the expect window, surfacing as spurious "the click did nothing"
+  // failures. Cap the fan-out to what one dev server can feed.
+  workers: process.env['CI'] ? 2 : 4,
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 1 : 0,
   reporter: process.env['CI']
@@ -41,6 +59,29 @@ export default defineConfig({
       name: 'live',
       testDir: './e2e/live',
       use: { baseURL: liveBaseUrl },
+    },
+    {
+      // Not a verification tier — a guided walkthrough for watching the app drive itself.
+      // One visible browser, paced by slowMo, and no timeout so it can sit on page.pause()
+      // at the end with the window still open. Excluded from `npm run e2e`, so CI never
+      // blocks on it.
+      name: 'demo',
+      testDir: './e2e/demo',
+      timeout: 0,
+      use: {
+        baseURL: 'http://localhost:4200',
+        headless: false,
+        // Explicit viewport rather than `viewport: null` — null is rejected alongside the
+        // deviceScaleFactor that the Desktop Chrome preset brings in. Playwright sizes the
+        // real window to fit this, so --window-size is unnecessary; only position is passed.
+        viewport: { width: demoWidth, height: demoHeight },
+        launchOptions: {
+          slowMo: Number(process.env['E2E_SLOW_MO'] ?? 700),
+          args: demoWindowPosition ? [`--window-position=${demoWindowPosition}`] : [],
+        },
+        trace: 'off',
+        video: 'off',
+      },
     },
   ],
   webServer: needsDevServer
