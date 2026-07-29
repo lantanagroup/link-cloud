@@ -88,12 +88,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             // Only register IConnectionMultiplexer if no other registration is present.
             services.TryAddSingleton<IConnectionMultiplexer>(_ =>
             {
-                var configOptions = new ConfigurationOptions
-                {
-                    AbortOnConnectFail = false,
-                    EndPoints = { redisSettings.ConnectionString! },
-                    AllowAdmin = true, // Required to access INFO command for memory checks.
-                };
+                var configOptions = StackExchange.Redis.ConfigurationOptions.Parse(redisSettings.ConnectionString);
 
                 if (!string.IsNullOrEmpty(redisSettings.Password))
                 {
