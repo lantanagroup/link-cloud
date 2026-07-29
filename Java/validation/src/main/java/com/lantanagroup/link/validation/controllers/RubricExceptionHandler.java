@@ -7,7 +7,8 @@ import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricNotFoundException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionConflictException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionNotFoundException;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -23,8 +24,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * being enabled and with the {@code ResponseStatusException}-based errors from the other controllers.
  */
 @RestControllerAdvice
-@Slf4j
 public class RubricExceptionHandler {
+
+    private static final Logger logger = LoggerFactory.getLogger(RubricExceptionHandler.class);
 
     @ExceptionHandler({
             RubricNotFoundException.class,
@@ -32,6 +34,7 @@ public class RubricExceptionHandler {
             FacilityOverrideNotFoundException.class
     })
     public ProblemDetail handleNotFound(RuntimeException ex) {
+        logger.warn("Rubric registry lookup failed: {}", ex.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
@@ -40,11 +43,13 @@ public class RubricExceptionHandler {
             RubricLifecycleException.class
     })
     public ProblemDetail handleConflict(RuntimeException ex) {
+        logger.warn("Rubric lifecycle conflict: {}", ex.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(InvalidRubricDefinitionException.class)
     public ProblemDetail handleInvalidDefinition(InvalidRubricDefinitionException ex) {
+        logger.warn("Rejected rubric definition: {} {}", ex.getMessage(), ex.getErrors());
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problem.setProperty("errors", ex.getErrors());
         return problem;
@@ -52,6 +57,7 @@ public class RubricExceptionHandler {
 
     @ExceptionHandler(PayloadParseException.class)
     public ProblemDetail handlePayloadParse(PayloadParseException ex) {
+        logger.warn("Rejected unparseable rubric payload: {}", ex.getMessage());
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 }

@@ -9,7 +9,8 @@ import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.services.execution.CheckExecutor;
 import com.lantanagroup.link.validation.services.execution.spi.CustomCheck;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -17,8 +18,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
-@Slf4j
 public class CustomCheckExecutor implements CheckExecutor {
+
+    private static final Logger logger = LoggerFactory.getLogger(CustomCheckExecutor.class);
 
     private final ObjectMapper objectMapper;
     private final Map<String, CustomCheck> byId = new ConcurrentHashMap<>();
@@ -28,11 +30,11 @@ public class CustomCheckExecutor implements CheckExecutor {
         for (CustomCheck cc : customChecks) {
             CustomCheck previous = byId.put(cc.id(), cc);
             if (previous != null) {
-                log.warn("Duplicate CustomCheck id '{}' — {} overrides {}",
+                logger.warn("Duplicate CustomCheck id '{}' — {} overrides {}",
                         cc.id(), cc.getClass().getName(), previous.getClass().getName());
             }
         }
-        log.info("Registered {} CustomCheck plug-in(s): {}", byId.size(), byId.keySet());
+        logger.info("Registered {} CustomCheck plug-in(s): {}", byId.size(), byId.keySet());
     }
 
     @Override
@@ -65,7 +67,7 @@ public class CustomCheckExecutor implements CheckExecutor {
                 customCheckId = params.path("customCheckId").asText(null);
                 className = params.path("className").asText(null);
             } catch (Exception e) {
-                log.warn("CUSTOM check {} has invalid parameters JSON: {}", check.getCheckLocalId(), e.getMessage());
+                logger.warn("CUSTOM check {} has invalid parameters JSON: {}", check.getCheckLocalId(), e.getMessage());
             }
         }
 
@@ -76,7 +78,7 @@ public class CustomCheckExecutor implements CheckExecutor {
         if (impl == null) {
             String ref = customCheckId != null ? "customCheckId=" + customCheckId
                     : (className != null ? "className=" + className : "<no customCheckId/className>");
-            log.warn("CUSTOM check {} could not resolve a plug-in ({})", check.getCheckLocalId(), ref);
+            logger.warn("CUSTOM check {} could not resolve a plug-in ({})", check.getCheckLocalId(), ref);
             return List.of(RawFinding.builder()
                     .checkLocalId(check.getCheckLocalId())
                     .dimension(check.getDimension())
@@ -90,7 +92,7 @@ public class CustomCheckExecutor implements CheckExecutor {
         try {
             return impl.run(check, context);
         } catch (Exception e) {
-            log.error("CUSTOM check {} ({}) threw", check.getCheckLocalId(), impl.getClass().getSimpleName(), e);
+            logger.error("CUSTOM check {} ({}) threw", check.getCheckLocalId(), impl.getClass().getSimpleName(), e);
             return List.of(RawFinding.builder()
                     .checkLocalId(check.getCheckLocalId())
                     .dimension(check.getDimension())
@@ -106,14 +108,14 @@ public class CustomCheckExecutor implements CheckExecutor {
         try {
             Class<?> clazz = Class.forName(className);
             if (!CustomCheck.class.isAssignableFrom(clazz)) {
-                log.warn("Class {} does not implement CustomCheck", className);
+                logger.warn("Class {} does not implement CustomCheck", className);
                 return null;
             }
             CustomCheck cc = (CustomCheck) clazz.getDeclaredConstructor().newInstance();
             byId.putIfAbsent(cc.id(), cc);
             return cc;
         } catch (Exception e) {
-            log.warn("Failed to load CustomCheck class {}: {}", className, e.getMessage());
+            logger.warn("Failed to load CustomCheck class {}: {}", className, e.getMessage());
             return null;
         }
     }

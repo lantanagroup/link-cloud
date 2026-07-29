@@ -8,12 +8,13 @@ import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.instance.model.api.IBase;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.DateTimeType;
 import org.hl7.fhir.r4.model.DateType;
 import org.hl7.fhir.r4.model.InstantType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -34,8 +35,9 @@ import java.util.List;
  */
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class FutureDateCustomCheck implements CustomCheck {
+
+    private static final Logger logger = LoggerFactory.getLogger(FutureDateCustomCheck.class);
 
     private final IFhirPath fhirPath;
     private final ObjectMapper objectMapper;
@@ -53,13 +55,13 @@ public class FutureDateCustomCheck implements CustomCheck {
         try {
             params = objectMapper.readTree(check.getParametersJson());
         } catch (Exception e) {
-            log.warn("future-date check {} has invalid parameters JSON", check.getCheckLocalId());
+            logger.warn("future-date check {} has invalid parameters JSON", check.getCheckLocalId());
             return List.of();
         }
 
         String path = params.path("path").asText(null);
         if (path == null || path.isBlank()) {
-            log.warn("future-date check {} missing required 'path' parameter", check.getCheckLocalId());
+            logger.warn("future-date check {} missing required 'path' parameter", check.getCheckLocalId());
             return List.of();
         }
 
@@ -82,7 +84,7 @@ public class FutureDateCustomCheck implements CustomCheck {
             try {
                 nodes = fhirPath.evaluate(resource, path, IBase.class);
             } catch (Exception e) {
-                log.debug("future-date path '{}' did not evaluate on {}: {}", path, resource.fhirType(), e.getMessage());
+                logger.debug("future-date path '{}' did not evaluate on {}: {}", path, resource.fhirType(), e.getMessage());
                 continue;
             }
 
