@@ -89,6 +89,12 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             var configurationOptions = ConfigurationOptions.Parse(connectionString);
             configurationOptions.Password = redisSettings.Password;
 
+            if (redisSettings.PoolSize <= 0)
+            {
+                throw new InvalidOperationException(
+                    "ResourceCache:Redis:PoolSize must be greater than zero.");
+            }
+
             services.AddStackExchangeRedisExtensions<SystemTextJsonSerializer>(new StackExchange.Redis.Extensions.Core.Configuration.RedisConfiguration
             {
                 ConnectionString = configurationOptions.ToString(true),
