@@ -249,6 +249,7 @@ public class CodeGroupCacheService(
         string? system = null;
         List<Code>? systemCodes = null;
         int scientificNotationCodeCount = 0;
+        string scientificNotationCodeExamples = "";
 
         foreach (var record in records)
         {
@@ -256,7 +257,12 @@ public class CodeGroupCacheService(
             string display = record.Display;
 
             if (ScientificNotationPattern.IsMatch(code))
+            {
                 scientificNotationCodeCount++;
+
+                if (scientificNotationCodeExamples.Length < 100)
+                    scientificNotationCodeExamples += (scientificNotationCodeExamples.Length > 0 ? ", " : "") + code;
+            }
 
             if (system == null || (!string.IsNullOrEmpty(record.System) && system != record.System))
             {
@@ -288,7 +294,7 @@ public class CodeGroupCacheService(
             });
         }
 
-        LogScientificNotationWarning(scientificNotationCodeCount, codeGroup.Id);
+        LogScientificNotationWarning(scientificNotationCodeCount, codeGroup.Id, scientificNotationCodeExamples);
 
         SetCodeGroup(codeGroup);
         logger.LogDebug("Value set {ValueSet} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes.Values.SelectMany(c => c).Count());
@@ -314,15 +320,21 @@ public class CodeGroupCacheService(
         var records = csv.GetRecords<CsvCodeSystemRecord>();
         string system = codeGroup.Url;
         int scientificNotationCodeCount = 0;
+        string scientificNotationCodeExamples = "";
 
         foreach (var record in records)
         {
             string code = record.Code;
             string display = record.Display;
             CodeStatus status = record.Status;
-
+            
             if (ScientificNotationPattern.IsMatch(code))
+            {
                 scientificNotationCodeCount++;
+
+                if (scientificNotationCodeExamples.Length < 100)
+                    scientificNotationCodeExamples += (scientificNotationCodeExamples.Length > 0 ? ", " : "") + code;
+            }
 
             if (!codeGroup.Codes.ContainsKey(system))
                 codeGroup.Codes.Add(system, new List<Code>());
@@ -335,20 +347,21 @@ public class CodeGroupCacheService(
             });
         }
 
-        LogScientificNotationWarning(scientificNotationCodeCount, codeGroup.Id);
+        LogScientificNotationWarning(scientificNotationCodeCount, codeGroup.Id, scientificNotationCodeExamples);
 
         SetCodeGroup(codeGroup);
         logger.LogDebug("Code system {CodeSystem} loaded with {Count} codes", codeGroup.Id, codeGroup.Codes[system].Count);
     }
 
-    private void LogScientificNotationWarning(int scientificNotationCodeCount, string? codeGroupId)
+    private void LogScientificNotationWarning(int scientificNotationCodeCount, string? codeGroupId, string? examples)
     {
         if (scientificNotationCodeCount > 0)
         {
             logger.LogWarning(
-                "Found {Count} code(s) in code group {CodeGroupId} that appear to be in scientific notation. Verify that codes were not altered during CSV creation",
+                "Found {Count} code(s) in code group {CodeGroupId} that appear to be in scientific notation. Verify that codes were not altered during CSV creation. Example codes: {Examples}",
                 scientificNotationCodeCount,
-                codeGroupId.SanitizeForLog());
+                codeGroupId.SanitizeForLog(),
+                examples.SanitizeForLog());
         }
     }
 
