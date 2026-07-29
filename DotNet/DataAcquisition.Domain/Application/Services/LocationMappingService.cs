@@ -492,7 +492,7 @@ public class LocationMappingService(
         }
 
         var cacheKey = $"{correlationId}:{ResourceType.Encounter}";
-        var cachedEncounters = _resourceCache.Get(cacheKey);
+        var cachedEncounters = await _resourceCache.GetAsync(cacheKey, cancellationToken);
         if (cachedEncounters.Count == 0)
         {
             return 0;
@@ -520,13 +520,13 @@ public class LocationMappingService(
             return 0;
         }
 
-        // UpdateCorrelationCache is an additive HashSet, so removing entries requires deleting the key
+        // UpdateCorrelationCacheAsync is an additive HashSet, so removing entries requires deleting the key
         // and rewriting it with only the org encounters. When none remain the key is left empty, so
         // Normalization/MeasureEval rehydrate no qualifying encounter for this correlation.
-        _resourceCache.Delete([cacheKey]);
+        await _resourceCache.DeleteAsync([cacheKey], cancellationToken);
         if (orgEncounters.Count > 0)
         {
-            _resourceCache.UpdateCorrelationCache(cacheKey, orgEncounters, ResourceType.Encounter);
+            await _resourceCache.UpdateCorrelationCacheAsync(cacheKey, orgEncounters, ResourceType.Encounter, cancellationToken);
         }
 
         _logger.LogDebug(
