@@ -96,7 +96,7 @@ services:
     ports:
       - '6379:6379'
     container_name: redis_cache
-    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASS}
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASS} --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes: 
       - redis_cache:/data
     networks:
@@ -600,6 +600,7 @@ services:
       ResourceCache__CacheImplementation: Hybrid
       ResourceCache__Redis__ConnectionString: redis_cache:6379,abortConnect=false,resolveDns=true,allowAdmin=true
       ResourceCache__Redis__Password: ${REDIS_PASS}
+      ResourceCache__Redis__MaxMemoryBytes: 268435456
       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ResourceCache__BlobStorage__BlobRoot: resource-cache
@@ -643,6 +644,7 @@ services:
        ResourceCache__CacheImplementation: Hybrid
        ResourceCache__Redis__ConnectionString: redis_cache:6379,abortConnect=false,resolveDns=true,allowAdmin=true
        ResourceCache__Redis__Password: ${REDIS_PASS}
+       ResourceCache__Redis__MaxMemoryBytes: 268435456
        ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
        ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
        ResourceCache__BlobStorage__BlobRoot: resource-cache
@@ -776,6 +778,7 @@ services:
       ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-normalization;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
       ResourceCache__Redis__ConnectionString: redis_cache:6379,abortConnect=false,resolveDns=true,allowAdmin=true
       ResourceCache__Redis__Password: ${REDIS_PASS}
+      ResourceCache__Redis__MaxMemoryBytes: 268435456
       ResourceCache__BlobStorage__ConnectionString: ${AZURITE_CONNECTION_STRING}
       ResourceCache__BlobStorage__BlobContainerName: ${INTERNAL_BLOB_CONTAINER_NAME}
       ResourceCache__BlobStorage__BlobRoot: resource-cache

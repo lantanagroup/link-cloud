@@ -223,7 +223,10 @@ services:
       description: "Optional Redis connection-pool size for the resource cache. Defaults to 5."
       required: false
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
-      description: "Optional Redis maxmemory percentage at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      required: false
+    - key: "ResourceCache:Redis:MaxMemoryBytes"
+      description: "The Redis max-memory limit in bytes, used as the denominator for Hybrid cache memory-pressure fallback. Supplied via configuration because Azure Managed Redis does not return maxmemory via INFO. Recommended for Hybrid; when unset or <= 0 Redis is always used (a warning is logged). All LCG Redis instances are currently 1 GB (1073741824); this must be updated if Redis capacity is scaled. Defaults to 268435456 (256 MB) to match local Docker Redis."
       required: false
     - key: "ResourceCache:BlobStorage:ConnectionString"
       description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
@@ -257,7 +260,10 @@ services:
       description: "Optional Redis connection-pool size for the resource cache. Defaults to 5."
       required: false
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
-      description: "Optional Redis maxmemory percentage at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      required: false
+    - key: "ResourceCache:Redis:MaxMemoryBytes"
+      description: "The Redis max-memory limit in bytes, used as the denominator for Hybrid cache memory-pressure fallback. Supplied via configuration because Azure Managed Redis does not return maxmemory via INFO. Recommended for Hybrid; when unset or <= 0 Redis is always used (a warning is logged). All LCG Redis instances are currently 1 GB (1073741824); this must be updated if Redis capacity is scaled. Defaults to 268435456 (256 MB) to match local Docker Redis."
       required: false
     - key: "ResourceCache:BlobStorage:ConnectionString"
       description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
@@ -297,7 +303,31 @@ services:
     - key: "resource-cache.blob-storage.blob-root"
       description: "Root path/prefix within the blob container under which cached resources are stored for the ABS resource cache. Required only when the ABS resource-cache backend is used."
       required: false
-  Normalization: []
+  Normalization:
+    - key: "ResourceCache:CacheImplementation"
+      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
+      required: false
+    - key: "ResourceCache:Redis:ConnectionString"
+      description: "The Redis endpoint used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
+      required: true
+    - key: "ResourceCache:Redis:Password"
+      description: "Optional Redis password for the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:Redis:MemoryThresholdPercent"
+      description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      required: false
+    - key: "ResourceCache:Redis:MaxMemoryBytes"
+      description: "The Redis max-memory limit in bytes, used as the denominator for Hybrid cache memory-pressure fallback. Supplied via configuration because Azure Managed Redis does not return maxmemory via INFO. Recommended for Hybrid; when unset or <= 0 Redis is always used (a warning is logged). All LCG Redis instances are currently 1 GB (1073741824); this must be updated if Redis capacity is scaled. Defaults to 268435456 (256 MB) to match local Docker Redis."
+      required: false
+    - key: "ResourceCache:BlobStorage:ConnectionString"
+      description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
+      required: true
+    - key: "ResourceCache:BlobStorage:BlobContainerName"
+      description: "Optional blob container name used by the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:BlobStorage:BlobRoot"
+      description: "Optional blob name prefix used by the resource cache. Defaults to empty."
+      required: false
   Notification:
     - key: "SmtpConnection:Host"
       description: "The SMTP server hostname for sending notifications."

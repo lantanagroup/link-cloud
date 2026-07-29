@@ -143,16 +143,19 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     return ResourceCacheType.Redis;
                 }
 
-                if (!infoDict.TryGetValue("maxmemory", out var maxMemoryStr) ||
-                    !long.TryParse(maxMemoryStr, out var maxMemory) ||
-                    maxMemory == 0)
+                // Azure Managed Redis does not return `maxmemory` via INFO, so the limit is
+                // supplied through configuration instead. Continue reading `used_memory` above.
+                var maxMemoryBytes = _settings.Redis.MaxMemoryBytes;
+                if (maxMemoryBytes is null or <= 0)
                 {
-                    // No memory limit configured — Redis is unconstrained, always use it.
-                    _logger.LogDebug("Redis maxmemory is not configured or unlimited; defaulting to Redis resource cache.");
+                    _logger.LogWarning(
+                        "ResourceCache:Redis:MaxMemoryBytes is not configured or invalid ({MaxMemoryBytes}); " +
+                        "cannot evaluate Redis memory pressure. Defaulting to Redis resource cache.",
+                        maxMemoryBytes);
                     return ResourceCacheType.Redis;
                 }
 
-                double usagePercent = (double)usedMemory / maxMemory * 100.0;
+                double usagePercent = (double)usedMemory / maxMemoryBytes.Value * 100.0;
 
                 if (usagePercent >= _settings.Redis.MemoryThresholdPercent)
                 {
