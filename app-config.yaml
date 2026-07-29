@@ -413,6 +413,7 @@ services:
 $defs:
   configEntry:
     type: "object"
+    additionalProperties: false
     required:
       - "key"
       - "description"
@@ -427,3 +428,29 @@ $defs:
         type: "boolean"
         default: true
         description: "Whether the setting is strictly required for the service to start/function correctly."
+      label:
+        type: "string"
+        description: "An optional label for the configuration key, if applicable."
+      sensitive:
+        type: "boolean"
+        default: false
+        description: "Whether the setting contains sensitive information (e.g., passwords, secrets) that should be protected."
+      defaultValue:
+        type: "string"
+        description: "An optional default value for the configuration key, if applicable."
+    # A sensitive setting must never carry a defaultValue - secrets and Key Vault
+    # references are supplied per environment, never seeded from this file.
+    # The "required: sensitive" guard below is load-bearing: without it, an entry that
+    # omits "sensitive" still matches the "if" (a properties clause is vacuously true for
+    # an absent property) and would be blocked from having a defaultValue. The
+    # "default: false" above does not help - JSON Schema defaults are annotation only
+    # and are not applied during validation.
+    if:
+      properties:
+        sensitive:
+          const: true
+      required:
+        - "sensitive"
+    then:
+      properties:
+        defaultValue: false

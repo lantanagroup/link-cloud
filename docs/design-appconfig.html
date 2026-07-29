@@ -496,9 +496,9 @@
     <div class="col-md-8">
         
         <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>To ensure services can be reliably deployed and operated across multiple environments, we maintain a central registry of required configuration settings in <code>/app-config.json</code>. This file provides a clear inventory of what must be provisioned for the system to function correctly.</p>
-<h2 id="when-to-add-a-setting-to-app-config.json" class="content-heading">When to Add a Setting to <code>/app-config.json</code> <a id="when-to-add-a-setting-to-app-config-json" href="#when-to-add-a-setting-to-app-config-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Add a Setting to /app-config.json"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>Developers MUST add a configuration key to <code>/app-config.json</code> if:</p>
+<p>To ensure services can be reliably deployed and operated across multiple environments, we maintain a central registry of required configuration settings in <code>/app-config.yaml</code>. This file provides a clear inventory of what must be provisioned for the system to function correctly.</p>
+<h2 id="when-to-add-a-setting-to-app-config.json" class="content-heading">When to Add a Setting to <code>/app-config.yaml</code> <a id="when-to-add-a-setting-to-app-config-json" href="#when-to-add-a-setting-to-app-config-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Add a Setting to /app-config.yaml"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<p>Developers MUST add a configuration key to <code>/app-config.yaml</code> if:</p>
 <ol>
 <li><strong>The setting is required</strong> for the service to start or perform its core functions.</li>
 <li><strong>The setting is environment-specific</strong> (e.g., URLs, connection strings, API keys) and does not have a &quot;one-size-fits-all&quot; default.</li>
@@ -514,17 +514,17 @@
 <h2 id="integration-into-workflow" class="content-heading">Integration into Workflow <a id="integration-into-workflow" href="#integration-into-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Integration into Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <h3 id="pull-requests-prs" class="content-heading">Pull Requests (PRs) <a id="pull-requests-prs" href="#pull-requests-prs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Pull Requests (PRs)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
-<li>Any PR that introduces a new required configuration setting MUST include an update to <code>/app-config.json</code>.</li>
+<li>Any PR that introduces a new required configuration setting MUST include an update to <code>/app-config.yaml</code>.</li>
 <li>PR reviewers should verify that the description for any new setting is clear and that no sensitive values or environment-specific defaults are included.</li>
-<li><strong>Automated Check</strong>: CodeRabbit is configured to scan for newly introduced configuration keys in <code>appsettings.json</code>, <code>application.yml</code>, and environment variable definitions. If new keys are detected without corresponding updates to <code>/app-config.json</code>, the PR will be flagged for correction and should be blocked until reconciled.</li>
+<li><strong>Automated Check</strong>: CodeRabbit is configured to scan for newly introduced configuration keys in <code>appsettings.json</code>, <code>application.yml</code>, and environment variable definitions. If new keys are detected without corresponding updates to <code>/app-config.yaml</code>, the PR will be flagged for correction and should be blocked until reconciled.</li>
 </ul>
 <h3 id="devops-release-notes" class="content-heading">DevOps &amp; Release Notes <a id="devops-amp-release-notes" href="#devops-amp-release-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: DevOps &amp;amp; Release Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
-<li><code>/app-config.json</code> serves as the primary hand-off artifact for DevOps during environment provisioning.</li>
-<li>Release notes should highlight changes to <code>/app-config.json</code> to ensure transparency across teams.</li>
+<li><code>/app-config.yaml</code> serves as the primary hand-off artifact for DevOps during environment provisioning.</li>
+<li>Release notes should highlight changes to <code>/app-config.yaml</code> to ensure transparency across teams.</li>
 </ul>
 <h2 id="file-format-and-schema" class="content-heading">File Format and Schema <a id="file-format-and-schema" href="#file-format-and-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: File Format and Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p>The <code>/app-config.json</code> follows a structured schema:</p>
+<p>The <code>/app-config.yaml</code> follows a structured schema:</p>
 <h3 id="global-array" class="content-heading"><code>global</code> Array <a id="global-array" href="#global-array" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: global Array"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Contains settings shared across most or all services (e.g., Kafka connection, Database provider).</p>
 <h3 id="services-object" class="content-heading"><code>services</code> Object <a id="services-object" href="#services-object" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: services Object"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
@@ -536,7 +536,7 @@
 <li><code>required</code>: (Optional, default: true) A boolean indicating if the setting is strictly required for the service to function.</li>
 </ul>
 <h2 id="security-warning" class="content-heading">Security Warning <a id="security-warning" href="#security-warning" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Security Warning"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<p><strong>NEVER commit environment-specific values, passwords, or secrets to <code>/app-config.json</code>.</strong> This file is intended for documentation and schema enforcement only. Use secure secret management (e.g., Azure Key Vault) for actual values in deployed environments.</p>
+<p><strong>NEVER commit environment-specific values, passwords, or secrets to <code>/app-config.yaml</code>.</strong> This file is intended for documentation and schema enforcement only. Use secure secret management (e.g., Azure Key Vault) for actual values in deployed environments.</p>
 
         
     </div>
