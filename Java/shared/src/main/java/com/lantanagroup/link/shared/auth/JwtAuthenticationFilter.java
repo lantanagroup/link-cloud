@@ -53,8 +53,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   @Override
   protected void doFilterInternal (HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
-    String secret;
-
     // Allow anonymous access to the hosted REST API
     if (this.authenticationConfig.isAnonymous()) {
       logger.debug("Anonymous access is enabled");
@@ -62,14 +60,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       return;
     }
 
-    if (this.secretClient == null) {
-        throw new SecurityException("SecretClient is not configured");
-    }
-
-    secret = secretClient.getSecret(JwtService.Link_Bearer_Key).getValue();
+    // Key Vault is the source of truth when configured; otherwise fall back to the
+    // authentication.signing-key config property (local development without a vault).
+    String secret = this.secretClient != null
+            ? secretClient.getSecret(JwtService.Link_Bearer_Key).getValue()
+            : authenticationConfig.getSigningKey();
 
     if (StringUtils.isBlank(secret)) {
-      throw new SecurityException("JWT secret cannot be empty");
+      throw new SecurityException("JWT secret is not configured: set secret-management.key-vault-uri or authentication.signing-key");
     }
 
     String authHeader = request.getHeader("Authorization");
