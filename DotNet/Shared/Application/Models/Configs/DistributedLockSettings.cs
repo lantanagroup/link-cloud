@@ -78,17 +78,7 @@ public static class DistributedLockSettingsExtensions
         }
 
         //Distributed Semaphore
-        var configOptions = new StackExchange.Redis.ConfigurationOptions
-        {
-            EndPoints = { distributedLockSettings.ConnectionString },
-            AbortOnConnectFail = false,
-            AllowAdmin = true, // Required to access INFO command for memory checks.
-            // Forces SE.Redis to resolve the hostname to a specific IP (preferring IPv4) and
-            // bind to an IPEndPoint instead of a DnsEndPoint with AddressFamily.Unspecified.
-            // Without this, on docker bridge networks the socket can pick an unreachable
-            // address family and silently never establish the connection (PING just times out).
-            ResolveDns = true,
-        };
+        var configOptions = StackExchange.Redis.ConfigurationOptions.Parse(distributedLockSettings.ConnectionString);
 
         if (distributedLockSettings?.Password != null)
         {
