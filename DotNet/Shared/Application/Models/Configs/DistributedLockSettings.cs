@@ -4,12 +4,15 @@ using Medallion.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Security;
+using StackExchange.Redis.Extensions.System.Text.Json;
+using StackExchange.Redis.Extensions.Core.Abstractions;
 
 namespace LantanaGroup.Link.Shared.Application.Models.Configs;
 public class DistributedLockSettings
 {
     public string? ConnectionString { get; set; } = string.Empty;
     public SecureString? Password { get; set; }
+    public int PoolSize { get; set; } = 5;
     public TimeSpan Expiration { get; set; } = TimeSpan.FromSeconds(10);
     public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(5);
     public int MaxRetryCount { get; set; } = 3;
@@ -20,7 +23,7 @@ public static class DistributedLockSettingsExtensions
     public static void AddDistributedLockSettingsToContainer(this IServiceCollection services, IConfiguration configuration)
     {
         var distributedLockSettings = configuration.GetSection("DistributedLockSettings").Get<DistributedLockSettings>();
-        services.AddSingleton(distributedLockSettings);
+        services.AddSingleton(distributedLockSettings);   
     }
 
     public static DistributedLockSettings BuildDistributedLockSettings(this DistributedLockSettings settings, IServiceCollection services, IConfiguration configuration, string connectionStringKey)
@@ -94,8 +97,16 @@ public static class DistributedLockSettingsExtensions
             }
         }
 
-        var connectionMultiplexer = StackExchange.Redis.ConnectionMultiplexer.Connect(configOptions);
-        services.AddSingleton<StackExchange.Redis.IConnectionMultiplexer>(connectionMultiplexer);
-        services.AddSingleton<IDistributedSemaphoreProvider>(new RedisDistributedSynchronizationProvider(connectionMultiplexer.GetDatabase()));
+        services.AddStackExchangeRedisExtensions<SystemTextJsonSerializer>(new StackExchange.Redis.Extensions.Core.Configuration.RedisConfiguration
+        {
+            ConnectionString = configOptions.ToString(true),
+            PoolSize = distributedLockSettings?.PoolSize ?? 5
+        });
+        
+        services.AddSingleton<IDistributedSemaphoreProvider>(sp =>
+        {
+            var database = sp.GetRequiredService<IRedisDatabase>();
+            return new RedisDistributedSynchronizationProvider(database.Database);
+        });
     }
 }

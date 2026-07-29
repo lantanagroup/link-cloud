@@ -5,7 +5,7 @@ using LantanaGroup.Link.Shared.Application.Models.Configs;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using StackExchange.Redis;
+using StackExchange.Redis.Extensions.Core.Abstractions;
 using System.Collections.Concurrent;
 using Task = System.Threading.Tasks.Task;
 
@@ -21,7 +21,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
     {
         private readonly IResourceCache _redisCache;
         private readonly IResourceCache _absCache;
-        private readonly IConnectionMultiplexer _multiplexer;
+        private readonly IRedisDatabase _redisDatabase;
         private readonly ResourceCacheSettings _settings;
         private readonly ILogger<HybridResourceCache> _logger;
 
@@ -30,13 +30,13 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         public HybridResourceCache(
             [FromKeyedServices(ResourceCacheType.Redis)] IResourceCache redisCache,
             [FromKeyedServices(ResourceCacheType.ABS)] IResourceCache absCache,
-            IConnectionMultiplexer multiplexer,
+            IRedisDatabase redisDatabase,
             IOptions<ResourceCacheSettings> settings,
             ILogger<HybridResourceCache> logger)
         {
             _redisCache = redisCache ?? throw new ArgumentNullException(nameof(redisCache));
             _absCache = absCache ?? throw new ArgumentNullException(nameof(absCache));
-            _multiplexer = multiplexer ?? throw new ArgumentNullException(nameof(multiplexer));
+            _redisDatabase = redisDatabase ?? throw new ArgumentNullException(nameof(redisDatabase));
             _settings = settings?.Value ?? throw new ArgumentNullException(nameof(settings));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
@@ -118,7 +118,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         {
             try
             {
-                var server = _multiplexer.GetServers().FirstOrDefault(s => s.IsConnected);
+                var server = _redisDatabase.Database.Multiplexer.GetServers().FirstOrDefault(s => s.IsConnected);
 
                 if (server == null)
                 {

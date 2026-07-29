@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
+using StackExchange.Redis.Extensions.Core.Abstractions;
 using System.Text.Json;
 using Task = System.Threading.Tasks.Task;
 
@@ -15,9 +16,9 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private readonly IDatabase _db;
         private readonly ILogger<RedisResourceCache> _logger;
 
-        public RedisResourceCache(IConnectionMultiplexer redis, ILogger<RedisResourceCache> logger)
+        public RedisResourceCache(IRedisDatabase redisDatabase, ILogger<RedisResourceCache> logger)
         {
-            _db = redis.GetDatabase();
+            _db = redisDatabase.Database;
             _logger = logger;
         }
 

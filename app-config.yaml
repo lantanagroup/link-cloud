@@ -204,6 +204,9 @@ services:
     - key: "DistributedLockSettings:Expiration"
       description: "The expiration time in minutes for distributed locks."
       required: true
+    - key: "DistributedLockSettings:PoolSize"
+      description: "Optional Redis connection-pool size for distributed locks. Defaults to 5."
+      required: false
     - key: "Cache:Type"
       description: "ICacheService backend. Defaults to InMemory (per-process); set to Redis to share the cache (e.g. org-location conditions) across the DataAcquisition service and AcquisitionWorker so a config change in one is seen by the other. Redis requires ConnectionStrings:Redis."
       required: false
@@ -215,6 +218,9 @@ services:
       required: true
     - key: "ResourceCache:Redis:Password"
       description: "Optional Redis password for the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:Redis:PoolSize"
+      description: "Optional Redis connection-pool size for the resource cache. Defaults to 5."
       required: false
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional Redis maxmemory percentage at which Hybrid caching falls back to blob storage. Defaults to 80.0."
@@ -246,6 +252,9 @@ services:
       required: true
     - key: "ResourceCache:Redis:Password"
       description: "Optional Redis password for the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:Redis:PoolSize"
+      description: "Optional Redis connection-pool size for the resource cache. Defaults to 5."
       required: false
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional Redis maxmemory percentage at which Hybrid caching falls back to blob storage. Defaults to 80.0."
