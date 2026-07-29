@@ -1,0 +1,212 @@
+- generic [ref=f10e2]:
+  - generic [ref=f10e3]:
+    - img "Icon" [ref=f10e1781]
+    - generic [ref=f10e5]: Link Administration
+    - textbox "Search facilities" [ref=f10e1782]
+    - button "Access user profile options" [ref=f10e1783] [cursor=pointer]:
+      - img [ref=f10e12]: account_circle
+  - navigation [ref=f10e17]:
+    - list [ref=f10e18]:
+      - listitem [ref=f10e19]:
+        - link "Home" [ref=f10e1784] [cursor=pointer]:
+          - /url: /dashboard
+      - listitem [ref=f10e21]:
+        - link "Tenants" [ref=f10e1785] [cursor=pointer]:
+          - /url: /tenant
+      - listitem [ref=f10e23]:
+        - link [ref=f10e1786] [cursor=pointer]:
+          - /url: /reports
+      - listitem [ref=f10e29]:
+        - button [ref=f10e1787]
+      - listitem [ref=f10e35]:
+        - button [ref=f10e1788]
+      - listitem [ref=f10e41]:
+        - button [ref=f10e1789]
+  - generic [ref=f10e49]:
+    - paragraph [ref=f10e50]:
+      - generic [ref=f10e51]:
+        - generic [ref=f10e52]: Tenant Dashboard
+        - button "Create tenant" [ref=f10e1790] [cursor=pointer]:
+          - img [ref=f10e54]: add
+    - generic [ref=f10e57]:
+      - generic [ref=f10e58]:
+        - paragraph [ref=f10e59]: All Tenants
+        - generic [ref=f10e60]:
+          - generic [ref=f10e63]:
+            - generic: Facility
+            - combobox "Facility" [ref=f10e1791]
+          - generic [ref=f10e69] [cursor=pointer]:
+            - generic: Timezone
+            - combobox "Timezone" [ref=f10e1792]:
+              - generic [ref=f10e73]: All
+          - generic [ref=f10e82] [cursor=pointer]:
+            - generic: Vendor
+            - combobox "Vendor" [ref=f10e1793]:
+              - generic [ref=f10e86]: All
+          - generic [ref=f10e94]:
+            - checkbox "Show deleted" [ref=f10e1794] [cursor=pointer]
+            - generic [ref=f10e98] [cursor=pointer]: Show deleted
+      - generic [ref=f10e99]:
+        - table [ref=f10e100]:
+          - rowgroup [ref=f10e101]:
+            - row [ref=f10e1795]:
+              - columnheader [ref=f10e1796] [cursor=pointer]:
+                - button "Facility ID" [active] [ref=f10e1797]
+              - columnheader [ref=f10e1798] [cursor=pointer]:
+                - button "Name" [ref=f10e1799]
+              - columnheader [ref=f10e1800] [cursor=pointer]:
+                - button "Timezone" [ref=f10e1801]
+              - columnheader [ref=f10e1802] [cursor=pointer]:
+                - button "Vendor" [ref=f10e1803]
+              - columnheader "Action" [ref=f10e1804]
+          - rowgroup [ref=f10e128]:
+            - row [ref=f10e2197]:
+              - cell [ref=f10e2198]:
+                - link "ui-demo-tenant-01" [ref=f10e2199] [cursor=pointer]:
+                  - /url: /tenant/facility/ui-demo-tenant-01
+              - cell "UI Demo Tenant 01" [ref=f10e2200]
+              - cell "America/New_York" [ref=f10e2201]
+              - cell "Epic" [ref=f10e2202]
+              - cell [ref=f10e2203]:
+                - button [ref=f10e2204] [cursor=pointer]:
+                  - img [ref=f10e2205]: edit
+                - button [ref=f10e2208] [cursor=pointer]:
+                  - img [ref=f10e2209]: delete
+                - button [ref=f10e2212] [cursor=pointer]:
+                  - img [ref=f10e2213]: visibility
+            - row [ref=f10e2216]:
+              - cell [ref=f10e2217]:
+                - link "MyFacility" [ref=f10e2218] [cursor=pointer]:
+                  - /url: /tenant/facility/MyFacility
+              - cell "MyFacility" [ref=f10e2219]
+              - cell "US/Eastern" [ref=f10e2220]
+              - cell "Epic" [ref=f10e2221]
+              - cell [ref=f10e2222]:
+                - button [ref=f10e2223] [cursor=pointer]:
+                  - img [ref=f10e2224]: edit
+                - button [ref=f10e2227] [cursor=pointer]:
+                  - img [ref=f10e2228]: delete
+                - button [ref=f10e2231] [cursor=pointer]:
+                  - img [ref=f10e2232]: visibility
+            - row [ref=f10e2235]:
+              - cell [ref=f10e2236]:
+                - link "fe0b8906-a5d8-4fcc-9e19-c2c90637c4dd" [ref=f10e2237] [cursor=pointer]:
+                  - /url: /tenant/facility/fe0b8906-a5d8-4fcc-9e19-c2c90637c4dd
+              - cell "fe0b8906-a5d8-4fcc-9e19-c2c90637c4dd" [ref=f10e2238]
+              - cell "America/Chicago" [ref=f10e2239]
+              - cell "Epic" [ref=f10e2240]
+              - cell [ref=f10e2241]:
+                - button [ref=f10e2242] [cursor=pointer]:
+                  - img [ref=f10e2243]: edit
+                - button [ref=f10e2246] [cursor=pointer]:
+                  - img [ref=f10e2247]: delete
+                - button [ref=f10e2250] [cursor=pointer]:
+                  - img [ref=f10e2251]: visibility
+            - row [ref=f10e2254]:
+              - cell [ref=f10e2255]:
+                - link "fbd2f49a-567e-427f-a194-b13f5abc40d9" [ref=f10e2256] [cursor=pointer]:
+                  - /url: /tenant/facility/fbd2f49a-567e-427f-a194-b13f5abc40d9
+              - cell "fbd2f49a-567e-427f-a194-b13f5abc40d9" [ref=f10e2257]
+              - cell "America/Chicago" [ref=f10e2258]
+              - cell "Epic" [ref=f10e2259]
+              - cell [ref=f10e2260]:
+                - button [ref=f10e2261] [cursor=pointer]:
+                  - img [ref=f10e2262]: edit
+                - button [ref=f10e2265] [cursor=pointer]:
+                  - img [ref=f10e2266]: delete
+                - button [ref=f10e2269] [cursor=pointer]:
+                  - img [ref=f10e2270]: visibility
+            - row [ref=f10e2273]:
+              - cell [ref=f10e2274]:
+                - link "d9dce5c0-c90e-476e-9733-26737f74f3cf" [ref=f10e2275] [cursor=pointer]:
+                  - /url: /tenant/facility/d9dce5c0-c90e-476e-9733-26737f74f3cf
+              - cell "d9dce5c0-c90e-476e-9733-26737f74f3cf" [ref=f10e2276]
+              - cell "America/Chicago" [ref=f10e2277]
+              - cell "Epic" [ref=f10e2278]
+              - cell [ref=f10e2279]:
+                - button [ref=f10e2280] [cursor=pointer]:
+                  - img [ref=f10e2281]: edit
+                - button [ref=f10e2284] [cursor=pointer]:
+                  - img [ref=f10e2285]: delete
+                - button [ref=f10e2288] [cursor=pointer]:
+                  - img [ref=f10e2289]: visibility
+            - row [ref=f10e2292]:
+              - cell [ref=f10e2293]:
+                - link "d9442447-7d75-41d0-a27e-144488a35472" [ref=f10e2294] [cursor=pointer]:
+                  - /url: /tenant/facility/d9442447-7d75-41d0-a27e-144488a35472
+              - cell "d9442447-7d75-41d0-a27e-144488a35472" [ref=f10e2295]
+              - cell "America/Chicago" [ref=f10e2296]
+              - cell "Epic" [ref=f10e2297]
+              - cell [ref=f10e2298]:
+                - button [ref=f10e2299] [cursor=pointer]:
+                  - img [ref=f10e2300]: edit
+                - button [ref=f10e2303] [cursor=pointer]:
+                  - img [ref=f10e2304]: delete
+                - button [ref=f10e2307] [cursor=pointer]:
+                  - img [ref=f10e2308]: visibility
+            - row [ref=f10e2311]:
+              - cell [ref=f10e2312]:
+                - link "bda820b1-e534-4216-9be1-adb231d1364a" [ref=f10e2313] [cursor=pointer]:
+                  - /url: /tenant/facility/bda820b1-e534-4216-9be1-adb231d1364a
+              - cell "bda820b1-e534-4216-9be1-adb231d1364a" [ref=f10e2314]
+              - cell "America/Chicago" [ref=f10e2315]
+              - cell "Epic" [ref=f10e2316]
+              - cell [ref=f10e2317]:
+                - button [ref=f10e2318] [cursor=pointer]:
+                  - img [ref=f10e2319]: edit
+                - button [ref=f10e2322] [cursor=pointer]:
+                  - img [ref=f10e2323]: delete
+                - button [ref=f10e2326] [cursor=pointer]:
+                  - img [ref=f10e2327]: visibility
+            - row [ref=f10e2330]:
+              - cell [ref=f10e2331]:
+                - link "a987b5ef-3d6c-41fc-b044-d16de103af9f" [ref=f10e2332] [cursor=pointer]:
+                  - /url: /tenant/facility/a987b5ef-3d6c-41fc-b044-d16de103af9f
+              - cell "a987b5ef-3d6c-41fc-b044-d16de103af9f" [ref=f10e2333]
+              - cell "America/Chicago" [ref=f10e2334]
+              - cell "Epic" [ref=f10e2335]
+              - cell [ref=f10e2336]:
+                - button [ref=f10e2337] [cursor=pointer]:
+                  - img [ref=f10e2338]: edit
+                - button [ref=f10e2341] [cursor=pointer]:
+                  - img [ref=f10e2342]: delete
+                - button [ref=f10e2345] [cursor=pointer]:
+                  - img [ref=f10e2346]: visibility
+            - row [ref=f10e2349]:
+              - cell [ref=f10e2350]:
+                - link "9a52d648-ad91-4c03-89e5-762b537f18af" [ref=f10e2351] [cursor=pointer]:
+                  - /url: /tenant/facility/9a52d648-ad91-4c03-89e5-762b537f18af
+              - cell "9a52d648-ad91-4c03-89e5-762b537f18af" [ref=f10e2352]
+              - cell "America/Chicago" [ref=f10e2353]
+              - cell "Epic" [ref=f10e2354]
+              - cell [ref=f10e2355]:
+                - button [ref=f10e2356] [cursor=pointer]:
+                  - img [ref=f10e2357]: edit
+                - button [ref=f10e2360] [cursor=pointer]:
+                  - img [ref=f10e2361]: delete
+                - button [ref=f10e2364] [cursor=pointer]:
+                  - img [ref=f10e2365]: visibility
+            - row [ref=f10e2368]:
+              - cell [ref=f10e2369]:
+                - link "8e09e6c3-1e63-4ca3-9894-9aafeb053339" [ref=f10e2370] [cursor=pointer]:
+                  - /url: /tenant/facility/8e09e6c3-1e63-4ca3-9894-9aafeb053339
+              - cell "8e09e6c3-1e63-4ca3-9894-9aafeb053339" [ref=f10e2371]
+              - cell "America/Chicago" [ref=f10e2372]
+              - cell "Epic" [ref=f10e2373]
+              - cell [ref=f10e2374]:
+                - button [ref=f10e2375] [cursor=pointer]:
+                  - img [ref=f10e2376]: edit
+                - button [ref=f10e2379] [cursor=pointer]:
+                  - img [ref=f10e2380]: delete
+                - button [ref=f10e2383] [cursor=pointer]:
+                  - img [ref=f10e2384]: visibility
+        - group "Select page" [ref=f10e1995]:
+          - generic [ref=f10e321]:
+            - generic [ref=f10e322]:
+              - generic [ref=f10e323]: "Items per page:"
+              - combobox "Items per page:" [ref=f10e1996] [cursor=pointer]:
+                - generic [ref=f10e329]: "10"
+            - generic [ref=f10e337]:
+              - status [ref=f10e338]: 1 – 10 of 22
+              - button "Previous page" [disabled] [ref=f10e1997]
+              - button "Next page" [ref=f10e1998] [cursor=pointer]

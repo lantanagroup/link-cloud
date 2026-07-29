@@ -1,0 +1,461 @@
+- generic [active] [ref=f8e1]:
+  - banner [ref=f8e2]:
+    - navigation [ref=f8e3]:
+      - generic [ref=f8e4]:
+        - link " Automation.UI" [ref=f8e5] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f8e6]: 
+          - text: Automation.UI
+        - list [ref=f8e8]:
+          - listitem [ref=f8e9]:
+            - link " Runs" [ref=f8e10] [cursor=pointer]:
+              - /url: /
+              - generic [ref=f8e11]: 
+              - text: Runs
+          - listitem [ref=f8e12]:
+            - link " Scenarios" [ref=f8e13] [cursor=pointer]:
+              - /url: /Scenarios
+              - generic [ref=f8e14]: 
+              - text: Scenarios
+          - listitem [ref=f8e15]:
+            - link " Query Plans" [ref=f8e16] [cursor=pointer]:
+              - /url: /QueryPlans
+              - generic [ref=f8e17]: 
+              - text: Query Plans
+          - listitem [ref=f8e18]:
+            - link " API Health" [ref=f8e19] [cursor=pointer]:
+              - /url: /ApiHealth
+              - generic [ref=f8e20]: 
+              - text: API Health
+  - main [ref=f8e22]:
+    - generic [ref=f8e23]:
+      - heading " Automation Runs" [level=2] [ref=f8e24]:
+        - generic [ref=f8e25]: 
+        - text: Automation Runs
+      - paragraph [ref=f8e26]: Dashboard overview, quick-launch tests, and run history.
+      - generic [ref=f8e27]:
+        - generic [ref=f8e29]:
+          - generic [ref=f8e30]: "1"
+          - generic [ref=f8e31]: Currently Active
+        - generic [ref=f8e33]:
+          - generic [ref=f8e34]: "1"
+          - generic [ref=f8e35]: Total Runs
+        - generic [ref=f8e37]:
+          - generic [ref=f8e38]: 0%
+          - generic [ref=f8e39]: Success Rate
+        - generic [ref=f8e41]:
+          - generic [ref=f8e42]: —
+          - generic [ref=f8e43]: Avg Duration
+      - generic [ref=f8e44]:
+        - generic [ref=f8e47]:
+          - generic [ref=f8e48]: 
+          - text: Status Breakdown
+        - generic [ref=f8e53]:
+          - generic [ref=f8e54]: 
+          - text: Runs Per Day (Last 14 Days)
+      - generic [ref=f8e57]:
+        - generic [ref=f8e58]:
+          - generic [ref=f8e59]: 
+          - text: Active Runs
+        - generic [ref=f8e63]:
+          - generic [ref=f8e64]: Adhoc Report Test
+          - generic [ref=f8e65]: 1 patients · seed 20260326
+          - generic [ref=f8e66]:
+            - generic [ref=f8e67]: Running
+            - generic [ref=f8e68]: 00:12 elapsed
+          - link " View Details" [ref=f8e69] [cursor=pointer]:
+            - /url: /Runs/Details/bda820b1-e534-4216-9be1-adb231d1364a
+            - generic [ref=f8e70]: 
+            - text: View Details
+      - generic [ref=f8e71]:
+        - generic [ref=f8e72]:
+          - generic [ref=f8e73]: 
+          - text: Quick Launch
+        - generic [ref=f8e75]:
+          - generic [ref=f8e76]:
+            - generic [ref=f8e77]: Select a saved scenario to run
+            - combobox "Select a saved scenario to run" [ref=f8e78]:
+              - option "-- Select a scenario --" [selected]
+              - option "FirstTest"
+              - option "Multi Patient Test"
+              - option "Second Test"
+              - option "Adhoc Report Test [System]"
+              - option "ApiHealthScenario [System]"
+              - option "Mega Multi Patient Test [System]"
+              - option "Mega Patient Test [System]"
+              - option "Multi Measure Test [System]"
+              - option "Multi Patient Test [System]"
+              - option "Regenerate Report Test [System]"
+              - option "Scheduled Report Test [System]"
+          - generic [ref=f8e80]:
+            - button " Run" [disabled]:
+              - generic: 
+              - text: Run
+          - button " New Scenario" [ref=f8e82] [cursor=pointer]:
+            - generic [ref=f8e83]: 
+            - text: New Scenario
+          - link " Manage" [ref=f8e85] [cursor=pointer]:
+            - /url: /Scenarios
+            - generic [ref=f8e86]: 
+            - text: Manage
+      - generic [ref=f8e88]:
+        - generic [ref=f8e89]:
+          - generic [ref=f8e90]:
+            - generic [ref=f8e91]: 
+            - text: Recent Runs
+          - generic [ref=f8e92]: 19 runs · page 1 of 1
+        - table [ref=f8e94]:
+          - rowgroup [ref=f8e95]:
+            - row [ref=f8e96]:
+              - columnheader [ref=f8e97]:
+                - link "Run" [ref=f8e98] [cursor=pointer]:
+                  - /url: /?pageNumber=1&pageSize=20&sortBy=runName&sortDir=desc
+              - columnheader [ref=f8e99]:
+                - link "Patients" [ref=f8e100] [cursor=pointer]:
+                  - /url: /?pageNumber=1&pageSize=20&sortBy=patientCount&sortDir=desc
+              - columnheader [ref=f8e101]:
+                - link "Seed" [ref=f8e102] [cursor=pointer]:
+                  - /url: /?pageNumber=1&pageSize=20&sortBy=seed&sortDir=desc
+              - columnheader [ref=f8e103]:
+                - link "Status" [ref=f8e104] [cursor=pointer]:
+                  - /url: /?pageNumber=1&pageSize=20&sortBy=status&sortDir=desc
+              - columnheader "Duration" [ref=f8e105]
+              - columnheader [ref=f8e106]:
+                - link "Created ▼" [ref=f8e107] [cursor=pointer]:
+                  - /url: /?pageNumber=1&pageSize=20&sortBy=createdAt&sortDir=asc
+              - columnheader [ref=f8e108]:
+                - link "Finished" [ref=f8e109] [cursor=pointer]:
+                  - /url: /?pageNumber=1&pageSize=20&sortBy=finishedAt&sortDir=desc
+              - columnheader [ref=f8e110]
+          - rowgroup [ref=f8e111]:
+            - row [ref=f8e112]:
+              - cell "Adhoc Report Test bda820b1-e534-4216-9be1-adb231d1364a" [ref=f8e113]:
+                - generic [ref=f8e114]: Adhoc Report Test
+                - code [ref=f8e115]: bda820b1-e534-4216-9be1-adb231d1364a
+              - cell "1" [ref=f8e116]
+              - cell "20260326" [ref=f8e117]
+              - cell "Running" [ref=f8e118]
+              - cell "–" [ref=f8e120]
+              - cell "7/29/2026 7:36:57 PM" [ref=f8e121]
+              - cell "—" [ref=f8e122]
+              - cell [ref=f8e123]:
+                - generic [ref=f8e124]:
+                  - link "" [ref=f8e125] [cursor=pointer]:
+                    - /url: /Runs/Details/bda820b1-e534-4216-9be1-adb231d1364a
+                  - button "" [ref=f8e127] [cursor=pointer]
+            - row [ref=f8e129]:
+              - cell "Adhoc Report Test a987b5ef-3d6c-41fc-b044-d16de103af9f" [ref=f8e130]:
+                - generic [ref=f8e131]: Adhoc Report Test
+                - code [ref=f8e132]: a987b5ef-3d6c-41fc-b044-d16de103af9f
+              - cell "1" [ref=f8e133]
+              - cell "20260326" [ref=f8e134]
+              - cell "Cancelled" [ref=f8e135]
+              - cell "–" [ref=f8e137]
+              - cell "7/1/2026 8:25:54 PM" [ref=f8e138]
+              - cell "7/1/2026 10:21:26 PM" [ref=f8e139]
+              - cell [ref=f8e140]:
+                - generic [ref=f8e141]:
+                  - link "" [ref=f8e142] [cursor=pointer]:
+                    - /url: /Runs/Details/a987b5ef-3d6c-41fc-b044-d16de103af9f
+                  - link "" [ref=f8e144] [cursor=pointer]:
+                    - /url: /Runs/Export/a987b5ef-3d6c-41fc-b044-d16de103af9f
+                  - button "" [ref=f8e146] [cursor=pointer]
+            - row [ref=f8e148]:
+              - cell "Regenerate Report Test 89b68ceb-a6a1-4e5c-9dbb-137d09e96ce4" [ref=f8e149]:
+                - generic [ref=f8e150]: Regenerate Report Test
+                - code [ref=f8e151]: 89b68ceb-a6a1-4e5c-9dbb-137d09e96ce4
+              - cell "1" [ref=f8e152]
+              - cell "20260401" [ref=f8e153]
+              - cell "Cancelled" [ref=f8e154]
+              - cell "–" [ref=f8e156]
+              - cell "7/1/2026 8:22:40 PM" [ref=f8e157]
+              - cell "7/1/2026 8:26:32 PM" [ref=f8e158]
+              - cell [ref=f8e159]:
+                - generic [ref=f8e160]:
+                  - link "" [ref=f8e161] [cursor=pointer]:
+                    - /url: /Runs/Details/89b68ceb-a6a1-4e5c-9dbb-137d09e96ce4
+                  - link "" [ref=f8e163] [cursor=pointer]:
+                    - /url: /Runs/Export/89b68ceb-a6a1-4e5c-9dbb-137d09e96ce4
+                  - button "" [ref=f8e165] [cursor=pointer]
+            - row [ref=f8e167]:
+              - cell "Regenerate Report Test 19f7236a-2025-4ed2-b45f-ed1f4435b33b" [ref=f8e168]:
+                - generic [ref=f8e169]: Regenerate Report Test
+                - code [ref=f8e170]: 19f7236a-2025-4ed2-b45f-ed1f4435b33b
+              - cell "1" [ref=f8e171]
+              - cell "20260401" [ref=f8e172]
+              - cell "Cancelled" [ref=f8e173]
+              - cell "–" [ref=f8e175]
+              - cell "7/1/2026 8:19:20 PM" [ref=f8e176]
+              - cell "7/1/2026 8:26:30 PM" [ref=f8e177]
+              - cell [ref=f8e178]:
+                - generic [ref=f8e179]:
+                  - link "" [ref=f8e180] [cursor=pointer]:
+                    - /url: /Runs/Details/19f7236a-2025-4ed2-b45f-ed1f4435b33b
+                  - link "" [ref=f8e182] [cursor=pointer]:
+                    - /url: /Runs/Export/19f7236a-2025-4ed2-b45f-ed1f4435b33b
+                  - button "" [ref=f8e184] [cursor=pointer]
+            - row [ref=f8e186]:
+              - cell "Adhoc Report Test f8310a60-da7c-47bf-b3fe-cb7696680c42" [ref=f8e187]:
+                - generic [ref=f8e188]: Adhoc Report Test
+                - code [ref=f8e189]: f8310a60-da7c-47bf-b3fe-cb7696680c42
+              - cell "1" [ref=f8e190]
+              - cell "20260326" [ref=f8e191]
+              - cell "Cancelled" [ref=f8e192]
+              - cell "–" [ref=f8e194]
+              - cell "7/1/2026 8:04:39 PM" [ref=f8e195]
+              - cell "7/1/2026 8:19:15 PM" [ref=f8e196]
+              - cell [ref=f8e197]:
+                - generic [ref=f8e198]:
+                  - link "" [ref=f8e199] [cursor=pointer]:
+                    - /url: /Runs/Details/f8310a60-da7c-47bf-b3fe-cb7696680c42
+                  - link "" [ref=f8e201] [cursor=pointer]:
+                    - /url: /Runs/Export/f8310a60-da7c-47bf-b3fe-cb7696680c42
+                  - button "" [ref=f8e203] [cursor=pointer]
+            - row [ref=f8e205]:
+              - cell "Adhoc Report Test c2047b86-1322-49d3-9b92-627667905660" [ref=f8e206]:
+                - generic [ref=f8e207]: Adhoc Report Test
+                - code [ref=f8e208]: c2047b86-1322-49d3-9b92-627667905660
+              - cell "1" [ref=f8e209]
+              - cell "20260326" [ref=f8e210]
+              - cell "Cancelled" [ref=f8e211]
+              - cell "–" [ref=f8e213]
+              - cell "7/1/2026 7:32:43 PM" [ref=f8e214]
+              - cell "7/1/2026 8:19:12 PM" [ref=f8e215]
+              - cell [ref=f8e216]:
+                - generic [ref=f8e217]:
+                  - link "" [ref=f8e218] [cursor=pointer]:
+                    - /url: /Runs/Details/c2047b86-1322-49d3-9b92-627667905660
+                  - link "" [ref=f8e220] [cursor=pointer]:
+                    - /url: /Runs/Export/c2047b86-1322-49d3-9b92-627667905660
+                  - button "" [ref=f8e222] [cursor=pointer]
+            - row [ref=f8e224]:
+              - cell "Regenerate Report Test 244bb2b5-9cfc-4613-9adf-3557de265559" [ref=f8e225]:
+                - generic [ref=f8e226]: Regenerate Report Test
+                - code [ref=f8e227]: 244bb2b5-9cfc-4613-9adf-3557de265559
+              - cell "1" [ref=f8e228]
+              - cell "20260401" [ref=f8e229]
+              - cell "Succeeded" [ref=f8e230]
+              - cell "–" [ref=f8e232]
+              - cell "6/30/2026 9:27:42 PM" [ref=f8e233]
+              - cell "6/30/2026 9:28:33 PM" [ref=f8e234]
+              - cell [ref=f8e235]:
+                - generic [ref=f8e236]:
+                  - link "" [ref=f8e237] [cursor=pointer]:
+                    - /url: /Runs/Details/244bb2b5-9cfc-4613-9adf-3557de265559
+                  - link "" [ref=f8e239] [cursor=pointer]:
+                    - /url: /Runs/Export/244bb2b5-9cfc-4613-9adf-3557de265559
+                  - button "" [ref=f8e241] [cursor=pointer]
+            - row [ref=f8e243]:
+              - cell "Regenerate Report Test 69b1ce87-0d95-4e7c-9203-4d888f1aeb48" [ref=f8e244]:
+                - generic [ref=f8e245]: Regenerate Report Test
+                - code [ref=f8e246]: 69b1ce87-0d95-4e7c-9203-4d888f1aeb48
+              - cell "1" [ref=f8e247]
+              - cell "20260401" [ref=f8e248]
+              - cell "Succeeded" [ref=f8e249]
+              - cell "7m 48s" [ref=f8e251]
+              - cell "6/30/2026 9:17:10 PM" [ref=f8e252]
+              - cell "6/30/2026 9:25:56 PM" [ref=f8e253]
+              - cell [ref=f8e254]:
+                - generic [ref=f8e255]:
+                  - link "" [ref=f8e256] [cursor=pointer]:
+                    - /url: /Runs/Details/69b1ce87-0d95-4e7c-9203-4d888f1aeb48
+                  - link "" [ref=f8e258] [cursor=pointer]:
+                    - /url: /Runs/Export/69b1ce87-0d95-4e7c-9203-4d888f1aeb48
+                  - button "" [ref=f8e260] [cursor=pointer]
+            - row [ref=f8e262]:
+              - cell "Regenerate Report Test 35736350-8572-408f-87c3-47a4f847a921" [ref=f8e263]:
+                - generic [ref=f8e264]: Regenerate Report Test
+                - code [ref=f8e265]: 35736350-8572-408f-87c3-47a4f847a921
+              - cell "1" [ref=f8e266]
+              - cell "20260401" [ref=f8e267]
+              - cell "Succeeded" [ref=f8e268]
+              - cell "42m 51s" [ref=f8e270]
+              - cell "6/30/2026 8:41:58 PM" [ref=f8e271]
+              - cell "6/30/2026 9:25:56 PM" [ref=f8e272]
+              - cell [ref=f8e273]:
+                - generic [ref=f8e274]:
+                  - link "" [ref=f8e275] [cursor=pointer]:
+                    - /url: /Runs/Details/35736350-8572-408f-87c3-47a4f847a921
+                  - link "" [ref=f8e277] [cursor=pointer]:
+                    - /url: /Runs/Export/35736350-8572-408f-87c3-47a4f847a921
+                  - button "" [ref=f8e279] [cursor=pointer]
+            - row [ref=f8e281]:
+              - cell "Regenerate Report Test d9442447-7d75-41d0-a27e-144488a35472" [ref=f8e282]:
+                - generic [ref=f8e283]: Regenerate Report Test
+                - code [ref=f8e284]: d9442447-7d75-41d0-a27e-144488a35472
+              - cell "1" [ref=f8e285]
+              - cell "20260401" [ref=f8e286]
+              - cell "Succeeded" [ref=f8e287]
+              - cell "–" [ref=f8e289]
+              - cell "6/30/2026 7:48:58 PM" [ref=f8e290]
+              - cell "6/30/2026 7:50:12 PM" [ref=f8e291]
+              - cell [ref=f8e292]:
+                - generic [ref=f8e293]:
+                  - link "" [ref=f8e294] [cursor=pointer]:
+                    - /url: /Runs/Details/d9442447-7d75-41d0-a27e-144488a35472
+                  - link "" [ref=f8e296] [cursor=pointer]:
+                    - /url: /Runs/Export/d9442447-7d75-41d0-a27e-144488a35472
+                  - button "" [ref=f8e298] [cursor=pointer]
+            - row [ref=f8e300]:
+              - cell "Multi Patient Test 36c20350-7f6f-4f3d-8dca-2a4ed891b021" [ref=f8e301]:
+                - generic [ref=f8e302]: Multi Patient Test
+                - code [ref=f8e303]: 36c20350-7f6f-4f3d-8dca-2a4ed891b021
+              - cell "6000" [ref=f8e304]
+              - cell "20260329" [ref=f8e305]
+              - cell "Failed" [ref=f8e306]
+              - cell "2h 5m 40s" [ref=f8e308]
+              - cell "6/1/2026 10:34:50 PM" [ref=f8e309]
+              - cell "6/2/2026 12:44:33 AM" [ref=f8e310]
+              - cell [ref=f8e311]:
+                - generic [ref=f8e312]:
+                  - link "" [ref=f8e313] [cursor=pointer]:
+                    - /url: /Runs/Details/36c20350-7f6f-4f3d-8dca-2a4ed891b021
+                  - link "" [ref=f8e315] [cursor=pointer]:
+                    - /url: /Runs/Export/36c20350-7f6f-4f3d-8dca-2a4ed891b021
+                  - button "" [ref=f8e317] [cursor=pointer]
+            - row [ref=f8e319]:
+              - cell "Second Test 5736fbb3-fdae-4c2f-884a-7565f9164d17" [ref=f8e320]:
+                - generic [ref=f8e321]: Second Test
+                - code [ref=f8e322]: 5736fbb3-fdae-4c2f-884a-7565f9164d17
+              - cell "100" [ref=f8e323]
+              - cell "20260329" [ref=f8e324]
+              - cell "Succeeded" [ref=f8e325]
+              - cell "11m 16s" [ref=f8e327]
+              - cell "5/14/2026 8:13:04 PM" [ref=f8e328]
+              - cell "5/14/2026 8:29:33 PM" [ref=f8e329]
+              - cell [ref=f8e330]:
+                - generic [ref=f8e331]:
+                  - link "" [ref=f8e332] [cursor=pointer]:
+                    - /url: /Runs/Details/5736fbb3-fdae-4c2f-884a-7565f9164d17
+                  - link "" [ref=f8e334] [cursor=pointer]:
+                    - /url: /Runs/Export/5736fbb3-fdae-4c2f-884a-7565f9164d17
+                  - button "" [ref=f8e336] [cursor=pointer]
+            - row [ref=f8e338]:
+              - cell "Second Test 34cdbdfd-3f4c-4110-acbd-942dea6457ac" [ref=f8e339]:
+                - generic [ref=f8e340]: Second Test
+                - code [ref=f8e341]: 34cdbdfd-3f4c-4110-acbd-942dea6457ac
+              - cell "100" [ref=f8e342]
+              - cell "20260329" [ref=f8e343]
+              - cell "Succeeded" [ref=f8e344]
+              - cell "9m 12s" [ref=f8e346]
+              - cell "5/14/2026 6:24:18 PM" [ref=f8e347]
+              - cell "5/14/2026 6:40:44 PM" [ref=f8e348]
+              - cell [ref=f8e349]:
+                - generic [ref=f8e350]:
+                  - link "" [ref=f8e351] [cursor=pointer]:
+                    - /url: /Runs/Details/34cdbdfd-3f4c-4110-acbd-942dea6457ac
+                  - link "" [ref=f8e353] [cursor=pointer]:
+                    - /url: /Runs/Export/34cdbdfd-3f4c-4110-acbd-942dea6457ac
+                  - button "" [ref=f8e355] [cursor=pointer]
+            - row [ref=f8e357]:
+              - cell "Second Test 9a52d648-ad91-4c03-89e5-762b537f18af" [ref=f8e358]:
+                - generic [ref=f8e359]: Second Test
+                - code [ref=f8e360]: 9a52d648-ad91-4c03-89e5-762b537f18af
+              - cell "100" [ref=f8e361]
+              - cell "20260329" [ref=f8e362]
+              - cell "Succeeded" [ref=f8e363]
+              - cell "9m 13s" [ref=f8e365]
+              - cell "5/14/2026 5:41:23 PM" [ref=f8e366]
+              - cell "5/14/2026 5:57:26 PM" [ref=f8e367]
+              - cell [ref=f8e368]:
+                - generic [ref=f8e369]:
+                  - link "" [ref=f8e370] [cursor=pointer]:
+                    - /url: /Runs/Details/9a52d648-ad91-4c03-89e5-762b537f18af
+                  - link "" [ref=f8e372] [cursor=pointer]:
+                    - /url: /Runs/Export/9a52d648-ad91-4c03-89e5-762b537f18af
+                  - button "" [ref=f8e374] [cursor=pointer]
+            - row [ref=f8e376]:
+              - cell "Second Test 755f854c-582a-4f95-8480-16f191e416e5" [ref=f8e377]:
+                - generic [ref=f8e378]: Second Test
+                - code [ref=f8e379]: 755f854c-582a-4f95-8480-16f191e416e5
+              - cell "100" [ref=f8e380]
+              - cell "20260329" [ref=f8e381]
+              - cell "Succeeded" [ref=f8e382]
+              - cell "10m 39s" [ref=f8e384]
+              - cell "5/14/2026 5:12:47 PM" [ref=f8e385]
+              - cell "5/14/2026 5:29:37 PM" [ref=f8e386]
+              - cell [ref=f8e387]:
+                - generic [ref=f8e388]:
+                  - link "" [ref=f8e389] [cursor=pointer]:
+                    - /url: /Runs/Details/755f854c-582a-4f95-8480-16f191e416e5
+                  - link "" [ref=f8e391] [cursor=pointer]:
+                    - /url: /Runs/Export/755f854c-582a-4f95-8480-16f191e416e5
+                  - button "" [ref=f8e393] [cursor=pointer]
+            - row [ref=f8e395]:
+              - cell "Second Test d9dce5c0-c90e-476e-9733-26737f74f3cf" [ref=f8e396]:
+                - generic [ref=f8e397]: Second Test
+                - code [ref=f8e398]: d9dce5c0-c90e-476e-9733-26737f74f3cf
+              - cell "100" [ref=f8e399]
+              - cell "20260329" [ref=f8e400]
+              - cell "Succeeded" [ref=f8e401]
+              - cell "11m 48s" [ref=f8e403]
+              - cell "5/14/2026 4:51:22 PM" [ref=f8e404]
+              - cell "5/14/2026 5:09:03 PM" [ref=f8e405]
+              - cell [ref=f8e406]:
+                - generic [ref=f8e407]:
+                  - link "" [ref=f8e408] [cursor=pointer]:
+                    - /url: /Runs/Details/d9dce5c0-c90e-476e-9733-26737f74f3cf
+                  - link "" [ref=f8e410] [cursor=pointer]:
+                    - /url: /Runs/Export/d9dce5c0-c90e-476e-9733-26737f74f3cf
+                  - button "" [ref=f8e412] [cursor=pointer]
+            - row [ref=f8e414]:
+              - cell "Second Test 5feaebb2-c662-4736-96c3-72c1faca42c8" [ref=f8e415]:
+                - generic [ref=f8e416]: Second Test
+                - code [ref=f8e417]: 5feaebb2-c662-4736-96c3-72c1faca42c8
+              - cell "100" [ref=f8e418]
+              - cell "20260329" [ref=f8e419]
+              - cell "Succeeded" [ref=f8e420]
+              - cell "10m 10s" [ref=f8e422]
+              - cell "5/13/2026 9:06:57 PM" [ref=f8e423]
+              - cell "5/13/2026 9:22:15 PM" [ref=f8e424]
+              - cell [ref=f8e425]:
+                - generic [ref=f8e426]:
+                  - link "" [ref=f8e427] [cursor=pointer]:
+                    - /url: /Runs/Details/5feaebb2-c662-4736-96c3-72c1faca42c8
+                  - link "" [ref=f8e429] [cursor=pointer]:
+                    - /url: /Runs/Export/5feaebb2-c662-4736-96c3-72c1faca42c8
+                  - button "" [ref=f8e431] [cursor=pointer]
+            - row [ref=f8e433]:
+              - cell "FirstTest 38616f06-708e-4b80-b5c9-2e87aa501989" [ref=f8e434]:
+                - generic [ref=f8e435]: FirstTest
+                - code [ref=f8e436]: 38616f06-708e-4b80-b5c9-2e87aa501989
+              - cell "100" [ref=f8e437]
+              - cell "20260329" [ref=f8e438]
+              - cell "Succeeded" [ref=f8e439]
+              - cell "3m 15s" [ref=f8e441]
+              - cell "5/13/2026 8:48:43 PM" [ref=f8e442]
+              - cell "5/13/2026 8:52:37 PM" [ref=f8e443]
+              - cell [ref=f8e444]:
+                - generic [ref=f8e445]:
+                  - link "" [ref=f8e446] [cursor=pointer]:
+                    - /url: /Runs/Details/38616f06-708e-4b80-b5c9-2e87aa501989
+                  - link "" [ref=f8e448] [cursor=pointer]:
+                    - /url: /Runs/Export/38616f06-708e-4b80-b5c9-2e87aa501989
+                  - button "" [ref=f8e450] [cursor=pointer]
+            - row [ref=f8e452]:
+              - cell "Multi Patient Test 8e09e6c3-1e63-4ca3-9894-9aafeb053339" [ref=f8e453]:
+                - generic [ref=f8e454]: Multi Patient Test
+                - code [ref=f8e455]: 8e09e6c3-1e63-4ca3-9894-9aafeb053339
+              - cell "150" [ref=f8e456]
+              - cell "20260328" [ref=f8e457]
+              - cell "Succeeded" [ref=f8e458]
+              - cell "4m 44s" [ref=f8e460]
+              - cell "5/13/2026 8:39:50 PM" [ref=f8e461]
+              - cell "5/13/2026 8:45:28 PM" [ref=f8e462]
+              - cell [ref=f8e463]:
+                - generic [ref=f8e464]:
+                  - link "" [ref=f8e465] [cursor=pointer]:
+                    - /url: /Runs/Details/8e09e6c3-1e63-4ca3-9894-9aafeb053339
+                  - link "" [ref=f8e467] [cursor=pointer]:
+                    - /url: /Runs/Export/8e09e6c3-1e63-4ca3-9894-9aafeb053339
+                  - button "" [ref=f8e469] [cursor=pointer]
+        - generic [ref=f8e472]:
+          - generic [ref=f8e473]: Rows per page
+          - combobox "Rows per page" [ref=f8e474]:
+            - option "10"
+            - option "20" [selected]
+            - option "50"
+            - option "100"
+  - contentinfo [ref=f8e475]:
+    - generic [ref=f8e476]: © 2026 - Automation.UI
+  - text:     
