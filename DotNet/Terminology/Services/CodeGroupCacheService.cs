@@ -250,16 +250,28 @@ public class CodeGroupCacheService(
         // the code system status when validated (see FhirService.ResolveIsActive).
         bool hasStatusColumn = headers.Length == 4;
 
-        var records = csv.GetRecords<CsvValueSetRecord>();
         string? system = null;
         List<Code>? systemCodes = null;
         int scientificNotationCodeCount = 0;
         string scientificNotationCodeExamples = "";
 
-        foreach (var record in records)
+        while (csv.Read())
         {
-            string code = record.Code;
-            string display = record.Display;
+            string recordSystem = csv.GetField(0) ?? string.Empty;
+            string code = csv.GetField(1) ?? string.Empty;
+            string display = csv.GetField(2) ?? string.Empty;
+            CodeStatus status = CodeStatus.Active;
+
+            if (hasStatusColumn)
+            {
+                var rawStatus = csv.GetField(3);
+
+                if (!string.IsNullOrWhiteSpace(rawStatus)
+                    && !Enum.TryParse<CodeStatus>(rawStatus, true, out status))
+                {
+                    status = CodeStatus.Active;
+                }
+            }
 
             if (ScientificNotationPattern.IsMatch(code))
             {
@@ -269,12 +281,12 @@ public class CodeGroupCacheService(
                     scientificNotationCodeExamples += (scientificNotationCodeExamples.Length > 0 ? ", " : "") + code;
             }
 
-            if (system == null || (!string.IsNullOrEmpty(record.System) && system != record.System))
+            if (system == null || (!string.IsNullOrEmpty(recordSystem) && system != recordSystem))
             {
-                if (string.IsNullOrEmpty(record.System))
+                if (string.IsNullOrEmpty(recordSystem))
                     continue;
 
-                system = record.System;
+                system = recordSystem;
                 if (!codeGroup.Codes.ContainsKey(system))
                 {
                     systemCodes = new List<Code>();
@@ -298,7 +310,7 @@ public class CodeGroupCacheService(
                 {
                     Value = code,
                     Display = display,
-                    Status = record.Status
+                    Status = status
                 });
             }
             else
