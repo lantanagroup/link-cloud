@@ -116,7 +116,9 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             if (!(await readBlobClient.ExistsAsync(cancellationToken)).Value)
             {
                 _logger.LogWarning("ABS blob not found for Get. CacheKey='{CacheKey}', BlobPath='{BlobPath}', Container='{Container}'",
-                    cacheKey, GetBlobKey(cacheKey), _settings.BlobContainerName);
+                    cacheKey.SanitizeForLog(),
+                    GetBlobKey(cacheKey).SanitizeForLog(),
+                    _settings.BlobContainerName.SanitizeForLog());
                 return resources;
             }
 
