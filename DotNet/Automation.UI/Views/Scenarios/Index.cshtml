@@ -14,81 +14,97 @@
                 <i class="bi bi-plus-lg"></i>
             </button>
         </div>
-        <div class="card-body p-0">
-            <table class="table au-table mb-0" id="scenarioTable">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Method</th>
-                        <th>Measures</th>
-                        <th>Patients</th>
-                        <th>Resources</th>
-                        <th>Seed</th>
-                        <th>Type</th>
-                        <th>Updated</th>
-                        <th style="width:180px;"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var s in Model)
-                    {
-                        var patientCount = s.PatientCohorts.Count > 0
-                            ? s.PatientCohorts.Sum(c => c.PatientCount)
-                            : s.PatientCount;
-                        var resourceRange = s.PatientCohorts.Count > 0
-                            ? string.Join(", ",
-                                s.PatientCohorts
-                                    .Select(c => c.ResourcesPerPatientMin == c.ResourcesPerPatientMax
-                                        ? c.ResourcesPerPatientMin.ToString()
-                                        : $"{c.ResourcesPerPatientMin}\u2013{c.ResourcesPerPatientMax}")
-                                    .Distinct())
-                            : "-";
+        <div class="card-body">
 
-                        <tr data-id="@s.Id">
-                            <td>
-                                <strong>@s.Name</strong>
-                                @if (!string.IsNullOrWhiteSpace(s.Description))
-                                {
-                                    <br /><small class="text-muted">@s.Description</small>
-                                }
-                            </td>
-                            <td><span class="badge bg-light text-dark border">@s.ReportMethod</span></td>
-                            <td>
-                                @foreach (var m in s.SelectedMeasures)
-                                {
-                                    <span class="badge bg-secondary">@ProfiledMeasureCatalog.GetDisplayName(m)</span>
-                                }
-                            </td>
-                            <td>@patientCount</td>
-                            <td>@resourceRange</td>
-                            <td><code>@s.Seed</code></td>
-                            <td>
-                                @if (s.IsSystemScenario)
-                                {
-                                    <span class="badge bg-dark">System</span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-light text-dark border">Custom</span>
-                                }
-                            </td>
-                            <td class="small text-muted">@s.UpdatedAt.LocalDateTime.ToString("g")</td>
-                            <td class="text-nowrap">
-                                <div class="d-inline-flex gap-1">
-                                    <button type="button" class="btn btn-sm btn-outline-primary btn-scenario-open" data-id="@s.Id" data-mode="@(s.IsSystemScenario ? "view" : "edit")">
-                                        @(s.IsSystemScenario ? "View" : "Edit")
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-outline-secondary btn-scenario-clone" data-id="@s.Id">Clone</button>
-                                    @if (!s.IsSystemScenario)
-                                    {
-                                        <button type="button" class="btn btn-sm btn-outline-danger btn-scenario-delete" data-id="@s.Id">Delete</button>
-                                    }
-                                </div>
-                            </td>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <input type="text"
+                           id="scenarioSearch"
+                           class="form-control"
+                           placeholder="Search scenarios..." />
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table au-table mb-0" id="scenarioTable">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Method</th>
+                            <th>Measures</th>
+                            <th>Patients</th>
+                            <th>Resources</th>
+                            <th>Seed</th>
+                            <th>Type</th>
+                            <th>Updated</th>
+                            <th style="width:180px;"></th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        @foreach (var s in Model)
+                        {
+                            var patientCount = s.PatientCohorts.Count > 0
+                                ? s.PatientCohorts.Sum(c => c.PatientCount)
+                                : s.PatientCount;
+                            var resourceRange = s.PatientCohorts.Count > 0
+                                ? string.Join(", ",
+                                    s.PatientCohorts
+                                        .Select(c => c.ResourcesPerPatientMin == c.ResourcesPerPatientMax
+                                            ? c.ResourcesPerPatientMin.ToString()
+                                        :   $"{c.ResourcesPerPatientMin}\u2013{c.ResourcesPerPatientMax}")
+                                        .Distinct())
+                                : "-";
+
+                            <tr data-id="@s.Id"
+                                data-name="@s.Name"
+                                data-description="@s.Description"
+                                data-method="@s.ReportMethod"
+                                data-type="@(s.IsSystemScenario ? "System" : "Custom")">
+                                <td>
+                                    <strong>@s.Name</strong>
+                                    @if (!string.IsNullOrWhiteSpace(s.Description))
+                                    {
+                                        <br /><small class="text-muted">@s.Description</small>
+                                    }
+                                </td>
+                                <td><span class="badge bg-light text-dark border">@s.ReportMethod</span></td>
+                                <td>
+                                    @foreach (var m in s.SelectedMeasures)
+                                    {
+                                        <span class="badge bg-secondary">@ProfiledMeasureCatalog.GetDisplayName(m)</span>
+                                    }
+                                </td>
+                                <td>@patientCount</td>
+                                <td>@resourceRange</td>
+                                <td><code>@s.Seed</code></td>
+                                <td>
+                                    @if (s.IsSystemScenario)
+                                    {
+                                        <span class="badge bg-dark">System</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-light text-dark border">Custom</span>
+                                    }
+                                </td>
+                                <td class="small text-muted">@s.UpdatedAt.LocalDateTime.ToString("g")</td>
+                                <td class="text-nowrap">
+                                    <div class="d-inline-flex gap-1">
+                                        <button type="button" class="btn btn-sm btn-outline-primary btn-scenario-open" data-id="@s.Id" data-mode="@(s.IsSystemScenario ? "view" : "edit")">
+                                            @(s.IsSystemScenario ? "View" : "Edit")
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary btn-scenario-clone" data-id="@s.Id">Clone</button>
+                                        @if (!s.IsSystemScenario)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-danger btn-scenario-delete" data-id="@s.Id">Delete</button>
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
             @if (Model.Count == 0)
             {
                 <div class="text-center text-muted py-4">No scenarios yet. Click <strong>+</strong> to create one.</div>
@@ -100,9 +116,38 @@
 @await Html.PartialAsync("_ScenarioEditorModal")
 
 <script>
-(function () {
-    // The shared editor fires this event after a successful save/clone/delete.
-    // On the Scenarios list page we reload so the table reflects the change.
-    document.addEventListener('scenario-editor:changed', function () { location.reload(); });
-})();
+    (function () {
+
+        // The shared editor fires this event after a successful save/clone/delete.
+        // On the Scenarios list page we reload so the table reflects the change.
+
+        // Reload after edits
+        document.addEventListener('scenario-editor:changed', function () {
+            location.reload();
+        });
+
+        // Scenario search
+        var search = document.getElementById('scenarioSearch');
+
+        if (search) {
+            search.addEventListener('input', function () {
+                var value = search.value.trim().toLowerCase();
+                var rows = document.querySelectorAll('#scenarioTable tbody tr');
+                rows.forEach(function (row) {
+                    var text =
+                        (
+                            row.dataset.name + " " +
+                            (row.dataset.description || "") + " " +
+                            row.dataset.method + " " +
+                            row.dataset.type
+                        ).toLowerCase();
+
+                    row.style.display =
+                        text.includes(value)
+                            ? ""
+                            : "none";
+                });
+            });
+        }
+    })();
 </script>
