@@ -2,7 +2,11 @@ package com.lantanagroup.link.validation.models;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.lantanagroup.link.validation.enums.RubricResultStatus;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.List;
 import java.util.UUID;

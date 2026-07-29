@@ -1,7 +1,11 @@
 package com.lantanagroup.link.validation.models;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 
 import java.time.OffsetDateTime;
