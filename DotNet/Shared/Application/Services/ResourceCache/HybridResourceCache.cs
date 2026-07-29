@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 using System.Collections.Concurrent;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 {
@@ -41,17 +42,17 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
-        public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType)
+        public async Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
         {
-            var cache = DetermineAndRecordCache(correlationId);
-            cache.UpdateCorrelationCache(correlationId, resources, resourceType);
+            var cache = await DetermineAndRecordCacheAsync(correlationId, cancellationToken);
+            await cache.UpdateCorrelationCacheAsync(correlationId, resources, resourceType, cancellationToken);
         }
 
         /// <inheritdoc/>
-        public List<DomainResource> Get(string cacheKey)
+        public async Task<List<DomainResource>> GetAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
             var cache = ResolveFromKey(cacheKey);
-            return cache.Get(cacheKey);
+            return await cache.GetAsync(cacheKey, cancellationToken);
         }
 
         /// <inheritdoc/>
@@ -62,7 +63,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         }
 
         /// <inheritdoc/>
-        public void Delete(List<string> cacheKeys)
+        public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
         {
             var byType = cacheKeys
                 .GroupBy(k => _correlationCacheTypes.GetValueOrDefault(ExtractCorrelationId(k), ResourceCacheType.Redis));
@@ -70,7 +71,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             foreach (var group in byType)
             {
                 var cache = group.Key == ResourceCacheType.ABS ? _absCache : _redisCache;
-                cache.Delete(group.ToList());
+                await cache.DeleteAsync(group.ToList(), cancellationToken);
             }
 
             // Clean up recorded decisions for deleted keys
@@ -94,10 +95,15 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 
         // -------------------------------------------------------------------------
 
-        private IResourceCache DetermineAndRecordCache(string correlationId)
+        private async Task<IResourceCache> DetermineAndRecordCacheAsync(string correlationId, CancellationToken cancellationToken)
         {
             var key = ExtractCorrelationId(correlationId);
-            var cacheType = _correlationCacheTypes.GetOrAdd(key, _ => SelectCacheType());
+            if (!_correlationCacheTypes.TryGetValue(key, out var cacheType))
+            {
+                cacheType = await SelectCacheTypeAsync(cancellationToken);
+                cacheType = _correlationCacheTypes.GetOrAdd(key, cacheType);
+            }
+
             return cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
         }
 
@@ -108,7 +114,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             return cacheType == ResourceCacheType.ABS ? _absCache : _redisCache;
         }
 
-        private ResourceCacheType SelectCacheType()
+        private async Task<ResourceCacheType> SelectCacheTypeAsync(CancellationToken cancellationToken)
         {
             try
             {
@@ -120,7 +126,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                     return ResourceCacheType.ABS;
                 }
 
-                var memoryInfo = server.Info("memory").FirstOrDefault();
+                var memoryInfo = (await server.InfoAsync("memory").WaitAsync(cancellationToken)).FirstOrDefault();
 
                 if (memoryInfo == null)
                 {
