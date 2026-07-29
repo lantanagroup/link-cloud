@@ -60,7 +60,9 @@
 		<PackageReference Include="Quartz.Plugins.TimeZoneConverter" />
 		<PackageReference Include="Quartz.Serialization.Json" />
 		<PackageReference Include="Quartz.Serialization.SystemTextJson" />
-		<PackageReference Include="StackExchange.Redis" />
+		<PackageReference Include="StackExchange.Redis.Extensions.AspNetCore" />
+		<PackageReference Include="StackExchange.Redis.Extensions.Core" />
+		<PackageReference Include="StackExchange.Redis.Extensions.System.Text.Json" />
 		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" />
 		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
 		<PackageReference Include="System.Text.Encodings.Web" />

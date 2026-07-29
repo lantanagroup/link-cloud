@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using StackExchange.Redis;
+using StackExchange.Redis.Extensions.System.Text.Json;
 
 namespace LantanaGroup.Link.Shared.Application.Extensions
 {
@@ -36,12 +37,10 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
         /// <code>
         /// "ResourceCache": {
         ///   "CacheImplementation": "Hybrid",
-        ///   "Redis": { "ConnectionString": "", "Password": "", "MemoryThresholdPercent": 80.0 },
+        ///   "Redis": { "ConnectionString": "", "Password": "", "PoolSize": 5, "MemoryThresholdPercent": 80.0 },
         ///   "BlobStorage": { "ConnectionString": "", "BlobContainerName": "", "BlobRoot": "" }
         /// }
         /// </code>
-        /// An <see cref="IConnectionMultiplexer"/> will be registered if one has not already
-        /// been added (e.g. by <c>DistributedLockBuildAndAddToDI</c>).
         /// </remarks>
         /// <exception cref="InvalidOperationException">
         /// Thrown when the required connection settings for the selected implementation are missing.
@@ -59,7 +58,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             {
                 case ResourceCacheType.Redis:
                     ValidateRedisSettings(settings.Redis);
-                    RegisterRedisMultiplexer(services, settings.Redis);
+                    RegisterRedisConnectionPool(services, settings.Redis);
                     services.AddSingleton<IResourceCache, RedisResourceCache>();
                     break;
 
@@ -72,7 +71,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
                 default: // Hybrid
                     ValidateRedisSettings(settings.Redis);
                     ValidateBlobStorageSettings(settings.BlobStorage);
-                    RegisterRedisMultiplexer(services, settings.Redis);
+                    RegisterRedisConnectionPool(services, settings.Redis);
                     services.Configure<ResourceCacheBlobStorageSettings>(section.GetSection("BlobStorage"));
                     services.AddKeyedSingleton<IResourceCache, RedisResourceCache>(ResourceCacheType.Redis);
                     services.AddKeyedSingleton<IResourceCache, ABSResourceCache>(ResourceCacheType.ABS);
@@ -83,19 +82,17 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             return services;
         }
 
-        private static void RegisterRedisMultiplexer(IServiceCollection services, ResourceCacheRedisSettings redisSettings)
+        private static void RegisterRedisConnectionPool(IServiceCollection services, ResourceCacheRedisSettings redisSettings)
         {
-            // Only register IConnectionMultiplexer if no other registration is present.
-            services.TryAddSingleton<IConnectionMultiplexer>(_ =>
+            var connectionString = redisSettings.ConnectionString
+                ?? throw new InvalidOperationException("ResourceCache:Redis:ConnectionString must be configured.");
+            var configurationOptions = ConfigurationOptions.Parse(connectionString);
+            configurationOptions.Password = redisSettings.Password;
+
+            services.AddStackExchangeRedisExtensions<SystemTextJsonSerializer>(new StackExchange.Redis.Extensions.Core.Configuration.RedisConfiguration
             {
-                var configOptions = StackExchange.Redis.ConfigurationOptions.Parse(redisSettings.ConnectionString);
-
-                if (!string.IsNullOrEmpty(redisSettings.Password))
-                {
-                    configOptions.Password = redisSettings.Password;
-                }
-
-                return ConnectionMultiplexer.Connect(configOptions);
+                ConnectionString = configurationOptions.ToString(true),
+                PoolSize = redisSettings.PoolSize
             });
         }
 
