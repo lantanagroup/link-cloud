@@ -43,6 +43,13 @@
 			"tags": {}
 		},
 		{
+			"key": "/link/terminology-service-url",
+			"value": "http://terminology-svc",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
 			"key": "/loki/app",
 			"value": "Link QA",
 			"label": null,
@@ -242,6 +249,13 @@
 			"key": "/telemetry/exporterEndpoint",
 			"value": "http://collector-svc.monitoring:55690",
 			"label": "MeasureEval",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "AcquisitionWorkerProcessorSettings:WorkChannelCapacity",
+			"value": "200",
+			"label": "DataAcquisitionWorker",
 			"content_type": "",
 			"tags": {}
 		},
@@ -1912,6 +1926,13 @@
 			"tags": {}
 		},
 		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "Terminology",
+			"label": "Terminology",
+			"content_type": "",
+			"tags": {}
+		},
+		{
 			"key": "Serilog:WriteTo:1:Args:propertiesAsLabels:0",
 			"value": "app",
 			"label": null,
@@ -1942,6 +1963,13 @@
 		{
 			"key": "ServiceRegistry:AccountServiceUrl",
 			"value": "https://qa-account.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "ServiceRegistry:AdminBffServiceUrl",
+			"value": "https://qa-admin.nhsnlink.org",
 			"label": null,
 			"content_type": "",
 			"tags": {}

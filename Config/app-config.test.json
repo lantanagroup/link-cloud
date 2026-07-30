@@ -1291,13 +1291,6 @@
 		{
 			"key": "MongoDB:DatabaseName",
 			"value": "botw-test-automation",
-			"label": "Automation",
-			"content_type": "",
-			"tags": {}
-		},
-		{
-			"key": "MongoDB:DatabaseName",
-			"value": "botw-test-automation",
 			"label": "Link Automation UI",
 			"content_type": "",
 			"tags": {}
@@ -1649,6 +1642,13 @@
 			"key": "Serilog:WriteTo:1:Args:labels:1:value",
 			"value": "Tenant",
 			"label": "Tenant",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "Terminology",
+			"label": "Terminology",
 			"content_type": "",
 			"tags": {}
 		},

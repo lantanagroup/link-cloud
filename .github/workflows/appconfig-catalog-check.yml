@@ -49,14 +49,12 @@ jobs:
       - name: Validate catalog schema
         run: python Scripts/validate_app_config_schema.py
 
-      # ADVISORY until the outstanding gaps are provisioned. Three required keys have no
-      # store row yet (ServiceRegistry:AdminBffServiceUrl and link.terminology-service-url in
-      # qa, AcquisitionWorkerProcessorSettings:WorkChannelCapacity in dev and qa) and the test
-      # store still carries an orphaned "Automation" label. Those are fixed with the other
-      # store changes; until then this would fail every PR for reasons no PR author caused.
+      # Enforcing. The gaps this was advisory for are closed: the three required keys now have
+      # rows in every environment file and the orphaned "Automation" label is gone.
       #
-      # To promote: delete continue-on-error, confirm a green run, then mark the job required
-      # in branch protection.
+      # A failure here means app-config.yaml and Config/app-config.*.json have drifted - most
+      # often a key marked required: true in the catalog with no row added to each environment
+      # file. Fix it in the same PR: either add the row, or set required: false and record the
+      # shipped default in defaultValue.
       - name: Check required keys are provisioned
-        continue-on-error: true
         run: python Scripts/check_required_config.py

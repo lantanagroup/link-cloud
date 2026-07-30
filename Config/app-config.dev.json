@@ -253,6 +253,13 @@
 			"tags": {}
 		},
 		{
+			"key": "AcquisitionWorkerProcessorSettings:WorkChannelCapacity",
+			"value": "200",
+			"label": "DataAcquisitionWorker",
+			"content_type": "",
+			"tags": {}
+		},
+		{
 			"key": "AllowReflection",
 			"value": "false",
 			"label": null,
@@ -1607,6 +1614,13 @@
 			"key": "Serilog:WriteTo:1:Args:labels:1:value",
 			"value": "Tenant",
 			"label": "Tenant",
+			"content_type": "",
+			"tags": {}
+		},
+		{
+			"key": "Serilog:WriteTo:1:Args:labels:1:value",
+			"value": "Terminology",
+			"label": "Terminology",
 			"content_type": "",
 			"tags": {}
 		},
