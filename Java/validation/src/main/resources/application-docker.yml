@@ -30,9 +30,6 @@ spring:
 authentication:
   anonymous: true
 
-secret-management:
-  managerUri: https://link-vault.vault.azure.net/
-
 springdoc:
   api-docs:
     enabled: true
