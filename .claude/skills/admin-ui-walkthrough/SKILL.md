@@ -31,7 +31,7 @@ so there is normally no login gate. If one appears, that itself is worth reporti
 
 Load MCP tools in **one** ToolSearch call:
 
-```
+```text
 select:mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_type,mcp__playwright__browser_press_key,mcp__playwright__browser_console_messages,mcp__playwright__browser_network_requests,mcp__playwright__browser_network_request,mcp__playwright__browser_take_screenshot
 ```
 
@@ -50,7 +50,7 @@ select:mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__
 For each step: act → snapshot → **check console and network**. Most defects here are
 swallowed Angular errors that leave the page looking fine.
 
-```
+```text
 browser_console_messages { level: "error" }          // all:false = this page only
 browser_network_requests { static: false, filter: "/api/" }
 browser_network_request  { index: N, part: "request-body" }
@@ -83,7 +83,7 @@ called until its header is clicked — never conclude "the app never calls X" fr
 To find the source behind a minified stack trace, grep for the property name in the message,
 not the chunk name:
 
-```
+```text
 Grep { pattern: "dispatchSchedules", path: "Web/Admin.UI/src" }
 ```
 

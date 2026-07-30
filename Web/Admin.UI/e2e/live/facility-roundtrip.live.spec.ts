@@ -58,7 +58,13 @@ test('a facility created through the BFF appears in the UI and disappears after 
     expect([200, 202, 204, 404]).toContain(del.status());
   }
 
-  // Verify it is gone from the real list.
-  const check = await request.get(`${api}/facility/${facilityId}`);
-  expect(check.status(), 'facility should no longer exist').not.toBe(200);
+  // Deletion is no more immediately visible than creation was, so poll for absence the same
+  // way the creation above polls for presence — a single GET can still catch the delete
+  // in flight on a busy stack and fail a test that is actually fine.
+  await expect
+    .poll(async () => (await request.get(`${api}/facility/${facilityId}`)).status(), {
+      message: `facility ${facilityId} was still readable after deletion`,
+      timeout: 30_000,
+    })
+    .not.toBe(200);
 });

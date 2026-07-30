@@ -9,7 +9,7 @@ Two tiers, selected via Playwright projects:
 
 ## Mocked tier (default)
 
-```
+```powershell
 npm run e2e        # headless
 npm run e2e:ui     # interactive UI mode
 npm run e2e:report # open the last HTML report
