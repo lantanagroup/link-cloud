@@ -104,14 +104,42 @@
         <div class="card-body">
             <div class="row g-2 align-items-end">
                 <div class="col-md-6">
-                    <label class="form-label fw-bold" for="quickLaunchSelect">Select a saved scenario to run</label>
+                    <label class="form-label fw-bold" for="quickLaunchSelect">Select a saved scenario to run</label>          
+                    <input type="text"
+                        id="quickLaunchSearch"
+                        class="form-control mb-2"
+                        placeholder="Search scenarios..." />
                     <select class="form-select" id="quickLaunchSelect">
                         <option value="">-- Select a scenario --</option>
-                        @foreach (var s in sortedScenarios)
+                        <optgroup label="Custom">
+                        @foreach (var s in sortedScenarios.Where(x => !x.IsSystemScenario))
                         {
                             var suffix = s.IsSystemScenario ? " [System]" : "";
-                            <option value="@s.Id">@s.Name@suffix</option>
+                            <option value="@s.Id"
+                                    data-name="@s.Name"
+                                    data-description="@s.Description"
+                                    data-method="@s.ReportMethod"
+                                    data-type="@(s.IsSystemScenario ? "System" : "Custom")"
+                                    data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))">
+                                @s.Name@suffix
+                            </option>
                         }
+                        </optgroup>
+
+                        <optgroup label="System">
+                        @foreach(var s in sortedScenarios.Where(x => x.IsSystemScenario))
+                        {
+                            var suffix = s.IsSystemScenario ? " [System]" : "";
+                            <option value="@s.Id"
+                                    data-name="@s.Name"
+                                    data-description="@s.Description"
+                                    data-method="@s.ReportMethod"
+                                    data-type="@(s.IsSystemScenario ? "System" : "Custom")"
+                                    data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))">
+                                @s.Name@suffix
+                            </option>
+                        }
+                        </optgroup>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -480,16 +508,62 @@
     // --- Quick Launch ---
     var selector = document.getElementById('quickLaunchSelect');
     var runBtn = document.getElementById('qlRunButton');
+    var quickSearch = document.getElementById('quickLaunchSearch');
 
-    selector.addEventListener('change', function () {
-        var id = selector.value;
-        runBtn.disabled = !id;
+    function applyQuickLaunchSearch() {
+        if (!selector || !quickSearch) return;
 
-        document.getElementById('qlScenarioId').value = id || '';
+        var value = quickSearch.value.trim().toLowerCase();
+
+        Array.from(selector.options).forEach(function (option) {
+            // Always keep the placeholder available.
+            if (!option.value) {
+                option.hidden = false;
+                return;
+            }
+
+            var text = (
+                (option.dataset.name || '') + ' ' +
+                (option.dataset.description || '') + ' ' +
+                (option.dataset.method || '') + ' ' +
+                (option.dataset.type || '') + ' ' +
+                (option.dataset.measures || '')
+            ).toLowerCase();
+
+            option.hidden = !text.includes(value);
+        });
+
+        selector.querySelectorAll('optgroup').forEach(function (group) {
+            group.hidden = !Array.from(group.children).some(function (option) {
+                return !option.hidden;
+            });
+        });
+
         var selected = selector.options[selector.selectedIndex];
-        var label = selected ? (selected.textContent || '') : '';
-        document.getElementById('qlScenarioName').value = label.replace(/\s\[System\]$/, '').trim() || 'Scenario';
-    });
+        if (selected && selected.hidden) {
+            selector.value = '';
+            selector.dispatchEvent(new Event('change'));
+        }
+    }
+
+    if (quickSearch) {
+        quickSearch.addEventListener('input', applyQuickLaunchSearch);
+    }
+
+    if (selector && runBtn) {
+        selector.addEventListener('change', function () {
+            var id = selector.value;
+            runBtn.disabled = !id;
+
+            document.getElementById('qlScenarioId').value = id || '';
+
+            var selected = selector.options[selector.selectedIndex];
+            var label = selected ? (selected.textContent || '') : '';
+
+            document.getElementById('qlScenarioName').value =
+                label.replace(/\s\[System\]$/, '').trim() || 'Scenario';
+        });
+    }
 
     // --- AJAX Cancel ---
     document.addEventListener('click', function (e) {
@@ -566,25 +640,49 @@
     document.addEventListener('scenario-editor:changed', function (e) {
         var detail = e.detail || {};
         if (detail.action !== 'saved' || !detail.id) return;
+
         var sel = document.getElementById('quickLaunchSelect');
         if (!sel) return;
+
         var label = detail.name || 'Scenario';
         var opt = sel.querySelector('option[value="' + detail.id + '"]');
+
         if (opt) {
-            // Preserve the existing " [System]" suffix (if any) across rename so an
-            // edited system scenario doesn't get demoted into the custom group on
-            // re-sort below. User-created scenarios have no suffix on either branch.
-            var wasSystem = /\s\[System\]$/.test(opt.textContent || '');
+            var wasSystem = opt.dataset.type === 'System' ||
+                /\s\[System\]$/.test(opt.textContent || '');
+
             opt.textContent = label + (wasSystem ? ' [System]' : '');
+            opt.dataset.name = label;
         } else {
             opt = document.createElement('option');
             opt.value = detail.id;
-            // New scenarios created through this editor are always custom; system
-            // scenarios are read-only and only the seeded set can exist.
             opt.textContent = label;
-            sel.appendChild(opt);
+            opt.dataset.name = label;
+            opt.dataset.description = '';
+            opt.dataset.method = '';
+            opt.dataset.type = 'Custom';
+            opt.dataset.measures = '';
+
+            var customGroup = sel.querySelector('optgroup[label="Custom"]');
+            if (customGroup) {
+                customGroup.appendChild(opt);
+            } else {
+                sel.appendChild(opt);
+            }
         }
+
         sortScenarioOptions(sel);
+        applyQuickLaunchSearch();
+
+        sel.value = detail.id;
+
+        // A newly saved scenario may not match the current search text.
+        // Clear the search so the newly created scenario can be selected.
+        if (opt.hidden && quickSearch) {
+            quickSearch.value = '';
+            applyQuickLaunchSearch();
+        }
+
         sel.value = detail.id;
         sel.dispatchEvent(new Event('change'));
     });
@@ -597,29 +695,33 @@
     // Sorting is case-insensitive so "zNick" / "ZNick" / "znick" cluster together.
     function sortScenarioOptions(sel) {
         if (!sel) return;
-        var placeholder = null;
-        var items = [];
-        for (var i = 0; i < sel.options.length; i++) {
-            var o = sel.options[i];
-            // The placeholder is the only option with an empty value.
-            if (placeholder === null && !o.value) {
-                placeholder = o;
-                continue;
-            }
-            items.push(o);
-        }
+
+        var customGroup = sel.querySelector('optgroup[label="Custom"]');
+        var systemGroup = sel.querySelector('optgroup[label="System"]');
+
+        if (!customGroup || !systemGroup) return;
+    
+        var items = Array.from(sel.options)
+            .filter(function (option) {
+                return !!option.value;
+            });
 
         items.sort(function (a, b) {
-            var aSys = /\s\[System\]$/.test(a.textContent || '') ? 1 : 0;
-            var bSys = /\s\[System\]$/.test(b.textContent || '') ? 1 : 0;
-            if (aSys !== bSys) return aSys - bSys;
-            return (a.textContent || '').localeCompare((b.textContent || ''), undefined, { sensitivity: 'base' });
+            return (a.dataset.name || a.textContent || '').localeCompare(
+                b.dataset.name || b.textContent || '',
+                undefined,
+                { sensitivity: 'base' }
+            );
         });
 
-        // Re-append in sorted order. appendChild on an already-parented node moves it,
-        // so we don't need to remove first.
-        if (placeholder) sel.appendChild(placeholder);
-        items.forEach(function (o) { sel.appendChild(o); });
+        items.forEach(function (option) {
+            var destination =
+                option.dataset.type === 'System'
+                    ? systemGroup
+                    : customGroup;
+
+            destination.appendChild(option);
+        });
     }
 
     // --- Recent Runs table: sort / page / size all go through the partial-view
