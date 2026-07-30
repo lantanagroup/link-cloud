@@ -15,6 +15,7 @@ parameters:
       - dev-scale
       - scale-test
       - scale-qa
+      - scale-qa2
 
 variables:
 - group: link-cloud-variables
@@ -33,6 +34,8 @@ variables:
     value:  'test'
   ${{ if eq(parameters.environment, 'scale-qa') }}:
     value:  'qa'
+  ${{ if eq(parameters.environment, 'scale-qa2') }}:
+    value:  'qa2'
 
 jobs:
 
