@@ -57,10 +57,13 @@
 
                             <tr data-id="@s.Id"
                                 data-name="@s.Name"
-                                data-description="@s.Description"
+                                data-description="@(s.Description ?? "")"
                                 data-method="@s.ReportMethod"
                                 data-type="@(s.IsSystemScenario ? "System" : "Custom")"
-                                data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))">
+                                data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))"
+                                data-seed="@s.Seed"
+                                data-patients="@patientCount"
+                                data-resources="@resourceRange">
                                 <td>
                                     <strong>@s.Name</strong>
                                     @if (!string.IsNullOrWhiteSpace(s.Description))
@@ -136,19 +139,21 @@
         var search = document.getElementById('scenarioSearch');
 
         if (search) {
+            search.focus();
             search.addEventListener('input', function () {
                 var value = search.value.trim().toLowerCase();
                 var rows = document.querySelectorAll('#scenarioTable tbody tr');
                 var visibleRows = 0;
                 rows.forEach(function (row) {
-                    var text =
-                        (
-                            row.dataset.name + " " +
-                            (row.dataset.description || "") + " " +
-                            row.dataset.method + " " +
-                            row.dataset.type + " " +
-                            (row.dataset.measures || "")
-                        ).toLowerCase();
+                        var text =
+                            (
+                                (row.dataset.name || "") + " " +
+                                (row.dataset.description || "") + " " +
+                                (row.dataset.method || "") + " " +
+                                (row.dataset.type || "") + " " +
+                                (row.dataset.measures || "") + " " +
+                                (row.dataset.seed || "")
+                            ).toLowerCase();
 
                     var matches = text.includes(value);
 
