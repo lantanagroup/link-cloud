@@ -1,4 +1,5 @@
 import { ICensusConfiguration } from '../../src/app/interfaces/census/census-config-model.interface';
+import { IQueryDispatchConfiguration } from '../../src/app/interfaces/query-dispatch/query-dispatch-config-model.interface';
 import {
   IEncounterMappingModel,
   IPagedEncounterMapping,
@@ -96,4 +97,13 @@ export const censusConfiguration: ICensusConfiguration = {
   facilityId,
   scheduledTrigger: '0 0 6 * * ?',
   enabled: true,
+};
+
+/**
+ * Discharge is the only event the form offers — its control is rendered disabled — so a
+ * configured facility always comes back with exactly this one schedule.
+ */
+export const queryDispatchConfiguration: IQueryDispatchConfiguration = {
+  facilityId,
+  dispatchSchedules: [{ event: 'Discharge', duration: 'PT30M' }],
 };
