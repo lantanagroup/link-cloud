@@ -15,9 +15,42 @@ properties:
       type: "array"
       items:
         $ref: "#/$defs/configEntry"
+  serviceMeta:
+    type: "object"
+    description: "Per-service deployment facts: the Azure App Configuration label the running service selects, and which runtime it is. Tooling reads this rather than hardcoding the mapping."
+    additionalProperties:
+      $ref: "#/$defs/serviceMetaEntry"
 required:
   - "global"
   - "services"
+  - "serviceMeta"
+
+# Label values are hardcoded in the services themselves and must match exactly:
+#   .NET  - a compile-time constant passed to AddExternalConfiguration(), e.g.
+#           LinkAdminConstants.ServiceName = "LinkAdminBFF"
+#           (DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:61)
+#   Java  - the label-filter in bootstrap.yml, e.g. ',MeasureEval'
+#           (Java/measureeval/src/main/resources/bootstrap.yml:9)
+# Each service selects unlabeled keys first, then its own label, so a labeled row
+# overrides an unlabeled one for that service only. Changing a label requires a redeploy.
+serviceMeta:
+  Account:               { label: "Account",               runtime: "dotnet" }
+  AdminBFF:              { label: "LinkAdminBFF",          runtime: "dotnet" }
+  Audit:                 { label: "Audit",                 runtime: "dotnet" }
+  AutomationUI:          { label: "Link Automation UI",    runtime: "dotnet" }
+  Census:                { label: "Census",                runtime: "dotnet" }
+  DataAcquisition:       { label: "DataAcquisition",       runtime: "dotnet" }
+  DataAcquisitionWorker: { label: "DataAcquisitionWorker", runtime: "dotnet" }
+  MeasureEval:           { label: "MeasureEval",           runtime: "java" }
+  Normalization:         { label: "Normalization",         runtime: "dotnet" }
+  Notification:          { label: "Notification",          runtime: "dotnet" }
+  QueryDispatch:         { label: "QueryDispatch",         runtime: "dotnet" }
+  Report:                { label: "Report",                runtime: "dotnet" }
+  Submission:            { label: "Submission",            runtime: "dotnet" }
+  Tenant:                { label: "Tenant",                runtime: "dotnet" }
+  Terminology:           { label: "Terminology",           runtime: "dotnet" }
+  Validation:            { label: "Validation",            runtime: "java" }
+
 global:
   - key: "KafkaConnection:BootstrapServers"
     description: "Comma-separated list of Kafka bootstrap servers for event messaging."
@@ -411,6 +444,20 @@ services:
       description: "Boolean flag (default true). When false, the expression[] of each issue is omitted from the pre-qualification OperationOutcome written by the Validation service."
       required: false
 $defs:
+  serviceMetaEntry:
+    type: "object"
+    additionalProperties: false
+    required:
+      - "label"
+      - "runtime"
+    properties:
+      label:
+        type: "string"
+        description: "The App Configuration label this service selects at startup. Hardcoded per service (a compile-time constant in .NET, the bootstrap.yml label-filter in Java), so it cannot be changed without a redeploy. Must match exactly, including case and spaces."
+      runtime:
+        type: "string"
+        enum: ["dotnet", "java"]
+        description: "Which runtime the service is. Determines key notation: .NET reads 'Section:Key' rows, Java reads '/section/key' rows which the Spring provider maps to 'section.key'."
   configEntry:
     type: "object"
     additionalProperties: false
@@ -438,6 +485,15 @@ $defs:
       defaultValue:
         type: "string"
         description: "An optional default value for the configuration key, if applicable."
+      runtime:
+        type: "string"
+        enum: ["dotnet", "java"]
+        description: "Overrides the runtime inferred from the owning service, for the rare entry whose notation does not match its section. Needed for Java-notation keys listed under 'global', which has no owning service."
+      consumers:
+        type: "array"
+        items:
+          type: "string"
+        description: "Services that read this key, derived from the code inventory. Documentation only - not used for resolution."
     # A sensitive setting must never carry a defaultValue - secrets and Key Vault
     # references are supplied per environment, never seeded from this file.
     # The "required: sensitive" guard below is load-bearing: without it, an entry that
