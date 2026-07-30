@@ -59,7 +59,8 @@
                                 data-name="@s.Name"
                                 data-description="@s.Description"
                                 data-method="@s.ReportMethod"
-                                data-type="@(s.IsSystemScenario ? "System" : "Custom")">
+                                data-type="@(s.IsSystemScenario ? "System" : "Custom")"
+                                data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))">
                                 <td>
                                     <strong>@s.Name</strong>
                                     @if (!string.IsNullOrWhiteSpace(s.Description))
@@ -104,6 +105,11 @@
                         }
                     </tbody>
                 </table>
+                <div id="noScenarioResults"
+                     class="text-center text-muted py-4"
+                     style="display:none;">
+                    No matching scenarios found.
+                </div>
             </div>
             @if (Model.Count == 0)
             {
@@ -133,20 +139,28 @@
             search.addEventListener('input', function () {
                 var value = search.value.trim().toLowerCase();
                 var rows = document.querySelectorAll('#scenarioTable tbody tr');
+                var visibleRows = 0;
                 rows.forEach(function (row) {
                     var text =
                         (
                             row.dataset.name + " " +
                             (row.dataset.description || "") + " " +
                             row.dataset.method + " " +
-                            row.dataset.type
+                            row.dataset.type + " " +
+                            (row.dataset.measures || "")
                         ).toLowerCase();
 
-                    row.style.display =
-                        text.includes(value)
-                            ? ""
-                            : "none";
+                    var matches = text.includes(value);
+
+                    row.style.display = matches ? "" : "none";
+
+                    if (matches) {
+                        visibleRows++;
+                    }
                 });
+
+                document.getElementById("noScenarioResults").style.display =
+                    visibleRows === 0 ? "" : "none";
             });
         }
     })();
