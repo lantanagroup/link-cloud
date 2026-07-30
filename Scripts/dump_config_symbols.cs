@@ -186,6 +186,29 @@ foreach (var type in AllTypes(compilation.GlobalNamespace))
     }
 }
 
+// Local constants inside a method body, including the top-level statements of a Program.cs.
+// Automation.UI declares `const string ApiBearerConfigSection = "Authentication:ApiBearer"`
+// this way and then interpolates it, so without these the keys it reads look dead.
+// Same ambiguity rule applies: a name declared twice with different values resolves to null.
+foreach (var tree in trees)
+{
+    foreach (var declaration in tree.GetRoot().DescendantNodes().OfType<LocalDeclarationStatementSyntax>())
+    {
+        if (!declaration.IsConst)
+        {
+            continue;
+        }
+        foreach (var variable in declaration.Declaration.Variables)
+        {
+            if (variable.Initializer?.Value is LiteralExpressionSyntax literal
+                && literal.IsKind(SyntaxKind.StringLiteralExpression))
+            {
+                AddConstant(variable.Identifier.ValueText, literal.Token.ValueText);
+            }
+        }
+    }
+}
+
 IEnumerable<string> Bases(INamedTypeSymbol type)
 {
     for (var b = type.BaseType; b is not null && b.SpecialType != SpecialType.System_Object; b = b.BaseType)

@@ -211,7 +211,14 @@ def expand_type(type_name: str, prefix: str, types: Dict[str, Dict[str, Any]],
 # Pass C - call sites
 # ---------------------------------------------------------------------------
 
-ARG = r'(?:"(?P<lit>[^"]*)"|nameof\(\s*(?P<nam>[A-Za-z_][\w\.]*)\s*\)|(?P<ref>[A-Za-z_][\w\.]*))'
+# A key may be a literal, a nameof(), a constant reference, or an interpolated string whose
+# first hole is a constant holding the section - Automation.UI writes
+# `$"{ApiBearerConfigSection}:Enabled"`. Without the last form those keys look dead, and
+# deleting them from the catalog would remove config the service genuinely reads.
+ARG = (r'(?:\$"\{\s*(?P<interp>[A-Za-z_][\w\.]*)\s*\}(?P<isuffix>[^"{}]*)"'
+       r'|"(?P<lit>[^"]*)"'
+       r'|nameof\(\s*(?P<nam>[A-Za-z_][\w\.]*)\s*\)'
+       r'|(?P<ref>[A-Za-z_][\w\.]*))')
 
 PATTERNS = [
     ("configure-bind", re.compile(
@@ -248,7 +255,21 @@ def local_binding_patterns(var: str) -> List[Tuple[str, "re.Pattern"]]:
     ]
 
 
+def lookup_constant(ref: str, constants: Dict[str, Optional[str]]) -> Optional[str]:
+    """Most-qualified match wins; an ambiguous name maps to None and stays unresolved."""
+    tail = ref.split(".")
+    for start in range(len(tail)):
+        candidate = ".".join(tail[start:])
+        if candidate in constants:
+            return constants[candidate]
+    return None
+
+
 def resolve_arg(match: re.Match, constants: Dict[str, Optional[str]]) -> Optional[str]:
+    groups = match.groupdict()
+    if groups.get("interp"):
+        base = lookup_constant(groups["interp"], constants)
+        return None if base is None else base + (groups.get("isuffix") or "")
     if match.group("lit") is not None:
         return match.group("lit")
     if match.group("nam"):

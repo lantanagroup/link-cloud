@@ -56,8 +56,9 @@ global:
     description: "Comma-separated list of Kafka bootstrap servers for event messaging."
     required: true
   - key: "DatabaseProvider"
-    description: "The type of database provider to use (e.g., SqlServer, MongoDB)."
-    required: true
+    description: "The database provider to use. SqlServer is the only value the code handles; the key exists for a future provider swap."
+    required: false
+    defaultValue: "SqlServer"
   - key: "ConnectionStrings:DatabaseConnection"
     description: "The connection string for the primary service database."
     required: true
@@ -92,9 +93,20 @@ global:
   - key: "Telemetry:EnableTelemetry"
     description: "Boolean flag to enable or disable OpenTelemetry tracing and metrics."
     required: true
-  - key: "Serilog:WriteTo:GrafanaLoki:Args:uri"
+  # Serilog's WriteTo is an array, so sinks are addressed positionally, not by name. Index 1
+  # is GrafanaLoki because every appsettings.json orders the array [GrafanaLoki, Console] and
+  # the stores overlay WriteTo:0:Name=Console / WriteTo:1:Name=GrafanaLoki, which .NET merges
+  # by index. Reordering that array in any service silently moves this setting.
+  - key: "Serilog:WriteTo:1:Args:uri"
     description: "The endpoint URI for the Grafana Loki log aggregator."
     required: true
+  # Read by logback-spring.xml via <springProperty>, not by any @ConfigurationProperties
+  # class, so a scan of the Java binding classes alone reports it as dead. It is not.
+  - key: "loki.app"
+    description: "The application label attached to log lines shipped to Loki by the Java services."
+    required: false
+    runtime: "java"
+    defaultValue: "link-cloud"
   - key: "ConnectionStrings:Redis"
     description: "The Redis endpoint (host:port). The password is supplied separately via Redis:Password. Required when Cache:Type is Redis; the resource cache uses ResourceCache:Redis:ConnectionString instead."
     required: true
@@ -149,9 +161,6 @@ global:
   - key: "link.report.base-url"
     description: "The base URL for the Report Service (used by Java services)."
     required: true
-  - key: "SecretManagement:Enabled"
-    description: "Boolean flag to enable or disable secret management."
-    required: true
   - key: "SecretManagement:Manager"
     description: "The type of secret manager to use (e.g., AzureKeyVault)."
     required: true
@@ -186,8 +195,9 @@ global:
 services:
   Account:
     - key: "UserManagement:EnableAutomaticUserActivation"
-      description: "Boolean flag to enable automatic activation of new users."
-      required: true
+      description: "Boolean flag to enable automatic activation of new users. Every environment currently runs the default; provision a row only where the posture should differ."
+      required: false
+      defaultValue: "true"
   AdminBFF:
     - key: "Authentication:Schemas:Oauth2:ClientId"
       description: "The OAuth2 client ID for the Admin BFF."
@@ -215,11 +225,11 @@ services:
       description: "The client ID for the Kafka connection."
       required: true
   AutomationUI:
-    - key: "Automation:ExternalFhirServerBase"
-      description: "The base URL for the external FHIR server used for testing."
+    - key: "Automation:FhirServerBase"
+      description: "The base URL of the FHIR server the generator writes test data to."
       required: true
-    - key: "Automation:InternalFhirServerBase"
-      description: "The base URL for the internal FHIR server used for testing."
+    - key: "Automation:FacilityFhirServerBase"
+      description: "The base URL of the FHIR server as the facility reaches it. Differs from Automation:FhirServerBase only when the consumer's network vantage point differs."
       required: true
     - key: "MongoDB:ConnectionString"
       description: "The MongoDB connection string for automation data."
@@ -233,10 +243,12 @@ services:
   DataAcquisition:
     - key: "AcquisitionJobSettings:CronSchedule"
       description: "The cron expression defining how often data acquisition jobs should run."
-      required: true
+      required: false
+      defaultValue: "0/10 * * * * ?"
     - key: "DistributedLockSettings:Expiration"
       description: "The expiration time in minutes for distributed locks."
-      required: true
+      required: false
+      defaultValue: "10"
     - key: "Cache:Type"
       description: "ICacheService backend. Defaults to InMemory (per-process); set to Redis to share the cache (e.g. org-location conditions) across the DataAcquisition service and AcquisitionWorker so a config change in one is seen by the other. Redis requires ConnectionStrings:Redis."
       required: false
@@ -255,6 +267,10 @@ services:
     - key: "ResourceCache:Redis:MaxMemoryBytes"
       description: "The Redis max-memory limit in bytes, used as the denominator for Hybrid cache memory-pressure fallback. Supplied via configuration because Azure Managed Redis does not return maxmemory via INFO. Recommended for Hybrid; when unset or <= 0 Redis is always used (a warning is logged). All LCG Redis instances are currently 1 GB (1073741824); this must be updated if Redis capacity is scaled. Defaults to 268435456 (256 MB) to match local Docker Redis."
       required: false
+    # Normalization binds a top-level "CacheBlobStorage" section for the same three settings
+    # (Normalization/Program.cs), while DataAcquisition and Shared bind the nested
+    # ResourceCache:BlobStorage form. Both spellings are live; unifying them needs a code
+    # change and is tracked separately.
     - key: "ResourceCache:BlobStorage:ConnectionString"
       description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
       required: true
@@ -266,8 +282,9 @@ services:
       required: false
   DataAcquisitionWorker:
     - key: "AcquisitionWorkerProcessorSettings:MaxConcurrentAcquisitions"
-      description: "The maximum number of concurrent data acquisition tasks."
-      required: true
+      description: "The maximum number of concurrent data acquisition tasks. Declared in appsettings.json as a flat colon key rather than a nested object."
+      required: false
+      defaultValue: "8"
     - key: "AcquisitionWorkerProcessorSettings:WorkChannelCapacity"
       description: "The capacity of the internal work channel for acquisition tasks."
       required: true
@@ -298,10 +315,9 @@ services:
     - key: "ResourceCache:BlobStorage:BlobRoot"
       description: "Optional blob name prefix used by the resource cache. Defaults to empty."
       required: false
-  Census:
-    - key: "CensusSettings:ObservationCodes"
-      description: "Comma-separated list of FHIR Observation codes used to identify census events."
-      required: true
+  # No service-specific required config: this service reads only global keys. An explicit
+  # empty list keeps it paired with its serviceMeta entry.
+  Census: []
   MeasureEval:
     - key: "spring.data.mongodb.uri"
       description: "The MongoDB connection string."
@@ -313,11 +329,13 @@ services:
       description: "The OIDC authority URL for token validation."
       required: true
     - key: "link.reportability-predicate"
-      description: "Fully qualified class name of the reportability predicate to use."
-      required: true
+      description: "Fully qualified class name of the reportability predicate. Changing it changes evaluation behaviour, not deployment topology, so it is not an environment concern."
+      required: false
+      defaultValue: "com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation"
     - key: "link.cql-debug"
       description: "Boolean flag to enable CQL debugging."
-      required: true
+      required: false
+      defaultValue: "false"
     - key: "resource-cache.blob-storage.connection-string"
       description: "Azure Blob Storage (or Azurite) connection string for the ABS resource cache. Required only when the ABS resource-cache backend is used instead of Redis; leave empty to disable ABS caching."
       required: false
@@ -359,14 +377,14 @@ services:
     - key: "SmtpConnection:Port"
       description: "The SMTP server port."
       required: true
-  QueryDispatch:
-    - key: "QuartzCollectionPrefix"
-      description: "The prefix for Quartz job collections in the database."
-      required: true
+  # No service-specific required config: this service reads only global keys. An explicit
+  # empty list keeps it paired with its serviceMeta entry.
+  QueryDispatch: []
   Report:
     - key: "EnhancedQueryLoggingSettings:EnableEnhancedQueryLogging"
-      description: "Boolean flag to enable detailed logging of database queries."
-      required: true
+      description: "Boolean flag to enable detailed logging of database queries. Diagnostic toggle; provision a row where it should be on."
+      required: false
+      defaultValue: "false"
     - key: "PatientAggregator:IncludeOrganizationResource"
       description: "Whether to include the submitting Organization in patient bundles."
       required: false
@@ -404,11 +422,13 @@ services:
   Tenant:
     - key: "FacilityIdSettings:NumericOnlyFacilityId"
       description: "Boolean flag to restrict facility IDs to numeric values only."
-      required: true
+      required: false
+      defaultValue: "false"
   Terminology:
     - key: "Terminology:Path"
-      description: "The path to the terminology data files."
-      required: true
+      description: "Path to the terminology data files. A path inside the container image, so it does not vary by environment. Validated at startup: a missing directory is a hard startup failure."
+      required: false
+      defaultValue: "data/"
   Validation:
     - key: "spring.datasource.url"
       description: "The SQL Server database connection URL for the validation service."

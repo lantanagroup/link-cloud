@@ -452,11 +452,14 @@ value set in a store can never take effect.
 
 ### AutomationUI
 
-131 keys.
+134 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
 | `ApiHealth:EnableAdminBffAuthSuite` | dotnet | yes | test | `DotNet/Automation.UI/Program.cs:247` |
+| `Authentication:ApiBearer:Audience` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:100` |
+| `Authentication:ApiBearer:Authority` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:99` |
+| `Authentication:ApiBearer:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:98` |
 | `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:92` |
 | `Authentication:UseBearerForServiceCalls` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:73` |
 | `AutoMigrate` | dotnet | - | dev, qa, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
