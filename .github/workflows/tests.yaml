@@ -334,6 +334,77 @@ jobs:
         if: always()
         run: docker compose down -v --remove-orphans
 
+  admin-ui-mocked-tests:
+    # The mocked Playwright tier needs no backend at all: Playwright boots its own
+    # `ng serve` and intercepts every /api call with fixtures. That makes it fast and
+    # deterministic enough to gate every PR, unlike the live tier in backend-e2e-tests
+    # which can only run once the whole compose stack is up and healthy.
+    name: Admin UI Tests (mocked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    needs: changes
+    if: ${{ needs.changes.outputs.run_job == 'true' }}
+
+    permissions:
+      contents: read
+      checks: write
+
+    defaults:
+      run:
+        working-directory: Web/Admin.UI
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Web/Admin.UI/package-lock.json
+
+      - name: Install Admin UI dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('Web/Admin.UI/package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # `npm run e2e` is --project=mocked; the config starts ng serve on 4200 itself.
+      - name: Admin UI mocked e2e tests
+        run: npm run e2e
+
+      # playwright.config.ts already emits test-results/junit.xml under CI. Paths here are
+      # repo-relative: defaults.run.working-directory applies to `run` steps only, not to
+      # action inputs. Reporting must never fail the job — the test step above is the gate.
+      - name: Admin UI Test Report
+        uses: dorny/test-reporter@v2
+        if: always()
+        continue-on-error: true
+        with:
+          name: Admin UI e2e (mocked)
+          path: Web/Admin.UI/test-results/junit.xml
+          reporter: java-junit
+
+      # Contains the HTML report plus traces/screenshots retained on failure, so a red CI
+      # run can be reproduced locally with `npx playwright show-trace <trace.zip>`.
+      - name: Upload Admin UI mocked e2e report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-ui-mocked-e2e-report
+          path: |
+            Web/Admin.UI/playwright-report/
+            Web/Admin.UI/test-results/
+          if-no-files-found: ignore
+
   dotnet-tests:
     name: .NET Tests
     runs-on: ubuntu-latest
