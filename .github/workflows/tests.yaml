@@ -64,6 +64,7 @@ jobs:
       HEALTH_CHECK_TIMEOUT: 60
       CHECK_INTERVAL: 10
       ADHOC_REPORT_TEST_DOWNLOAD_PATH: ./Tests/BackendE2ETests/TestResults/
+      LOCAL_APIHEALTH_ENABLE_ADMINBFF_AUTH_SUITE: false
 
     steps:
       - name: Checkout code

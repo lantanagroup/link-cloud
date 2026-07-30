@@ -26,4 +26,24 @@ public class ValidationCacheService {
     ) {
         return delegate.invokeRemoteValidateCode(codeSystem, code, display, valueSetUrl, (IBaseResource) null);
     }
+
+    /**
+     * Cache wrapper for {@link RemoteTermServiceValidation#invokeIsCodeSystemSupported(String)}.
+     * HAPI's ValidationSupportChain probes {@code isCodeSystemSupported} per system per traversal,
+     * so an uncached implementation hits the remote TS on every coded element. Both {@code true}
+     * and {@code false} results are cached (unknown systems shouldn't be reprobed either).
+     */
+    @Cacheable(value = "isCodeSystemSupportedCache", key = "#codeSystem")
+    public boolean cachedIsCodeSystemSupported(RemoteTermServiceValidation delegate, String codeSystem) {
+        return delegate.invokeIsCodeSystemSupported(codeSystem);
+    }
+
+    /**
+     * Cache wrapper for {@link RemoteTermServiceValidation#invokeIsValueSetSupported(String)}.
+     * See {@link #cachedIsCodeSystemSupported} for rationale — identical caching model applies.
+     */
+    @Cacheable(value = "isValueSetSupportedCache", key = "#valueSetUrl")
+    public boolean cachedIsValueSetSupported(RemoteTermServiceValidation delegate, String valueSetUrl) {
+        return delegate.invokeIsValueSetSupported(valueSetUrl);
+    }
 }

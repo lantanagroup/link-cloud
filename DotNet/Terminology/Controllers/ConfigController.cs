@@ -87,9 +87,12 @@ public class ConfigController(ICodeGroupCacheService cacheService, ILogger<Confi
                 type: "https://tools.ietf.org/html/rfc9110#section-15.5.5");
         }
 
+        // A CSV may list the same code more than once with differing status; the last occurrence
+        // wins (LEGLINK-599/814). LastOrDefault mirrors FhirService.BuildMatchResult's last-match
+        // selection so this endpoint agrees with $validate-code.
         var match = codeGroup.Codes.Values
             .SelectMany(codes => codes)
-            .FirstOrDefault(c => string.Equals(c.Value, cleanCode, StringComparison.Ordinal));
+            .LastOrDefault(c => string.Equals(c.Value, cleanCode, StringComparison.Ordinal));
 
         if (match == null)
         {

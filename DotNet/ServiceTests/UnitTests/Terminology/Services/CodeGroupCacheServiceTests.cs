@@ -183,8 +183,9 @@ public class CodeGroupCacheServiceTests
             Version = "1.0"
         };
 
-        var csvContent = @"system,code,display,extra
-http://test.system,123,Test Display,Extra Value";
+        // Four columns (system,code,display,status) is now valid; five columns is not.
+        var csvContent = @"system,code,display,status,extra
+http://test.system,123,Test Display,Active,Extra Value";
 
         using var reader = new StringReader(csvContent);
         using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
@@ -193,7 +194,7 @@ http://test.system,123,Test Display,Extra Value";
         var ex = Assert.Throws<InvalidOperationException>(() =>
             mockService.Object.ProcessValueSetCsv(codeGroup, csv));
 
-        Assert.Contains("ValueSet CSV must have exactly 3 columns", ex.Message);
+        Assert.Contains("ValueSet CSV must have", ex.Message);
     }
 
     [Fact]
@@ -221,8 +222,9 @@ http://test.system,123,Test Display,Extra Value";
                      "http://test.system,123,Test Display\r\n" +
                      "http://test.system,456,Another Display";
 
-        using var reader = new StringReader(csvData);
-        using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+        // Use the same reader configuration LoadCache builds (MissingFieldFound tolerated), since a
+        // 3-column value set has no field at the optional status index.
+        using var csv = CreateCsvReader(csvData);
 
         var codeGroup = new CodeGroup
         {
@@ -576,6 +578,162 @@ http://test.system,123,Test Display,Extra Value";
         Assert.Equal(CodeStatus.Active, ((CodeSystemCode)codes[0]).Status);
         Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[1]).Status);
         Assert.Equal(CodeStatus.Inactive, ((CodeSystemCode)codes[2]).Status);
+    }
+
+    [Fact]
+    public async Task LoadCache_ValueSetWithStatusColumn_LoadsValueSetCodeWithStatus()
+    {
+        // A four-column value set file (system,code,display,status) carries its own membership
+        // status, which is loaded as a ValueSetCode and is authoritative over the code system.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/vs"] = new[] { "vs.json", "vs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["vs.json"] = "{ \"resourceType\": \"ValueSet\", \"id\": \"test-vs\", " +
+                          "\"url\": \"http://test.valueset\", \"version\": \"1.0\" }",
+            ["vs.csv"] = "system,code,display,status\r\n" +
+                         "http://test.system,123,Test Display,Active\r\n" +
+                         "http://test.system,456,Another Display,Inactive\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+
+        // Act
+        await service.LoadCache();
+
+        // Assert - members are ValueSetCode instances carrying the file's membership status.
+        var codeGroup = service.GetCodeGroup(
+            CodeGroup.CodeGroupTypes.ValueSet, "http://test.valueset");
+
+        Assert.NotNull(codeGroup);
+        Assert.Equal("test-vs", codeGroup.Id);
+        var codes = codeGroup.Codes["http://test.system"];
+        Assert.Equal(2, codes.Count);
+        Assert.Equal(CodeStatus.Active, ((ValueSetCode)codes[0]).Status);
+        Assert.Equal(CodeStatus.Inactive, ((ValueSetCode)codes[1]).Status);
+    }
+
+    [Fact]
+    public async Task LoadCache_ValueSetBlankStatus_DefaultsToActive()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/vs"] = new[] { "vs.json", "vs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["vs.json"] = "{ \"resourceType\": \"ValueSet\", \"id\": \"test-vs\", " +
+                          "\"url\": \"http://test.valueset\", \"version\": \"1.0\" }",
+            // Second row has a blank status column, which should default to Active.
+            ["vs.csv"] = "system,code,display,status\r\n" +
+                         "http://test.system,123,Test Display,Inactive\r\n" +
+                         "http://test.system,456,Another Display,\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+
+        // Act
+        await service.LoadCache();
+
+        // Assert - the blank-status member is loaded as an Active ValueSetCode.
+        var codeGroup = service.GetCodeGroup(
+            CodeGroup.CodeGroupTypes.ValueSet, "http://test.valueset");
+
+        Assert.NotNull(codeGroup);
+        var codes = codeGroup.Codes["http://test.system"];
+        Assert.Equal(2, codes.Count);
+        Assert.Equal("456", codes[1].Value);
+        Assert.Equal(CodeStatus.Active, ((ValueSetCode)codes[1]).Status);
+    }
+
+    [Fact]
+    public async Task LoadCache_ValueSetNoStatusColumn_LoadsPlainCode()
+    {
+        // A three-column value set file has no membership status, so its members are plain Code
+        // instances (not ValueSetCode) and fall back to the code system status when validated.
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/vs"] = new[] { "vs.json", "vs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["vs.json"] = "{ \"resourceType\": \"ValueSet\", \"id\": \"test-vs\", " +
+                          "\"url\": \"http://test.valueset\", \"version\": \"1.0\" }",
+            ["vs.csv"] = "system,code,display\r\n" +
+                         "http://test.system,123,Test Display\r\n" +
+                         "http://test.system,456,Another Display\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+
+        // Act
+        await service.LoadCache();
+
+        // Assert - members are plain Code (no membership status), not ValueSetCode.
+        var codeGroup = service.GetCodeGroup(
+            CodeGroup.CodeGroupTypes.ValueSet, "http://test.valueset");
+
+        Assert.NotNull(codeGroup);
+        var codes = codeGroup.Codes["http://test.system"];
+        Assert.Equal(2, codes.Count);
+        Assert.All(codes, code => Assert.Equal(
+            typeof(LantanaGroup.Link.Terminology.Application.Models.Code), code.GetType()));
+    }
+
+    [Fact]
+    public async Task LoadCache_ValueSetMixedCaseStatus_ParsesCaseInsensitively()
+    {
+        using var memoryCache = new MemoryCache(new MemoryCacheOptions());
+        var mockConfig = new Mock<IOptions<TerminologyConfig>>();
+        mockConfig.Setup(x => x.Value).Returns(_config);
+
+        var directoryFiles = new Dictionary<string, string[]>
+        {
+            ["/test/path/vs"] = new[] { "vs.json", "vs.csv" }
+        };
+        var fileContents = new Dictionary<string, string>
+        {
+            ["vs.json"] = "{ \"resourceType\": \"ValueSet\", \"id\": \"test-vs\", " +
+                          "\"url\": \"http://test.valueset\", \"version\": \"1.0\" }",
+            ["vs.csv"] = "system,code,display,status\r\n" +
+                         "http://test.system,123,Test Display,active\r\n" +
+                         "http://test.system,456,Another Display,INACTIVE\r\n" +
+                         "http://test.system,789,Third Display,Inactive\r\n"
+        };
+
+        var service = new TestableCodeGroupCacheService(
+            _loggerMock.Object, memoryCache, mockConfig.Object, directoryFiles, fileContents);
+
+        // Act
+        await service.LoadCache();
+
+        // Assert - lowercase/uppercase/mixed-case status all load and normalize correctly.
+        var codeGroup = service.GetCodeGroup(
+            CodeGroup.CodeGroupTypes.ValueSet, "http://test.valueset");
+
+        Assert.NotNull(codeGroup);
+        var codes = codeGroup.Codes["http://test.system"];
+        Assert.Equal(3, codes.Count);
+        Assert.Equal(CodeStatus.Active, ((ValueSetCode)codes[0]).Status);
+        Assert.Equal(CodeStatus.Inactive, ((ValueSetCode)codes[1]).Status);
+        Assert.Equal(CodeStatus.Inactive, ((ValueSetCode)codes[2]).Status);
     }
 
     // Loads two versions of the same code group into a real cache. Defaults to "4.0.9" and
