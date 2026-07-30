@@ -19,8 +19,9 @@ jobs:
 
   changes:
     runs-on: ubuntu-latest
-    outputs: 
+    outputs:
       run_job: ${{ steps.should.outputs.run_job }}
+      run_admin_ui: ${{ steps.should.outputs.run_admin_ui }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,8 +44,19 @@ jobs:
             echo "run_job=false" >> "$GITHUB_OUTPUT"
           fi
 
+          # The mocked Admin UI tier stubs every /api call, so no backend change can affect
+          # it — gate it on its own sources rather than the shared filter above. The workflow
+          # itself counts, so a change to this file still exercises the job that runs it.
+          if echo "$CHANGED_FILES" | grep -Eq '^(Web/Admin\.UI/|\.github/workflows/tests\.yaml)'; then
+            echo "run_admin_ui=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_admin_ui=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Show decision
-        run: echo "run_job=${{ steps.should.outputs.run_job }}"
+        run: |
+          echo "run_job=${{ steps.should.outputs.run_job }}"
+          echo "run_admin_ui=${{ steps.should.outputs.run_admin_ui }}"
 
   backend-e2e-tests:
     # PR-safe Backend E2E categories run in parallel against a SINGLE shared
@@ -348,7 +360,7 @@ jobs:
     timeout-minutes: 20
 
     needs: changes
-    if: ${{ needs.changes.outputs.run_job == 'true' }}
+    if: ${{ needs.changes.outputs.run_admin_ui == 'true' }}
 
     permissions:
       contents: read
