@@ -19,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Builds the single pre-qualification {@link OperationOutcome} written to the patient NDJSON: one issue
@@ -81,6 +82,7 @@ public class PreQualOperationOutcomeBuilder {
         }
 
         OperationOutcome operationOutcome = new OperationOutcome();
+        operationOutcome.setId(UUID.randomUUID().toString());
 
         for (Map.Entry<String, List<Result>> entry : byCategoryId.entrySet()) {
             String categoryId = entry.getKey();

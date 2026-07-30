@@ -134,12 +134,21 @@ global:
   - key: "ConsumerSettings:DisableConsumer"
     description: "Boolean flag to disable the Kafka consumer entirely for the service."
     required: true
-  # Pre-qualification OperationOutcome ownership is a single cross-runtime decision with one
-  # key per runtime convention. Both must be set to the same value: with only the Java side on,
-  # the patient NDJSON gets both the detailed OperationOutcome and Report's legacy flat one;
-  # with only the .NET side on, it gets neither.
+  # PAIRED KEYS — one decision, one key per runtime, and they MUST be set to the same value.
+  # Enabling only the Java side puts two OperationOutcomes in the patient NDJSON; enabling only the
+  # .NET side puts none there. Neither failure is loud, so treat these as a single change.
+  # They are separate keys because Spring cannot bind a colon-separated key, and the Java services are
+  # being retired: a shared key would leave the surviving .NET services carrying a translation layer
+  # for a platform that no longer exists. When Validation is retired, drop the dotted key below and
+  # keep the .NET one.
+  # In Azure App Configuration these are two rows, each in its runtime's convention:
+  #   PreQualification:WritePreQualOperationOutcome        (.NET, as with other Section:Key rows)
+  #   /pre-qualification/write-pre-qual-operation-outcome  (Java, as with /link/report/base-url)
+  - key: "PreQualification:WritePreQualOperationOutcome"
+    description: "Boolean flag (default false), read by the .NET Report service. When true, Report skips its legacy 'Patient has failed Validation' OperationOutcome append to the patient NDJSON, because the Validation service is the sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as pre-qualification.write-pre-qual-operation-outcome."
+    required: false
   - key: "pre-qualification.write-pre-qual-operation-outcome"
-    description: "Boolean flag (default false), read by the Java Validation service. When true, Validation writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is its sole writer (LEGLINK-425/LEGLINK-466). .NET counterpart: PreQualification:WritePreQualOperationOutcome."
+    description: "Boolean flag (default false), read by the Java Validation service. When true, Validation writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is its sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as PreQualification:WritePreQualOperationOutcome."
     required: false
 services:
   Account:
@@ -208,7 +217,10 @@ services:
       description: "Optional Redis password for the resource cache. Defaults to empty."
       required: false
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
-      description: "Optional Redis maxmemory percentage at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      required: false
+    - key: "ResourceCache:Redis:MaxMemoryBytes"
+      description: "The Redis max-memory limit in bytes, used as the denominator for Hybrid cache memory-pressure fallback. Supplied via configuration because Azure Managed Redis does not return maxmemory via INFO. Recommended for Hybrid; when unset or <= 0 Redis is always used (a warning is logged). All LCG Redis instances are currently 1 GB (1073741824); this must be updated if Redis capacity is scaled. Defaults to 268435456 (256 MB) to match local Docker Redis."
       required: false
     - key: "ResourceCache:BlobStorage:ConnectionString"
       description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
@@ -239,7 +251,10 @@ services:
       description: "Optional Redis password for the resource cache. Defaults to empty."
       required: false
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
-      description: "Optional Redis maxmemory percentage at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      required: false
+    - key: "ResourceCache:Redis:MaxMemoryBytes"
+      description: "The Redis max-memory limit in bytes, used as the denominator for Hybrid cache memory-pressure fallback. Supplied via configuration because Azure Managed Redis does not return maxmemory via INFO. Recommended for Hybrid; when unset or <= 0 Redis is always used (a warning is logged). All LCG Redis instances are currently 1 GB (1073741824); this must be updated if Redis capacity is scaled. Defaults to 268435456 (256 MB) to match local Docker Redis."
       required: false
     - key: "ResourceCache:BlobStorage:ConnectionString"
       description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
@@ -279,7 +294,31 @@ services:
     - key: "resource-cache.blob-storage.blob-root"
       description: "Root path/prefix within the blob container under which cached resources are stored for the ABS resource cache. Required only when the ABS resource-cache backend is used."
       required: false
-  Normalization: []
+  Normalization:
+    - key: "ResourceCache:CacheImplementation"
+      description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
+      required: false
+    - key: "ResourceCache:Redis:ConnectionString"
+      description: "The Redis endpoint used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
+      required: true
+    - key: "ResourceCache:Redis:Password"
+      description: "Optional Redis password for the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:Redis:MemoryThresholdPercent"
+      description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
+      required: false
+    - key: "ResourceCache:Redis:MaxMemoryBytes"
+      description: "The Redis max-memory limit in bytes, used as the denominator for Hybrid cache memory-pressure fallback. Supplied via configuration because Azure Managed Redis does not return maxmemory via INFO. Recommended for Hybrid; when unset or <= 0 Redis is always used (a warning is logged). All LCG Redis instances are currently 1 GB (1073741824); this must be updated if Redis capacity is scaled. Defaults to 268435456 (256 MB) to match local Docker Redis."
+      required: false
+    - key: "ResourceCache:BlobStorage:ConnectionString"
+      description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
+      required: true
+    - key: "ResourceCache:BlobStorage:BlobContainerName"
+      description: "Optional blob container name used by the resource cache. Defaults to empty."
+      required: false
+    - key: "ResourceCache:BlobStorage:BlobRoot"
+      description: "Optional blob name prefix used by the resource cache. Defaults to empty."
+      required: false
   Notification:
     - key: "SmtpConnection:Host"
       description: "The SMTP server hostname for sending notifications."
@@ -365,9 +404,9 @@ services:
     - key: "link.terminology-service-url"
       description: "The base URL for the Terminology Service used for validation."
       required: true
-    # pre-qualification.write-pre-qual-operation-outcome is registered under global, not here —
-    # it is one cross-runtime decision with a key per runtime convention, and the .NET Report
-    # service reads the counterpart PreQualification:WritePreQualOperationOutcome (LEGLINK-466).
+    # The master gate, pre-qualification.write-pre-qual-operation-outcome, is registered under
+    # global instead of here: the .NET Report service reads that same key (LEGLINK-466). Only the
+    # expression toggle below is Validation-only.
     - key: "pre-qualification.write-expressions-in-operation-outcome"
       description: "Boolean flag (default true). When false, the expression[] of each issue is omitted from the pre-qualification OperationOutcome written by the Validation service."
       required: false

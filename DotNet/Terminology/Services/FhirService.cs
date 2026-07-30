@@ -217,7 +217,13 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
                 {
                     logger.LogDebug("Search performed without summary mode for code system {Url}", url.SanitizeAndRemove());
 
-                    foreach (var codeGroupCode in codeGroup.Codes[codeGroup.Codes.Keys.First()])
+                    // A CSV may list the same code more than once; emit each code once, keeping the
+                    // last occurrence's display so the read agrees with last-one-wins (LEGLINK-814).
+                    var lastByValue = codeGroup.Codes[codeGroup.Codes.Keys.First()]
+                        .GroupBy(c => c.Value)
+                        .Select(g => g.Last());
+
+                    foreach (var codeGroupCode in lastByValue)
                     {
                         clone.Concept.Add(new CodeSystem.ConceptDefinitionComponent()
                         {
@@ -713,8 +719,10 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
     }
 
     /// <summary>
-    /// Determines whether a matched code is active. CodeSystem members carry their own status; ValueSet members
-    /// are plain codes with no status, so their status is rejoined from the CodeSystem identified by <paramref name="system"/>.
+    /// Determines whether a matched code is active. CodeSystem members carry their own status. ValueSet members
+    /// that carry a membership status (loaded as a <see cref="ValueSetCode"/>) are authoritative and override the
+    /// code system. ValueSet members with no membership status (plain <see cref="Application.Models.Code"/>) have
+    /// their status rejoined from the CodeSystem identified by <paramref name="system"/>.
     /// Defaults to active when the code cannot be resolved to a loaded CodeSystem, preserving prior behavior.
     /// </summary>
     private bool ResolveIsActive(Code codeObject, string? system)
@@ -724,16 +732,24 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
             return codeSystemCode.Status == CodeStatus.Active;
         }
 
+        // Value set membership status, when present, is authoritative and overrides the code system.
+        if (codeObject is ValueSetCode valueSetCode)
+        {
+            return valueSetCode.Status == CodeStatus.Active;
+        }
+
         if (string.IsNullOrEmpty(system))
         {
             return true;
         }
 
         var codeSystemGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system);
+        // When the CodeSystem lists the code more than once with differing status, the last
+        // occurrence wins (LEGLINK-599/814), matching BuildMatchResult's last-match selection.
         var match = codeSystemGroup?.Codes.Values
             .SelectMany(codes => codes)
             .OfType<CodeSystemCode>()
-            .FirstOrDefault(c => c.Value == codeObject.Value);
+            .LastOrDefault(c => c.Value == codeObject.Value);
 
         return match == null || match.Status == CodeStatus.Active;
     }

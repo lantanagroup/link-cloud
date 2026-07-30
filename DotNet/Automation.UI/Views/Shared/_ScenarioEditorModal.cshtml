@@ -340,6 +340,13 @@
             if (nd) ns.value = nd.value;
         }
 
+        function selectDefaultQueryPlanTemplate() {
+            var qp = document.getElementById('QueryPlanTemplate');
+            if (!qp) return;
+            var d = qp.querySelector('[data-is-default="true"]');
+            if (d) qp.value = d.value;
+        }
+
         function selectDefaultOrganizationResourceMap() {
             var orm = document.getElementById('OrganizationResourceMap');
             if (!orm) return;
@@ -1171,6 +1178,7 @@
                 document.getElementById('NhsnOrganizationId').value = generateRandomNhsnOrganizationId();
                 document.getElementById('ReportPeriodStart').value = '';
                 document.getElementById('ReportPeriodEnd').value = '';
+                selectDefaultQueryPlanTemplate();
                 selectDefaultNormalizationSuite();
                 selectDefaultOrganizationResourceMap();
                 document.querySelectorAll('.measure-checkbox').forEach(function (cb) { cb.checked = false; });

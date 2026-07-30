@@ -4,14 +4,137 @@
     <title>Architecture Export</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
     <script>
         mermaid.initialize({{startOnLoad:true}});
 
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
         window.copyMermaidSource = function(btn) {{
             const container = btn.closest('.mermaid-container');
-            const pre = container.querySelector('pre.mermaid');
-            const source = pre.dataset.source || pre.textContent.trim();
+            const source = getMermaidSourceFromContainer(container);
             if (source) {{
                 navigator.clipboard.writeText(source).then(() => {{
                     const originalHtml = btn.innerHTML;
@@ -21,9 +144,8 @@
             }}
         }};
 
-        window.downloadMermaidPng = function(btn) {{
-            const container = btn.closest('.mermaid-container');
-            const svg = container.querySelector('svg');
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
             if (!svg) return;
 
             const svgData = new XMLSerializer().serializeToString(svg);
@@ -51,7 +173,82 @@
                 document.body.removeChild(downloadLink);
             }};
             img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
         }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
     </script>
     <style>
         .sidebar {{
@@ -73,25 +270,101 @@
         .mermaid-container {{
             position: relative;
             min-height: 50px;
+            max-height: 500px;
             overflow: auto;
             background-color: #fff;
         }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
         .mermaid-actions {{
             position: absolute;
-            top: 10px;
-            right: 10px;
             display: none;
             gap: 5px;
             z-index: 10;
         }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
         .mermaid-container:hover .mermaid-actions {{
             display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
         }}
         .mermaid-actions .btn {{
             background-color: rgba(255, 255, 255, 0.8);
             border: 1px solid #dee2e6;
             padding: 2px 6px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
         }}
         /* Custom Purple Utilities */
         .text-purple {{ color: #6f42c1 !important; }}
@@ -101,6 +374,37 @@
     </style>
 </head>
 <body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="container-fluid">
         <div class="row">
             <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
@@ -108,6 +412,7 @@
                     <ul class="nav flex-column">
   <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
@@ -124,8 +429,8 @@
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourceacquired.html">Resource Acquired</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resourcenormalized.html">Resource Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
   <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
@@ -161,22 +466,26 @@
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
   <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
-  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
   <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
 </ul>
 
                 </div>
@@ -187,7 +496,7 @@
     <div class="col-md-8">
         
         <p>The Link Cloud solution implements a dual-scheduler architecture using Quartz.NET, enabling the Report service to use MongoDB-backed persistent job storage for clustering and fault tolerance, while maintaining lightweight in-memory scheduling for other services. This architecture provides proper isolation between different job types and enables horizontal scaling of the Report service.</p>
-<h1 id="architecture-overview">Architecture Overview <a id="architecture-overview" href="#architecture-overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Architecture Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h1 id="architecture-overview" class="content-heading">Architecture Overview <a id="architecture-overview" href="#architecture-overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Architecture Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
 <p>The dual-scheduler system uses <strong>keyed dependency injection</strong> to register multiple <code>ISchedulerFactory</code> implementations:</p>
 <ul>
 <li><strong>MongoScheduler</strong> - MongoDB-backed persistent storage (Report service only)</li>
@@ -217,10 +526,10 @@
 │                                         │
 └─────────────────────────────────────────┘
 </code></pre>
-<h1 id="mongodb-jobstore-configuration">MongoDB JobStore Configuration <a id="mongodb-jobstore-configuration" href="#mongodb-jobstore-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: MongoDB JobStore Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
-<h2 id="report-service-setup">Report Service Setup <a id="report-service-setup" href="#report-service-setup" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Service Setup"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h1 id="mongodb-jobstore-configuration" class="content-heading">MongoDB JobStore Configuration <a id="mongodb-jobstore-configuration" href="#mongodb-jobstore-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: MongoDB JobStore Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="report-service-setup" class="content-heading">Report Service Setup <a id="report-service-setup" href="#report-service-setup" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Service Setup"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The Report service uses <a href="https://github.com/Reddoxx/Quartz.Mongodb.JobStore">Reddoxx.Quartz.MongoDbJobStore</a> for persistent job storage with Redis-based distributed locking.</p>
-<h3 id="service-registration">Service Registration <a id="service-registration" href="#service-registration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Registration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="service-registration" class="content-heading">Service Registration <a id="service-registration" href="#service-registration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Registration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-csharp">// Program.cs - Report service
 builder.Services.AddQuartz(q =&gt;
 {
@@ -241,7 +550,7 @@ builder.Services.AddSingleton&lt;InMemorySchedulerFactory&gt;();
 builder.Services.AddKeyedSingleton&lt;ISchedulerFactory&gt;(&quot;InMemoryScheduler&quot;, 
     (provider, key) =&gt; provider.GetRequiredService&lt;InMemorySchedulerFactory&gt;());
 </code></pre>
-<h3 id="custommongoschedulerfactory">CustomMongoSchedulerFactory <a id="custommongoschedulerfactory" href="#custommongoschedulerfactory" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CustomMongoSchedulerFactory"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="custommongoschedulerfactory" class="content-heading">CustomMongoSchedulerFactory <a id="custommongoschedulerfactory" href="#custommongoschedulerfactory" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: CustomMongoSchedulerFactory"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The <code>CustomMongoSchedulerFactory</code> creates and manages the MongoDB-backed scheduler:</p>
 <pre><code class="language-csharp">public class CustomMongoSchedulerFactory : ISchedulerFactory
 {
@@ -266,7 +575,7 @@ builder.Services.AddKeyedSingleton&lt;ISchedulerFactory&gt;(&quot;InMemorySchedu
     }
 }
 </code></pre>
-<h3 id="mongodb-collections">MongoDB Collections <a id="mongodb-collections" href="#mongodb-collections" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: MongoDB Collections"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="mongodb-collections" class="content-heading">MongoDB Collections <a id="mongodb-collections" href="#mongodb-collections" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: MongoDB Collections"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The MongoDB JobStore creates the following collections:</p>
 <table>
 <thead>
@@ -306,7 +615,7 @@ builder.Services.AddKeyedSingleton&lt;ISchedulerFactory&gt;(&quot;InMemorySchedu
 </tr>
 </tbody>
 </table>
-<h3 id="redis-distributed-locking">Redis Distributed Locking <a id="redis-distributed-locking" href="#redis-distributed-locking" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Redis Distributed Locking"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="redis-distributed-locking" class="content-heading">Redis Distributed Locking <a id="redis-distributed-locking" href="#redis-distributed-locking" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Redis Distributed Locking"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Redis provides distributed locking to prevent duplicate job execution across multiple Report service instances:</p>
 <pre><code class="language-csharp">// Redis configuration
 var redisConfiguration = new RedisConfiguration
@@ -322,8 +631,8 @@ builder.Services.AddStackExchangeRedisExtensions&lt;SystemTextJsonSerializer&gt;
 builder.Services.AddSingleton&lt;IQuartzJobStoreLockingManager, 
     DistributedLocksQuartzLockingManager&gt;();
 </code></pre>
-<h1 id="in-memory-scheduler-configuration">In-Memory Scheduler Configuration <a id="in-memory-scheduler-configuration" href="#in-memory-scheduler-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: In-Memory Scheduler Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
-<h2 id="services-using-in-memory-scheduling">Services Using In-Memory Scheduling <a id="services-using-in-memory-scheduling" href="#services-using-in-memory-scheduling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Services Using In-Memory Scheduling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h1 id="in-memory-scheduler-configuration" class="content-heading">In-Memory Scheduler Configuration <a id="in-memory-scheduler-configuration" href="#in-memory-scheduler-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: In-Memory Scheduler Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="services-using-in-memory-scheduling" class="content-heading">Services Using In-Memory Scheduling <a id="services-using-in-memory-scheduling" href="#services-using-in-memory-scheduling" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Services Using In-Memory Scheduling"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The following services use in-memory scheduling for RetryJob:</p>
 <ul>
 <li>Audit</li>
@@ -332,7 +641,7 @@ builder.Services.AddSingleton&lt;IQuartzJobStoreLockingManager,
 <li>QueryDispatch</li>
 <li>Submission</li>
 </ul>
-<h3 id="inmemoryschedulerfactory">InMemorySchedulerFactory <a id="inmemoryschedulerfactory" href="#inmemoryschedulerfactory" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: InMemorySchedulerFactory"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="inmemoryschedulerfactory" class="content-heading">InMemorySchedulerFactory <a id="inmemoryschedulerfactory" href="#inmemoryschedulerfactory" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: InMemorySchedulerFactory"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The <code>InMemorySchedulerFactory</code> provides standard Quartz in-memory scheduling:</p>
 <pre><code class="language-csharp">public class InMemorySchedulerFactory : ISchedulerFactory
 {
@@ -349,7 +658,7 @@ builder.Services.AddSingleton&lt;IQuartzJobStoreLockingManager,
     }
 }
 </code></pre>
-<h3 id="service-registration-pattern">Service Registration Pattern <a id="service-registration-pattern" href="#service-registration-pattern" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Registration Pattern"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="service-registration-pattern" class="content-heading">Service Registration Pattern <a id="service-registration-pattern" href="#service-registration-pattern" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Service Registration Pattern"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-csharp">// Program.cs - All services except Report
 builder.Services.AddSingleton&lt;InMemorySchedulerFactory&gt;();
 builder.Services.AddKeyedSingleton&lt;ISchedulerFactory&gt;(&quot;InMemoryScheduler&quot;, 
@@ -357,13 +666,13 @@ builder.Services.AddKeyedSingleton&lt;ISchedulerFactory&gt;(&quot;InMemorySchedu
 builder.Services.AddSingleton&lt;ISchedulerFactory&gt;(
     provider =&gt; provider.GetRequiredService&lt;InMemorySchedulerFactory&gt;());
 </code></pre>
-<h1 id="job-data-serialization">Job Data Serialization <a id="job-data-serialization" href="#job-data-serialization" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Job Data Serialization"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
-<h2 id="problem-complex-object-serialization">Problem: Complex Object Serialization <a id="problem-complex-object-serialization" href="#problem-complex-object-serialization" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Problem: Complex Object Serialization"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h1 id="job-data-serialization" class="content-heading">Job Data Serialization <a id="job-data-serialization" href="#job-data-serialization" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Job Data Serialization"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="problem-complex-object-serialization" class="content-heading">Problem: Complex Object Serialization <a id="problem-complex-object-serialization" href="#problem-complex-object-serialization" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Problem: Complex Object Serialization"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Previously, jobs stored entire model objects in the <code>JobDataMap</code>, causing BSON serialization failures:</p>
 <pre><code class="language-csharp">// ❌ BEFORE - Causes MongoDB serialization errors
 jobDataMap.Put(&quot;ReportScheduleModel&quot;, reportSchedule); // Full object
 </code></pre>
-<h2 id="solution-store-ids-fetch-on-execution">Solution: Store IDs, Fetch on Execution <a id="solution-store-ids-fetch-on-execution" href="#solution-store-ids-fetch-on-execution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Solution: Store IDs, Fetch on Execution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="solution-store-ids-fetch-on-execution" class="content-heading">Solution: Store IDs, Fetch on Execution <a id="solution-store-ids-fetch-on-execution" href="#solution-store-ids-fetch-on-execution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Solution: Store IDs, Fetch on Execution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Jobs now store only primitive identifiers and fetch full objects from the database when executing:</p>
 <pre><code class="language-csharp">// ✅ AFTER - Store only IDs
 public static IJobDetail CreateJob(ReportScheduleModel reportSchedule)
@@ -381,7 +690,7 @@ public static IJobDetail CreateJob(ReportScheduleModel reportSchedule)
         .Build();
 }
 </code></pre>
-<h2 id="job-execution-pattern">Job Execution Pattern <a id="job-execution-pattern" href="#job-execution-pattern" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Job Execution Pattern"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="job-execution-pattern" class="content-heading">Job Execution Pattern <a id="job-execution-pattern" href="#job-execution-pattern" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Job Execution Pattern"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Jobs retrieve fresh data from the database on each execution:</p>
 <pre><code class="language-csharp">public async Task Execute(IJobExecutionContext context)
 {
@@ -401,15 +710,15 @@ public static IJobDetail CreateJob(ReportScheduleModel reportSchedule)
     await ProcessReport(schedule);
 }
 </code></pre>
-<h2 id="benefits">Benefits <a id="benefits" href="#benefits" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Benefits"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="benefits" class="content-heading">Benefits <a id="benefits" href="#benefits" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Benefits"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li><strong>No Serialization Issues</strong> - Only primitive types stored in MongoDB</li>
 <li><strong>Fresh Data</strong> - Always works with current database state</li>
 <li><strong>No Stale Data</strong> - Schedule updates reflected immediately</li>
 <li><strong>Smaller Footprint</strong> - Minimal job data in MongoDB</li>
 </ul>
-<h1 id="keyed-dependency-injection">Keyed Dependency Injection <a id="keyed-dependency-injection" href="#keyed-dependency-injection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Keyed Dependency Injection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
-<h2 id="constructor-injection">Constructor Injection <a id="constructor-injection" href="#constructor-injection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Constructor Injection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h1 id="keyed-dependency-injection" class="content-heading">Keyed Dependency Injection <a id="keyed-dependency-injection" href="#keyed-dependency-injection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Keyed Dependency Injection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="constructor-injection" class="content-heading">Constructor Injection <a id="constructor-injection" href="#constructor-injection" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Constructor Injection"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Jobs and services use <code>FromKeyedServices</code> attribute to inject the correct scheduler:</p>
 <pre><code class="language-csharp">// Report service - MongoDB scheduler
 public class EndOfReportPeriodJob : IJob
@@ -445,9 +754,9 @@ public class RetryScheduleService : BackgroundService
     }
 }
 </code></pre>
-<h1 id="configuration">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
-<h2 id="report-service-configuration">Report Service Configuration <a id="report-service-configuration" href="#report-service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="appsettings.json">appsettings.json <a id="appsettings-json" href="#appsettings-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: appsettings.json"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h1 id="configuration" class="content-heading">Configuration <a id="configuration" href="#configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="report-service-configuration" class="content-heading">Report Service Configuration <a id="report-service-configuration" href="#report-service-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Service Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="appsettings.json" class="content-heading">appsettings.json <a id="appsettings-json" href="#appsettings-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: appsettings.json"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-json">{
   &quot;MongoDB&quot;: {
     &quot;ConnectionString&quot;: &quot;mongodb://mongo:27017&quot;,
@@ -471,7 +780,7 @@ public class RetryScheduleService : BackgroundService
   }
 }
 </code></pre>
-<h3 id="docker-compose">Docker Compose <a id="docker-compose" href="#docker-compose" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Docker Compose"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="docker-compose" class="content-heading">Docker Compose <a id="docker-compose" href="#docker-compose" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Docker Compose"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-yaml">report:
   environment:
     - MongoDB__ConnectionString=mongodb://mongo:27017
@@ -482,7 +791,7 @@ public class RetryScheduleService : BackgroundService
     - mongo
     - redis_cache
 </code></pre>
-<h3 id="required-nuget-packages">Required NuGet Packages <a id="required-nuget-packages" href="#required-nuget-packages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Required NuGet Packages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="required-nuget-packages" class="content-heading">Required NuGet Packages <a id="required-nuget-packages" href="#required-nuget-packages" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Required NuGet Packages"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-xml">&lt;ItemGroup&gt;
   &lt;PackageReference Include=&quot;Quartz&quot; Version=&quot;3.*&quot; /&gt;
   &lt;PackageReference Include=&quot;Quartz.Serialization.Json&quot; Version=&quot;3.15.0&quot; /&gt;
@@ -494,7 +803,7 @@ public class RetryScheduleService : BackgroundService
   &lt;PackageReference Include=&quot;MongoDB.Driver&quot; Version=&quot;3.2.0&quot; /&gt;
 &lt;/ItemGroup&gt;
 </code></pre>
-<h2 id="other-services-configuration">Other Services Configuration <a id="other-services-configuration" href="#other-services-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Other Services Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="other-services-configuration" class="content-heading">Other Services Configuration <a id="other-services-configuration" href="#other-services-configuration" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Other Services Configuration"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Other services only require standard Quartz configuration:</p>
 <pre><code class="language-json">{
   &quot;Quartz&quot;: {
@@ -505,22 +814,22 @@ public class RetryScheduleService : BackgroundService
   }
 }
 </code></pre>
-<h1 id="clustering-high-availability">Clustering &amp; High Availability <a id="clustering-amp-high-availability" href="#clustering-amp-high-availability" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Clustering &amp;amp; High Availability"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
-<h2 id="multiple-report-instances">Multiple Report Instances <a id="multiple-report-instances" href="#multiple-report-instances" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Multiple Report Instances"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h1 id="clustering-high-availability" class="content-heading">Clustering &amp; High Availability <a id="clustering-amp-high-availability" href="#clustering-amp-high-availability" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Clustering &amp;amp; High Availability"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="multiple-report-instances" class="content-heading">Multiple Report Instances <a id="multiple-report-instances" href="#multiple-report-instances" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Multiple Report Instances"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The MongoDB JobStore with Redis locking enables safe operation of multiple Report service instances:</p>
-<h3 id="instance-coordination">Instance Coordination <a id="instance-coordination" href="#instance-coordination" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Instance Coordination"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="instance-coordination" class="content-heading">Instance Coordination <a id="instance-coordination" href="#instance-coordination" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Instance Coordination"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Cluster Check-in</strong> - Every 7.5 seconds, each instance updates its status</li>
 <li><strong>Distributed Locks</strong> - Redis-based locks prevent duplicate job execution</li>
 <li><strong>Instance Recovery</strong> - Failed instances detected and their jobs reassigned</li>
 <li><strong>Load Distribution</strong> - Jobs distributed across healthy instances</li>
 </ul>
-<h3 id="monitoring-cluster-health">Monitoring Cluster Health <a id="monitoring-cluster-health" href="#monitoring-cluster-health" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Monitoring Cluster Health"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="monitoring-cluster-health" class="content-heading">Monitoring Cluster Health <a id="monitoring-cluster-health" href="#monitoring-cluster-health" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Monitoring Cluster Health"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <pre><code class="language-csharp">// Logs show cluster activity
 [22:52:26 INF] ClusterManager: detected 1 failed or restarted instances.
 [22:52:26 INF] ClusterManager: Scanning for instance &quot;hostname-timestamp&quot;'s failed in-progress jobs.
 </code></pre>
-<h2 id="failover-behavior">Failover Behavior <a id="failover-behavior" href="#failover-behavior" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Failover Behavior"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="failover-behavior" class="content-heading">Failover Behavior <a id="failover-behavior" href="#failover-behavior" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Failover Behavior"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>When a Report service instance fails:</p>
 <ol>
 <li>Other instances detect the failure via cluster check-in timeout</li>
@@ -529,8 +838,8 @@ public class RetryScheduleService : BackgroundService
 <li>Healthy instances pick up the recovered jobs</li>
 <li>Job execution continues without data loss</li>
 </ol>
-<h1 id="job-scheduling-examples">Job Scheduling Examples <a id="job-scheduling-examples" href="#job-scheduling-examples" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Job Scheduling Examples"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
-<h2 id="report-service-endofreportperiodjob">Report Service - EndOfReportPeriodJob <a id="report-service-endofreportperiodjob" href="#report-service-endofreportperiodjob" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Service - EndOfReportPeriodJob"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h1 id="job-scheduling-examples" class="content-heading">Job Scheduling Examples <a id="job-scheduling-examples" href="#job-scheduling-examples" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Job Scheduling Examples"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="report-service-endofreportperiodjob" class="content-heading">Report Service - EndOfReportPeriodJob <a id="report-service-endofreportperiodjob" href="#report-service-endofreportperiodjob" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Report Service - EndOfReportPeriodJob"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <pre><code class="language-csharp">public class MeasureReportScheduleService : BackgroundService
 {
     public MeasureReportScheduleService(
@@ -574,7 +883,7 @@ public class RetryScheduleService : BackgroundService
     }
 }
 </code></pre>
-<h2 id="all-services-retryjob">All Services - RetryJob <a id="all-services-retryjob" href="#all-services-retryjob" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: All Services - RetryJob"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="all-services-retryjob" class="content-heading">All Services - RetryJob <a id="all-services-retryjob" href="#all-services-retryjob" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: All Services - RetryJob"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <pre><code class="language-csharp">public class RetryScheduleService : BackgroundService
 {
     public RetryScheduleService(
@@ -600,15 +909,15 @@ public class RetryScheduleService : BackgroundService
     }
 }
 </code></pre>
-<h1 id="migration-guide">Migration Guide <a id="migration-guide" href="#migration-guide" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Migration Guide"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
-<h2 id="deploying-the-dual-scheduler">Deploying the Dual Scheduler <a id="deploying-the-dual-scheduler" href="#deploying-the-dual-scheduler" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Deploying the Dual Scheduler"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="prerequisites">Prerequisites <a id="prerequisites" href="#prerequisites" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Prerequisites"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h1 id="migration-guide" class="content-heading">Migration Guide <a id="migration-guide" href="#migration-guide" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Migration Guide"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="deploying-the-dual-scheduler" class="content-heading">Deploying the Dual Scheduler <a id="deploying-the-dual-scheduler" href="#deploying-the-dual-scheduler" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Deploying the Dual Scheduler"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="prerequisites" class="content-heading">Prerequisites <a id="prerequisites" href="#prerequisites" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Prerequisites"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ol>
 <li><strong>MongoDB</strong> - Accessible from Report service instances</li>
 <li><strong>Redis</strong> - Accessible from Report service instances</li>
 <li><strong>Configuration</strong> - Update appsettings.json with connection strings</li>
 </ol>
-<h3 id="deployment-steps">Deployment Steps <a id="deployment-steps" href="#deployment-steps" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Deployment Steps"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="deployment-steps" class="content-heading">Deployment Steps <a id="deployment-steps" href="#deployment-steps" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Deployment Steps"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ol>
 <li><strong>Update Configuration</strong></li>
 </ol>
@@ -636,45 +945,45 @@ mongo link-report --eval &quot;db.getCollectionNames()&quot;
 # Check scheduler logs
 docker logs link-report | grep &quot;Scheduler created successfully&quot;
 </code></pre>
-<h3 id="important-notes">Important Notes <a id="important-notes" href="#important-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Important Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="important-notes" class="content-heading">Important Notes <a id="important-notes" href="#important-notes" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Important Notes"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><strong>Existing Jobs</strong> - In-memory jobs are NOT automatically migrated to MongoDB</li>
 <li><strong>Rescheduling</strong> - Existing report schedules will be picked up on first startup</li>
 <li><strong>Storage</strong> - Monitor MongoDB storage growth, implement cleanup policies if needed</li>
 <li><strong>Clustering</strong> - Multiple Report instances can be deployed immediately</li>
 </ul>
-<h2 id="rollback-plan">Rollback Plan <a id="rollback-plan" href="#rollback-plan" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Rollback Plan"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="rollback-plan" class="content-heading">Rollback Plan <a id="rollback-plan" href="#rollback-plan" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Rollback Plan"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>If issues occur, rollback to in-memory scheduling:</p>
 <pre><code class="language-csharp">// Temporarily revert to in-memory for Report service
 builder.Services.AddSingleton&lt;InMemorySchedulerFactory&gt;();
 builder.Services.AddKeyedSingleton&lt;ISchedulerFactory&gt;(&quot;MongoScheduler&quot;, 
     (provider, key) =&gt; provider.GetRequiredService&lt;InMemorySchedulerFactory&gt;());
 </code></pre>
-<h1 id="monitoring-troubleshooting">Monitoring &amp; Troubleshooting <a id="monitoring-amp-troubleshooting" href="#monitoring-amp-troubleshooting" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Monitoring &amp;amp; Troubleshooting"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
-<h2 id="key-metrics-to-monitor">Key Metrics to Monitor <a id="key-metrics-to-monitor" href="#key-metrics-to-monitor" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Metrics to Monitor"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="mongodb">MongoDB <a id="mongodb" href="#mongodb" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: MongoDB"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h1 id="monitoring-troubleshooting" class="content-heading">Monitoring &amp; Troubleshooting <a id="monitoring-amp-troubleshooting" href="#monitoring-amp-troubleshooting" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Monitoring &amp;amp; Troubleshooting"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="key-metrics-to-monitor" class="content-heading">Key Metrics to Monitor <a id="key-metrics-to-monitor" href="#key-metrics-to-monitor" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Metrics to Monitor"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="mongodb" class="content-heading">MongoDB <a id="mongodb" href="#mongodb" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: MongoDB"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Collection sizes (reportjobs.*)</li>
 <li>Document counts in jobs and triggers collections</li>
 <li>Query performance for job retrieval</li>
 <li>Storage usage trends</li>
 </ul>
-<h3 id="redis">Redis <a id="redis" href="#redis" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Redis"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="redis" class="content-heading">Redis <a id="redis" href="#redis" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Redis"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Lock acquisition/release rates</li>
 <li>Lock contention events</li>
 <li>Connection pool usage</li>
 <li>Memory usage</li>
 </ul>
-<h3 id="scheduler-health">Scheduler Health <a id="scheduler-health" href="#scheduler-health" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scheduler Health"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="scheduler-health" class="content-heading">Scheduler Health <a id="scheduler-health" href="#scheduler-health" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Scheduler Health"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Job execution success/failure rates</li>
 <li>Misfire counts</li>
 <li>Cluster instance count</li>
 <li>Instance check-in frequency</li>
 </ul>
-<h2 id="common-issues">Common Issues <a id="common-issues" href="#common-issues" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Issues"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="issue-jobs-not-persisting">Issue: Jobs Not Persisting <a id="issue-jobs-not-persisting" href="#issue-jobs-not-persisting" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Issue: Jobs Not Persisting"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="common-issues" class="content-heading">Common Issues <a id="common-issues" href="#common-issues" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Common Issues"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="issue-jobs-not-persisting" class="content-heading">Issue: Jobs Not Persisting <a id="issue-jobs-not-persisting" href="#issue-jobs-not-persisting" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Issue: Jobs Not Persisting"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p><strong>Symptoms:</strong> Jobs execute but don't appear in MongoDB</p>
 <p><strong>Solutions:</strong></p>
 <ul>
@@ -683,7 +992,7 @@ builder.Services.AddKeyedSingleton&lt;ISchedulerFactory&gt;(&quot;MongoScheduler
 <li>Confirm <code>CollectionPrefix</code> setting matches</li>
 <li>Review logs for BSON serialization errors</li>
 </ul>
-<h3 id="issue-duplicate-job-execution">Issue: Duplicate Job Execution <a id="issue-duplicate-job-execution" href="#issue-duplicate-job-execution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Issue: Duplicate Job Execution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="issue-duplicate-job-execution" class="content-heading">Issue: Duplicate Job Execution <a id="issue-duplicate-job-execution" href="#issue-duplicate-job-execution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Issue: Duplicate Job Execution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p><strong>Symptoms:</strong> Same job runs multiple times across instances</p>
 <p><strong>Solutions:</strong></p>
 <ul>
@@ -692,7 +1001,7 @@ builder.Services.AddKeyedSingleton&lt;ISchedulerFactory&gt;(&quot;MongoScheduler
 <li>Confirm <code>Clustered = true</code> in job store config</li>
 <li>Review Redis logs for connection issues</li>
 </ul>
-<h3 id="issue-cluster-instance-not-detected">Issue: Cluster Instance Not Detected <a id="issue-cluster-instance-not-detected" href="#issue-cluster-instance-not-detected" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Issue: Cluster Instance Not Detected"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="issue-cluster-instance-not-detected" class="content-heading">Issue: Cluster Instance Not Detected <a id="issue-cluster-instance-not-detected" href="#issue-cluster-instance-not-detected" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Issue: Cluster Instance Not Detected"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p><strong>Symptoms:</strong> Warning about failed instances repeatedly</p>
 <p><strong>Solutions:</strong></p>
 <ul>
@@ -705,7 +1014,7 @@ db.reportjobs.locks.deleteMany({})
 <li>Restart all Report service instances</li>
 <li>Verify cluster check-in interval settings</li>
 </ul>
-<h3 id="issue-bson-serialization-errors">Issue: BSON Serialization Errors <a id="issue-bson-serialization-errors" href="#issue-bson-serialization-errors" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Issue: BSON Serialization Errors"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="issue-bson-serialization-errors" class="content-heading">Issue: BSON Serialization Errors <a id="issue-bson-serialization-errors" href="#issue-bson-serialization-errors" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Issue: BSON Serialization Errors"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p><strong>Symptoms:</strong> <code>BsonSerializationException</code> for custom types</p>
 <p><strong>Solutions:</strong></p>
 <ul>
@@ -718,22 +1027,22 @@ db.reportjobs.locks.deleteMany({})
     cm.SetIgnoreExtraElements(true);
 });
 </code></pre>
-<h1 id="security-considerations">Security Considerations <a id="security-considerations" href="#security-considerations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Security Considerations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
-<h2 id="mongodb-access">MongoDB Access <a id="mongodb-access" href="#mongodb-access" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: MongoDB Access"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h1 id="security-considerations" class="content-heading">Security Considerations <a id="security-considerations" href="#security-considerations" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Security Considerations"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<h2 id="mongodb-access" class="content-heading">MongoDB Access <a id="mongodb-access" href="#mongodb-access" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: MongoDB Access"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li>Use MongoDB authentication in production</li>
 <li>Limit MongoDB user permissions to Report database only</li>
 <li>Enable MongoDB SSL/TLS connections</li>
 <li>Use network isolation (VPC/VNET) when possible</li>
 </ul>
-<h2 id="redis-access">Redis Access <a id="redis-access" href="#redis-access" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Redis Access"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="redis-access" class="content-heading">Redis Access <a id="redis-access" href="#redis-access" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Redis Access"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li>Always use Redis password authentication</li>
 <li>Consider Redis ACLs for fine-grained access control</li>
 <li>Enable Redis SSL/TLS in production</li>
 <li>Restrict Redis network access to Report service instances</li>
 </ul>
-<h2 id="job-data-security">Job Data Security <a id="job-data-security" href="#job-data-security" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Job Data Security"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="job-data-security" class="content-heading">Job Data Security <a id="job-data-security" href="#job-data-security" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Job Data Security"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <ul>
 <li>Never store sensitive data in JobDataMap</li>
 <li>Store only identifiers, fetch sensitive data on execution</li>
@@ -749,13 +1058,27 @@ db.reportjobs.locks.deleteMany({})
         <h3>Relationships</h3>
         <div class="mermaid-container">
             <pre class="mermaid">flowchart LR
-ndual_scheduler_architecture_2DDACFB["Design: Dual Scheduler Architecture"]</pre>
-            <div class="mermaid-actions no-print">
+ndual_scheduler_architecture_192D3316["Design: Dual Scheduler Architecture"]</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
                 <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
                     <i class="bi bi-clipboard"></i>
                 </button>
                 <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
                     <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
                 </button>
             </div>
         </div>

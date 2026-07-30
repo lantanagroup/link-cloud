@@ -240,10 +240,15 @@ public class CodeGroupCacheService(
         csv.Read();
         csv.ReadHeader();
         var headers = csv.HeaderRecord;
-        if (headers == null || headers.Length != 3)
+        if (headers == null || headers.Length > 4 || headers.Length < 3)
         {
-            throw new InvalidOperationException("ValueSet CSV must have exactly 3 columns: code, display, and system");
+            throw new InvalidOperationException("ValueSet CSV must have 3 or 4 columns: system, code, display, and optionally status.");
         }
+
+        // A 4-column file carries value set membership status; a 3-column file does not.
+        // Members loaded with membership status are authoritative; members without it fall back to
+        // the code system status when validated (see FhirService.ResolveIsActive).
+        bool hasStatusColumn = headers.Length == 4;
 
         var records = csv.GetRecords<CsvValueSetRecord>();
         string? system = null;
@@ -287,11 +292,23 @@ public class CodeGroupCacheService(
                 continue;
             }
 
-            systemCodes.Add(new Code
+            if (hasStatusColumn)
             {
-                Value = code,
-                Display = display
-            });
+                systemCodes.Add(new ValueSetCode
+                {
+                    Value = code,
+                    Display = display,
+                    Status = record.Status
+                });
+            }
+            else
+            {
+                systemCodes.Add(new Code
+                {
+                    Value = code,
+                    Display = display
+                });
+            }
         }
 
         LogScientificNotationWarning(scientificNotationCodeCount, codeGroup.Id, scientificNotationCodeExamples);
@@ -412,9 +429,10 @@ public class CodeGroupCacheService(
                 using var reader = new StringReader(csvContent);
                 var config = new CsvConfiguration(CultureInfo.InvariantCulture);
 
-                // CodeSystem CSVs have an optional trailing status column, so a missing field is
-                // tolerated there. ValueSet keeps strict missing-field validation.
-                if (codeGroup.Type == CodeGroup.CodeGroupTypes.CodeSystem)
+                // Both CodeSystem and ValueSet CSVs have an optional trailing status column, so a
+                // missing field is tolerated (a 3-column value set has no Status field to map).
+                if (codeGroup.Type == CodeGroup.CodeGroupTypes.CodeSystem ||
+                    codeGroup.Type == CodeGroup.CodeGroupTypes.ValueSet)
                     config.MissingFieldFound = null;
 
                 using var csv = new CsvReader(reader, config);

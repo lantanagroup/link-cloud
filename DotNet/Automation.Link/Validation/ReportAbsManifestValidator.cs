@@ -13,6 +13,22 @@ public class ReportAbsManifestValidator
     private const int MaxErrors = 200;
     private const string ApplicablePeriodExtensionUrl = "http://www.cdc.gov/nhsn/fhirportal/dqm/ig/StructureDefinition/link-patient-list-applicable-period-extension";
 
+    /// <summary>
+    /// Controls expected derived OperationOutcome writes per failed-validation patient.
+    /// </summary>
+    public sealed record OperationOutcomeExpectationSettings(
+        bool ReportWritesLegacyOperationOutcomeWhenInvalid,
+        bool ValidationWritesPreQualOperationOutcomeWhenInvalid)
+    {
+        public static OperationOutcomeExpectationSettings Default { get; } =
+            new(ReportWritesLegacyOperationOutcomeWhenInvalid: true,
+                ValidationWritesPreQualOperationOutcomeWhenInvalid: false);
+
+        public int ExpectedCountPerFailedValidationPatient =>
+            (ReportWritesLegacyOperationOutcomeWhenInvalid ? 1 : 0)
+            + (ValidationWritesPreQualOperationOutcomeWhenInvalid ? 1 : 0);
+    }
+
     private static readonly HashSet<string> DerivedResourceTypes =
     [
         "MeasureReport",
@@ -42,7 +58,8 @@ public class ReportAbsManifestValidator
         IReadOnlyList<(string Name, string Json)>? generatedBundles = null,
         IReadOnlyCollection<string>? expectedManifestPatientListIds = null,
         bool expectDataAcquisitionData = true,
-        GenerationManifest? manifest = null)
+        GenerationManifest? manifest = null,
+        OperationOutcomeExpectationSettings? operationOutcomeExpectations = null)
     {
         return ValidateAllAsync(
             internalAbsResources,
@@ -55,7 +72,8 @@ public class ReportAbsManifestValidator
             generatedBundles,
             expectedManifestPatientListIds,
             expectDataAcquisitionData,
-            manifest);
+            manifest,
+            operationOutcomeExpectations);
     }
 
     public async Task ValidateAllAsync(
@@ -69,7 +87,8 @@ public class ReportAbsManifestValidator
         IReadOnlyList<(string Name, string Json)>? generatedBundles = null,
         IReadOnlyCollection<string>? expectedManifestPatientListIds = null,
         bool expectDataAcquisitionData = true,
-        GenerationManifest? manifest = null)
+        GenerationManifest? manifest = null,
+        OperationOutcomeExpectationSettings? operationOutcomeExpectations = null)
     {
         var errors = new List<string>();
 
@@ -130,6 +149,7 @@ public class ReportAbsManifestValidator
                     .ToHashSet(StringComparer.Ordinal);
 
                 var entries = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleIdForMeasureReports);
+
                 expectedSubmittedMeasureReportIds = entries
                     .Where(e => !string.IsNullOrWhiteSpace(e.PatientId)
                                 && expectedSubmittedPatientSet.Contains(e.PatientId)
@@ -195,11 +215,13 @@ public class ReportAbsManifestValidator
         {
             // Populate the count-level expectation for OperationOutcome from the authoritative
             // source: Report.ReportEntry.ReportingStatus. ValidationCompleteListener appends
-            // exactly one OperationOutcome to a patient's aggregate blob when its
-            // ValidationComplete.IsValid == false (status becomes FailedValidation).
+            // a runtime-flag-dependent number of OperationOutcomes per failed patient.
             if (!string.IsNullOrWhiteSpace(reportId) && Guid.TryParse(reportId, out var scheduleId))
             {
-                await PopulateExpectedOperationOutcomesFromReportEntriesAsync(manifest, scheduleId);
+                await PopulateExpectedOperationOutcomesFromReportEntriesAsync(
+                    manifest,
+                    scheduleId,
+                    operationOutcomeExpectations ?? OperationOutcomeExpectationSettings.Default);
             }
 
             ValidateAbsResourceCountsAgainstManifest(
@@ -214,31 +236,39 @@ public class ReportAbsManifestValidator
 
     /// <summary>
     /// Populates <see cref="GenerationManifest.ExpectedOperationOutcomeCountByPatient"/>
-    /// from Report DB entries. Every patient whose <c>ReportingStatus</c> is
-    /// <c>FailedValidation</c> gets exactly one OperationOutcome appended to their ABS
-    /// patient file by <c>ValidationCompleteListener.ProcessMessageAsync</c>.
+    /// from Report DB entries and current pre-qualification writer settings.
     /// </summary>
-    private async Task PopulateExpectedOperationOutcomesFromReportEntriesAsync(GenerationManifest manifest, Guid scheduleId)
+    private async Task PopulateExpectedOperationOutcomesFromReportEntriesAsync(
+        GenerationManifest manifest,
+        Guid scheduleId,
+        OperationOutcomeExpectationSettings expectations)
     {
         try
         {
             var entries = await _reader.GetReportEntriesWithMeasureReportsAsync(scheduleId);
             var expected = new Dictionary<string, int>(StringComparer.Ordinal);
+            var expectedPerFailedPatient = expectations.ExpectedCountPerFailedValidationPatient;
             foreach (var entry in entries)
             {
                 if (string.IsNullOrWhiteSpace(entry.PatientId))
                     continue;
 
                 if (string.Equals(entry.ReportingStatus, "FailedValidation", StringComparison.OrdinalIgnoreCase))
-                    expected[entry.PatientId] = 1;
+                {
+                    if (expectedPerFailedPatient > 0)
+                    {
+                        expected[entry.PatientId] = expectedPerFailedPatient;
+                    }
+                }
             }
 
             manifest.ExpectedOperationOutcomeCountByPatient = expected;
 
-            if (expected.Count > 0)
-            {
-                _output.WriteLine($"[ABS] Predicting 1 OperationOutcome for {expected.Count} patient(s) with FailedValidation status.");
-            }
+            _output.WriteLine(
+                $"[ABS] OperationOutcome expectation for failed patients: " +
+                $"{expectedPerFailedPatient} each " +
+                $"(ReportLegacyWriter={(expectations.ReportWritesLegacyOperationOutcomeWhenInvalid ? "on" : "off")}, " +
+                $"ValidationPreQualWriter={(expectations.ValidationWritesPreQualOperationOutcomeWhenInvalid ? "on" : "off")}).");
         }
         catch (Exception ex)
         {
@@ -575,7 +605,9 @@ public class ReportAbsManifestValidator
         List<string> errors)
     {
         var absCountsByPatientType = parsedPatientResources
-            .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType) && !string.IsNullOrWhiteSpace(r.ResourceId))
+            .Where(r => !string.IsNullOrWhiteSpace(r.ResourceType)
+                        && (!string.IsNullOrWhiteSpace(r.ResourceId)
+                            || string.Equals(r.ResourceType, "OperationOutcome", StringComparison.OrdinalIgnoreCase)))
             .GroupBy(r => r.PatientId)
             .ToDictionary(
                 g => g.Key,
