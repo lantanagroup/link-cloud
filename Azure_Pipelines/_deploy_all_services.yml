@@ -177,6 +177,9 @@ jobs:
           GIT_COMMIT=$(git rev-parse --short HEAD)
           echo "GIT_COMMIT: ${GIT_COMMIT}"
           echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+          CLEANED_BRANCH_NAME=$(echo "$(Build.SourceBranchName)" | sed 's/\//-/g')
+          echo "CLEANED_BRANCH_NAME: ${CLEANED_BRANCH_NAME}"
+          echo "##vso[task.setvariable variable=CLEANED_BRANCH_NAME]${CLEANED_BRANCH_NAME}"
 
     - task: Kubernetes@1
       displayName: 'Deploy $(serviceName)'
@@ -187,7 +190,7 @@ jobs:
         kubernetesCluster: '$(kube_clustername)'
         namespace: '$(kube_namespace)'
         command: set
-        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(Build.SourceBranchName)-$(GIT_COMMIT)'
+        arguments: 'image -n $(kube_namespace) deployment $(serviceName)-deploy $(containerName)=$(containerRegistry)/link-$(repoName):$(CLEANED_BRANCH_NAME)-$(GIT_COMMIT)'
 
     - task: Bash@3
       displayName: 'Site Validation for $(serviceName)'

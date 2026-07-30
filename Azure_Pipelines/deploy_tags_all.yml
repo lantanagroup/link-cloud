@@ -53,6 +53,9 @@ jobs:
           GIT_COMMIT=$(git rev-parse --short HEAD)
           echo "GIT_COMMIT: ${GIT_COMMIT}"
           echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+          CLEANED_BRANCH_NAME=$(echo "$(Build.SourceBranchName)" | sed 's/\//-/g')
+          echo "CLEANED_BRANCH_NAME: ${CLEANED_BRANCH_NAME}"
+          echo "##vso[task.setvariable variable=CLEANED_BRANCH_NAME]${CLEANED_BRANCH_NAME}"
   
   # - task: DotNetCoreCLI@2
   #   displayName: Restore
@@ -77,10 +80,10 @@ jobs:
         targetType: 'inline'
         script: |
           if ("$(Build.SourceBranch)" -like "*release/*") {
-          $myTag1 = "release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+          $myTag1 = "release-$(CLEANED_BRANCH_NAME)-r$(Revision)-$(GIT_COMMIT)"
           }
           else { 
-          $myTag1 = "$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+          $myTag1 = "$(CLEANED_BRANCH_NAME)-r$(Revision)-$(GIT_COMMIT)"
           }
           Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
           Write-Host "Set MyTag to: $myTag1"
@@ -127,16 +130,19 @@ jobs:
           GIT_COMMIT=$(git rev-parse --short HEAD)
           echo "GIT_COMMIT: ${GIT_COMMIT}"
           echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+          CLEANED_BRANCH_NAME=$(echo "$(Build.SourceBranchName)" | sed 's/\//-/g')
+          echo "CLEANED_BRANCH_NAME: ${CLEANED_BRANCH_NAME}"
+          echo "##vso[task.setvariable variable=CLEANED_BRANCH_NAME]${CLEANED_BRANCH_NAME}"
 
     - task: PowerShell@2
       inputs:
         targetType: 'inline'
         script: |
           if ("$(Build.SourceBranch)" -like "*release/*") {
-          $myTag1 = "release-$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+          $myTag1 = "release-$(CLEANED_BRANCH_NAME)-r$(Revision)-$(GIT_COMMIT)"
           }
           else { 
-          $myTag1 = "$(Build.SourceBranchName)-r$(Revision)-$(GIT_COMMIT)"
+          $myTag1 = "$(CLEANED_BRANCH_NAME)-r$(Revision)-$(GIT_COMMIT)"
           }
           Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
           Write-Host "Set MyTag to: $myTag1"

@@ -2,9 +2,11 @@
 
 import argparse
 import os
+import re
 import subprocess
 import sys
-from typing import List
+import xml.etree.ElementTree as ET
+from typing import List, Tuple
 
 
 def ensure_git_repo() -> str:
@@ -68,6 +70,58 @@ def print_added_removed_lines(from_ref: str, to_ref: str, file_path: str) -> Non
                 print(f"DEL: {line[1:]}")
     except subprocess.CalledProcessError:
         pass
+
+def get_file_version(ref: str, path: str) -> str:
+    """Extract version from .csproj or pom.xml at a given git ref."""
+    try:
+        content = subprocess.check_output(
+            ["git", "show", f"{ref}:{path}"],
+            stderr=subprocess.DEVNULL
+        ).decode()
+
+        if path.endswith(".csproj"):
+            try:
+                root = ET.fromstring(content)
+                # In .csproj, Version is usually in a PropertyGroup
+                v = root.find(".//Version")
+                if v is not None and v.text:
+                    return v.text.strip()
+            except Exception:
+                # Fallback to regex
+                match = re.search(r"<Version>(.*?)</Version>", content)
+                if match:
+                    return match.group(1).strip()
+        elif path.endswith("pom.xml"):
+            try:
+                # Remove namespaces for easier searching with ElementTree
+                # namespaces can be tricky with find()
+                content_no_ns = re.sub(r' xmlns(:\w+)?="[^"]+"', '', content)
+                root = ET.fromstring(content_no_ns)
+                
+                # 1. Check <project><version>
+                v = root.find("version")
+                if v is not None and v.text:
+                    return v.text.strip()
+                
+                # 2. Check <project><parent><version>
+                v = root.find("parent/version")
+                if v is not None and v.text:
+                    return v.text.strip()
+            except Exception:
+                # Fallback to simple regex if XML is malformed or parsing fails
+                match = re.search(r"<version>(.*?)</version>", content)
+                if match:
+                    return match.group(1).strip()
+    except subprocess.CalledProcessError:
+        pass
+    return "unknown"
+
+def version_to_tuple(v: str) -> Tuple:
+    """Convert version string to a tuple of integers for comparison."""
+    try:
+        return tuple(int(p) for p in re.findall(r'\d+', v))
+    except Exception:
+        return (v,)
 
 def call_azure_openai(endpoint: str, deployment: str, api_key: str, changes_output: str) -> str:
     """Call Azure OpenAI to analyze and summarize changes."""
@@ -172,6 +226,64 @@ def main() -> None:
             svc_path = os.path.join("Java", svc)
             if os.path.isdir(svc_path) and os.path.exists(os.path.join(svc_path, "pom.xml")):
                 java_services.append(svc)
+
+    # Version checks
+    print("== Service Versioning ==")
+    version_to_services = {} # Dict[str, List[str]]
+    version_warnings = []
+
+    # DotNet services
+    for svc in sorted(dotnet_services):
+        svc_path = os.path.join("DotNet", svc)
+        try:
+            csproj = next(f for f in os.listdir(svc_path) if f.endswith(".csproj"))
+            csproj_path = f"DotNet/{svc}/{csproj}"
+
+            from_v = get_file_version(from_ref, csproj_path)
+            to_v = get_file_version(to_ref, csproj_path)
+
+            if to_v != "unknown":
+                version_to_services.setdefault(to_v, []).append(f"{svc} (DotNet)")
+
+            if from_v != "unknown" and to_v != "unknown":
+                if version_to_tuple(to_v) <= version_to_tuple(from_v):
+                    version_warnings.append(f"Warning: {svc} (DotNet) version not incremented ({from_v} -> {to_v})")
+        except StopIteration:
+            continue
+
+    # Java services
+    for svc in sorted(java_services):
+        pom_path = f"Java/{svc}/pom.xml"
+        from_v = get_file_version(from_ref, pom_path)
+        to_v = get_file_version(to_ref, pom_path)
+
+        if to_v != "unknown":
+            version_to_services.setdefault(to_v, []).append(f"{svc} (Java)")
+
+        if from_v != "unknown" and to_v != "unknown":
+            if version_to_tuple(to_v) <= version_to_tuple(from_v):
+                version_warnings.append(f"Warning: {svc} (Java) version not incremented ({from_v} -> {to_v})")
+
+    # Top-level Java pom
+    if os.path.exists("Java/pom.xml"):
+        from_v = get_file_version(from_ref, "Java/pom.xml")
+        to_v = get_file_version(to_ref, "Java/pom.xml")
+        if to_v != "unknown":
+            version_to_services.setdefault(to_v, []).append("Java Parent")
+            if from_v != "unknown" and version_to_tuple(to_v) <= version_to_tuple(from_v):
+                 version_warnings.append(f"Warning: Java Parent version not incremented ({from_v} -> {to_v})")
+
+    # Print current versions concisely
+    for v in sorted(version_to_services.keys(), reverse=True):
+        services = ", ".join(version_to_services[v])
+        print(f"{v}: {services}")
+
+    # Print warnings
+    if version_warnings:
+        print()
+        for warning in version_warnings:
+            print(warning)
+    print()
 
     print("== Per-Service Changes ==")
 
