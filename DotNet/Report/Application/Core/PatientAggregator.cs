@@ -171,14 +171,14 @@ namespace LantanaGroup.Link.Report.Application.Core
             return aggregateResult;
         }
 
-        public async System.Threading.Tasks.Task AppendResourceToBlob(string uri, DomainResource domainResource)
+        public virtual async System.Threading.Tasks.Task AppendResourceToBlob(string uri, DomainResource domainResource)
         {
             AppendBlobClient appendBlobClient = _containerClient.GetAppendBlobClient(uri);
 
             var serializer = new FhirJsonSerializer();
             string resourceString = serializer.SerializeToString(domainResource);
 
-            byte[] string_bytes = Encoding.UTF8.GetBytes(resourceString);
+            byte[] string_bytes = Encoding.UTF8.GetBytes(resourceString + Environment.NewLine);
 
             using (var stream = new MemoryStream(string_bytes))
             {

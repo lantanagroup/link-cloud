@@ -267,7 +267,7 @@ public sealed class GenerationManifest
     {
         var filtered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        if (ExpectedAbsPatientIdsOverride is { Count: > 0 }
+        if (ExpectedAbsPatientIdsOverride != null
             && !ExpectedAbsPatientIdsOverride.Contains(patientId))
         {
             return filtered;
@@ -364,7 +364,7 @@ public sealed class GenerationManifest
 
     private bool ShouldExpectAbsForPatient(string patientId)
     {
-        return ExpectedAbsPatientIdsOverride is not { Count: > 0 }
+        return ExpectedAbsPatientIdsOverride == null
                || ExpectedAbsPatientIdsOverride.Contains(patientId);
     }
 

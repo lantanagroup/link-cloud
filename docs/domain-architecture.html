@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Architecture Export</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({{startOnLoad:true}});
+
+        function getMermaidSourceFromContainer(container) {{
+            const pre = container?.querySelector('pre.mermaid');
+            if (!pre) return '';
+            return pre.dataset.source || pre.textContent.trim();
+        }}
+
+        function getFullscreenContainer() {{
+            return document.getElementById('mermaidFullscreenContainer');
+        }}
+
+        function getFullscreenTarget() {{
+            return document.getElementById('mermaidFullscreenTarget');
+        }}
+
+        function getFullscreenOverlay() {{
+            return document.getElementById('mermaidFullscreenOverlay');
+        }}
+
+        function enableMermaidDragPan(container) {{
+            if (!container || container.dataset.dragPanBound === 'true') return;
+
+            container.dataset.dragPanBound = 'true';
+            container.classList.add('mermaid-pannable');
+            container.dataset.zoomScale = container.dataset.zoomScale || '1';
+
+            let dragging = false;
+            let startX = 0;
+            let startY = 0;
+            let startScrollLeft = 0;
+            let startScrollTop = 0;
+            let moved = false;
+
+            const stopDragging = function() {{
+                dragging = false;
+                moved = false;
+                container.classList.remove('is-dragging');
+            }};
+
+            container.addEventListener('mousedown', function(event) {{
+                if (event.button !== 0) return;
+                if (event.target.closest('.mermaid-actions, button, a')) return;
+
+                dragging = true;
+                moved = false;
+                startX = event.clientX;
+                startY = event.clientY;
+                startScrollLeft = container.scrollLeft;
+                startScrollTop = container.scrollTop;
+                container.classList.add('is-dragging');
+                event.preventDefault();
+            }});
+
+            container.addEventListener('mousemove', function(event) {{
+                if (!dragging) return;
+
+                const deltaX = event.clientX - startX;
+                const deltaY = event.clientY - startY;
+                if (!moved && (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3)) {{
+                    moved = true;
+                }}
+
+                container.scrollLeft = startScrollLeft - deltaX;
+                container.scrollTop = startScrollTop - deltaY;
+            }});
+
+            container.addEventListener('wheel', function(event) {{
+                if (!event.ctrlKey) return;
+                event.preventDefault();
+                const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+                zoomMermaidContainer(container, factor);
+            }}, {{ passive: false }});
+
+            container.addEventListener('mouseleave', stopDragging);
+            container.addEventListener('mouseup', stopDragging);
+            window.addEventListener('mouseup', stopDragging);
+
+            container.addEventListener('click', function(event) {{
+                if (!moved) return;
+                event.preventDefault();
+                event.stopPropagation();
+            }}, true);
+        }}
+
+        function getMermaidSvg(container) {{
+            return container?.querySelector('svg') || null;
+        }}
+
+        function applyMermaidZoom(container) {{
+            const svg = getMermaidSvg(container);
+            if (!svg) return;
+
+            const scale = Math.max(0.2, Math.min(8, Number(container.dataset.zoomScale || '1')));
+            container.dataset.zoomScale = String(scale);
+
+            if (!svg.dataset.baseWidth || !svg.dataset.baseHeight) {{
+                const rect = svg.getBoundingClientRect();
+                const viewBox = svg.viewBox?.baseVal;
+                const baseWidth = (viewBox && viewBox.width) || rect.width || svg.width?.baseVal?.value || 800;
+                const baseHeight = (viewBox && viewBox.height) || rect.height || svg.height?.baseVal?.value || 600;
+                svg.dataset.baseWidth = String(baseWidth);
+                svg.dataset.baseHeight = String(baseHeight);
+            }}
+
+            const baseWidth = Number(svg.dataset.baseWidth || '800');
+            const baseHeight = Number(svg.dataset.baseHeight || '600');
+            svg.style.width = `${{baseWidth * scale}}px`;
+            svg.style.height = `${{baseHeight * scale}}px`;
+            svg.style.maxWidth = 'none';
+            svg.style.transform = 'none';
+        }}
+
+        function zoomMermaidContainer(container, factor) {{
+            if (!container) return;
+            const currentScale = Number(container.dataset.zoomScale || '1');
+            container.dataset.zoomScale = String(currentScale * factor);
+            applyMermaidZoom(container);
+        }}
+
+        function resetMermaidZoomForContainer(container) {{
+            if (!container) return;
+            container.dataset.zoomScale = '1';
+            applyMermaidZoom(container);
+        }}
+
+        window.copyMermaidSource = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            const source = getMermaidSourceFromContainer(container);
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        function downloadMermaidPngFromContainer(container) {{
+            const svg = container?.querySelector('svg');
+            if (!svg) return;
+
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            const viewBox = svg.viewBox.baseVal;
+            const width = viewBox.width || svg.width.baseVal.value || 800;
+            const height = viewBox.height || svg.height.baseVal.value || 600;
+            
+            canvas.width = width * 2;
+            canvas.height = height * 2;
+            
+            img.onload = function() {{
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                const pngUrl = canvas.toDataURL('image/png');
+                const downloadLink = document.createElement('a');
+                downloadLink.href = pngUrl;
+                downloadLink.download = 'diagram.png';
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+            }};
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        }}
+
+        window.downloadMermaidPng = function(btn) {{
+            const container = btn.closest('.mermaid-container');
+            downloadMermaidPngFromContainer(container);
+        }};
+
+        window.copyFullscreenMermaidSource = function(btn) {{
+            const source = getMermaidSourceFromContainer(getFullscreenContainer());
+            if (source) {{
+                navigator.clipboard.writeText(source).then(() => {{
+                    const originalHtml = btn.innerHTML;
+                    btn.innerHTML = '<i class="bi bi-check"></i>';
+                    setTimeout(() => btn.innerHTML = originalHtml, 2000);
+                }});
+            }}
+        }};
+
+        window.downloadFullscreenMermaidPng = function() {{
+            downloadMermaidPngFromContainer(getFullscreenContainer());
+        }};
+
+        window.zoomMermaid = function(btn, factor) {{
+            zoomMermaidContainer(btn?.closest('.mermaid-container'), factor);
+        }};
+
+        window.resetMermaidZoom = function(btn) {{
+            resetMermaidZoomForContainer(btn?.closest('.mermaid-container'));
+        }};
+
+        window.zoomFullscreenMermaid = function(btn, factor) {{
+            zoomMermaidContainer(getFullscreenContainer(), factor);
+        }};
+
+        window.resetFullscreenMermaidZoom = function() {{
+            resetMermaidZoomForContainer(getFullscreenContainer());
+        }};
+
+        window.expandMermaidDiagram = function(btn) {{
+            const container = btn?.closest('.mermaid-container');
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!container || !overlay || !target) return;
+
+            const source = getMermaidSourceFromContainer(container);
+            const svg = container.querySelector('svg');
+            if (!source || !svg) return;
+
+            target.dataset.source = source;
+            target.innerHTML = svg.outerHTML;
+            enableMermaidDragPan(getFullscreenContainer());
+            resetMermaidZoomForContainer(getFullscreenContainer());
+            overlay.classList.remove('d-none');
+            overlay.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('overflow-hidden');
+        }};
+
+        window.closeMermaidFullscreen = function() {{
+            const overlay = getFullscreenOverlay();
+            const target = getFullscreenTarget();
+            if (!overlay || !target) return;
+
+            overlay.classList.add('d-none');
+            overlay.setAttribute('aria-hidden', 'true');
+            target.innerHTML = '';
+            delete target.dataset.source;
+            document.body.classList.remove('overflow-hidden');
+        }};
+
+        document.addEventListener('keydown', function(event) {{
+            if (event.key !== 'Escape') return;
+            const overlay = getFullscreenOverlay();
+            if (overlay && !overlay.classList.contains('d-none')) {{
+                closeMermaidFullscreen();
+            }}
+        }});
+    </script>
+    <style>
+        .sidebar {{
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            overflow-y: auto;
+        }}
+        .main-content {{
+            margin-left: 240px;
+            padding: 20px;
+        }}
+        .sidebar .nav-link {{ color: #333; }}
+        .sidebar .nav-link:hover {{ color: #007bff; }}
+        .mermaid-container {{
+            position: relative;
+            min-height: 50px;
+            max-height: 500px;
+            overflow: auto;
+            background-color: #fff;
+        }}
+        .mermaid-container > pre.mermaid,
+        .mermaid-container > pre.language-mermaid {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+        }}
+        .mermaid-actions {{
+            position: absolute;
+            display: none;
+            gap: 5px;
+            z-index: 10;
+        }}
+        .mermaid-actions-top {{
+            top: 10px;
+            right: 10px;
+        }}
+        .mermaid-actions-bottom {{
+            right: 10px;
+            bottom: 10px;
+        }}
+        .mermaid-container:hover .mermaid-actions {{
+            display: flex;
+        }}
+        .mermaid-container.mermaid-pannable {{
+            cursor: grab;
+            user-select: none;
+        }}
+        .mermaid-container.mermaid-pannable.is-dragging {{
+            cursor: grabbing;
+        }}
+        .mermaid-actions .btn {{
+            background-color: rgba(255, 255, 255, 0.8);
+            border: 1px solid #dee2e6;
+            padding: 2px 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .mermaid-fullscreen-overlay {{
+            position: fixed;
+            inset: 0;
+            z-index: 2000;
+        }}
+        .mermaid-fullscreen-backdrop {{
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+        }}
+        .mermaid-fullscreen-panel {{
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            width: calc(100vw - 1rem);
+            height: calc(100vh - 1rem);
+            margin: 0.5rem;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            box-shadow: 0 1rem 3rem rgba(0,0,0,.175);
+            overflow: hidden;
+        }}
+        .mermaid-fullscreen-toolbar {{
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid #dee2e6;
+            background: #fff;
+            flex: 0 0 auto;
+        }}
+        .mermaid-fullscreen-content {{
+            flex: 1 1 auto;
+            min-height: 0;
+            padding: 0.25rem;
+        }}
+        .mermaid-fullscreen-container {{
+            height: 100%;
+            overflow: auto;
+            background: #fff;
+        }}
+        .mermaid-fullscreen-container svg {{
+            max-width: none;
+            height: auto;
+            transform-origin: top left;
+        }}
+        #mermaidFullscreenTarget {{
+            margin: 0;
+            padding: 0.25rem;
+            width: max-content;
+            min-width: 100%;
+            min-height: 100%;
+        }}
+        /* Custom Purple Utilities */
+        .text-purple {{ color: #6f42c1 !important; }}
+        .bg-purple-subtle {{ background-color: #e2d9f3 !important; color: #6f42c1 !important; }}
+        .bg-primary-subtle {{ background-color: #cfe2ff !important; color: #052c65 !important; }}
+        .bg-success-subtle {{ background-color: #d1e7dd !important; color: #0a3622 !important; }}
+    </style>
+</head>
+<body>
+    <div id="mermaidFullscreenOverlay" class="mermaid-fullscreen-overlay d-none" aria-hidden="true">
+        <div class="mermaid-fullscreen-backdrop" onclick="closeMermaidFullscreen()"></div>
+        <div class="mermaid-fullscreen-panel" role="dialog" aria-modal="true" aria-label="Expanded Mermaid diagram">
+            <div class="mermaid-fullscreen-toolbar">
+                <h5 class="mb-0">Expanded Mermaid Diagram</h5>
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomFullscreenMermaid(this, 1.2)">
+                        <i class="bi bi-zoom-in"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomFullscreenMermaid(this, 1 / 1.2)">
+                        <i class="bi bi-zoom-out"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetFullscreenMermaidZoom(this)">
+                        <i class="bi bi-aspect-ratio"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyFullscreenMermaidSource(this)">
+                        <i class="bi bi-clipboard"></i>
+                    </button>
+                    <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadFullscreenMermaidPng(this)">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button type="button" class="btn-close" aria-label="Close" onclick="closeMermaidFullscreen()"></button>
+                </div>
+            </div>
+            <div class="mermaid-fullscreen-content">
+                <div id="mermaidFullscreenContainer" class="mermaid-container mermaid-fullscreen-container">
+                    <pre id="mermaidFullscreenTarget" class="mermaid mb-0"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+  <li class="nav-item"><a class="nav-link" href="index.html">Home</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="domains.html">Domains</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-architecture.html">Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-compliance.html">Compliance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-dataaccess.html">Data Access</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-knowledgeartifactmanagement.html">Knowledge Artifact Management</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-report.html">Report</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="domain-tenant.html">Tenant</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="events.html">Events</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-auditableeventoccurred.html">Auditable Event Occurred</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-cernerpatientsacquired.html">Cerner Patients Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-measurereportgenerated.html">Measure Report Generated</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientcensusscheduled.html">Patient Census Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientevent.html">Patient Event</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-patientlistsacquired.html">Patient Lists Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-payloadsubmitted.html">Payload Submitted</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readyforvalidation.html">Ready for Validation</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-readytoacquire.html">Ready to Acquire</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-reportscheduled.html">Report Scheduled</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-acquired.html">Resources Acquired</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-resources-normalized.html">Resources Normalized</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-submitpayload.html">Submit Payload</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="event-validationcomplete.html">Validation Complete</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="commands.html">Commands</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-dataacquisitionrequested.html">Data Acquisition Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-evaluationrequested.html">Evaluation Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-generatereportrequested.html">Generate Report Requested</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatecodesystemcode.html">Validate CodeSystem Code</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="command-validatevaluesetcode.html">Validate ValueSet Code</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="queries.html">Queries</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilitieslist.html">Get Facilities List</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getfacilityconfig.html">Get Facility Configuration</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="query-getserviceinfo.html">Get Service Info</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="services.html">Services</a></strong></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-accountservice.html">Account Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminbff.html">Admin Backend-for-Frontend</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-adminui.html">Admin UI (front-end)</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-auditservice.html">Audit Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-censusservice.html">Census Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionservice.html">Data Acquisition Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-dataacquisitionworkerservice.html">Data Acquisition Worker Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-measureevalservice.html">Measure Evaluation Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-normalizationservice.html">Normalization Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-querydispatchservice.html">Query Dispatch Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-reportservice.html">Report Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-submissionservice.html">Submission Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-tenantservice.html">Tenant Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-terminologyservice.html">Terminology Service</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-2" href="service-validationservice.html">Validation Service</a></li>
+  <li class="nav-item mt-2"><strong><a class="nav-link p-0" href="designs.html">Designs</a></strong></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > config</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dotnet.html">Configuring .NET Services</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-java.html">Configuring Java Services</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">deploy_use > user</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tenant_management.html">Tenant Management</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > arch</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_flow.html">Link Inner-Service Auth Flow</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-ehr-auth.html">EHR Authentication</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-persistence.html">Data Persistence</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-dual_scheduler_architecture.html">Dual Scheduler Architecture</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-retry_topics.html">Retry Topics</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-security.html">Security</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-telemetry.html">Telemetry</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">design > use_cases</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-nhsn.html">NHSN Reporting Use Case</a></li>
+  <li class="nav-item mt-1 ms-2"><small class="text-muted text-uppercase" style="font-size: 0.75rem;">development > patterns</small></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-api_guidance.html">API Guidance</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-appconfig.html">Application Configuration Management Process</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-auth_policies.html">Authorization Policies</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-error_retry_scenarios.html">Kafka DeadLetter/Retry Scenarios</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-otel.html">Open Telemetry</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-tail_messages.html">Tail Messages</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-testing.html">Testing</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-data-arch-erd.html">Data Architecture Overview ERD</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-logging_error_handling.html">Logging & Error Handling</a></li>
+  <li class="nav-item"><a class="nav-link py-1 ms-3" href="design-performance-model.html">Performance Model</a></li>
+</ul>
+
+                </div>
+            </nav>
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+<h1>Architecture</h1>
+<div class="row">
+    <div class="col-md-8">
+        <section class="mb-4"><h3>Capabilities</h3><h4>Implemented</h4><ol><li class="mb-4"><h5>Administer application-wide architecture settings <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Governance</span></h5><div class="mb-3"><strong>Definition</strong><p>Administrators can maintain shared settings such as architecture version, home/export markdown, service tech-stack lists, package lists, stakeholder directory, and GitHub export templates.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Provides centralized control over repository-wide conventions and presentation settings.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Admin-only settings page and related persistence services.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Settings page, settings service, stakeholder persistence, role authorization.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Admin settings page persists global configuration and stakeholder list data.</p>
+</div></li><li class="mb-4"><h5>Apply approved proposal changes into current state <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Governance</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone provides a proposal application workflow that steps through diffs, detects conflicts, accepts resolved state, and writes approved changes into current-state entities.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Turns architecture proposals into governed changes to the approved repository.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes sequential diff review, conflict detection, resolved state submission, and proposal status progression.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Proposal apply page, diff service, entity service, proposal repository.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Proposal apply page persists applied changes and updates diff/proposal status.</p>
+</div></li><li class="mb-4"><h5>Authenticate users via OpenID Connect providers <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Security</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone supports OpenID Connect authentication with configurable providers, including Keycloak by default and Azure AD configuration support.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Integrates architecture access with enterprise identity providers.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes sign-in, sign-out, role claim normalization, default role behavior, and profile email initialization.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>ASP.NET authentication middleware, provider configuration, claims mapping logic, profile service.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Configured OIDC provider support exists in application startup and account flows.</p>
+</div></li><li class="mb-4"><h5>Author architecture content in markdown with diagrams and references <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Functional</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone supports markdown-based authoring with rendered Mermaid diagrams, custom reference resolution, and rich content sections on architecture entities.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Lets teams capture architecture context in a readable form while retaining structured references.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Applies across entities, proposals, exported HTML, and related detail views.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Markdown service, diagram service, reference resolution logic, UI pages, export templates.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Markdown content renders in entity details and export output; Mermaid content is supported in the app and exported pages.</p>
+</div></li><li class="mb-4"><h5>Browse architecture through a navigator view <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Functional</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone provides a Navigator screen for browsing architecture entities by package, domain, entity type, and specific entity selections.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Improves discoverability of architecture structure and relationships.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes domain filter labels, derived service relationship exploration, and JSON detail endpoints backing navigator interactions.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Navigator page model, entity service, relationship data, package/domain filters.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Navigator page and filter endpoints are implemented and covered by regression tests.</p>
+</div></li><li class="mb-4"><h5>Capture diff-based proposed changes <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Governance</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone records proposal changes as entity diffs containing base and proposed snapshots, captured metadata, and diff status lifecycle values.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Provides a maintainable change model that avoids cloning the entire architecture repository for each proposal.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes pending, applied, discarded, and conflict diff states.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Diff service, proposal entity model, entity service, proposal apply workflow.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Proposal diffs are persisted with base/proposed snapshots and evaluated during apply workflows.</p>
+</div></li><li class="mb-4"><h5>Capture domain capabilities within Domain entities <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Functional</span></h5><div class="mb-3"><strong>Definition</strong><p>Domain entities can store ordered capability records with name, status, type, definition, purpose/value, scope, dependencies, and measures.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Allows domains to represent business and technical capabilities directly inside the architecture knowledge graph.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes create, edit, reorder, render, export, proposal overlay, and MCP management of domain capabilities.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Domain entity model, capability editor UI, entity detail rendering, export service, MCP domain capability tools.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Capabilities persist on domains and can be queried separately through get_domain_capabilities.</p>
+</div></li><li class="mb-4"><h5>Create and manage ADR-style proposals with decision structure <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Governance</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone supports Proposal entities that function as architecture decision records with context, drivers, options, outcomes, pros/cons, stakeholders, open questions, and use cases.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Provides a structured way to capture, socialize, and govern architecture change decisions.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes create/edit/details/index/apply workflows and stakeholder participation fields.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Proposal entity model, proposal pages, stakeholder model, repository support, MCP proposal tools.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Proposal-specific fields and workflows are implemented and persisted.</p>
+</div></li><li class="mb-4"><h5>Enforce role-based access control <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Security</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone enforces role-aware behavior across User, Contributor, and Admin permissions for viewing, editing, governance, and administration workflows.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Limits sensitive actions to appropriate roles while preserving broad read access.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes page authorization, action visibility, edit/create/delete rights, comments, settings, and deleted-items administration.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Authentication configuration, role mapping, Razor Page authorization attributes, UI checks, controller authorization.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Role expectations are encoded in the app and validated by regression tests.</p>
+</div></li><li class="mb-4"><h5>Export architecture artifacts as PDF, AsyncAPI, and OpenAPI bundles <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Functional</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone supports additional export formats including PDF output, AsyncAPI export for selected async items, and OpenAPI ZIP export for selected services.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Allows architecture content to be reused in downstream documentation and interface distribution workflows.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Applies to supported service and message-oriented content.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Export service, QuestPDF, service/event metadata, selection workflows.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Export service exposes dedicated methods for PDF, AsyncAPI, and OpenAPI ZIP outputs.</p>
+</div></li><li class="mb-4"><h5>Export architecture documentation as static HTML and ZIP <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Functional</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone can generate a static HTML documentation site and ZIP package for the current architecture repository, including navigation and cross-links.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Makes architecture documentation portable and easy to publish or share outside the live application.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes full-site HTML generation, preview routes, ZIP export, and export filtering options.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Export service, markdown service, diagram service, export templates, entity repository.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>HTML preview and ZIP export workflows are implemented and documented.</p>
+</div></li><li class="mb-4"><h5>Expose Keystone as an MCP server for machine integration <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Technical</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone exposes a streamable HTTP MCP endpoint with typed tools for searching, reading, creating, updating, and deleting supported entities.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Enables agentic and automation scenarios against the live architecture repository.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes endpoint discovery, tools/list, tools/call, API-key authentication, and entity-specific schemas.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>MCP controller, entity service, user profile API keys, JSON-RPC handling, tool schema builders.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Production endpoint responds with tool catalog and supports typed domain/entity operations.</p>
+</div></li><li class="mb-4"><h5>Expose specialized MCP operations for domain capability maintenance <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Technical</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone MCP supports targeted operations to read domain capabilities and create or update individual capabilities without replacing unrelated domain properties.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Makes requirements and capability management safer and easier for automation clients.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes get_domain_capabilities, create_domain_capability, and update_domain_capability.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>MCP controller domain tool definitions, domain capability model, entity persistence.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Specialized domain capability tools are present in the MCP tool catalog.</p>
+</div></li><li class="mb-4"><h5>Maintain audit history for entity lifecycle changes <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Governance</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone records audit information for entity lifecycle actions such as create, update, delete, restore, and related governance events.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Provides traceability and operational accountability for architecture maintenance.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Applies to persisted entities and is visible in detail experiences and via audit-log entity support.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Entity service, audit log model/repository, detail pages, MCP CRUD support for audit-log entities.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Audit log entity support exists and audit information is loaded for entity details.</p>
+</div></li><li class="mb-4"><h5>Manage comments and threaded discussion on architecture records <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Functional</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone supports comments on entities and proposals, including replies, resolution, and deletion behaviors based on user role.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Enables collaborative review and discussion directly in the architecture repository.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes comment retrieval, add, reply, resolve, delete, and dedicated comments page experiences.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Comment model, comment service, entity/proposal detail pages, role-based authorization.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Comment service implements add, reply, resolve, and delete operations.</p>
+</div></li><li class="mb-4"><h5>Model architecture with typed domain entities <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Functional</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone supports architecture modeling using first-class typed entities including Domains, Events, Commands, Queries, Services, Designs, Design Categories, ADR-style Proposals, Stakeholders, and Audit Logs.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Provides a structured, consistent repository for architecture knowledge rather than relying on unstructured documents.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Covers entity type definitions, persistence, CRUD workflows, and cross-type navigation.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Base entity model, MongoDB persistence, entity repositories, entity service, Razor Pages UI, MCP CRUD surface.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Entity types are exposed in the application model, UI, services, and MCP tool catalog.</p>
+</div></li><li class="mb-4"><h5>Model service interaction patterns <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Functional</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone models relationships among Services, Events, Commands, and Queries, including producers, consumers, handlers, providers, and dependencies.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Enables users to document runtime integration patterns and system boundaries in a navigable way.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes bidirectional references, service dependencies, parent domain assignment, and detail-page relationship views.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Entity models, entity service relationship sync, detail pages, navigator, export rendering.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Relationship fields exist on service/event/command/query entities and are synchronized across linked entities.</p>
+</div></li><li class="mb-4"><h5>Operate on MongoDB-backed persistence with service-oriented architecture <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Non-Functional</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone is implemented as an ASP.NET Core application using MongoDB persistence, dependency-injected repositories/services, and an extensible entity model intended to support additional entity types over time.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Provides a maintainable technical foundation for evolving architecture knowledge management.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Covers repository abstractions, service-layer business logic, configurable hosting, and deployable web runtime.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>MongoDB client/database configuration, repositories, services, Razor Pages app composition, Docker/Aspire hosting assets.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>The application uses repository/service abstractions, MongoDB persistence, and deployable configuration in code and infrastructure files.</p>
+</div></li><li class="mb-4"><h5>Overlay proposed changes onto current-state architecture <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Governance</span></h5><div class="mb-3"><strong>Definition</strong><p>When a proposal is active, Keystone can overlay entity diffs onto current-state entities so users can review a proposed architecture without mutating approved records.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Separates approved architecture from in-flight change design while keeping comparison simple.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Applies to retrieval, detail rendering, editing in proposal mode, and proposal-aware MCP reads.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Proposal context, diff service, entity service, entity details pages, MCP adrId overlays.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Entities can be read with proposal overlays and proposal-mode edits create diffs instead of mutating current state.</p>
+</div></li><li class="mb-4"><h5>Personalize user profile, API keys, and integration preferences <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Operational</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone maintains user profiles with display name, theme, email preferences, API keys, and GitHub export preferences/tokens.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Supports secure user-specific integrations and a customizable working experience.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes profile editing, API key generation/deletion, email notification preferences, and GitHub export settings memory.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>User profile model, user profile service, profile page, API key authentication in MCP and export automation APIs.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Profiles persist API keys and user settings; MCP authenticates via stored API keys.</p>
+</div></li><li class="mb-4"><h5>Preserve soft-deleted entities with restoration and permanent deletion workflows <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Operational</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone supports soft deletion, deleted-item review, restoration, and permanent deletion for managed entities.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Improves safety and recoverability when architecture content is removed.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes deleted page administration and entity lifecycle state fields.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Base entity delete fields, entity service delete/restore/permanent delete methods, deleted page UI.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Delete, restore, and permanent delete workflows are implemented and covered in regression scenarios.</p>
+</div></li><li class="mb-4"><h5>Publish static HTML exports to GitHub via UI and automation API <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Operational</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone can publish generated HTML documentation to GitHub repositories using a user-scoped personal access token, either interactively or via an automation API.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Supports repeatable publishing of architecture documentation to external repositories.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes repository/branch/folder selection, PR creation, deletion of non-existing files, and API-key-authenticated automation endpoint.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>GitHub export service, export automation controller, user profile PAT storage, export service.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>GitHub export UI and automation controller are implemented and call a dedicated GitHub export service.</p>
+</div></li><li class="mb-4"><h5>Search architecture entities across the repository <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Functional</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone supports repository-wide search across supported architecture entity types by name and content.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Allows users to quickly locate relevant architecture records without knowing their exact location.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes search page workflows and MCP search tools for typed entities.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Entity service, search page model, MCP search tooling.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Search endpoints and typed MCP search tools are present for core entity categories.</p>
+</div></li><li class="mb-4"><h5>Store rich technical metadata for architecture entities <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Functional</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone stores technical metadata such as tech stack, Docker image, port, compute sizing, OpenAPI specifications, database schema, message schema structure, payload examples, and topic metadata.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Preserves important implementation context needed for architecture communication and governance.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Primarily applies to Services, Events, Commands, and Queries.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Typed entity models, edit forms, markdown/rendering services, navigator JSON endpoints, export service.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Metadata fields are editable, persisted, rendered in UI, and included in API/export workflows.</p>
+</div></li><li class="mb-4"><h5>Support AI-assisted architecture authoring and retrieval <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Technical</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone includes AI-assisted chat and edit workflows that use page context, repository retrieval, conversation history, and targeted field editing guidance.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Improves author productivity and speeds architecture analysis within the application.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes AI chat conversations, contextual retrieval, edit prompt history, and field-targeted edit assistance.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>AI chat service, AI conversation service, AI retrieval service, AI page context service, AI history service, provider configuration.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Authenticated AI chat API and AI-assisted edit UI hooks are implemented.</p>
+</div></li><li class="mb-4"><h5>Support concurrent editing awareness and entity locking <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Operational</span></h5><div class="mb-3"><strong>Definition</strong><p>Keystone uses SignalR-backed edit sessions and lock coordination to show who is editing and to reduce conflicting simultaneous edits.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Improves operational safety and collaboration during live editing.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes join session, request/release lock, force release, user list updates, and live entity data updates.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>EntityHub SignalR hub, entity lock service, edit page scripts.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>SignalR hub methods exist for collaborative edit session membership and lock management.</p>
+</div></li><li class="mb-4"><h5>Watch entities and notify interested users of changes <span class="badge text-bg-secondary ms-2">Implemented</span> <span class="badge text-bg-info ms-2">Operational</span></h5><div class="mb-3"><strong>Definition</strong><p>Users can watch architecture entities, see watched items, receive in-app notifications, and optionally receive email notifications when watched content changes.</p>
+</div><div class="mb-3"><strong>Purpose / Value</strong><p>Keeps stakeholders informed when important architecture records are modified.</p>
+</div><div class="mb-3"><strong>Scope</strong><p>Includes watch toggling, watched-items page, unread notification count, mark-read, and queued email sending.</p>
+</div><div class="mb-3"><strong>Dependencies</strong><p>Watcher IDs on base entities, watch service, notification service, notifications API, SMTP/email queue configuration.</p>
+</div><div class="mb-3"><strong>Measures</strong><p>Watch and notification controllers/pages are implemented and notification delivery can be queued.</p>
+</div></li></ol></section>
+        <h1 id="architecture-domain" class="content-heading">Architecture Domain <a id="architecture-domain" href="#architecture-domain" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Architecture Domain"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h1>
+<p>This domain captures the currently implemented capabilities of Keystone itself as an architecture documentation, governance, collaboration, export, and integration platform. The capabilities below are written to reflect functionality verified from the running codebase and production MCP surface as of 2026-07-01.</p>
+
+        
+    </div>
+    <div class="col-md-4">
+        <h3>Relationships</h3>
+        <div class="mermaid-container">
+            <pre class="mermaid">flowchart LR
+narchitecture_69C3F4FA["Domain: Architecture"]</pre>
+            <div class="mermaid-actions mermaid-actions-top no-print">
+                <button class="btn btn-sm btn-light" title="Copy Mermaid Source" onclick="copyMermaidSource(this)">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Download PNG" onclick="downloadMermaidPng(this)">
+                    <i class="bi bi-download"></i>
+                </button>
+            </div>
+            <div class="mermaid-actions mermaid-actions-bottom no-print">
+                <button class="btn btn-sm btn-light" title="Zoom In" onclick="zoomMermaid(this, 1.2)">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Zoom Out" onclick="zoomMermaid(this, 1 / 1.2)">
+                    <i class="bi bi-zoom-out"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Reset Zoom" onclick="resetMermaidZoom(this)">
+                    <i class="bi bi-aspect-ratio"></i>
+                </button>
+                <button class="btn btn-sm btn-light" title="Expand Diagram" onclick="expandMermaidDiagram(this)">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>            </main>
+        </div>
+    </div>
+</body>
+</html>

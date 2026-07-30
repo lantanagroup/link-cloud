@@ -38,6 +38,9 @@ public sealed class TestScenarioDocument
     public Guid? QueryPlanTemplateId { get; set; }
 
     [BsonRepresentation(BsonType.String)]
+    public Guid? NormalizationSuiteId { get; set; }
+
+    [BsonRepresentation(BsonType.String)]
     public Guid? OrganizationResourceMapTemplateId { get; set; }
 
     public bool CleanupServiceData { get; set; }
