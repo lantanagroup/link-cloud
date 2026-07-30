@@ -34,6 +34,6 @@ export const reportSchedules: IReportSchedule[] = [
 export function pagedReportSchedules(records: IReportSchedule[] = reportSchedules): IPagedReportSchedule {
   return {
     records,
-    metadata: { pageSize: 10, pageNumber: 1, totalCount: records.length, totalPages: 1 },
+    metadata: { pageSize: 10, pageNumber: 1, totalCount: records.length, totalPages: Math.max(1, Math.ceil(records.length / 10)) },
   };
 }

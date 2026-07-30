@@ -46,7 +46,7 @@ export function pagedLocationMappings(
 ): IPagedOrganizationLocationMapping {
   return {
     records,
-    metadata: { pageSize: 10, pageNumber: 1, totalCount: records.length, totalPages: 1 },
+    metadata: { pageSize: 10, pageNumber: 1, totalCount: records.length, totalPages: Math.max(1, Math.ceil(records.length / 10)) },
   };
 }
 
@@ -78,7 +78,7 @@ export function pagedEncounterMappings(
 ): IPagedEncounterMapping {
   return {
     records,
-    metadata: { pageSize: 10, pageNumber: 1, totalCount: records.length, totalPages: 1 },
+    metadata: { pageSize: 10, pageNumber: 1, totalCount: records.length, totalPages: Math.max(1, Math.ceil(records.length / 10)) },
   };
 }
 
@@ -89,7 +89,7 @@ export function pagedEncounterMappings(
 export function pagedOperations(records: IOperationModel[] = []): IPagedOperationModel {
   return {
     records,
-    metadata: { pageSize: 10, pageNumber: 1, totalCount: records.length, totalPages: 1 },
+    metadata: { pageSize: 10, pageNumber: 1, totalCount: records.length, totalPages: Math.max(1, Math.ceil(records.length / 10)) },
   };
 }
 

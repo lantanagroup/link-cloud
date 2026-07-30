@@ -8,7 +8,10 @@ import { APIRequestContext, Page } from '@playwright/test';
  * - Against ng serve (no UI_E2E_BASE_URL) the app uses same-origin /api via the dev proxy.
  */
 export function apiBaseUrl(): string {
-  if (process.env['UI_E2E_API_URL']) return process.env['UI_E2E_API_URL'];
+  // Trim any trailing slash: every caller appends `/something`, and a value like
+  // "http://host/api/" would otherwise produce "http://host/api//info", which not every
+  // reverse proxy normalises.
+  if (process.env['UI_E2E_API_URL']) return process.env['UI_E2E_API_URL'].replace(/\/$/, '');
   const base = process.env['UI_E2E_BASE_URL'];
   // ng serve mode: same-origin /api, proxied to a local BFF on 5218.
   if (base && base.includes(':4200')) return `${base.replace(/\/$/, '')}/api`;
