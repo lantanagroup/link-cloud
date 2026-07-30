@@ -104,8 +104,11 @@ def build_store_index(items: Iterable[Dict[str, Any]]) -> Dict[str, Set[str]]:
             continue
         label = item.get("label") or ""
         add(key, label)
-        if key.startswith("/"):
-            add(slash_to_dotted(key), label)
+        # No dotted alias for slash keys here. candidate_forms() already derives the slash
+        # form for entries whose runtime is java, so aliasing in the index as well would let
+        # a .NET entry be satisfied by a Java row - and the two runtimes read disjoint key
+        # spaces. Blob children below are a different case: those really are dotted
+        # properties once the provider flattens them.
         if is_json_blob(item.get("content_type") or ""):
             for child in flatten_blob(key, item.get("value") or ""):
                 add(child, label)

@@ -55,6 +55,39 @@ attribution, and the report generation.
 `springProperty` reads. Update it when those change; it is small enough not to warrant a
 parser.
 
+### Catalog checks
+
+```powershell
+# Does app-config.yaml conform to the JSON Schema embedded in itself?
+python Scripts/validate_app_config_schema.py
+
+# Does every required: true key have a row in every environment store?
+python Scripts/check_required_config.py
+
+# Where do the catalog, the code and the stores disagree?
+python Scripts/reconcile_config_catalog.py            # all four buckets
+python Scripts/reconcile_config_catalog.py --bucket D # required but absent
+
+python -m unittest discover Scripts/tests             # tests for the matching rules
+```
+
+`check_required_config.py` also enforces two invariants on store labels: a label containing
+`:` is rejected, because the `<Service>:<Environment>` tier does not resolve
+(`ExternalConfigurationExtension.cs:64` concatenates the environment object rather than its
+name); and a label absent from `serviceMeta` is rejected, because no service selects it.
+
+It also warns if a store stops pinning `Serilog:WriteTo:<n>:Name`. Serilog addresses sinks
+positionally, and every `appsettings.json` ships `[GrafanaLoki, Console]` -- the opposite of
+what the catalog's `Serilog:WriteTo:1:Args:uri` assumes. The store's `Name` rows are what make
+the pairing correct; remove them and logging silently reverts to the file's ordering.
+
+The rules for "is this key present" live in `Scripts/config_key_matching.py`, shared between
+the check and the reconciler so the two cannot disagree. They cover Java dotted/slash notation,
+array elements, `{Placeholder}` templates, JSON blobs the provider flattens, Spring relaxed
+binding, and label scoping.
+
+These three need **PyYAML**; the secret scanner is stdlib-only.
+
 ### Secret scanning
 
 App Configuration does not stop anyone storing a literal credential, so an export

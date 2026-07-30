@@ -158,9 +158,13 @@ global:
   - key: "ServiceRegistry:NotificationServiceUrl"
     description: "The base URL for the Notification Service."
     required: true
+  # Java-notation key under global, which has no owning service to infer a runtime from.
+  # Without the marker it is looked up as a .NET key and its /link/report/base-url row is
+  # never matched.
   - key: "link.report.base-url"
     description: "The base URL for the Report Service (used by Java services)."
     required: true
+    runtime: "java"
   - key: "SecretManagement:Manager"
     description: "The type of secret manager to use (e.g., AzureKeyVault)."
     required: true
@@ -192,6 +196,7 @@ global:
   - key: "pre-qualification.write-pre-qual-operation-outcome"
     description: "Boolean flag (default false), read by the Java Validation service. When true, Validation writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is its sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as PreQualification:WritePreQualOperationOutcome."
     required: false
+    runtime: "java"
 services:
   Account:
     - key: "UserManagement:EnableAutomaticUserActivation"

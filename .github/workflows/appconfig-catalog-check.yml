@@ -1,0 +1,62 @@
+name: "App Config Catalog Check"
+
+# Verifies app-config.yaml describes reality: every key marked required: true has a row in
+# every environment store, no store row carries a label no service selects, and the Serilog
+# sink index the catalog depends on is still pinned.
+#
+# LEGLINK-775 will make a pipeline import Config/app-config.*.json into the stores, at which
+# point a missing required key becomes a deployment defect rather than a documentation one.
+#
+# Runs on every PR rather than filtering on paths, so it stays valid as a required status
+# check. A path filter would leave PRs that touch nothing here reporting no status at all.
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+      - 'release/**'
+      - 'hotfix/**'
+  push:
+    branches:
+      - dev
+      - main
+      - 'release/**'
+      - 'hotfix/**'
+  merge_group:
+    branches:
+      - dev
+
+jobs:
+  check:
+    name: Validate catalog and required keys
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # validate_aac_secrets.py is stdlib-only; these two need a YAML parser.
+      - name: Install dependencies
+        run: pip install "pyyaml==6.0.*"
+
+      - name: Unit tests
+        run: python -m unittest discover Scripts/tests
+
+      - name: Validate catalog schema
+        run: python Scripts/validate_app_config_schema.py
+
+      # ADVISORY until the outstanding gaps are provisioned. Three required keys have no
+      # store row yet (ServiceRegistry:AdminBffServiceUrl and link.terminology-service-url in
+      # qa, AcquisitionWorkerProcessorSettings:WorkChannelCapacity in dev and qa) and the test
+      # store still carries an orphaned "Automation" label. Those are fixed with the other
+      # store changes; until then this would fail every PR for reasons no PR author caused.
+      #
+      # To promote: delete continue-on-error, confirm a green run, then mark the job required
+      # in branch protection.
+      - name: Check required keys are provisioned
+        continue-on-error: true
+        run: python Scripts/check_required_config.py

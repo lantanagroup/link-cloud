@@ -1,20 +1,26 @@
 #!/bin/sh
 #
-# Block commits that would put a credential into Config/*.json.
+# Guards the App Configuration exports and the catalog that describes them.
+#
+#   Config/*.json      scanned for credentials
+#   app-config.yaml    validated against its own embedded schema
 #
 # Enable for your clone with:
 #     git config core.hooksPath .githooks
 #
-# Validates the STAGED content, not the working tree, so a secret cannot slip
-# through by being removed from the file after `git add`.
+# Validates the STAGED content, not the working tree, so a problem cannot slip through by
+# being fixed in the file after `git add`.
 #
-# Bypass with `git commit --no-verify`. CI runs the same check either way.
+# Bypass with `git commit --no-verify`. CI runs the same checks either way.
 
 set -e
 
-staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^Config/.*\.json$' || true)
+staged_exports=$(git diff --cached --name-only --diff-filter=ACM \
+    | grep -E '^Config/.*\.json$' || true)
+staged_catalog=$(git diff --cached --name-only --diff-filter=ACM \
+    | grep -E '^app-config\.yaml$' || true)
 
-if [ -z "$staged" ]; then
+if [ -z "$staged_exports" ] && [ -z "$staged_catalog" ]; then
     exit 0
 fi
 
@@ -31,29 +37,49 @@ for candidate in python3 python py; do
 done
 
 if [ -z "$PYTHON" ]; then
-    echo "pre-commit: no working python found, skipping App Config secret scan."
-    echo "pre-commit: CI will still run it."
+    echo "pre-commit: no working python found, skipping App Config checks."
+    echo "pre-commit: CI will still run them."
     exit 0
 fi
 
-# Materialize staged blobs so the scan sees exactly what is being committed.
+# Materialize staged blobs so the checks see exactly what is being committed.
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 
-files=""
-for path in $staged; do
-    dest="$tmpdir/$(basename "$path")"
-    git show ":$path" > "$dest"
-    files="$files $dest"
-done
+stage_blob() {
+    dest="$tmpdir/$(basename "$1")"
+    git show ":$1" > "$dest"
+    echo "$dest"
+}
 
-# shellcheck disable=SC2086
-if ! "$PYTHON" Scripts/validate_aac_secrets.py $files; then
-    echo ""
-    echo "pre-commit: BLOCKED -- staged App Config export contains a credential."
-    echo "pre-commit: Move the value into Key Vault and reference it, then re-stage."
-    echo "pre-commit: If the finding is wrong, commit with --no-verify."
-    exit 1
+if [ -n "$staged_exports" ]; then
+    files=""
+    for path in $staged_exports; do
+        files="$files $(stage_blob "$path")"
+    done
+
+    # shellcheck disable=SC2086
+    if ! "$PYTHON" Scripts/validate_aac_secrets.py $files; then
+        echo ""
+        echo "pre-commit: BLOCKED -- staged App Config export contains a credential."
+        echo "pre-commit: Move the value into Key Vault and reference it, then re-stage."
+        echo "pre-commit: If the finding is wrong, commit with --no-verify."
+        exit 1
+    fi
 fi
+
+if [ -n "$staged_catalog" ]; then
+    catalog=$(stage_blob "$staged_catalog")
+    if ! "$PYTHON" Scripts/validate_app_config_schema.py "$catalog"; then
+        echo ""
+        echo "pre-commit: BLOCKED -- staged app-config.yaml does not match its own schema."
+        echo "pre-commit: Fix the entries above, or commit with --no-verify."
+        exit 1
+    fi
+fi
+
+# The required-key check is deliberately NOT run here. It compares the catalog against all
+# three stores, so it would fail on gaps a commit did not introduce and cannot fix. CI reports
+# it instead.
 
 exit 0
