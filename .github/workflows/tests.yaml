@@ -184,13 +184,16 @@ jobs:
           docker compose logs --no-color --tail=100 admin-ui || true
           exit 1
 
+      # Via the npm script so the --workers=1 lives in one place: the live specs create and
+      # delete real facilities, and running them concurrently makes the cleanup DELETEs
+      # collide. Serial is also faster here, since nothing waits on a shared dev server.
       - name: Admin UI live e2e tests
         id: ui_e2e
         continue-on-error: true
         working-directory: Web/Admin.UI
         env:
           UI_E2E_BASE_URL: http://localhost:8066
-        run: npx playwright test --project=live
+        run: npm run e2e:live
 
       # Build the test project ONCE up front. The parallel `dotnet test`
       # invocations below all target the same assembly and transitively

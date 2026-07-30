@@ -8,7 +8,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "e2e": "playwright test --project=mocked",
-    "e2e:live": "playwright test --project=live",
+    "e2e:live": "playwright test --project=live --workers=1",
     "e2e:ui": "playwright test --project=mocked --ui",
     "e2e:demo": "playwright test --project=demo --workers=1",
     "e2e:report": "playwright show-report"
