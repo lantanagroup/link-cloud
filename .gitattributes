@@ -5,6 +5,12 @@
 *.sh text eol=lf
 /topics.txt text eol=lf
 
+# Git hooks are shell scripts without a .sh extension. With core.autocrlf=true they would be
+# checked out with CRLF, making the shebang "#!/bin/sh\r". Git for Windows' bundled bash
+# tolerates that, but a real Linux shell (WSL, CI, a non-Windows developer) reports
+# "bad interpreter" and the hook silently stops guarding anything.
+/.githooks/** text eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #
