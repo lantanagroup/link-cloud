@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# Block commits that would put a credential into Config/*.json.
+#
+# Enable for your clone with:
+#     git config core.hooksPath .githooks
+#
+# Validates the STAGED content, not the working tree, so a secret cannot slip
+# through by being removed from the file after `git add`.
+#
+# Bypass with `git commit --no-verify`. CI runs the same check either way.
+
+set -e
+
+staged=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^Config/.*\.json$' || true)
+
+if [ -z "$staged" ]; then
+    exit 0
+fi
+
+# Probe that the interpreter actually runs. On Windows, `python3` often resolves
+# to the Microsoft Store alias, which exists on PATH but exits non-zero -- so
+# `command -v` alone picks an interpreter that cannot execute anything.
+PYTHON=""
+for candidate in python3 python py; do
+    if command -v "$candidate" >/dev/null 2>&1 &&
+       "$candidate" -c "import sys" >/dev/null 2>&1; then
+        PYTHON="$candidate"
+        break
+    fi
+done
+
+if [ -z "$PYTHON" ]; then
+    echo "pre-commit: no working python found, skipping App Config secret scan."
+    echo "pre-commit: CI will still run it."
+    exit 0
+fi
+
+# Materialize staged blobs so the scan sees exactly what is being committed.
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+files=""
+for path in $staged; do
+    dest="$tmpdir/$(basename "$path")"
+    git show ":$path" > "$dest"
+    files="$files $dest"
+done
+
+# shellcheck disable=SC2086
+if ! "$PYTHON" Scripts/validate_aac_secrets.py $files; then
+    echo ""
+    echo "pre-commit: BLOCKED -- staged App Config export contains a credential."
+    echo "pre-commit: Move the value into Key Vault and reference it, then re-stage."
+    echo "pre-commit: If the finding is wrong, commit with --no-verify."
+    exit 1
+fi
+
+exit 0

@@ -63,7 +63,7 @@ global:
     description: "The endpoint URI for the Grafana Loki log aggregator."
     required: true
   - key: "ConnectionStrings:Redis"
-    description: "The connection string for the Redis cache (e.g., 'localhost:6379,password=...')."
+    description: "The Redis endpoint (host:port). The password is supplied separately via Redis:Password. Required when Cache:Type is Redis; the resource cache uses ResourceCache:Redis:ConnectionString instead."
     required: true
   - key: "InternalBlobStorage:ConnectionString"
     description: "The connection string for the internal Azure Blob Storage (or Azurite)."
