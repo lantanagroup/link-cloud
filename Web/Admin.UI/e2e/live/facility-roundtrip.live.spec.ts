@@ -13,13 +13,16 @@ test.beforeAll(async ({ request }) => {
 
 test('a facility created through the BFF appears in the UI and disappears after deletion', async ({ page, request }) => {
   const facilityId = `ui-e2e-${Date.now()}`;
+  // Held in a const because the dashboard filter searches on name — see below — so the
+  // search term and the created facility must not be able to drift apart.
+  const facilityName = 'UI E2E Roundtrip Facility';
   const api = apiBaseUrl();
 
   try {
     const create = await request.post(`${api}/facility`, {
       data: {
         facilityId,
-        facilityName: 'UI E2E Roundtrip Facility',
+        facilityName,
         timeZone: 'America/New_York',
         vendor: 'Epic',
         scheduledReports: { daily: [], weekly: [], monthly: [] },
@@ -38,8 +41,17 @@ test('a facility created through the BFF appears in the UI and disappears after 
 
     const tenants = new TenantDashboardPage(page);
     await tenants.goto();
-    await tenants.facilitySearch.fill(facilityId);
-    await expect(tenants.rowFor(facilityId).or(page.getByRole('option', { name: new RegExp(facilityId) }))).toBeVisible({ timeout: 15_000 });
+
+    // Search by name, not id: the filter sends the term as facilityName, and the Tenant
+    // service matches it with FacilityName.Contains (FacilityController.GetFacilityList ->
+    // FacilityQueries.PagedSearchAsync). Typing the id filters everything out, which an
+    // earlier version of this test hid by also accepting an autocomplete option — those
+    // options are rendered from the *unfiltered* lookup and carry the id, so the assertion
+    // passed without the search ever working.
+    await tenants.facilitySearch.fill(facilityName);
+
+    // The row is the real outcome: it fails if either the search or the table breaks.
+    await expect(tenants.rowFor(facilityId)).toBeVisible({ timeout: 15_000 });
   } finally {
     const del = await request.delete(`${api}/facility/${facilityId}`);
     // 404 is acceptable if creation itself failed.
