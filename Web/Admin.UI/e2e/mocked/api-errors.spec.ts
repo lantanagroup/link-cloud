@@ -2,6 +2,10 @@ import { test, expect } from '../support/test';
 import { TenantDashboardPage } from '../support/pages/tenant-dashboard.page';
 import { facilityLookup } from '../fixtures/facilities';
 
+// This spec exists to drive the failure path, so logged errors are the expected outcome —
+// what it asserts is that the app handles them (toast shown, shell intact).
+test.use({ allowConsoleErrors: true });
+
 test('a failing facility API shows an error toast without breaking the page', async ({ page, api }) => {
   api.mock('GET /api/facility', {
     status: 500,

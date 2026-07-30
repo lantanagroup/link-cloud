@@ -2,6 +2,8 @@ import { test, expect } from '../support/test';
 import { facilityLookup, testFacilities } from '../fixtures/facilities';
 import { measureDefinitions } from '../fixtures/measure-defs';
 
+const ADHOC_POST = '/api/Facility/TestFacility01/AdHocReport';
+
 test('generate ad-hoc report submits the expected request', async ({ page, api }) => {
   api.mock('GET /api/facility/list', facilityLookup());
   api.mock('GET /api/measureeval/measure-definition', measureDefinitions);
@@ -32,8 +34,11 @@ test('generate ad-hoc report submits the expected request', async ({ page, api }
 
   await page.getByRole('button', { name: 'Generate Report' }).click();
 
-  const posts = api.callsTo('POST', '/api/Facility/TestFacility01/AdHocReport');
-  expect(posts).toHaveLength(1);
+  // The click fires the POST asynchronously, so the call log has to be polled — reading it
+  // straight after the click races the request and fails intermittently under parallel load.
+  await expect.poll(() => api.callsTo('POST', ADHOC_POST).length).toBe(1);
+
+  const posts = api.callsTo('POST', ADHOC_POST);
   const payload = JSON.parse(posts[0].postData ?? '{}');
   expect(payload.reportTypes).toEqual([measureDefinitions[0].id]);
   expect(payload.bypassSubmission).toBe(false);
