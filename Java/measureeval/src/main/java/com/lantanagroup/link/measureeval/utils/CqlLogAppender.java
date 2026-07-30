@@ -5,7 +5,6 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.AppenderBase;
 import com.lantanagroup.link.measureeval.services.LibraryResolver;
-import javassist.NotFoundException;
 import org.hl7.fhir.r4.model.Library;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,7 +57,7 @@ public class CqlLogAppender extends AppenderBase<ILoggingEvent> {
             } else {
                 try {
                     cql = CqlUtils.getCql(library, range);
-                } catch (NotFoundException e) {
+                } catch (Exception e) {
                     logger.warn("Failed to get CQL for libraryId={}, range={}, output={}", libraryId, range, output);
                 }
             }

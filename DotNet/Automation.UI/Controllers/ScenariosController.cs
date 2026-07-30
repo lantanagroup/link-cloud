@@ -421,6 +421,7 @@ public class ScenariosController(
                 })
                 .ToList(),
             QueryPlanTemplateId = source.QueryPlanTemplateId,
+            NormalizationSuiteId = source.NormalizationSuiteId,
             OrganizationResourceMapTemplateId = source.OrganizationResourceMapTemplateId,
             CleanupServiceData = source.CleanupServiceData,
             CleanupFhirData = source.CleanupFhirData,
