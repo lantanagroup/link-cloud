@@ -14,6 +14,47 @@ committed to this **public** repository.
 * `validate_aac_secrets.py [paths] [--strict]` fails if an export contains a
   credential. Defaults to `Config/*.json`.
 
+### Configuration key inventory
+
+Two tools derive the set of configuration keys the code actually reads, so the catalog can be
+checked against reality rather than trusted:
+
+```powershell
+# 1. Roslyn symbol dump (file-based app - no project, needs .NET 10 SDK)
+dotnet run --file Scripts/dump_config_symbols.cs -- DotNet Scripts/config_symbols.json
+
+# 2. Call-site scan + service attribution + inventory
+python Scripts/extract_config_keys.py
+```
+
+Producing `Config/config-key-inventory.json` (machine-readable, consumed by the reconciler and
+the tagging tool) and `docs/config-key-inventory.md` (the human reference).
+
+Only the markdown is committed. Both JSON files are gitignored: a committed derived file
+drifts from the code it describes the moment someone adds a `GetSection` call, which is the
+exact failure this tooling exists to detect. Regenerate before using either.
+
+The split is deliberate. Four things cannot be read reliably from text, and Roslyn resolves
+all of them from the symbol model:
+
+* Section names are declared both as `const string` and as `public static string`
+  (`KafkaConstants.SectionName`, `ServiceRegistry.ConfigSectionName`).
+* Six different classes declare a member named `SectionName`. Resolving that without a symbol
+  table files one section's keys under another section's name.
+* `ExternalBlobStorageSettings` inherits `ConnectionString` and `BlobContainerName` from
+  `BlobStorageSettings`.
+* `TelemetrySettings.EnableOtelCollector` is a public **field**, not a property.
+  `ConfigurationBinder` binds properties only, so the value set for it in all three stores
+  can never take effect.
+
+Python keeps the call-site scanning, the `.csproj` ProjectReference walk for service
+attribution, and the report generation.
+
+`Scripts/java_config_audit.json` is a hand-maintained audit of the Java bindings - 15
+`@ConfigurationProperties` classes, 12 `@Value` sites and the `logback-spring.xml`
+`springProperty` reads. Update it when those change; it is small enough not to warrant a
+parser.
+
 ### Secret scanning
 
 App Configuration does not stop anyone storing a literal credential, so an export
