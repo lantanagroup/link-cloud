@@ -514,15 +514,31 @@
           "Quartz": "3.18.1"
         }
       },
-      "StackExchange.Redis": {
+      "StackExchange.Redis.Extensions.AspNetCore": {
         "type": "Direct",
-        "requested": "[2.13.17, )",
-        "resolved": "2.13.17",
-        "contentHash": "P7o7ZDBAmBrOLQEw8Pt44iIA08ioj48smRxn4Jp6yzCu6P3DOSU6lj7f+IOtN3pPvSgC9YufvM92ycukEEBCYQ==",
+        "requested": "[11.0.0, )",
+        "resolved": "11.0.0",
+        "contentHash": "00WEH+3KvyHh6RT0/E+BYLaoy7UY0GsTzWZnls1UrsfKusj/s7W/95sskXe4Y6g79mvvH1exX7adRiHyEMUG8w==",
         "dependencies": {
-          "Microsoft.Extensions.Logging.Abstractions": "8.0.0",
-          "Pipelines.Sockets.Unofficial": "2.2.16",
-          "System.IO.Hashing": "10.0.2"
+          "StackExchange.Redis.Extensions.Core": "11.0.0"
+        }
+      },
+      "StackExchange.Redis.Extensions.Core": {
+        "type": "Direct",
+        "requested": "[11.0.0, )",
+        "resolved": "11.0.0",
+        "contentHash": "KGH7IDglQyyIU135xq9K9Ng193VDoSSRsLVE4AsbscyGEsRAbs8xU6cJLuelenfPpjea7oQPMNSg7peXDwPdBw==",
+        "dependencies": {
+          "StackExchange.Redis": "[2.8.24, 3.0.0)"
+        }
+      },
+      "StackExchange.Redis.Extensions.System.Text.Json": {
+        "type": "Direct",
+        "requested": "[11.0.0, )",
+        "resolved": "11.0.0",
+        "contentHash": "YNrspMI8AUOjuYTstse/kN0SqAiOd9KmPA6Z36jidCf8uSVgRap/OfOiaXGoDr+5cXy/UTCtnFOVcBfw74cOkA==",
+        "dependencies": {
+          "StackExchange.Redis.Extensions.Core": "11.0.0"
         }
       },
       "Swashbuckle.AspNetCore.SwaggerGen": {
@@ -1206,10 +1222,10 @@
       },
       "Pipelines.Sockets.Unofficial": {
         "type": "Transitive",
-        "resolved": "2.2.16",
-        "contentHash": "nonu9l0YrZH6krVYbskBjE7uG0VMAnvOQ9PU+RmzUsy+++vHkqzzCkHRoP877OiA3iRTxJyNDLfpcU8hrJ3/YQ==",
+        "resolved": "2.2.8",
+        "contentHash": "zG2FApP5zxSx6OcdJQLbZDk2AVlN2BNQD6MorwIfV6gVj0RRxWPEp2LXAxqDGZqeNV1Zp0BNPcNaey/GXmTdvQ==",
         "dependencies": {
-          "System.IO.Pipelines": "8.0.0"
+          "System.IO.Pipelines": "5.0.1"
         }
       },
       "runtime.debian.8-x64.runtime.native.System.Security.Cryptography.OpenSsl": {
@@ -2361,6 +2377,16 @@
         "contentHash": "cloLGeZolXbCJhJBc5OC05uhrdhdPL6MWHuVUnkkUvPDeK7HkwThBaLZ1XjBQVk9YhxXE2OvHXnKi0PLleXxDg==",
         "dependencies": {
           "Microsoft.IdentityModel.Tokens": "7.1.2"
+        }
+      },
+      "StackExchange.Redis": {
+        "type": "CentralTransitive",
+        "requested": "[2.13.17, )",
+        "resolved": "2.8.24",
+        "contentHash": "GWllmsFAtLyhm4C47cOCipGxyEi1NQWTFUHXnJ8hiHOsK/bH3T5eLkWPVW+LRL6jDiB3g3izW3YEHgLuPoJSyA==",
+        "dependencies": {
+          "Microsoft.Extensions.Logging.Abstractions": "6.0.0",
+          "Pipelines.Sockets.Unofficial": "2.2.8"
         }
       },
       "System.IdentityModel.Tokens.Jwt": {

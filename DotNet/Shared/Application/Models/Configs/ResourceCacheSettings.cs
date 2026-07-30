@@ -24,6 +24,7 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
     {
         public string? ConnectionString { get; set; }
         public string? Password { get; set; }
+        public int PoolSize { get; set; } = 5;
         /// <summary>
         /// The percentage of maxmemory at which the cache will fall back to ABS.
         /// Defaults to 80. When Redis maxmemory is 0 (unlimited), Redis is always used.

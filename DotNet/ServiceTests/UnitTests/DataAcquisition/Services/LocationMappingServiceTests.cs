@@ -913,14 +913,16 @@ public class LocationMappingServiceTests
         const string correlationId = "corr-1";
         const string patientId = "patient-1";
         var cacheKey = $"{correlationId}:{ResourceType.Encounter}";
+        using var cancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = cancellationTokenSource.Token;
 
         _mockConfigQueries
             .Setup(q => q.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
         _mockResourceCache
-            .Setup(c => c.Get(cacheKey))
-            .Returns(new List<DomainResource>
+            .Setup(c => c.GetAsync(cacheKey, cancellationToken))
+            .ReturnsAsync(new List<DomainResource>
             {
                 new Encounter { Id = "enc-org" },
                 new Encounter { Id = "enc-nonorg" }
@@ -936,16 +938,17 @@ public class LocationMappingServiceTests
 
         List<DomainResource>? rewritten = null;
         _mockResourceCache
-            .Setup(c => c.UpdateCorrelationCache(cacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Encounter))
-            .Callback<string, List<DomainResource>, ResourceType>((_, resources, _) => rewritten = resources);
+            .Setup(c => c.UpdateCorrelationCacheAsync(cacheKey, It.IsAny<List<DomainResource>>(), ResourceType.Encounter, cancellationToken))
+            .Callback<string, List<DomainResource>, ResourceType, CancellationToken>((_, resources, _, _) => rewritten = resources)
+            .Returns(System.Threading.Tasks.Task.CompletedTask);
 
         // Act
         var stripped = await _service.StripNonOrgEncountersFromCacheAsync(
-            FacilityId, correlationId, patientId, CancellationToken.None);
+            FacilityId, correlationId, patientId, cancellationToken);
 
         // Assert — only the non-org encounter is removed; the org encounter is rewritten.
         Assert.Equal(1, stripped);
-        _mockResourceCache.Verify(c => c.Delete(It.Is<List<string>>(keys => keys.Contains(cacheKey))), Times.Once);
+        _mockResourceCache.Verify(c => c.DeleteAsync(It.Is<List<string>>(keys => keys.Contains(cacheKey)), cancellationToken), Times.Once);
         Assert.NotNull(rewritten);
         Assert.Single(rewritten!);
         Assert.Equal("enc-org", rewritten![0].Id);
@@ -963,8 +966,8 @@ public class LocationMappingServiceTests
             .Setup(q => q.HasActiveByFacilityIdAsync(FacilityId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         _mockResourceCache
-            .Setup(c => c.Get(cacheKey))
-            .Returns(new List<DomainResource> { new Encounter { Id = "enc-nonorg" } });
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<DomainResource> { new Encounter { Id = "enc-nonorg" } });
         _mockEncounterMappingQueries
             .Setup(q => q.GetByFacilityIdAndPatientIdAsync(FacilityId, patientId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<EncounterMappingModel> { new() { EncounterId = "enc-nonorg", MappedToOrg = false } });
@@ -975,9 +978,9 @@ public class LocationMappingServiceTests
 
         // Assert — the key is deleted and never rewritten, so MeasureEval rehydrates no qualifying encounter.
         Assert.Equal(1, stripped);
-        _mockResourceCache.Verify(c => c.Delete(It.Is<List<string>>(keys => keys.Contains(cacheKey))), Times.Once);
+        _mockResourceCache.Verify(c => c.DeleteAsync(It.Is<List<string>>(keys => keys.Contains(cacheKey)), It.IsAny<CancellationToken>()), Times.Once);
         _mockResourceCache.Verify(
-            c => c.UpdateCorrelationCache(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>()),
+            c => c.UpdateCorrelationCacheAsync(It.IsAny<string>(), It.IsAny<List<DomainResource>>(), It.IsAny<ResourceType>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -995,8 +998,8 @@ public class LocationMappingServiceTests
 
         // Assert — never touches the resource cache or encounter mappings when mapping is inactive.
         Assert.Equal(0, stripped);
-        _mockResourceCache.Verify(c => c.Get(It.IsAny<string>()), Times.Never);
-        _mockResourceCache.Verify(c => c.Delete(It.IsAny<List<string>>()), Times.Never);
+        _mockResourceCache.Verify(c => c.GetAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockResourceCache.Verify(c => c.DeleteAsync(It.IsAny<List<string>>(), It.IsAny<CancellationToken>()), Times.Never);
         _mockEncounterMappingQueries.Verify(
             q => q.GetByFacilityIdAndPatientIdAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);

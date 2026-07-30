@@ -97,7 +97,7 @@ public class SearchFhirCommand : ISearchFhirCommand
         _logger.LogDebug(
             "Semaphore: SearchPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
             request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), maxConcurrent.SanitizeForLog());
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
+        using (await _distributedSemaphoreProvider.AcquireSemaphoreAsync(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
             var semAcquiredAt = DateTime.UtcNow;
             _logger.LogDebug(
@@ -159,7 +159,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                     _logger.LogDebug(
                         "Semaphore: SearchPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
                         request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), maxConcurrent.SanitizeForLog());
-                    using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
+                    using (await _distributedSemaphoreProvider.AcquireSemaphoreAsync(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
                     {
                         var semAcquiredAt = DateTime.UtcNow;
                         _logger.LogDebug(
@@ -212,7 +212,7 @@ public class SearchFhirCommand : ISearchFhirCommand
         _logger.LogDebug(
             "Semaphore: SearchNonPaging acquire attempt facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} maxConcurrent={MaxConcurrent}",
             request.facilityId.SanitizeForLog(), request.resourceType, request.correlationId, maxConcurrent);
-        using (_distributedSemaphoreProvider.AcquireSemaphore(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
+        using (await _distributedSemaphoreProvider.AcquireSemaphoreAsync(request.facilityId, maxConcurrent, _distributedLockSettings.Expiration, cancellationToken))
         {
             var semAcquiredAt = DateTime.UtcNow;
             _logger.LogDebug(

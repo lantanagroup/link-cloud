@@ -5,7 +5,9 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.SerDes;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
+using StackExchange.Redis.Extensions.Core.Abstractions;
 using System.Text.Json;
+using Task = System.Threading.Tasks.Task;
 
 namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 {
@@ -14,23 +16,20 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
         private readonly IDatabase _db;
         private readonly ILogger<RedisResourceCache> _logger;
 
-        public RedisResourceCache(IConnectionMultiplexer redis, ILogger<RedisResourceCache> logger)
+        public RedisResourceCache(IRedisDatabase redisDatabase, ILogger<RedisResourceCache> logger)
         {
-            _db = redis.GetDatabase();
+            _db = redisDatabase.Database;
             _logger = logger;
         }
 
-        public void Delete(List<string> cacheKeys)
+        public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
         {
-            foreach (var cacheKey in cacheKeys)
-            {
-                _db.KeyDelete(cacheKey);
-            }
+            await Task.WhenAll(cacheKeys.Select(cacheKey => _db.KeyDeleteAsync(cacheKey))).WaitAsync(cancellationToken);
         }
 
-        public List<DomainResource> Get(string cacheKey)
+        public async Task<List<DomainResource>> GetAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
-            var hashEntries = _db.HashGetAll(cacheKey);
+            var hashEntries = await _db.HashGetAllAsync(cacheKey).WaitAsync(cancellationToken);
 
             if (hashEntries == null || hashEntries.Length == 0) {
                 return new List<DomainResource>();
@@ -73,7 +72,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
             }
         }
 
-        public void UpdateCorrelationCache(string correlationId, List<DomainResource> resources, ResourceType resourceType)
+        public async Task UpdateCorrelationCacheAsync(string correlationId, List<DomainResource> resources, ResourceType resourceType, CancellationToken cancellationToken = default)
         {
             List<HashEntry> correlationHash = new List<HashEntry>();
 
@@ -82,7 +81,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 correlationHash.Add(new HashEntry(resource.TypeName + "/" + resource.Id, resource.ToJson()));
             }
 
-            _db.HashSet(correlationId, correlationHash.ToArray());
+            await _db.HashSetAsync(correlationId, correlationHash.ToArray()).WaitAsync(cancellationToken);
         }
 
         public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
