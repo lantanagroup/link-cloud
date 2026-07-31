@@ -18,10 +18,10 @@ checked against reality rather than trusted:
 
 ```powershell
 # 1. Roslyn symbol dump (file-based app - no project, needs .NET 10 SDK)
-dotnet run --file Scripts/dump_config_symbols.cs -- DotNet Scripts/config_symbols.json
+dotnet run --file Scripts/AzureAppConfig/dump_config_symbols.cs -- DotNet Scripts/AzureAppConfig/config_symbols.json
 
 # 2. Call-site scan + service attribution + inventory
-python Scripts/extract_config_keys.py
+python Scripts/AzureAppConfig/extract_config_keys.py
 ```
 
 Producing `Config/config-key-inventory.json` (machine-readable, consumed by the reconciler and
@@ -47,25 +47,25 @@ all of them from the symbol model:
 Python keeps the call-site scanning, the `.csproj` ProjectReference walk for service
 attribution, and the report generation.
 
-`Scripts/java_config_audit.json` is a hand-maintained audit of the Java bindings - 15
-`@ConfigurationProperties` classes, 12 `@Value` sites and the `logback-spring.xml`
-`springProperty` reads. Update it when those change; it is small enough not to warrant a
-parser.
+`Scripts/AzureAppConfig/java_config_audit.json` is a hand-maintained audit of the Java
+bindings - 15 `@ConfigurationProperties` classes, 12 `@Value` sites and the
+`logback-spring.xml` `springProperty` reads. Update it when those change; it is small enough
+not to warrant a parser.
 
 ### Catalog checks
 
 ```powershell
 # Does app-config.yaml conform to the JSON Schema embedded in itself?
-python Scripts/validate_app_config_schema.py
+python Scripts/AzureAppConfig/validate_app_config_schema.py
 
 # Does every required: true key have a row in every environment store?
-python Scripts/check_required_config.py
+python Scripts/AzureAppConfig/check_required_config.py
 
 # Where do the catalog, the code and the stores disagree?
-python Scripts/reconcile_config_catalog.py            # all four buckets
-python Scripts/reconcile_config_catalog.py --bucket D # required but absent
+python Scripts/AzureAppConfig/reconcile_config_catalog.py            # all four buckets
+python Scripts/AzureAppConfig/reconcile_config_catalog.py --bucket D # required but absent
 
-python -m unittest discover Scripts/tests             # tests for the matching rules
+python -m unittest discover Scripts/AzureAppConfig/tests             # tests for the matching rules
 ```
 
 ### Sensitive keys and Key Vault
@@ -138,8 +138,8 @@ App Configuration does not stop anyone storing a literal credential, so an expor
 can carry one into permanent git history. `validate_aac_secrets.py` gates that:
 
 ```powershell
-python Scripts/validate_aac_secrets.py "Config/*.json"
-python Scripts/validate_aac_secrets.py "Config/*.json" --strict   # warnings fatal
+python Scripts/AzureAppConfig/validate_aac_secrets.py "Config/*.json"
+python Scripts/AzureAppConfig/validate_aac_secrets.py "Config/*.json" --strict   # warnings fatal
 ```
 
 It reports **errors** for values matching a known credential shape (storage
