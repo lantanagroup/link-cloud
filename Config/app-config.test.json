@@ -685,15 +685,6 @@
 			"tags": {}
 		},
 		{
-			"key": "CORS",
-			"value": "{\r\n\t\"AllowAllOrigins\": false,\r\n\t\"AllowedOrigins\": [ \"https://test-demo.nhsnlink.org/\", \"https://test-dash.nhsnlink.org\", \"https://test-demo-ngnix.nhsnlink.org/\", \"http://test-demo-ngnix.nhsnlink.org\", \"http://localhost:4200\" ],\r\n\t\"AllowAllMethods\": false,\r\n\t\"AllowedMethods\": [ \"GET\", \"POST\", \"PUT\", \"DELETE\", \"OPTIONS\" ],\r\n\t\"AllowAllHeaders\": false,\r\n\t\"AllowedHeaders\": [ \"Authorization\", \"Content-Type\", \"Accept\", \"Origin\", \"Access-Control-Allow-Origin\", \"User-Agent\", \"X-Requested-With\", \"Set-Cookie\" ],\r\n\t\"AllowedExposedHeaders\": [ \"X-Pagination\" ],\r\n\t\"AllowCredentials\": true,\r\n\t\"MaxAge\": 600\r\n}",
-			"label": "LinkAdminBFF",
-			"content_type": "application/json",
-			"tags": {
-				"link:consumers": "AdminBFF"
-			}
-		},
-		{
 			"key": "CORS:AllowAllHeaders",
 			"value": "True",
 			"label": null,
