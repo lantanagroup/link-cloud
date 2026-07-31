@@ -44,6 +44,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import yaml
 
+import config_findings as findings_mod
 import config_key_matching as matching
 
 DEFAULT_CATALOG = "app-config.yaml"
@@ -62,25 +63,15 @@ FRAMEWORK_PREFIXES = (
 )
 
 
-def load_yaml(path: str) -> Dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle) or {}
-
-
-def load_json(path: str) -> Dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as handle:
-        return json.load(handle)
+INVENTORY_HINT = ("Generate it first:\n"
+                  "    dotnet run --file Scripts/dump_config_symbols.cs -- DotNet "
+                  "Scripts/config_symbols.json\n"
+                  "    python Scripts/extract_config_keys.py")
 
 
 def load_inventory(path: str) -> Dict[str, Dict[str, Any]]:
-    if not os.path.exists(path):
-        print(f"Error: {path} not found.", file=sys.stderr)
-        print("Generate it first:", file=sys.stderr)
-        print("    dotnet run --file Scripts/dump_config_symbols.cs -- DotNet "
-              "Scripts/config_symbols.json", file=sys.stderr)
-        print("    python Scripts/extract_config_keys.py", file=sys.stderr)
-        sys.exit(2)
-    return {entry["key"]: entry for entry in load_json(path).get("keys", [])}
+    payload = findings_mod.load_json_file(path, hint=INVENTORY_HINT)
+    return {entry["key"]: entry for entry in payload.get("keys", [])}
 
 
 def shipped_defaults() -> Dict[str, Tuple[str, Any]]:
@@ -110,7 +101,7 @@ def shipped_defaults() -> Dict[str, Tuple[str, Any]]:
     for path in glob.glob(os.path.join("Java", "*", "src", "main", "resources", "application.yml")):
         try:
             module = path.replace("\\", "/").split("/")[1]
-            walk(load_yaml(path), "", ".", module)
+            walk(findings_mod.load_yaml_file(path), "", ".", module)
         except (OSError, yaml.YAMLError):
             continue
 
@@ -155,7 +146,7 @@ def main() -> int:
                         help="Show only one bucket")
     args = parser.parse_args()
 
-    catalog = load_yaml(args.catalog)
+    catalog = findings_mod.load_yaml_file(args.catalog)
     inventory = load_inventory(args.inventory)
     defaults = shipped_defaults()
 
@@ -164,7 +155,7 @@ def main() -> int:
     all_items: Dict[str, Tuple[str, str]] = {}
     for env in ENVIRONMENTS:
         path = os.path.join(args.config_dir, f"app-config.{env}.json")
-        items = load_json(path).get("items", [])
+        items = findings_mod.load_json_file(path).get("items", [])
         stores[env] = matching.build_store_index(items)
         raw_keys[env] = {i["key"] for i in items if isinstance(i.get("key"), str)}
         for item in items:

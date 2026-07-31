@@ -81,12 +81,26 @@ positionally, and every `appsettings.json` ships `[GrafanaLoki, Console]` -- the
 what the catalog's `Serilog:WriteTo:1:Args:uri` assumes. The store's `Name` rows are what make
 the pairing correct; remove them and logging silently reverts to the file's ordering.
 
-The rules for "is this key present" live in `Scripts/config_key_matching.py`, shared between
-the check and the reconciler so the two cannot disagree. They cover Java dotted/slash notation,
-array elements, `{Placeholder}` templates, JSON blobs the provider flattens, Spring relaxed
-binding, and label scoping.
+**`check_required_config.py` is the gate; `reconcile_config_catalog.py` is the investigation.**
+They overlap deliberately: the reconciler's "required but absent" bucket asks the same question
+the check does. The check stays small and answers one question so it can be trusted as a CI
+gate; the reconciler is a four-bucket exploration with heuristics about which schemas are
+framework-owned, which is not something a gate should carry. They call the same matching
+functions, so they cannot give different answers.
 
-These three need **PyYAML**; the secret scanner is stdlib-only.
+Two shared modules keep the family consistent:
+
+* `config_key_matching.py` — the rules for "is this key present in a store". Java dotted/slash
+  notation, array elements, `{Placeholder}` templates, JSON blobs the provider flattens, Spring
+  relaxed binding, and label scoping.
+* `config_findings.py` — `Finding`, the ERROR/WARN report, the `--strict` exit-code rule, and
+  file loading. Three scripts here gate CI, so a single definition means changing `--strict`
+  behaviour is one edit rather than three files and a hope that none was missed.
+
+Exit codes are uniform: `0` clean, `1` findings, `2` the inputs could not be read — so a
+caller can tell "did not run" from "ran and found problems".
+
+These need **PyYAML**; the secret scanner is stdlib-only.
 
 ### Secret scanning
 

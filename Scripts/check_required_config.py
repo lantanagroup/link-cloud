@@ -48,7 +48,9 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import yaml
 
+import config_findings as findings_mod
 import config_key_matching as matching
+from config_findings import ERROR, WARN, Finding
 
 DEFAULT_CATALOG = "app-config.yaml"
 DEFAULT_CONFIG_DIR = "Config"
@@ -56,42 +58,6 @@ ENVIRONMENTS = ("dev", "qa", "test")
 
 SERILOG_SINK_RE = re.compile(r"^Serilog:WriteTo:(\d+):")
 GRAFANA_SINK = "GrafanaLoki"
-
-
-class Finding:
-    """One problem, located precisely enough to act on without hunting."""
-
-    def __init__(self, severity: str, where: str, message: str):
-        self.severity = severity
-        self.where = where
-        self.message = message
-
-    def format(self) -> str:
-        return f"  [{self.severity}] {self.where}\n           {self.message}"
-
-
-def load_yaml(path: str) -> Dict[str, Any]:
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            return yaml.safe_load(handle) or {}
-    except FileNotFoundError:
-        print(f"Error: File not found: {path}", file=sys.stderr)
-        sys.exit(2)
-    except yaml.YAMLError as exc:
-        print(f"Error: {path} is not valid YAML: {exc}", file=sys.stderr)
-        sys.exit(2)
-
-
-def load_store(path: str) -> List[Dict[str, Any]]:
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            return json.load(handle).get("items", [])
-    except FileNotFoundError:
-        print(f"Error: File not found: {path}", file=sys.stderr)
-        sys.exit(2)
-    except json.JSONDecodeError as exc:
-        print(f"Error: Invalid JSON in {path}: {exc}", file=sys.stderr)
-        sys.exit(2)
 
 
 def check_required_keys(catalog: Dict[str, Any],
@@ -215,11 +181,12 @@ def main() -> int:
     parser.add_argument("--strict", action="store_true", help="Treat warnings as errors")
     args = parser.parse_args()
 
-    catalog = load_yaml(args.catalog)
+    catalog = findings_mod.load_yaml_file(args.catalog)
     stores: Dict[str, List[Dict[str, Any]]] = {}
     indexes: Dict[str, Dict[str, Set[str]]] = {}
     for env in args.environments:
-        items = load_store(os.path.join(args.config_dir, f"app-config.{env}.json"))
+        items = findings_mod.load_json_file(
+            os.path.join(args.config_dir, f"app-config.{env}.json")).get("items", [])
         stores[env] = items
         indexes[env] = matching.build_store_index(items)
 
@@ -227,27 +194,14 @@ def main() -> int:
     findings.extend(check_labels(catalog, stores))
     findings.extend(check_serilog_sink_order(catalog, stores))
 
-    errors = [f for f in findings if f.severity == "ERROR"]
-    warnings = [f for f in findings if f.severity == "WARN"]
-
     required = sum(1 for _, entry, _, _ in matching.catalog_entries(catalog)
                    if entry.get("required"))
-    print(f"Checked {required} required keys against {len(stores)} store(s): "
-          f"{', '.join(args.environments)}")
-
-    if errors:
-        print(f"\nERRORS ({len(errors)}):")
-        for finding in errors:
-            print(finding.format())
-
-    if warnings:
-        print(f"\nWARNINGS ({len(warnings)}):")
-        for finding in warnings:
-            print(finding.format())
-
-    if not findings:
-        print("\nOK: every required key is present in every store.")
-        return 0
+    return findings_mod.report(
+        findings,
+        headline=(f"Checked {required} required keys against {len(stores)} store(s): "
+                  f"{', '.join(args.environments)}"),
+        all_clear="OK: every required key is present in every store.",
+        strict=args.strict)
 
     print(f"\nSummary: {len(errors)} error(s), {len(warnings)} warning(s).")
 

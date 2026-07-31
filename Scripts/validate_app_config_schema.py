@@ -43,35 +43,10 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+import config_findings as findings_mod
+from config_findings import ERROR, WARN, Finding
+
 DEFAULT_PATH = "app-config.yaml"
-
-
-class Finding:
-    """One schema violation, located as precisely as the document allows."""
-
-    def __init__(self, severity: str, where: str, message: str):
-        self.severity = severity
-        self.where = where
-        self.message = message
-
-    def format(self) -> str:
-        return f"  [{self.severity}] {self.where}\n           {self.message}"
-
-
-def load_document(path: str) -> Dict[str, Any]:
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            document = yaml.safe_load(handle)
-    except FileNotFoundError:
-        print(f"Error: File not found: {path}", file=sys.stderr)
-        sys.exit(2)
-    except yaml.YAMLError as exc:
-        print(f"Error: {path} is not valid YAML: {exc}", file=sys.stderr)
-        sys.exit(2)
-    if not isinstance(document, dict):
-        print(f"Error: {path} does not contain a mapping at the root.", file=sys.stderr)
-        sys.exit(2)
-    return document
 
 
 def type_matches(value: Any, declared: str) -> bool:
@@ -269,7 +244,7 @@ def check_top_level(document: Dict[str, Any]) -> List[Finding]:
 
 
 def validate(path: str) -> List[Finding]:
-    document = load_document(path)
+    document = findings_mod.load_yaml_file(path)
     defs = document.get("$defs")
     if not isinstance(defs, dict):
         return [Finding("ERROR", "(root)", "$defs is missing; there is no schema to validate against.")]
@@ -289,24 +264,11 @@ def main() -> int:
     args = parser.parse_args()
 
     findings = validate(args.path)
-    errors = [f for f in findings if f.severity == "ERROR"]
-    warnings = [f for f in findings if f.severity == "WARN"]
-
-    print(f"Validated {os.path.basename(args.path)} against its embedded schema.")
-
-    if errors:
-        print(f"\nERRORS ({len(errors)}):")
-        for finding in errors:
-            print(finding.format())
-
-    if warnings:
-        print(f"\nWARNINGS ({len(warnings)}):")
-        for finding in warnings:
-            print(finding.format())
-
-    if not findings:
-        print("\nOK: catalog conforms to its schema.")
-        return 0
+    return findings_mod.report(
+        findings,
+        headline=f"Validated {os.path.basename(args.path)} against its embedded schema.",
+        all_clear="OK: catalog conforms to its schema.",
+        strict=args.strict)
 
     print(f"\nSummary: {len(errors)} error(s), {len(warnings)} warning(s).")
 

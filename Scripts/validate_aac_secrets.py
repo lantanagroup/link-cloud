@@ -42,6 +42,9 @@ import re
 import sys
 from typing import Any, Dict, List, Tuple
 
+import config_findings as findings_mod
+from config_findings import ERROR, WARN, Finding, entry_location
+
 KEY_VAULT_REF_CONTENT_TYPE = "application/vnd.microsoft.appconfig.keyvaultref+json"
 
 # Substrings that mark a key as expected to hold a secret. Matched against the
@@ -109,38 +112,6 @@ CREDENTIAL_VALUE_PATTERNS: Tuple[Tuple[str, str], ...] = (
 )
 
 
-class Finding:
-    """One problem found in one config entry."""
-
-    def __init__(self, severity: str, path: str, index: int, key: str,
-                 label: str, message: str):
-        self.severity = severity
-        self.path = path
-        self.index = index
-        self.key = key
-        self.label = label
-        self.message = message
-
-    def format(self) -> str:
-        label_str = f" [label: {self.label}]" if self.label else ""
-        return (f"  [{self.severity}] {os.path.basename(self.path)} "
-                f"(item {self.index}): {self.key}{label_str}\n"
-                f"           {self.message}")
-
-
-def load_config(file_path: str) -> Dict:
-    """Load an Azure App Config JSON export from file."""
-    try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        print(f"Error: File not found: {file_path}", file=sys.stderr)
-        sys.exit(2)
-    except json.JSONDecodeError as e:
-        print(f"Error: Invalid JSON in file {file_path}: {e}", file=sys.stderr)
-        sys.exit(2)
-
-
 def is_key_vault_reference(value: Any) -> bool:
     """Check if value is a JSON object with only a 'uri' field (Key Vault reference)."""
     try:
@@ -205,7 +176,7 @@ def check_item(path: str, index: int, item: Dict) -> List[Finding]:
     # JSON text instead of the secret.
     if is_kv_ref and not declared_kv_ref:
         findings.append(Finding(
-            "ERROR", path, index, key, label,
+            "ERROR", entry_location(path, index, key, label),
             f"Value is a Key Vault reference but content_type is '{content_type}'. "
             f"App Configuration will serve the literal JSON string, not the secret. "
             f"Set content_type to '{KEY_VAULT_REF_CONTENT_TYPE};charset=utf-8'."))
@@ -213,14 +184,14 @@ def check_item(path: str, index: int, item: Dict) -> List[Finding]:
     # Declared as a reference but not shaped like one -- resolution will fail.
     if declared_kv_ref and not is_kv_ref:
         findings.append(Finding(
-            "ERROR", path, index, key, label,
+            "ERROR", entry_location(path, index, key, label),
             "content_type declares a Key Vault reference but the value is not a "
             '{"uri": "..."} object.'))
 
     # A vault URI smuggled into a value that is not a well-formed reference.
     if looks_like_vault_uri(value) and not is_kv_ref:
         findings.append(Finding(
-            "ERROR", path, index, key, label,
+            "ERROR", entry_location(path, index, key, label),
             "Value mentions a Key Vault secret URI but is not a well-formed "
             "Key Vault reference."))
 
@@ -230,7 +201,7 @@ def check_item(path: str, index: int, item: Dict) -> List[Finding]:
         for pattern, description in CREDENTIAL_VALUE_PATTERNS:
             if re.search(pattern, value):
                 findings.append(Finding(
-                    "ERROR", path, index, key, label,
+            "ERROR", entry_location(path, index, key, label),
                     f"Value looks like a credential ({description}). "
                     f"Move it to Key Vault and reference it instead."))
                 break
@@ -240,7 +211,7 @@ def check_item(path: str, index: int, item: Dict) -> List[Finding]:
     # being the shape a pasted credential arrives in.
     if is_endpoint_only_key(key) and "," in value:
         findings.append(Finding(
-            "WARN", path, index, key, label,
+            "WARN", entry_location(path, index, key, label),
             f"Value contains ',' but this key is assigned to "
             f"ConfigurationOptions.EndPoints, which accepts only host:port. "
             f"Redis options belong in the sibling settings, not here."))
@@ -251,7 +222,7 @@ def check_item(path: str, index: int, item: Dict) -> List[Finding]:
             and not is_endpoint_only_key(key)):
         preview = value if len(value) <= 60 else value[:57] + "..."
         findings.append(Finding(
-            "WARN", path, index, key, label,
+            "WARN", entry_location(path, index, key, label),
             f"Key name implies a secret but the value is a literal: '{preview}'. "
             f"Confirm this is not a credential."))
 
@@ -261,7 +232,7 @@ def check_item(path: str, index: int, item: Dict) -> List[Finding]:
             not value.strip() and content_type.strip()
             and "/" not in content_type):
         findings.append(Finding(
-            "WARN", path, index, key, label,
+            "WARN", entry_location(path, index, key, label),
             f"Malformed entry: value='{value}' content_type='{content_type}'. "
             f"These look transposed."))
 
@@ -278,7 +249,7 @@ def check_duplicates(path: str, items: List[Dict]) -> List[Finding]:
         composite = (key, label)
         if composite in seen:
             findings.append(Finding(
-                "WARN", path, index, key, label,
+            "WARN", entry_location(path, index, key, label),
                 f"Duplicate of item {seen[composite]}; the later value silently wins."))
         else:
             seen[composite] = index
@@ -287,10 +258,10 @@ def check_duplicates(path: str, items: List[Dict]) -> List[Finding]:
 
 def validate_file(path: str) -> List[Finding]:
     """Validate one export file and return every finding."""
-    config = load_config(path)
+    config = findings_mod.load_json_file(path)
     items = config.get("items", [])
     if not isinstance(items, list):
-        return [Finding("ERROR", path, 0, "(root)", "",
+        return [Finding("ERROR", entry_location(path, 0, "(root)"),
                         "Export has no 'items' array.")]
 
     findings: List[Finding] = []
@@ -333,24 +304,14 @@ def main() -> int:
     for path in paths:
         all_findings.extend(validate_file(path))
 
-    errors = [f for f in all_findings if f.severity == "ERROR"]
-    warnings = [f for f in all_findings if f.severity == "WARN"]
-
-    print(f"Scanned {len(paths)} file(s): {', '.join(os.path.basename(p) for p in paths)}")
-
-    if errors:
-        print(f"\nERRORS ({len(errors)}):")
-        for finding in errors:
-            print(finding.format())
-
-    if warnings:
-        print(f"\nWARNINGS ({len(warnings)}):")
-        for finding in warnings:
-            print(finding.format())
-
-    if not all_findings:
-        print("\nOK: no secrets or malformed entries found.")
-        return 0
+    return findings_mod.report(
+        all_findings,
+        headline=(f"Scanned {len(paths)} file(s): "
+                  f"{', '.join(os.path.basename(p) for p in paths)}"),
+        all_clear="OK: no secrets or malformed entries found.",
+        strict=args.strict,
+        epilogue=("A credential in a public repository must be rotated, not just "
+                  "deleted -- git history is permanent."))
 
     print(f"\nSummary: {len(errors)} error(s), {len(warnings)} warning(s).")
 

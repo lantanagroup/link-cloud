@@ -40,6 +40,7 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import config_findings as findings_mod
 import config_key_matching as matching  # noqa: E402
 
 DEFAULT_CATALOG = "app-config.yaml"
@@ -48,21 +49,10 @@ ENVIRONMENTS = ("dev", "qa", "test")
 CONSUMERS_TAG = "link:consumers"
 
 
-def load_json(path: str) -> Any:
-    try:
-        with open(path, "r", encoding="utf-8") as handle:
-            return json.load(handle)
-    except FileNotFoundError:
-        print(f"Error: File not found: {path}", file=sys.stderr)
-        if path.endswith("config-key-inventory.json"):
-            print("Generate it first:", file=sys.stderr)
-            print("    dotnet run --file Scripts/dump_config_symbols.cs -- DotNet "
-                  "Scripts/config_symbols.json", file=sys.stderr)
-            print("    python Scripts/extract_config_keys.py", file=sys.stderr)
-        sys.exit(2)
-    except json.JSONDecodeError as exc:
-        print(f"Error: Invalid JSON in {path}: {exc}", file=sys.stderr)
-        sys.exit(2)
+INVENTORY_HINT = ("Generate it first:\n"
+                  "    dotnet run --file Scripts/dump_config_symbols.cs -- DotNet "
+                  "Scripts/config_symbols.json\n"
+                  "    python Scripts/extract_config_keys.py")
 
 
 def label_owners(catalog_path: str) -> Dict[str, str]:
@@ -142,7 +132,7 @@ def apply_plan(items: List[Dict[str, Any]], plan: List[Dict[str, Any]]) -> None:
 def process(env: str, config_dir: str, inventory: List[Dict[str, Any]],
             owners: Dict[str, str], write: bool) -> int:
     path = os.path.join(config_dir, f"app-config.{env}.json")
-    document = load_json(path)
+    document = findings_mod.load_json_file(path)
     items = document.get("items", [])
     plan = plan_for(items, inventory, owners)
 
@@ -181,7 +171,8 @@ def main() -> int:
     if not args.env and not args.all:
         parser.error("pass --env <name> or --all")
 
-    inventory = load_json(args.inventory).get("keys", [])
+    inventory = findings_mod.load_json_file(
+        args.inventory, hint=INVENTORY_HINT).get("keys", [])
     owners = label_owners(args.catalog)
     targets = list(ENVIRONMENTS) if args.all else [args.env]
 
