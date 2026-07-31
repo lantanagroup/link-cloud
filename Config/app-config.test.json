@@ -718,7 +718,7 @@
 		},
 		{
 			"key": "CORS:AllowAllOrigins",
-			"value": "True",
+			"value": "False",
 			"label": null,
 			"content_type": "",
 			"tags": {
@@ -926,15 +926,6 @@
 		{
 			"key": "CORS:AllowedOrigins:4",
 			"value": "http://localhost:4200",
-			"label": "LinkAdminBFF",
-			"content_type": "",
-			"tags": {
-				"link:consumers": "AdminBFF"
-			}
-		},
-		{
-			"key": "CORS:AllowedOrigins:5",
-			"value": "https://qa-admin.nhsnlink.org/",
 			"label": "LinkAdminBFF",
 			"content_type": "",
 			"tags": {

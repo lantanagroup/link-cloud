@@ -718,7 +718,7 @@
 		},
 		{
 			"key": "CORS:AllowAllOrigins",
-			"value": "true",
+			"value": "false",
 			"label": null,
 			"content_type": "",
 			"tags": {
