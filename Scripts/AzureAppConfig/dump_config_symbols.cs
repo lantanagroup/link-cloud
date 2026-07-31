@@ -152,8 +152,14 @@ foreach (var type in AllTypes(compilation.GlobalNamespace))
 
         switch (member)
         {
-            // Bindable: ConfigurationBinder walks public properties with a setter.
-            case IPropertySymbol { SetMethod: not null, IsIndexer: false } property:
+            // Bindable: ConfigurationBinder walks public properties with a *public* setter.
+            // The outer accessibility filter checks the property, not the accessor, so
+            // `public string Foo { get; private set; }` would otherwise be reported as
+            // bindable. BinderOptions.BindNonPublicProperties defaults to false and nothing
+            // here sets it, so such a property is never written and a store row for it can
+            // never take effect - the same class of dead key as a public field.
+            case IPropertySymbol { SetMethod.DeclaredAccessibility: Accessibility.Public,
+                                   IsIndexer: false } property:
                 declaration.Members.Add(new MemberInfo(
                     property.Name, property.Type.ToDisplayString(typeFormat), "property", true));
                 break;
