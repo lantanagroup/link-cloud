@@ -34,8 +34,8 @@ Checks:
 Exit code is 0 when no errors are found (and, with --strict, no warnings either).
 
 Usage:
-    python Scripts/check_required_config.py
-    python Scripts/check_required_config.py --strict
+    python Scripts/AzureAppConfig/check_required_config.py
+    python Scripts/AzureAppConfig/check_required_config.py --strict
 """
 
 import argparse

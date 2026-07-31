@@ -32,8 +32,8 @@ Checks:
 Exit code is 0 when no errors are found (and, with --strict, no warnings either).
 
 Usage:
-    python Scripts/validate_app_config_schema.py
-    python Scripts/validate_app_config_schema.py app-config.yaml --strict
+    python Scripts/AzureAppConfig/validate_app_config_schema.py
+    python Scripts/AzureAppConfig/validate_app_config_schema.py app-config.yaml --strict
 """
 
 import argparse

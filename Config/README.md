@@ -156,25 +156,25 @@ az appconfig kv export -n nhsnlink-ac-dev -d file --path Config/app-config.dev.j
     --format json --profile appconfig/kvset --label "*" --auth-mode login --yes
 
 # Diff two exports
-python Scripts/compare_aac_exports.py Config/app-config.dev.json Config/app-config.qa.json
+python Scripts/AzureAppConfig/compare_aac_exports.py Config/app-config.dev.json Config/app-config.qa.json
 
 # Scan for credentials (also runs in CI and in the pre-commit hook)
-python Scripts/validate_aac_secrets.py "Config/*.json" --strict
+python Scripts/AzureAppConfig/validate_aac_secrets.py "Config/*.json" --strict
 
 # Validate the catalog against its own schema
-python Scripts/validate_app_config_schema.py
+python Scripts/AzureAppConfig/validate_app_config_schema.py
 ```
 
 Without `--profile appconfig/kvset`, a plain `--format json` export omits labels entirely and
 writes a nested object rather than the `items` array.
 
-`Scripts/export-appconfigs.bat` predates all of this: it iterates a hardcoded label list and
+`Scripts/AzureAppConfig/export-appconfigs.bat` predates all of this: it iterates a hardcoded label list and
 writes one file per label, and that list is missing `DataAcquisitionWorker`,
 `Link Automation UI` and `Terminology`. Using it loses those rows. Prefer the command above.
 
 ## Guardrails
 
-`Scripts/validate_aac_secrets.py` runs in two places and fails on any value matching a
+`Scripts/AzureAppConfig/validate_aac_secrets.py` runs in two places and fails on any value matching a
 credential shape — storage account keys, inline passwords, Mongo URIs with credentials, PEM
 blocks, JWTs, Slack webhooks — and on Key Vault references with the wrong `content_type`.
 

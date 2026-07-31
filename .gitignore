@@ -419,7 +419,7 @@ FodyWeavers.xsd
 # committed copy would drift from the code it describes - the exact problem this tooling
 # exists to detect. docs/config-key-inventory.md IS committed: it is the human-readable
 # deliverable. Regenerate with:
-#   dotnet run --file Scripts/dump_config_symbols.cs -- DotNet Scripts/config_symbols.json
-#   python Scripts/extract_config_keys.py
-Scripts/config_symbols.json
+#   dotnet run --file Scripts/AzureAppConfig/dump_config_symbols.cs -- DotNet Scripts/AzureAppConfig/config_symbols.json
+#   python Scripts/AzureAppConfig/extract_config_keys.py
+Scripts/AzureAppConfig/config_symbols.json
 Config/config-key-inventory.json

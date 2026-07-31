@@ -5,7 +5,7 @@ for each notation class there is a case that must pass and a case that must fail
 rule that silently matches everything would look healthy.
 
 Run with:
-    python -m unittest discover Scripts/tests
+    python -m unittest discover Scripts/AzureAppConfig/tests
 """
 
 import json

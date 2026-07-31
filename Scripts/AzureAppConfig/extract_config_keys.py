@@ -17,11 +17,11 @@ Two properties of this codebase defeat plain text matching:
 
 So the work is split between two tools, each doing what it is good at:
 
-  Scripts/dump_config_symbols.cs  (Roslyn, run as a file-based app)
+  Scripts/AzureAppConfig/dump_config_symbols.cs  (Roslyn, run as a file-based app)
       Resolves what only a symbol model can: constant values whether declared `const` or
       `static`, ambiguity when several classes share a member name, inherited members, and
       the difference between a bindable property and a public field that ConfigurationBinder
-      silently ignores. Emits Scripts/config_symbols.json.
+      silently ignores. Emits Scripts/AzureAppConfig/config_symbols.json.
 
   this script
       Scans the configuration API call sites, resolves each argument through the constant
@@ -40,15 +40,15 @@ Known blind spots, stated rather than papered over:
   * Framework-owned schemas are not derivable from Link's source at all. YARP binds
     `ReverseProxy:Routes:<arbitrary-name>:*` and Serilog binds `Serilog:WriteTo:<index>:*`
     from their own schemas over names this codebase never declares.
-  * Java is not scanned here; its bindings come from Scripts/java_config_audit.json.
+  * Java is not scanned here; its bindings come from Scripts/AzureAppConfig/java_config_audit.json.
 
 Because of those, the inventory is evidence for a human to adjudicate, not a verdict. The
 reconciliation step compares it against the catalog in both directions: a store key with no
 inventory entry is either a missed read or dead weight, and either answer is useful.
 
 Usage:
-    dotnet run --file Scripts/dump_config_symbols.cs -- DotNet Scripts/config_symbols.json
-    python Scripts/extract_config_keys.py
+    dotnet run --file Scripts/AzureAppConfig/dump_config_symbols.cs -- DotNet Scripts/AzureAppConfig/config_symbols.json
+    python Scripts/AzureAppConfig/extract_config_keys.py
 """
 
 import argparse
@@ -120,7 +120,7 @@ def normalize_with_lines(text: str) -> Tuple[str, List[int]]:
 
 
 # ---------------------------------------------------------------------------
-# Passes A and B - supplied by Roslyn (Scripts/dump_config_symbols.cs)
+# Passes A and B - supplied by Roslyn (Scripts/AzureAppConfig/dump_config_symbols.cs)
 # ---------------------------------------------------------------------------
 
 def load_symbols(path: str) -> Tuple[Dict[str, Optional[str]], Dict[str, Dict[str, Any]]]:
@@ -137,7 +137,7 @@ def load_symbols(path: str) -> Tuple[Dict[str, Optional[str]], Dict[str, Dict[st
     if not os.path.exists(path):
         print(f"Error: {path} not found.", file=sys.stderr)
         print("Generate it first:", file=sys.stderr)
-        print(f"    dotnet run --file Scripts/dump_config_symbols.cs -- DotNet {path}",
+        print(f"    dotnet run --file Scripts/AzureAppConfig/dump_config_symbols.cs -- DotNet {path}",
               file=sys.stderr)
         sys.exit(2)
     with open(path, "r", encoding="utf-8") as handle:
@@ -491,12 +491,12 @@ def write_markdown(keys: List[Dict[str, Any]], path: str, catalog_keys: Set[str]
     lines.append("# Configuration key inventory")
     lines.append("")
     lines.append("Every configuration key the code reads, derived from source by")
-    lines.append("`Scripts/extract_config_keys.py`. **Generated - do not edit by hand.**")
+    lines.append("`Scripts/AzureAppConfig/extract_config_keys.py`. **Generated - do not edit by hand.**")
     lines.append("")
     lines.append("Regenerate with:")
     lines.append("")
     lines.append("```powershell")
-    lines.append("python Scripts/extract_config_keys.py")
+    lines.append("python Scripts/AzureAppConfig/extract_config_keys.py")
     lines.append("```")
     lines.append("")
     lines.append("This is the exhaustive reference. `/app-config.yaml` is the curated catalog of")
@@ -571,9 +571,9 @@ def main() -> int:
     parser.add_argument("--root", default="DotNet", help="Source root to scan (default: DotNet)")
     parser.add_argument("--catalog", default="app-config.yaml",
                         help="Catalog, read only for the serviceMeta project mapping")
-    parser.add_argument("--symbols", default="Scripts/config_symbols.json",
-                        help="Roslyn symbol dump from Scripts/dump_config_symbols.cs")
-    parser.add_argument("--java-audit", default="Scripts/java_config_audit.json",
+    parser.add_argument("--symbols", default="Scripts/AzureAppConfig/config_symbols.json",
+                        help="Roslyn symbol dump from Scripts/AzureAppConfig/dump_config_symbols.cs")
+    parser.add_argument("--java-audit", default="Scripts/AzureAppConfig/java_config_audit.json",
                         help="Hand-maintained Java binding audit to fold in")
     parser.add_argument("--json", default="Config/config-key-inventory.json",
                         help="Where to write the machine-readable inventory")

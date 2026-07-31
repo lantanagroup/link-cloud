@@ -29,9 +29,9 @@ Three classes of finding:
 Exit code is 0 when no errors are found (and, with --strict, no warnings either).
 
 Usage:
-    python Scripts/validate_aac_secrets.py Config/app-config.dev.json
-    python Scripts/validate_aac_secrets.py Config/*.json --strict
-    python Scripts/validate_aac_secrets.py            # defaults to Config/*.json
+    python Scripts/AzureAppConfig/validate_aac_secrets.py Config/app-config.dev.json
+    python Scripts/AzureAppConfig/validate_aac_secrets.py Config/*.json --strict
+    python Scripts/AzureAppConfig/validate_aac_secrets.py            # defaults to Config/*.json
 """
 
 import argparse

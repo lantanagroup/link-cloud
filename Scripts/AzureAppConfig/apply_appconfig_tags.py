@@ -1,7 +1,7 @@
 """Tag the App Configuration exports with the services that consume each row.
 
 Knowing which services read a given key is currently archaeology: you grep the code, follow
-the .csproj reference graph, and hope. Scripts/extract_config_keys.py already computes it, so
+the .csproj reference graph, and hope. Scripts/AzureAppConfig/extract_config_keys.py already computes it, so
 this writes the answer onto the rows as a tag.
 
 This edits the committed exports under Config/ only. It does not talk to Azure. The exports
@@ -25,9 +25,9 @@ and the other ten readers of that key never see it; tagging it with all eleven w
 opposite of the resolution rules.
 
 Usage:
-    python Scripts/apply_appconfig_tags.py --env dev            # show the plan
-    python Scripts/apply_appconfig_tags.py --env dev --write    # edit the export
-    python Scripts/apply_appconfig_tags.py --all --write
+    python Scripts/AzureAppConfig/apply_appconfig_tags.py --env dev            # show the plan
+    python Scripts/AzureAppConfig/apply_appconfig_tags.py --env dev --write    # edit the export
+    python Scripts/AzureAppConfig/apply_appconfig_tags.py --all --write
 """
 
 import argparse
@@ -50,9 +50,9 @@ CONSUMERS_TAG = "link:consumers"
 
 
 INVENTORY_HINT = ("Generate it first:\n"
-                  "    dotnet run --file Scripts/dump_config_symbols.cs -- DotNet "
-                  "Scripts/config_symbols.json\n"
-                  "    python Scripts/extract_config_keys.py")
+                  "    dotnet run --file Scripts/AzureAppConfig/dump_config_symbols.cs -- DotNet "
+                  "Scripts/AzureAppConfig/config_symbols.json\n"
+                  "    python Scripts/AzureAppConfig/extract_config_keys.py")
 
 
 def label_owners(catalog_path: str) -> Dict[str, str]:

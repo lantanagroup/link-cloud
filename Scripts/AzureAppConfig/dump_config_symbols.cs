@@ -11,11 +11,11 @@
 //
 // Run as a file-based app - no project, no solution load:
 //
-//     dotnet run --file Scripts/dump_config_symbols.cs -- DotNet Scripts/config_symbols.json
+//     dotnet run --file Scripts/AzureAppConfig/dump_config_symbols.cs -- DotNet Scripts/AzureAppConfig/config_symbols.json
 //
 // Why this exists
 // ---------------
-// Scripts/extract_config_keys.py finds the *call sites* that read configuration. To turn a
+// Scripts/AzureAppConfig/extract_config_keys.py finds the *call sites* that read configuration. To turn a
 // bound section into the sub-keys it supplies, it needs to know what a settings type actually
 // contains. Deriving that from text was wrong in four distinct ways, all of which are free
 // here because Roslyn resolves symbols rather than matching characters:
@@ -43,7 +43,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 var root = args.Length > 0 ? args[0] : "DotNet";
-var outputPath = args.Length > 1 ? args[1] : "Scripts/config_symbols.json";
+var outputPath = args.Length > 1 ? args[1] : "Scripts/AzureAppConfig/config_symbols.json";
 
 string[] skipDirs = ["bin", "obj", ".vs", "node_modules", "Migrations"];
 string[] skipProjects = ["ServiceTests", "Audit.Specification"];
@@ -244,7 +244,7 @@ var constantMap = constants.ToDictionary(
 
 var payload = new
 {
-    generatedBy = "Scripts/dump_config_symbols.cs",
+    generatedBy = "Scripts/AzureAppConfig/dump_config_symbols.cs",
     sourceRoot = root,
     fileCount = sources.Count,
     types = types.ToDictionary(kv => kv.Key, kv => new

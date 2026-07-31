@@ -6,8 +6,8 @@ Prefixes:
 
 ## Inventory
 
-Every script in this folder, by what it is for. The App Configuration family is summarised here
-and documented in full further down.
+Every script in this folder, by what it is for. The App Configuration family lives in its own
+subfolder and is summarised at the end.
 
 ### Local stack
 
@@ -60,8 +60,9 @@ Run these in LINQPad; they prompt for a path rather than taking arguments.
 
 ### Azure App Configuration
 
-Detailed in [the section below](#azure-app-configuration-tooling). Exit codes are uniform across
-the checks: `0` clean, `1` findings, `2` inputs unusable.
+These live in [`AzureAppConfig/`](AzureAppConfig/README.md), which documents them in full -
+the catalog checks, the key inventory and the secret scanning. Run them from the repository
+root. Exit codes are uniform across the checks: `0` clean, `1` findings, `2` inputs unusable.
 
 | Script | Purpose |
 |---|---|
@@ -76,148 +77,5 @@ the checks: `0` clean, `1` findings, `2` inputs unusable.
 | `dump_config_symbols.cs` | Roslyn symbol dump feeding the above. Run with `dotnet run --file`. |
 | `config_key_matching.py` | Shared rules for "is this key present in a store". |
 | `config_findings.py` | Shared `Finding`, severity report, `--strict` rule and file loading. |
-| `tests/` | `python -m unittest discover Scripts/tests` |
+| `tests/` | `python -m unittest discover Scripts/AzureAppConfig/tests` |
 | `java_config_audit.json` | Hand-maintained audit of the Java bindings. |
-
-## Azure App Configuration tooling
-
-The JSON files under `Config/` are exports of the Azure App Configuration stores,
-committed to this **public** repository.
-
-* `export-appconfigs.bat <app-config-name> <output-directory>` produces an export.
-* `compare_aac_exports.py <left> <right>` diffs two exports.
-* `validate_aac_secrets.py [paths] [--strict]` fails if an export contains a
-  credential. Defaults to `Config/*.json`.
-
-### Configuration key inventory
-
-Two tools derive the set of configuration keys the code actually reads, so the catalog can be
-checked against reality rather than trusted:
-
-```powershell
-# 1. Roslyn symbol dump (file-based app - no project, needs .NET 10 SDK)
-dotnet run --file Scripts/dump_config_symbols.cs -- DotNet Scripts/config_symbols.json
-
-# 2. Call-site scan + service attribution + inventory
-python Scripts/extract_config_keys.py
-```
-
-Producing `Config/config-key-inventory.json` (machine-readable, consumed by the reconciler and
-the tagging tool) and `docs/config-key-inventory.md` (the human reference).
-
-Only the markdown is committed. Both JSON files are gitignored: a committed derived file
-drifts from the code it describes the moment someone adds a `GetSection` call, which is the
-exact failure this tooling exists to detect. Regenerate before using either.
-
-The split is deliberate. Four things cannot be read reliably from text, and Roslyn resolves
-all of them from the symbol model:
-
-* Section names are declared both as `const string` and as `public static string`
-  (`KafkaConstants.SectionName`, `ServiceRegistry.ConfigSectionName`).
-* Six different classes declare a member named `SectionName`. Resolving that without a symbol
-  table files one section's keys under another section's name.
-* `ExternalBlobStorageSettings` inherits `ConnectionString` and `BlobContainerName` from
-  `BlobStorageSettings`.
-* `TelemetrySettings.EnableOtelCollector` is a public **field**, not a property.
-  `ConfigurationBinder` binds properties only, so the value set for it in all three stores
-  can never take effect.
-
-Python keeps the call-site scanning, the `.csproj` ProjectReference walk for service
-attribution, and the report generation.
-
-`Scripts/java_config_audit.json` is a hand-maintained audit of the Java bindings - 15
-`@ConfigurationProperties` classes, 12 `@Value` sites and the `logback-spring.xml`
-`springProperty` reads. Update it when those change; it is small enough not to warrant a
-parser.
-
-### Catalog checks
-
-```powershell
-# Does app-config.yaml conform to the JSON Schema embedded in itself?
-python Scripts/validate_app_config_schema.py
-
-# Does every required: true key have a row in every environment store?
-python Scripts/check_required_config.py
-
-# Where do the catalog, the code and the stores disagree?
-python Scripts/reconcile_config_catalog.py            # all four buckets
-python Scripts/reconcile_config_catalog.py --bucket D # required but absent
-
-python -m unittest discover Scripts/tests             # tests for the matching rules
-```
-
-`check_required_config.py` also enforces two invariants on store labels: a label containing
-`:` is rejected, because the `<Service>:<Environment>` tier does not resolve
-(`ExternalConfigurationExtension.cs:64` concatenates the environment object rather than its
-name); and a label absent from `serviceMeta` is rejected, because no service selects it.
-
-It also warns if a store stops pinning `Serilog:WriteTo:<n>:Name`. Serilog addresses sinks
-positionally, and every `appsettings.json` ships `[GrafanaLoki, Console]` -- the opposite of
-what the catalog's `Serilog:WriteTo:1:Args:uri` assumes. The store's `Name` rows are what make
-the pairing correct; remove them and logging silently reverts to the file's ordering.
-
-**`check_required_config.py` is the gate; `reconcile_config_catalog.py` is the investigation.**
-They overlap deliberately: the reconciler's "required but absent" bucket asks the same question
-the check does. The check stays small and answers one question so it can be trusted as a CI
-gate; the reconciler is a four-bucket exploration with heuristics about which schemas are
-framework-owned, which is not something a gate should carry. They call the same matching
-functions, so they cannot give different answers.
-
-Two shared modules keep the family consistent:
-
-* `config_key_matching.py` — the rules for "is this key present in a store". Java dotted/slash
-  notation, array elements, `{Placeholder}` templates, JSON blobs the provider flattens, Spring
-  relaxed binding, and label scoping.
-* `config_findings.py` — `Finding`, the ERROR/WARN report, the `--strict` exit-code rule, and
-  file loading. Three scripts here gate CI, so a single definition means changing `--strict`
-  behaviour is one edit rather than three files and a hope that none was missed.
-
-Exit codes are uniform: `0` clean, `1` findings, `2` the inputs could not be read — so a
-caller can tell "did not run" from "ran and found problems".
-
-These need **PyYAML**; the secret scanner is stdlib-only.
-
-### Secret scanning
-
-App Configuration does not stop anyone storing a literal credential, so an export
-can carry one into permanent git history. `validate_aac_secrets.py` gates that:
-
-```powershell
-python Scripts/validate_aac_secrets.py "Config/*.json"
-python Scripts/validate_aac_secrets.py "Config/*.json" --strict   # warnings fatal
-```
-
-It reports **errors** for values matching a known credential shape (storage
-account key, inline password, Mongo URI with credentials, PEM block, JWT, Slack
-webhook, ...) and for Key Vault references whose `content_type` is not the
-`keyvaultref` type -- App Configuration serves those as a literal JSON string
-instead of resolving them, so the service reads `{"uri": "..."}` as its password.
-
-It reports **warnings** for secret-shaped keys holding a plain literal, for
-malformed entries, and for duplicate `(key, label)` pairs. Not every such value is
-a credential, so these are surfaced for review rather than failing the build.
-
-A few keys are named `...ConnectionString` but hold only a bare `host:port` --
-`ConnectionStrings:Redis` and `ResourceCache:Redis:ConnectionString`. Both are
-assigned to `ConfigurationOptions.EndPoints` with the password supplied separately
-from Key Vault, so they are listed in `ENDPOINT_ONLY_KEYS` and exempt from the
-secret-shaped-key warning. They are still checked for credential shapes, and they
-warn if given comma-delimited StackExchange.Redis config syntax, which
-`EndPoints.Add()` cannot parse. Add to that list only when the code assigns the
-value to an endpoint rather than parsing it as a connection string.
-
-Run automatically in two places:
-
-* **CI** -- `.github/workflows/appconfig-secret-scan.yml`, on every PR and push to
-  `dev`, `main`, `release/**`, and `hotfix/**`.
-* **Pre-commit** -- `.githooks/pre-commit` validates the *staged* content of any
-  `Config/*.json`. Enable it per clone with:
-
-  ```powershell
-  git config core.hooksPath .githooks
-  ```
-
-  Bypass a false positive with `git commit --no-verify`; CI still runs the check.
-
-If a real credential is ever committed, **rotate it** -- deleting the line does
-not remove it from git history.

@@ -31,8 +31,8 @@ Buckets:
      that decision turns on.
 
 Usage:
-    python Scripts/reconcile_config_catalog.py
-    python Scripts/reconcile_config_catalog.py --bucket D
+    python Scripts/AzureAppConfig/reconcile_config_catalog.py
+    python Scripts/AzureAppConfig/reconcile_config_catalog.py --bucket D
 """
 
 import argparse
@@ -64,9 +64,9 @@ FRAMEWORK_PREFIXES = (
 
 
 INVENTORY_HINT = ("Generate it first:\n"
-                  "    dotnet run --file Scripts/dump_config_symbols.cs -- DotNet "
-                  "Scripts/config_symbols.json\n"
-                  "    python Scripts/extract_config_keys.py")
+                  "    dotnet run --file Scripts/AzureAppConfig/dump_config_symbols.cs -- DotNet "
+                  "Scripts/AzureAppConfig/config_symbols.json\n"
+                  "    python Scripts/AzureAppConfig/extract_config_keys.py")
 
 
 def load_inventory(path: str) -> Dict[str, Dict[str, Any]]:

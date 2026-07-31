@@ -44,10 +44,10 @@ jobs:
         run: pip install "pyyaml==6.0.*"
 
       - name: Unit tests
-        run: python -m unittest discover Scripts/tests
+        run: python -m unittest discover Scripts/AzureAppConfig/tests
 
       - name: Validate catalog schema
-        run: python Scripts/validate_app_config_schema.py
+        run: python Scripts/AzureAppConfig/validate_app_config_schema.py
 
       # Enforcing. The gaps this was advisory for are closed: the three required keys now have
       # rows in every environment file and the orphaned "Automation" label is gone.
@@ -57,4 +57,4 @@ jobs:
       # file. Fix it in the same PR: either add the row, or set required: false and record the
       # shipped default in defaultValue.
       - name: Check required keys are provisioned
-        run: python Scripts/check_required_config.py
+        run: python Scripts/AzureAppConfig/check_required_config.py

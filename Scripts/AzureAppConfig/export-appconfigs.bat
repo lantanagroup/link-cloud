@@ -58,7 +58,7 @@ IF %ERRORLEVEL% NEQ 0 (
 echo Export successful: %output_file%
 echo.
 echo Now verify before committing:
-echo     python Scripts/validate_aac_secrets.py "%output_file%" --strict
+echo     python Scripts/AzureAppConfig/validate_aac_secrets.py "%output_file%" --strict
 exit /b 0
 
 :usage

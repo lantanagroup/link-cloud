@@ -59,7 +59,7 @@ if [ -n "$staged_exports" ]; then
     done
 
     # shellcheck disable=SC2086
-    if ! "$PYTHON" Scripts/validate_aac_secrets.py $files; then
+    if ! "$PYTHON" Scripts/AzureAppConfig/validate_aac_secrets.py $files; then
         echo ""
         echo "pre-commit: BLOCKED -- staged App Config export contains a credential."
         echo "pre-commit: Move the value into Key Vault and reference it, then re-stage."
@@ -70,7 +70,7 @@ fi
 
 if [ -n "$staged_catalog" ]; then
     catalog=$(stage_blob "$staged_catalog")
-    if ! "$PYTHON" Scripts/validate_app_config_schema.py "$catalog"; then
+    if ! "$PYTHON" Scripts/AzureAppConfig/validate_app_config_schema.py "$catalog"; then
         echo ""
         echo "pre-commit: BLOCKED -- staged app-config.yaml does not match its own schema."
         echo "pre-commit: Fix the entries above, or commit with --no-verify."

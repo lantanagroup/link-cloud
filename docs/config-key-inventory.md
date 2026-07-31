@@ -1,12 +1,12 @@
 # Configuration key inventory
 
 Every configuration key the code reads, derived from source by
-`Scripts/extract_config_keys.py`. **Generated - do not edit by hand.**
+`Scripts/AzureAppConfig/extract_config_keys.py`. **Generated - do not edit by hand.**
 
 Regenerate with:
 
 ```powershell
-python Scripts/extract_config_keys.py
+python Scripts/AzureAppConfig/extract_config_keys.py
 ```
 
 This is the exhaustive reference. `/app-config.yaml` is the curated catalog of
