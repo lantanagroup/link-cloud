@@ -149,8 +149,15 @@ def check_entries(document: Dict[str, Any], defs: Dict[str, Any]) -> List[Findin
         sections.extend((f"services.{name}", entries) for name, entries in services.items())
 
     for section, entries in sections:
+        # An explicit empty list is valid and deliberate: several services read only global
+        # keys, and `Census: []` keeps the section paired with its serviceMeta entry rather
+        # than looking forgotten. A bare `Census:` with no value parses as None, which is
+        # what someone leaves behind after deleting the last entry - so only that is an error.
         if entries is None:
-            findings.append(Finding("ERROR", section, "Section is missing or empty."))
+            findings.append(Finding(
+                "ERROR", section,
+                "Section has no value. Write an explicit empty list ([]) if the service has "
+                "no service-specific keys."))
             continue
         if not isinstance(entries, list):
             findings.append(Finding("ERROR", section, "Section should be a list of entries."))
