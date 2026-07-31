@@ -461,6 +461,99 @@ public class FhirServiceTests
     }
 
     [Fact]
+    public void ValidateCodeInValueSet_ValueSetCodeInactive_OverridesActiveCodeSystem_ReturnsInactiveIssue()
+    {
+        // Arrange - the member carries its own inactive membership status (a 4-column value set file).
+        // Even though the CodeSystem marks the code Active, the value set membership status wins.
+        var valueSetId = "test-vs-member-inactive";
+        var code = "member-inactive-code";
+        var system = "http://test.system";
+        var display = "Member Inactive Code";
+
+        var valueSetGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new ValueSetCode { Value = code, Display = display, Status = CodeStatus.Inactive } } }
+            }
+        };
+        // CodeSystem says Active; it must NOT be consulted because the membership status is authoritative.
+        var codeSystemGroup = new CodeGroup
+        {
+            Url = system,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new CodeSystemCode { Value = code, Display = display, Status = CodeStatus.Active } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(valueSetGroup);
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system, It.IsAny<string>()))
+            .Returns(codeSystemGroup);
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, system, code, display, null);
+
+        // Assert - membership status makes it inactive despite the active CodeSystem.
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        var issuesParameter = result.Parameter.FirstOrDefault(p => p.Name == "issues");
+        Assert.NotNull(issuesParameter);
+        var outcome = Assert.IsType<OperationOutcome>(issuesParameter.Resource);
+        Assert.Equal("Code is inactive.", Assert.Single(outcome.Issue).Details?.Text);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_ValueSetCodeActive_OverridesInactiveCodeSystem_ReturnsNoIssue()
+    {
+        // Arrange - the member carries its own active membership status; the CodeSystem is not consulted,
+        // so an inactive CodeSystem status does not make an active value set member inactive.
+        var valueSetId = "test-vs-member-active";
+        var code = "member-active-code";
+        var system = "http://test.system";
+        var display = "Member Active Code";
+
+        var valueSetGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new ValueSetCode { Value = code, Display = display, Status = CodeStatus.Active } } }
+            }
+        };
+        // CodeSystem says Inactive; it must NOT be consulted because the membership status is authoritative.
+        var codeSystemGroup = new CodeGroup
+        {
+            Url = system,
+            Type = CodeGroup.CodeGroupTypes.CodeSystem,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new CodeSystemCode { Value = code, Display = display, Status = CodeStatus.Inactive } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(valueSetGroup);
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.CodeSystem, system, It.IsAny<string>()))
+            .Returns(codeSystemGroup);
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, system, code, display, null);
+
+        // Assert - active membership status means no inactive issue, despite the inactive CodeSystem.
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+        Assert.Null(result.Parameter.FirstOrDefault(p => p.Name == "issues"));
+    }
+
+    [Fact]
     public void ValidateCodeInValueSet_WithInvalidCode_ReturnsFalse()
     {
         // Arrange
