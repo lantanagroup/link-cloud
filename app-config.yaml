@@ -89,7 +89,7 @@ global:
     required: true
     consumers: ["Account", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "Authentication:EnableAnonymousAccess"
-    description: "Controls whether Automation.UI serves non-health traffic. Must be true for requests to reach UseAuthentication()/ApiBearer policy evaluation."
+    description: "Whether services skip authentication. The effect differs by consumer and the polarity is easy to misread. In the eleven backend services, false registers UseAuthentication() and UserScopeMiddleware, so true serves requests without authenticating them. Admin.BFF additionally stops attaching a bearer token to its downstream service calls and drops the YARP authorization transforms. Automation.UI is the exception: it has no built-in authentication, so false makes it serve nothing - every non-/health request is short-circuited with 503 - and true serves the UI anonymously, intended only behind an authenticating proxy. Must be true for requests to reach UseAuthentication()/ApiBearer policy evaluation in Automation.UI; see the note above."
     required: true
     consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "Authentication:ApiBearer:Enabled"
