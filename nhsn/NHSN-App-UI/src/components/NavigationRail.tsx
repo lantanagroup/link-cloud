@@ -1,4 +1,5 @@
 import React from 'react';
+import {useTranslation} from 'react-i18next';
 
 type RouteName = 'home' | 'onboarding' | 'configuration';
 
@@ -29,11 +30,13 @@ export function NavigationRail({
   userName,
   userEmail
 }: NavigationRailProps) {
+  const {t} = useTranslation('common');
+
   return (
     <aside className="nhsn-link__nav">
       <div>
         <h1 className="nhsn-link__nav-title">{title}</h1>
-        <h2>Navigation</h2>
+        <h2>{t('navigation.title')}</h2>
       </div>
       <div className="nhsn-link__nav-sections">
         {sections.map((section, index) => (

@@ -1,4 +1,5 @@
 import React from 'react';
+import {useTranslation} from 'react-i18next';
 import {TestUserProfile} from '../shared/models';
 import {UserInfoService} from '../services/user-info-service';
 import {useNotifications} from './notifications/NotificationProvider';
@@ -12,23 +13,24 @@ interface OnboardingScreenProps {
 
 export function OnboardingScreen({ activeTestUser, facilityId, userInfoService, onCompleted }: OnboardingScreenProps) {
   const { notifySuccess, notifyError } = useNotifications();
+  const {t} = useTranslation(['onboarding', 'common']);
 
   async function completeOnboarding() {
     try {
       await userInfoService.updateFacilityOnboarding(activeTestUser, facilityId, true);
-      notifySuccess(`Completed onboarding for facility ${facilityId}.`);
+      notifySuccess(t('onboarding:messages.completeSuccess', { facilityId }));
       onCompleted();
     } catch (error) {
-      notifyError(error instanceof Error ? error.message : 'Unable to complete onboarding.');
+      notifyError(error instanceof Error ? error.message : t('onboarding:messages.completeError'));
     }
   }
 
   return (
     <div className="nhsn-link__content">
-      <h2>Onboarding</h2>
-      <p>Hello world...</p>
+      <h2>{t('onboarding:page.title')}</h2>
+      <p>{t('onboarding:page.intro')}</p>
       <button type="button" className="nhsn-link__action-button" onClick={completeOnboarding}>
-        Complete Onboarding
+        {t('common:actions.completeOnboarding')}
       </button>
     </div>
   );

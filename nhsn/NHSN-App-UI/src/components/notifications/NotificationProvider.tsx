@@ -8,6 +8,7 @@ import React, {
     useRef,
     useState
 } from 'react';
+import {useTranslation} from 'react-i18next';
 
 export type NotificationVariant = 'success' | 'error' | 'info';
 
@@ -28,6 +29,7 @@ interface NotificationContextValue {
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 
 export function NotificationProvider({ children }: PropsWithChildren) {
+  const {t} = useTranslation('common');
   const [notifications, setNotifications] = useState<NotificationMessage[]>([]);
   const timers = useRef<Record<string, number>>({});
 
@@ -73,7 +75,7 @@ export function NotificationProvider({ children }: PropsWithChildren) {
         {notifications.map(notification => (
           <div key={notification.id} className={`notification-stack__item notification-stack__item--${notification.variant}`}>
             <div className="notification-stack__message">{notification.message}</div>
-            <button type="button" className="notification-stack__close" onClick={() => closeNotification(notification.id)} aria-label="Close notification">
+            <button type="button" className="notification-stack__close" onClick={() => closeNotification(notification.id)} aria-label={t('notifications.close')}>
               ×
             </button>
           </div>

@@ -1,16 +1,19 @@
 import React, {useEffect, useMemo, useState} from 'react';
+import {useTranslation} from 'react-i18next';
 import {UserInfoService} from '../services/user-info-service';
 import {TestUserProfile, UserInfoResponse} from '../shared/models';
 import {NavigationItem, NavigationRail, NavigationSection} from './NavigationRail';
 import {ConfigurationScreen} from './ConfigurationScreen';
 import {OnboardingScreen} from './OnboardingScreen';
 import './NHSNLink.css';
+import {setAppLocale} from '../localization/i18n';
 
 export interface NHSNLinkProps {
   activeTestUser?: TestUserProfile;
   userInfoService?: UserInfoService;
   baseUrl?: string;
   apiBaseUrl?: string;
+  locale?: string;
 }
 
 type RouteName = 'home' | 'onboarding' | 'configuration';
@@ -21,7 +24,8 @@ const routePathMap: Record<RouteName, string> = {
   configuration: '/configuration'
 };
 
-export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBaseUrl = '/api' }: NHSNLinkProps) {
+export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBaseUrl = '/api', locale }: NHSNLinkProps) {
+  const {t} = useTranslation('common');
   const effectiveUserInfoService = useMemo(() => userInfoService ?? new UserInfoService(apiBaseUrl), [userInfoService, apiBaseUrl]);
   const [userInfo, setUserInfo] = useState<UserInfoResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +44,10 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
   }, [normalizedBaseUrl]);
 
   useEffect(() => {
+    void setAppLocale(locale);
+  }, [locale]);
+
+  useEffect(() => {
     let mounted = true;
     setLoading(true);
     setError(null);
@@ -52,7 +60,7 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
       })
       .catch(err => {
         if (mounted) {
-          setError(err instanceof Error ? err.message : 'Unable to load user context.');
+          setError(err instanceof Error ? err.message : t('state.loadUserContextError'));
         }
       })
       .finally(() => {
@@ -64,28 +72,28 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
     return () => {
       mounted = false;
     };
-  }, [activeTestUser, effectiveUserInfoService]);
+  }, [activeTestUser, effectiveUserInfoService, t]);
 
   const navigationSections = useMemo<NavigationSection[]>(() => {
     if (!userInfo || userInfo.AccessState !== 'Allowed') {
       return [];
     }
 
-    const facilityItems: NavigationItem[] = [{ key: 'home', label: 'Home' }];
+    const facilityItems: NavigationItem[] = [{ key: 'home', label: t('navigation.home') }];
 
     if (!userInfo.IsOnboarded) {
-      facilityItems.push({ key: 'onboarding', label: 'Onboarding' });
+      facilityItems.push({ key: 'onboarding', label: t('navigation.onboarding') });
     }
 
     if (userInfo.IsOnboarded) {
-      facilityItems.push({ key: 'configuration', label: 'Configuration' });
+      facilityItems.push({ key: 'configuration', label: t('navigation.configuration') });
     }
 
-    return [{ heading: 'Facility', items: facilityItems }];
-  }, [userInfo]);
+    return [{ heading: t('navigation.facility'), items: facilityItems }];
+  }, [t, userInfo]);
 
   if (loading) {
-    return <div className="nhsn-link__state">Loading NHSNLink user context...</div>;
+    return <div className="nhsn-link__state">{t('state.loadingUserContext')}</div>;
   }
 
   if (error) {
@@ -93,18 +101,18 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
   }
 
   if (!userInfo) {
-    return <div className="nhsn-link__state">No user context was returned.</div>;
+    return <div className="nhsn-link__state">{t('state.noUserContext')}</div>;
   }
 
   if (userInfo.AccessState === 'MissingRequiredRole') {
     return (
       <div className="nhsn-link__state">
         <div style={{ maxWidth: '600px', textAlign: 'center', padding: '1rem' }}>
-          <h2>You do not currently have access to NHSNLink configuration.</h2>
-          <p>Your NHSN App identity does not include the FACADMIN role required for this experience.</p>
+          <h2>{t('auth.missingAccessTitle')}</h2>
+          <p>{t('auth.missingAccessDescription')}</p>
           {userInfo.AccessRequestUrl && (
             <p>
-              <a href={userInfo.AccessRequestUrl} target="_blank" rel="noreferrer">Submit a request</a>
+              <a href={userInfo.AccessRequestUrl} target="_blank" rel="noreferrer">{t('actions.submitRequest')}</a>
             </p>
           )}
         </div>
@@ -116,8 +124,8 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
     return (
       <div className="nhsn-link__state">
         <div style={{ maxWidth: '600px', textAlign: 'center', padding: '1rem' }}>
-          <h2>You must select a facility before proceeding.</h2>
-          <p>Your user context did not include a facility. Please return to the NHSN App and choose a facility before continuing.</p>
+          <h2>{t('auth.missingFacilityTitle')}</h2>
+          <p>{t('auth.missingFacilityDescription')}</p>
         </div>
       </div>
     );
@@ -136,7 +144,7 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
     <div className="nhsn-link">
       <div className="nhsn-link__layout">
         <NavigationRail
-          title="NHSNLink"
+          title={t('app.linkTitle')}
           sections={navigationSections}
           activeRoute={route}
           onNavigate={navigateTo}
@@ -147,29 +155,27 @@ export function NHSNLink({ activeTestUser, userInfoService, baseUrl = '/', apiBa
           {route === 'home' && (
             <>
               <div className="nhsn-link__panel">
-                <h2>User context</h2>
-                <p><strong>Facility:</strong> {userInfo.FacilityId ?? 'Not assigned'}</p>
-                <p><strong>Groups:</strong> {userInfo.Groups.length > 0 ? userInfo.Groups.join(', ') : 'No groups provided'}</p>
-                <p><strong>Access state:</strong> {userInfo.AccessState}</p>
-                <p><strong>Facility admin:</strong> {userInfo.IsFacilityAdmin ? 'Yes' : 'No'}</p>
-                <p><strong>Onboarding:</strong> {userInfo.IsOnboarded ? 'Complete' : 'In progress'}</p>
+                <h2>{t('home.userContextTitle')}</h2>
+                <p><strong>{t('home.facilityLabel')}</strong> {userInfo.FacilityId ?? t('home.notAssigned')}</p>
+                <p><strong>{t('home.groupsLabel')}</strong> {userInfo.Groups.length > 0 ? userInfo.Groups.join(', ') : t('home.noGroupsProvided')}</p>
+                <p><strong>{t('home.accessStateLabel')}</strong> {userInfo.AccessState}</p>
+                <p><strong>{t('home.facilityAdminLabel')}</strong> {userInfo.IsFacilityAdmin ? t('commonBoolean.yes') : t('commonBoolean.no')}</p>
+                <p><strong>{t('home.onboardingLabel')}</strong> {userInfo.IsOnboarded ? t('home.onboardingComplete') : t('home.onboardingInProgress')}</p>
               </div>
 
               <div className="nhsn-link__panel">
-                <h2>Framework status</h2>
+                <h2>{t('home.frameworkStatusTitle')}</h2>
                 {userInfo.IsOnboarded ? (
                   <p>
-                    This framework foundation is in maintenance mode. As the facility configuration evolves, this area can surface the
-                    specific onboarding artifacts or settings that need to be reviewed or updated.
+                    {t('home.maintenanceModeDescription')}
                   </p>
                 ) : (
                   <p>
-                    This framework foundation is in onboarding mode. Future work will guide the user through initial facility
-                    onboarding, source-system coordination, and role-appropriate setup tasks.
+                    {t('home.onboardingModeDescription')}
                   </p>
                 )}
 
-                <h3>Available navigation from the BFF</h3>
+                <h3>{t('home.availableNavigationTitle')}</h3>
                 <ul>
                   {userInfo.AvailableNavigation.map(item => <li key={item}>{item}</li>)}
                 </ul>
