@@ -551,11 +551,23 @@ def write_markdown(keys: List[Dict[str, Any]], path: str, catalog_keys: Set[str]
 
 
 def catalog_key_set(path: str) -> Set[str]:
+    """Catalog keys, for the "in catalog" column. Degrades to empty rather than failing.
+
+    An empty set is indistinguishable in the output from a catalog that documents nothing:
+    every row reads "-". Since docs/config-key-inventory.md is committed, a silent empty set
+    means publishing a document that claims none of the keys are catalogued. Both ways of
+    getting there therefore say so on stderr.
+    """
     try:
         import yaml
     except ImportError:
+        print(f"Warning: PyYAML is not installed, so {path} cannot be read. The 'in catalog' "
+              f"column will read '-' for every key. Install it with: pip install pyyaml",
+              file=sys.stderr)
         return set()
     if not os.path.exists(path):
+        print(f"Warning: catalog not found at {path}. The 'in catalog' column will read '-' "
+              f"for every key.", file=sys.stderr)
         return set()
     with open(path, "r", encoding="utf-8") as handle:
         document = yaml.safe_load(handle) or {}
