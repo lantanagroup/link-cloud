@@ -100,8 +100,23 @@ the pairing correct; remove them and logging silently reverts to the file's orde
 They overlap deliberately: the reconciler's "required but absent" bucket asks the same question
 the check does. The check stays small and answers one question so it can be trusted as a CI
 gate; the reconciler is a four-bucket exploration with heuristics about which schemas are
-framework-owned, which is not something a gate should carry. They call the same matching
-functions, so they cannot give different answers.
+framework-owned, which is not something a gate should carry.
+
+They share the matching functions but **do not apply the same strictness, deliberately**. The
+reconciler layers `relax()` on top — Spring's relaxed binding, which folds case and strips `-`
+and `_`. It is answering "does anything read this key?", where a spelling mismatch produces a
+false "dead key" report, so leniency is the safer error. The gate answers "will this service
+bind this row?", where the same leniency is a false pass: .NET keys are case-insensitive but
+hyphen- and underscore-**sensitive**, so `Foo:BarBaz` and `Foo:Bar-Baz` are different keys and
+only one of them is really provisioned.
+
+Labels are never relaxed anywhere. App Configuration matches them exactly — the provider issues
+`Select("*", "LinkAdminBFF")` verbatim — so folding them would claim a service can see a row it
+cannot fetch, and would stop `check_required_config.py` catching the label typos it exists to
+catch.
+
+The two agree on every catalog entry against all three stores today; that is a property of the
+current data, not a guarantee the code makes.
 
 Two shared modules keep the family consistent:
 
