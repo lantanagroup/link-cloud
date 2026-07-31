@@ -745,7 +745,7 @@
 		},
 		{
 			"key": "CORS:AllowCredentials",
-			"value": "True",
+			"value": "False",
 			"label": null,
 			"content_type": "",
 			"tags": {
