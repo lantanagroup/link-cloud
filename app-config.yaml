@@ -66,6 +66,32 @@ global:
     required: true
     sensitive: true
     consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  # SASL_PLAINTEXT is deliberate, and is catalogued so review tooling stops proposing SASL_SSL.
+  # Three things would all have to change together first:
+  #   1. The brokers have no TLS listener. docker-compose maps every listener to SASL_PLAINTEXT,
+  #      and the deployed Strimzi clusters are addressed on :9092, the plain listener (:9093 is
+  #      TLS). A SASL_SSL client against a plaintext listener fails the handshake outright.
+  #   2. The client has no TLS surface. KafkaConnection.cs sets SecurityProtocol, SaslUsername,
+  #      SaslPassword and SaslMechanism only - there is no SslCaLocation or truststore setting
+  #      anywhere in either runtime.
+  #   3. The bootstrap address is a Kubernetes internal service name
+  #      (kafka-kafka-bootstrap.kafka-<env>), so this is pod-to-pod traffic on the cluster
+  #      network, not an exposed endpoint.
+  # The residual risk is real but not fixable here: SCRAM credentials cross the cluster network
+  # unencrypted, so a compromised pod could capture them. Hardening that is a broker-and-code
+  # change, and these values move last, not first.
+  - key: "KafkaConnection:Protocol"
+    description: "Confluent.Kafka SecurityProtocol for the .NET clients. SaslPlaintext today; see the note above before changing it."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  - key: "KafkaConnection:Mechanism"
+    description: "Confluent.Kafka SaslMechanism for the .NET clients. ScramSha512, matching the brokers' SCRAM-SHA-512 credentials."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  - key: "KafkaConnection:SaslProtocolEnabled"
+    description: "Whether the .NET clients send SASL credentials at all. When false, KafkaConnection.CreateConsumerConfig/CreateProducerConfig skip the security protocol, username, password and mechanism entirely, producing an unauthenticated connection."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "DatabaseProvider"
     description: "The database provider to use. SqlServer is the only value the code handles; the key exists for a future provider swap."
     required: false
@@ -165,12 +191,22 @@ global:
     sensitive: true
     runtime: "java"
     consumers: ["MeasureEval", "Validation"]
-  # No consumers listed for the same reason as Serilog above: Spring Boot binds this itself,
-  # so no Link class reads it. Both Java services authenticate to Kafka with it.
+  # The Java half of the Kafka client security settings, mirroring the KafkaConnection:* keys
+  # above - see the SASL_PLAINTEXT note there before changing either side. None of the three
+  # lists consumers, for the same reason as Serilog: Spring Boot binds spring.kafka.* itself,
+  # so no Link class reads them. Both Java services authenticate to Kafka with them.
   - key: "spring.kafka.properties.sasl.jaas.config"
     description: "The JAAS login module configuration Spring Kafka uses to authenticate to Kafka. Bound by Spring Boot auto-configuration, not by any Link class, and commented out in application.yml so the store is its only source."
     required: true
     sensitive: true
+    runtime: "java"
+  - key: "spring.kafka.properties.security.protocol"
+    description: "Spring Kafka security protocol, the Java counterpart to KafkaConnection:Protocol. SASL_PLAINTEXT today; the two must stay in step or the runtimes disagree about how to reach the same brokers."
+    required: true
+    runtime: "java"
+  - key: "spring.kafka.properties.sasl.mechanism"
+    description: "Spring Kafka SASL mechanism, the Java counterpart to KafkaConnection:Mechanism. SCRAM-SHA-512, spelled in Kafka's convention rather than Confluent.Kafka's ScramSha512."
+    required: true
     runtime: "java"
   - key: "ConnectionStrings:Redis"
     description: "The Redis endpoint (host:port). The password is supplied separately via Redis:Password. Required when Cache:Type is Redis; the resource cache uses ResourceCache:Redis:ConnectionString instead."
