@@ -58,7 +58,7 @@ design.
 
 **.NET** reads colon-delimited rows matching `appsettings.json` section paths:
 
-```
+```text
 KafkaConnection:BootstrapServers:0
 Authentication:Schemas:Cookie:HttpOnly
 ```
@@ -67,7 +67,7 @@ Authentication:Schemas:Cookie:HttpOnly
 configured `key-filter` of `/`, giving a server-side filter of `/*`; it then strips the
 leading slash and converts remaining slashes to dots:
 
-```
+```text
 /spring/datasource/url   ->  spring.datasource.url
 /link/report/base-url    ->  link.report.base-url
 ```
@@ -82,7 +82,7 @@ So a Java service never sees the colon-delimited rows at all — they do not mat
 A row with `content_type: application/json` is flattened into child properties by both
 providers. One row:
 
-```
+```text
 key:   /authentication
 value: {"anonymous": false, "authority": "https://dev-demo.nhsnlink.org", "adminEmail": ""}
 ```
@@ -120,7 +120,7 @@ Because labels are compiled in, a running service cannot be re-pointed at a diff
 without a redeploy.
 
 A label containing `:` will never match anything. The `<Service>:<Environment>` tier is not
-functional — `ExternalConfigurationExtension.cs:64` concatenates the environment object
+functional — `ExternalConfigurationExtension.AddExternalConfiguration` concatenates the environment object
 rather than its name — so such a label silently resolves to nothing.
 
 ## Precedence over environment variables

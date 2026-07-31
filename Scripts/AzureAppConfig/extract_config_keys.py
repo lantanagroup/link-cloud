@@ -277,14 +277,7 @@ def resolve_arg(match: re.Match, constants: Dict[str, Optional[str]]) -> Optiona
     ref = match.group("ref")
     if not ref:
         return None
-    # Prefer the most qualified match; an ambiguous name maps to None and is left unresolved
-    # rather than guessed.
-    tail = ref.split(".")
-    for start in range(len(tail)):
-        candidate = ".".join(tail[start:])
-        if candidate in constants:
-            return constants[candidate]
-    return None
+    return lookup_constant(ref, constants)
 
 
 # ---------------------------------------------------------------------------

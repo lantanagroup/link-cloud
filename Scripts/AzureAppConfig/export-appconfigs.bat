@@ -33,10 +33,10 @@ REM unless you add --strict, which makes the store match the file exactly.
 IF "%~1"=="" GOTO :usage
 IF "%~2"=="" GOTO :usage
 
-SET app_config_name=%~1
-SET output_file=%~2
-SET auth_mode=%~3
-IF "%auth_mode%"=="" SET auth_mode=login
+SET "app_config_name=%~1"
+SET "output_file=%~2"
+SET "auth_mode=%~3"
+IF "%auth_mode%"=="" SET "auth_mode=login"
 
 echo Exporting %app_config_name% to %output_file% ...
 

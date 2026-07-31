@@ -495,9 +495,9 @@
 <div class="row">
     <div class="col-md-8">
         
-        <h2 id="overview" class="content-heading">Overview <a id="overview" href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+        <h2 id="overview" class="content-heading">Overview <a href="#overview" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Overview"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>To ensure services can be reliably deployed and operated across multiple environments, we maintain a central registry of required configuration settings in <code>/app-config.yaml</code>. This file provides a clear inventory of what must be provisioned for the system to function correctly.</p>
-<h2 id="when-to-add-a-setting-to-app-config.json" class="content-heading">When to Add a Setting to <code>/app-config.yaml</code> <a id="when-to-add-a-setting-to-app-config-json" href="#when-to-add-a-setting-to-app-config-json" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Add a Setting to /app-config.yaml"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="when-to-add-a-setting-to-app-config-yaml" class="content-heading">When to Add a Setting to <code>/app-config.yaml</code> <a href="#when-to-add-a-setting-to-app-config-yaml" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Add a Setting to /app-config.yaml"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>Developers MUST add a configuration key to <code>/app-config.yaml</code> if:</p>
 <ol>
 <li><strong>The setting is required</strong> for the service to start or perform its core functions.</li>
@@ -505,14 +505,14 @@
 <li><strong>The setting is an override</strong> of a default value that is expected to change in most production or production-like environments.</li>
 <li><strong>The setting is security-sensitive</strong> (e.g., Auth Authority, Secret Keys). Note: only the <em>key</em> and <em>description</em> are added; never the <em>value</em>.</li>
 </ol>
-<h2 id="when-to-exclude-a-setting" class="content-heading">When to Exclude a Setting <a id="when-to-exclude-a-setting" href="#when-to-exclude-a-setting" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Exclude a Setting"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="when-to-exclude-a-setting" class="content-heading">When to Exclude a Setting <a href="#when-to-exclude-a-setting" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: When to Exclude a Setting"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>It is acceptable to exclude a setting if:</p>
 <ol>
 <li><strong>It has a sufficient default value</strong> that is unlikely to require an override in any deployed environment (e.g., internal cache timeouts, logging levels).</li>
 <li><strong>The setting is strictly for local development</strong> and has no relevance in deployed environments.</li>
 </ol>
-<h2 id="integration-into-workflow" class="content-heading">Integration into Workflow <a id="integration-into-workflow" href="#integration-into-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Integration into Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="pull-requests-prs" class="content-heading">Pull Requests (PRs) <a id="pull-requests-prs" href="#pull-requests-prs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Pull Requests (PRs)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="integration-into-workflow" class="content-heading">Integration into Workflow <a href="#integration-into-workflow" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Integration into Workflow"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="pull-requests-prs" class="content-heading">Pull Requests (PRs) <a href="#pull-requests-prs" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Pull Requests (PRs)"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li>Any PR that introduces a new required configuration setting MUST include an update to <code>/app-config.yaml</code>.</li>
 <li>PR reviewers should verify that the description for any new setting is clear and that no sensitive values or environment-specific defaults are included.</li>
@@ -523,13 +523,13 @@
 <li><code>/app-config.yaml</code> serves as the primary hand-off artifact for DevOps during environment provisioning.</li>
 <li>Release notes should highlight changes to <code>/app-config.yaml</code> to ensure transparency across teams.</li>
 </ul>
-<h2 id="file-format-and-schema" class="content-heading">File Format and Schema <a id="file-format-and-schema" href="#file-format-and-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: File Format and Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="file-format-and-schema" class="content-heading">File Format and Schema <a href="#file-format-and-schema" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: File Format and Schema"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p>The <code>/app-config.yaml</code> follows a structured schema:</p>
-<h3 id="global-array" class="content-heading"><code>global</code> Array <a id="global-array" href="#global-array" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: global Array"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="global-array" class="content-heading"><code>global</code> Array <a href="#global-array" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: global Array"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Contains settings shared across most or all services (e.g., Kafka connection, Database provider).</p>
-<h3 id="services-object" class="content-heading"><code>services</code> Object <a id="services-object" href="#services-object" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: services Object"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="services-object" class="content-heading"><code>services</code> Object <a href="#services-object" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: services Object"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Contains service-specific settings, keyed by the service name.</p>
-<h3 id="configuration-entry-fields" class="content-heading">Configuration Entry Fields: <a id="configuration-entry-fields" href="#configuration-entry-fields" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration Entry Fields:"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="configuration-entry-fields" class="content-heading">Configuration Entry Fields: <a href="#configuration-entry-fields" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Configuration Entry Fields:"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <ul>
 <li><code>key</code>: The path to the configuration setting, in the notation of the runtime that reads it. See <a href="#key-notation-by-runtime">Key Notation by Runtime</a>.</li>
 <li><code>description</code>: A brief explanation of the setting's purpose and its impact on the system.</li>
@@ -540,11 +540,11 @@
 <li><code>runtime</code>: (Optional, <code>dotnet</code> or <code>java</code>) Overrides the runtime inferred from the owning service. Needed only for Java-notation keys listed under <code>global</code>, which has no owning service.</li>
 <li><code>consumers</code>: (Optional) The services that read this key, derived from the code inventory. Documentation only &mdash; it plays no part in resolution.</li>
 </ul>
-<h3 id="servicemeta-object" class="content-heading"><code>serviceMeta</code> Object <a id="servicemeta-object" href="#servicemeta-object" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: serviceMeta Object"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="servicemeta-object" class="content-heading"><code>serviceMeta</code> Object <a href="#servicemeta-object" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: serviceMeta Object"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Maps each service to two deployment facts: the App Configuration <code>label</code> the running service selects, and its <code>runtime</code>. Tooling reads this rather than hardcoding the mapping, so the label vocabulary lives in one place.</p>
 <p>Label values are compiled into the services and must match exactly, including case and spaces. In .NET they are constants passed to <code>AddExternalConfiguration()</code>; in Java they are the <code>label-filter</code> in <code>bootstrap.yml</code>. Three are not simply the service name: <code>AdminBFF</code> uses <code>LinkAdminBFF</code>, <code>AutomationUI</code> uses <code>Link Automation UI</code>, and <code>DataAcquisitionWorker</code> is a distinct label from <code>DataAcquisition</code>.</p>
-<h2 id="how-services-resolve-keys" class="content-heading">How Services Resolve Keys <a id="how-services-resolve-keys" href="#how-services-resolve-keys" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: How Services Resolve Keys"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
-<h3 id="label-resolution" class="content-heading">Label Resolution <a id="label-resolution" href="#label-resolution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Label Resolution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h2 id="how-services-resolve-keys" class="content-heading">How Services Resolve Keys <a href="#how-services-resolve-keys" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: How Services Resolve Keys"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h3 id="label-resolution" class="content-heading">Label Resolution <a href="#label-resolution" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Label Resolution"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>Every service selects <strong>unlabeled keys first, then its own label</strong>. Both sets merge into one flat dictionary keyed by name alone &mdash; the label is a filter, not part of the resulting key &mdash; so a labeled row <strong>overrides</strong> the unlabeled row of the same name, for that service only. Other services, which do not select that label, continue to see the unlabeled value.</p>
 <p>Two consequences follow, and they are asymmetric:</p>
 <ul>
@@ -552,7 +552,7 @@
 <li><strong>Moving a key from unlabeled to labeled is not.</strong> Deleting the unlabeled row breaks every service that does not select that exact label. Only do this when precisely one service consumes the key.</li>
 </ul>
 <p>Because labels are compiled in, a running service cannot be re-pointed at a different label without a redeploy.</p>
-<h3 id="key-notation-by-runtime" class="content-heading">Key Notation by Runtime <a id="key-notation-by-runtime" href="#key-notation-by-runtime" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Notation by Runtime"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="key-notation-by-runtime" class="content-heading">Key Notation by Runtime <a href="#key-notation-by-runtime" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Key Notation by Runtime"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The two runtimes read different rows from the same store, in different notations. This is by design, not drift.</p>
 <ul>
 <li><strong>.NET</strong> reads colon-delimited rows such as <code>KafkaConnection:BootstrapServers:0</code>, matching <code>appsettings.json</code> section paths.</li>
@@ -560,16 +560,16 @@
 </ul>
 <p>The catalog records Java keys in the dotted Spring form (<code>spring.datasource.url</code>) while the store holds the slash form. These are two representations of one key; the transform between them is total and mechanical.</p>
 <p>Values whose <code>content_type</code> is <code>application/json</code> are <strong>flattened</strong> by both providers. A single row <code>/authentication</code> holding <code>{"anonymous": false, "authority": "..."}</code> therefore supplies the properties <code>authentication.anonymous</code> and <code>authentication.authority</code>. Key Vault references are resolved automatically in both runtimes.</p>
-<h3 id="precedence-over-environment-variables" class="content-heading">Precedence Over Environment Variables <a id="precedence-over-environment-variables" href="#precedence-over-environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Precedence Over Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="precedence-over-environment-variables" class="content-heading">Precedence Over Environment Variables <a href="#precedence-over-environment-variables" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Precedence Over Environment Variables"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p><strong>A key present in App Configuration beats a container environment variable.</strong> This is the opposite of the usual expectation and is worth knowing before debugging a deployed service.</p>
 <ul>
 <li><strong>Java</strong>: the Spring Cloud bootstrap property source defaults to <code>overrideSystemProperties=true</code>, and nothing in this repository overrides it.</li>
 <li><strong>.NET</strong>: <code>AddAzureAppConfiguration</code> is called after the host builder has already registered the environment-variable source, so the App Configuration source is appended last and wins.</li>
 </ul>
 <p>Setting an environment variable on a pod will therefore be silently ignored for any key the store defines. Change the store instead.</p>
-<h3 id="java-enablement" class="content-heading">Java Enablement <a id="java-enablement" href="#java-enablement" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Java Enablement"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
+<h3 id="java-enablement" class="content-heading">Java Enablement <a href="#java-enablement" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Java Enablement"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h3>
 <p>The checked-in <code>bootstrap.yml</code> for both Java services sets <code>spring.cloud.azure.appconfiguration.enabled: false</code>. That is the correct default for local and Docker runs, which take configuration from YAML and environment variables. <strong>Deployed environments set <code>SPRING_CLOUD_AZURE_APPCONFIGURATION_ENABLED=true</code> on the pods</strong>, so App Configuration is live in dev, test and qa. The endpoint and credentials are likewise supplied at deploy time and do not appear in this repository.</p>
-<h2 id="security-warning" class="content-heading">Security Warning <a id="security-warning" href="#security-warning" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Security Warning"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
+<h2 id="security-warning" class="content-heading">Security Warning <a href="#security-warning" class="markdown-heading-anchor text-decoration-none" aria-label="Link to section: Security Warning"><i class="bi bi-link-45deg" style="opacity: 0.2; font-size: 20px;"></i></a></h2>
 <p><strong>NEVER commit environment-specific values, passwords, or secrets to <code>/app-config.yaml</code>.</strong> This file is intended for documentation and schema enforcement only. Use secure secret management (e.g., Azure Key Vault) for actual values in deployed environments.</p>
 
         
