@@ -7,6 +7,8 @@ import com.lantanagroup.link.validation.enums.PiqiDimension;
 import com.lantanagroup.link.validation.enums.Severity;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,7 +23,9 @@ import lombok.Setter;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CheckDto {
 
+    // mirrors rubric_check.check_local_id varchar(64)
     @NotBlank
+    @Size(max = 64)
     private String id;
 
     @NotNull
@@ -32,8 +36,10 @@ public class CheckDto {
 
     private JsonNode parameters;
 
+    @NotNull
     private Severity severityOverride;
 
+    @PositiveOrZero
     private int ordinal;
 
     @Builder.Default
