@@ -26,6 +26,11 @@ on:
     branches:
       - dev
 
+# This job only reads the repository: checkout, install PyYAML, then run the catalog checks.
+# Nothing is written back, so the token needs no more than read access.
+permissions:
+  contents: read
+
 jobs:
   check:
     name: Validate catalog and required keys
