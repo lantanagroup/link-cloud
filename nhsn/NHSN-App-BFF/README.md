@@ -82,6 +82,70 @@ Expected response includes:
 
 The UI uses this to determine whether to render no-access, missing-facility, onboarding, or configuration states.
 
+## Localization API and runtime resources
+
+The BFF serves localization resources to the UI at runtime so language files can be updated without rebuilding UI assets.
+
+### Endpoint
+
+- `GET /api/localization/{locale}/{namespaceName}`
+
+Supported namespaces:
+
+- `common`
+- `onboarding`
+- `configuration`
+
+Default source-controlled fallback files are stored in:
+
+- `Localization/en-US/common.json`
+- `Localization/en-US/onboarding.json`
+- `Localization/en-US/configuration.json`
+
+### Configuration
+
+- `Localization:ResourceDirectory`
+- Environment override: `Localization__ResourceDirectory`
+
+Default value is `Localization` (relative path). Relative paths are resolved from application content root; absolute paths are also supported.
+
+Fallback chain behavior:
+
+- requested locale (for example `es-MX`)
+- neutral locale when available (for example `es`)
+- final fallback `en-US`
+
+If a translated key is missing in the requested locale, the English value from `en-US` is used.
+
+### Container mounted-volume override
+
+When `Localization__ResourceDirectory` points to a mounted path, files in that path become the active runtime resources.
+
+```yaml
+env:
+  - name: Localization__ResourceDirectory
+    value: /app/localization
+
+volumeMounts:
+  - name: localization
+    mountPath: /app/localization
+    readOnly: true
+
+volumes:
+  - name: localization
+    configMap:
+      name: nhsnlink-localization
+```
+
+For larger independently managed resource sets, a persistent volume or other mounted source may be preferable to a ConfigMap.
+
+### Adding localization content
+
+1. Add a locale folder (for example `Localization/es-MX/`).
+2. Add namespace files (`common.json`, `onboarding.json`, `configuration.json`) using the same key structure as `en-US`.
+3. Keep JSON payloads as objects and do not include executable/script content.
+4. For additional namespaces beyond the initial three, update both backend allow-list handling and UI namespace configuration together.
+
 ## Configuration
 
 ### Required app settings

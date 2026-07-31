@@ -1,0 +1,10 @@
+{
+  "page": {
+    "title": "Onboarding",
+    "intro": "Hello world..."
+  },
+  "messages": {
+    "completeSuccess": "Completed onboarding for facility {{facilityId}}.",
+    "completeError": "Unable to complete onboarding."
+  }
+}

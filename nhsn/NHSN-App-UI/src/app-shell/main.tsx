@@ -2,6 +2,7 @@ import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {App} from './App';
 import {NotificationProvider} from '../components/notifications/NotificationProvider';
+import {ensureI18nInitialized} from '../localization/i18n';
 import '../styles.scss';
 
 declare global {
@@ -20,10 +21,12 @@ if (!rootElement) {
   throw new Error('Root element was not found.');
 }
 
-createRoot(rootElement).render(
-  <React.StrictMode>
-    <NotificationProvider>
-      <App />
-    </NotificationProvider>
-  </React.StrictMode>
-);
+void ensureI18nInitialized({ apiBaseUrl: '/api' }).then(() => {
+  createRoot(rootElement).render(
+    <React.StrictMode>
+      <NotificationProvider>
+        <App />
+      </NotificationProvider>
+    </React.StrictMode>
+  );
+});

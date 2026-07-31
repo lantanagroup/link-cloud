@@ -128,9 +128,12 @@ static void RegisterServices(WebApplicationBuilder builder)
 
     builder.Services.AddScoped<IUserInfoService, UserInfoService>();
     builder.Services.AddScoped<IFacilityAdministrationService, FacilityAdministrationService>();
+    builder.Services.AddScoped<ILocalizationResourceService, LocalizationResourceService>();
+    builder.Services.Configure<LocalizationSettings>(builder.Configuration.GetSection(LocalizationSettings.SectionName));
 
     builder.Services.AddTransient<IApi, UserInfoEndpoints>();
     builder.Services.AddTransient<IApi, FacilityAdministrationEndpoints>();
+    builder.Services.AddTransient<IApi, LocalizationEndpoints>();
     builder.Services.AddHealthChecks().AddDbContextCheck<NhsnAppDbContext>(name: "database");
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>

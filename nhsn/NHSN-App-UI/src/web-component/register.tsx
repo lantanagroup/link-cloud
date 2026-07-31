@@ -2,13 +2,14 @@ import React from 'react';
 import {createRoot, Root} from 'react-dom/client';
 import {NHSNLink} from '../components/NHSNLink';
 import {NotificationProvider} from '../components/notifications/NotificationProvider';
+import {ensureI18nInitialized} from '../localization/i18n';
 import '../styles.scss';
 
 class NhsnLinkElement extends HTMLElement {
   private root?: Root;
 
   static get observedAttributes() {
-    return ['baseurl', 'apibaseurl'];
+    return ['baseurl', 'apibaseurl', 'locale'];
   }
 
   attributeChangedCallback() {
@@ -35,11 +36,15 @@ class NhsnLinkElement extends HTMLElement {
 
     const baseUrl = this.getAttribute('baseurl') || '/nhsnlink';
     const apiBaseUrl = this.getAttribute('apibaseurl') || '/api';
-    this.root.render(
-      <NotificationProvider>
-        <NHSNLink baseUrl={baseUrl} apiBaseUrl={apiBaseUrl} />
-      </NotificationProvider>
-    );
+    const locale = this.getAttribute('locale') || undefined;
+
+    void ensureI18nInitialized({ apiBaseUrl, locale }).then(() => {
+      this.root?.render(
+        <NotificationProvider>
+          <NHSNLink baseUrl={baseUrl} apiBaseUrl={apiBaseUrl} locale={locale} />
+        </NotificationProvider>
+      );
+    });
   }
 }
 

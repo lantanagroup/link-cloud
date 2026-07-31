@@ -1,0 +1,10 @@
+{
+  "page": {
+    "title": "Incorporación",
+    "intro": "Hola mundo..."
+  },
+  "messages": {
+    "completeSuccess": "Incorporación completada para el centro {{facilityId}}.",
+    "completeError": "No se pudo completar la incorporación."
+  }
+}
