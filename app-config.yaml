@@ -118,6 +118,19 @@ global:
     required: true
     sensitive: true
     consumers: ["Account", "AdminBFF", "Audit", "Notification"]
+  # Security posture, and the stores currently contradict the shipped default: appsettings.json
+  # ships Enabled: true, every store sets it to False, and App Configuration outranks the file.
+  # With it off, Admin.BFF caches the serialized Account - email, name, roles and claims - into
+  # Redis unencrypted (LinkClaimsTransformer.cs:65-95). Catalogued so the divergence is visible
+  # rather than buried in a store nobody diffs.
+  - key: "DataProtection:Enabled"
+    description: "Whether ASP.NET Data Protection encrypts values before they are cached. When false, Admin.BFF writes the serialized Account to the shared cache as plain JSON. Set to False in all three stores today, overriding the true shipped in appsettings.json."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "DataProtection:KeyRing"
+    description: "The Data Protection key ring name, used to scope keys so services sharing a store do not read each other's protected payloads. Only meaningful when DataProtection:Enabled is true."
+    required: true
+    consumers: ["Account", "AdminBFF", "DataAcquisition", "DataAcquisitionWorker"]
   - key: "Telemetry:EnableTelemetry"
     description: "Boolean flag to enable or disable OpenTelemetry tracing and metrics."
     required: true
@@ -346,6 +359,9 @@ services:
       description: "The Slack webhook the Automation.UI test pipeline posts consolidated results to. Consumed by Tests/AutomationUI.Pipeline/azure-pipelines.yml at runtime, not by any service, which is why it does not appear in the code-derived inventory."
       required: true
       sensitive: true
+    - key: "DataProtection:ApplicationName"
+      description: "The Data Protection application name isolating Automation.UI's key ring from other services sharing the store. Falls back to 'Link.Automation.UI:{Environment}' when unset (Automation.UI/Program.cs:208), so it is only provisioned where that default is not wanted - currently dev alone."
+      required: false
   DataAcquisition:
     - key: "AcquisitionJobSettings:CronSchedule"
       description: "The cron expression defining how often data acquisition jobs should run."
