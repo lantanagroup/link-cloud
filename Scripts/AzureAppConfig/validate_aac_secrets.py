@@ -212,9 +212,9 @@ def check_item(path: str, index: int, item: Dict) -> List[Finding]:
     if is_endpoint_only_key(key) and "," in value:
         findings.append(Finding(
             "WARN", entry_location(path, index, key, label),
-            f"Value contains ',' but this key is assigned to "
-            f"ConfigurationOptions.EndPoints, which accepts only host:port. "
-            f"Redis options belong in the sibling settings, not here."))
+            "Value contains ',' but this key is assigned to "
+            "ConfigurationOptions.EndPoints, which accepts only host:port. "
+            "Redis options belong in the sibling settings, not here."))
 
     # Secret-shaped key holding a literal. Not always a credential, so warn.
     if (is_secret_shaped_key(key) and value.strip() and not is_kv_ref

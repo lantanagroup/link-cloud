@@ -235,7 +235,7 @@ def print_results(results: Dict[str, List]):
             label_str = f" [Label: {label}]" if label else " [No Label]"
             print(f"  + {key}{label_str}")
     else:
-        print(f"\n🆕 NEWLY CREATED KEYS: 0")
+        print("\n🆕 NEWLY CREATED KEYS: 0")
 
     # Deleted keys
     if results['deleted']:
@@ -246,7 +246,7 @@ def print_results(results: Dict[str, List]):
             label_str = f" [Label: {label}]" if label else " [No Label]"
             print(f"  - {key}{label_str}")
     else:
-        print(f"\n🗑️  DELETED KEYS: 0")
+        print("\n🗑️  DELETED KEYS: 0")
 
     # Changed keys
     if results['changed']:
@@ -268,7 +268,7 @@ def print_results(results: Dict[str, List]):
                 # Regular value differences
                 print(f"  {item['left_value']} --> {item['right_value']}")
     else:
-        print(f"\n🔄 CHANGED KEYS: 0")
+        print("\n🔄 CHANGED KEYS: 0")
 
     # Tag-only changes
     if results['tags_changed']:
@@ -280,7 +280,7 @@ def print_results(results: Dict[str, List]):
             for change in item['tag_changes']:
                 print(f"    {change}")
     else:
-        print(f"\nTAG CHANGES ONLY: 0")
+        print("\nTAG CHANGES ONLY: 0")
 
     # Unchanged keys
     if results['unchanged']:
@@ -291,7 +291,7 @@ def print_results(results: Dict[str, List]):
             label_str = f" [Label: {label}]" if label else " [No Label]"
             print(f"  = {key}{label_str}")
     else:
-        print(f"\n✅ UNCHANGED KEYS: 0")
+        print("\n✅ UNCHANGED KEYS: 0")
 
     print("\n" + "=" * 80)
     print("SUMMARY")
