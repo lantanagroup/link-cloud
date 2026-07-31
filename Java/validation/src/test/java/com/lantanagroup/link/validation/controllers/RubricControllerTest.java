@@ -63,11 +63,13 @@ class RubricControllerTest {
                   "title": "Demo Rubric",
                   "owner": "qa",
                   "dimensions": ["CONFORMANCE"],
+                  "scoringPolicy": { "type": "piqi-dimension-scorecard", "rollup": "worst-of" },
                   "checks": [
                     {
                       "id": "c1",
                       "type": "FHIRPATH",
                       "dimension": "CONFORMANCE",
+                      "severityOverride": "ERROR",
                       "parameters": { "expression": "Patient.name.exists()" },
                       "ordinal": 0,
                       "enabled": true
@@ -207,11 +209,208 @@ class RubricControllerTest {
         }
 
         @Test
+        @DisplayName("unknown top-level key (typo 'cheks') -> 400 naming the property")
+        void register_unknownTopLevelKey() throws Exception {
+            when(registry.registerVersion(any(), any()))
+                    .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
+            String body = validPayload("piqi.core", "1.0.0").replace("\"checks\":", "\"cheks\":");
+            mockMvc.perform(post(BASE + "/piqi.core/versions")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0]").value(containsString("unknown property 'cheks'")));
+        }
+
+        @Test
+        @DisplayName("unknown key inside a check item -> 400 naming the property")
+        void register_unknownCheckKey() throws Exception {
+            String body = validPayload("piqi.core", "1.0.0")
+                    .replace("\"ordinal\": 0,", "\"ordinal\": 0, \"severtyOverride\": \"ERROR\",");
+            mockMvc.perform(post(BASE + "/piqi.core/versions")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0]").value(containsString("unknown property 'severtyOverride'")));
+        }
+
+        @Test
+        @DisplayName("payload over the size cap -> 400")
+        void register_oversizedPayload() throws Exception {
+            String body = validPayload("piqi.core", "1.0.0")
+                    .replace("\"Patient.name.exists()\"",
+                            "\"Patient.name.exists()\", \"failureMessage\": \"" + "x".repeat(300_000) + "\"");
+            expectStatus(post(BASE + "/piqi.core/versions")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body), 400);
+        }
+
+        @Test
+        @DisplayName("rubric id not matching the slug pattern -> 400")
+        void register_badIdPattern() throws Exception {
+            when(registry.registerVersion(any(), any()))
+                    .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
+            expectStatus(post(BASE + "/PIQI.Core/versions")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(validPayload("PIQI.Core", "1.0.0")), 400);
+            expectStatus(post(BASE + "/ab/versions")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(validPayload("ab", "1.0.0")), 400);
+            expectStatus(post(BASE + "/piqi_core/versions")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(validPayload("piqi_core", "1.0.0")), 400);
+        }
+
+        @Test
+        @DisplayName("missing dimensions -> 400 (dimensions are required)")
+        void register_missingDimensions() throws Exception {
+            when(registry.registerVersion(any(), any()))
+                    .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
+            String body = validPayload("piqi.core", "1.0.0")
+                    .replace("\"dimensions\": [\"CONFORMANCE\"],", "");
+            expectStatus(post(BASE + "/piqi.core/versions")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body), 400);
+        }
+
+        @Test
+        @DisplayName("negative ordinal -> 400")
+        void register_negativeOrdinal() throws Exception {
+            when(registry.registerVersion(any(), any()))
+                    .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
+            String body = validPayload("piqi.core", "1.0.0").replace("\"ordinal\": 0", "\"ordinal\": -1");
+            expectStatus(post(BASE + "/piqi.core/versions")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body), 400);
+        }
+
+        @Test
+        @DisplayName("YAML: unknown top-level key -> 400 naming the property")
+        void register_yamlUnknownTopLevelKey() throws Exception {
+            String body = validYamlPayload("piqi.core", "1.0.0").replace("checks:", "cheks:");
+            mockMvc.perform(post(BASE + "/piqi.core/versions")
+                            .contentType("application/yaml")
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.errors[0]").value(containsString("unknown property 'cheks'")));
+        }
+
+        @Test
+        @DisplayName("title longer than 256 chars -> 400 (bean validation, not a SQL truncation 500)")
+        void register_titleTooLong() throws Exception {
+            when(registry.registerVersion(any(), any()))
+                    .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
+            String body = """
+                    {
+                      "id": "piqi.core",
+                      "semver": "1.0.0",
+                      "title": "%s",
+                      "checks": [
+                        { "id": "c1", "type": "FHIRPATH", "dimension": "CONFORMANCE",
+                          "parameters": { "expression": "Patient.name.exists()" }, "ordinal": 0, "enabled": true }
+                      ]
+                    }
+                    """.formatted("x".repeat(257));
+            expectStatus(post(BASE + "/piqi.core/versions")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body), 400);
+        }
+
+        @Test
+        @DisplayName("dimension outside the defined PiqiDimension set -> 400")
+        void register_unknownDimension() throws Exception {
+            String body = validPayload("piqi.core", "1.0.0")
+                    .replace("\"CONFORMANCE\"", "\"NOT_A_DIMENSION\"");
+            expectStatus(post(BASE + "/piqi.core/versions")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body), 400);
+        }
+
+        @Test
         @DisplayName("malformed JSON body -> 400")
         void register_malformedJson() throws Exception {
             expectStatus(post(BASE + "/piqi.core/versions")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{ not json "), 400);
+        }
+
+        // A YAML rendering of validPayload(); authored with comments to prove the raw source
+        // (not a re-serialization) is what reaches the service.
+        private static String validYamlPayload(String id, String semver) {
+            return """
+                    # demo rubric authored in YAML
+                    id: %s
+                    semver: "%s"
+                    title: Demo Rubric
+                    owner: qa
+                    dimensions:
+                      - CONFORMANCE
+                    scoringPolicy:
+                      type: piqi-dimension-scorecard
+                      rollup: worst-of
+                    checks:
+                      - id: c1
+                        type: FHIRPATH
+                        dimension: CONFORMANCE
+                        severityOverride: ERROR
+                        parameters:
+                          expression: Patient.name.exists()
+                        ordinal: 0
+                        enabled: true
+                    """.formatted(id, semver);
+        }
+
+        @Test
+        @DisplayName("valid YAML payload -> 201 Created (parsed same as JSON, not persisted as YAML)")
+        void register_validYaml() throws Exception {
+            when(registry.registerVersion(any(), any()))
+                    .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
+
+            mockMvc.perform(post(BASE + "/piqi.core/versions")
+                            .contentType("application/yaml")
+                            .content(validYamlPayload("piqi.core", "1.0.0")))
+                    .andExpect(status().isCreated())
+                    .andExpect(header().string("Location", containsString("/piqi.core/versions/1.0.0")))
+                    .andExpect(jsonPath("$.data.status").value("DRAFT"));
+        }
+
+        @Test
+        @DisplayName("YAML with title longer than 256 chars -> 400 (bean validation)")
+        void register_yamlTitleTooLong() throws Exception {
+            when(registry.registerVersion(any(), any()))
+                    .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
+            String body = validYamlPayload("piqi.core", "1.0.0")
+                    .replace("title: Demo Rubric", "title: " + "x".repeat(257));
+            expectStatus(post(BASE + "/piqi.core/versions")
+                    .contentType("application/yaml")
+                    .content(body), 400);
+        }
+
+        @Test
+        @DisplayName("YAML with a dimension outside the defined PiqiDimension set -> 400")
+        void register_yamlUnknownDimension() throws Exception {
+            String body = validYamlPayload("piqi.core", "1.0.0")
+                    .replace("- CONFORMANCE", "- NOT_A_DIMENSION");
+            expectStatus(post(BASE + "/piqi.core/versions")
+                    .contentType("application/yaml")
+                    .content(body), 400);
+        }
+
+        @Test
+        @DisplayName("YAML with invalid fields -> 400 (bean validation still applies)")
+        void register_yamlBadSemver() throws Exception {
+            when(registry.registerVersion(any(), any()))
+                    .thenReturn(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT));
+            expectStatus(post(BASE + "/piqi.core/versions")
+                    .contentType("application/yaml")
+                    .content(validYamlPayload("piqi.core", "v1")), 400);
+        }
+
+        @Test
+        @DisplayName("malformed YAML body -> 400")
+        void register_malformedYaml() throws Exception {
+            expectStatus(post(BASE + "/piqi.core/versions")
+                    .contentType("application/yaml")
+                    .content("checks: [ {id: c1, type: ["), 400);
         }
     }
 
