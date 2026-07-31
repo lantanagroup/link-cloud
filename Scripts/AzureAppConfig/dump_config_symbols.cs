@@ -131,15 +131,15 @@ foreach (var type in AllTypes(compilation.GlobalNamespace))
         path.Insert(0, current.Name);
     }
 
-    var info = types.TryGetValue(type.Name, out var existing)
-        ? existing
-        : types[type.Name] = new TypeInfo();
+    // This declaration on its own. It is compared against any earlier declaration of the
+    // same short name before being merged in - see the ambiguity handling below.
+    var declaration = new TypeInfo();
 
     foreach (var baseType in Bases(type))
     {
-        if (!info.Bases.Contains(baseType))
+        if (!declaration.Bases.Contains(baseType))
         {
-            info.Bases.Add(baseType);
+            declaration.Bases.Add(baseType);
         }
     }
 
@@ -154,7 +154,7 @@ foreach (var type in AllTypes(compilation.GlobalNamespace))
         {
             // Bindable: ConfigurationBinder walks public properties with a setter.
             case IPropertySymbol { SetMethod: not null, IsIndexer: false } property:
-                info.Members.Add(new MemberInfo(
+                declaration.Members.Add(new MemberInfo(
                     property.Name, property.Type.ToDisplayString(typeFormat), "property", true));
                 break;
 
@@ -179,11 +179,49 @@ foreach (var type in AllTypes(compilation.GlobalNamespace))
             // in a store but can never take effect is reported as such, rather than looking
             // like an extraction miss.
             case IFieldSymbol { IsConst: false, IsStatic: false, IsImplicitlyDeclared: false } field:
-                info.Members.Add(new MemberInfo(
+                declaration.Members.Add(new MemberInfo(
                     field.Name, field.Type.ToDisplayString(typeFormat), "field", false));
                 break;
         }
     }
+
+    // Types are keyed by short name because that is how call sites name them:
+    // Configure<TelemetryConfig>() carries no namespace. Two namespaces can declare the same
+    // short name, and unioning them invents a type that exists nowhere - the five
+    // TelemetryConfig declarations differ, so a union would attribute EnableTracing to
+    // services whose copy has no such property.
+    //
+    // Only a *divergent* redeclaration is ambiguous. BlobStorageSettings is declared
+    // identically in Report and Submission, so merging it changes nothing and the derived
+    // ExternalBlobStorageSettings must still resolve its inherited ConnectionString. Where
+    // declarations genuinely differ, mirror the constants path and refuse to resolve:
+    // under-reporting shows up as an uncatalogued key, whereas a silent union is a wrong
+    // answer that looks right.
+    if (!types.TryGetValue(type.Name, out var info))
+    {
+        declaration.Declarations = 1;
+        types[type.Name] = declaration;
+    }
+    else
+    {
+        info.Declarations++;
+        if (!info.Ambiguous && !SameShape(info, declaration))
+        {
+            info.Ambiguous = true;
+            info.Bases.Clear();
+            info.Members.Clear();
+        }
+    }
+}
+
+// Whether two declarations of one short name describe the same type, so that merging them
+// is a no-op rather than a guess.
+static bool SameShape(TypeInfo left, TypeInfo right)
+{
+    static IEnumerable<string> Shape(TypeInfo t) =>
+        t.Members.Select(m => $"{m.Kind}:{m.Name}:{m.Type}:{m.Bindable}").OrderBy(s => s);
+    return left.Bases.OrderBy(b => b).SequenceEqual(right.Bases.OrderBy(b => b))
+           && Shape(left).SequenceEqual(Shape(right));
 }
 
 // Local constants inside a method body, including the top-level statements of a Program.cs.
@@ -250,6 +288,8 @@ var payload = new
     types = types.ToDictionary(kv => kv.Key, kv => new
     {
         bases = kv.Value.Bases,
+        ambiguous = kv.Value.Ambiguous,
+        declarations = kv.Value.Declarations,
         members = kv.Value.Members.Select(m => new
         {
             name = m.Name, type = m.Type, kind = m.Kind, bindable = m.Bindable,
@@ -274,6 +314,15 @@ sealed class TypeInfo
 {
     public List<string> Bases { get; } = new();
     public List<MemberInfo> Members { get; } = new();
+
+    /// <summary>How many namespaces declare this short name.</summary>
+    public int Declarations { get; set; }
+
+    /// <summary>
+    /// More than one declaration, so the short name cannot identify a single type. Bases and
+    /// members are left empty rather than unioned; consumers should decline to expand it.
+    /// </summary>
+    public bool Ambiguous { get; set; }
 }
 
 record MemberInfo(string Name, string Type, string Kind, bool Bindable);

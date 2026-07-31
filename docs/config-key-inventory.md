@@ -53,7 +53,7 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | test | `DotNet/Account/Program.cs:81` |
+| `CORS` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
@@ -71,8 +71,8 @@ value set in a store can never take effect.
 | `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:164` |
 | `ConnectionStrings:Redis` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:114` |
 | `ConnectionStrings:SqlServer` | dotnet | - | - | `DotNet/Account/Persistence/AccountDbContext.cs:57` |
-| `DataProtection:Enabled` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:147` |
-| `DataProtection:KeyRing` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:98` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:147` |
+| `DataProtection:KeyRing` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:98` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -87,12 +87,12 @@ value set in a store can never take effect.
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:77` |
 | `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:77` |
 | `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:Mechanism` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:Protocol` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:77` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:77` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:77` |
 | `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:SaslPassword` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:77` |
-| `KafkaConnection:SaslUsername` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:77` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:77` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:77` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:77` |
 | `LinkTokenService` | dotnet | - | - | `DotNet/Account/Program.cs:82` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:82` |
 | `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:82` |
@@ -101,9 +101,9 @@ value set in a store can never take effect.
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:82` |
 | `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:82` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
-| `Logging:HmacKey` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:252` |
+| `Logging:HmacKey` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:252` |
 | `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Account/Program.cs:73` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -124,7 +124,7 @@ value set in a store can never take effect.
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, test | `DotNet/Account/Program.cs:80` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
@@ -192,10 +192,10 @@ value set in a store can never take effect.
 | `Authentication:Schemas:Oauth2:Endpoints:Authorization` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:141` |
 | `Authentication:Schemas:Oauth2:Endpoints:Token` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:142` |
 | `Authentication:Schemas:Oauth2:Endpoints:UserInformation` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:143` |
-| `Authentication:Schemas:OpenIdConnect:Authority` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:165` |
+| `Authentication:Schemas:OpenIdConnect:Authority` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:165` |
 | `Authentication:Schemas:OpenIdConnect:CallbackPath` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:168` |
-| `Authentication:Schemas:OpenIdConnect:ClientId` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:166` |
-| `Authentication:Schemas:OpenIdConnect:ClientSecret` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:167` |
+| `Authentication:Schemas:OpenIdConnect:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:166` |
+| `Authentication:Schemas:OpenIdConnect:ClientSecret` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:167` |
 | `Authentication:Schemas:OpenIdConnect:Enabled` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:156` |
 | `Authentication:Schemas:OpenIdConnect:NameClaimType` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:169` |
 | `Authentication:Schemas:OpenIdConnect:RoleClaimType` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:170` |
@@ -204,7 +204,7 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | test | `DotNet/Admin.BFF/Program.cs:199` |
+| `CORS` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:199` |
 | `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:199` |
 | `CORS:AllowCredentials` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:199` |
 | `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:199` |
@@ -223,8 +223,8 @@ value set in a store can never take effect.
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
 | `ConnectionStrings:Redis` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:141` |
 | `DataProtection` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:87` |
-| `DataProtection:Enabled` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:87` |
-| `DataProtection:KeyRing` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:87` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:87` |
+| `DataProtection:KeyRing` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:87` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -240,12 +240,12 @@ value set in a store can never take effect.
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
 | `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
 | `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:96` |
-| `KafkaConnection:Mechanism` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
-| `KafkaConnection:Protocol` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
 | `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:96` |
-| `KafkaConnection:SaslPassword` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
-| `KafkaConnection:SaslUsername` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
 | `LinkTokenService` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:89` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:207` |
 | `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:89` |
@@ -254,10 +254,10 @@ value set in a store can never take effect.
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Infrastructure/Extensions/Security/InitializeSecurity.cs:210` |
 | `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:89` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
-| `Logging:HmacKey` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:323` |
+| `Logging:HmacKey` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:323` |
 | `MonitorBackendHealthChecks` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:243` |
 | `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:82` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:147` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:147` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -281,7 +281,7 @@ value set in a store can never take effect.
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:88` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, test | `DotNet/Admin.BFF/Program.cs:88` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:88` |
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:88` |
@@ -337,7 +337,7 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | test | `DotNet/Audit/Program.cs:72` |
+| `CORS` | dotnet | - | - | `DotNet/Audit/Program.cs:72` |
 | `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:72` |
 | `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:72` |
 | `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:72` |
@@ -357,7 +357,7 @@ value set in a store can never take effect.
 | `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:71` |
 | `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:71` |
 | `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:71` |
-| `DataProtection:Enabled` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:174` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:174` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Audit/Program.cs:102` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -372,12 +372,12 @@ value set in a store can never take effect.
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:69` |
 | `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:69` |
 | `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:Mechanism` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:Protocol` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:69` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:69` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:69` |
 | `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:SaslPassword` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:69` |
-| `KafkaConnection:SaslUsername` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:69` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:69` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:69` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:69` |
 | `LinkTokenService` | dotnet | - | - | `DotNet/Audit/Program.cs:73` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:73` |
 | `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:73` |
@@ -386,9 +386,9 @@ value set in a store can never take effect.
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:73` |
 | `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:73` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
-| `Logging:HmacKey` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:197` |
+| `Logging:HmacKey` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:197` |
 | `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Audit/Program.cs:65` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -408,7 +408,7 @@ value set in a store can never take effect.
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/Audit/Program.cs:70` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:70` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, test | `DotNet/Audit/Program.cs:70` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:70` |
 | `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:70` |
 | `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:70` |
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:70` |
@@ -465,7 +465,7 @@ value set in a store can never take effect.
 | `AutoMigrate` | dotnet | - | dev, qa, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `Automation` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
 | `Automation:DownloadPath` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FacilityFhirServerBase` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:38` |
+| `Automation:FacilityFhirServerBase` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:38` |
 | `Automation:FhirGeneration:IncludeLowValueOptionalReferences` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
 | `Automation:FhirGeneration:ResourceDistribution` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
 | `Automation:FhirGeneration:ResourceDistribution:{Placeholder}` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
@@ -473,7 +473,7 @@ value set in a store can never take effect.
 | `Automation:FhirQuery:MaxConcurrentRequests` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
 | `Automation:FhirQuery:MinAcquisitionPullTime` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
 | `Automation:FhirQuery:TimeZone` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirServerBase` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:38` |
+| `Automation:FhirServerBase` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:38` |
 | `Automation:FhirServerBasicAuth:Password` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
 | `Automation:FhirServerBasicAuth:ShouldAuthenticate` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
 | `Automation:FhirServerBasicAuth:Username` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
@@ -494,7 +494,7 @@ value set in a store can never take effect.
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
 | `Dashboard:SeedFakeRuns` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:283` |
-| `DataProtection:ApplicationName` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:208` |
+| `DataProtection:ApplicationName` | dotnet | yes | dev | `DotNet/Automation.UI/Program.cs:208` |
 | `DataProtection:KeyCollectionName` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:210` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -511,12 +511,12 @@ value set in a store can never take effect.
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
 | `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
 | `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:Mechanism` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:Protocol` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
 | `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:SaslPassword` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:SaslUsername` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
 | `LinkTokenService` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:67` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:67` |
 | `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:67` |
@@ -529,7 +529,7 @@ value set in a store can never take effect.
 | `Loki:Url` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:40` |
 | `MongoDB:ConnectionString` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:178` |
 | `MongoDB:DatabaseName` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:179` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -549,7 +549,7 @@ value set in a store can never take effect.
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:66` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, test | `DotNet/Automation.UI/Program.cs:66` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
 | `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
 | `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
@@ -605,7 +605,7 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | test | `DotNet/Census/Program.cs:73` |
+| `CORS` | dotnet | - | - | `DotNet/Census/Program.cs:73` |
 | `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:73` |
 | `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:73` |
 | `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:73` |
@@ -624,7 +624,7 @@ value set in a store can never take effect.
 | `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:75` |
 | `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:75` |
 | `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:75` |
-| `DataProtection:Enabled` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:189` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:189` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Census/Program.cs:80` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -639,12 +639,12 @@ value set in a store can never take effect.
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:72` |
 | `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:72` |
 | `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:Mechanism` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:Protocol` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:72` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:72` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:72` |
 | `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:SaslPassword` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:72` |
-| `KafkaConnection:SaslUsername` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:72` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:72` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:72` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:72` |
 | `LinkTokenService` | dotnet | - | - | `DotNet/Census/Program.cs:74` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:74` |
 | `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:74` |
@@ -653,7 +653,7 @@ value set in a store can never take effect.
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:74` |
 | `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:74` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -673,7 +673,7 @@ value set in a store can never take effect.
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/Census/Program.cs:71` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:71` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, test | `DotNet/Census/Program.cs:71` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:71` |
 | `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:71` |
 | `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:71` |
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:71` |
@@ -734,7 +734,7 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | test | `DotNet/Account/Program.cs:81` |
+| `CORS` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
@@ -756,8 +756,8 @@ value set in a store can never take effect.
 | `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition/Program.cs:48` |
 | `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Program.cs:48` |
 | `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Program.cs:48` |
-| `DataProtection:Enabled` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition/Program.cs:108` |
-| `DataProtection:KeyRing` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition/Program.cs:52` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Program.cs:108` |
+| `DataProtection:KeyRing` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Program.cs:52` |
 | `DataSourceAuth` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:139` |
 | `DataSourceAuth:KeySource` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:139` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
@@ -774,12 +774,12 @@ value set in a store can never take effect.
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
 | `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
 | `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:158` |
-| `KafkaConnection:Mechanism` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
-| `KafkaConnection:Protocol` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
 | `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:158` |
-| `KafkaConnection:SaslPassword` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
-| `KafkaConnection:SaslUsername` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
 | `LinkTokenService` | dotnet | - | - | `DotNet/Account/Program.cs:82` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:82` |
 | `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:82` |
@@ -788,7 +788,7 @@ value set in a store can never take effect.
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Program.cs:109` |
 | `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:82` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -811,7 +811,7 @@ value set in a store can never take effect.
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, test | `DotNet/Account/Program.cs:80` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
@@ -886,7 +886,7 @@ value set in a store can never take effect.
 | `AcquisitionWorkerProcessorSettings:StalledProcessingThresholdMinutes` | dotnet | - | - | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:31` |
 | `AcquisitionWorkerProcessorSettings:StalledQueuedThresholdMinutes` | dotnet | - | - | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:31` |
 | `AcquisitionWorkerProcessorSettings:TimeBudgetPerRunSeconds` | dotnet | - | - | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:31` |
-| `AcquisitionWorkerProcessorSettings:WorkChannelCapacity` | dotnet | yes | test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:31` |
+| `AcquisitionWorkerProcessorSettings:WorkChannelCapacity` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:31` |
 | `ApiSettings` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:135` |
 | `ApiSettings:FhirListSettings:ValidStatuses:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:135` |
 | `ApiSettings:FhirListSettings:ValidTimeFrames:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:135` |
@@ -895,7 +895,7 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | test | `DotNet/Account/Program.cs:81` |
+| `CORS` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
@@ -917,7 +917,7 @@ value set in a store can never take effect.
 | `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:26` |
 | `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:26` |
 | `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:26` |
-| `DataProtection:KeyRing` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:98` |
+| `DataProtection:KeyRing` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:98` |
 | `DataSourceAuth` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:139` |
 | `DataSourceAuth:KeySource` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:139` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
@@ -934,12 +934,12 @@ value set in a store can never take effect.
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
 | `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
 | `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
-| `KafkaConnection:Mechanism` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
-| `KafkaConnection:Protocol` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
 | `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
-| `KafkaConnection:SaslPassword` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
-| `KafkaConnection:SaslUsername` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
 | `LinkTokenService` | dotnet | - | - | `DotNet/Account/Program.cs:82` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:82` |
 | `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:82` |
@@ -948,7 +948,7 @@ value set in a store can never take effect.
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:82` |
 | `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:82` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -971,7 +971,7 @@ value set in a store can never take effect.
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, test | `DotNet/Account/Program.cs:80` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:80` |
@@ -1037,14 +1037,14 @@ value set in a store can never take effect.
 | `authentication.admin-email` | java | - | - | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java:7` |
 | `authentication.anonymous` | java | - | - | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java:7` |
 | `authentication.authority` | java | yes | - | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java:7` |
-| `authentication.signing-key` | java | - | dev, qa, test | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java:7` |
+| `authentication.signing-key` | java | yes | dev, qa, test | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java:7` |
 | `internal-blob-storage.blob-container-name` | java | - | dev, qa, test | `Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/BlobStorageConfig.java:21` |
-| `internal-blob-storage.connection-string` | java | - | dev, qa, test | `Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/BlobStorageConfig.java:21` |
+| `internal-blob-storage.connection-string` | java | yes | dev, qa, test | `Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/BlobStorageConfig.java:21` |
 | `link.cql-debug` | java | yes | - | `Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/LinkConfig.java:24` |
 | `link.info-route` | java | - | - | `Java/shared/src/main/java/com/lantanagroup/link/shared/BaseSpringConfig.java:23` |
 | `link.report.base-url` | java | yes | dev, qa, test | `Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/LinkConfig.java:42` |
 | `link.reportability-predicate` | java | yes | - | `Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/LinkConfig.java:24` |
-| `loki.app` | java | - | dev, qa, test | `Java/measureeval/src/main/resources/logback-spring.xml:3` |
+| `loki.app` | java | yes | dev, qa, test | `Java/measureeval/src/main/resources/logback-spring.xml:3` |
 | `loki.enabled` | java | - | dev, qa, test | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/LokiConfig.java:9` |
 | `loki.url` | java | - | dev, qa, test | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/LokiConfig.java:9` |
 | `management.health.resource-cache.timeout-ms` | java | - | - | `Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/health/ResourceCacheHealthIndicator.java:67` |
@@ -1071,7 +1071,7 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | test | `DotNet/Normalization/Program.cs:73` |
+| `CORS` | dotnet | - | - | `DotNet/Normalization/Program.cs:73` |
 | `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
 | `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
 | `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
@@ -1091,7 +1091,7 @@ value set in a store can never take effect.
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
 | `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:135` |
 | `ConsumerSettings` | dotnet | - | - | `DotNet/Normalization/Program.cs:66` |
-| `DataProtection:Enabled` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:122` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:122` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Normalization/Program.cs:130` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -1106,12 +1106,12 @@ value set in a store can never take effect.
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
 | `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
 | `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:Mechanism` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:Protocol` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
 | `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:SaslPassword` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:SaslUsername` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
 | `LinkTokenService` | dotnet | - | - | `DotNet/Normalization/Program.cs:74` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
 | `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
@@ -1120,7 +1120,7 @@ value set in a store can never take effect.
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
 | `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -1140,7 +1140,7 @@ value set in a store can never take effect.
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/Normalization/Program.cs:71` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, test | `DotNet/Normalization/Program.cs:71` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
 | `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
 | `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
@@ -1196,7 +1196,7 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | test | `DotNet/Notification/Program.cs:120` |
+| `CORS` | dotnet | - | - | `DotNet/Notification/Program.cs:120` |
 | `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:120` |
 | `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:120` |
 | `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:120` |
@@ -1216,7 +1216,7 @@ value set in a store can never take effect.
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
 | `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:184` |
-| `DataProtection:Enabled` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:168` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:168` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Notification/Program.cs:180` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -1231,12 +1231,12 @@ value set in a store can never take effect.
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:116` |
 | `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:116` |
 | `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:Mechanism` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:Protocol` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:116` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:116` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:116` |
 | `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:SaslPassword` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:116` |
-| `KafkaConnection:SaslUsername` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:116` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:116` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:116` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:116` |
 | `LinkTokenService` | dotnet | - | - | `DotNet/Notification/Program.cs:121` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:121` |
 | `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:121` |
@@ -1245,8 +1245,8 @@ value set in a store can never take effect.
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:121` |
 | `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:121` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
-| `Logging:HmacKey` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:266` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:120` |
+| `Logging:HmacKey` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:266` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -1266,7 +1266,7 @@ value set in a store can never take effect.
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Notification/Program.cs:81` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/Notification/Program.cs:115` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:115` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, test | `DotNet/Notification/Program.cs:115` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:115` |
 | `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:115` |
 | `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:115` |
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:115` |
@@ -1296,16 +1296,16 @@ value set in a store can never take effect.
 | `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:115` |
 | `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:115` |
 | `SmtpConnection` | dotnet | - | - | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:ClientId` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:ClientSecret` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:118` |
+| `SmtpConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:118` |
+| `SmtpConnection:ClientSecret` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:118` |
 | `SmtpConnection:EmailFrom` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:118` |
 | `SmtpConnection:Host` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:118` |
 | `SmtpConnection:Password` | dotnet | - | - | `DotNet/Notification/Program.cs:118` |
 | `SmtpConnection:Port` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:TenantId` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:118` |
+| `SmtpConnection:TenantId` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:118` |
 | `SmtpConnection:UseBasicAuth` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:118` |
 | `SmtpConnection:UseOAuth2` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:118` |
-| `SmtpConnection:Username` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:118` |
+| `SmtpConnection:Username` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:118` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
@@ -1333,7 +1333,7 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:57` |
 | `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
 | `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
 | `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
@@ -1349,7 +1349,7 @@ value set in a store can never take effect.
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
 | `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:114` |
 | `ConsumerSettings` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:75` |
-| `DataProtection:Enabled` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:68` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:68` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -1364,12 +1364,12 @@ value set in a store can never take effect.
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
 | `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
 | `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:54` |
-| `KafkaConnection:Mechanism` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
-| `KafkaConnection:Protocol` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
 | `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:54` |
-| `KafkaConnection:SaslPassword` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
-| `KafkaConnection:SaslUsername` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
 | `LinkTokenService` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:58` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:58` |
 | `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:58` |
@@ -1378,7 +1378,7 @@ value set in a store can never take effect.
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:58` |
 | `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:58` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -1398,7 +1398,7 @@ value set in a store can never take effect.
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:56` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, test | `DotNet/QueryDispatch/Program.cs:56` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:56` |
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:56` |
@@ -1455,7 +1455,7 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | test | `DotNet/Report/Program.cs:95` |
+| `CORS` | dotnet | - | - | `DotNet/Report/Program.cs:95` |
 | `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:95` |
 | `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:95` |
 | `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:95` |
@@ -1474,7 +1474,7 @@ value set in a store can never take effect.
 | `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:94` |
 | `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:94` |
 | `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:94` |
-| `DataProtection:Enabled` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:171` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:171` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -1495,12 +1495,12 @@ value set in a store can never take effect.
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:92` |
 | `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:92` |
 | `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Report/Program.cs:92` |
-| `KafkaConnection:Mechanism` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:92` |
-| `KafkaConnection:Protocol` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:92` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:92` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:92` |
 | `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Report/Program.cs:92` |
-| `KafkaConnection:SaslPassword` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:92` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:92` |
-| `KafkaConnection:SaslUsername` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:92` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:92` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:92` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:92` |
 | `LinkTokenService` | dotnet | - | - | `DotNet/Report/Program.cs:96` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:96` |
 | `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:96` |
@@ -1514,7 +1514,7 @@ value set in a store can never take effect.
 | `PreQualification` | dotnet | - | - | `DotNet/Report/Program.cs:99` |
 | `PreQualification:WritePreQualOperationOutcome` | dotnet | yes | test | `DotNet/Report/Program.cs:99` |
 | `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Report/Program.cs:88` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -1534,7 +1534,7 @@ value set in a store can never take effect.
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/Report/Program.cs:91` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:91` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, test | `DotNet/Report/Program.cs:91` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:91` |
 | `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:91` |
 | `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:91` |
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:91` |
@@ -1590,7 +1590,7 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | test | `DotNet/Submission/Program.cs:78` |
+| `CORS` | dotnet | - | - | `DotNet/Submission/Program.cs:78` |
 | `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:78` |
 | `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:78` |
 | `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:78` |
@@ -1609,7 +1609,7 @@ value set in a store can never take effect.
 | `ConsumerSettings:ConsumerRetryDuration:0` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:77` |
 | `ConsumerSettings:DisableConsumer` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:77` |
 | `ConsumerSettings:DisableRetryConsumer` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:77` |
-| `DataProtection:Enabled` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:94` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:94` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -1638,12 +1638,12 @@ value set in a store can never take effect.
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:75` |
 | `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:75` |
 | `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:Mechanism` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:Protocol` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:75` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:75` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:75` |
 | `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:SaslPassword` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:75` |
-| `KafkaConnection:SaslUsername` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:75` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:75` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:75` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:75` |
 | `LinkTokenService` | dotnet | - | - | `DotNet/Submission/Program.cs:79` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:79` |
 | `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:79` |
@@ -1652,7 +1652,7 @@ value set in a store can never take effect.
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:79` |
 | `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:79` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -1672,7 +1672,7 @@ value set in a store can never take effect.
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/Submission/Program.cs:74` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:74` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, test | `DotNet/Submission/Program.cs:74` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:74` |
 | `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:74` |
 | `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:74` |
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:74` |
@@ -1734,7 +1734,7 @@ value set in a store can never take effect.
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | test | `DotNet/Tenant/Program.cs:91` |
+| `CORS` | dotnet | - | - | `DotNet/Tenant/Program.cs:91` |
 | `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
 | `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
 | `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
@@ -1749,7 +1749,7 @@ value set in a store can never take effect.
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
 | `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:109` |
-| `DataProtection:Enabled` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:71` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:71` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Tenant/Program.cs:104` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -1766,12 +1766,12 @@ value set in a store can never take effect.
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
 | `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
 | `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:Mechanism` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:Protocol` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
 | `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:SaslPassword` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:SaslUsername` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
 | `LinkTokenService` | dotnet | - | - | `DotNet/Tenant/Program.cs:92` |
 | `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
 | `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
@@ -1782,7 +1782,7 @@ value set in a store can never take effect.
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
 | `MeasureConfig` | dotnet | - | - | `DotNet/Tenant/Program.cs:87` |
 | `MeasureConfig:CheckIfMeasureExists` | dotnet | - | - | `DotNet/Tenant/Program.cs:87` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -1802,7 +1802,7 @@ value set in a store can never take effect.
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceRegistry` | dotnet | - | - | `DotNet/Tenant/Program.cs:88` |
 | `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, test | `DotNet/Tenant/Program.cs:88` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
 | `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
 | `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
 | `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
@@ -1860,7 +1860,7 @@ value set in a store can never take effect.
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
-| `DataProtection:Enabled` | dotnet | - | dev, qa, test | `DotNet/Terminology/Program.cs:47` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Terminology/Program.cs:47` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -1873,7 +1873,7 @@ value set in a store can never take effect.
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Terminology/Program.cs:48` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
 | `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Terminology/Program.cs:59` |
-| `Redis:Password` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:120` |
+| `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
 | `ResourceCache:BlobStorage:BlobRoot` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -1915,18 +1915,18 @@ value set in a store can never take effect.
 | `authentication.admin-email` | java | - | - | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java:7` |
 | `authentication.anonymous` | java | - | - | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java:7` |
 | `authentication.authority` | java | yes | - | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java:7` |
-| `authentication.signing-key` | java | - | dev, qa, test | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java:7` |
+| `authentication.signing-key` | java | yes | dev, qa, test | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/AuthenticationConfig.java:7` |
 | `cache.type` | java | - | - | `Java/validation/src/main/java/com/lantanagroup/link/validation/configs/CacheConfig.java:9` |
 | `cache.validate-code.ttl` | java | - | - | `Java/validation/src/main/java/com/lantanagroup/link/validation/configs/CacheConfig.java:9` |
 | `internal-blob-storage.blob-container-name` | java | - | dev, qa, test | `Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/BlobStorageConfig.java:21` |
-| `internal-blob-storage.connection-string` | java | - | dev, qa, test | `Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/BlobStorageConfig.java:21` |
+| `internal-blob-storage.connection-string` | java | yes | dev, qa, test | `Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/BlobStorageConfig.java:21` |
 | `link.fhir-client-retry.backoff-millis` | java | - | - | `Java/validation/src/main/java/com/lantanagroup/link/validation/configs/FhirConfig.java:36` |
 | `link.fhir-client-retry.max-attempts` | java | - | - | `Java/validation/src/main/java/com/lantanagroup/link/validation/configs/FhirConfig.java:35` |
 | `link.fhir-terminology-service-url` | java | - | - | `Java/validation/src/main/java/com/lantanagroup/link/validation/configs/LinkConfig.java:16` |
 | `link.info-route` | java | - | - | `Java/shared/src/main/java/com/lantanagroup/link/shared/BaseSpringConfig.java:23` |
 | `link.report.base-url` | java | yes | dev, qa, test | `Java/measureeval/src/main/java/com/lantanagroup/link/measureeval/configs/LinkConfig.java:42` |
-| `link.terminology-service-url` | java | yes | dev, test | `Java/validation/src/main/java/com/lantanagroup/link/validation/configs/LinkConfig.java:16` |
-| `loki.app` | java | - | dev, qa, test | `Java/validation/src/main/resources/logback-spring.xml:3` |
+| `link.terminology-service-url` | java | yes | dev, qa, test | `Java/validation/src/main/java/com/lantanagroup/link/validation/configs/LinkConfig.java:16` |
+| `loki.app` | java | yes | dev, qa, test | `Java/validation/src/main/resources/logback-spring.xml:3` |
 | `loki.enabled` | java | - | dev, qa, test | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/LokiConfig.java:9` |
 | `loki.url` | java | - | dev, qa, test | `Java/shared/src/main/java/com/lantanagroup/link/shared/config/LokiConfig.java:9` |
 | `management.health.redis.timeout-ms` | java | - | - | `Java/validation/src/main/java/com/lantanagroup/link/validation/health/RedisHealthIndicator.java:56` |
