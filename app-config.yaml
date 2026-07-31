@@ -55,6 +55,14 @@ global:
   - key: "KafkaConnection:BootstrapServers"
     description: "Comma-separated list of Kafka bootstrap servers for event messaging."
     required: true
+  - key: "KafkaConnection:SaslUsername"
+    description: "The SASL username for authenticating to Kafka. Read by every .NET service through the shared Kafka wiring."
+    required: true
+    sensitive: true
+  - key: "KafkaConnection:SaslPassword"
+    description: "The SASL password for authenticating to Kafka. Read by every .NET service through the shared Kafka wiring."
+    required: true
+    sensitive: true
   - key: "DatabaseProvider"
     description: "The database provider to use. SqlServer is the only value the code handles; the key exists for a future provider swap."
     required: false
@@ -62,6 +70,8 @@ global:
   - key: "ConnectionStrings:DatabaseConnection"
     description: "The connection string for the primary service database."
     required: true
+    sensitive: true
+
   # Automation.UI inbound-auth coordination note:
   # In Automation.UI Program.cs, the anonymous-access short-circuit middleware runs
   # before UseAuthentication(). When Authentication:EnableAnonymousAccess is false,
@@ -90,9 +100,15 @@ global:
   - key: "LinkTokenService:SigningKey"
     description: "The secret key used for signing internal tokens. Must be kept secure."
     required: true
+    sensitive: true
+  - key: "Logging:HmacKey"
+    description: "The HMAC key used to pseudonymise identifiers before they reach the logs. Read by Account, Admin BFF, Audit and Notification."
+    required: true
+    sensitive: true
   - key: "Telemetry:EnableTelemetry"
     description: "Boolean flag to enable or disable OpenTelemetry tracing and metrics."
     required: true
+    
   # Serilog's WriteTo is an array, so sinks are addressed positionally, not by name. Index 1
   # is GrafanaLoki because every appsettings.json orders the array [GrafanaLoki, Console] and
   # the stores overlay WriteTo:0:Name=Console / WriteTo:1:Name=GrafanaLoki, which .NET merges
@@ -107,12 +123,32 @@ global:
     required: false
     runtime: "java"
     defaultValue: "link-cloud"
+  - key: "authentication.signing-key"
+    description: "Java-side signing key for internal Link tokens, the counterpart to LinkTokenService:SigningKey. Read by MeasureEval and Validation."
+    required: true
+    sensitive: true
+    runtime: "java"
+  - key: "internal-blob-storage.connection-string"
+    description: "Java-side connection string for the internal blob container, the counterpart to InternalBlobStorage:ConnectionString. Read by MeasureEval and Validation."
+    required: true
+    sensitive: true
+    runtime: "java"
+  - key: "spring.kafka.properties.sasl.jaas.config"
+    description: "The JAAS login module configuration Spring Kafka uses to authenticate to Kafka. Bound by Spring Boot auto-configuration, not by any Link class, and commented out in application.yml so the store is its only source."
+    required: true
+    sensitive: true
+    runtime: "java"
   - key: "ConnectionStrings:Redis"
     description: "The Redis endpoint (host:port). The password is supplied separately via Redis:Password. Required when Cache:Type is Redis; the resource cache uses ResourceCache:Redis:ConnectionString instead."
     required: true
+  - key: "Redis:Password"
+    description: "The password for the Redis instance addressed by ConnectionStrings:Redis. Supplied separately because that key holds only host:port."
+    required: true
+    sensitive: true
   - key: "InternalBlobStorage:ConnectionString"
     description: "The connection string for the internal Azure Blob Storage (or Azurite)."
     required: true
+    sensitive: true
   - key: "InternalBlobStorage:BlobContainerName"
     description: "The name of the blob container used for internal storage."
     required: true
@@ -210,6 +246,7 @@ services:
     - key: "Authentication:Schemas:Oauth2:ClientSecret"
       description: "The OAuth2 client secret for the Admin BFF."
       required: true
+      sensitive: true
     - key: "Authentication:Schemas:Oauth2:Endpoints:Authorization"
       description: "The OAuth2 authorization endpoint URL."
       required: true
@@ -225,6 +262,18 @@ services:
     - key: "MonitorBackendHealthChecks"
       description: "Boolean flag to enable monitoring of backend service health."
       required: true
+    - key: "Authentication:Schemas:OpenIdConnect:Authority"
+      description: "The OpenID Connect authority the Admin BFF authenticates against. Stored as a Key Vault reference even though it is a URL, so it is flagged sensitive to match the store."
+      required: true
+      sensitive: true
+    - key: "Authentication:Schemas:OpenIdConnect:ClientId"
+      description: "The OpenID Connect client ID for the Admin BFF."
+      required: true
+      sensitive: true
+    - key: "Authentication:Schemas:OpenIdConnect:ClientSecret"
+      description: "The OpenID Connect client secret for the Admin BFF."
+      required: true
+      sensitive: true
   Audit:
     - key: "KafkaConnection:ClientId"
       description: "The client ID for the Kafka connection."
@@ -239,12 +288,17 @@ services:
     - key: "MongoDB:ConnectionString"
       description: "The MongoDB connection string for automation data."
       required: true
+      sensitive: true
     - key: "MongoDB:DatabaseName"
       description: "The MongoDB database name for automation data."
       required: true
     - key: "ApiHealth:EnableAdminBffAuthSuite"
       description: "Boolean flag to enable the Admin BFF authentication API Health suite in Automation.UI."
       required: false
+    - key: "Automation:SlackWebhookUrl"
+      description: "The Slack webhook the Automation.UI test pipeline posts consolidated results to. Consumed by Tests/AutomationUI.Pipeline/azure-pipelines.yml at runtime, not by any service, which is why it does not appear in the code-derived inventory."
+      required: true
+      sensitive: true
   DataAcquisition:
     - key: "AcquisitionJobSettings:CronSchedule"
       description: "The cron expression defining how often data acquisition jobs should run."
@@ -266,6 +320,7 @@ services:
     - key: "ResourceCache:Redis:Password"
       description: "Optional Redis password for the resource cache. Defaults to empty."
       required: false
+      sensitive: true
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -279,6 +334,7 @@ services:
     - key: "ResourceCache:BlobStorage:ConnectionString"
       description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
       required: true
+      sensitive: true
     - key: "ResourceCache:BlobStorage:BlobContainerName"
       description: "Optional blob container name used by the resource cache. Defaults to empty."
       required: false
@@ -305,6 +361,7 @@ services:
     - key: "ResourceCache:Redis:Password"
       description: "Optional Redis password for the resource cache. Defaults to empty."
       required: false
+      sensitive: true
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -314,6 +371,7 @@ services:
     - key: "ResourceCache:BlobStorage:ConnectionString"
       description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
       required: true
+      sensitive: true
     - key: "ResourceCache:BlobStorage:BlobContainerName"
       description: "Optional blob container name used by the resource cache. Defaults to empty."
       required: false
@@ -327,6 +385,7 @@ services:
     - key: "spring.data.mongodb.uri"
       description: "The MongoDB connection string."
       required: true
+      sensitive: true
     - key: "spring.kafka.bootstrap-servers"
       description: "Kafka bootstrap servers for the measure evaluation service."
       required: true
@@ -344,6 +403,7 @@ services:
     - key: "resource-cache.blob-storage.connection-string"
       description: "Azure Blob Storage (or Azurite) connection string for the ABS resource cache. Required only when the ABS resource-cache backend is used instead of Redis; leave empty to disable ABS caching."
       required: false
+      sensitive: true
     - key: "resource-cache.blob-storage.blob-container-name"
       description: "Name of the blob container backing the ABS resource cache. Required only when the ABS resource-cache backend is used."
       required: false
@@ -360,6 +420,7 @@ services:
     - key: "ResourceCache:Redis:Password"
       description: "Optional Redis password for the resource cache. Defaults to empty."
       required: false
+      sensitive: true
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -369,6 +430,7 @@ services:
     - key: "ResourceCache:BlobStorage:ConnectionString"
       description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
       required: true
+      sensitive: true
     - key: "ResourceCache:BlobStorage:BlobContainerName"
       description: "Optional blob container name used by the resource cache. Defaults to empty."
       required: false
@@ -382,6 +444,22 @@ services:
     - key: "SmtpConnection:Port"
       description: "The SMTP server port."
       required: true
+    - key: "SmtpConnection:Username"
+      description: "The SMTP account username used to send notifications."
+      required: true
+      sensitive: true
+    - key: "SmtpConnection:ClientId"
+      description: "The Entra application (client) ID used for SMTP OAuth authentication."
+      required: true
+      sensitive: true
+    - key: "SmtpConnection:ClientSecret"
+      description: "The Entra application client secret used for SMTP OAuth authentication."
+      required: true
+      sensitive: true
+    - key: "SmtpConnection:TenantId"
+      description: "The Entra tenant ID used for SMTP OAuth authentication."
+      required: true
+      sensitive: true
   # No service-specific required config: this service reads only global keys. An explicit
   # empty list keeps it paired with its serviceMeta entry.
   QueryDispatch: []
@@ -403,12 +481,14 @@ services:
     - key: "InternalBlobStorage:ConnectionString"
       description: "The connection string for the internal Azure Blob Storage (where submissions are stored)."
       required: true
+      sensitive: true
     - key: "InternalBlobStorage:BlobContainerName"
       description: "The name of the blob container used for internal storage."
       required: true
     - key: "ExternalBlobStorage:ConnectionString"
       description: "The connection string for the external Azure Blob Storage (where submissions are stored)."
       required: true
+      sensitive: true
     - key: "ExternalBlobStorage:BlobContainerName"
       description: "The name of the blob container used for external storage."
       required: true
@@ -441,21 +521,25 @@ services:
     - key: "spring.datasource.username"
       description: "The database username."
       required: true
+      sensitive: true
     - key: "spring.datasource.password"
       description: "The database password."
       required: true
+      sensitive: true
     - key: "spring.kafka.bootstrap-servers"
       description: "Kafka bootstrap servers for the validation service."
       required: true
     - key: "spring.data.redis.host"
       description: "The Redis host for the validation service."
       required: true
+      sensitive: true
     - key: "spring.data.redis.port"
       description: "The Redis port for the validation service."
       required: true
     - key: "spring.data.redis.password"
       description: "The Redis password."
       required: true
+      sensitive: true
     - key: "authentication.authority"
       description: "The OIDC authority URL for token validation."
       required: true

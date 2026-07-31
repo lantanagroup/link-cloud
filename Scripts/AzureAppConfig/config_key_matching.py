@@ -47,6 +47,18 @@ def slash_to_dotted(key: str) -> str:
     return key.lstrip("/").replace("/", ".")
 
 
+KEY_VAULT_REF_CONTENT_TYPE = "application/vnd.microsoft.appconfig.keyvaultref+json"
+
+
+def is_key_vault_ref(content_type: str) -> bool:
+    """Whether a row's value is a Key Vault reference rather than a literal.
+
+    The store resolving a reference is the environment's own statement that the value is a
+    secret, which is what `sensitive: true` in the catalog is meant to record.
+    """
+    return KEY_VAULT_REF_CONTENT_TYPE in (content_type or "")
+
+
 def is_json_blob(content_type: str) -> bool:
     lowered = (content_type or "").lower()
     if any(marker in lowered for marker in EXCLUDED_CONTENT_TYPES):

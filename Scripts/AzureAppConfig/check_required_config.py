@@ -27,6 +27,15 @@ Checks:
   ERROR  A store row carries a label no service selects. Labels are compiled into the services,
          so a label absent from serviceMeta is dead weight that looks live.
 
+  ERROR  A key served from Key Vault is not marked `sensitive: true`, or an entry marked
+         sensitive is held as a literal in every store. The store resolving a Key Vault
+         reference is the environment declaring the value a secret, so the two can be held
+         in step. The second direction is the one that matters: a credential written as a
+         literal lands in a file committed to a public repository.
+
+  WARN   A key served from Key Vault has no catalog entry at all. A value in Key Vault is
+         per-environment with no safe default, which is exactly the catalog's admission rule.
+
   WARN   The Serilog sink index the catalog names disagrees with what a store or an
          appsettings.json declares. Serilog addresses sinks positionally, so reordering the
          WriteTo array in a service silently repoints Serilog:WriteTo:<n>:Args:uri.
@@ -115,6 +124,71 @@ def check_labels(catalog: Dict[str, Any],
     return findings
 
 
+def _row_forms(key: str) -> Set[str]:
+    """The shapes a store key can be recognised as, for set comparison against the catalog."""
+    return {key, matching.slash_to_dotted(key), matching.normalize_indices(key)}
+
+
+def check_sensitive_flags(catalog: Dict[str, Any],
+                          stores: Dict[str, List[Dict[str, Any]]]) -> List[Finding]:
+    """Keep `sensitive: true` in step with what the stores actually do.
+
+    A row served as a Key Vault reference is the environment declaring the value a secret.
+    That is a fact in the data rather than a judgement call, so the catalog can be held to it:
+    if a store resolves a key from Key Vault, the catalog entry for that key must say so.
+
+    The reverse direction matters more. An entry marked sensitive whose stores hold a literal
+    is a credential sitting in a file committed to a public repository - the case
+    validate_aac_secrets.py exists for, caught here from the other side.
+    """
+    findings: List[Finding] = []
+    kv_forms: Set[str] = set()
+    plain_forms: Set[str] = set()
+    kv_rows: Dict[str, Set[str]] = {}
+
+    for env, items in stores.items():
+        for item in items:
+            key = item.get("key") or ""
+            if not key or key.startswith(".appconfig"):
+                continue
+            if matching.is_key_vault_ref(item.get("content_type") or ""):
+                kv_forms |= _row_forms(key)
+                kv_rows.setdefault(key, set()).add(env)
+            else:
+                plain_forms |= _row_forms(key)
+
+    catalogued: Set[str] = set()
+    for section, entry, runtime, _ in matching.catalog_entries(catalog):
+        forms = set(matching.candidate_forms(entry["key"], runtime))
+        forms |= {matching.normalize_indices(form) for form in forms}
+        catalogued |= forms
+        key_vault_backed = bool(forms & kv_forms)
+
+        if key_vault_backed and not entry.get("sensitive"):
+            findings.append(Finding(
+                ERROR, f"{section} -> {entry['key']}",
+                "Stored as a Key Vault reference but the catalog does not mark it "
+                "sensitive: true. The store treats this value as a secret; the catalog "
+                "should say the same."))
+        elif entry.get("sensitive") and not key_vault_backed and (forms & plain_forms):
+            findings.append(Finding(
+                ERROR, f"{section} -> {entry['key']}",
+                "Marked sensitive: true but every store holds a literal value rather than a "
+                "Key Vault reference. A credential in these files is committed to a public "
+                "repository - move it to Key Vault and rotate it, or drop the flag if the "
+                "value is not actually a secret."))
+
+    for key, envs in sorted(kv_rows.items()):
+        if not (_row_forms(key) & catalogued):
+            findings.append(Finding(
+                WARN, f"store -> {key}",
+                f"Served from Key Vault in {', '.join(sorted(envs))} but absent from the "
+                f"catalog. A value held in Key Vault is per-environment and has no safe "
+                f"default, which is the catalog's admission rule - add it, or record why "
+                f"it is deliberately left out."))
+    return findings
+
+
 def check_serilog_sink_order(catalog: Dict[str, Any],
                              stores: Dict[str, List[Dict[str, Any]]]) -> List[Finding]:
     """Guard the positional assumption the catalog's Serilog keys depend on.
@@ -192,6 +266,7 @@ def main() -> int:
 
     findings = check_required_keys(catalog, indexes)
     findings.extend(check_labels(catalog, stores))
+    findings.extend(check_sensitive_flags(catalog, stores))
     findings.extend(check_serilog_sink_order(catalog, stores))
 
     required = sum(1 for _, entry, _, _ in matching.catalog_entries(catalog)

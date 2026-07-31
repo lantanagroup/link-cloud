@@ -231,5 +231,73 @@ class RequiredKeyCheck(unittest.TestCase):
         self.assertNotIn("dev,", findings[0].message)
 
 
+KV = matching.KEY_VAULT_REF_CONTENT_TYPE + ";charset=utf-8"
+
+
+def secret(key, label=None):
+    """A row served as a Key Vault reference, as the exports record one."""
+    return item(key, value='{"uri":"https://v.vault.azure.net/secrets/s"}',
+                label=label, content_type=KV)
+
+
+class SensitiveFlagTests(unittest.TestCase):
+    """Both directions again: the catalog must not claim more, or less, than the stores do."""
+
+    @staticmethod
+    def catalog(entry):
+        return {"serviceMeta": {}, "services": {}, "global": [entry]}
+
+    def test_key_vault_backed_key_must_be_marked_sensitive(self):
+        cat = self.catalog({"key": "A:Secret", "description": "d", "required": True})
+        findings = checker.check_sensitive_flags(cat, {"dev": [secret("A:Secret")]})
+        self.assertEqual(1, len(findings))
+        self.assertEqual("ERROR", findings[0].severity)
+
+    def test_marked_sensitive_and_key_vault_backed_is_clean(self):
+        cat = self.catalog({"key": "A:Secret", "description": "d", "required": True,
+                            "sensitive": True})
+        self.assertEqual([], checker.check_sensitive_flags(cat, {"dev": [secret("A:Secret")]}))
+
+    def test_sensitive_entry_stored_as_a_literal_is_an_error(self):
+        cat = self.catalog({"key": "A:Secret", "description": "d", "required": True,
+                            "sensitive": True})
+        findings = checker.check_sensitive_flags(cat, {"dev": [item("A:Secret", "hunter2")]})
+        self.assertEqual(1, len(findings))
+        self.assertEqual("ERROR", findings[0].severity)
+        self.assertIn("public repository", findings[0].message)
+
+    def test_one_key_vault_environment_is_enough(self):
+        """Mixed backing is not flagged: the key is a secret somewhere, so the flag is right."""
+        cat = self.catalog({"key": "A:Secret", "description": "d", "required": True,
+                            "sensitive": True})
+        stores = {"dev": [secret("A:Secret")], "qa": [item("A:Secret", "local-dev-value")]}
+        self.assertEqual([], checker.check_sensitive_flags(cat, stores))
+
+    def test_uncatalogued_key_vault_row_warns_rather_than_fails(self):
+        cat = self.catalog({"key": "Other:Key", "description": "d", "required": False})
+        findings = checker.check_sensitive_flags(cat, {"dev": [secret("Rogue:Secret")]})
+        self.assertEqual(1, len(findings))
+        self.assertEqual("WARN", findings[0].severity)
+        self.assertIn("Rogue:Secret", findings[0].where)
+
+    def test_java_slash_notation_matches_the_dotted_catalog_entry(self):
+        cat = self.catalog({"key": "spring.datasource.password", "description": "d",
+                            "required": True, "sensitive": True, "runtime": "java"})
+        stores = {"dev": [secret("/spring/datasource/password")]}
+        self.assertEqual([], checker.check_sensitive_flags(cat, stores))
+
+    def test_java_slash_notation_is_still_held_to_the_flag(self):
+        cat = self.catalog({"key": "spring.datasource.password", "description": "d",
+                            "required": True, "runtime": "java"})
+        findings = checker.check_sensitive_flags(
+            cat, {"dev": [secret("/spring/datasource/password")]})
+        self.assertEqual(1, len(findings))
+        self.assertEqual("ERROR", findings[0].severity)
+
+    def test_plain_rows_alone_produce_nothing(self):
+        cat = self.catalog({"key": "A:Plain", "description": "d", "required": True})
+        self.assertEqual([], checker.check_sensitive_flags(cat, {"dev": [item("A:Plain")]}))
+
+
 if __name__ == "__main__":
     unittest.main()

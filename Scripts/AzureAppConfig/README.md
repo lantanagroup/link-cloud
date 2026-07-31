@@ -68,6 +68,24 @@ python Scripts/reconcile_config_catalog.py --bucket D # required but absent
 python -m unittest discover Scripts/tests             # tests for the matching rules
 ```
 
+### Sensitive keys and Key Vault
+
+`sensitive: true` in the catalog is tied to a fact in the stores rather than to judgement: a
+row whose `content_type` is the `keyvaultref` type is the environment declaring that value a
+secret. `check_required_config.py` holds the two in step in both directions.
+
+The direction that matters is the second one. An entry marked `sensitive: true` whose stores
+all hold a **literal** is a credential sitting in a file committed to a public repository -
+the same failure `validate_aac_secrets.py` scans for, caught from the catalog side. If it
+fires, rotate the value; deleting the line does not remove it from git history.
+
+A Key Vault backed key with no catalog entry warns rather than fails. A value held in Key
+Vault is per-environment with no safe default, which is exactly the catalog's admission rule,
+so the usual answer is to add it - but the catalog stays curated, so that is a human call.
+
+Mixed backing is deliberately not flagged: if any store resolves the key from Key Vault, the
+flag is correct, even where another environment holds a local development value.
+
 `check_required_config.py` also enforces two invariants on store labels: a label containing
 `:` is rejected, because the `<Service>:<Environment>` tier does not resolve
 (`ExternalConfigurationExtension.cs:64` concatenates the environment object rather than its
