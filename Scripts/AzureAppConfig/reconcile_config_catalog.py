@@ -192,12 +192,16 @@ def main() -> int:
     # ---- B: catalogued, read by nobody --------------------------------------------------
     if show("B"):
         dead = []
+        # The inventory shaped as a store index, so resolve() can apply its notation rules -
+        # Java slash form, array elements, {Placeholder} templates - to it. Every key is given
+        # the empty label because the inventory records what the code reads, which carries no
+        # label. Built once: it does not vary across entries.
+        inventory_index = {k: {""} for k in inventory}
         for section, entry, runtime, _ in entries:
             key = entry["key"]
             if key in inventory or key.startswith(FRAMEWORK_PREFIXES):
                 continue
-            index = {k: {""} for k in inventory}
-            if matching.resolve(key, runtime, index):
+            if matching.resolve(key, runtime, inventory_index):
                 continue
             dead.append((section, key, runtime))
         print(f"=== B. In the catalog, read by no code: {len(dead)} ===")
