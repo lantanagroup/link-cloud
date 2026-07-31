@@ -19,7 +19,8 @@ import com.lantanagroup.link.validation.repositories.RubricLifecycleEventReposit
 import com.lantanagroup.link.validation.repositories.RubricRepository;
 import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -39,8 +40,9 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class RubricRegistryService {
+
+    private static final Logger logger = LoggerFactory.getLogger(RubricRegistryService.class);
 
     private final RubricRepository rubricRepository;
     private final RubricVersionRepository rubricVersionRepository;
@@ -107,7 +109,7 @@ public class RubricRegistryService {
         }
         rubricCheckRepository.saveAll(checks);
         recordEvent(rubric.getRubricId(), payload.getSemver(), RubricLifecycleAction.REGISTERED, actor, checksum);
-        log.info("Registered rubric {} v{} with {} checks (status=DRAFT)",
+        logger.info("Registered rubric {} v{} with {} checks (status=DRAFT)",
                 rubric.getRubricId(), payload.getSemver(), checks.size());
         return version;
     }
@@ -124,6 +126,7 @@ public class RubricRegistryService {
         v.setPublishedBy(publishedBy);
         v = rubricVersionRepository.save(v);
         recordEvent(rubricId, semver, RubricLifecycleAction.PUBLISHED, publishedBy, v.getChecksum());
+        logger.info("Published rubric {} v{} by {}", rubricId, semver, publishedBy);
         return v;
     }
 
@@ -139,6 +142,7 @@ public class RubricRegistryService {
         v.setRetiredBy(retiredBy);
         v = rubricVersionRepository.save(v);
         recordEvent(rubricId, semver, RubricLifecycleAction.RETIRED, retiredBy, v.getChecksum());
+        logger.info("Retired rubric {} v{} by {}", rubricId, semver, retiredBy);
         return v;
     }
 
@@ -214,7 +218,7 @@ public class RubricRegistryService {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (Exception e) {
-            log.error("Failed to write JSON for {}", value.getClass().getSimpleName(), e);
+            logger.error("Failed to write JSON for {}", value.getClass().getSimpleName(), e);
             return null;
         }
     }
