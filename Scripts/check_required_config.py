@@ -203,15 +203,6 @@ def main() -> int:
         all_clear="OK: every required key is present in every store.",
         strict=args.strict)
 
-    print(f"\nSummary: {len(errors)} error(s), {len(warnings)} warning(s).")
-
-    if errors:
-        return 1
-    if warnings and args.strict:
-        print("\nFailing because --strict treats warnings as errors.")
-        return 1
-    return 0
-
 
 if __name__ == "__main__":
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

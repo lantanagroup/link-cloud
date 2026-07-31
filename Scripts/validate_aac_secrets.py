@@ -313,17 +313,6 @@ def main() -> int:
         epilogue=("A credential in a public repository must be rotated, not just "
                   "deleted -- git history is permanent."))
 
-    print(f"\nSummary: {len(errors)} error(s), {len(warnings)} warning(s).")
-
-    if errors:
-        print("\nA credential in a public repository must be rotated, not just "
-              "deleted -- git history is permanent.")
-        return 1
-    if warnings and args.strict:
-        print("\nFailing because --strict treats warnings as errors.")
-        return 1
-    return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
