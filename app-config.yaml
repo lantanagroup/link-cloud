@@ -55,22 +55,27 @@ global:
   - key: "KafkaConnection:BootstrapServers"
     description: "Comma-separated list of Kafka bootstrap servers for event messaging."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "KafkaConnection:SaslUsername"
     description: "The SASL username for authenticating to Kafka. Read by every .NET service through the shared Kafka wiring."
     required: true
     sensitive: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "KafkaConnection:SaslPassword"
     description: "The SASL password for authenticating to Kafka. Read by every .NET service through the shared Kafka wiring."
     required: true
     sensitive: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "DatabaseProvider"
     description: "The database provider to use. SqlServer is the only value the code handles; the key exists for a future provider swap."
     required: false
     defaultValue: "SqlServer"
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "ConnectionStrings:DatabaseConnection"
     description: "The connection string for the primary service database."
     required: true
     sensitive: true
+    consumers: ["Account", "Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
 
   # Automation.UI inbound-auth coordination note:
   # In Automation.UI Program.cs, the anonymous-access short-circuit middleware runs
@@ -82,37 +87,48 @@ global:
   - key: "Authentication:Schemas:LinkBearer:Authority"
     description: "The OIDC authority URL used for validating bearer tokens."
     required: true
+    consumers: ["Account", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "Authentication:EnableAnonymousAccess"
     description: "Controls whether Automation.UI serves non-health traffic. Must be true for requests to reach UseAuthentication()/ApiBearer policy evaluation."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "Authentication:ApiBearer:Enabled"
     description: "Boolean flag that enables inbound API bearer-token validation in Automation.UI for /api/runs endpoints."
     required: true
+    consumers: ["AutomationUI"]
   - key: "Authentication:ApiBearer:Authority"
     description: "OIDC authority URL for validating inbound Automation.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true."
     required: true
+    consumers: ["AutomationUI"]
   - key: "Authentication:ApiBearer:Audience"
     description: "Expected audience for inbound Automation.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true."
     required: true
+    consumers: ["AutomationUI"]
   - key: "LinkTokenService:Authority"
     description: "The authority URL used by the LinkTokenService for internal token generation and validation."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "LinkTokenService:SigningKey"
     description: "The secret key used for signing internal tokens. Must be kept secure."
     required: true
     sensitive: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "Logging:HmacKey"
     description: "The HMAC key used to pseudonymise identifiers before they reach the logs. Read by Account, Admin BFF, Audit and Notification."
     required: true
     sensitive: true
+    consumers: ["Account", "AdminBFF", "Audit", "Notification"]
   - key: "Telemetry:EnableTelemetry"
     description: "Boolean flag to enable or disable OpenTelemetry tracing and metrics."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
     
   # Serilog's WriteTo is an array, so sinks are addressed positionally, not by name. Index 1
   # is GrafanaLoki because every appsettings.json orders the array [GrafanaLoki, Console] and
   # the stores overlay WriteTo:0:Name=Console / WriteTo:1:Name=GrafanaLoki, which .NET merges
   # by index. Reordering that array in any service silently moves this setting.
+  # No consumers listed: Serilog reads its own configuration section, so there is no call site
+  # for the extractor to attribute and no service to name. Every .NET service ships Serilog.
   - key: "Serilog:WriteTo:1:Args:uri"
     description: "The endpoint URI for the Grafana Loki log aggregator."
     required: true
@@ -123,16 +139,21 @@ global:
     required: false
     runtime: "java"
     defaultValue: "link-cloud"
+    consumers: ["MeasureEval", "Validation"]
   - key: "authentication.signing-key"
     description: "Java-side signing key for internal Link tokens, the counterpart to LinkTokenService:SigningKey. Read by MeasureEval and Validation."
     required: true
     sensitive: true
     runtime: "java"
+    consumers: ["MeasureEval", "Validation"]
   - key: "internal-blob-storage.connection-string"
     description: "Java-side connection string for the internal blob container, the counterpart to InternalBlobStorage:ConnectionString. Read by MeasureEval and Validation."
     required: true
     sensitive: true
     runtime: "java"
+    consumers: ["MeasureEval", "Validation"]
+  # No consumers listed for the same reason as Serilog above: Spring Boot binds this itself,
+  # so no Link class reads it. Both Java services authenticate to Kafka with it.
   - key: "spring.kafka.properties.sasl.jaas.config"
     description: "The JAAS login module configuration Spring Kafka uses to authenticate to Kafka. Bound by Spring Boot auto-configuration, not by any Link class, and commented out in application.yml so the store is its only source."
     required: true
@@ -141,59 +162,77 @@ global:
   - key: "ConnectionStrings:Redis"
     description: "The Redis endpoint (host:port). The password is supplied separately via Redis:Password. Required when Cache:Type is Redis; the resource cache uses ResourceCache:Redis:ConnectionString instead."
     required: true
+    consumers: ["Account", "AdminBFF", "DataAcquisition", "DataAcquisitionWorker"]
   - key: "Redis:Password"
     description: "The password for the Redis instance addressed by ConnectionStrings:Redis. Supplied separately because that key holds only host:port."
     required: true
     sensitive: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "InternalBlobStorage:ConnectionString"
     description: "The connection string for the internal Azure Blob Storage (or Azurite)."
     required: true
     sensitive: true
+    consumers: ["Report", "Submission"]
   - key: "InternalBlobStorage:BlobContainerName"
     description: "The name of the blob container used for internal storage."
     required: true
+    consumers: ["Report", "Submission"]
   - key: "ServiceRegistry:TenantService:TenantServiceUrl"
     description: "The base URL for the Tenant Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:AccountServiceUrl"
     description: "The base URL for the Account Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:ReportServiceUrl"
     description: "The base URL for the Report Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:MeasureServiceUrl"
     description: "The base URL for the Measure Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:CensusServiceUrl"
     description: "The base URL for the Census Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:DataAcquisitionServiceUrl"
     description: "The base URL for the Data Acquisition Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:AdminBffServiceUrl"
     description: "The base URL for the Admin BFF service used by Automation.UI and LinkSdk Admin.BFF integration calls."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:NormalizationServiceUrl"
     description: "The base URL for the Normalization Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:ValidationServiceUrl"
     description: "The base URL for the Validation Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:SubmissionServiceUrl"
     description: "The base URL for the Submission Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:TerminologyServiceUrl"
     description: "The base URL for the Terminology Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:AuditServiceUrl"
     description: "The base URL for the Audit Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:QueryDispatchServiceUrl"
     description: "The base URL for the Query Dispatch Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:NotificationServiceUrl"
     description: "The base URL for the Notification Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   # Java-notation key under global, which has no owning service to infer a runtime from.
   # Without the marker it is looked up as a .NET key and its /link/report/base-url row is
   # never matched.
@@ -201,21 +240,27 @@ global:
     description: "The base URL for the Report Service (used by Java services)."
     required: true
     runtime: "java"
+    consumers: ["MeasureEval", "Validation"]
   - key: "SecretManagement:Manager"
     description: "The type of secret manager to use (e.g., AzureKeyVault)."
     required: true
+    consumers: ["Account", "AdminBFF", "DataAcquisition", "DataAcquisitionWorker"]
   - key: "SecretManagement:ManagerUri"
     description: "The URI for the secret manager."
     required: true
+    consumers: ["AdminBFF", "DataAcquisition", "DataAcquisitionWorker"]
   - key: "ConsumerSettings:ConsumerRetryDuration"
     description: "List of ISO 8601 durations defining the retry intervals for Kafka consumers."
     required: true
+    consumers: ["Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Report", "Submission"]
   - key: "ConsumerSettings:DisableRetryConsumer"
     description: "Boolean flag to disable the retry consumer for Kafka events."
     required: true
+    consumers: ["Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Report", "Submission"]
   - key: "ConsumerSettings:DisableConsumer"
     description: "Boolean flag to disable the Kafka consumer entirely for the service."
     required: true
+    consumers: ["Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Report", "Submission"]
   # PAIRED KEYS — one decision, one key per runtime, and they MUST be set to the same value.
   # Enabling only the Java side puts two OperationOutcomes in the patient NDJSON; enabling only the
   # .NET side puts none there. Neither failure is loud, so treat these as a single change.
@@ -229,10 +274,12 @@ global:
   - key: "PreQualification:WritePreQualOperationOutcome"
     description: "Boolean flag (default false), read by the .NET Report service. When true, Report skips its legacy 'Patient has failed Validation' OperationOutcome append to the patient NDJSON, because the Validation service is the sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as pre-qualification.write-pre-qual-operation-outcome."
     required: false
+    consumers: ["Report"]
   - key: "pre-qualification.write-pre-qual-operation-outcome"
     description: "Boolean flag (default false), read by the Java Validation service. When true, Validation writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is its sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as PreQualification:WritePreQualOperationOutcome."
     required: false
     runtime: "java"
+    consumers: ["Report", "Validation"]
 services:
   Account:
     - key: "UserManagement:EnableAutomaticUserActivation"
@@ -602,7 +649,7 @@ $defs:
         type: "array"
         items:
           type: "string"
-        description: "Services that read this key, derived from the code inventory. Documentation only - not used for resolution."
+        description: "Services that read this key. Populated on 'global' entries only - under 'services' the owning section already names the consumer. Values come from the link:consumers tag the exports carry, which apply_appconfig_tags.py derives from the code inventory. Documentation only; nothing resolves configuration from it. Absent where the key is bound by a framework rather than by Link code, so no call site exists to attribute."
     # A sensitive setting must never carry a defaultValue - secrets and Key Vault
     # references are supplied per environment, never seeded from this file.
     # The "required: sensitive" guard below is load-bearing: without it, an entry that
