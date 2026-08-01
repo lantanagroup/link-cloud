@@ -164,7 +164,7 @@ namespace UnitTests.Tenant
         public async Task SearchAsync_ByFacilityNameExact_ReturnsMatchingFacilities()
         {
             var facility = _sampleFacilities[0];
-            var model = new FacilitySearchModel { FacilityName = facility.FacilityName, FacilityNameContains = false };
+            var model = new FacilitySearchModel { FacilityName = facility.FacilityName, PartialMatch = false };
             var results = await _queries.SearchAsync(model);
 
             Assert.Single(results);
@@ -172,19 +172,94 @@ namespace UnitTests.Tenant
         }
 
         [Fact]
-        public async Task SearchAsync_ByFacilityNameContains_ReturnsMatchingFacilities()
+        public async Task SearchAsync_ByPartialFacilityName_ReturnsMatchingFacilities()
         {
-            var model = new FacilitySearchModel { FacilityName = "Facility One", FacilityNameContains = true };
+            var model = new FacilitySearchModel { FacilityName = "Facility One", PartialMatch = true };
             var results = await _queries.SearchAsync(model);
 
             Assert.Equal(2, results.Count); // "Facility One" and "Another Facility One"
         }
 
         [Fact]
+        public async Task SearchAsync_PartialMatch_MatchesOnFacilityId()
+        {
+            // The term is a fragment of the id only — no facility is named "FAC002".
+            var model = new FacilitySearchModel { FacilityName = "FAC002", PartialMatch = true };
+            var results = await _queries.SearchAsync(model);
+
+            Assert.Single(results);
+            Assert.Equal("FAC002", results[0].FacilityId);
+        }
+
+        [Fact]
+        public async Task SearchAsync_PartialMatch_MatchesFragmentOfFacilityId()
+        {
+            var model = new FacilitySearchModel { FacilityName = "FAC00", PartialMatch = true };
+            var results = await _queries.SearchAsync(model);
+
+            Assert.Equal(3, results.Count);
+        }
+
+        [Fact]
+        public async Task SearchAsync_PartialMatch_UnionsNameAndIdMatches()
+        {
+            // Seed a facility that carries the term in its id while its name does not, so the
+            // term matches two facilities by name and this one by id. Each test gets its own
+            // in-memory database, so this row is invisible to the other tests.
+            _context.Facilities.Add(new Facility
+            {
+                Id = Guid.NewGuid(),
+                FacilityId = "One-Site",
+                FacilityName = "Riverside",
+                TimeZone = "UTC",
+                ScheduledReports = new ScheduledReportModel
+                {
+                    Daily = Array.Empty<string>(),
+                    Weekly = Array.Empty<string>(),
+                    Monthly = Array.Empty<string>()
+                },
+                CreateDate = DateTime.UtcNow
+            });
+            await _context.SaveChangesAsync();
+
+            var model = new FacilitySearchModel { FacilityName = "One", PartialMatch = true };
+            var results = await _queries.SearchAsync(model);
+
+            Assert.Equal(3, results.Count);
+            Assert.Contains(results, f => f.FacilityId == "FAC001");   // by name, "Facility One"
+            Assert.Contains(results, f => f.FacilityId == "FAC003");   // by name, "Another Facility One"
+            Assert.Contains(results, f => f.FacilityId == "One-Site"); // by id only
+        }
+
+        [Fact]
+        public async Task SearchAsync_WithoutPartialMatch_DoesNotMatchFacilityId()
+        {
+            // Exact-name lookups must not start matching ids, or GetAsync's SingleOrDefault
+            // could suddenly see more than one row.
+            var model = new FacilitySearchModel { FacilityName = "FAC002" };
+            var results = await _queries.SearchAsync(model);
+
+            Assert.Empty(results);
+        }
+
+        [Fact]
+        public async Task PagedSearchAsync_PartialName_ReturnsMatches()
+        {
+            // Regression: the paged endpoint used exact name matching, so a partial term typed
+            // into the dashboard search box returned nothing while the autocomplete found it.
+            var searchModel = new FacilitySearchModel { FacilityName = "Facility", PartialMatch = true };
+
+            var result = await _queries.PagedSearchAsync(searchModel, pageSize: 10, pageNumber: 1);
+
+            Assert.Equal(3, result.Records.Count);
+            Assert.Equal(3, result.Metadata.TotalCount);
+        }
+
+        [Fact]
         public async Task SearchAsync_Combination_ReturnsMatchingFacilities()
         {
             var facility = _sampleFacilities[0];
-            var model = new FacilitySearchModel { FacilityId = facility.FacilityId, FacilityName = "Facility", FacilityNameContains = true };
+            var model = new FacilitySearchModel { FacilityId = facility.FacilityId, FacilityName = "Facility", PartialMatch = true };
             var results = await _queries.SearchAsync(model);
 
             Assert.Single(results);
@@ -214,7 +289,7 @@ namespace UnitTests.Tenant
         public async Task PagedSearchAsync_WithCriteria_ReturnsMatchingPagedFacilities()
         {
             var facility = _sampleFacilities[0];
-            var searchModel = new FacilitySearchModel { Id = facility.Id, FacilityId = "FAC001", FacilityName = "One", FacilityNameContains = true };
+            var searchModel = new FacilitySearchModel { Id = facility.Id, FacilityId = "FAC001", FacilityName = "One", PartialMatch = true };
             var pageSize = 1;
             var pageNumber = 1;
 

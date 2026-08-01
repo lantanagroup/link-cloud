@@ -76,8 +76,16 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
 
             if (!string.IsNullOrEmpty(model.FacilityName))
             {
-                if (model.FacilityNameContains == true)
-                    query = query.Where(f => f.FacilityName.Contains(model.FacilityName));
+                if (model.PartialMatch == true)
+                {
+                    // A free-text term matches either identifying field, so a partial name and a
+                    // partial id both find the facility. Null-guarded because both columns are
+                    // nullable in the database.
+                    var term = model.FacilityName;
+                    query = query.Where(f =>
+                        (f.FacilityName != null && f.FacilityName.Contains(term)) ||
+                        (f.FacilityId != null && f.FacilityId.Contains(term)));
+                }
                 else
                     query = query.Where(f => f.FacilityName == model.FacilityName);
             }
