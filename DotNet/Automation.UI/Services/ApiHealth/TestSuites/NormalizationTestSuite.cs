@@ -368,7 +368,10 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = "America/Chicago",
-            Vendor = Vendor.Epic,
+            Vendor = new VendorModel
+            {
+                Name = "Epic"
+            },
             ScheduledReports = new TenantScheduledReportConfig { Daily = [], Weekly = [], Monthly = [] }
         };
         await _facilityClient.CreateAsync(model, ct);

@@ -44,7 +44,7 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
         FacilityModel BuildFacility(
             string id,
             string? name = null,
-            Vendor? vendor = Vendor.Epic,
+            VendorModel? vendor = null,
             bool allowNullName = false) => new()
             {
                 FacilityId = id,
@@ -142,7 +142,7 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
                     FacilityId = facilityId,
                     FacilityName = facilityId + "-Updated",
                     TimeZone = "America/Chicago",
-                    Vendor = Vendor.Epic,
+                    Vendor = new VendorModel { Name = "Epic" },
                     ScheduledReports = new TenantScheduledReportConfig { Daily = [], Weekly = [], Monthly = [] }
                 };
                 return await _client.UpdateAsync(facilityId, updated, ct);
