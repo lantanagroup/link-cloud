@@ -21,6 +21,7 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
+import java.util.TimeZone;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -66,6 +67,75 @@ class FutureDateCustomCheckTest {
         assertThat(findings).hasSize(1);
         assertThat(findings.get(0).getCode()).isEqualTo("future-date");
         assertThat(findings.get(0).getSeverity()).isEqualTo(Severity.WARNING);
+    }
+
+    @Test
+    @DisplayName("a future date is flagged even when the JVM zone is east of UTC")
+    void futureDateFlaggedWithJvmZoneEastOfUtc() {
+        TimeZone original = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Etc/GMT-14"));
+            Patient patient = new Patient();
+            patient.setBirthDateElement(new DateType(LocalDate.now(ZoneOffset.UTC).plusDays(1).toString()));
+
+            List<RawFinding> findings = check.run(rubricCheck("Patient.birthDate"), context(patient));
+
+            assertThat(findings).hasSize(1);
+        } finally {
+            TimeZone.setDefault(original);
+        }
+    }
+
+    @Test
+    @DisplayName("malformed parameters JSON -> no findings")
+    void malformedParametersJson() {
+        RubricCheck malformed = RubricCheck.builder()
+                .checkLocalId("future-date-1")
+                .dimension(PiqiDimension.PLAUSIBILITY)
+                .parametersJson("{not json")
+                .build();
+
+        assertThat(check.run(malformed, context(new Patient()))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("missing 'path' parameter -> no findings")
+    void missingPathParameter() {
+        RubricCheck noPath = RubricCheck.builder()
+                .checkLocalId("future-date-1")
+                .dimension(PiqiDimension.PLAUSIBILITY)
+                .parametersJson("{}")
+                .build();
+
+        assertThat(check.run(noPath, context(new Patient()))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("invalid FHIRPath expression is skipped without throwing")
+    void invalidFhirPathIgnored() {
+        Patient patient = new Patient();
+        patient.setBirthDateElement(new DateType(LocalDate.now(ZoneOffset.UTC).plusDays(2).toString()));
+
+        assertThat(check.run(rubricCheck("!!!not a path!!!"), context(patient))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("bundle entries are scanned instead of the resource when present")
+    void bundleEntriesTakePrecedence() {
+        Patient future = new Patient();
+        future.setBirthDateElement(new DateType(LocalDate.now(ZoneOffset.UTC).plusDays(2).toString()));
+        Patient current = new Patient();
+        current.setBirthDateElement(new DateType(LocalDate.now(ZoneOffset.UTC).toString()));
+        Patient resourceAlsoFuture = new Patient();
+        resourceAlsoFuture.setBirthDateElement(new DateType(LocalDate.now(ZoneOffset.UTC).plusDays(2).toString()));
+
+        ExecutionContext context = ExecutionContext.builder()
+                .resource(resourceAlsoFuture)
+                .bundleEntries(List.of(future, current))
+                .build();
+
+        // one finding from the bundle entries; the resource is not scanned as well
+        assertThat(check.run(rubricCheck("Patient.birthDate"), context)).hasSize(1);
     }
 
     @Test
