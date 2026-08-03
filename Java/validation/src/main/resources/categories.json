@@ -4,7 +4,13 @@
     "title": "Incorrect Display Value for Code",
     "severity": "WARNING",
     "acceptable": true,
-    "guidance": "External: Code display values are not usually used, except for human readability. Incorrect display values are acceptable for reporting to NHSN",
+    "strategy": "SKIP",
+    "scope": {
+      "excludeActions": [
+        "InvalidDisplay"
+      ]
+    },
+    "guidance": "External: Code display values are not usually used, except for human readability. Incorrect display values are acceptable for reporting to NHSN. Phase 2 SKIP migration: HAPI's display-name check is suppressed globally via scope.excludeActions=['InvalidDisplay']. Every other coded-content check (ValueSet membership, code validity, terminology lookups) still runs — only the 'Wrong Display Name X' messages are silenced. The matcher below remains as a defensive fallback in case the advisor does not fire.",
     "matcher": {
       "field": "MESSAGE",
       "regex": "^Wrong Display Name '.*' for .* should be .*'.*' .*"
@@ -15,7 +21,25 @@
     "title": "Unknown Code System",
     "severity": "ERROR",
     "acceptable": true,
-    "guidance": "Internal: This is an unrecognized code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code')",
+    "strategy": "SKIP",
+    "scope": {
+      "codeSystems": [
+        "https?://fhir\\.cerner\\.com/.*",
+        "https?://open\\.epic\\.com/FHIR/StructureDefinition/.*",
+        "urn:oid:1\\.2\\.840\\.114350\\..*",
+        "urn:oid:1\\.2\\.246\\.537\\.6\\.96.*"
+      ]
+    },
+    "suppressMessageIds": [
+      "Terminology_TX_System_Unknown",
+      "Coding_has_no_system__cannot_validate",
+      "TERMINOLOGY_TX_SYSTEM_NO_CODE",
+      "UNKNOWN_CODESYSTEM",
+      "UNKNOWN_CODESYSTEM_VERSION",
+      "UNKNOWN_CODESYSTEM_VERSION_UNK",
+      "UNKNOWN_CODESYSTEM_VERSION_NONE"
+    ],
+    "guidance": "Internal: This is an unrecognized code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code'). Phase 1 SKIP migration covers four URL-specific matcher branches via scope.codeSystems (Cerner FHIR, Epic FHIR StructureDefinition, Epic OIDs urn:oid:1.2.840.114350.*, namespace urn:oid:1.2.246.537.6.96.*). Phase 4 SUPPRESS migration covers three of the four generic-shape branches via suppressMessageIds: Terminology_TX_System_Unknown ('Unknown Code System X'), Coding_has_no_system__cannot_validate + TERMINOLOGY_TX_SYSTEM_NO_CODE ('A code with no system, a system should be provided'), and the UNKNOWN_CODESYSTEM* family ('A definition for CodeSystem X could not be found' — the modern HAPI shape of the rule's '^CodeSystem is unknown and can't be validated' matcher branch). The eighth matcher branch ('The Coding provided (...) is not in the value set V3 Value SetActEncounterCode') still relies on the LABEL fallback — promoting it would require a suppressValueSets narrowing axis to target only V3 ValueSet ActEncounterCode binding violations rather than the broader Terminology_TX_NoValid_* family. After this migration the matcher below should rarely fire; it remains as a defensive fallback for the cold-start window before categories load and for the V3 ValueSet branch.",
     "matcher": {
       "children": [
         {
@@ -59,7 +83,14 @@
     "title": "Unresolved Code System",
     "severity": "ERROR",
     "acceptable": true,
-    "guidance": "Internal: This is an unrecognized code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code')",
+    "strategy": "SUPPRESS",
+    "suppressMessageIds": [
+      "Type_Specific_Checks_DT_URL_Resolve"
+    ],
+    "suppressPathPatterns": [
+      "\\.coding\\[[0-9]+\\]\\.system"
+    ],
+    "guidance": "Internal: This is an unrecognized code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code'). Phase 4 SUPPRESS migration: HAPI's Type_Specific_Checks_DT_URL_Resolve message ('No definition could be found for URL value X') is dropped via the policy advisor when the FHIR path narrows to a Coding.system element (\\.coding[N].system). Path narrowing keeps the suppression scoped to code-system URL contexts only — canonical URL resolution failures on profiles, ValueSets, etc. continue to validate normally. Note: the rule's matcher MESSAGE branch ('URL value X does not resolve') doesn't exactly match HAPI's modern template text ('No definition could be found for URL value X'); the team's intent ('we accept unresolved code system URLs') maps cleanly to Type_Specific_Checks_DT_URL_Resolve regardless. The matcher below remains as a defensive fallback for cold start.",
     "matcher": {
       "children": [
         {
@@ -110,7 +141,14 @@
     "title": "Unresolved Epic Code System URI",
     "severity": "INFORMATION",
     "acceptable": true,
-    "guidance": "Internal: This is an Epic-defined code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code')",
+    "strategy": "SKIP",
+    "scope": {
+      "codeSystems": [
+        "^urn:oid:1\\.2\\.840\\.114350.*$",
+        "^https?://.*epic\\.com/.*$"
+      ]
+    },
+    "guidance": "Internal: This is an Epic-defined code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code'). Phase 2 SKIP migration: terminology checks for Epic code system URLs (OID 1.2.840.114350.*, any *.epic.com URL) are short-circuited via the policy advisor (scope.codeSystems). The matcher branches below remain as a defensive fallback in case the advisor does not fire.",
     "matcher": {
       "children": [
         {
@@ -130,7 +168,13 @@
     "title": "Unresolved Medispan Code System URI",
     "severity": "INFORMATION",
     "acceptable": true,
-    "guidance": "Internal: This is a Medispan-defined code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code')",
+    "strategy": "SKIP",
+    "scope": {
+      "codeSystems": [
+        "^urn:oid:2\\.16\\.840\\.1\\.113883\\.6\\.68$"
+      ]
+    },
+    "guidance": "Internal: This is a Medispan-defined code system and is only a concern if there is not another coding that provides a standard recognized coding Code System (which is categorized as 'Missing Standard [X] Code'). Phase 2 SKIP migration: terminology checks for the Medispan Generic Product Identifier OID (urn:oid:2.16.840.1.113883.6.68 exact match) are short-circuited via the policy advisor (scope.codeSystems). The matcher below remains as a defensive fallback in case the advisor does not fire. Sub-OIDs (e.g., urn:oid:2.16.840.1.113883.6.68.X) are NOT covered by this rule and continue to validate normally.",
     "matcher": {
       "field": "MESSAGE",
       "regex": "^Code System URI 'urn:oid:2\\.16\\.840\\.1\\.113883\\.6\\.68' is unknown so the code cannot be validated"
@@ -341,7 +385,14 @@
     "title": "MedicationRequest.requester Does Not Have a Proper Reference",
     "severity": "WARNING",
     "acceptable": true,
-    "guidance": "External: No identity or reference for requester (Provider). Safe to ignore when ordering provider is not needed.",
+    "strategy": "SUPPRESS",
+    "suppressMessageIds": [
+      "Reference_REF_NoDisplay"
+    ],
+    "suppressPathPatterns": [
+      "ofType\\(MedicationRequest\\).*\\.requester"
+    ],
+    "guidance": "External: No identity or reference for requester (Provider). Safe to ignore when ordering provider is not needed. Phase 4 SUPPRESS migration: HAPI's Reference_REF_NoDisplay message ('A Reference without an actual reference or identifier should have a display') is dropped via the policy advisor — but only when the FHIR path narrows to MedicationRequest.requester (suppressPathPatterns). Without the path narrowing this rule would silence Reference no-display warnings on every Reference in every resource, which the team has not classified as acceptable. The matcher below remains as a defensive fallback in case the advisor does not fire (e.g., during cold-start before categories load).",
     "matcher": {
       "children": [
         {

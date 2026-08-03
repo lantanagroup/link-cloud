@@ -39,16 +39,19 @@ public class CategorizationService {
     private final CategoryRepository categoryRepository;
     private final CategoryRuleRepository categoryRuleRepository;
     private final ResultRepository resultRepository;
+    private final ValidationMetrics metrics;
 
     public CategorizationService(
             ObjectMapper objectMapper,
             CategoryRepository categoryRepository,
             CategoryRuleRepository categoryRuleRepository,
-            ResultRepository resultRepository) {
+            ResultRepository resultRepository,
+            ValidationMetrics metrics) {
         this.objectMapper = objectMapper;
         this.categoryRepository = categoryRepository;
         this.categoryRuleRepository = categoryRuleRepository;
         this.resultRepository = resultRepository;
+        this.metrics = metrics;
     }
 
     /**
@@ -108,6 +111,14 @@ public class CategorizationService {
                     .map(CategoryRule::getCategory)
                     .toList();
             result.setCategories(categories);
+            // Counter wiring for Phase 1 observability. Every LABEL match is recorded so we can
+            // see, per rule, how often it actually fires. Pairs with the SKIP/SUPPRESS counters in
+            // CategoryBackedPolicyAdvisor.
+            if (metrics != null) {
+                for (Category c : categories) {
+                    metrics.incrementRuleOutcome(c.getId(), ValidationMetrics.OUTCOME_LABELED);
+                }
+            }
         });
     }
 

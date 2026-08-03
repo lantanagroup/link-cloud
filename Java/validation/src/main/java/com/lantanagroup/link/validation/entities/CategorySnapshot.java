@@ -4,6 +4,8 @@ import com.lantanagroup.link.validation.matchers.Matcher;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 public class CategorySnapshot {
@@ -12,6 +14,26 @@ public class CategorySnapshot {
     private CategorySeverity severity;
     private boolean acceptable;
     private String guidance;
+    /**
+     * Optional in the source JSON. Absent or null → {@link CategoryStrategy#LABEL}.
+     */
+    private CategoryStrategy strategy = CategoryStrategy.LABEL;
+    /**
+     * Optional. Only meaningful for {@link CategoryStrategy#SKIP} rules.
+     */
+    private CategoryScope scope;
+    /**
+     * Optional. Stable HAPI message IDs to suppress via
+     * {@code CategoryBackedPolicyAdvisor.isSuppressMessageId(...)}. Independent of
+     * {@link #strategy} — a rule can declare both SKIP scope and SUPPRESS message IDs.
+     */
+    private List<String> suppressMessageIds;
+    /**
+     * Optional path-narrowing for {@link #suppressMessageIds}. Regex patterns matched against the
+     * {@code path} argument of {@code isSuppressMessageId(...)}. When null or empty, the rule fires
+     * on any path; when non-empty, the rule fires only when at least one pattern matches.
+     */
+    private List<String> suppressPathPatterns;
     private Matcher matcher;
 
     public CategorySnapshot() {
@@ -23,6 +45,10 @@ public class CategorySnapshot {
         severity = category.getSeverity();
         acceptable = category.isAcceptable();
         guidance = category.getGuidance();
+        strategy = category.getStrategy() != null ? category.getStrategy() : CategoryStrategy.LABEL;
+        scope = category.getScope();
+        suppressMessageIds = category.getSuppressMessageIds();
+        suppressPathPatterns = category.getSuppressPathPatterns();
         CategoryRule latestRule = category.getLatestRule();
         if (latestRule != null) {
             matcher = latestRule.getMatcher();
@@ -39,6 +65,10 @@ public class CategorySnapshot {
         category.setSeverity(severity);
         category.setAcceptable(acceptable);
         category.setGuidance(guidance);
+        category.setStrategy(strategy != null ? strategy : CategoryStrategy.LABEL);
+        category.setScope(scope);
+        category.setSuppressMessageIds(suppressMessageIds);
+        category.setSuppressPathPatterns(suppressPathPatterns);
         return category;
     }
 
