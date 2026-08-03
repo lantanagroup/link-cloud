@@ -746,13 +746,14 @@
         <div class="table-scroll" style="max-height:none;">
           <table>
             <thead>
-              <tr><th style="width:20%;">Field / Column</th><th style="width:13%;">Service</th><th style="width:9%;">Method</th><th style="width:20%;">URL</th><th style="width:20%;">Description</th><th style="width:7%;">Status</th><th style="width:7%;"></th></tr>
+              <tr><th style="width:22%;">Field / Column</th><th style="width:14%;">Service</th><th style="width:10%;">Method</th><th style="width:22%;">URL</th><th style="width:22%;">Description</th><th style="width:10%;">Status</th></tr>
             </thead>
             <tbody id="backendSupportAdminBody"></tbody>
           </table>
         </div>
         <div class="btn-row" style="margin-top:22px;">
           <button class="btn btn-secondary" id="backendSupportBackBtn">Back</button>
+          <button class="btn" id="backendSupportSaveAllBtn" disabled>Save All Changes</button>
         </div>
       </div>
     </section>
@@ -1124,7 +1125,7 @@
             <div class="form-group" id="censusAccuracyWrap" hidden style="margin-top:22px;">
               <div class="checkbox-row">
                 <input type="checkbox" id="censusAccuracyAckCheckbox">
-                <label for="censusAccuracyAckCheckbox" style="margin:0;">I acknowledge that the census results are accurate.</label>
+                <label for="censusAccuracyAckCheckbox" style="margin:0;">I acknowledge that the census results are accurate.<span class="backend-support-slot" data-support-key="censusAccuracyAckCheckbox"></span></label>
               </div>
               <div class="btn-row" style="margin-top:12px;">
                 <button class="btn" id="censusAccuracyContinueBtn" disabled>Continue</button>
@@ -1445,7 +1446,7 @@
         </div>
         <div class="form-group checkbox-row" id="reportResultsAckWrap" hidden style="margin-top:18px;">
           <input type="checkbox" id="reportResultsAckCheckbox">
-          <label for="reportResultsAckCheckbox" style="margin:0;">I acknowledge that the generated reports are accurate.</label>
+          <label for="reportResultsAckCheckbox" style="margin:0;">I acknowledge that the generated reports are accurate.<span class="backend-support-slot" data-support-key="reportResultsAckCheckbox"></span></label>
         </div>
         <div class="btn-row" style="margin-top:18px;">
           <button class="btn" id="reportResultsCompleteBtn" hidden disabled>Continue</button>
@@ -1458,9 +1459,12 @@
       <div class="card">
         <div class="card-header-row">
           <h1>Report Details</h1>
-          <button type="button" class="icon-btn" id="rdRerunBtn" aria-label="Regenerate report" title="Regenerate report">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
-          </button>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <button type="button" class="icon-btn" id="rdRerunBtn" aria-label="Regenerate report" title="Regenerate report">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+            </button>
+            <span class="backend-support-slot" data-support-key="rdRerunBtn"></span>
+          </div>
         </div>
         <ul class="summary-list" style="margin-bottom:22px;">
           <li><span>Report Id<span class="backend-support-slot" data-support-key="rdReportId"></span></span><span id="rdReportId"></span></li>
@@ -1522,7 +1526,7 @@
         </div>
         <div class="form-group checkbox-row" style="margin-top:18px;">
           <input type="checkbox" id="reportingPlanAckCheckbox">
-          <label for="reportingPlanAckCheckbox" style="margin:0;">I acknowledge that this reporting plan is accurate.</label>
+          <label for="reportingPlanAckCheckbox" style="margin:0;">I acknowledge that this reporting plan is accurate.<span class="backend-support-slot" data-support-key="reportingPlanAckCheckbox"></span></label>
         </div>
         <div class="btn-row" style="margin-top:18px;">
           <button class="btn btn-secondary" id="reportingPlanBackBtn">Back</button>
@@ -1544,6 +1548,20 @@
     </section>
 
   </main>
+</div>
+
+<div class="modal-overlay" id="unsavedChangesModal" hidden>
+  <div class="modal">
+    <h3>Unsaved Changes</h3>
+    <p>You have unsaved changes to the API Support Registry. What would you like to do before leaving this page?</p>
+    <div class="modal-actions" style="justify-content:flex-start; flex-wrap:wrap;">
+      <button type="button" class="btn" id="unsavedChangesSaveBtn">Save &amp; Continue</button>
+      <button type="button" class="btn btn-secondary" id="unsavedChangesDiscardBtn">Discard Changes</button>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary" id="unsavedChangesCancelBtn">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <div class="modal-overlay" id="patientDetailModal" hidden>
@@ -1892,6 +1910,7 @@
     { key: 'censusCRemoteDir', page: 'Census Configuration', label: 'Remote Directory' },
     { key: 'censusCRemove', page: 'Census Configuration', label: 'Remove Files After Processing' },
     { key: 'censusFreq', page: 'Census Configuration', label: 'Census Acquisition Frequency' },
+    { key: 'censusAccuracyAckCheckbox', page: 'Census Configuration', label: 'Census Results Accuracy Acknowledgment' },
 
     { key: 'locOrgMethod', page: 'Location Organization Resolution', label: 'Resolution Method' },
     { key: 'locTypeList', page: 'Location Organization Resolution', label: 'Location Type Code / Location Alias' },
@@ -1915,6 +1934,7 @@
     { key: 'reportResultsEndDate', page: 'Report Results', label: 'End Date (column)' },
     { key: 'reportResultsCreateDate', page: 'Report Results', label: 'Create Date (column)' },
     { key: 'reportResultsStatus', page: 'Report Results', label: 'Status (column)' },
+    { key: 'reportResultsAckCheckbox', page: 'Report Results', label: 'Generated Reports Accuracy Acknowledgment' },
 
     { key: 'rdReportId', page: 'Report Details', label: 'Report Id' },
     { key: 'rdPeriod', page: 'Report Details', label: 'Reporting Period' },
@@ -1928,10 +1948,12 @@
     { key: 'rdColLocationOrg', page: 'Report Details', label: 'Location Org (column)' },
     { key: 'rdColHsloc', page: 'Report Details', label: 'HSLOC Mapping (column)' },
     { key: 'rdColEncounter', page: 'Report Details', label: 'Encounter Mapping (column)' },
+    { key: 'rdRerunBtn', page: 'Report Details', label: 'Regenerate Report Button' },
 
     { key: 'reportingPlanMonth', page: 'Facility Reporting Plan', label: 'Report Month (column)' },
     { key: 'reportingPlanYear', page: 'Facility Reporting Plan', label: 'Report Year (column)' },
-    { key: 'reportingPlanMeasures', page: 'Facility Reporting Plan', label: 'NHSN Measures (column)' }
+    { key: 'reportingPlanMeasures', page: 'Facility Reporting Plan', label: 'NHSN Measures (column)' },
+    { key: 'reportingPlanAckCheckbox', page: 'Facility Reporting Plan', label: 'Reporting Plan Accuracy Acknowledgment' }
   ];
   var backendSupportData = {};
   var backendSupportLoaded = false;
@@ -2000,7 +2022,20 @@
   var BACKEND_SUPPORT_METHODS = ['', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
   var BACKEND_SUPPORT_SERVICES = ['', 'Tenant', 'Census', 'Data Acquisition', 'Data Acquisition Worker', 'Query Dispatch', 'Normalization', 'Measure Eval', 'Report', 'Validation', 'Terminology', 'Submission', 'Audit', 'Account'];
 
+  var backendSupportDirtyKeys = {};
+  var pendingNavAfterUnsavedCheck = null;
+
+  function backendSupportIsDirty() {
+    return Object.keys(backendSupportDirtyKeys).length > 0;
+  }
+
+  function updateBackendSupportSaveAllState() {
+    var btn = $('backendSupportSaveAllBtn');
+    if (btn) btn.disabled = !backendSupportIsDirty();
+  }
+
   function renderBackendSupportAdminPage() {
+    backendSupportDirtyKeys = {};
     var groups = {};
     var order = [];
     BACKEND_SUPPORT_REGISTRY.forEach(function (item) {
@@ -2009,7 +2044,7 @@
     });
     var html = '';
     order.forEach(function (page) {
-      html += '<tr class="bs-group-row"><td colspan="7">' + escapeHtml(page) + '</td></tr>';
+      html += '<tr class="bs-group-row"><td colspan="6">' + escapeHtml(page) + '</td></tr>';
       groups[page].forEach(function (item) {
         var entry = backendSupportData[item.key] || {};
         html += '<tr data-key="' + item.key + '">' +
@@ -2023,27 +2058,62 @@
           '<td><input type="text" class="bs-url" value="' + escapeHtml(entry.url || '') + '" placeholder="https://…"></td>' +
           '<td><input type="text" class="bs-desc" value="' + escapeHtml(entry.description || '') + '" placeholder="Description"></td>' +
           '<td class="bs-status">' + backendSupportIconHtml(item.key) + '</td>' +
-          '<td><button type="button" class="btn btn-secondary btn-sm bs-save">Save</button></td>' +
           '</tr>';
       });
     });
     $('backendSupportAdminBody').innerHTML = html;
+    updateBackendSupportSaveAllState();
   }
 
-  document.addEventListener('click', function (e) {
-    var btn = e.target.closest('.bs-save');
-    if (!btn) return;
-    var tr = btn.closest('tr');
-    var key = tr.getAttribute('data-key');
-    var service = tr.querySelector('.bs-service').value;
-    var method = tr.querySelector('.bs-method').value;
-    var url = tr.querySelector('.bs-url').value.trim();
-    var description = tr.querySelector('.bs-desc').value.trim();
-    saveBackendSupportEntry(key, service, method, url, description).then(function () {
-      tr.querySelector('.bs-status').innerHTML = backendSupportIconHtml(key);
-      showToast('Backend support entry saved.');
-    });
+  function markBackendSupportRowDirty(el) {
+    var tr = el.closest('tr[data-key]');
+    if (!tr) return;
+    backendSupportDirtyKeys[tr.getAttribute('data-key')] = true;
+    updateBackendSupportSaveAllState();
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target.closest && e.target.closest('#backendSupportAdminBody')) markBackendSupportRowDirty(e.target);
   });
+  document.addEventListener('change', function (e) {
+    if (e.target.closest && e.target.closest('#backendSupportAdminBody')) markBackendSupportRowDirty(e.target);
+  });
+
+  function saveAllBackendSupportChanges() {
+    var keys = Object.keys(backendSupportDirtyKeys);
+    if (!keys.length) return Promise.resolve();
+    var promises = keys.map(function (key) {
+      var tr = $('backendSupportAdminBody').querySelector('tr[data-key="' + key + '"]');
+      if (!tr) return Promise.resolve();
+      var service = tr.querySelector('.bs-service').value;
+      var method = tr.querySelector('.bs-method').value;
+      var url = tr.querySelector('.bs-url').value.trim();
+      var description = tr.querySelector('.bs-desc').value.trim();
+      return saveBackendSupportEntry(key, service, method, url, description);
+    });
+    return Promise.all(promises).then(function () {
+      backendSupportDirtyKeys = {};
+      updateBackendSupportSaveAllState();
+      showToast('API support changes saved.');
+    });
+  }
+
+  function resolvePendingUnsavedNav(action) {
+    var nav = pendingNavAfterUnsavedCheck;
+    $('unsavedChangesModal').hidden = true;
+    if (action === 'cancel') { pendingNavAfterUnsavedCheck = null; return; }
+    if (action === 'save') {
+      saveAllBackendSupportChanges().then(function () {
+        pendingNavAfterUnsavedCheck = null;
+        if (nav) goTo(nav.panelId, nav.stepId);
+      });
+      return;
+    }
+    if (action === 'discard') {
+      backendSupportDirtyKeys = {};
+      pendingNavAfterUnsavedCheck = null;
+      if (nav) goTo(nav.panelId, nav.stepId);
+    }
+  }
 
   // ---------- utilities ----------
   function $(id) { return document.getElementById(id); }
@@ -3031,6 +3101,11 @@
   }
 
   function goTo(panelId, stepId) {
+    if (panelId !== 'panel-backend-support' && !$('panel-backend-support').hidden && backendSupportIsDirty()) {
+      pendingNavAfterUnsavedCheck = { panelId: panelId, stepId: stepId };
+      $('unsavedChangesModal').hidden = false;
+      return;
+    }
     if (facility && panelId !== 'panel-census' && !$('panel-census').hidden) {
       facility.census.selectedListKey = null;
       facility.census.selectedSftpFile = null;
@@ -3130,6 +3205,14 @@
   $('backendSupportBackBtn').addEventListener('click', function () {
     goTo('panel-welcome', 'welcome');
   });
+
+  $('backendSupportSaveAllBtn').addEventListener('click', function () {
+    saveAllBackendSupportChanges();
+  });
+
+  $('unsavedChangesSaveBtn').addEventListener('click', function () { resolvePendingUnsavedNav('save'); });
+  $('unsavedChangesDiscardBtn').addEventListener('click', function () { resolvePendingUnsavedNav('discard'); });
+  $('unsavedChangesCancelBtn').addEventListener('click', function () { resolvePendingUnsavedNav('cancel'); });
 
   $('backendIconsToggle').addEventListener('change', function () {
     localStorage.setItem('nhsnlink-show-backend-icons', this.checked ? '1' : '0');
