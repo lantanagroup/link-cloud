@@ -7,6 +7,7 @@ import com.lantanagroup.link.validation.entities.RubricCheck;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import lombok.RequiredArgsConstructor;
 import org.hl7.fhir.instance.model.api.IBase;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -18,6 +19,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -55,13 +58,13 @@ public class FutureDateCustomCheck implements CustomCheck {
         try {
             params = objectMapper.readTree(check.getParametersJson());
         } catch (Exception e) {
-            logger.warn("future-date check {} has invalid parameters JSON", check.getCheckLocalId());
+            logger.warn("future-date check {} has invalid parameters JSON", LogUtils.sanitize(check.getCheckLocalId()));
             return List.of();
         }
 
         String path = params.path("path").asText(null);
         if (path == null || path.isBlank()) {
-            logger.warn("future-date check {} missing required 'path' parameter", check.getCheckLocalId());
+            logger.warn("future-date check {} missing required 'path' parameter", LogUtils.sanitize(check.getCheckLocalId()));
             return List.of();
         }
 
@@ -72,9 +75,10 @@ public class FutureDateCustomCheck implements CustomCheck {
                 ? check.getSeverityOverride()
                 : Severity.WARNING;
 
-        List<IBaseResource> targets = context.getBundleEntries().isEmpty()
-                ? List.of(context.getResource())
-                : context.getBundleEntries();
+        List<IBaseResource> bundleEntries = context.getBundleEntries();
+        List<IBaseResource> targets = !bundleEntries.isEmpty() ? bundleEntries
+                : context.getResource() != null ? List.of(context.getResource()) : List.of();
+        if (targets.isEmpty()) return List.of();
 
         Instant now = Instant.now();
         List<RawFinding> findings = new ArrayList<>();
@@ -84,14 +88,15 @@ public class FutureDateCustomCheck implements CustomCheck {
             try {
                 nodes = fhirPath.evaluate(resource, path, IBase.class);
             } catch (Exception e) {
-                logger.debug("future-date path '{}' did not evaluate on {}: {}", path, resource.fhirType(), e.getMessage());
+                logger.debug("future-date path '{}' did not evaluate on {}: {}",
+                        LogUtils.sanitize(path), resource.fhirType(), LogUtils.sanitize(e.getMessage()));
                 continue;
             }
 
             for (IBase node : nodes) {
                 Instant instant = toInstant(node);
                 if (instant == null) continue;
-                if (instant.isAfter(now)) {
+                if (isFuture(node, instant, now)) {
                     findings.add(RawFinding.builder()
                             .checkLocalId(check.getCheckLocalId())
                             .dimension(check.getDimension())
@@ -105,6 +110,15 @@ public class FutureDateCustomCheck implements CustomCheck {
             }
         }
         return findings;
+    }
+
+    // dates are day-precision with no zone, so compare calendar days in UTC rather than instants
+    private boolean isFuture(IBase node, Instant instant, Instant now) {
+        if (node instanceof DateType) {
+            LocalDate date = instant.atZone(ZoneOffset.UTC).toLocalDate();
+            return date.isAfter(now.atZone(ZoneOffset.UTC).toLocalDate());
+        }
+        return instant.isAfter(now);
     }
 
     private Instant toInstant(IBase node) {
