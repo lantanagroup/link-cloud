@@ -23,9 +23,15 @@ public class ExecutionContext {
     private UUID requestId;
     private String correlationId;
     private SubjectDto subject;
+    // optional; null when the payload only carries bundle entries
     private IBaseResource resource;
     @Builder.Default
     private List<IBaseResource> bundleEntries = Collections.emptyList();
+
+    // @Builder.Default doesn't cover the no-args constructor or setters, so guard against null here
+    public List<IBaseResource> getBundleEntries() {
+        return bundleEntries != null ? bundleEntries : Collections.emptyList();
+    }
     private JsonNode rawPayload;
     private Map<String, Object> contextVars;
     private String requestor;
