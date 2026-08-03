@@ -126,7 +126,11 @@ public class FacilityControllerTests : IDisposable
             FacilityId = facilityId,
             FacilityName = facilityName,
             TimeZone = "America/Chicago",
-            Vendor = Vendor.Epic,
+            Vendor = new VendorModel
+            {
+                Id = Guid.NewGuid(),
+                Name = "Test Vendor"
+            },
             ScheduledReports = new TenantScheduledReportConfig { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
 
@@ -153,7 +157,11 @@ public class FacilityControllerTests : IDisposable
             FacilityId = facilityId,
             FacilityName = "Updated Name",
             TimeZone = "America/New_York",
-            Vendor = Vendor.Epic,
+            Vendor = new VendorModel
+            {
+                Id = Guid.NewGuid(),
+                Name = "Test Vendor"
+            },
             ScheduledReports = new TenantScheduledReportConfig { Daily = new string[] { "NewReport" }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
 

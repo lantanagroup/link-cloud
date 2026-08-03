@@ -1,10 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.Serialization;
 
-namespace LantanaGroup.Link.Tenant.Business.Models
+namespace LantanaGroup.Link.Shared.Application.Models.Tenant
 {
     [DataContract]
-    public class UpdateVendorModel
+    public class CreateVendorModel
     {
         [Required]
         [DataMember]
