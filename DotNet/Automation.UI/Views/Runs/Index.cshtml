@@ -12,6 +12,28 @@
         : "—";
 }
 
+<style>
+    #quickLaunchCard {
+        overflow: visible;
+        position: relative;
+        z-index: 20;
+    }
+
+        #quickLaunchCard .card-body {
+            overflow: visible;
+        }
+
+    #quickLaunchDropdown {
+        position: relative;
+    }
+
+        #quickLaunchDropdown .dropdown-menu {
+            z-index: 1080;
+            max-height: 360px;
+            overflow-y: auto;
+        }
+</style>
+
 <div class="container mt-4">
     <h2 class="fw-bold mb-1"><i class="bi bi-lightning-charge-fill me-2"></i>Automation Runs</h2>
     <p class="text-muted mb-3">Dashboard overview, quick-launch tests, and run history.</p>
@@ -99,47 +121,89 @@
     </div>
 
     @* ========== Quick-Launch ========== *@
-    <div class="au-card mb-4">
+    <div class="au-card mb-4" id="quickLaunchCard">
         <div class="card-header"><i class="bi bi-play-circle me-2"></i>Quick Launch</div>
         <div class="card-body">
             <div class="row g-2 align-items-end">
                 <div class="col-md-6">
                     <label class="form-label fw-bold" for="quickLaunchSelect">Select a saved scenario to run</label>          
-                    <input type="text"
-                        id="quickLaunchSearch"
-                        class="form-control mb-2"
-                        placeholder="Search scenarios..." />
-                    <select class="form-select" id="quickLaunchSelect">
-                        <option value="">-- Select a scenario --</option>
-                        <optgroup label="Custom">
-                        @foreach (var s in sortedScenarios.Where(x => !x.IsSystemScenario))
-                        {
-                            var suffix = s.IsSystemScenario ? " [System]" : "";
-                            <option value="@s.Id"
-                                    data-name="@s.Name"
-                                    data-description="@s.Description"
-                                    data-method="@s.ReportMethod"
-                                    data-type="@(s.IsSystemScenario ? "System" : "Custom")"
-                                    data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))">
-                                @s.Name@suffix
-                            </option>
-                        }
-                        </optgroup>
+                    <div class="dropdown" id="quickLaunchDropdown">
+                        <button class="form-select text-start"
+                                type="button"
+                                id="quickLaunchDropdownButton"
+                                data-bs-toggle="dropdown"
+                                data-bs-auto-close="outside"
+                                aria-expanded="false">
+                            -- Select a scenario --
+                        </button>
+                        <div class="dropdown-menu w-100 p-2"
+                             aria-labelledby="quickLaunchDropdownButton"
+                             style="max-height: 360px; overflow-y: auto;">
 
-                        <optgroup label="System">
-                        @foreach(var s in sortedScenarios.Where(x => x.IsSystemScenario))
+                            <input type="text"
+                                   id="quickLaunchSearch"
+                                   class="form-control mb-2"
+                                   placeholder="Search scenarios..."
+                                   autocomplete="off" />
+
+                            <div id="quickLaunchNoResults"
+                                 class="text-muted text-center py-2"
+                                 hidden>
+                                No matching scenarios found.
+                            </div>
+
+                            <div class="quick-launch-group" data-group="Custom">
+                                <h6 class="dropdown-header px-2">Custom</h6>
+
+                                @foreach (var s in sortedScenarios.Where(x => !x.IsSystemScenario))
+                                {
+                                    <button type="button"
+                                            class="dropdown-item quick-launch-option"
+                                            data-id="@s.Id"
+                                            data-name="@s.Name"
+                                            data-description="@(s.Description ?? "")"
+                                            data-method="@s.ReportMethod"
+                                            data-type="Custom"
+                                            data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))">
+                                        @s.Name
+                                    </button>
+                                }
+                            </div>
+
+                            <div class="quick-launch-group" data-group="System">
+                                <h6 class="dropdown-header px-2">System</h6>
+
+                                @foreach (var s in sortedScenarios.Where(x => x.IsSystemScenario))
+                                {
+                                    <button type="button"
+                                            class="dropdown-item quick-launch-option"
+                                            data-id="@s.Id"
+                                            data-name="@s.Name"
+                                            data-description="@(s.Description ?? "")"
+                                            data-method="@s.ReportMethod"
+                                            data-type="System"
+                                            data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))">
+                                        @s.Name <span class="text-muted">[System]</span>
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <select id="quickLaunchSelect" hidden>
+                        <option value="">-- Select a scenario --</option>
+
+                        @foreach (var s in sortedScenarios)
                         {
-                            var suffix = s.IsSystemScenario ? " [System]" : "";
                             <option value="@s.Id"
                                     data-name="@s.Name"
-                                    data-description="@s.Description"
+                                    data-description="@(s.Description ?? "")"
                                     data-method="@s.ReportMethod"
                                     data-type="@(s.IsSystemScenario ? "System" : "Custom")"
                                     data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))">
-                                @s.Name@suffix
+                                @s.Name@(s.IsSystemScenario ? " [System]" : "")
                             </option>
                         }
-                        </optgroup>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -509,59 +573,103 @@
     var selector = document.getElementById('quickLaunchSelect');
     var runBtn = document.getElementById('qlRunButton');
     var quickSearch = document.getElementById('quickLaunchSearch');
+    var dropdownButton = document.getElementById('quickLaunchDropdownButton');
+    var dropdownMenu = document.querySelector('#quickLaunchDropdown .dropdown-menu');
+    var noResults = document.getElementById('quickLaunchNoResults');
+
+    function getQuickLaunchOptions() {
+        return Array.from(
+            document.querySelectorAll('#quickLaunchDropdown .quick-launch-option')
+        );
+    }
+
+    function searchableScenarioText(option) {
+        return (
+            (option.dataset.name || '') + ' ' +
+            (option.dataset.description || '') + ' ' +
+            (option.dataset.method || '') + ' ' +
+            (option.dataset.type || '') + ' ' +
+            (option.dataset.measures || '')
+        ).toLowerCase();
+    }
 
     function applyQuickLaunchSearch() {
-        if (!selector || !quickSearch) return;
+        if (!quickSearch) return;
 
         var value = quickSearch.value.trim().toLowerCase();
+        var visibleCount = 0;
 
-        Array.from(selector.options).forEach(function (option) {
-            // Always keep the placeholder available.
-            if (!option.value) {
-                option.hidden = false;
-                return;
+        getQuickLaunchOptions().forEach(function (option) {
+            var matches = searchableScenarioText(option).includes(value);
+
+            option.hidden = !matches;
+
+            if (matches) {
+                visibleCount++;
             }
-
-            var text = (
-                (option.dataset.name || '') + ' ' +
-                (option.dataset.description || '') + ' ' +
-                (option.dataset.method || '') + ' ' +
-                (option.dataset.type || '') + ' ' +
-                (option.dataset.measures || '')
-            ).toLowerCase();
-
-            option.hidden = !text.includes(value);
         });
 
-        selector.querySelectorAll('optgroup').forEach(function (group) {
-            group.hidden = !Array.from(group.children).some(function (option) {
-                return !option.hidden;
+        document
+            .querySelectorAll('#quickLaunchDropdown .quick-launch-group')
+            .forEach(function (group) {
+                var hasVisibleOption = Array.from(
+                    group.querySelectorAll('.quick-launch-option')
+                ).some(function (option) {
+                    return !option.hidden;
+                });
+
+                group.hidden = !hasVisibleOption;
             });
-        });
 
-        var selected = selector.options[selector.selectedIndex];
-        if (selected && selected.hidden) {
-            selector.value = '';
-            selector.dispatchEvent(new Event('change'));
+        if (noResults) {
+            noResults.hidden = visibleCount !== 0;
+        }
+    }
+
+    function selectQuickLaunchScenario(id, label) {
+        if (!selector || !runBtn) return;
+
+        selector.value = id || '';
+        runBtn.disabled = !id;
+
+        document.getElementById('qlScenarioId').value = id || '';
+        document.getElementById('qlScenarioName').value =
+            label || 'Scenario';
+
+        if (dropdownButton) {
+            dropdownButton.textContent =
+                label || '-- Select a scenario --';
         }
     }
 
     if (quickSearch) {
         quickSearch.addEventListener('input', applyQuickLaunchSearch);
+
+        // Prevent the dropdown from interpreting typing as menu navigation.
+        quickSearch.addEventListener('keydown', function (event) {
+            event.stopPropagation();
+        });
     }
 
-    if (selector && runBtn) {
-        selector.addEventListener('change', function () {
-            var id = selector.value;
-            runBtn.disabled = !id;
+    if (dropdownMenu) {
+        dropdownMenu.addEventListener('click', function (event) {
+            var option = event.target.closest('.quick-launch-option');
+            if (!option) return;
 
-            document.getElementById('qlScenarioId').value = id || '';
+            var id = option.dataset.id || '';
+            var label = option.dataset.name || 'Scenario';
 
-            var selected = selector.options[selector.selectedIndex];
-            var label = selected ? (selected.textContent || '') : '';
+            selectQuickLaunchScenario(id, label);
 
-            document.getElementById('qlScenarioName').value =
-                label.replace(/\s\[System\]$/, '').trim() || 'Scenario';
+            if (quickSearch) {
+                quickSearch.value = '';
+                applyQuickLaunchSearch();
+            }
+
+            var dropdownInstance =
+                bootstrap.Dropdown.getOrCreateInstance(dropdownButton);
+
+            dropdownInstance.hide();
         });
     }
 
@@ -637,54 +745,69 @@
 
     // When the shared editor saves a scenario, add/update its option and select it so
     // the user can immediately run the newly created scenario.
-    document.addEventListener('scenario-editor:changed', function (e) {
-        var detail = e.detail || {};
-        if (detail.action !== 'saved' || !detail.id) return;
+    document.addEventListener('scenario-editor:changed', function (event) {
+        var detail = event.detail || {};
 
-        var sel = document.getElementById('quickLaunchSelect');
-        if (!sel) return;
+        if (detail.action !== 'saved' || !detail.id) {
+            return;
+        }
 
+        var id = String(detail.id);
         var label = detail.name || 'Scenario';
-        var opt = sel.querySelector('option[value="' + detail.id + '"]');
 
-        if (opt) {
-            var wasSystem = opt.dataset.type === 'System' ||
-                /\s\[System\]$/.test(opt.textContent || '');
+        // Update the hidden native select.
+        var hiddenOption = selector
+            ? selector.querySelector('option[value="' + id + '"]')
+            : null;
 
-            opt.textContent = label + (wasSystem ? ' [System]' : '');
-            opt.dataset.name = label;
+        if (hiddenOption) {
+            hiddenOption.textContent = label;
+            hiddenOption.dataset.name = label;
+        } else if (selector) {
+            hiddenOption = document.createElement('option');
+            hiddenOption.value = id;
+            hiddenOption.textContent = label;
+            hiddenOption.dataset.name = label;
+            hiddenOption.dataset.description = '';
+            hiddenOption.dataset.method = '';
+            hiddenOption.dataset.type = 'Custom';
+            hiddenOption.dataset.measures = '';
+            selector.appendChild(hiddenOption);
+        }
+
+        // Update the visible searchable dropdown.
+        var visibleOption = document.querySelector(
+            '#quickLaunchDropdown .quick-launch-option[data-id="' + id + '"]'
+        );
+
+        if (visibleOption) {
+            visibleOption.dataset.name = label;
+            visibleOption.textContent = label;
         } else {
-            opt = document.createElement('option');
-            opt.value = detail.id;
-            opt.textContent = label;
-            opt.dataset.name = label;
-            opt.dataset.description = '';
-            opt.dataset.method = '';
-            opt.dataset.type = 'Custom';
-            opt.dataset.measures = '';
+            var customGroup = document.querySelector(
+                '#quickLaunchDropdown .quick-launch-group[data-group="Custom"]'
+            );
 
-            var customGroup = sel.querySelector('optgroup[label="Custom"]');
             if (customGroup) {
-                customGroup.appendChild(opt);
-            } else {
-                sel.appendChild(opt);
+                visibleOption = document.createElement('button');
+                visibleOption.type = 'button';
+                visibleOption.className =
+               'dropdown-item quick-launch-option';
+                visibleOption.dataset.id = id;
+                visibleOption.dataset.name = label;
+                visibleOption.dataset.description = '';
+                visibleOption.dataset.method = '';
+                visibleOption.dataset.type = 'Custom';
+                visibleOption.dataset.measures = '';
+                visibleOption.textContent = label;
+
+                customGroup.appendChild(visibleOption);
             }
         }
 
-        sortScenarioOptions(sel);
+        sortQuickLaunchDropdownOptions();
         applyQuickLaunchSearch();
-
-        sel.value = detail.id;
-
-        // A newly saved scenario may not match the current search text.
-        // Clear the search so the newly created scenario can be selected.
-        if (opt.hidden && quickSearch) {
-            quickSearch.value = '';
-            applyQuickLaunchSearch();
-        }
-
-        sel.value = detail.id;
-        sel.dispatchEvent(new Event('change'));
+        selectQuickLaunchScenario(id, label);
     });
 
     // Re-orders <option>s inside the Quick Launch selector to match the server-side
@@ -693,35 +816,26 @@
     //   2. Custom scenarios (no " [System]" suffix) come next, alphabetically.
     //   3. System scenarios come last, alphabetically.
     // Sorting is case-insensitive so "zNick" / "ZNick" / "znick" cluster together.
-    function sortScenarioOptions(sel) {
-        if (!sel) return;
+    function sortQuickLaunchDropdownOptions() {
+        document
+            .querySelectorAll('#quickLaunchDropdown .quick-launch-group')
+            .forEach(function (group) {
+                var options = Array.from(
+                   group.querySelectorAll('.quick-launch-option')
+                );
 
-        var customGroup = sel.querySelector('optgroup[label="Custom"]');
-        var systemGroup = sel.querySelector('optgroup[label="System"]');
+                options.sort(function (a, b) {
+                    return (a.dataset.name || '').localeCompare(
+                        b.dataset.name || '',
+                        undefined,
+                        { sensitivity: 'base' }
+                    );
+                });
 
-        if (!customGroup || !systemGroup) return;
-    
-        var items = Array.from(sel.options)
-            .filter(function (option) {
-                return !!option.value;
+                options.forEach(function (option) {
+                   group.appendChild(option);
+                });
             });
-
-        items.sort(function (a, b) {
-            return (a.dataset.name || a.textContent || '').localeCompare(
-                b.dataset.name || b.textContent || '',
-                undefined,
-                { sensitivity: 'base' }
-            );
-        });
-
-        items.forEach(function (option) {
-            var destination =
-                option.dataset.type === 'System'
-                    ? systemGroup
-                    : customGroup;
-
-            destination.appendChild(option);
-        });
     }
 
     // --- Recent Runs table: sort / page / size all go through the partial-view
