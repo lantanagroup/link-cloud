@@ -841,7 +841,7 @@
 
         var id = String(detail.id);
         var label = detail.name || 'Scenario';
-        var now = String(Date.now());hiddenOption.dataset.updated = String(Date.now());
+        var now = String(Date.now());
 
         // Update the hidden native select.
         var hiddenOption = selector
@@ -851,9 +851,9 @@
         if (hiddenOption) {
             hiddenOption.textContent = label;
             hiddenOption.dataset.name = label;
-            hiddenOption.dataset.created = now;
+
+            // Editing changes only the modification timestamp.
             hiddenOption.dataset.updated = now;
-            hiddenOption.dataset.lastUsed = '0';
         } else if (selector) {
             hiddenOption = document.createElement('option');
             hiddenOption.value = id;
@@ -866,6 +866,7 @@
             hiddenOption.dataset.created = now;
             hiddenOption.dataset.updated = now;
             hiddenOption.dataset.lastUsed = '0';
+
             selector.appendChild(hiddenOption);
         }
 
@@ -876,9 +877,9 @@
 
         if (visibleOption) {
             visibleOption.dataset.name = label;
-            visibleOption.dataset.created = now;
+
+            // Editing changes only the modification timestamp.
             visibleOption.dataset.updated = now;
-            visibleOption.dataset.lastUsed = '0';
             visibleOption.textContent = label;
         } else {
             var customGroup = document.querySelector(
@@ -889,7 +890,7 @@
                 visibleOption = document.createElement('button');
                 visibleOption.type = 'button';
                 visibleOption.className =
-               'dropdown-item quick-launch-option';
+                    'dropdown-item quick-launch-option';
                 visibleOption.dataset.id = id;
                 visibleOption.dataset.name = label;
                 visibleOption.dataset.description = '';
