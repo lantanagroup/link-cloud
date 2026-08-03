@@ -24,9 +24,9 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 {
     public interface IVendorManager
     {
-        Task CreateVendorAsync(VendorModel newVendor, CancellationToken cancellationToken = default);
+        Task<VendorModel> CreateVendorAsync(VendorModel newVendor, CancellationToken cancellationToken = default);
         Task CreateVendorVersionAsync(VendorVersionModel newVendorVersion, CancellationToken cancellationToken = default);
-        Task UpdateVendorAsync(Guid id, VendorModel vendor, CancellationToken cancellationToken = default);
+        Task<VendorModel> UpdateVendorAsync(Guid id, VendorModel vendor, CancellationToken cancellationToken = default);
         Task UpdateVendorVersionAsync(Guid id, VendorVersionModel vendorVersion, CancellationToken cancellationToken = default);
         Task DeleteVendorAsync(Guid vendorId, CancellationToken cancellationToken = default);
         Task DeleteVendorVersionAsync(Guid vendorVersionId, CancellationToken cancellationToken = default);
@@ -45,7 +45,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
         }
 
-        public async Task CreateVendorAsync(VendorModel newVendor, CancellationToken cancellationToken = default)
+        public async Task<VendorModel> CreateVendorAsync(VendorModel newVendor, CancellationToken cancellationToken = default)
         {
             if(newVendor == null)
             {
@@ -76,6 +76,11 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             await _dbContext.Vendors.AddAsync(vendorEntity, cancellationToken);
             await _dbContext.VendorVersions.AddAsync(vendorVersionEntity, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
+            return new VendorModel
+            {
+                Id = vendorEntity.Id,
+                Name = vendorEntity.Name
+            };
         }
 
         public async Task CreateVendorVersionAsync(VendorVersionModel newVendorVersion, CancellationToken cancellationToken = default)
@@ -121,7 +126,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             await _dbContext.VendorVersions.Where(q => q.Id == vendorVersionId).ExecuteDeleteAsync(cancellationToken);
         }
 
-        public async Task UpdateVendorAsync(Guid id, VendorModel vendor, CancellationToken cancellationToken = default)
+        public async Task<VendorModel> UpdateVendorAsync(Guid id, VendorModel vendor, CancellationToken cancellationToken = default)
         {
             if(string.IsNullOrWhiteSpace(vendor.Name))
             {
@@ -138,6 +143,11 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
             _dbContext.Vendors.Update(existingVendor);
             await _dbContext.SaveChangesAsync(cancellationToken);
+            return new VendorModel
+            {
+                Id = existingVendor.Id,
+                Name = existingVendor.Name
+            };
         }
 
         public async Task UpdateVendorVersionAsync(Guid id, VendorVersionModel vendorVersion, CancellationToken cancellationToken = default)

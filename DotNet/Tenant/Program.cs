@@ -96,8 +96,9 @@ namespace Tenant
 
             //Managers and Queries
             builder.Services.AddScoped<IFacilityManager, FacilityManager>();
-            builder.Services.AddScoped<IVendorManager, VendorManager>();
             builder.Services.AddScoped<IFacilityQueries, FacilityQueries>();
+            builder.Services.AddScoped<IVendorManager, VendorManager>();
+            builder.Services.AddScoped<IVendorQueries, VendorQueries>();
 
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
             builder.Services.AddSingleton<CreateAuditEventCommand>();
