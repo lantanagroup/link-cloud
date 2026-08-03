@@ -10,8 +10,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace LantanaGroup.Link.MockDmrpApi.Migrations
 {
-    [DbContext(typeof(MockDmrpDbContext))]
-    partial class MockDmrpDbContextModelSnapshot : ModelSnapshot
+    [DbContext(typeof(ReportingPlanDbContext))]
+    partial class ReportingPlanDbContextModelSnapshot : ModelSnapshot
     {
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
@@ -22,7 +22,7 @@ namespace LantanaGroup.Link.MockDmrpApi.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("LantanaGroup.Link.MockDmrpApi.Domain.Entities.MockDmrpEntry", b =>
+            modelBuilder.Entity("LantanaGroup.Link.MockDmrpApi.Domain.Entities.ReportingPlanEntryEntity", b =>
                 {
                     b.Property<string>("Id")
                         .HasMaxLength(50)

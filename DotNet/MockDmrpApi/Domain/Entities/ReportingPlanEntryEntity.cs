@@ -23,7 +23,7 @@ namespace LantanaGroup.Link.MockDmrpApi.Domain.Entities;
 /// <c>UpdateBaseEntityInterceptor</c>, not by this class.
 /// </para>
 /// </remarks>
-public class MockDmrpEntry : BaseEntityExtended
+public class ReportingPlanEntryEntity : BaseEntityExtended
 {
     /// <summary>Identifier of the reporting facility, as known to the Tenant service.</summary>
     public string FacilityId { get; set; } = string.Empty;

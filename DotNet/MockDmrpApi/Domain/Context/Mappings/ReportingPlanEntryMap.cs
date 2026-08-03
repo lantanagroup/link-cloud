@@ -4,9 +4,9 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace LantanaGroup.Link.MockDmrpApi.Domain.Context.Mappings;
 
-public class MockDmrpEntryMap : IEntityTypeConfiguration<MockDmrpEntry>
+public class ReportingPlanEntryMap : IEntityTypeConfiguration<ReportingPlanEntryEntity>
 {
-    public void Configure(EntityTypeBuilder<MockDmrpEntry> builder)
+    public void Configure(EntityTypeBuilder<ReportingPlanEntryEntity> builder)
     {
         builder.ToTable("MockDmrpEntries");
 

@@ -2736,6 +2736,19 @@
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },
+      "mockdmrpapi": {
+        "type": "Project",
+        "dependencies": {
+          "AspNetCore.HealthChecks.UI.Client": "[9.0.0, )",
+          "Serilog": "[4.3.1, )",
+          "Serilog.AspNetCore": "[8.0.3, )",
+          "Serilog.Enrichers.Span": "[3.1.0, )",
+          "Serilog.Exceptions": "[8.4.0, )",
+          "Serilog.Sinks.Grafana.Loki": "[8.3.2, )",
+          "Swashbuckle.AspNetCore": "[6.9.0, )",
+          "com.lantanagroup.link.Shared": "[0.4.0, )"
+        }
+      },
       "normalization": {
         "type": "Project",
         "dependencies": {

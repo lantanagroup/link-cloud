@@ -5,17 +5,17 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace LantanaGroup.Link.MockDmrpApi.Domain.Context;
 
-public class MockDmrpDbContext : DbContext
+public class ReportingPlanDbContext : DbContext
 {
-    public MockDmrpDbContext(DbContextOptions<MockDmrpDbContext> options) : base(options)
+    public ReportingPlanDbContext(DbContextOptions<ReportingPlanDbContext> options) : base(options)
     {
     }
 
-    public virtual DbSet<MockDmrpEntry> MockDmrpEntries { get; set; } = null!;
+    public virtual DbSet<ReportingPlanEntryEntity> ReportingPlanEntries { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.ApplyConfiguration(new MockDmrpEntryMap());
+        modelBuilder.ApplyConfiguration(new ReportingPlanEntryMap());
         base.OnModelCreating(modelBuilder);
     }
 }
@@ -36,12 +36,12 @@ public class MockDmrpDbContext : DbContext
 /// provider, so the value does not have to point at a reachable server for
 /// <c>migrations add</c>.
 /// </remarks>
-public class MockDmrpDbContextFactory : IDesignTimeDbContextFactory<MockDmrpDbContext>
+public class ReportingPlanDbContextFactory : IDesignTimeDbContextFactory<ReportingPlanDbContext>
 {
     private const string LocalDefault =
         "Server=localhost\\SQLEXPRESS;Initial Catalog=link-mock-dmrp;Integrated Security=true;Encrypt=false;TrustServerCertificate=True";
 
-    public MockDmrpDbContext CreateDbContext(string[] args)
+    public ReportingPlanDbContext CreateDbContext(string[] args)
     {
         var connectionString =
             Environment.GetEnvironmentVariable("ConnectionStrings__DatabaseConnection");
@@ -51,9 +51,9 @@ public class MockDmrpDbContextFactory : IDesignTimeDbContextFactory<MockDmrpDbCo
             connectionString = LocalDefault;
         }
 
-        var optionsBuilder = new DbContextOptionsBuilder<MockDmrpDbContext>();
+        var optionsBuilder = new DbContextOptionsBuilder<ReportingPlanDbContext>();
         optionsBuilder.UseSqlServer(connectionString);
 
-        return new MockDmrpDbContext(optionsBuilder.Options);
+        return new ReportingPlanDbContext(optionsBuilder.Options);
     }
 }
