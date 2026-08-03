@@ -77,7 +77,7 @@ describe('VendorConfigFormComponent', () => {
     );
   });
 
-  it('clears the association by sending undefined rather than an empty string', () => {
+  it('clears the association by sending an explicit null, not undefined or ""', () => {
     vendorService.updateVendor.and.returnValue(of({ success: true, message: '' }));
     initWith(epic, FormMode.Edit);
 
@@ -85,7 +85,11 @@ describe('VendorConfigFormComponent', () => {
     component.submitConfiguration();
 
     const sent = vendorService.updateVendor.calls.mostRecent().args[0];
-    expect(sent.secretId).toBeUndefined();
+    expect(sent.secretId).toBeNull();
+    // Undefined would be dropped by JSON.stringify, leaving the field absent from the request
+    // body -- indistinguishable from "leave it alone" for a partial-update endpoint.
+    expect('secretId' in sent).toBeTrue();
+    expect(JSON.parse(JSON.stringify(sent)).secretId).toBeNull();
   });
 
   it('emits success after a saved update', () => {

@@ -119,12 +119,14 @@ export class VendorConfigFormComponent {
       return;
     }
 
-    // An empty box means "no key associated", which travels as undefined rather than "" so the
-    // backend sees the field absent rather than set to the empty string.
+    // An empty box means "no key associated", sent as an explicit null rather than undefined:
+    // JSON.stringify omits undefined keys, and an absent field reads as "leave unchanged" to
+    // any endpoint with partial-update semantics, which would make clearing a key silently
+    // do nothing. Null says remove it.
     const updated: IVendorConfigModel = {
       ...this.item,
       name: this.name.value,
-      secretId: this.secretId.value?.trim() || undefined
+      secretId: this.secretId.value?.trim() || null
     };
 
     this.vendorService.updateVendor(updated).subscribe({

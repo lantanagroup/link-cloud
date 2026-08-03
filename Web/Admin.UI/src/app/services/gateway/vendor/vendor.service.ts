@@ -35,7 +35,7 @@ export class VendorService {
         map((response) => {
           return response;
         }),
-        catchError(this.handleError.bind(this))
+        catchError(this.handleSaveError.bind(this))
       )
   }
 
@@ -56,7 +56,7 @@ export class VendorService {
         map((response) => {
           return response;
         }),
-        catchError(this.handleError.bind(this))
+        catchError(this.handleSaveError.bind(this))
       )
   }
 
@@ -73,6 +73,19 @@ export class VendorService {
 
   private handleError(err: HttpErrorResponse) {
     return this.errorHandler.handleError(err);
+  }
+
+  /**
+   * Save failures are presented by the config dialog, which shows a snackbar and stays open so
+   * the admin's input is not thrown away. ErrorHandlingService raises its own toastr by default,
+   * so one failed save produced two messages; suppressing the toastr here leaves the dialog as
+   * the single surface. List and delete keep the toastr, having no dialog to carry the news.
+   *
+   * The rethrown error still carries the sanitized `message` the dialog displays -- that is set
+   * regardless of whether the toastr is shown.
+   */
+  private handleSaveError(err: HttpErrorResponse) {
+    return this.errorHandler.handleError(err, false);
   }
 
 }

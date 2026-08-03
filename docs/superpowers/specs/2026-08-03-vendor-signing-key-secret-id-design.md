@@ -182,3 +182,7 @@ regression net for LEGLINK-569 (QA: Validate Vendor-Level KID Association).
 
 1. Update endpoint route and payload, to be confirmed with the LEGLINK-743 work.
 2. Ownership of the audit trail event for vendor changes (LEGLINK-63 AC #3).
+3. How the endpoint reads a cleared association. The UI sends `secretId: null` when the box is
+   emptied, rather than omitting the field, so that a clear cannot be mistaken for "leave
+   unchanged" by an endpoint with partial-update semantics. Confirm the backend removes the
+   association on null.
