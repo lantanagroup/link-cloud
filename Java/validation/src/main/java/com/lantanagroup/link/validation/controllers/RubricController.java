@@ -41,7 +41,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
@@ -139,7 +138,9 @@ public class RubricController {
             @RequestBody String rawBody,
             @RequestHeader(value = HttpHeaders.CONTENT_TYPE, required = false) String contentType,
             Principal principal) {
-        if (rawBody.getBytes(StandardCharsets.UTF_8).length > maxPayloadBytes) {
+        // secondary safeguard behind RubricPayloadLimitConfig for requests without a
+        // Content-Length header (chunked transfer encoding)
+        if (utf8ByteLength(rawBody) > maxPayloadBytes) {
             throw new PayloadParseException(
                     "Rubric payload exceeds maximum size of " + maxPayloadBytes + " bytes", null);
         }
@@ -157,6 +158,19 @@ public class RubricController {
                 .toUri();
         return ResponseEntity.created(location)
                 .body(ApiResponse.created("Rubric version registered", dto));
+    }
+
+    // counts UTF-8 bytes without materializing a full byte-array copy of the body
+    private static long utf8ByteLength(String s) {
+        long bytes = 0;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c < 0x80) bytes += 1;
+            else if (c < 0x800) bytes += 2;
+            else if (Character.isHighSurrogate(c) && i + 1 < s.length()) { bytes += 4; i++; }
+            else bytes += 3;
+        }
+        return bytes;
     }
 
     private static boolean isYaml(String contentType) {
