@@ -34,6 +34,18 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
             .SetQueryParam("pageNumber", pageNumber)
             .GetAsync(cancellationToken: cancellationToken));
 
+    public Task<LinkApiResponse<PagedConfigModel<NormalizationOperationApiModel>>> SearchVendorVersionOperationsAsync(
+        Guid vendorVersionId,
+        bool includeDisabled = true,
+        int pageSize = 100,
+        int pageNumber = 1,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<PagedConfigModel<NormalizationOperationApiModel>>(() => Request($"normalization/Operations/vendor-version/{vendorVersionId}")
+            .SetQueryParam("includeDisabled", includeDisabled)
+            .SetQueryParam("pageSize", pageSize)
+            .SetQueryParam("pageNumber", pageNumber)
+            .GetAsync(cancellationToken: cancellationToken));
+
     public Task<LinkApiResponse> CreateOperationAsync(
         CreateNormalizationOperationRequestApiModel requestBody,
         CancellationToken cancellationToken = default) =>
@@ -44,6 +56,12 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         string facilityId,
         CancellationToken cancellationToken = default) =>
         SendAsync(() => Request($"normalization/operations/facility/{facilityId}")
+            .DeleteAsync(cancellationToken: cancellationToken));
+
+    public Task<LinkApiResponse> DeleteVendorVersionOperationsAsync(
+        Guid vendorVersionId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync(() => Request($"normalization/operations/vendor-version/{vendorVersionId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<List<NormalizationOperationSequenceApiModel>>> GetOperationSequencesAsync(
@@ -74,49 +92,27 @@ public class NormalizationServiceClient : LinkApiClientBase, INormalizationServi
         return SendAsync(() => req.DeleteAsync(cancellationToken: cancellationToken));
     }
 
-    public Task<LinkApiResponse<NormalizationVendorApiModel>> CreateVendorAsync(
-        string vendorName,
+    public Task<LinkApiResponse<NormalizationVendorVersionOperationPresetApiModel>> CreateVendorVersionOperationPresetAsync(
+        CreateNormalizationVendorVersionOperationPresetRequestApiModel request,
         CancellationToken cancellationToken = default) =>
-        SendAsync<NormalizationVendorApiModel>(() => Request($"normalization/Vendor/{vendorName}")
-            .PostAsync(cancellationToken: cancellationToken));
-
-    public Task<LinkApiResponse<List<NormalizationVendorApiModel>>> GetVendorAsync(
-        string vendor,
-        CancellationToken cancellationToken = default) =>
-        SendAsync<List<NormalizationVendorApiModel>>(() => Request($"normalization/Vendor/{vendor}")
-            .GetAsync(cancellationToken: cancellationToken));
-
-    public Task<LinkApiResponse<List<NormalizationVendorApiModel>>> GetAllVendorsAsync(
-        CancellationToken cancellationToken = default) =>
-        SendAsync<List<NormalizationVendorApiModel>>(() => Request("normalization/Vendor/vendors")
-            .GetAsync(cancellationToken: cancellationToken));
-
-    public Task<LinkApiResponse> DeleteVendorAsync(
-        string vendor,
-        CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"normalization/Vendor/{vendor}")
-            .DeleteAsync(cancellationToken: cancellationToken));
-
-    public Task<LinkApiResponse<NormalizationVendorPresetApiModel>> CreateVendorPresetAsync(
-        CreateNormalizationVendorPresetRequestApiModel request,
-        CancellationToken cancellationToken = default) =>
-        SendAsync<NormalizationVendorPresetApiModel>(() => Request("normalization/Vendor/presets")
+        SendAsync<NormalizationVendorVersionOperationPresetApiModel>(() => Request("normalization/vendor-version-operation-presets")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
 
-    public Task<LinkApiResponse<List<NormalizationVendorPresetApiModel>>> GetVendorPresetsAsync(
-        string vendor,
+    public Task<LinkApiResponse<List<NormalizationVendorVersionOperationPresetApiModel>>> GetVendorVersionOperationPresetsAsync(
+        Guid? vendorVersionId = null,
         string? resource = null,
         CancellationToken cancellationToken = default)
     {
-        var req = Request($"normalization/Vendor/presets/{vendor}");
+        var req = Request("normalization/vendor-version-operation-presets");
+        if (vendorVersionId.HasValue) req = req.SetQueryParam("vendorVersionId", vendorVersionId.Value);
         if (!string.IsNullOrWhiteSpace(resource)) req = req.SetQueryParam("resource", resource);
-        return SendAsync<List<NormalizationVendorPresetApiModel>>(() => req.GetAsync(cancellationToken: cancellationToken));
+        return SendAsync<List<NormalizationVendorVersionOperationPresetApiModel>>(() => req.GetAsync(cancellationToken: cancellationToken));
     }
 
-    public Task<LinkApiResponse> DeleteVendorPresetAsync(
-        string vendor,
+    public Task<LinkApiResponse> DeleteVendorVersionOperationPresetAsync(
+        Guid vendorVersionId,
         Guid presetId,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"normalization/Vendor/presets/{vendor}/{presetId}")
+        SendAsync(() => Request($"normalization/vendor-version-operation-presets/{vendorVersionId}/{presetId}")
             .DeleteAsync(cancellationToken: cancellationToken));
 }

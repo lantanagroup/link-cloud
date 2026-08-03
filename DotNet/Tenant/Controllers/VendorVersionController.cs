@@ -155,6 +155,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpDelete("{id}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Delete(string id)
         {
@@ -177,6 +178,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 await _vendorManager.DeleteVendorVersionAsync(parsedId);
 
                 return NoContent();
+            }
+            catch (VendorVersionInUseException ex)
+            {
+                return Conflict(ex.Message);
             }
             catch (Exception ex)
             {

@@ -89,6 +89,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpPost]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<VendorModel>> Post(CreateVendorModel createVendorModel)
         {
@@ -96,6 +97,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
             {
                 var newVendor = await _vendorManager.CreateVendorAsync(new VendorModel { Name = createVendorModel.Name });
                 return CreatedAtAction(nameof(Get), new { id = newVendor.Id }, newVendor);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Conflict();
             }
             catch (Exception ex)
             {
@@ -138,6 +143,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [HttpDelete("{id}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Delete(string id)
         {
@@ -160,6 +166,10 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 await _vendorManager.DeleteVendorAsync(parsedId);
 
                 return NoContent();
+            }
+            catch (VendorVersionInUseException ex)
+            {
+                return Conflict(ex.Message);
             }
             catch (Exception ex)
             {

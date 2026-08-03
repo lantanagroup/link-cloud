@@ -112,7 +112,7 @@ public static class FacilitySetupHelper
                     TargetFhirPath = "type[0].coding.code"
                 },
                 Description = "Copy Location Identifier to Code",
-                VendorIds = []
+                VendorVersionIds = []
             });
 
             if (!normResp.IsSuccessStatusCode)

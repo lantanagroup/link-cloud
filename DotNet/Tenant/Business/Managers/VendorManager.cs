@@ -5,6 +5,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
 using LantanaGroup.Link.Tenant.Config;
@@ -32,17 +33,28 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
         Task DeleteVendorVersionAsync(Guid vendorVersionId, CancellationToken cancellationToken = default);
     }
 
+    public sealed class VendorVersionInUseException : InvalidOperationException
+    {
+        public VendorVersionInUseException(Guid vendorVersionId)
+            : base($"Vendor version '{vendorVersionId}' is referenced by Normalization and cannot be deleted.")
+        {
+        }
+    }
+
     public class VendorManager : IVendorManager
     {
         private readonly ILogger<VendorManager> _logger;
         private readonly TenantDbContext _dbContext;
+        private readonly INormalizationServiceClient _normalizationServiceClient;
 
         public VendorManager(
             ILogger<VendorManager> logger,
-            TenantDbContext dbContext)
+            TenantDbContext dbContext,
+            INormalizationServiceClient normalizationServiceClient)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+            _normalizationServiceClient = normalizationServiceClient ?? throw new ArgumentNullException(nameof(normalizationServiceClient));
         }
 
         public async Task<VendorModel> CreateVendorAsync(VendorModel newVendor, CancellationToken cancellationToken = default)
@@ -124,12 +136,40 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
         public async Task DeleteVendorAsync(Guid vendorId, CancellationToken cancellationToken = default)
         {
+            var vendorVersionIds = await _dbContext.VendorVersions
+                .Where(vendorVersion => vendorVersion.VendorId == vendorId)
+                .Select(vendorVersion => vendorVersion.Id)
+                .ToListAsync(cancellationToken);
+
+            foreach (var vendorVersionId in vendorVersionIds)
+            {
+                await EnsureVendorVersionIsNotReferencedByNormalizationAsync(vendorVersionId, cancellationToken);
+            }
+
             await _dbContext.Vendors.Where(q => q.Id == vendorId).ExecuteDeleteAsync(cancellationToken);
         }
 
         public async Task DeleteVendorVersionAsync(Guid vendorVersionId, CancellationToken cancellationToken = default)
         {
+            await EnsureVendorVersionIsNotReferencedByNormalizationAsync(vendorVersionId, cancellationToken);
             await _dbContext.VendorVersions.Where(q => q.Id == vendorVersionId).ExecuteDeleteAsync(cancellationToken);
+        }
+
+        private async Task EnsureVendorVersionIsNotReferencedByNormalizationAsync(Guid vendorVersionId, CancellationToken cancellationToken)
+        {
+            var response = await _normalizationServiceClient.GetVendorVersionOperationPresetsAsync(
+                vendorVersionId: vendorVersionId,
+                cancellationToken: cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException("Unable to verify Normalization references before deleting the vendor version.");
+            }
+
+            if (response.Body?.Count > 0)
+            {
+                throw new VendorVersionInUseException(vendorVersionId);
+            }
         }
 
         public async Task<VendorModel> UpdateVendorAsync(Guid id, VendorModel vendor, CancellationToken cancellationToken = default)
