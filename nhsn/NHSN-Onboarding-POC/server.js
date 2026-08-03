@@ -13,6 +13,7 @@ const path = require('path');
 const PORT = process.env.PORT || 5173;
 const ROOT = __dirname;
 const DATA_FILE = path.join(ROOT, 'facilities.ndjson');
+const BACKEND_SUPPORT_FILE = path.join(ROOT, 'api-support.json');
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -45,6 +46,20 @@ function writeFacilities(list) {
   const lines = list.map((f) => JSON.stringify(f));
   const contents = lines.length ? lines.join('\n') + '\n' : '';
   fs.writeFileSync(DATA_FILE, contents, 'utf8');
+}
+
+function readBackendSupport() {
+  if (!fs.existsSync(BACKEND_SUPPORT_FILE)) return {};
+  try {
+    return JSON.parse(fs.readFileSync(BACKEND_SUPPORT_FILE, 'utf8'));
+  } catch (err) {
+    console.error('Skipping malformed api-support.json:', err.message);
+    return {};
+  }
+}
+
+function writeBackendSupport(data) {
+  fs.writeFileSync(BACKEND_SUPPORT_FILE, JSON.stringify(data, null, 2), 'utf8');
 }
 
 function sendJson(res, status, obj) {
@@ -103,6 +118,50 @@ const server = http.createServer((req, res) => {
         }
         writeFacilities(list);
         return sendJson(res, 200, { ok: true, facility: incoming });
+      } catch (err) {
+        return sendJson(res, 400, { error: err.message });
+      }
+    });
+    return;
+  }
+
+  if (u.pathname === '/api/backend-support' && req.method === 'GET') {
+    try {
+      return sendJson(res, 200, readBackendSupport());
+    } catch (err) {
+      return sendJson(res, 500, { error: err.message });
+    }
+  }
+
+  if (u.pathname === '/api/backend-support' && req.method === 'POST') {
+    let body = '';
+    let tooLarge = false;
+    req.on('data', (chunk) => {
+      body += chunk;
+      if (body.length > 5_000_000) {
+        tooLarge = true;
+        req.destroy();
+      }
+    });
+    req.on('end', () => {
+      if (tooLarge) return;
+      try {
+        const incoming = JSON.parse(body);
+        if (!incoming || typeof incoming.key !== 'string' || !incoming.key.trim()) {
+          return sendJson(res, 400, { error: 'key is required' });
+        }
+        const data = readBackendSupport();
+        const service = typeof incoming.service === 'string' ? incoming.service.trim() : '';
+        const method = typeof incoming.method === 'string' ? incoming.method.trim() : '';
+        const url = typeof incoming.url === 'string' ? incoming.url.trim() : '';
+        const description = typeof incoming.description === 'string' ? incoming.description.trim() : '';
+        if (!service && !method && !url && !description) {
+          delete data[incoming.key];
+        } else {
+          data[incoming.key] = { service, method, url, description };
+        }
+        writeBackendSupport(data);
+        return sendJson(res, 200, { ok: true, data: data[incoming.key] || null });
       } catch (err) {
         return sendJson(res, 400, { error: err.message });
       }
