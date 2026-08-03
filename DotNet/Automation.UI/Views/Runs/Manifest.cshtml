@@ -193,6 +193,38 @@
     // ─── Fetch & Render ────────────────────────────────────────────
     let manifestData = null;
     let fallbackInpatientPatternByPatient = null;
+    let patientSortDirection = 'asc';
+
+    function comparePatientIds(left, right) {
+        return String(left).localeCompare(String(right), undefined, {
+            numeric: true,
+            sensitivity: 'base'
+        });
+    }
+
+    function sortPatientEntries(entries) {
+        const direction = patientSortDirection === 'desc' ? -1 : 1;
+
+        return [...entries].sort(([leftId], [rightId]) =>
+            direction * comparePatientIds(leftId, rightId)
+        );
+    }
+
+    function patientSortIcon() {
+        return patientSortDirection === 'asc'
+            ? '<i class="bi bi-sort-up ms-1"></i>'
+            : '<i class="bi bi-sort-down ms-1"></i>';
+    }
+
+    function togglePatientSort() {
+        patientSortDirection =
+            patientSortDirection === 'asc' ? 'desc' : 'asc';
+
+        if (!manifestData) return;
+
+        renderEligibility(manifestData);
+        renderPatientBreakdown();
+    }
 
     fetch(`${manifestDataUrl}?id=${runId}`)
         .then(r => r.ok && r.status !== 204 ? r.json() : null)
@@ -257,24 +289,7 @@
             <div><div class="small text-muted mb-1">CQL Referenced</div>${renderBadgeSet(m.cqlReferencedResourceTypes)}</div>`;
 
         // Eligibility
-        const el = document.getElementById('eligibilitySection');
-        const eb = document.getElementById('eligibilityBadge');
-        if (m.patientEligibility && Object.keys(m.patientEligibility).length) {
-            const entries = Object.entries(m.patientEligibility);
-            const q = entries.filter(([, ms]) => ms.length > 0).length;
-            eb.textContent = `${q}/${entries.length} qualifying`;
-            let html = '<div style="max-height:300px;overflow-y:auto;"><table class="au-table table table-sm small mb-0"><thead><tr><th>Patient</th><th>Qualifying Measures</th></tr></thead><tbody>';
-            entries.forEach(([pid, measures]) => {
-                const b = measures.length > 0
-                    ? `<span class="badge au-badge-success">${measures.length} measure(s)</span>`
-                    : `<span class="badge au-badge-muted">None</span>`;
-                html += `<tr><td><code>${escapeHtml(pid)}</code></td><td>${b}</td></tr>`;
-            });
-            html += '</tbody></table></div>';
-            el.innerHTML = html;
-        } else {
-            el.innerHTML = '<span class="text-muted small">No eligibility data</span>';
-        }
+        renderEligibility(m);
 
         // Resource counts table
         const allCounts = { ...(m.totalCountsByType || {}) };
@@ -320,31 +335,140 @@
         }
     }
 
-    // ─── PATIENTS TAB ──────────────────────────────────────────────
-    function renderPatients(m) {
-        const container = document.getElementById('patientBreakdownContainer');
-        const patients = Object.entries(m.resourceCountsByPatient || {});
-        if (!patients.length) {
-            container.innerHTML = '<span class="text-muted small">No per-patient data</span>';
+    function renderEligibility(m) {
+        const el = document.getElementById('eligibilitySection');
+        const eb = document.getElementById('eligibilityBadge');
+
+        if (!m.patientEligibility ||
+            !Object.keys(m.patientEligibility).length) {
+            eb.textContent = '';
+            el.innerHTML =
+                '<span class="text-muted small">No eligibility data</span>';
             return;
         }
 
-        fallbackInpatientPatternByPatient = buildFallbackInpatientPatternMap(m);
+        const entries = sortPatientEntries(
+            Object.entries(m.patientEligibility)
+        );
 
-        // Bar chart: total resources per patient (top 50)
-        const patientTotals = patients.map(([pid, counts]) => ({
-            pid,
-            total: Object.values(counts).reduce((s, c) => s + c, 0)
-        })).sort((a, b) => b.total - a.total);
+        const qualifyingCount = entries.filter(
+            ([, measures]) => measures.length > 0
+        ).length;
 
-        const chartPatients = patientTotals.slice(0, 50);
-        new Chart(document.getElementById('patientBarChart'), {
+        eb.textContent =
+            `${qualifyingCount}/${entries.length} qualifying`;
+
+        let html = `
+            <div style="max-height:300px;overflow-y:auto;">
+                <table class="au-table table table-sm small mb-0">
+                    <thead>
+                        <tr>
+                            <th>
+                                <button type="button"
+                                        class="btn btn-link btn-sm p-0 text-white text-decoration-none patient-sort-button"
+                                        aria-label="Sort patient IDs ${patientSortDirection === 'asc' ? 'descending' : 'ascending'}">
+                                    Patient
+                                    ${patientSortIcon()}
+                                </button>
+                            </th>
+                            <th>Qualifying Measures</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+        entries.forEach(([pid, measures]) => {
+            const badge = measures.length > 0
+                ? `<span class="badge au-badge-success">${measures.length} measure(s)</span>`
+                : '<span class="badge au-badge-muted">None</span>';
+
+            html += `
+                <tr>
+                    <td><code>${escapeHtml(pid)}</code></td>
+                    <td>${badge}</td>
+                </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        el.innerHTML = html;
+
+        el.querySelector('.patient-sort-button')
+            ?.addEventListener('click', togglePatientSort);
+    }
+
+    // ─── PATIENTS TAB ──────────────────────────────────────────────
+    let allPatientEntries = [];
+    let patientBarChart = null;
+
+    function renderPatients(m) {
+        allPatientEntries = Object.entries(
+            m.resourceCountsByPatient || {}
+        );
+
+        const container =
+            document.getElementById('patientBreakdownContainer');
+
+        if (!allPatientEntries.length) {
+            container.innerHTML =
+                '<span class="text-muted small">No per-patient data</span>';
+            return;
+        }
+
+        fallbackInpatientPatternByPatient =
+            buildFallbackInpatientPatternMap(m);
+
+        renderPatientBreakdown();
+
+        const searchInput = document.getElementById('patientSearch');
+
+        searchInput.addEventListener('input', function () {
+            renderPatientBreakdown();
+        });
+    }
+
+    function getVisiblePatientEntries() {
+        const searchTerm =
+            document.getElementById('patientSearch')
+                ?.value
+                ?.trim()
+                ?.toLowerCase() || '';
+
+        const filtered = allPatientEntries.filter(([pid]) =>
+            !searchTerm || pid.toLowerCase().includes(searchTerm)
+        );
+
+        return sortPatientEntries(filtered);
+    }
+
+    function renderPatientBreakdown() {
+        const patients = getVisiblePatientEntries();
+
+        renderPatientBarChart(patients);
+        renderPatientCards(patients);
+    }
+
+    function renderPatientBarChart(patients) {
+        const patientTotals = patients
+            .map(([pid, counts]) => ({
+                pid,
+                total: Object.values(counts)
+                    .reduce((sum, count) => sum + count, 0)
+            }))
+            .slice(0, 50);
+
+        const chartCanvas =
+            document.getElementById('patientBarChart');
+
+        if (patientBarChart) {
+            patientBarChart.destroy();
+        }
+
+        patientBarChart = new Chart(chartCanvas, {
             type: 'bar',
             data: {
-                labels: chartPatients.map(p => p.pid),
+                labels: patientTotals.map(patient => patient.pid),
                 datasets: [{
                     label: 'Total Resources',
-                    data: chartPatients.map(p => p.total),
+                    data: patientTotals.map(patient => patient.total),
                     backgroundColor: 'var(--au-accent)',
                     borderRadius: 3
                 }]
@@ -353,36 +477,61 @@
                 responsive: true,
                 maintainAspectRatio: true,
                 plugins: {
-                    legend: { display: false },
-                    tooltip: { callbacks: { label: ctx => `${ctx.parsed.y.toLocaleString()} resources` } }
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: context =>
+                                `${context.parsed.y.toLocaleString()} resources`
+                        }
+                    }
                 },
                 scales: {
-                    x: { ticks: { font: { size: 10 }, maxRotation: 45 } },
-                    y: { beginAtZero: true, ticks: { callback: v => v.toLocaleString() } }
+                    x: {
+                        ticks: {
+                            font: { size: 10 },
+                            maxRotation: 45
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: value => value.toLocaleString()
+                        }
+                    }
                 }
             }
-        });
-
-        // Patient cards
-        renderPatientCards(patients);
-
-        // Search
-        document.getElementById('patientSearch').addEventListener('input', function () {
-            const q = this.value.toLowerCase();
-            const filtered = patients.filter(([pid]) => pid.toLowerCase().includes(q));
-            renderPatientCards(filtered);
         });
     }
 
     function renderPatientCards(patients) {
         const container = document.getElementById('patientBreakdownContainer');
+        disposeTooltips(container);
         if (!patients.length) {
             container.innerHTML = '<span class="text-muted small">No matching patients</span>';
             return;
         }
 
         // Compact table view for many patients
-        let html = '<table class="au-table table table-sm small mb-0"><thead><tr><th>Patient</th><th>Inpatient Pattern</th><th class="text-end">Total</th><th>Resource Types</th></tr></thead><tbody>';
+        let html = `
+            <table class="au-table table table-sm small mb-0">
+                <thead>
+                    <tr>
+                        <th>
+                            <button type="button"
+                                class="btn btn-link btn-sm p-0 text-white text-decoration-none patient-sort-button"
+                                aria-label="Sort patient IDs ${patientSortDirection === 'asc' ? 'descending' : 'ascending'}">
+                            Patient
+                            ${patientSortIcon()}
+                        </button>
+                    </th>
+                <th>Inpatient Pattern</th>
+                <th class="text-end">Total</th>
+                <th>Resource Types</th>
+            </tr>
+        </thead>
+        <tbody>`;
         patients.forEach(([pid, counts]) => {
             const total = Object.values(counts).reduce((s, c) => s + c, 0);
             const inpatientPattern = manifestData?.patientInpatientPatterns?.[pid]
@@ -400,8 +549,18 @@
         });
         html += '</tbody></table>';
         container.innerHTML = html;
+        container.querySelector('.patient-sort-button')
+            ?.addEventListener('click', togglePatientSort);
         // Re-init tooltips for new elements
         container.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+    }
+
+    function disposeTooltips(container) {
+        container
+            .querySelectorAll('[data-bs-toggle="tooltip"]')
+            .forEach(el => {
+                bootstrap.Tooltip.getInstance(el)?.dispose();
+            });
     }
 
     function normalizePatternForDisplay(value) {
