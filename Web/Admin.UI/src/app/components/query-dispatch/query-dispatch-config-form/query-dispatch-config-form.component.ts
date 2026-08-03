@@ -95,8 +95,9 @@ export class QueryDispatchConfigFormComponent implements OnInit, OnChanges {
 
   ngOnChanges(changes: SimpleChanges) {
 
-    // set dispatchSchedules
-    this.setDispatchSchedules(this.item.dispatchSchedules);
+    // set dispatchSchedules — `item` is still undefined when a sibling input (viewOnly) changes
+    // first, so read through it optionally and let setDispatchSchedules fall back to an empty row.
+    this.setDispatchSchedules(this.item?.dispatchSchedules);
     if (changes['item'] && changes['item'].currentValue) {
       this.setSchedulesDisabled(this.viewOnly);
       this.facilityIdControl.setValue(this.item.facilityId);

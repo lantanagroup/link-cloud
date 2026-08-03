@@ -3,17 +3,18 @@
     <div class="link-card-header">
       <div class="split-container" style="margin-bottom: 0;">
             <div class="left-pane">
-               <p class="title">{{ facilityConfig?.facilityName }}
-              <p>
+               <p class="title" data-testid="facility-view-title">{{ facilityConfig?.facilityName }}</p>
             </div>
             <div class="right-pane">
               <div class="link-button-group">
-                <button type="button" class="link-button secondary" aria-label="Reload acquisition logs"
+                <button type="button" class="link-button secondary" aria-label="Facility configuration"
+                  data-testid="facility-config-btn"
                   (click)="onFacilityConfig()">
                   <fa-icon [icon]="faGears"></fa-icon>
                   Configuration
                 </button>
-                <button type="button" class="link-button primary" aria-label="Reload acquisition logs"
+                <button type="button" class="link-button primary" aria-label="Refresh report schedules"
+                  data-testid="facility-refresh-btn"
                   (click)="onRefresh()">
                   <fa-icon [icon]="faRotate"></fa-icon>
                   Refresh
@@ -21,7 +22,7 @@
               </div>
 
               <button type="button" class="link-button light" style="margin-left: 1em;"
-                aria-label="Navigate to previous page" (click)="navBack()">
+                aria-label="Back to previous page" (click)="navBack()">
                 <fa-icon [icon]="faArrowLeft"></fa-icon>
                 Back
               </button>
@@ -33,7 +34,7 @@
         </div>
         @if (scheduledReports?.length > 0) {
           <div class="table-container no-border" style="margin-bottom: 1em;">
-            <table class="link-table">
+            <table class="link-table" data-testid="enrolled-reporting-table">
               <thead class="table-head">
                 <tr>
                   <th class="header-column">Cadence</th>
@@ -150,7 +151,7 @@
 
     @if (dataSource) {
     <div class="table-container no-border">
-      <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" style="width: 100%; background-color: transparent">
+      <table mat-table [dataSource]="dataSource" matSort (matSortChange)="onSortChange($event)" data-testid="report-schedules-table" style="width: 100%; background-color: transparent">
 
         <!-- Report ID Column -->
         <ng-container matColumnDef="id">

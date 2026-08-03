@@ -19,8 +19,9 @@ jobs:
 
   changes:
     runs-on: ubuntu-latest
-    outputs: 
+    outputs:
       run_job: ${{ steps.should.outputs.run_job }}
+      run_admin_ui: ${{ steps.should.outputs.run_admin_ui }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,14 +38,25 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED_FILES"
 
-          if echo "$CHANGED_FILES" | grep -Eq '^(DotNet/|Tests/|Java/|docker-compose\.yml|\.github/workflows/tests\.yaml)'; then
+          if echo "$CHANGED_FILES" | grep -Eq '^(DotNet/|Tests/|Java/|Web/|docker-compose\.yml|\.github/workflows/tests\.yaml)'; then
             echo "run_job=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_job=false" >> "$GITHUB_OUTPUT"
           fi
 
+          # The mocked Admin UI tier stubs every /api call, so no backend change can affect
+          # it — gate it on its own sources rather than the shared filter above. The workflow
+          # itself counts, so a change to this file still exercises the job that runs it.
+          if echo "$CHANGED_FILES" | grep -Eq '^(Web/Admin\.UI/|\.github/workflows/tests\.yaml)'; then
+            echo "run_admin_ui=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_admin_ui=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Show decision
-        run: echo "run_job=${{ steps.should.outputs.run_job }}"
+        run: |
+          echo "run_job=${{ steps.should.outputs.run_job }}"
+          echo "run_admin_ui=${{ steps.should.outputs.run_admin_ui }}"
 
   backend-e2e-tests:
     # PR-safe Backend E2E categories run in parallel against a SINGLE shared
@@ -146,6 +158,55 @@ jobs:
         run: |
           chmod +x Scripts/check_health.sh
           Scripts/check_health.sh $PROJECT_NAME $HEALTH_CHECK_TIMEOUT $CHECK_INTERVAL
+
+      # ---- Admin UI live e2e (Playwright) ----
+      # Runs while the stack is otherwise idle — before the parallel dotnet categories
+      # mutate facilities/reports — so the UI roundtrip test cannot race them.
+
+      - name: Setup Node for Admin UI e2e
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Web/Admin.UI/package-lock.json
+
+      - name: Install Admin UI e2e dependencies
+        working-directory: Web/Admin.UI
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('Web/Admin.UI/package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        working-directory: Web/Admin.UI
+        run: npx playwright install --with-deps chromium
+
+      # check_health.sh treats containers without a healthcheck (admin-ui) as healthy,
+      # so wait for the UI to actually respond before pointing a browser at it.
+      - name: Wait for Admin UI (8066)
+        shell: bash
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsS -o /dev/null http://localhost:8066/ && exit 0
+            sleep 2
+          done
+          echo "Admin UI never became reachable on 8066"
+          docker compose logs --no-color --tail=100 admin-ui || true
+          exit 1
+
+      # Via the npm script so the --workers=1 lives in one place: the live specs create and
+      # delete real facilities, and running them concurrently makes the cleanup DELETEs
+      # collide. Serial is also faster here, since nothing waits on a shared dev server.
+      - name: Admin UI live e2e tests
+        id: ui_e2e
+        continue-on-error: true
+        working-directory: Web/Admin.UI
+        env:
+          UI_E2E_BASE_URL: http://localhost:8066
+        run: npm run e2e:live
 
       # Build the test project ONCE up front. The parallel `dotnet test`
       # invocations below all target the same assembly and transitively
@@ -267,9 +328,98 @@ jobs:
           path: ./Tests/BackendE2ETests/bin/**/adhoc-report-test-submission.zip
           if-no-files-found: ignore
 
+      - name: Upload Admin UI e2e report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-ui-e2e-report
+          path: |
+            Web/Admin.UI/playwright-report/
+            Web/Admin.UI/test-results/
+          if-no-files-found: ignore
+
+      # The UI step uses continue-on-error so a UI failure never suppresses backend
+      # results or artifacts; this gate still fails the job afterwards.
+      - name: Fail job if Admin UI e2e failed
+        if: ${{ steps.ui_e2e.outcome == 'failure' }}
+        run: |
+          echo "Admin UI live e2e tests failed — see the admin-ui-e2e-report artifact."
+          exit 1
+
       - name: Tear down services
         if: always()
         run: docker compose down -v --remove-orphans
+
+  admin-ui-mocked-tests:
+    # The mocked Playwright tier needs no backend at all: Playwright boots its own
+    # `ng serve` and intercepts every /api call with fixtures. That makes it fast and
+    # deterministic enough to gate every PR, unlike the live tier in backend-e2e-tests
+    # which can only run once the whole compose stack is up and healthy.
+    name: Admin UI Tests (mocked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    needs: changes
+    if: ${{ needs.changes.outputs.run_admin_ui == 'true' }}
+
+    permissions:
+      contents: read
+      checks: write
+
+    defaults:
+      run:
+        working-directory: Web/Admin.UI
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Web/Admin.UI/package-lock.json
+
+      - name: Install Admin UI dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('Web/Admin.UI/package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # `npm run e2e` is --project=mocked; the config starts ng serve on 4200 itself.
+      - name: Admin UI mocked e2e tests
+        run: npm run e2e
+
+      # playwright.config.ts already emits test-results/junit.xml under CI. Paths here are
+      # repo-relative: defaults.run.working-directory applies to `run` steps only, not to
+      # action inputs. Reporting must never fail the job — the test step above is the gate.
+      - name: Admin UI Test Report
+        uses: dorny/test-reporter@v2
+        if: always()
+        continue-on-error: true
+        with:
+          name: Admin UI e2e (mocked)
+          path: Web/Admin.UI/test-results/junit.xml
+          reporter: java-junit
+
+      # Contains the HTML report plus traces/screenshots retained on failure, so a red CI
+      # run can be reproduced locally with `npx playwright show-trace <trace.zip>`.
+      - name: Upload Admin UI mocked e2e report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-ui-mocked-e2e-report
+          path: |
+            Web/Admin.UI/playwright-report/
+            Web/Admin.UI/test-results/
+          if-no-files-found: ignore
 
   dotnet-tests:
     name: .NET Tests
