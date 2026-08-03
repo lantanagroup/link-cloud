@@ -112,10 +112,17 @@ public class FutureDateCustomCheck implements CustomCheck {
         return findings;
     }
 
-    // dates are day-precision with no zone, so compare calendar days in UTC rather than instants
+    // dates have no zone, so compare calendar dates from the lexical value — going through an
+    // Instant would let the JVM default zone shift the day. Partial dates (year or year-month)
+    // compare by their earliest possible day, so they only flag when the whole period is future.
     private boolean isFuture(IBase node, Instant instant, Instant now) {
-        if (node instanceof DateType) {
-            LocalDate date = instant.atZone(ZoneOffset.UTC).toLocalDate();
+        if (node instanceof DateType d) {
+            if (d.getYear() == null) {
+                return false;
+            }
+            int month = d.getMonth() != null ? d.getMonth() + 1 : 1;
+            int day = d.getDay() != null ? d.getDay() : 1;
+            LocalDate date = LocalDate.of(d.getYear(), month, day);
             return date.isAfter(now.atZone(ZoneOffset.UTC).toLocalDate());
         }
         return instant.isAfter(now);
