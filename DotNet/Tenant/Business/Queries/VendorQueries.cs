@@ -8,6 +8,9 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
     {
         Task<VendorModel?> GetVendor(Guid Id);
         Task<List<VendorModel>> GetAll();
+        Task<VendorVersionModel?> GetVendorVersion(Guid Id);
+        Task<List<VendorVersionModel>> GetAllVendorVersions();
+        Task<List<VendorVersionModel>> GetVendorVersionsByVendorId(Guid vendorId);
     }
 
     public class VendorQueries : IVendorQueries
@@ -37,6 +40,44 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                 {
                     Id = v.Id,
                     Name = v.Name,
+                })
+                .ToListAsync();
+        }
+
+        public async Task<VendorVersionModel?> GetVendorVersion(Guid Id)
+        {
+            return await _dbContext.VendorVersions
+                .Where(vv => vv.Id == Id)
+                .Select(vv => new VendorVersionModel
+                {
+                    Id = vv.Id,
+                    VendorId = vv.VendorId,
+                    Version = vv.Version,
+                })
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<List<VendorVersionModel>> GetAllVendorVersions()
+        {
+            return await _dbContext.VendorVersions
+                .Select(vv => new VendorVersionModel
+                {
+                    Id = vv.Id,
+                    VendorId = vv.VendorId,
+                    Version = vv.Version,
+                })
+                .ToListAsync();
+        }
+
+        public async Task<List<VendorVersionModel>> GetVendorVersionsByVendorId(Guid vendorId)
+        {
+            return await _dbContext.VendorVersions
+                .Where(vv => vv.VendorId == vendorId)
+                .Select(vv => new VendorVersionModel
+                {
+                    Id = vv.Id,
+                    VendorId = vv.VendorId,
+                    Version = vv.Version,
                 })
                 .ToListAsync();
         }
