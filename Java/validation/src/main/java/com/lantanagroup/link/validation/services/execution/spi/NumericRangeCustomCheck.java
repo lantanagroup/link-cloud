@@ -7,6 +7,7 @@ import com.lantanagroup.link.validation.entities.RubricCheck;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.ExecutionContext;
 import com.lantanagroup.link.validation.models.RawFinding;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import lombok.RequiredArgsConstructor;
 import org.hl7.fhir.instance.model.api.IBase;
 import org.hl7.fhir.instance.model.api.IBaseResource;
@@ -42,23 +43,29 @@ public class NumericRangeCustomCheck implements CustomCheck {
         try {
             params = objectMapper.readTree(check.getParametersJson());
         } catch (Exception e) {
-            logger.warn("numeric-range check {} has invalid parameters JSON", check.getCheckLocalId());
+            logger.warn("numeric-range check {} has invalid parameters JSON", LogUtils.sanitize(check.getCheckLocalId()));
             return List.of();
         }
         String path = params.path("path").asText(null);
         if (path == null || path.isBlank()) {
-            logger.warn("numeric-range check {} missing 'path'", check.getCheckLocalId());
+            logger.warn("numeric-range check {} missing 'path'", LogUtils.sanitize(check.getCheckLocalId()));
             return List.of();
         }
-        Double min = params.hasNonNull("min") ? params.get("min").asDouble() : null;
-        Double max = params.hasNonNull("max") ? params.get("max").asDouble() : null;
+        Double min = numericParam(params, "min");
+        Double max = numericParam(params, "max");
+        if (min == null && max == null) {
+            logger.warn("numeric-range check {} has no usable numeric 'min' or 'max' bound",
+                    LogUtils.sanitize(check.getCheckLocalId()));
+            return List.of();
+        }
         String code = params.path("code").asText("numeric-out-of-range");
         String failureMessage = params.path("failureMessage").asText("Value at " + path + " is outside the plausible range");
         Severity severity = check.getSeverityOverride() != null ? check.getSeverityOverride() : Severity.WARNING;
 
-        List<IBaseResource> targets = context.getBundleEntries().isEmpty()
-                ? List.of(context.getResource())
-                : context.getBundleEntries();
+        List<IBaseResource> bundleEntries = context.getBundleEntries();
+        List<IBaseResource> targets = !bundleEntries.isEmpty() ? bundleEntries
+                : context.getResource() != null ? List.of(context.getResource()) : List.of();
+        if (targets.isEmpty()) return List.of();
 
         List<RawFinding> findings = new ArrayList<>();
         for (IBaseResource resource : targets) {
@@ -66,7 +73,8 @@ public class NumericRangeCustomCheck implements CustomCheck {
             try {
                 nodes = fhirPath.evaluate(resource, path, IBase.class);
             } catch (Exception e) {
-                logger.debug("numeric-range path '{}' did not evaluate on {}: {}", path, resource.fhirType(), e.getMessage());
+                logger.debug("numeric-range path '{}' did not evaluate on {}: {}",
+                        LogUtils.sanitize(path), resource.fhirType(), LogUtils.sanitize(e.getMessage()));
                 continue;
             }
             for (IBase node : nodes) {
@@ -86,6 +94,12 @@ public class NumericRangeCustomCheck implements CustomCheck {
             }
         }
         return findings;
+    }
+
+    // asDouble() coerces strings and other junk to 0, so only accept real JSON numbers
+    private Double numericParam(JsonNode params, String field) {
+        JsonNode node = params.get(field);
+        return node != null && node.isNumber() ? node.asDouble() : null;
     }
 
     private Double numericValue(IBase node) {
