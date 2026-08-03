@@ -58,11 +58,21 @@ if [ -n "$staged_exports" ]; then
         files="$files $(stage_blob "$path")"
     done
 
+    # --strict matches appconfig-secret-scan.yml, so the hook cannot pass something CI will
+    # reject. Errors block either way; --strict is only about warnings - a secret-shaped key
+    # holding a literal, a duplicate (key, label), a malformed entry. Those are worth stopping
+    # for here because these files go to a public repository, where a false positive costs a
+    # --no-verify and a false negative costs a rotated credential and permanent git history.
+    #
+    # It does not make the two identical: this scans the staged blob, CI scans all three files
+    # on disk. A warning in a file you did not stage still passes here and fails there.
     # shellcheck disable=SC2086
-    if ! "$PYTHON" Scripts/AzureAppConfig/validate_aac_secrets.py $files; then
+    if ! "$PYTHON" Scripts/AzureAppConfig/validate_aac_secrets.py --strict $files; then
         echo ""
-        echo "pre-commit: BLOCKED -- staged App Config export contains a credential."
-        echo "pre-commit: Move the value into Key Vault and reference it, then re-stage."
+        echo "pre-commit: BLOCKED -- staged App Config export failed the secret scan."
+        echo "pre-commit: An ERROR is a credential: move it into Key Vault and reference it,"
+        echo "pre-commit: then re-stage. A WARNING is something worth a look rather than"
+        echo "pre-commit: certainly wrong; it blocks here because CI runs --strict too."
         echo "pre-commit: If the finding is wrong, commit with --no-verify."
         exit 1
     fi

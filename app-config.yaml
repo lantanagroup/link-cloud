@@ -233,6 +233,43 @@ global:
     description: "Spring Kafka SASL mechanism, the Java counterpart to KafkaConnection:Mechanism. SCRAM-SHA-512, spelled in Kafka's convention rather than Confluent.Kafka's ScramSha512."
     required: true
     runtime: "java"
+  # CORS. The unlabeled rows are the platform default that the eleven backend services apply;
+  # Admin.BFF overrides them under its own label because it is the only one a browser calls
+  # directly. Automation.UI reads this section but never registers a CORS policy, so nothing
+  # it holds affects that service.
+  #
+  # AllowAllOrigins and AllowCredentials are a pair, and the combination is the trap. The
+  # shared builder does not emit a wildcard when AllowAllOrigins is true - CorsServiceExtension
+  # calls SetIsOriginAllowed(_ => true), which reflects the caller's own Origin header back.
+  # That is legal alongside Access-Control-Allow-Credentials, so the browser does not block it
+  # and nothing throws; any site could then make credentialed cross-origin requests and read
+  # the responses. Both are false on the unlabeled rows for that reason. Admin.BFF keeps
+  # AllowCredentials true, which is correct because it pairs it with an explicit AllowedOrigins
+  # list rather than reflection.
+  - key: "CORS:AllowAllOrigins"
+    description: "Whether any origin is accepted. When true the shared builder reflects the caller's Origin header rather than emitting a wildcard, which is legal with credentials and therefore dangerous when paired with them. False on the unlabeled rows; Admin.BFF sets it false and lists origins explicitly."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "CORS:AllowCredentials"
+    description: "Whether cross-origin requests may carry cookies or TLS client certificates. False on the unlabeled rows: the backend services are reached server-side through Admin.BFF, so no browser sends them credentials. Admin.BFF sets it true, paired with an explicit AllowedOrigins list."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "CORS:AllowAllMethods"
+    description: "Whether any HTTP method is accepted. When false the service uses AllowedMethods, falling back to a built-in default list."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "CORS:AllowAllHeaders"
+    description: "Whether any request header is accepted. When false the service uses AllowedHeaders, falling back to a built-in default list."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "CORS:AllowedExposedHeaders"
+    description: "Response headers a browser may read cross-origin. Stored element by element (CORS:AllowedExposedHeaders:0). X-Pagination, so paged responses expose their metadata."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "CORS:MaxAge"
+    description: "Preflight cache lifetime in seconds."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "ConnectionStrings:Redis"
     description: "The Redis endpoint (host:port). The password is supplied separately via Redis:Password. Required when Cache:Type is Redis; the resource cache uses ResourceCache:Redis:ConnectionString instead."
     required: true
@@ -383,6 +420,22 @@ services:
     - key: "MonitorBackendHealthChecks"
       description: "Boolean flag to enable monitoring of backend service health."
       required: true
+    # The explicit lists that make Admin.BFF's AllowCredentials safe. They exist only under
+    # the LinkAdminBFF label - no unlabeled rows - because it is the one service a browser
+    # calls cross-origin: the Admin UI is served from <env>-demo/<env>-dash and calls the BFF
+    # at <env>-admin. Each is stored element by element (CORS:AllowedOrigins:0, :1, ...).
+    - key: "CORS:AllowedOrigins"
+      description: "The origins allowed to call the Admin BFF: the hosts serving the Admin UI, plus http://localhost:4200 for local development. Keep this list exact - it is what makes AllowCredentials: true safe, and a cross-environment entry here lets one environment's UI reach another's BFF with credentials."
+      required: true
+      consumers: ["AdminBFF"]
+    - key: "CORS:AllowedMethods"
+      description: "HTTP methods the Admin BFF accepts cross-origin, used because AllowAllMethods is false under this label."
+      required: true
+      consumers: ["AdminBFF"]
+    - key: "CORS:AllowedHeaders"
+      description: "Request headers the Admin BFF accepts cross-origin, used because AllowAllHeaders is false under this label. Includes Authorization and Set-Cookie, which its cookie-based authentication needs."
+      required: true
+      consumers: ["AdminBFF"]
     - key: "Authentication:Schemas:OpenIdConnect:Authority"
       description: "The OpenID Connect authority the Admin BFF authenticates against. Stored as a Key Vault reference even though it is a URL, so it is flagged sensitive to match the store."
       required: true

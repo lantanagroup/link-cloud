@@ -54,16 +54,16 @@ value set in a store can never take effect.
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `CORS` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowCredentials` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:EnableCors` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `CORS:MaxAge` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:PolicyName` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
 | `Cache:Type` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:101` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
@@ -205,13 +205,13 @@ value set in a store can never take effect.
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `CORS` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:199` |
-| `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:199` |
-| `CORS:AllowCredentials` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:199` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:199` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:199` |
 | `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:199` |
 | `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:199` |
 | `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:199` |
 | `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:199` |
-| `CORS:MaxAge` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:199` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Admin.BFF/Program.cs:199` |
 | `CORS:PolicyName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:199` |
 | `Cache` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:90` |
 | `Cache:ConnectionString` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:90` |
@@ -338,16 +338,16 @@ value set in a store can never take effect.
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `CORS` | dotnet | - | - | `DotNet/Audit/Program.cs:72` |
-| `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:72` |
-| `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:72` |
-| `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:72` |
-| `CORS:AllowCredentials` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:72` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:72` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:72` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:72` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:72` |
 | `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:72` |
 | `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:72` |
 | `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:72` |
 | `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:72` |
 | `CORS:EnableCors` | dotnet | - | - | `DotNet/Audit/Program.cs:72` |
-| `CORS:MaxAge` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:72` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Audit/Program.cs:72` |
 | `CORS:PolicyName` | dotnet | - | - | `DotNet/Audit/Program.cs:72` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
@@ -606,16 +606,16 @@ value set in a store can never take effect.
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `CORS` | dotnet | - | - | `DotNet/Census/Program.cs:73` |
-| `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:73` |
-| `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:73` |
-| `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:73` |
-| `CORS:AllowCredentials` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:73` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:73` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:73` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:73` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:73` |
 | `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:73` |
 | `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:73` |
 | `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:73` |
 | `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:73` |
 | `CORS:EnableCors` | dotnet | - | - | `DotNet/Census/Program.cs:73` |
-| `CORS:MaxAge` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:73` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Census/Program.cs:73` |
 | `CORS:PolicyName` | dotnet | - | - | `DotNet/Census/Program.cs:73` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
@@ -735,16 +735,16 @@ value set in a store can never take effect.
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `CORS` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowCredentials` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:EnableCors` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `CORS:MaxAge` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:PolicyName` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
 | `Cache:Type` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:101` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
@@ -896,16 +896,16 @@ value set in a store can never take effect.
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `CORS` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
-| `CORS:AllowCredentials` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:EnableCors` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
-| `CORS:MaxAge` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:81` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:81` |
 | `CORS:PolicyName` | dotnet | - | - | `DotNet/Account/Program.cs:81` |
 | `Cache:Type` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:101` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
@@ -1072,16 +1072,16 @@ value set in a store can never take effect.
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `CORS` | dotnet | - | - | `DotNet/Normalization/Program.cs:73` |
-| `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
-| `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
-| `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
-| `CORS:AllowCredentials` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
 | `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
 | `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
 | `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
 | `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
 | `CORS:EnableCors` | dotnet | - | - | `DotNet/Normalization/Program.cs:73` |
-| `CORS:MaxAge` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
 | `CORS:PolicyName` | dotnet | - | - | `DotNet/Normalization/Program.cs:73` |
 | `CacheBlobStorage` | dotnet | - | - | `DotNet/Normalization/Program.cs:70` |
 | `CacheBlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Normalization/Program.cs:70` |
@@ -1197,16 +1197,16 @@ value set in a store can never take effect.
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `CORS` | dotnet | - | - | `DotNet/Notification/Program.cs:120` |
-| `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:120` |
-| `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:120` |
-| `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:120` |
-| `CORS:AllowCredentials` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:120` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:120` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:120` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:120` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:120` |
 | `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:120` |
 | `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:120` |
 | `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:120` |
 | `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:120` |
 | `CORS:EnableCors` | dotnet | - | - | `DotNet/Notification/Program.cs:120` |
-| `CORS:MaxAge` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:120` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Notification/Program.cs:120` |
 | `CORS:PolicyName` | dotnet | - | - | `DotNet/Notification/Program.cs:120` |
 | `Channels` | dotnet | - | - | `DotNet/Notification/Program.cs:119` |
 | `Channels:Email` | dotnet | - | dev, qa, test | `DotNet/Notification/Program.cs:119` |
@@ -1334,16 +1334,16 @@ value set in a store can never take effect.
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `CORS` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:57` |
-| `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
-| `CORS:AllowCredentials` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
 | `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
 | `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
 | `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
 | `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
 | `CORS:EnableCors` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:57` |
-| `CORS:MaxAge` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/QueryDispatch/Program.cs:57` |
 | `CORS:PolicyName` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:57` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
@@ -1456,16 +1456,16 @@ value set in a store can never take effect.
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `CORS` | dotnet | - | - | `DotNet/Report/Program.cs:95` |
-| `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:95` |
-| `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:95` |
-| `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:95` |
-| `CORS:AllowCredentials` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:95` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:95` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:95` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:95` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:95` |
 | `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:95` |
 | `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:95` |
 | `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:95` |
 | `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:95` |
 | `CORS:EnableCors` | dotnet | - | - | `DotNet/Report/Program.cs:95` |
-| `CORS:MaxAge` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:95` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:95` |
 | `CORS:PolicyName` | dotnet | - | - | `DotNet/Report/Program.cs:95` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
@@ -1591,16 +1591,16 @@ value set in a store can never take effect.
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `CORS` | dotnet | - | - | `DotNet/Submission/Program.cs:78` |
-| `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:78` |
-| `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:78` |
-| `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:78` |
-| `CORS:AllowCredentials` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:78` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:78` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:78` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:78` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:78` |
 | `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:78` |
 | `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:78` |
 | `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:78` |
 | `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:78` |
 | `CORS:EnableCors` | dotnet | - | - | `DotNet/Submission/Program.cs:78` |
-| `CORS:MaxAge` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:78` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:78` |
 | `CORS:PolicyName` | dotnet | - | - | `DotNet/Submission/Program.cs:78` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
@@ -1735,16 +1735,16 @@ value set in a store can never take effect.
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `CORS` | dotnet | - | - | `DotNet/Tenant/Program.cs:91` |
-| `CORS:AllowAllHeaders` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
-| `CORS:AllowAllMethods` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
-| `CORS:AllowAllOrigins` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
-| `CORS:AllowCredentials` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
 | `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
 | `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
 | `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
 | `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
 | `CORS:EnableCors` | dotnet | - | - | `DotNet/Tenant/Program.cs:91` |
-| `CORS:MaxAge` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
 | `CORS:PolicyName` | dotnet | - | - | `DotNet/Tenant/Program.cs:91` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
