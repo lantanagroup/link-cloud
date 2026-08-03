@@ -140,10 +140,7 @@
   }
   .info-icon .tooltip-bubble {
     display: none;
-    position: absolute;
-    bottom: calc(100% + 9px);
-    left: 50%;
-    transform: translateX(-50%);
+    position: fixed;
     background: var(--gray-800);
     color: #fff;
     font-size: 12px;
@@ -156,16 +153,22 @@
     padding: 9px 11px;
     border-radius: 6px;
     box-shadow: 0 6px 18px rgba(20,30,50,0.25);
-    z-index: 30;
+    z-index: 200;
   }
   .info-icon .tooltip-bubble::after {
     content: '';
     position: absolute;
     top: 100%;
-    left: 50%;
+    left: var(--tt-arrow-left, 50%);
     transform: translateX(-50%);
     border: 5px solid transparent;
     border-top-color: var(--gray-800);
+  }
+  .info-icon .tooltip-bubble.tooltip-flip::after {
+    top: auto;
+    bottom: 100%;
+    border-top-color: transparent;
+    border-bottom-color: var(--gray-800);
   }
   .info-icon:hover .tooltip-bubble,
   .info-icon:focus-visible .tooltip-bubble,
@@ -173,6 +176,21 @@
     display: block;
   }
   .info-icon code { display: block; margin-top: 5px; color: #cfe0f5; word-break: break-all; }
+
+  /* Backend-support indicator icon: reuses .info-icon sizing/positioning + .tooltip-bubble popup mechanics,
+     with its own glyph/color per status. Placed inside a .backend-support-slot placeholder next to a label. */
+  .backend-support-slot { display: inline-flex; vertical-align: middle; }
+  .support-icon { cursor: pointer; }
+  .support-icon.status-missing { background: #fbe9d0; color: var(--amber); }
+  .support-icon.status-missing:hover, .support-icon.status-missing:focus-visible, .support-icon.status-missing.active {
+    background: var(--amber); color: #fff;
+  }
+  .support-icon.status-present { background: #cfeee0; color: #0d7a4a; }
+  .support-icon.status-present:hover, .support-icon.status-present:focus-visible, .support-icon.status-present.active {
+    background: #0d7a4a; color: #fff;
+  }
+  .support-icon .tooltip-bubble strong { color: #cfe0f5; }
+  body.hide-backend-icons .backend-support-slot { display: none; }
 
   .triplet { display: flex; gap: 12px; }
   .triplet .form-group { flex: 1; }
@@ -648,6 +666,10 @@
   .icon-btn:hover { border-color: var(--blue); background: var(--gray-50); }
 
   #panel-report-detail { max-width: 1000px; }
+  #panel-backend-support { max-width: 1200px; }
+  .bs-group-row td { background: var(--gray-100); color: var(--gray-600); font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 12px; padding-bottom: 12px; }
+  #backendSupportAdminBody select, #backendSupportAdminBody input[type="text"] { padding: 6px 8px; font-size: 13px; }
+  #backendSupportAdminBody td { vertical-align: middle; }
   .card-header-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
   .card-header-row h1 { margin: 0; }
   .check-pill-link { border: none; padding: 0; cursor: pointer; font: inherit; }
@@ -661,8 +683,8 @@
 
   .summary-list { list-style: square outside none; margin: 0; padding: 0; }
   .summary-list li { display: flex; justify-content: space-between; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--gray-100); font-size: 13.5px; }
-  .summary-list li span:first-child { color: var(--gray-600); }
-  .summary-list li span:last-child { font-weight: 600; text-align: right; }
+  .summary-list li > span:first-child { color: var(--gray-600); }
+  .summary-list li > span:last-child { font-weight: 600; text-align: right; }
 
   [hidden] { display: none !important; }
 </style>
@@ -701,6 +723,32 @@
           <div class="error-text" id="newFacilityNameError">Facility name is required.</div>
         </div>
         <button class="btn" id="startNewBtn">Simulate NHSN Login &amp; Launch NHSNLink</button>
+
+        <div class="section-title">API Support Visualization</div>
+        <div class="form-group checkbox-row">
+          <input type="checkbox" id="backendIconsToggle">
+          <label for="backendIconsToggle" style="margin:0;">Show backend support icons next to fields while navigating onboarding pages</label>
+        </div>
+        <button type="button" class="btn btn-secondary" id="openBackendSupportBtn">Manage API Support Registry</button>
+      </div>
+    </section>
+
+    <!-- ============ API SUPPORT REGISTRY ============ -->
+    <section class="panel" id="panel-backend-support" hidden>
+      <div class="card">
+        <h1>API Support Registry</h1>
+        <p class="subtitle">Track which fields and table columns across the onboarding flow are wired up to an NHSNLink Rest API endpoint. Fill in the service, an HTTP method, URL, and description for a field to mark it as supported. Leave the service, method and URL blank to flag it as not yet supported.</p>
+        <div class="table-scroll" style="max-height:none;">
+          <table>
+            <thead>
+              <tr><th style="width:20%;">Field / Column</th><th style="width:13%;">Service</th><th style="width:9%;">Method</th><th style="width:20%;">URL</th><th style="width:20%;">Description</th><th style="width:7%;">Status</th><th style="width:7%;"></th></tr>
+            </thead>
+            <tbody id="backendSupportAdminBody"></tbody>
+          </table>
+        </div>
+        <div class="btn-row" style="margin-top:22px;">
+          <button class="btn btn-secondary" id="backendSupportBackBtn">Back</button>
+        </div>
       </div>
     </section>
 
@@ -752,12 +800,13 @@
           <label for="tzSelect">Facility Time Zone
             <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">The time zone setting is used to determine when NHSNLink schedules a new reporting period for your facility.</span>
             </button>
+            <span class="backend-support-slot" data-support-key="tzSelect"></span>
           </label>
           <select id="tzSelect"></select>
         </div>
 
         <div class="form-group">
-          <label for="vendorSelect">EHR Vendor</label>
+          <label for="vendorSelect">EHR Vendor<span class="backend-support-slot" data-support-key="vendorSelect"></span></label>
           <select id="vendorSelect">
             <option value="">Select a vendor…</option>
             <option value="Epic">Epic</option>
@@ -811,6 +860,7 @@
         <div class="form-group">
           <label for="fhirBaseUrl">FHIR Server Base URL
             <button type="button" class="info-icon" aria-label="More info about FHIR Server Base URL">?<span class="tooltip-bubble" role="tooltip">The FHIR base URL used to access your facility FHIR resources. Example: <code>https://FHIR-HOSTNAME/fhir</code></span></button>
+            <span class="backend-support-slot" data-support-key="fhirBaseUrl"></span>
           </label>
           <input type="url" id="fhirBaseUrl" placeholder="https://ehr.example.org/fhir/r4">
           <div class="error-text" id="fhirBaseUrlError">FHIR Server Base URL is required.</div>
@@ -832,6 +882,7 @@
           <div class="form-group">
             <label for="otherTokenUrl">Token URL
               <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">The OAuth 2.0 token endpoint used to obtain an access token.</span></button>
+              <span class="backend-support-slot" data-support-key="otherTokenUrl"></span>
             </label>
             <input type="url" id="otherTokenUrl" placeholder="https://ehr.example.org/oauth2/token">
             <div class="error-text" id="otherTokenUrlError">Token URL is required.</div>
@@ -839,6 +890,7 @@
           <div class="form-group">
             <label for="otherClientId">Client Id
               <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">The client identifier used when authenticating to the facility FHIR server.</span></button>
+              <span class="backend-support-slot" data-support-key="otherClientId"></span>
             </label>
             <input type="text" id="otherClientId" placeholder="Client Id">
             <div class="error-text" id="otherClientIdError">Client Id is required.</div>
@@ -846,6 +898,7 @@
           <div class="form-group">
             <label for="otherClientSecret">Client Secret
               <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">The client secret used when authenticating to the facility FHIR server.</span></button>
+              <span class="backend-support-slot" data-support-key="otherClientSecret"></span>
             </label>
             <input type="password" id="otherClientSecret" placeholder="Client Secret">
             <div class="error-text" id="otherClientSecretError">Client Secret is required.</div>
@@ -853,6 +906,7 @@
           <div class="form-group">
             <label for="otherScope">Scope
               <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">The OAuth 2.0 scope(s) requested when obtaining an access token.</span></button>
+              <span class="backend-support-slot" data-support-key="otherScope"></span>
             </label>
             <input type="text" id="otherScope" placeholder="Scope">
             <div class="error-text" id="otherScopeError">Scope is required.</div>
@@ -865,6 +919,7 @@
             <label for="maxConcurrent">Max Concurrent Requests
               <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">NHSNLink is capable of querying resources concurrently for reported patients. This setting will throttle how many requests will run concurrently against your facility FHIR server. An empty value will set the value to 1.</span>
               </button>
+              <span class="backend-support-slot" data-support-key="maxConcurrent"></span>
             </label>
             <input type="number" id="maxConcurrent" min="1" step="1">
           </div>
@@ -872,6 +927,7 @@
             <label for="maxRetries">Max Retries
               <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">If NHSNLink experiences an issue while querying your facility FHIR server, NHSNLink is capable of retrying requests. This setting will determine the maximum amount of retries NHSNLink can attempt for a given FHIR resource request. The value must be between 0 and 10.</span>
               </button>
+              <span class="backend-support-slot" data-support-key="maxRetries"></span>
             </label>
             <input type="number" id="maxRetries" min="0" max="10" step="1">
           </div>
@@ -882,6 +938,7 @@
             <label for="minPullTime">Min Acquisition Pull Time
               <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">This setting specifies a window of time when NHSNLink is allowed to start querying your facility FHIR server for patient resources.</span>
               </button>
+              <span class="backend-support-slot" data-support-key="minPullTime"></span>
             </label>
             <input type="text" id="minPullTime" placeholder="HH:MM" maxlength="5" inputmode="numeric" autocomplete="off">
           </div>
@@ -889,6 +946,7 @@
             <label for="maxPullTime">Max Acquisition Pull Time
               <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">This setting specifies a window of time when NHSNLink stops querying your facility FHIR server for patient resources.</span>
               </button>
+              <span class="backend-support-slot" data-support-key="maxPullTime"></span>
             </label>
             <input type="text" id="maxPullTime" placeholder="HH:MM" maxlength="5" inputmode="numeric" autocomplete="off">
           </div>
@@ -898,6 +956,7 @@
           <label>Patient Resource Acquisition Lag Duration
             <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">A lag time can be applied for each patient being reported to ensure that data related to the visit has settled prior to acquiring it from the facility FHIR server. For example, applying a lag can ensure that enough time has passed so that lab results can be finalized, medication orders completed, etc. All scheduled reports will wait until each patient in the census is accounted for, even if the lag that's applied goes beyond a reporting period (monthly, daily, etc)</span>
             </button>
+            <span class="backend-support-slot" data-support-key="lagDuration"></span>
           </label>
           <div class="triplet">
             <div class="form-group"><label for="freqLagDays">Days</label><input type="number" id="freqLagDays" min="0" placeholder="Days"></div>
@@ -927,7 +986,7 @@
           <p class="subtitle">Census refers to the patient cohort from which the Initial Population (IP) of enrolled NHSN measures are identified. How NHSNLink will acquire census information depends on the EHR vendor implementations. Below will guide you on the configuration steps needed for NHSNLink to acquire and maintain a patient census.</p>
 
             <div class="form-group" id="censusAdtQuestionWrap">
-              <label>Will your facility be using an HL7 V2 ADT (<a href="https://v2.hl7.org/conformance/HL7v2_Conformance_Methodology_R1_O1_Ballot_Revised_D9_-_September_2019_Introduction.html">Link Here</a>) feed for NHSNLink census management?</label>
+              <label>Will your facility be using an HL7 V2 ADT (<a href="https://v2.hl7.org/conformance/HL7v2_Conformance_Methodology_R1_O1_Ballot_Revised_D9_-_September_2019_Introduction.html">Link Here</a>) feed for NHSNLink census management?<span class="backend-support-slot" data-support-key="censusAdtQuestion"></span></label>
               <div class="btn-group" id="censusAdtQuestion">
                 <button type="button" class="choice-btn" data-value="true">Yes</button>
                 <button type="button" class="choice-btn" data-value="false">No</button>
@@ -955,7 +1014,7 @@
                   </a>
                 </div>
                 <div class="form-group census-list-field">
-                  <label for="censusEAdmitLt24">Admit - Within 24 Hours<span class="census-list-indicator" id="censusListIndicator-admitLt24"></span></label>
+                  <label for="censusEAdmitLt24">Admit - Within 24 Hours<span class="census-list-indicator" id="censusListIndicator-admitLt24"></span><span class="backend-support-slot" data-support-key="censusEAdmitLt24"></span></label>
                   <div class="census-list-input-row">
                     <input type="text" id="censusEAdmitLt24">
                     <button type="button" class="census-view-btn" id="censusViewBtn-admitLt24" hidden aria-label="View results for Admit - Within 24 Hours"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/></svg></button>
@@ -963,7 +1022,7 @@
                   <div class="error-text" id="censusEAdmitLt24Error">This field is required.</div>
                 </div>
                 <div class="form-group census-list-field">
-                  <label for="censusEAdmit24to48">Admit - Between 24 and 48 hours<span class="census-list-indicator" id="censusListIndicator-admit24to48"></span></label>
+                  <label for="censusEAdmit24to48">Admit - Between 24 and 48 hours<span class="census-list-indicator" id="censusListIndicator-admit24to48"></span><span class="backend-support-slot" data-support-key="censusEAdmit24to48"></span></label>
                   <div class="census-list-input-row">
                     <input type="text" id="censusEAdmit24to48">
                     <button type="button" class="census-view-btn" id="censusViewBtn-admit24to48" hidden aria-label="View results for Admit - Between 24 and 48 hours"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/></svg></button>
@@ -971,7 +1030,7 @@
                   <div class="error-text" id="censusEAdmit24to48Error">This field is required.</div>
                 </div>
                 <div class="form-group census-list-field">
-                  <label for="censusEAdmitGt48">Admit - Over 48 hours<span class="census-list-indicator" id="censusListIndicator-admitGt48"></span></label>
+                  <label for="censusEAdmitGt48">Admit - Over 48 hours<span class="census-list-indicator" id="censusListIndicator-admitGt48"></span><span class="backend-support-slot" data-support-key="censusEAdmitGt48"></span></label>
                   <div class="census-list-input-row">
                     <input type="text" id="censusEAdmitGt48">
                     <button type="button" class="census-view-btn" id="censusViewBtn-admitGt48" hidden aria-label="View results for Admit - Over 48 hours"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/></svg></button>
@@ -979,7 +1038,7 @@
                   <div class="error-text" id="censusEAdmitGt48Error">This field is required.</div>
                 </div>
                 <div class="form-group census-list-field">
-                  <label for="censusEDischargeLt24">Discharge - Where lookback of admission is within past 24 hours<span class="census-list-indicator" id="censusListIndicator-dischargeLt24"></span></label>
+                  <label for="censusEDischargeLt24">Discharge - Where lookback of admission is within past 24 hours<span class="census-list-indicator" id="censusListIndicator-dischargeLt24"></span><span class="backend-support-slot" data-support-key="censusEDischargeLt24"></span></label>
                   <div class="census-list-input-row">
                     <input type="text" id="censusEDischargeLt24">
                     <button type="button" class="census-view-btn" id="censusViewBtn-dischargeLt24" hidden aria-label="View results for Discharge - Within past 24 hours"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/></svg></button>
@@ -987,7 +1046,7 @@
                   <div class="error-text" id="censusEDischargeLt24Error">This field is required.</div>
                 </div>
                 <div class="form-group census-list-field">
-                  <label for="censusEDischarge24to48">Discharge - Where lookback of admission is between 24 and 48 hours<span class="census-list-indicator" id="censusListIndicator-discharge24to48"></span></label>
+                  <label for="censusEDischarge24to48">Discharge - Where lookback of admission is between 24 and 48 hours<span class="census-list-indicator" id="censusListIndicator-discharge24to48"></span><span class="backend-support-slot" data-support-key="censusEDischarge24to48"></span></label>
                   <div class="census-list-input-row">
                     <input type="text" id="censusEDischarge24to48">
                     <button type="button" class="census-view-btn" id="censusViewBtn-discharge24to48" hidden aria-label="View results for Discharge - Between 24 and 48 hours"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/></svg></button>
@@ -995,7 +1054,7 @@
                   <div class="error-text" id="censusEDischarge24to48Error">This field is required.</div>
                 </div>
                 <div class="form-group census-list-field">
-                  <label for="censusEDischargeGt48">Discharge - Where lookback of admission is over 48 hours<span class="census-list-indicator" id="censusListIndicator-dischargeGt48"></span></label>
+                  <label for="censusEDischargeGt48">Discharge - Where lookback of admission is over 48 hours<span class="census-list-indicator" id="censusListIndicator-dischargeGt48"></span><span class="backend-support-slot" data-support-key="censusEDischargeGt48"></span></label>
                   <div class="census-list-input-row">
                     <input type="text" id="censusEDischargeGt48">
                     <button type="button" class="census-view-btn" id="censusViewBtn-dischargeGt48" hidden aria-label="View results for Discharge - Over 48 hours"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/></svg></button>
@@ -1011,14 +1070,15 @@
                     Download PDF Instructions
                   </a>
                 </div>
-                <div class="form-group"><label for="censusCHost">SFTP Host URL</label><input type="text" id="censusCHost"><div class="error-text" id="censusCHostError">SFTP Host URL is required.</div></div>
-                <div class="form-group"><label for="censusCPort">SFTP Host URL Port</label><input type="number" id="censusCPort" min="1" max="65535"><div class="error-text" id="censusCPortError">SFTP Host URL Port is required.</div></div>
-                <div class="form-group"><label for="censusCRemoteDir">Remote Directory</label><input type="text" id="censusCRemoteDir" placeholder="/"><div class="form-hint">Path to the directory on the SFTP server (use '/' for root)</div></div>
+                <div class="form-group"><label for="censusCHost">SFTP Host URL<span class="backend-support-slot" data-support-key="censusCHost"></span></label><input type="text" id="censusCHost"><div class="error-text" id="censusCHostError">SFTP Host URL is required.</div></div>
+                <div class="form-group"><label for="censusCPort">SFTP Host URL Port<span class="backend-support-slot" data-support-key="censusCPort"></span></label><input type="number" id="censusCPort" min="1" max="65535"><div class="error-text" id="censusCPortError">SFTP Host URL Port is required.</div></div>
+                <div class="form-group"><label for="censusCRemoteDir">Remote Directory<span class="backend-support-slot" data-support-key="censusCRemoteDir"></span></label><input type="text" id="censusCRemoteDir" placeholder="/"><div class="form-hint">Path to the directory on the SFTP server (use '/' for root)</div></div>
                 <div class="form-group checkbox-row">
                   <input type="checkbox" id="censusCRemove">
                     <label for="censusCRemove" style="margin:0;">Remove files after processing
                       <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">Enable this setting is your facility prefers for NHSNLink to delete files in the SFTP directory after they are processed.</span>
                       </button>
+                      <span class="backend-support-slot" data-support-key="censusCRemove"></span>
                     </label>
                 </div>
               </div>
@@ -1028,6 +1088,7 @@
               <label>Census Acquisition Frequency
                 <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">This setting determines the frequency in which NHSNLink will attempt to get the latest census results.</span>
                 </button>
+                <span class="backend-support-slot" data-support-key="censusFreq"></span>
               </label>
               <div class="triplet">
                 <div class="form-group"><label for="freqCensusHours">Hours</label><input type="number" id="freqCensusHours" min="0" placeholder="Hours"></div>
@@ -1082,7 +1143,7 @@
         <p class="subtitle">Often reporting facilities within a health system will share a common FHIR endpoint with other facilities in the network. Due to query limitations from EHR (Electronic Health Record) systems, there's a risk that NHSNLink may retrieve patient related FHIR resources that don't belong to the reporting facility. To address this, configuration on specific FHIR Location values must be provided to ensure that any patient Encounters that are evaluated for NHSN measures are within the reporting facility. <b>No configuration is needed unless your facility's FHIR data is shared with other facilities in your health system.</b></p>
 
         <div class="form-group" id="locOrgMethodWrap">
-          <label>Resolution Method</label>
+          <label>Resolution Method<span class="backend-support-slot" data-support-key="locOrgMethod"></span></label>
           <div class="btn-group" id="locOrgMethodGroup" role="tablist"></div>
         </div>
 
@@ -1092,7 +1153,7 @@
             <button type="button" class="btn btn-secondary btn-sm" id="cernerSiteSearchBtn">Search Cerner Site Locations</button>
           </div>
           <div class="form-group">
-            <label>Location Type Code / Location Alias</label>
+            <label>Location Type Code / Location Alias<span class="backend-support-slot" data-support-key="locTypeList"></span></label>
             <div class="repeat-list" id="locTypeList"></div>
             <button type="button" class="btn btn-secondary btn-sm" id="locTypeAddBtn">+ Add Location Type</button>
           </div>
@@ -1100,7 +1161,7 @@
 
         <div id="locOrgFieldsManagingOrg" hidden>
           <div class="form-group">
-            <label>Managing Organizations</label>
+            <label>Managing Organizations<span class="backend-support-slot" data-support-key="managingOrgList"></span></label>
             <div class="repeat-list" id="managingOrgList"></div>
             <button type="button" class="btn btn-secondary btn-sm" id="managingOrgAddBtn">+ Add Managing Organization</button>
           </div>
@@ -1115,7 +1176,7 @@
             </a>
           </div>
           <div class="form-group">
-            <label>Location Identifier System / Location Identifier Code</label>
+            <label>Location Identifier System / Location Identifier Code<span class="backend-support-slot" data-support-key="locIdentifierList"></span></label>
             <div class="repeat-list" id="locIdentifierList"></div>
             <button type="button" class="btn btn-secondary btn-sm" id="locIdentifierAddBtn">+ Add Location Identifier</button>
           </div>
@@ -1123,7 +1184,7 @@
 
         <div id="locOrgFieldsCustomPath" hidden>
           <div class="form-group">
-            <label for="customFhirPath">Custom FHIR Path</label>
+            <label for="customFhirPath">Custom FHIR Path<span class="backend-support-slot" data-support-key="customFhirPath"></span></label>
             <input type="text" id="customFhirPath" placeholder="e.g. Location.extension.where(url='...')">
           </div>
         </div>
@@ -1156,7 +1217,7 @@
           </div>
           <div id="hslocFieldsMapping" hidden>
             <div class="form-group">
-              <label id="hslocMappingLabel">HSLOC Code Mappings</label>
+              <label id="hslocMappingLabel">HSLOC Code Mappings<span class="backend-support-slot" data-support-key="hslocMappingList"></span></label>
               <div class="repeat-list" id="hslocMappingList"></div>
               <button type="button" class="btn btn-secondary btn-sm" id="hslocMappingAddBtn">+ Add Mapping</button>
             </div>
@@ -1212,7 +1273,7 @@
 
         <div id="encounterMappingTab">
           <div class="form-group">
-            <label>Encounter.type Code Systems</label>
+            <label>Encounter.type Code Systems<span class="backend-support-slot" data-support-key="encounterCodeSystems"></span></label>
             <p class="form-hint" style="margin-top:0;">Add each source code system your facility's local Encounter.type codes come from. Within each code system, map its local codes to the corresponding CPT or SNOMED reference code.</p>
           </div>
           <div id="encounterCodeSystemList"></div>
@@ -1269,6 +1330,7 @@
           <label for="measuresSearchInput">Measures
             <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">A list of NHSN measures that your facility has a reporting plan for.</span>
             </button>
+            <span class="backend-support-slot" data-support-key="measuresSelect"></span>
           </label>
           <div class="measures-multiselect" id="measuresMultiselect">
             <div class="measures-chips" id="measuresChips"></div>
@@ -1278,14 +1340,15 @@
         </div>
 
         <div class="triplet">
-          <div class="form-group"><label for="reportStartDate">Report Start Date</label><input type="date" id="reportStartDate"></div>
-          <div class="form-group"><label for="reportEndDate">Report End Date</label><input type="date" id="reportEndDate"></div>
+          <div class="form-group"><label for="reportStartDate">Report Start Date<span class="backend-support-slot" data-support-key="reportStartDate"></span></label><input type="date" id="reportStartDate"></div>
+          <div class="form-group"><label for="reportEndDate">Report End Date<span class="backend-support-slot" data-support-key="reportEndDate"></span></label><input type="date" id="reportEndDate"></div>
         </div>
 
         <div class="form-group">
           <label>FHIR Patient ID(s)
             <button type="button" class="info-icon" aria-label="More info">?<span class="tooltip-bubble" role="tooltip">List the FHIR Patient Id's to report against. Prior to generating the report, NHSNLink will validate that each Patient Id returns a FHIR Patient resource to ensure that all Id's are acurate. A maximum of 10 Patient Id's are allowed, added via any combination of the methods below.</span>
             </button>
+            <span class="backend-support-slot" data-support-key="patientIds"></span>
           </label>
 
           <div class="btn-group" id="patientIdMethodTabGroup" role="tablist" style="margin-bottom:16px;">
@@ -1370,7 +1433,7 @@
         <div class="table-scroll">
           <table>
             <thead>
-              <tr><th>Report Id</th><th>Measures</th><th>Patient Count</th><th>Start Date</th><th>End Date</th><th>Create Date</th><th>Status</th><th></th></tr>
+              <tr><th>Report Id<span class="backend-support-slot" data-support-key="reportResultsReportId"></span></th><th>Measures<span class="backend-support-slot" data-support-key="reportResultsMeasures"></span></th><th>Patient Count<span class="backend-support-slot" data-support-key="reportResultsPatientCount"></span></th><th>Start Date<span class="backend-support-slot" data-support-key="reportResultsStartDate"></span></th><th>End Date<span class="backend-support-slot" data-support-key="reportResultsEndDate"></span></th><th>Create Date<span class="backend-support-slot" data-support-key="reportResultsCreateDate"></span></th><th>Status<span class="backend-support-slot" data-support-key="reportResultsStatus"></span></th><th></th></tr>
             </thead>
             <tbody id="reportResultsTbody"></tbody>
           </table>
@@ -1395,15 +1458,15 @@
           </button>
         </div>
         <ul class="summary-list" style="margin-bottom:22px;">
-          <li><span>Report Id</span><span id="rdReportId"></span></li>
+          <li><span>Report Id<span class="backend-support-slot" data-support-key="rdReportId"></span></span><span id="rdReportId"></span></li>
           <li id="rdRegeneratedFromRow" hidden><span>Regenerated From</span><span id="rdRegeneratedFrom"></span></li>
-          <li><span>Reporting Period</span><span id="rdPeriod"></span></li>
-          <li><span>Create Date</span><span id="rdCreateDate"></span></li>
-          <li><span>Patient Count</span><span id="rdPatientCount"></span></li>
-          <li><span>Status</span><span id="rdStatus"></span></li>
+          <li><span>Reporting Period<span class="backend-support-slot" data-support-key="rdPeriod"></span></span><span id="rdPeriod"></span></li>
+          <li><span>Create Date<span class="backend-support-slot" data-support-key="rdCreateDate"></span></span><span id="rdCreateDate"></span></li>
+          <li><span>Patient Count<span class="backend-support-slot" data-support-key="rdPatientCount"></span></span><span id="rdPatientCount"></span></li>
+          <li><span>Status<span class="backend-support-slot" data-support-key="rdStatus"></span></span><span id="rdStatus"></span></li>
         </ul>
 
-        <div class="section-title" style="margin-top:0;">Selected Measures &amp; Digital Quality Measures</div>
+        <div class="section-title" style="margin-top:0;">Selected Measures &amp; Digital Quality Measures<span class="backend-support-slot" data-support-key="rdMeasureMapping"></span></div>
         <div class="table-scroll" style="margin-bottom:22px;">
           <table>
             <thead>
@@ -1421,7 +1484,7 @@
         <div class="table-scroll" id="rdTableScroll">
           <table>
             <thead>
-              <tr><th>Patient Id</th><th>FHIR Resource Count</th><th>Report Status</th><th>Location Org</th><th>HSLOC Mapping</th><th>Encounter Mapping</th><th></th></tr>
+              <tr><th>Patient Id<span class="backend-support-slot" data-support-key="rdColPatientId"></span></th><th>FHIR Resource Count<span class="backend-support-slot" data-support-key="rdColResourceCount"></span></th><th>Report Status<span class="backend-support-slot" data-support-key="rdColReportStatus"></span></th><th>Location Org<span class="backend-support-slot" data-support-key="rdColLocationOrg"></span></th><th>HSLOC Mapping<span class="backend-support-slot" data-support-key="rdColHsloc"></span></th><th>Encounter Mapping<span class="backend-support-slot" data-support-key="rdColEncounter"></span></th><th></th></tr>
             </thead>
             <tbody id="rdTableBody"></tbody>
           </table>
@@ -1447,7 +1510,7 @@
         <div class="table-scroll" id="reportingPlanTableScroll">
           <table>
             <thead>
-              <tr><th>Report Month</th><th>Report Year</th><th>NHSN Measures</th></tr>
+              <tr><th>Report Month<span class="backend-support-slot" data-support-key="reportingPlanMonth"></span></th><th>Report Year<span class="backend-support-slot" data-support-key="reportingPlanYear"></span></th><th>NHSN Measures<span class="backend-support-slot" data-support-key="reportingPlanMeasures"></span></th></tr>
             </thead>
             <tbody id="reportingPlanTbody"></tbody>
           </table>
@@ -1758,10 +1821,6 @@
     return result;
   }
 
-  var DEAD_END_PANEL_STEP = {
-    'panel-report-detail': 'report-results'
-  };
-
   function getSteps() {
     var steps = [
       { id: 'welcome', label: 'Setup', panel: 'panel-welcome' },
@@ -1784,6 +1843,190 @@
   var facilities = [];
   var facility = null;
   var currentStepId = 'welcome';
+
+  // ---------- backend support visualization ----------
+  // Canonical registry of every primary field / table column whose data may or may not
+  // yet be wired up to a real backend. Each entry gets an indicator icon rendered into a
+  // matching <span class="backend-suppock rt-slot" data-support-key="KEY"> placeholder.
+  var BACKEND_SUPPORT_REGISTRY = [
+    { key: 'tzSelect', page: 'Facility Information', label: 'Facility Time Zone' },
+    { key: 'vendorSelect', page: 'Facility Information', label: 'EHR Vendor' },
+
+    { key: 'fhirBaseUrl', page: 'FHIR Server Information', label: 'FHIR Server Base URL' },
+    { key: 'otherTokenUrl', page: 'FHIR Server Information', label: 'Token URL (Other vendor)' },
+    { key: 'otherClientId', page: 'FHIR Server Information', label: 'Client Id (Other vendor)' },
+    { key: 'otherClientSecret', page: 'FHIR Server Information', label: 'Client Secret (Other vendor)' },
+    { key: 'otherScope', page: 'FHIR Server Information', label: 'Scope (Other vendor)' },
+    { key: 'maxConcurrent', page: 'FHIR Server Information', label: 'Max Concurrent Requests' },
+    { key: 'maxRetries', page: 'FHIR Server Information', label: 'Max Retries' },
+    { key: 'minPullTime', page: 'FHIR Server Information', label: 'Min Acquisition Pull Time' },
+    { key: 'maxPullTime', page: 'FHIR Server Information', label: 'Max Acquisition Pull Time' },
+    { key: 'lagDuration', page: 'FHIR Server Information', label: 'Patient Resource Acquisition Lag Duration' },
+
+    { key: 'censusAdtQuestion', page: 'Census Configuration', label: 'HL7 V2 ADT Feed Question' },
+    { key: 'censusEAdmitLt24', page: 'Census Configuration', label: 'Epic List: Admit - Within 24 Hours' },
+    { key: 'censusEAdmit24to48', page: 'Census Configuration', label: 'Epic List: Admit - Between 24 and 48 Hours' },
+    { key: 'censusEAdmitGt48', page: 'Census Configuration', label: 'Epic List: Admit - Over 48 Hours' },
+    { key: 'censusEDischargeLt24', page: 'Census Configuration', label: 'Epic List: Discharge - Lookback Within 24 Hours' },
+    { key: 'censusEDischarge24to48', page: 'Census Configuration', label: 'Epic List: Discharge - Lookback Between 24 and 48 Hours' },
+    { key: 'censusEDischargeGt48', page: 'Census Configuration', label: 'Epic List: Discharge - Lookback Over 48 Hours' },
+    { key: 'censusCHost', page: 'Census Configuration', label: 'SFTP Host URL' },
+    { key: 'censusCPort', page: 'Census Configuration', label: 'SFTP Host URL Port' },
+    { key: 'censusCRemoteDir', page: 'Census Configuration', label: 'Remote Directory' },
+    { key: 'censusCRemove', page: 'Census Configuration', label: 'Remove Files After Processing' },
+    { key: 'censusFreq', page: 'Census Configuration', label: 'Census Acquisition Frequency' },
+
+    { key: 'locOrgMethod', page: 'Location Organization Resolution', label: 'Resolution Method' },
+    { key: 'locTypeList', page: 'Location Organization Resolution', label: 'Location Type Code / Location Alias' },
+    { key: 'managingOrgList', page: 'Location Organization Resolution', label: 'Managing Organizations' },
+    { key: 'locIdentifierList', page: 'Location Organization Resolution', label: 'Location Identifier System / Location Identifier Code' },
+    { key: 'customFhirPath', page: 'Location Organization Resolution', label: 'Custom FHIR Path' },
+
+    { key: 'hslocMappingList', page: 'HSLOC Location Mapping', label: 'HSLOC Code Mappings' },
+
+    { key: 'encounterCodeSystems', page: 'Encounter Mapping', label: 'Encounter.type Code Systems' },
+
+    { key: 'measuresSelect', page: 'Generate Report', label: 'Measures' },
+    { key: 'reportStartDate', page: 'Generate Report', label: 'Report Start Date' },
+    { key: 'reportEndDate', page: 'Generate Report', label: 'Report End Date' },
+    { key: 'patientIds', page: 'Generate Report', label: 'FHIR Patient ID(s)' },
+
+    { key: 'reportResultsReportId', page: 'Report Results', label: 'Report Id (column)' },
+    { key: 'reportResultsMeasures', page: 'Report Results', label: 'Measures (column)' },
+    { key: 'reportResultsPatientCount', page: 'Report Results', label: 'Patient Count (column)' },
+    { key: 'reportResultsStartDate', page: 'Report Results', label: 'Start Date (column)' },
+    { key: 'reportResultsEndDate', page: 'Report Results', label: 'End Date (column)' },
+    { key: 'reportResultsCreateDate', page: 'Report Results', label: 'Create Date (column)' },
+    { key: 'reportResultsStatus', page: 'Report Results', label: 'Status (column)' },
+
+    { key: 'rdReportId', page: 'Report Details', label: 'Report Id' },
+    { key: 'rdPeriod', page: 'Report Details', label: 'Reporting Period' },
+    { key: 'rdCreateDate', page: 'Report Details', label: 'Create Date' },
+    { key: 'rdPatientCount', page: 'Report Details', label: 'Patient Count' },
+    { key: 'rdStatus', page: 'Report Details', label: 'Status' },
+    { key: 'rdMeasureMapping', page: 'Report Details', label: 'NHSN Measure / Digital Quality Measure Mapping' },
+    { key: 'rdColPatientId', page: 'Report Details', label: 'Patient Id (column)' },
+    { key: 'rdColResourceCount', page: 'Report Details', label: 'FHIR Resource Count (column)' },
+    { key: 'rdColReportStatus', page: 'Report Details', label: 'Report Status (column)' },
+    { key: 'rdColLocationOrg', page: 'Report Details', label: 'Location Org (column)' },
+    { key: 'rdColHsloc', page: 'Report Details', label: 'HSLOC Mapping (column)' },
+    { key: 'rdColEncounter', page: 'Report Details', label: 'Encounter Mapping (column)' },
+
+    { key: 'reportingPlanMonth', page: 'Facility Reporting Plan', label: 'Report Month (column)' },
+    { key: 'reportingPlanYear', page: 'Facility Reporting Plan', label: 'Report Year (column)' },
+    { key: 'reportingPlanMeasures', page: 'Facility Reporting Plan', label: 'NHSN Measures (column)' }
+  ];
+  var backendSupportData = {};
+  var backendSupportLoaded = false;
+
+  function loadBackendSupportData() {
+    return fetch('/api/backend-support')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        backendSupportData = data || {};
+        backendSupportLoaded = true;
+        renderBackendSupportIcons();
+      })
+      .catch(function () { backendSupportLoaded = true; });
+  }
+
+  function saveBackendSupportEntry(key, service, method, url, description) {
+    return fetch('/api/backend-support', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: key, service: service, method: method, url: url, description: description })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (result) {
+        if (service || method || url || description) {
+          backendSupportData[key] = { service: service, method: method, url: url, description: description };
+        } else {
+          delete backendSupportData[key];
+        }
+        renderBackendSupportIcons();
+        return result;
+      });
+  }
+
+  function backendSupportIconHtml(key) {
+    var entry = backendSupportData[key];
+    var hasSupport = entry && entry.method && entry.url;
+    var serviceLine = entry && entry.service ? '<strong>Service:</strong> ' + escapeHtml(entry.service) + '<br/>' : '';
+    if (hasSupport) {
+      return '<button type="button" class="info-icon support-icon status-present" aria-label="Backend supported">✓' +
+        '<span class="tooltip-bubble" role="tooltip">' + serviceLine + '<strong>' + escapeHtml(entry.method) + '</strong> ' + escapeHtml(entry.url) +
+        (entry.description ? '<br/>' + escapeHtml(entry.description) : '') +
+        '</span></button>';
+    }
+    var desc = entry && entry.description ? entry.description : '';
+    return '<button type="button" class="info-icon support-icon status-missing" aria-label="Backend not yet supported">!' +
+      '<span class="tooltip-bubble" role="tooltip">' + serviceLine + 'No API support entry yet for this field.' +
+      (desc ? '<br/>' + escapeHtml(desc) : '') +
+      '</span></button>';
+  }
+
+  function renderBackendSupportIcons() {
+    if (!backendSupportLoaded) return;
+    document.querySelectorAll('.backend-support-slot').forEach(function (slot) {
+      var key = slot.getAttribute('data-support-key');
+      slot.innerHTML = backendSupportIconHtml(key);
+    });
+  }
+
+  function applyBackendIconsVisibility() {
+    var show = localStorage.getItem('nhsnlink-show-backend-icons') === '1';
+    document.body.classList.toggle('hide-backend-icons', !show);
+    var toggle = $('backendIconsToggle');
+    if (toggle) toggle.checked = show;
+  }
+
+  var BACKEND_SUPPORT_METHODS = ['', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+  var BACKEND_SUPPORT_SERVICES = ['', 'Tenant', 'Census', 'Data Acquisition', 'Data Acquisition Worker', 'Query Dispatch', 'Normalization', 'Measure Eval', 'Report', 'Validation', 'Terminology', 'Submission', 'Audit', 'Account'];
+
+  function renderBackendSupportAdminPage() {
+    var groups = {};
+    var order = [];
+    BACKEND_SUPPORT_REGISTRY.forEach(function (item) {
+      if (!groups[item.page]) { groups[item.page] = []; order.push(item.page); }
+      groups[item.page].push(item);
+    });
+    var html = '';
+    order.forEach(function (page) {
+      html += '<tr class="bs-group-row"><td colspan="7">' + escapeHtml(page) + '</td></tr>';
+      groups[page].forEach(function (item) {
+        var entry = backendSupportData[item.key] || {};
+        html += '<tr data-key="' + item.key + '">' +
+          '<td>' + escapeHtml(item.label) + '</td>' +
+          '<td><select class="bs-service">' + BACKEND_SUPPORT_SERVICES.map(function (s) {
+            return '<option value="' + s + '"' + (entry.service === s ? ' selected' : '') + '>' + (s || '—') + '</option>';
+          }).join('') + '</select></td>' +
+          '<td><select class="bs-method">' + BACKEND_SUPPORT_METHODS.map(function (m) {
+            return '<option value="' + m + '"' + (entry.method === m ? ' selected' : '') + '>' + (m || '—') + '</option>';
+          }).join('') + '</select></td>' +
+          '<td><input type="text" class="bs-url" value="' + escapeHtml(entry.url || '') + '" placeholder="https://…"></td>' +
+          '<td><input type="text" class="bs-desc" value="' + escapeHtml(entry.description || '') + '" placeholder="Description"></td>' +
+          '<td class="bs-status">' + backendSupportIconHtml(item.key) + '</td>' +
+          '<td><button type="button" class="btn btn-secondary btn-sm bs-save">Save</button></td>' +
+          '</tr>';
+      });
+    });
+    $('backendSupportAdminBody').innerHTML = html;
+  }
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.bs-save');
+    if (!btn) return;
+    var tr = btn.closest('tr');
+    var key = tr.getAttribute('data-key');
+    var service = tr.querySelector('.bs-service').value;
+    var method = tr.querySelector('.bs-method').value;
+    var url = tr.querySelector('.bs-url').value.trim();
+    var description = tr.querySelector('.bs-desc').value.trim();
+    saveBackendSupportEntry(key, service, method, url, description).then(function () {
+      tr.querySelector('.bs-status').innerHTML = backendSupportIconHtml(key);
+      showToast('Backend support entry saved.');
+    });
+  });
 
   // ---------- utilities ----------
   function $(id) { return document.getElementById(id); }
@@ -2783,6 +3026,7 @@
       saveFacility();
     }
     renderNav();
+    renderBackendSupportIcons();
     window.scrollTo(0, 0);
   }
 
@@ -2841,25 +3085,7 @@
       return;
     }
 
-    var panel = f.currentPanel || 'panel-enrollment';
-    var stepId = DEAD_END_PANEL_STEP[panel];
-    if (!stepId) {
-      var step = getSteps().filter(function (s) { return s.panel === panel; })[0];
-      stepId = step ? step.id : 'enrollment';
-    }
-
-    if (panel === 'panel-fhir-upload') renderFhirUploadPanel();
-    if (panel === 'panel-fhir') renderFhirTestState();
-    if (panel === 'panel-census') renderCensusPanelState();
-    if (panel === 'panel-location-org') renderLocationOrgPanel();
-    if (panel === 'panel-hsloc') renderHslocPanel();
-    if (panel === 'panel-report') renderReportPanelState();
-    if (panel === 'panel-report-results') renderReportResultsState();
-    if (panel === 'panel-report-detail') renderReportDetailPanel(f.viewingReportId);
-    if (panel === 'panel-reporting-plan') renderReportingPlanPanel();
-    if (panel === 'panel-complete') renderCompleteSummary();
-
-    goTo(panel, stepId);
+    enterStep('enrollment');
   }
 
   $('startNewBtn').addEventListener('click', function () {
@@ -2877,6 +3103,20 @@
       loadFacilities();
       enterStep('enrollment');
     });
+  });
+
+  $('openBackendSupportBtn').addEventListener('click', function () {
+    renderBackendSupportAdminPage();
+    goTo('panel-backend-support', 'backend-support');
+  });
+
+  $('backendSupportBackBtn').addEventListener('click', function () {
+    goTo('panel-welcome', 'welcome');
+  });
+
+  $('backendIconsToggle').addEventListener('change', function () {
+    localStorage.setItem('nhsnlink-show-backend-icons', this.checked ? '1' : '0');
+    applyBackendIconsVisibility();
   });
 
   $('maintenanceBackBtn').addEventListener('click', function () {
@@ -6366,6 +6606,37 @@
   }
 
   // ---------- info icon tooltips (reusable "?" pattern, delegated so it works on dynamically-rendered labels too) ----------
+  // Bubbles are position:fixed and their coordinates are computed here (rather than via pure CSS) so they
+  // render above ancestors with overflow:auto/hidden clipping (e.g. table headers inside .table-scroll).
+  function positionTooltipBubble(icon) {
+    var bubble = icon.querySelector('.tooltip-bubble');
+    if (!bubble) return;
+    bubble.style.visibility = 'hidden';
+    bubble.style.display = 'block';
+    var iconRect = icon.getBoundingClientRect();
+    var bubbleRect = bubble.getBoundingClientRect();
+    var gap = 9;
+    var left = iconRect.left + iconRect.width / 2 - bubbleRect.width / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - bubbleRect.width - 8));
+    var top = iconRect.top - bubbleRect.height - gap;
+    var flip = top < 8;
+    if (flip) top = iconRect.bottom + gap;
+    var arrowLeft = Math.max(12, Math.min(iconRect.left + iconRect.width / 2 - left, bubbleRect.width - 12));
+    bubble.style.left = left + 'px';
+    bubble.style.top = top + 'px';
+    bubble.style.setProperty('--tt-arrow-left', arrowLeft + 'px');
+    bubble.classList.toggle('tooltip-flip', flip);
+    bubble.style.visibility = '';
+    bubble.style.display = '';
+  }
+  document.addEventListener('mouseover', function (e) {
+    var icon = e.target.closest('.info-icon');
+    if (icon) positionTooltipBubble(icon);
+  });
+  document.addEventListener('focusin', function (e) {
+    var icon = e.target.closest('.info-icon');
+    if (icon) positionTooltipBubble(icon);
+  });
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('.info-icon');
     document.querySelectorAll('.info-icon.active').forEach(function (b) {
@@ -6375,6 +6646,7 @@
       e.preventDefault();
       e.stopPropagation();
       btn.classList.toggle('active');
+      if (btn.classList.contains('active')) positionTooltipBubble(btn);
     }
   });
   document.addEventListener('keydown', function (e) {
@@ -6386,6 +6658,8 @@
   // ---------- init ----------
   loadFacilities();
   renderNav();
+  applyBackendIconsVisibility();
+  loadBackendSupportData();
 })();
 </script>
 </body>
