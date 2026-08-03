@@ -21,6 +21,27 @@ The full narrative version of this document is `docs/design-appconfig.html`.
 ## File format
 
 Each file is an `az appconfig kv export` result: a single `items` array, one object per row.
+This is the exact command that produces one, wrapped by
+`Scripts/AzureAppConfig/export-appconfigs.bat`:
+
+```powershell
+az appconfig kv export `
+    --name nhsnlink-ac-dev `
+    --destination file `
+    --path Config/app-config.dev.json `
+    --format json `
+    --profile appconfig/kvset `
+    --label "*" `
+    --auth-mode login `
+    --yes
+```
+
+Two of those flags decide whether the result is usable at all. `--profile appconfig/kvset`
+produces the `items` shape below, with a label and content type per row; the default profile
+writes a nested configuration tree carrying no labels, which cannot be round-tripped.
+`--label "*"` exports every label, and is only accepted alongside that profile — omit it and
+you get only the rows with no label. Store names differ per environment
+(`nhsnlink-ac-dev`, `nhnslink-ac-qa`, `nhnslink-ac-test`; note the transposed letters).
 
 ```json
 {
