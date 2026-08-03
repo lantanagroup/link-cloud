@@ -89,6 +89,9 @@ global:
   - key: "ServiceRegistry:DataAcquisitionServiceUrl"
     description: "The base URL for the Data Acquisition Service."
     required: true
+  - key: "ServiceRegistry:DmrpServiceUrl"
+    description: "The base URL for the DMRP Service."
+    required: true
   - key: "ServiceRegistry:AdminBffServiceUrl"
     description: "The base URL for the Admin BFF service used by Automation.UI and LinkSdk Admin.BFF integration calls."
     required: true

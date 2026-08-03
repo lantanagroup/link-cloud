@@ -14,6 +14,8 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
         public string? PublicCensusServiceUrl { get; set; }
         public string DataAcquisitionServiceUrl { get; set; } = null!;
         public string? PublicDataAcquisitionServiceUrl { get; set; }
+        public string DmrpServiceUrl { get; set; } = null!;
+        public string? PublicDmrpServiceUrl { get; set; }
         public string MeasureServiceUrl { get; set; } = null!;
         public string? PublicMeasureServiceUrl { get; set; }
         public string NormalizationServiceUrl { get; set; } = null!;
@@ -96,6 +98,17 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
             {
                 if (!string.IsNullOrEmpty(this.DataAcquisitionServiceUrl))
                     return this.DataAcquisitionServiceUrl.TrimEnd('/') + "/api";
+
+                return null;
+            }
+        }
+
+        public string DmrpServiceApiUrl
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(this.DmrpServiceUrl))
+                    return this.DmrpServiceUrl.TrimEnd('/') + "/api";
 
                 return null;
             }
@@ -234,6 +247,17 @@ namespace LantanaGroup.Link.Shared.Application.Models.Configs
             {
                 if (!string.IsNullOrEmpty(this.PublicDataAcquisitionServiceUrl))
                     return this.PublicDataAcquisitionServiceUrl.TrimEnd('/') + "/api";
+
+                return null;
+            }
+        }
+
+        public string? PublicDmrpServiceApiUrl
+        {
+            get
+            {
+                if (!string.IsNullOrEmpty(this.PublicDmrpServiceUrl))
+                    return this.PublicDmrpServiceUrl.TrimEnd('/') + "/api";
 
                 return null;
             }

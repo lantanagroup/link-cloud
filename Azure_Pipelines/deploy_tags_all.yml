@@ -17,6 +17,7 @@ parameters:
   - Census
   - DataAcquisition
 #  - Demo-app
+  - DMRP
 #  - Measureeval
   - Normalization
   - Notification
