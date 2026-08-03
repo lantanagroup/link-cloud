@@ -18,6 +18,7 @@ import com.lantanagroup.link.validation.repositories.RubricCheckRepository;
 import com.lantanagroup.link.validation.repositories.RubricLifecycleEventRepository;
 import com.lantanagroup.link.validation.repositories.RubricRepository;
 import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -117,7 +118,7 @@ public class RubricRegistryService {
         rubricCheckRepository.saveAll(checks);
         recordEvent(rubric.getRubricId(), payload.getSemver(), RubricLifecycleAction.REGISTERED, actor, checksum);
         logger.info("Registered rubric {} v{} with {} checks (status=DRAFT)",
-                rubric.getRubricId(), payload.getSemver(), checks.size());
+                LogUtils.sanitize(rubric.getRubricId()), LogUtils.sanitize(payload.getSemver()), checks.size());
         return version;
     }
 
@@ -133,7 +134,8 @@ public class RubricRegistryService {
         v.setPublishedBy(publishedBy);
         v = rubricVersionRepository.save(v);
         recordEvent(rubricId, semver, RubricLifecycleAction.PUBLISHED, publishedBy, v.getChecksum());
-        logger.info("Published rubric {} v{} by {}", rubricId, semver, publishedBy);
+        logger.info("Published rubric {} v{} by {}",
+                LogUtils.sanitize(rubricId), LogUtils.sanitize(semver), LogUtils.sanitize(publishedBy));
         return v;
     }
 
@@ -149,7 +151,8 @@ public class RubricRegistryService {
         v.setRetiredBy(retiredBy);
         v = rubricVersionRepository.save(v);
         recordEvent(rubricId, semver, RubricLifecycleAction.RETIRED, retiredBy, v.getChecksum());
-        logger.info("Retired rubric {} v{} by {}", rubricId, semver, retiredBy);
+        logger.info("Retired rubric {} v{} by {}",
+                LogUtils.sanitize(rubricId), LogUtils.sanitize(semver), LogUtils.sanitize(retiredBy));
         return v;
     }
 

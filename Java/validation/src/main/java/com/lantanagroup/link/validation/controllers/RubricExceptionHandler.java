@@ -7,6 +7,7 @@ import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricNotFoundException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionConflictException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionNotFoundException;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -34,7 +35,7 @@ public class RubricExceptionHandler {
             FacilityOverrideNotFoundException.class
     })
     public ProblemDetail handleNotFound(RuntimeException ex) {
-        logger.warn("Rubric registry lookup failed: {}", ex.getMessage());
+        logger.warn("Rubric registry lookup failed: {}", LogUtils.sanitize(ex.getMessage()));
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
@@ -43,13 +44,14 @@ public class RubricExceptionHandler {
             RubricLifecycleException.class
     })
     public ProblemDetail handleConflict(RuntimeException ex) {
-        logger.warn("Rubric lifecycle conflict: {}", ex.getMessage());
+        logger.warn("Rubric lifecycle conflict: {}", LogUtils.sanitize(ex.getMessage()));
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(InvalidRubricDefinitionException.class)
     public ProblemDetail handleInvalidDefinition(InvalidRubricDefinitionException ex) {
-        logger.warn("Rejected rubric definition: {} {}", ex.getMessage(), ex.getErrors());
+        logger.warn("Rejected rubric definition: {} {}",
+                LogUtils.sanitize(ex.getMessage()), LogUtils.sanitize(ex.getErrors()));
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problem.setProperty("errors", ex.getErrors());
         return problem;
@@ -57,7 +59,7 @@ public class RubricExceptionHandler {
 
     @ExceptionHandler(PayloadParseException.class)
     public ProblemDetail handlePayloadParse(PayloadParseException ex) {
-        logger.warn("Rejected unparseable rubric payload: {}", ex.getMessage());
+        logger.warn("Rejected unparseable rubric payload: {}", LogUtils.sanitize(ex.getMessage()));
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 }
