@@ -1,6 +1,8 @@
 # Azure App Configuration exports
 
-The JSON files in this folder are exports of the three Azure App Configuration stores:
+The JSON files in this folder are exports of the Azure App Configuration stores. The set
+is declared in `/app-config.yaml` under `environments`; the tooling reads it from there,
+so adding a store is one catalog line plus its export:
 
 | File | Store | Key Vault |
 |---|---|---|
@@ -8,8 +10,14 @@ The JSON files in this folder are exports of the three Azure App Configuration s
 | `app-config.qa.json` | `nhnslink-ac-qa` | `nhsnlink-kv-qa` |
 | `app-config.test.json` | `nhnslink-ac-test` | `nhsnlink-kv-test` |
 
-> Note the store names for qa and test are spelled `nhnslink`, not `nhsnlink`. That
-> transposition is in the actual Azure resource names, so scripts must use it verbatim.
+> Note the store names for qa and test are spelled `nhnslink`, not `nhsnlink` - only dev
+> uses `nhsnlink`. That transposition is in the actual Azure resource names, so
+> anything addressing a store must use it verbatim. The Key Vaults spell it the other way
+> round (`nhsnlink-kv-*`), and dev's vault does not follow the pattern at all.
+
+A fourth store, `nhnslink-ac-qa2`, exists in Azure but holds no key-values yet. It joins
+the table and the catalog's `environments` block once LEGLINK-775 imports into it; until
+then enforcing it would report every required key as missing.
 
 They are committed to a **public** repository. Nothing in them may be a credential. See
 [Guardrails](#guardrails) below.
@@ -40,8 +48,8 @@ Two of those flags decide whether the result is usable at all. `--profile appcon
 produces the `items` shape below, with a label and content type per row; the default profile
 writes a nested configuration tree carrying no labels, which cannot be round-tripped.
 `--label "*"` exports every label, and is only accepted alongside that profile — omit it and
-you get only the rows with no label. Store names differ per environment
-(`nhsnlink-ac-dev`, `nhnslink-ac-qa`, `nhnslink-ac-test`; note the transposed letters).
+you get only the rows with no label. Substitute the store name and output path from the table
+above; note the spelling differs between dev and the rest.
 
 ```json
 {
@@ -164,8 +172,8 @@ Both Java services ship `spring.cloud.azure.appconfiguration.enabled: false` in
 configuration from YAML and environment variables.
 
 Deployed environments set `SPRING_CLOUD_AZURE_APPCONFIGURATION_ENABLED=true` on the pods, so
-App Configuration **is** live in dev, test and qa. The endpoint and credentials are supplied
-at deploy time and do not appear in this repository.
+App Configuration **is** live in every environment listed above. The endpoint and credentials
+are supplied at deploy time and do not appear in this repository.
 
 ## Working with these files
 

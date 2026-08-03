@@ -63,7 +63,6 @@ from config_findings import ERROR, WARN, Finding
 
 DEFAULT_CATALOG = "app-config.yaml"
 DEFAULT_CONFIG_DIR = "Config"
-ENVIRONMENTS = ("dev", "qa", "test")
 
 SERILOG_SINK_RE = re.compile(r"^Serilog:WriteTo:(\d+):")
 GRAFANA_SINK = "GrafanaLoki"
@@ -251,16 +250,27 @@ def main() -> int:
         description="Verify required catalog keys exist in every environment store.")
     parser.add_argument("--catalog", default=DEFAULT_CATALOG)
     parser.add_argument("--config-dir", default=DEFAULT_CONFIG_DIR)
-    parser.add_argument("--environments", nargs="*", default=list(ENVIRONMENTS))
+    parser.add_argument("--environments", nargs="*", default=None,
+                        help="Override the environments declared in the catalog.")
     parser.add_argument("--strict", action="store_true", help="Treat warnings as errors")
     args = parser.parse_args()
 
     catalog = findings_mod.load_yaml_file(args.catalog)
+    # The catalog declares which environments exist. A declared one with no export must stop
+    # the run: covering three stores instead of four and reporting success is the failure this
+    # check exists to prevent.
+    environments = args.environments or matching.environment_names(catalog)
+    if not environments:
+        print(f"Error: {args.catalog} declares no environments.", file=sys.stderr)
+        return findings_mod.EXIT_UNUSABLE
+
     stores: Dict[str, List[Dict[str, Any]]] = {}
     indexes: Dict[str, Dict[str, Set[str]]] = {}
-    for env in args.environments:
+    for env in environments:
         items = findings_mod.load_json_file(
-            os.path.join(args.config_dir, f"app-config.{env}.json")).get("items", [])
+            os.path.join(args.config_dir, f"app-config.{env}.json"),
+            hint=matching.missing_export_hint(
+                catalog, env, args.catalog, args.config_dir)).get("items", [])
         stores[env] = items
         indexes[env] = matching.build_store_index(items)
 
@@ -274,7 +284,7 @@ def main() -> int:
     return findings_mod.report(
         findings,
         headline=(f"Checked {required} required keys against {len(stores)} store(s): "
-                  f"{', '.join(args.environments)}"),
+                  f"{', '.join(environments)}"),
         all_clear="OK: every required key is present in every store.",
         strict=args.strict)
 

@@ -5,6 +5,11 @@ REM   export-appconfigs.bat <app-config-name> <output-file> [auth-mode]
 REM
 REM   export-appconfigs.bat nhsnlink-ac-dev  Config\app-config.dev.json
 REM   export-appconfigs.bat nhnslink-ac-qa   Config\app-config.qa.json   login
+REM   export-appconfigs.bat nhnslink-ac-qa2  Config\app-config.qa2.json  key
+REM
+REM auth-mode "login" uses your Entra identity and needs the App Configuration Data Reader
+REM role on the store. "key" uses the store's access key, read via the control plane, and
+REM works where the data-plane role has not been granted - which is the case for qa2.
 REM
 REM Two flags below are load-bearing and were both missing before:
 REM
@@ -52,6 +57,16 @@ call az appconfig kv export ^
 
 IF %ERRORLEVEL% NEQ 0 (
     echo Export failed.
+    exit /b 1
+)
+
+REM az exits 0 and writes nothing when the store has no key-values, so a successful exit is
+REM not evidence a file exists. Without this check the script reports success, leaves no
+REM output, and the caller only finds out when a later tool cannot open the file.
+IF NOT EXIST "%output_file%" (
+    echo Export failed: az reported success but wrote no file.
+    echo The store is most likely empty - "Source configuration is empty" above says so.
+    echo Nothing has been imported into %app_config_name% yet.
     exit /b 1
 )
 

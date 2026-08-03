@@ -49,7 +49,6 @@ import config_key_matching as matching
 
 DEFAULT_CATALOG = "app-config.yaml"
 DEFAULT_INVENTORY = "Config/config-key-inventory.json"
-ENVIRONMENTS = ("dev", "qa", "test")
 
 # Framework-owned schemas, on both sides. YARP binds ReverseProxy:Routes:<name>:* and Serilog
 # binds Serilog:WriteTo:<index>:* from their own schemas; on the Java side Spring Boot's
@@ -147,15 +146,18 @@ def main() -> int:
     args = parser.parse_args()
 
     catalog = findings_mod.load_yaml_file(args.catalog)
+    environments = matching.environment_names(catalog)
     inventory = load_inventory(args.inventory)
     defaults = shipped_defaults()
 
     stores: Dict[str, Dict[str, Set[str]]] = {}
     raw_keys: Dict[str, Set[str]] = {}
     all_items: Dict[str, Tuple[str, str]] = {}
-    for env in ENVIRONMENTS:
+    for env in environments:
         path = os.path.join(args.config_dir, f"app-config.{env}.json")
-        items = findings_mod.load_json_file(path).get("items", [])
+        items = findings_mod.load_json_file(
+            path, hint=matching.missing_export_hint(
+                catalog, env, args.catalog, args.config_dir)).get("items", [])
         stores[env] = matching.build_store_index(items)
         raw_keys[env] = {i["key"] for i in items if isinstance(i.get("key"), str)}
         for item in items:
@@ -228,7 +230,7 @@ def main() -> int:
             orphans.append(key)
         print(f"=== C. In a store, neither catalogued nor read: {len(orphans)} ===")
         for key in orphans:
-            envs = [e for e in ENVIRONMENTS if key in raw_keys[e]]
+            envs = [e for e in environments if key in raw_keys[e]]
             print(f"    {key}   ({', '.join(envs)})")
         print()
 
@@ -239,7 +241,7 @@ def main() -> int:
             if not entry.get("required"):
                 continue
             key = entry["key"]
-            absent = [e for e in ENVIRONMENTS
+            absent = [e for e in environments
                       if not matching.is_satisfied(key, runtime, stores[e], label)]
             if absent:
                 gaps.append((section, key, runtime, absent, defaults.get(key)))

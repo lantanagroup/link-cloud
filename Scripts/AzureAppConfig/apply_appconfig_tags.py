@@ -45,7 +45,6 @@ import config_key_matching as matching  # noqa: E402
 
 DEFAULT_CATALOG = "app-config.yaml"
 DEFAULT_INVENTORY = "Config/config-key-inventory.json"
-ENVIRONMENTS = ("dev", "qa", "test")
 CONSUMERS_TAG = "link:consumers"
 
 
@@ -130,9 +129,9 @@ def apply_plan(items: List[Dict[str, Any]], plan: List[Dict[str, Any]]) -> None:
 
 
 def process(env: str, config_dir: str, inventory: List[Dict[str, Any]],
-            owners: Dict[str, str], write: bool) -> int:
+            owners: Dict[str, str], write: bool, hint: Optional[str] = None) -> int:
     path = os.path.join(config_dir, f"app-config.{env}.json")
-    document = findings_mod.load_json_file(path)
+    document = findings_mod.load_json_file(path, hint=hint)
     items = document.get("items", [])
     plan = plan_for(items, inventory, owners)
 
@@ -159,7 +158,7 @@ def process(env: str, config_dir: str, inventory: List[Dict[str, Any]],
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Tag the App Config exports with their consuming services.")
-    parser.add_argument("--env", choices=list(ENVIRONMENTS), help="Which export to process")
+    parser.add_argument("--env", help="Which export to process")
     parser.add_argument("--all", action="store_true", help="Process every environment")
     parser.add_argument("--config-dir", default="Config")
     parser.add_argument("--inventory", default=DEFAULT_INVENTORY)
@@ -173,10 +172,18 @@ def main() -> int:
 
     inventory = findings_mod.load_json_file(
         args.inventory, hint=INVENTORY_HINT).get("keys", [])
+    catalog = findings_mod.load_yaml_file(args.catalog)
+    environments = matching.environment_names(catalog)
     owners = label_owners(args.catalog)
-    targets = list(ENVIRONMENTS) if args.all else [args.env]
 
-    total = sum(process(env, args.config_dir, inventory, owners, args.write)
+    if args.env and args.env not in environments:
+        parser.error(f"unknown environment {args.env!r}; "
+                     f"{args.catalog} declares {', '.join(environments)}")
+    targets = environments if args.all else [args.env]
+
+    total = sum(process(env, args.config_dir, inventory, owners, args.write,
+                        matching.missing_export_hint(catalog, env, args.catalog,
+                                                     args.config_dir))
                 for env in targets)
 
     if not total:

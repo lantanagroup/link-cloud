@@ -20,10 +20,16 @@ properties:
     description: "Per-service deployment facts: the Azure App Configuration label the running service selects, and which runtime it is. Tooling reads this rather than hardcoding the mapping."
     additionalProperties:
       $ref: "#/$defs/serviceMetaEntry"
+  environments:
+    type: "object"
+    description: "The environments this catalog is checked against, keyed by the suffix of their export file (Config/app-config.<key>.json). Declared here so adding a store is one line plus its export rather than four hardcoded lists."
+    additionalProperties:
+      $ref: "#/$defs/environmentEntry"
 required:
   - "global"
   - "services"
   - "serviceMeta"
+  - "environments"
 
 # Label values are hardcoded in the services themselves and must match exactly:
 #   .NET  - a compile-time constant passed to AddExternalConfiguration(), e.g.
@@ -33,6 +39,25 @@ required:
 #           (Java/measureeval/src/main/resources/bootstrap.yml:9)
 # Each service selects unlabeled keys first, then its own label, so a labeled row
 # overrides an unlabeled one for that service only. Changing a label requires a redeploy.
+# The environments every required: true key must be present in. Each key is the suffix of its
+# export file, so `qa2` means Config/app-config.qa2.json. A declared environment with no export
+# is an error, not a quietly smaller check.
+#
+# The store names are not consistently spelled. dev is `nhsnlink`; qa, qa2 and test are
+# `nhnslink`, with the middle letters transposed. That is in the actual Azure resource names,
+# so anything addressing a store must use it verbatim. The Key Vaults spell it the other way
+# again (`nhsnlink-kv-*`), and dev's vault does not follow the pattern at all.
+environments:
+  dev:  { store: "nhsnlink-ac-dev",  keyVault: "link-vault" }
+  qa:   { store: "nhnslink-ac-qa",   keyVault: "nhsnlink-kv-qa" }
+  test: { store: "nhnslink-ac-test", keyVault: "nhsnlink-kv-test" }
+  # nhnslink-ac-qa2 exists in Azure but holds no key-values yet, so listing it here would
+  # report all 95 required keys as missing - true, but not actionable until LEGLINK-775
+  # imports into it. Add it with its first export, in that change:
+  #   qa2: { store: "nhnslink-ac-qa2", keyVault: "nhsnlink-kv-qa2" }
+  # The keyVault above is inferred from the qa/test pattern; confirm it from the keyvaultref
+  # values in the export rather than trusting the guess.
+
 serviceMeta:
   Account:               { label: "Account",               runtime: "dotnet" }
   AdminBFF:              { label: "LinkAdminBFF",          runtime: "dotnet" }
@@ -666,6 +691,18 @@ $defs:
         type: "string"
         enum: ["dotnet", "java"]
         description: "Which runtime the service is. Determines key notation: .NET reads 'Section:Key' rows, Java reads '/section/key' rows which the Spring provider maps to 'section.key'."
+  environmentEntry:
+    type: "object"
+    additionalProperties: false
+    required:
+      - "store"
+    properties:
+      store:
+        type: "string"
+        description: "The Azure App Configuration resource name. Used verbatim by export and import tooling, so the nhnslink/nhsnlink spelling matters."
+      keyVault:
+        type: "string"
+        description: "The Key Vault the store's keyvaultref rows resolve against. Optional: it is documentation, and a new environment may not have one recorded yet."
   configEntry:
     type: "object"
     additionalProperties: false

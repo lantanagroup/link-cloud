@@ -214,6 +214,40 @@ def is_satisfied(key: str, runtime: str, index: Dict[str, Set[str]],
     return "" in labels or service_label in labels
 
 
+def environment_names(document: Dict[str, Any]) -> List[str]:
+    """Environments the catalog declares, in the order it lists them.
+
+    Declared in one place because it was previously a tuple repeated in four scripts, and a
+    fourth environment appearing meant finding all four. Each name is the suffix of its export:
+    `qa2` is Config/app-config.qa2.json. Callers should let a declared environment with no
+    export fail rather than skipping it - a check that silently covers three stores instead of
+    four still reports success.
+    """
+    return list((document.get("environments") or {}).keys())
+
+
+def environment_store(document: Dict[str, Any], name: str) -> Optional[str]:
+    """The Azure resource name for an environment, or None if it is not declared."""
+    entry = (document.get("environments") or {}).get(name) or {}
+    return entry.get("store")
+
+
+def missing_export_hint(document: Dict[str, Any], name: str,
+                        catalog: str = "app-config.yaml",
+                        config_dir: str = "Config") -> str:
+    """What to do when a declared environment has no export.
+
+    Every tool here loads the same set of exports, so all of them hit this together. Saying
+    only "file not found" leaves the reader to work out that the catalog is what expects it.
+    """
+    store = environment_store(document, name) or f"the {name} store"
+    return (f"{name} is declared under 'environments' in {catalog}, so its export is "
+            f"required. Produce it with:\n"
+            f"    Scripts\\AzureAppConfig\\export-appconfigs.bat {store} "
+            f"{config_dir}\\app-config.{name}.json\n"
+            f"Or remove {name} from the catalog if it should not be checked.")
+
+
 def catalog_entries(document: Dict[str, Any]) -> List[Tuple[str, Dict[str, Any], str, Optional[str]]]:
     """Flatten the catalog into (section, entry, runtime, service_label) tuples."""
     meta = document.get("serviceMeta") or {}

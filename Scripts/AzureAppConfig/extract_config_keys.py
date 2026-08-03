@@ -52,6 +52,7 @@ Usage:
 """
 
 import argparse
+import glob
 import json
 import os
 import re
@@ -427,10 +428,11 @@ def load_java_audit(path: Optional[str]) -> List[Dict[str, Any]]:
         return json.load(handle).get("keys", [])
 
 
-def store_presence(config_dir: str = "Config") -> Dict[str, List[str]]:
+def store_presence(environments: List[str],
+                   config_dir: str = "Config") -> Dict[str, List[str]]:
     """Which environments hold each key, for the human-facing table."""
     presence: Dict[str, List[str]] = defaultdict(list)
-    for env in ("dev", "qa", "test"):
+    for env in environments:
         path = os.path.join(config_dir, "app-config." + env + ".json")
         if not os.path.exists(path):
             continue
@@ -468,13 +470,14 @@ def service_owns(service: str, file_path: str) -> bool:
     return bool(directory) and file_path.startswith(directory + "/")
 
 
-def write_markdown(keys: List[Dict[str, Any]], path: str, catalog_keys: Set[str]) -> None:
+def write_markdown(keys: List[Dict[str, Any]], path: str, catalog_keys: Set[str],
+                   environments: List[str]) -> None:
     """Emit the human-readable inventory.
 
     app-config.yaml stays curated and scannable as the deployment hand-off artifact, so the
     exhaustive picture lives here instead. Generated from the same data, so it cannot drift.
     """
-    presence = store_presence()
+    presence = store_presence(environments)
     by_service: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for entry in keys:
         for service in entry["consumers"] or ["(unattributed)"]:
@@ -541,6 +544,34 @@ def write_markdown(keys: List[Dict[str, Any]], path: str, catalog_keys: Set[str]
 
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write("\n".join(lines))
+
+
+def catalog_environments(path: str) -> List[str]:
+    """Environments the catalog declares, for the "stores" column.
+
+    Falls back to whichever exports are committed. That is a weaker answer than the catalog -
+    it cannot tell a declared environment apart from a forgotten one - but for a documentation
+    column it is still the right question, and it keeps the inventory generatable without
+    PyYAML installed.
+    """
+    try:
+        import yaml
+        with open(path, "r", encoding="utf-8") as handle:
+            declared = list(((yaml.safe_load(handle) or {}).get("environments") or {}).keys())
+        if declared:
+            return declared
+        print(f"Warning: {path} declares no environments; falling back to the committed "
+              f"exports.", file=sys.stderr)
+    except ImportError:
+        print(f"Warning: PyYAML is not installed, so the environments in {path} cannot be "
+              f"read; falling back to the committed exports.", file=sys.stderr)
+    except OSError:
+        print(f"Warning: {path} could not be read; falling back to the committed exports.",
+              file=sys.stderr)
+
+    found = sorted(re.sub(r"^app-config\.|\.json$", "", os.path.basename(p))
+                   for p in glob.glob(os.path.join("Config", "app-config.*.json")))
+    return found
 
 
 def catalog_key_set(path: str) -> Set[str]:
@@ -627,7 +658,8 @@ def main() -> int:
 
     if args.markdown:
         os.makedirs(os.path.dirname(args.markdown) or ".", exist_ok=True)
-        write_markdown(keys, args.markdown, catalog_key_set(args.catalog))
+        write_markdown(keys, args.markdown, catalog_key_set(args.catalog),
+                       catalog_environments(args.catalog))
         print(f"Wrote {args.markdown}")
     return 0
 
