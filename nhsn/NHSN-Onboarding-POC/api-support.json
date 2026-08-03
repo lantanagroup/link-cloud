@@ -250,5 +250,11 @@
     "method": "",
     "url": "",
     "description": "Scheduled for PI2 development: https://keystone.lantanagroup.com/Proposals/Details/DMRP"
+  },
+  "rdColResourceCount": {
+    "service": "Report",
+    "method": "GET",
+    "url": "/api/entries/schedules/{reportScheduleId}",
+    "description": ""
   }
 }
