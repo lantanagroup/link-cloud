@@ -13,7 +13,6 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -35,8 +34,6 @@ import java.util.UUID;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class FacilityOverride {
 
     @Id
@@ -84,6 +81,26 @@ public class FacilityOverride {
 
     @Column(name = "created_by", nullable = false, length = 128)
     private String createdBy;
+
+    // builder on a constructor rather than the class so the read-only rubric association
+    // above cannot be set through construction
+    @Builder
+    private FacilityOverride(UUID overrideId, String facilityId, String rubricId, UUID rubricVersionId,
+                             String disabledCheckIdsJson, String severityOverridesJson, String contextVarsJson,
+                             OffsetDateTime effectiveFrom, OffsetDateTime effectiveTo,
+                             OffsetDateTime createdAt, String createdBy) {
+        this.overrideId = overrideId;
+        this.facilityId = facilityId;
+        this.rubricId = rubricId;
+        this.rubricVersionId = rubricVersionId;
+        this.disabledCheckIdsJson = disabledCheckIdsJson;
+        this.severityOverridesJson = severityOverridesJson;
+        this.contextVarsJson = contextVarsJson;
+        this.effectiveFrom = effectiveFrom;
+        this.effectiveTo = effectiveTo;
+        this.createdAt = createdAt;
+        this.createdBy = createdBy;
+    }
 
     @PrePersist
     void onCreate() {

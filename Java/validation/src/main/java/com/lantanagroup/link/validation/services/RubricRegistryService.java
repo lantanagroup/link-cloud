@@ -21,6 +21,7 @@ import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -92,7 +93,13 @@ public class RubricRegistryService {
                 .scoringPolicyJson(writeJson(payload.getScoringPolicy()))
                 .createdBy(actor)
                 .build();
-        version = rubricVersionRepository.save(version);
+        try {
+            // flush so a concurrent registration that won the uq_rv_rubric_semver race
+            // surfaces here rather than at commit, and reports the same 409 as the pre-check
+            version = rubricVersionRepository.saveAndFlush(version);
+        } catch (DataIntegrityViolationException e) {
+            throw new RubricVersionConflictException(payload.getId(), payload.getSemver());
+        }
 
         List<RubricCheck> checks = new ArrayList<>();
         for (CheckDto c : payload.getChecks()) {
