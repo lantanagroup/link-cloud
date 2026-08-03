@@ -1,0 +1,572 @@
+openapi: 3.0.3
+
+info:
+  title: DMRP API
+  version: 0.1.0-provisional
+  description: |
+    ##########################################################################
+    # PROVISIONAL. THIS IS NOT THE PUBLISHED CONTRACT.
+    #
+    # DMRP (Digital Monthly Reporting Plan) is being developed by Leidos for
+    # CDC. The real endpoint is reachable only from the CDC Dev environment
+    # and no OpenAPI description has been published to LCG.
+    #
+    # This document is a best-effort reconstruction from what LCG knows, so
+    # that:
+    #   * the implementing service has a machine-readable source of truth, and
+    #   * replacing this file with the published contract turns every
+    #     difference into a C# compile error rather than a silent divergence.
+    #
+    # WHEN THE PUBLISHED CONTRACT ARRIVES: replace this file WHOLESALE,
+    # rebuild, and fix the resulting compile errors. Do not hand-merge. Do not
+    # add consumer-specific or environment-specific routes to this file.
+    #
+    # Treat no field name, path or status code here as authoritative.
+    ##########################################################################
+
+    ## Reporting plan entries
+
+    A reporting plan entry records that a facility is enrolled to report a
+    given NHSN measure for a given month and year.
+
+    ## Enrollment is expressed by presence, not by value
+
+    `GET /reporting-plans` returns only the measures a facility IS enrolled
+    in. A measure that does not appear in the `measures` array means the
+    facility is NOT enrolled in it for that period. There is no negative
+    representation, and `isReporting` is currently always `Y` wherever an
+    entry exists.
+
+    Consequently a facility enrolled in nothing returns `200` with an empty
+    `measures` array - not `204`, and not `404`. An empty plan is a
+    meaningful answer, not an absent resource.
+
+servers:
+  - url: /
+    description: The API root.
+
+tags:
+  - name: Reporting Plans
+    description: Retrieval and maintenance of reporting plan entries.
+  - name: Authorization
+    description: Token issuance for API access.
+
+paths:
+
+  /:
+    post:
+      tags: [Reporting Plans]
+      operationId: CreateReportingPlanEntry
+      summary: Create a reporting plan entry.
+      description: |
+        Creates a single entry. The natural key is
+        (facilityId, measure, reportingYear, reportingMonth); creating a
+        second entry with the same natural key is a conflict.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportingPlanEntryRequest' }
+      responses:
+        '201':
+          description: Created. The `Location` header addresses the new entry.
+          headers:
+            Location:
+              description: URL of the created entry.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportingPlanEntry' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: An entry already exists for this facility, measure and period.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetails' }
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+    delete:
+      tags: [Reporting Plans]
+      operationId: DeleteAllReportingPlanEntries
+      summary: Delete every reporting plan entry.
+      responses:
+        '204':
+          description: Deleted.
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+  # Path parameters are declared per-operation, ahead of any query parameters,
+  # rather than once at the path-item level. Both are valid OpenAPI and mean the
+  # same thing, but code generators emit operation-level parameters first, which
+  # would otherwise place an optional query parameter before a required path one.
+  /{id}:
+    get:
+      tags: [Reporting Plans]
+      operationId: GetReportingPlanEntry
+      summary: Get a reporting plan entry by identifier.
+      parameters:
+        - $ref: '#/components/parameters/EntryId'
+      responses:
+        '200':
+          description: The entry.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportingPlanEntry' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+    put:
+      tags: [Reporting Plans]
+      operationId: UpdateReportingPlanEntry
+      summary: Update an existing reporting plan entry.
+      description: |
+        Update only. If no entry exists for the supplied identifier the
+        request fails with `404`; the entry is never created. The `id` in the
+        body must match the `id` in the path.
+      parameters:
+        - $ref: '#/components/parameters/EntryId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportingPlanEntry' }
+      responses:
+        '202':
+          description: Accepted. The updated entry.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportingPlanEntry' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+    delete:
+      tags: [Reporting Plans]
+      operationId: DeleteReportingPlanEntry
+      summary: Delete a reporting plan entry by identifier.
+      parameters:
+        - $ref: '#/components/parameters/EntryId'
+      responses:
+        '204':
+          description: Deleted.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+  /facilities/{facilityId}:
+    get:
+      tags: [Reporting Plans]
+      operationId: GetReportingPlanEntriesByFacility
+      summary: Get every reporting plan entry for a facility.
+      parameters:
+        - $ref: '#/components/parameters/FacilityIdPath'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageNumber'
+      responses:
+        '200':
+          description: A page of entries.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportingPlanEntryPage' }
+        '204':
+          description: The facility has no entries.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+    delete:
+      tags: [Reporting Plans]
+      operationId: DeleteReportingPlanEntriesByFacility
+      summary: Delete every reporting plan entry for a facility.
+      description: Idempotent. Succeeds whether or not the facility had entries.
+      parameters:
+        - $ref: '#/components/parameters/FacilityIdPath'
+      responses:
+        '204':
+          description: Deleted.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+  /search:
+    get:
+      tags: [Reporting Plans]
+      operationId: SearchReportingPlanEntries
+      summary: Search reporting plan entries.
+      parameters:
+        - name: facilityId
+          in: query
+          required: false
+          schema: { type: string, maxLength: 120 }
+        - name: measure
+          in: query
+          required: false
+          description: Matched case-insensitively.
+          schema: { type: string, maxLength: 50 }
+        - name: reportingMonth
+          in: query
+          required: false
+          schema: { type: integer, format: int32, minimum: 1, maximum: 12 }
+        - name: reportingYear
+          in: query
+          required: false
+          schema: { type: integer, format: int32, minimum: 2000, maximum: 2100 }
+        - name: isReporting
+          in: query
+          required: false
+          schema: { type: string, maxLength: 10 }
+        - name: sortBy
+          in: query
+          required: false
+          description: |
+            Constrained to a fixed set. The implementing service resolves this
+            to a property by name, so an unconstrained string would be a
+            server fault rather than a client error.
+          schema:
+            type: string
+            default: CreateDate
+            enum: [FacilityId, Measure, ReportingMonth, ReportingYear, CreateDate, ModifyDate]
+        - name: sortOrder
+          in: query
+          required: false
+          schema:
+            type: string
+            default: Descending
+            enum: [Ascending, Descending]
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/PageNumber'
+      responses:
+        '200':
+          description: A page of matching entries.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportingPlanEntryPage' }
+        '204':
+          description: No entries matched.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+  /reporting-plans:
+    get:
+      tags: [Reporting Plans]
+      operationId: GetReportingPlan
+      summary: Get the reporting plan for a facility and period.
+      description: |
+        Returns the measures the facility is enrolled to report for the given
+        month and year.
+
+        A facility enrolled in nothing returns `200` with an empty `measures`
+        array. See the enrollment note in the API description.
+      security:
+        - dmrpBearer: []
+      parameters:
+        - name: facilityId
+          in: query
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 120 }
+        - name: reportingMonth
+          in: query
+          required: true
+          schema: { type: integer, format: int32, minimum: 1, maximum: 12 }
+        - name: reportingYear
+          in: query
+          required: true
+          schema: { type: integer, format: int32, minimum: 2000, maximum: 2100 }
+      responses:
+        '200':
+          description: The reporting plan. `measures` may be empty.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportingPlanResponse' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+  /oauth2/token:
+    post:
+      tags: [Authorization]
+      operationId: IssueToken
+      summary: Issue an access token.
+      description: |
+        Client credentials grant. Returns a signed JSON Web Token to be
+        presented as a bearer token on `GET /reporting-plans`.
+
+        The request body is JSON. RFC 6749 specifies
+        `application/x-www-form-urlencoded` for the token endpoint; this API
+        takes JSON so that every operation in the contract has a consistent
+        request encoding.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TokenRequest' }
+      responses:
+        '200':
+          description: Token issued.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthTokenResponse' }
+        '400':
+          description: Malformed request or unsupported grant type.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthErrorResponse' }
+        '401':
+          description: Client credentials rejected.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthErrorResponse' }
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+components:
+
+  securitySchemes:
+    dmrpBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: The `access_token` returned by `POST /oauth2/token`.
+
+  parameters:
+    EntryId:
+      name: id
+      in: path
+      required: true
+      description: Identifier of the reporting plan entry.
+      schema: { type: string, maxLength: 50 }
+
+    FacilityIdPath:
+      name: facilityId
+      in: path
+      required: true
+      description: Identifier of the reporting facility.
+      schema: { type: string, minLength: 1, maxLength: 120 }
+
+    PageSize:
+      name: pageSize
+      in: query
+      required: false
+      schema: { type: integer, format: int32, minimum: 1, maximum: 100, default: 10 }
+
+    PageNumber:
+      name: pageNumber
+      in: query
+      required: false
+      schema: { type: integer, format: int32, minimum: 1, default: 1 }
+
+  responses:
+    BadRequest:
+      description: The request failed validation.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    Unauthorized:
+      description: Missing, malformed or expired bearer token.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    NotFound:
+      description: No such entry.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+    Unavailable:
+      description: The API is not available in this environment.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetails' }
+
+  schemas:
+
+    ReportingPlanEntryRequest:
+      type: object
+      required: [facilityId, measure, reportingMonth, reportingYear]
+      properties:
+        facilityId:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Identifier of the reporting facility.
+        measure:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: NHSN measure (module) short name.
+          example: HOB
+        reportingMonth:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 12
+          example: 5
+        reportingYear:
+          type: integer
+          format: int32
+          minimum: 2000
+          maximum: 2100
+          example: 2026
+        isReporting:
+          type: string
+          maxLength: 10
+          default: 'Y'
+          description: Currently always `Y` wherever an entry exists.
+
+    ReportingPlanEntry:
+      allOf:
+        - $ref: '#/components/schemas/ReportingPlanEntryRequest'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: string
+              maxLength: 50
+              description: Identifier of the entry.
+            createDate:
+              type: string
+              format: date-time
+            modifyDate:
+              type: string
+              format: date-time
+              nullable: true
+
+    ReportingPlanEntryPage:
+      type: object
+      required: [records, metadata]
+      properties:
+        records:
+          type: array
+          items: { $ref: '#/components/schemas/ReportingPlanEntry' }
+        metadata: { $ref: '#/components/schemas/PageMetadata' }
+
+    PageMetadata:
+      type: object
+      required: [pageSize, pageNumber, totalCount, totalPages]
+      properties:
+        pageSize: { type: integer, format: int32 }
+        pageNumber: { type: integer, format: int32 }
+        totalCount: { type: integer, format: int64 }
+        totalPages: { type: integer, format: int32 }
+
+    ReportingPlanResponse:
+      type: object
+      required: [facilityId, reportingMonth, reportingYear, measures]
+      properties:
+        facilityId:
+          type: string
+        reportingMonth:
+          type: integer
+          format: int32
+        reportingYear:
+          type: integer
+          format: int32
+        measures:
+          type: array
+          description: |
+            Only measures the facility IS enrolled in appear here. Absence of
+            a measure means the facility is NOT enrolled in it for this
+            period. There is no negative representation. An empty array is a
+            valid, meaningful response.
+          items: { $ref: '#/components/schemas/ReportingPlanMeasure' }
+        retrievedOn:
+          type: string
+          format: date-time
+          description: When the response was produced.
+
+    ReportingPlanMeasure:
+      type: object
+      required: [measure, isReporting]
+      properties:
+        measure:
+          type: string
+          description: NHSN measure (module) short name.
+          example: HOB
+        isReporting:
+          type: string
+          description: Currently always `Y`.
+          example: 'Y'
+
+    TokenRequest:
+      type: object
+      required: [grant_type, client_id, client_secret]
+      properties:
+        grant_type:
+          type: string
+          enum: [client_credentials]
+        client_id:
+          type: string
+          maxLength: 200
+        client_secret:
+          type: string
+          maxLength: 400
+        scope:
+          type: string
+          maxLength: 200
+          example: dmrp.read
+
+    AuthTokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in]
+      properties:
+        access_token:
+          type: string
+          description: A signed JSON Web Token.
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_in:
+          type: integer
+          format: int32
+          description: Seconds until the token expires.
+          example: 3600
+        scope:
+          type: string
+          nullable: true
+        issued_at:
+          type: string
+          format: date-time
+
+    AuthErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          enum: [invalid_client, invalid_request, invalid_scope, unsupported_grant_type]
+        error_description:
+          type: string
+          nullable: true
+
+    ProblemDetails:
+      type: object
+      description: RFC 9457 problem detail.
+      properties:
+        type: { type: string, nullable: true }
+        title: { type: string, nullable: true }
+        status: { type: integer, format: int32, nullable: true }
+        detail: { type: string, nullable: true }
+        instance: { type: string, nullable: true }
+        traceId: { type: string, nullable: true }
+      additionalProperties: true
