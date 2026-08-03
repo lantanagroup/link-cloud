@@ -165,7 +165,9 @@
                                     <select id="quickLaunchSort"
                                             class="form-select form-select-sm">
                                         <option value="name">Alphabetical</option>
+                                        <option value="lastUsed">Recently Used</option>
                                         <option value="updated">Recently Modified</option>
+                                        <option value="created">Created Date</option>
                                     </select>
                                 </div>
                             </div>
@@ -195,7 +197,9 @@
                                             data-method="@s.ReportMethod"
                                             data-type="Custom"
                                             data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))"
-                                            data-updated="@s.UpdatedAt.ToUnixTimeMilliseconds()">
+                                            data-updated="@s.UpdatedAt.ToUnixTimeMilliseconds()"
+                                            data-created="@((s.CreatedAt != default ? s.CreatedAt : s.UpdatedAt).ToUnixTimeMilliseconds())"
+                                            data-last-used="@(s.LastUsedAt?.ToUnixTimeMilliseconds() ?? 0)">
                                         @s.Name
                                     </button>
                                 }
@@ -214,7 +218,9 @@
                                             data-method="@s.ReportMethod"
                                             data-type="System"
                                             data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))"
-                                            data-updated="@s.UpdatedAt.ToUnixTimeMilliseconds()">
+                                            data-updated="@s.UpdatedAt.ToUnixTimeMilliseconds()"
+                                            data-created="@((s.CreatedAt != default ? s.CreatedAt : s.UpdatedAt).ToUnixTimeMilliseconds())"
+                                            data-last-used="@(s.LastUsedAt?.ToUnixTimeMilliseconds() ?? 0)">
                                         @s.Name <span class="text-muted">[System]</span>
                                     </button>
                                 }
@@ -233,7 +239,9 @@
                                     data-method="@s.ReportMethod"
                                     data-type="@(s.IsSystemScenario ? "System" : "Custom")"
                                     data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))"
-                                    data-updated="@s.UpdatedAt.ToUnixTimeMilliseconds()">
+                                    data-updated="@s.UpdatedAt.ToUnixTimeMilliseconds()"
+                                    data-created="@((s.CreatedAt != default ? s.CreatedAt : s.UpdatedAt).ToUnixTimeMilliseconds())"
+                                    data-last-used="@(s.LastUsedAt?.ToUnixTimeMilliseconds() ?? 0)">
                                 @s.Name@(s.IsSystemScenario ? " [System]" : "")
                             </option>
                         }
@@ -833,6 +841,7 @@
 
         var id = String(detail.id);
         var label = detail.name || 'Scenario';
+        var now = String(Date.now());hiddenOption.dataset.updated = String(Date.now());
 
         // Update the hidden native select.
         var hiddenOption = selector
@@ -842,7 +851,9 @@
         if (hiddenOption) {
             hiddenOption.textContent = label;
             hiddenOption.dataset.name = label;
-            hiddenOption.dataset.updated = String(Date.now());
+            hiddenOption.dataset.created = now;
+            hiddenOption.dataset.updated = now;
+            hiddenOption.dataset.lastUsed = '0';
         } else if (selector) {
             hiddenOption = document.createElement('option');
             hiddenOption.value = id;
@@ -852,7 +863,9 @@
             hiddenOption.dataset.method = '';
             hiddenOption.dataset.type = 'Custom';
             hiddenOption.dataset.measures = '';
-            hiddenOption.dataset.updated = String(Date.now());
+            hiddenOption.dataset.created = now;
+            hiddenOption.dataset.updated = now;
+            hiddenOption.dataset.lastUsed = '0';
             selector.appendChild(hiddenOption);
         }
 
@@ -863,7 +876,9 @@
 
         if (visibleOption) {
             visibleOption.dataset.name = label;
-            visibleOption.dataset.updated = String(Date.now());
+            visibleOption.dataset.created = now;
+            visibleOption.dataset.updated = now;
+            visibleOption.dataset.lastUsed = '0';
             visibleOption.textContent = label;
         } else {
             var customGroup = document.querySelector(
@@ -881,7 +896,9 @@
                 visibleOption.dataset.method = '';
                 visibleOption.dataset.type = 'Custom';
                 visibleOption.dataset.measures = '';
-                visibleOption.dataset.updated = String(Date.now());
+                visibleOption.dataset.created = now;
+                visibleOption.dataset.updated = now;
+                visibleOption.dataset.lastUsed = '0';
                 visibleOption.textContent = label;
 
                 customGroup.appendChild(visibleOption);
@@ -912,9 +929,29 @@
                 );
 
                 options.sort(function (a, b) {
+                    if (sortValue === 'lastUsed') {
+                        var aLastUsed = Number(a.dataset.lastUsed || 0);
+                        var bLastUsed = Number(b.dataset.lastUsed || 0);
+
+                        if (aLastUsed !== bLastUsed) {
+                            return bLastUsed - aLastUsed;
+                        }
+
+                        return (a.dataset.name || '').localeCompare(
+                            b.dataset.name || '',
+                            undefined,
+                            { sensitivity: 'base' }
+                        );
+                    }
+
                     if (sortValue === 'updated') {
                         return Number(b.dataset.updated || 0) -
-                               Number(a.dataset.updated || 0);
+                            Number(a.dataset.updated || 0);
+                    }
+
+                    if (sortValue === 'created') {
+                        return Number(b.dataset.created || 0) -
+                            Number(a.dataset.created || 0);
                     }
 
                     return (a.dataset.name || '').localeCompare(

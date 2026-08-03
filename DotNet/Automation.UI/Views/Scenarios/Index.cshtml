@@ -38,7 +38,9 @@
                     <label class="form-label" for="scenarioSort">Sort by</label>
                     <select id="scenarioSort" class="form-select">
                         <option value="name">Alphabetical (A–Z)</option>
+                        <option value="lastUsed">Recently Used</option>
                         <option value="updated">Recently Modified</option>
+                        <option value="created">Created Date</option>
                     </select>
                 </div>
             </div>
@@ -82,7 +84,9 @@
                                 data-seed="@s.Seed"
                                 data-patients="@patientCount"
                                 data-resources="@resourceRange"
-                                data-updated="@s.UpdatedAt.ToUnixTimeMilliseconds()">
+                                data-updated="@s.UpdatedAt.ToUnixTimeMilliseconds()"
+                                data-created="@((s.CreatedAt != default ? s.CreatedAt : s.UpdatedAt).ToUnixTimeMilliseconds())"
+                                data-last-used="@(s.LastUsedAt?.ToUnixTimeMilliseconds() ?? 0)">
                                 <td>
                                     <strong>@s.Name</strong>
                                     @if (!string.IsNullOrWhiteSpace(s.Description))
@@ -208,9 +212,31 @@
             });
 
             rows.sort(function (a, b) {
+                if (sortValue === 'lastUsed') {
+                    var aLastUsed = Number(a.dataset.lastUsed || 0);
+                    var bLastUsed = Number(b.dataset.lastUsed || 0);
+
+                    // Used scenarios first, newest usage first.
+                    // Never-used scenarios are sorted alphabetically afterward.
+                    if (aLastUsed !== bLastUsed) {
+                        return bLastUsed - aLastUsed;
+                    }
+
+                    return (a.dataset.name || '').localeCompare(
+                        b.dataset.name || '',
+                        undefined,
+                        { sensitivity: 'base' }
+                    );
+                }
+
                 if (sortValue === 'updated') {
                     return Number(b.dataset.updated || 0) -
                         Number(a.dataset.updated || 0);
+                }
+
+                if (sortValue === 'created') {
+                    return Number(b.dataset.created || 0) -
+                        Number(a.dataset.created || 0);
                 }
 
                 return (a.dataset.name || '').localeCompare(

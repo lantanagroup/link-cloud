@@ -124,6 +124,16 @@ public class TestScenarioDefinition
     /// </summary>
     public List<ImportedPatientInput> ImportedPatientBundles { get; set; } = [];
 
+    /// <summary>When the scenario was originally created.</summary>
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+
     /// <summary>When the scenario was created or last updated.</summary>
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// When the scenario was most recently launched.
+    /// Null means it has never been used.
+    /// </summary>
+    public DateTimeOffset? LastUsedAt { get; set; }
 }
