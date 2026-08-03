@@ -16,12 +16,30 @@
         </div>
         <div class="card-body">
 
-            <div class="row mb-3">
+            <div class="row g-2 mb-3">
                 <div class="col-md-6">
+                    <label class="form-label" for="scenarioSearch">Search</label>
                     <input type="text"
                            id="scenarioSearch"
                            class="form-control"
                            placeholder="Search scenarios..." />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label" for="scenarioTypeFilter">Scenario type</label>
+                    <select id="scenarioTypeFilter" class="form-select">
+                        <option value="">All types</option>
+                        <option value="Custom">Custom</option>
+                        <option value="System">System</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label" for="scenarioSort">Sort by</label>
+                    <select id="scenarioSort" class="form-select">
+                        <option value="name">Alphabetical (A–Z)</option>
+                        <option value="updated">Recently Modified</option>
+                    </select>
                 </div>
             </div>
 
@@ -63,7 +81,8 @@
                                 data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))"
                                 data-seed="@s.Seed"
                                 data-patients="@patientCount"
-                                data-resources="@resourceRange">
+                                data-resources="@resourceRange"
+                                data-updated="@s.UpdatedAt.ToUnixTimeMilliseconds()">
                                 <td>
                                     <strong>@s.Name</strong>
                                     @if (!string.IsNullOrWhiteSpace(s.Description))
@@ -137,36 +156,96 @@
 
         // Scenario search
         var search = document.getElementById('scenarioSearch');
+        var typeFilter = document.getElementById('scenarioTypeFilter');
+        var sort = document.getElementById('scenarioSort');
+        var tableBody = document.querySelector('#scenarioTable tbody');
+        var noResults = document.getElementById('noScenarioResults');
+
+        function getScenarioRows() {
+            return Array.from(
+                document.querySelectorAll('#scenarioTable tbody tr[data-id]')
+            );
+        }
+
+        function applyScenarioView() {
+            if (!tableBody) return;
+
+            var searchValue = search
+                ? search.value.trim().toLowerCase()
+                : '';
+
+            var selectedType = typeFilter
+                ? typeFilter.value
+                : '';
+
+            var sortValue = sort
+                ? sort.value
+                : 'name';
+
+            var rows = getScenarioRows();
+
+            rows.forEach(function (row) {
+                var searchableText = (
+                    (row.dataset.name || '') + ' ' +
+                    (row.dataset.description || '') + ' ' +
+                    (row.dataset.method || '') + ' ' +
+                    (row.dataset.type || '') + ' ' +
+                    (row.dataset.measures || '') + ' ' +
+                    (row.dataset.seed || '') + ' ' +
+                    (row.dataset.patients || '') + ' ' +
+                    (row.dataset.resources || '')
+                ).toLowerCase();
+
+                var matchesSearch =
+                    !searchValue ||
+                    searchableText.includes(searchValue);
+
+                var matchesType =
+                    !selectedType ||
+                    row.dataset.type === selectedType;
+
+                row.hidden = !(matchesSearch && matchesType);
+            });
+
+            rows.sort(function (a, b) {
+                if (sortValue === 'updated') {
+                    return Number(b.dataset.updated || 0) -
+                        Number(a.dataset.updated || 0);
+                }
+
+                return (a.dataset.name || '').localeCompare(
+                    b.dataset.name || '',
+                    undefined,
+                    { sensitivity: 'base' }
+                );
+            });
+
+            rows.forEach(function (row) {
+                tableBody.appendChild(row);
+            });
+
+            var visibleCount = rows.filter(function (row) {
+                return !row.hidden;
+            }).length;
+
+            if (noResults) {
+                noResults.style.display =
+                    visibleCount === 0 ? '' : 'none';
+            }
+        }
 
         if (search) {
-            search.focus();
-            search.addEventListener('input', function () {
-                var value = search.value.trim().toLowerCase();
-                var rows = document.querySelectorAll('#scenarioTable tbody tr');
-                var visibleRows = 0;
-                rows.forEach(function (row) {
-                        var text =
-                            (
-                                (row.dataset.name || "") + " " +
-                                (row.dataset.description || "") + " " +
-                                (row.dataset.method || "") + " " +
-                                (row.dataset.type || "") + " " +
-                                (row.dataset.measures || "") + " " +
-                                (row.dataset.seed || "")
-                            ).toLowerCase();
-
-                    var matches = text.includes(value);
-
-                    row.style.display = matches ? "" : "none";
-
-                    if (matches) {
-                        visibleRows++;
-                    }
-                });
-
-                document.getElementById("noScenarioResults").style.display =
-                    visibleRows === 0 ? "" : "none";
-            });
+            search.addEventListener('input', applyScenarioView);
         }
+
+        if (typeFilter) {
+            typeFilter.addEventListener('change', applyScenarioView);
+        }
+
+        if (sort) {
+            sort.addEventListener('change', applyScenarioView);
+        }
+
+        applyScenarioView();
     })();
 </script>

@@ -133,12 +133,42 @@
                                 id="quickLaunchDropdownButton"
                                 data-bs-toggle="dropdown"
                                 data-bs-auto-close="outside"
+                                data-bs-display="dynamic"
                                 aria-expanded="false">
                             -- Select a scenario --
                         </button>
                         <div class="dropdown-menu w-100 p-2"
                              aria-labelledby="quickLaunchDropdownButton"
                              style="max-height: 360px; overflow-y: auto;">
+
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label class="form-label small mb-1"
+                                           for="quickLaunchTypeFilter">
+                                        Type
+                                    </label>
+
+                                    <select id="quickLaunchTypeFilter"
+                                            class="form-select form-select-sm">
+                                        <option value="">All types</option>
+                                        <option value="Custom">Custom</option>
+                                        <option value="System">System</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-6">
+                                    <label class="form-label small mb-1"
+                                           for="quickLaunchSort">
+                                        Sort
+                                    </label>
+
+                                    <select id="quickLaunchSort"
+                                            class="form-select form-select-sm">
+                                        <option value="name">Alphabetical</option>
+                                        <option value="updated">Recently Modified</option>
+                                    </select>
+                                </div>
+                            </div>
 
                             <input type="text"
                                    id="quickLaunchSearch"
@@ -164,7 +194,8 @@
                                             data-description="@(s.Description ?? "")"
                                             data-method="@s.ReportMethod"
                                             data-type="Custom"
-                                            data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))">
+                                            data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))"
+                                            data-updated="@s.UpdatedAt.ToUnixTimeMilliseconds()">
                                         @s.Name
                                     </button>
                                 }
@@ -182,7 +213,8 @@
                                             data-description="@(s.Description ?? "")"
                                             data-method="@s.ReportMethod"
                                             data-type="System"
-                                            data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))">
+                                            data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))"
+                                            data-updated="@s.UpdatedAt.ToUnixTimeMilliseconds()">
                                         @s.Name <span class="text-muted">[System]</span>
                                     </button>
                                 }
@@ -200,7 +232,8 @@
                                     data-description="@(s.Description ?? "")"
                                     data-method="@s.ReportMethod"
                                     data-type="@(s.IsSystemScenario ? "System" : "Custom")"
-                                    data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))">
+                                    data-measures="@string.Join(" ", s.SelectedMeasures.Select(ProfiledMeasureCatalog.GetDisplayName))"
+                                    data-updated="@s.UpdatedAt.ToUnixTimeMilliseconds()">
                                 @s.Name@(s.IsSystemScenario ? " [System]" : "")
                             </option>
                         }
@@ -576,6 +609,8 @@
     var dropdownButton = document.getElementById('quickLaunchDropdownButton');
     var dropdownMenu = document.querySelector('#quickLaunchDropdown .dropdown-menu');
     var noResults = document.getElementById('quickLaunchNoResults');
+    var quickTypeFilter = document.getElementById('quickLaunchTypeFilter');
+    var quickSort = document.getElementById('quickLaunchSort');
 
     function getQuickLaunchOptions() {
         return Array.from(
@@ -594,17 +629,30 @@
     }
 
     function applyQuickLaunchSearch() {
-        if (!quickSearch) return;
+        var searchValue = quickSearch
+            ? quickSearch.value.trim().toLowerCase()
+            : '';
 
-        var value = quickSearch.value.trim().toLowerCase();
+        var selectedType = quickTypeFilter
+            ? quickTypeFilter.value
+            : '';
+
         var visibleCount = 0;
 
         getQuickLaunchOptions().forEach(function (option) {
-            var matches = searchableScenarioText(option).includes(value);
+            var matchesSearch =
+                !searchValue ||
+                searchableScenarioText(option).includes(searchValue);
 
-            option.hidden = !matches;
+            var matchesType =
+                !selectedType ||
+                option.dataset.type === selectedType;
 
-            if (matches) {
+            var visible = matchesSearch && matchesType;
+
+            option.hidden = !visible;
+
+            if (visible) {
                 visibleCount++;
             }
         });
@@ -650,6 +698,37 @@
             event.stopPropagation();
         });
     }
+
+    // Reapply filtering whenever the scenario type changes.
+    if (quickTypeFilter) {
+        quickTypeFilter.addEventListener('change', function (event) {
+            event.stopPropagation();
+            applyQuickLaunchSearch();
+        });
+    }
+
+    // Reorder the visible scenario buttons whenever the sort mode changes.
+    if (quickSort) {
+        quickSort.addEventListener('change', function (event) {
+            event.stopPropagation();
+            sortQuickLaunchDropdownOptions();
+            applyQuickLaunchSearch();
+        });
+    }
+
+    // Keep the Bootstrap dropdown open while the user interacts with
+    // the search, type filter, or sort controls.
+    [quickSearch, quickTypeFilter, quickSort]
+        .filter(Boolean)
+        .forEach(function (control) {
+            control.addEventListener('click', function (event) {
+                event.stopPropagation();
+            });
+        });
+
+    // Establish the initial ordering and visibility when the page loads.
+    sortQuickLaunchDropdownOptions();
+    applyQuickLaunchSearch();
 
     if (dropdownMenu) {
         dropdownMenu.addEventListener('click', function (event) {
@@ -763,6 +842,7 @@
         if (hiddenOption) {
             hiddenOption.textContent = label;
             hiddenOption.dataset.name = label;
+            hiddenOption.dataset.updated = String(Date.now());
         } else if (selector) {
             hiddenOption = document.createElement('option');
             hiddenOption.value = id;
@@ -772,6 +852,7 @@
             hiddenOption.dataset.method = '';
             hiddenOption.dataset.type = 'Custom';
             hiddenOption.dataset.measures = '';
+            hiddenOption.dataset.updated = String(Date.now());
             selector.appendChild(hiddenOption);
         }
 
@@ -782,6 +863,7 @@
 
         if (visibleOption) {
             visibleOption.dataset.name = label;
+            visibleOption.dataset.updated = String(Date.now());
             visibleOption.textContent = label;
         } else {
             var customGroup = document.querySelector(
@@ -799,6 +881,7 @@
                 visibleOption.dataset.method = '';
                 visibleOption.dataset.type = 'Custom';
                 visibleOption.dataset.measures = '';
+                visibleOption.dataset.updated = String(Date.now());
                 visibleOption.textContent = label;
 
                 customGroup.appendChild(visibleOption);
@@ -817,14 +900,23 @@
     //   3. System scenarios come last, alphabetically.
     // Sorting is case-insensitive so "zNick" / "ZNick" / "znick" cluster together.
     function sortQuickLaunchDropdownOptions() {
+        var sortValue = quickSort
+            ? quickSort.value
+            : 'name';
+
         document
             .querySelectorAll('#quickLaunchDropdown .quick-launch-group')
             .forEach(function (group) {
                 var options = Array.from(
-                   group.querySelectorAll('.quick-launch-option')
+                    group.querySelectorAll('.quick-launch-option')
                 );
 
                 options.sort(function (a, b) {
+                    if (sortValue === 'updated') {
+                        return Number(b.dataset.updated || 0) -
+                               Number(a.dataset.updated || 0);
+                    }
+
                     return (a.dataset.name || '').localeCompare(
                         b.dataset.name || '',
                         undefined,
@@ -833,7 +925,7 @@
                 });
 
                 options.forEach(function (option) {
-                   group.appendChild(option);
+                    group.appendChild(option);
                 });
             });
     }
