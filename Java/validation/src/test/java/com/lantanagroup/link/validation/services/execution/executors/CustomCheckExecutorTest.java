@@ -50,7 +50,8 @@ class CustomCheckExecutorTest {
         }
     }
 
-    // resolved reflectively by class name below; needs a public no-arg constructor
+    // a loadable CustomCheck with a public no-arg constructor — proves below that even a
+    // valid implementor is not instantiated from a rubric-supplied class name
     public static class ReflectiveCheck implements CustomCheck {
         @Override
         public String id() {
@@ -97,13 +98,14 @@ class CustomCheckExecutorTest {
     }
 
     @Test
-    @DisplayName("plug-in resolved reflectively by class name runs and returns its findings")
-    void reflectiveResolutionByClassName() {
+    @DisplayName("className values are never resolved reflectively; only registered ids resolve")
+    void classNameIsNotResolvedReflectively() {
         List<RawFinding> findings = executor.execute(
                 check("{\"className\":\"" + ReflectiveCheck.class.getName() + "\"}"), new ExecutionContext());
 
         assertThat(findings).hasSize(1);
-        assertThat(findings.get(0).getCode()).isEqualTo("reflective-ran");
+        assertThat(findings.get(0).getCode()).isEqualTo("custom-check-not-found");
+        assertThat(executor.canResolve(null, ReflectiveCheck.class.getName())).isFalse();
     }
 
     @Test

@@ -43,19 +43,10 @@ public class CustomCheckExecutor implements CheckExecutor {
         return CheckType.CUSTOM;
     }
 
-    // registration-time lookup; mirrors the resolution order of execute()
+    // registration-time lookup; checks resolve only through the Spring-injected registry —
+    // rubric-supplied className values must never reach Class.forName or reflective instantiation
     public boolean canResolve(String customCheckId, String className) {
-        if (customCheckId != null && byId.containsKey(customCheckId)) {
-            return true;
-        }
-        if (className != null) {
-            try {
-                return CustomCheck.class.isAssignableFrom(Class.forName(className));
-            } catch (ClassNotFoundException e) {
-                return false;
-            }
-        }
-        return false;
+        return customCheckId != null && byId.containsKey(customCheckId);
     }
 
     @Override
@@ -74,9 +65,6 @@ public class CustomCheckExecutor implements CheckExecutor {
         }
 
         CustomCheck impl = customCheckId != null ? byId.get(customCheckId) : null;
-        if (impl == null && className != null) {
-            impl = loadReflectively(className);
-        }
         if (impl == null) {
             String ref = customCheckId != null ? "customCheckId=" + customCheckId
                     : (className != null ? "className=" + className : "<no customCheckId/className>");
@@ -110,22 +98,5 @@ public class CustomCheckExecutor implements CheckExecutor {
 
     private static String location(ExecutionContext context) {
         return context.getResource() != null ? context.getResource().fhirType() : null;
-    }
-
-    private CustomCheck loadReflectively(String className) {
-        try {
-            Class<?> clazz = Class.forName(className);
-            if (!CustomCheck.class.isAssignableFrom(clazz)) {
-                logger.warn("Class {} does not implement CustomCheck", LogUtils.sanitize(className));
-                return null;
-            }
-            CustomCheck cc = (CustomCheck) clazz.getDeclaredConstructor().newInstance();
-            byId.putIfAbsent(cc.id(), cc);
-            return cc;
-        } catch (Exception e) {
-            logger.warn("Failed to load CustomCheck class {}: {}",
-                    LogUtils.sanitize(className), LogUtils.sanitize(e.getMessage()));
-            return null;
-        }
     }
 }
