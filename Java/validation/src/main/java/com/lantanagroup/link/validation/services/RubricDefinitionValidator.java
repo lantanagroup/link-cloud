@@ -158,6 +158,8 @@ public class RubricDefinitionValidator {
         }
     }
 
+    private static final int MAX_WHITELIST_REGEX_LENGTH = 512;
+
     private void validateParameters(CheckDto check, String label, List<String> errors) {
         JsonNode params = check.getParameters();
         if (params != null && !params.isNull() && !params.isObject()) {
@@ -184,11 +186,16 @@ public class RubricDefinitionValidator {
                 }
                 String regex = text(params, "valueSetWhitelistRegex");
                 if (regex != null) {
-                    try {
-                        Pattern.compile(regex);
-                    } catch (PatternSyntaxException e) {
-                        errors.add("checks[" + label + "].parameters.valueSetWhitelistRegex: invalid regular expression: "
-                                + firstLine(e.getMessage()));
+                    if (regex.length() > MAX_WHITELIST_REGEX_LENGTH) {
+                        errors.add("checks[" + label + "].parameters.valueSetWhitelistRegex: must be at most "
+                                + MAX_WHITELIST_REGEX_LENGTH + " characters");
+                    } else {
+                        try {
+                            Pattern.compile(regex);
+                        } catch (PatternSyntaxException e) {
+                            errors.add("checks[" + label + "].parameters.valueSetWhitelistRegex: invalid regular expression: "
+                                    + firstLine(e.getMessage()));
+                        }
                     }
                 }
             }
