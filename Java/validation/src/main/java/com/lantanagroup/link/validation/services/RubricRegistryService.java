@@ -226,7 +226,10 @@ public class RubricRegistryService {
             return objectMapper.writeValueAsString(value);
         } catch (Exception e) {
             logger.error("Failed to write JSON for {}", value.getClass().getSimpleName(), e);
-            return null;
+            // rethrow so registerVersion can't persist a version with missing JSON and an
+            // empty checksum; the runtime exception also rolls back the transaction
+            throw new IllegalStateException(
+                    "Failed to serialize " + value.getClass().getSimpleName() + " to JSON", e);
         }
     }
 
