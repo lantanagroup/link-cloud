@@ -102,13 +102,15 @@ test('GET /facility/:id returns the fields the edit form binds', async ({ reques
 });
 
 /**
- * Characterisation test, not an endorsement: `search` matches facilityName only, and an
- * empty result is 204 rather than 200 with an empty body. The tenant dashboard's "Facility"
- * filter feeds this endpoint, so typing a facility ID finds nothing — see the note in the
- * spec header. If the BFF learns to match IDs, this test should start failing; update it
- * then, because the UI filter will finally work.
+ * `search` is a free-text fragment matched against both the facility name and the facility
+ * id (Tenant's FacilityQueries.PagedSearchAsync, under PartialMatch). The tenant dashboard's
+ * "Facility" filter feeds this endpoint with whatever the user typed, so both halves matter:
+ * part of a name and part of an id must each find the facility.
+ *
+ * This previously asserted that an id search found nothing — a characterisation of the bug
+ * where the dropdown offered a facility the table underneath then reported as missing.
  */
-test('GET /facility/list matches on name, not id, and 204s when empty', async ({ request }) => {
+test('GET /facility/list matches on both name and id', async ({ request }) => {
   const api = apiBaseUrl();
 
   await withFacility(request, async (facilityId) => {
@@ -116,13 +118,30 @@ test('GET /facility/list matches on name, not id, and 204s when empty', async ({
     expect(byName.status(), 'name search should match').toBe(200);
 
     // A map of facilityId -> facilityName, which is what the autocomplete is built from.
-    const lookup = await byName.json();
-    expect(typeof lookup).toBe('object');
-    expect(lookup[facilityId]).toBe('UI Contract Check Facility');
+    const nameLookup = await byName.json();
+    expect(typeof nameLookup).toBe('object');
+    expect(nameLookup[facilityId]).toBe('UI Contract Check Facility');
 
     const byId = await request.get(`${api}/facility/list?search=${facilityId}&includeDeleted=false`);
-    expect(byId.status(), 'id search currently finds nothing — 204, no body').toBe(204);
+    expect(byId.status(), 'id search should match').toBe(200);
+
+    const idLookup = await byId.json();
+    expect(typeof idLookup).toBe('object');
+    expect(idLookup[facilityId]).toBe('UI Contract Check Facility');
   });
+});
+
+/**
+ * Kept from the test above, which used to cover this incidentally through its id search: an
+ * empty result is 204 with no body rather than 200 with an empty map. Callers have to treat
+ * "no matches" as a status code, not as an empty collection.
+ */
+test('GET /facility/list 204s when nothing matches', async ({ request }) => {
+  const api = apiBaseUrl();
+  const term = `no-such-facility-${Date.now()}`;
+
+  const response = await request.get(`${api}/facility/list?search=${term}&includeDeleted=false`);
+  expect(response.status(), 'an empty result is 204, no body').toBe(204);
 });
 
 /**

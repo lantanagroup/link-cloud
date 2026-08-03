@@ -42,12 +42,13 @@ test('a facility created through the BFF appears in the UI and disappears after 
     const tenants = new TenantDashboardPage(page);
     await tenants.goto();
 
-    // Search by name, not id: the filter sends the term as facilityName, and the Tenant
-    // service matches it with FacilityName.Contains (FacilityController.GetFacilityList ->
-    // FacilityQueries.PagedSearchAsync). Typing the id filters everything out, which an
-    // earlier version of this test hid by also accepting an autocomplete option — those
-    // options are rendered from the *unfiltered* lookup and carry the id, so the assertion
-    // passed without the search ever working.
+    // The filter sends the term as facilityName, which the Tenant service matches as a
+    // fragment of either the name or the id (FacilityController.GetFacilities ->
+    // FacilityQueries.PagedSearchAsync). Searching by name here rather than by id because
+    // the name is the harder case: an earlier version of this test hid a broken search by
+    // also accepting an autocomplete option, and those options are rendered from the
+    // *unfiltered* lookup and carry the id — so the assertion passed without the search
+    // ever working.
     await tenants.facilitySearch.fill(facilityName);
 
     // The row is the real outcome: it fails if either the search or the table breaks.
