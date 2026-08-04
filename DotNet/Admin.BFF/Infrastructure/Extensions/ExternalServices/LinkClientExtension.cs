@@ -10,6 +10,7 @@ namespace LantanaGroup.Link.LinkAdmin.BFF.Infrastructure.Extensions.ExternalServ
             services.AddHttpClient<AuditService>();
             services.AddHttpClient<CensusService>();
             services.AddHttpClient<DataAcquisitionService>();
+            services.AddHttpClient<DmrpService>();
             services.AddHttpClient<MeasureEvalService>();
             services.AddHttpClient<NormalizationService>();
             services.AddHttpClient<NotificationService>();
