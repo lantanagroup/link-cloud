@@ -23,14 +23,40 @@ export class VendorService {
       )
   }
 
-  createVendor(vendorId: IVendorConfigModel): Observable<any> {
-    return this.http.post<any>(`${this.baseApiPath}/normalization/Vendor/${vendorId}`, "")
+  /**
+   * The vendor name travels in the route, not a body. Typed as a string because that is what
+   * callers pass -- it was previously declared as IVendorConfigModel and interpolated straight
+   * into the URL, which produced "[object Object]" for anything but a bare string.
+   */
+  createVendor(name: string): Observable<any> {
+    return this.http.post<any>(`${this.baseApiPath}/normalization/Vendor/${encodeURIComponent(name)}`, "")
       .pipe(
-        tap(_ => console.log(`add user.`)),
+        tap(_ => console.log(`created vendor.`)),
         map((response) => {
           return response;
         }),
-        catchError(this.handleError.bind(this))
+        catchError(this.handleSaveError.bind(this))
+      )
+  }
+
+  /**
+   * Persists changes to a vendor, including its Key Vault secret id.
+   *
+   * PROVISIONAL ROUTE. No update endpoint exists yet: the Vendor model is moving out of
+   * Normalization and into Tenant under LEGLINK-743, whose acceptance criteria cover list,
+   * add and delete but not update, so this operation is owned by neither ticket. The route
+   * below mirrors the sibling delete endpoint so the shape is a reasonable guess, and this
+   * method is deliberately the only place in the UI that knows it -- when the contract is
+   * confirmed, this body is the sole edit required. Until then it is exercised through mocks.
+   */
+  updateVendor(vendor: IVendorConfigModel): Observable<IApiResponse> {
+    return this.http.put<IApiResponse>(`${this.baseApiPath}/normalization/Vendor/${encodeURIComponent(vendor.id)}`, vendor)
+      .pipe(
+        tap(_ => console.log(`updated vendor.`)),
+        map((response) => {
+          return response;
+        }),
+        catchError(this.handleSaveError.bind(this))
       )
   }
 
@@ -47,6 +73,19 @@ export class VendorService {
 
   private handleError(err: HttpErrorResponse) {
     return this.errorHandler.handleError(err);
+  }
+
+  /**
+   * Save failures are presented by the config dialog, which shows a snackbar and stays open so
+   * the admin's input is not thrown away. ErrorHandlingService raises its own toastr by default,
+   * so one failed save produced two messages; suppressing the toastr here leaves the dialog as
+   * the single surface. List and delete keep the toastr, having no dialog to carry the news.
+   *
+   * The rethrown error still carries the sanitized `message` the dialog displays -- that is set
+   * regardless of whether the toastr is shown.
+   */
+  private handleSaveError(err: HttpErrorResponse) {
+    return this.errorHandler.handleError(err, false);
   }
 
 }
