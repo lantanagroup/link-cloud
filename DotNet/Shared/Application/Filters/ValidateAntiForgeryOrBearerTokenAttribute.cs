@@ -1,9 +1,10 @@
 ﻿using Microsoft.AspNetCore.Antiforgery;
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace LantanaGroup.Link.DataAcquisition.Filters;
+namespace LantanaGroup.Link.Shared.Application.Filters;
 
 /// <summary>
 /// Validates antiforgery tokens for cookie-authenticated requests but skips validation

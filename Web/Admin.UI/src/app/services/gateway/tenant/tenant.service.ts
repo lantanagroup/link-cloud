@@ -7,11 +7,11 @@ import {
   IScheduledReportModel,
   PagedFacilityConfigModel
 } from 'src/app/interfaces/tenant/facility-config-model.interface';
-import {Vendor} from 'src/app/interfaces/tenant/vendor.enum';
 import {Observable, catchError, map, tap, of} from 'rxjs';
 import {IEntityCreatedResponse} from 'src/app/interfaces/entity-created-response.model';
 import {AppConfigService} from '../../app-config.service';
 import {IEntityDeletedResponse} from "../../../interfaces/entity-deleted-response.interface";
+import { IVendor, IVendorVersion } from 'src/app/interfaces/tenant/vendor-interface';
 
 @Injectable({
   providedIn: 'root'
@@ -21,12 +21,13 @@ export class TenantService {
   }
 
 
-  createFacility(facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel, vendor?: Vendor): Observable<IEntityCreatedResponse> {
+  createFacility(facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel, vendor?: IVendorVersion): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
       facilityId: facilityId,
       facilityName: facilityName,
       timeZone: timeZone,
-      vendor: vendor,
+      vendor: vendor ? { id: vendor.vendorId, name: vendor.vendorName } : undefined,
+      vendorVersionId: vendor?.id,
       scheduledReports: scheduledReports
     };
 
@@ -40,13 +41,14 @@ export class TenantService {
       )
   }
 
-  updateFacility(id: string, facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel, vendor?: Vendor): Observable<IEntityCreatedResponse> {
+  updateFacility(id: string, facilityId: string, facilityName: string, timeZone: string, scheduledReports: IScheduledReportModel, vendor?: IVendorVersion): Observable<IEntityCreatedResponse> {
     let facility: IFacilityConfigModel = {
       id: id,
       facilityId: facilityId,
       facilityName: facilityName,
       timeZone: timeZone,
-      vendor: vendor,
+      vendor: vendor ? { id: vendor.vendorId, name: vendor.vendorName } : undefined,
+      vendorVersionId: vendor?.id,
       scheduledReports: scheduledReports
     };
 
@@ -127,7 +129,7 @@ export class TenantService {
   }
 
 
-  listFacilities(facilityId: string, facilityName: string, timeZone: string, vendor: string, sortBy: string, sortOrder: number, pageSize: number, pageNumber: number, showDeleted: boolean): Observable<PagedFacilityConfigModel> {
+  listFacilities(facilityId: string, facilityName: string, timeZone: string, vendorId: string, sortBy: string, sortOrder: number, pageSize: number, pageNumber: number, showDeleted: boolean): Observable<PagedFacilityConfigModel> {
 
     //javascript based paging is zero based, so increment page number by 1
     pageNumber = pageNumber + 1;
@@ -142,7 +144,7 @@ export class TenantService {
       .set('includeDeleted', showDeleted.toString());
 
     if (timeZone) { params = params.set('timeZone', timeZone); }
-    if (vendor) { params = params.set('vendor', vendor); }
+    if (vendorId) { params = params.set('vendor.id', vendorId); }
 
     return this.http.get<PagedFacilityConfigModel>(`${this.appConfigService.config?.baseApiUrl}/facility`, {params})
       .pipe(
@@ -184,6 +186,20 @@ export class TenantService {
       map((response: any) => response),
       catchError((error) => this.errorHandler.handleError(error))
     );
+  }
+
+  getVendors(): Observable<IVendor[]> {
+    return this.http.get<IVendor[]>(`${this.appConfigService.config?.baseApiUrl}/vendor`)
+      .pipe(
+        catchError((error) => this.errorHandler.handleError(error))
+      )
+  }
+
+  getVendorVersions(): Observable<IVendorVersion[]> {
+    return this.http.get<IVendorVersion[]>(`${this.appConfigService.config?.baseApiUrl}/VendorVersion`)
+      .pipe(
+        catchError((error) => this.errorHandler.handleError(error))
+      )
   }
 
   private handleError(err: HttpErrorResponse) {

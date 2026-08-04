@@ -181,7 +181,7 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
 
                         existingFacility.FacilityName = newFacility.FacilityName;
                         existingFacility.TimeZone = newFacility.TimeZone;
-                        existingFacility.Vendor = newFacility.Vendor;
+                        existingFacility.VendorVersionId = newFacility.VendorVersionId;
                         existingFacility.ScheduledReports.Daily = newFacility.ScheduledReports.Daily;
                         existingFacility.ScheduledReports.Weekly = newFacility.ScheduledReports.Weekly;
                         existingFacility.ScheduledReports.Monthly = newFacility.ScheduledReports.Monthly;

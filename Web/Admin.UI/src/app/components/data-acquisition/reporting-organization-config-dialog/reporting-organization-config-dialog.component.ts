@@ -5,7 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { IOrganizationLocationConfigurationModel } from '../../../interfaces/data-acquisition/organization-location-config-model.interface';
 import { IEntityCreatedResponse } from '../../../interfaces/entity-created-response.model';
-import { Vendor } from '../../../interfaces/tenant/vendor.enum';
+import { IVendor } from '../../../interfaces/tenant/vendor-interface';
 import { FormMode } from '../../../models/FormMode.enum';
 import { ReportingOrganizationConfigFormComponent } from '../reporting-organization-config-form/reporting-organization-config-form.component';
 
@@ -26,7 +26,7 @@ export class ReportingOrganizationConfigDialogComponent {
   viewOnly: boolean = false;
   config!: IOrganizationLocationConfigurationModel;
   formMode!: FormMode;
-  vendor!: Vendor;
+  vendor?: IVendor;
   formIsInvalid: boolean = true;
 
   @ViewChild(ReportingOrganizationConfigFormComponent) configForm!: ReportingOrganizationConfigFormComponent;
@@ -36,7 +36,7 @@ export class ReportingOrganizationConfigDialogComponent {
       dialogTitle: string,
       formMode: FormMode,
       viewOnly: boolean,
-      vendor: Vendor,
+      vendor?: IVendor,
       reportingOrgConfig: IOrganizationLocationConfigurationModel
     },
     private dialogRef: MatDialogRef<ReportingOrganizationConfigDialogComponent>,

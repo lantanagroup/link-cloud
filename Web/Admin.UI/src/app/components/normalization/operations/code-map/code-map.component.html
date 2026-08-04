@@ -22,7 +22,7 @@
         <mat-label>Select Vendor</mat-label>
         <mat-select formControlName="selectedVendor" [disabled]="viewOnly" multiple>
           @for (vendor of vendors; track vendor) {
-            <mat-option [value]="vendor.id">{{ vendor.name }}</mat-option>
+            <mat-option [value]="vendor.id">{{ vendor.vendorName }} - {{ vendor.version }}</mat-option>
           }
         </mat-select>
       </mat-form-field>

@@ -105,7 +105,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [HttpGet(Name = "GetFacilities")]
         public async Task<ActionResult<PagedConfigModel<FacilityModel>>> GetFacilities(string? facilityId,
-            string? facilityName, string? timeZone, Vendor? vendor, string? sortBy, SortOrder? sortOrder,
+            string? facilityName, string? timeZone, VendorModel? vendor, string? sortBy, SortOrder? sortOrder,
             int pageSize = 10, int pageNumber = 1, bool includeDeleted = false,
             CancellationToken cancellationToken = default)
         {

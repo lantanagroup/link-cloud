@@ -45,8 +45,8 @@
         <mat-form-field appearance="outline" class="compact-filter">
           <mat-label>Vendor</mat-label>
           <mat-select [(ngModel)]="filterVendor" (selectionChange)="onSearchChange()">
-            <mat-option value="">All</mat-option>
-            <mat-option *ngFor="let v of vendorOptions" [value]="v">{{ v }}</mat-option>
+            <mat-option [value]="null">All</mat-option>
+            <mat-option *ngFor="let vendor of vendorOptions" [value]="vendor">{{ vendor.name }}</mat-option>
           </mat-select>
         </mat-form-field>
 
@@ -97,7 +97,7 @@
         <!-- Vendor -->
         <ng-container matColumnDef="vendor">
           <th mat-header-cell *matHeaderCellDef mat-sort-header>Vendor</th>
-          <td mat-cell *matCellDef="let row">{{ row.vendor }}</td>
+          <td mat-cell *matCellDef="let row">{{ row.vendor.name }}</td>
         </ng-container>
 
         <!-- Action buttons -->

@@ -172,7 +172,10 @@ public sealed class AdminBffTestSuite : ServiceTestSuiteBase
                 FacilityId = facilityId,
                 FacilityName = facilityId,
                 TimeZone = "America/Chicago",
-                Vendor = Vendor.Epic,
+                Vendor = new VendorModel
+                {
+                    Name = "Epic"
+                },
                 ScheduledReports = new TenantScheduledReportConfig
                 {
                     Daily = [],
