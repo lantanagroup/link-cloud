@@ -352,6 +352,19 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         var systemComponent = parameters?.Get("system").FirstOrDefault();
         var codeComponent = parameters?.Get("code").FirstOrDefault();
         var displayComponent = parameters?.Get("display").FirstOrDefault();
+        var coding = parameters?.Get("coding").FirstOrDefault()?.Value as Coding;
+        var codeableConcept = parameters?.Get("codeableConcept").FirstOrDefault()?.Value as CodeableConcept;
+
+        // Every client-supplied system is normalized here, ahead of the merges below and of the value set
+        // lookup. The merges treat an empty string as "not supplied", so a blank reaching them would be
+        // silently overwritten and never rejected; validating up front also keeps the answer for a
+        // malformed codeableConcept independent of which coding happens to match first (LEGLINK-888).
+        system = NormalizeSystem(system, "system");
+        var bodySystem = NormalizeSystem(systemComponent?.Value?.ToString(), "system");
+        var codingSystem = coding == null ? null : NormalizeSystem(coding.System, "coding.system");
+        var conceptSystems = (codeableConcept?.Coding ?? [])
+            .Select(conceptCoding => NormalizeSystem(conceptCoding.System, "codeableConcept.coding.system"))
+            .ToList();
 
         if (urlComponent?.Value != null && string.IsNullOrEmpty(url))
         {
@@ -385,9 +398,11 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         // Priority 1: Direct parameters
         if (!string.IsNullOrEmpty(code))
         {
-            if (systemComponent?.Value != null && string.IsNullOrEmpty(system))
+            // A normalized system is either null or a real value, so "not supplied" is a null check.
+            // string.IsNullOrEmpty here would fold a blank back into the absent case (LEGLINK-888).
+            if (bodySystem != null && system == null)
             {
-                system = systemComponent.Value.ToString();
+                system = bodySystem;
             }
 
             if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
@@ -401,9 +416,9 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         // Priority 2: Parameters.code and Parameters.system
         if (codeComponent?.Value != null)
         {
-            if (systemComponent?.Value != null && string.IsNullOrEmpty(system))
+            if (bodySystem != null && system == null)
             {
-                system = systemComponent.Value.ToString();
+                system = bodySystem;
             }
 
             if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
@@ -415,19 +430,17 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         }
 
         // Priority 3: Parameters.coding
-        var coding = parameters?.Get("coding").FirstOrDefault()?.Value as Coding;
         if (coding != null)
         {
-            return ValidateCodeInCodeGroup(codeGroup, coding.Code, coding.System, coding.Display);
+            return ValidateCodeInCodeGroup(codeGroup, coding.Code, codingSystem, coding.Display);
         }
 
         // Priority 4: Parameters.codeableConcept
-        var codeableConcept = parameters?.Get("codeableConcept").FirstOrDefault()?.Value as CodeableConcept;
         if (codeableConcept?.Coding != null)
         {
-            foreach (var conceptCoding in codeableConcept.Coding)
+            foreach (var (conceptCoding, conceptSystem) in codeableConcept.Coding.Zip(conceptSystems))
             {
-                var result = ValidateCodeInCodeGroup(codeGroup, conceptCoding.Code, conceptCoding.System, conceptCoding.Display);
+                var result = ValidateCodeInCodeGroup(codeGroup, conceptCoding.Code, conceptSystem, conceptCoding.Display);
                 var resultBoolean = result.GetSingleValue<FhirBoolean>("result");
                 if (resultBoolean?.Value == true)
                 {
@@ -560,8 +573,49 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         return parameters;
     }
 
+    /// <summary>
+    /// Placeholders a client produces by interpolating an unset variable into a request rather than
+    /// omitting the parameter — JavaScript renders null and undefined this way. They are accepted as
+    /// meaning "no system supplied".
+    /// </summary>
+    private static readonly string[] SystemPlaceholders = ["null", "undefined"];
+
+    /// <summary>
+    /// Validates and normalizes a client-supplied <c>system</c> for a ValueSet $validate-code request,
+    /// mapping it onto the two states the validator understands: a real system to look up, or null
+    /// meaning "search every system in the value set".
+    /// </summary>
+    /// <remarks>
+    /// An absent system is legitimate FHIR and keeps its search-all-systems meaning. A blank one is not:
+    /// no FHIR primitive may be an empty string, so the request is malformed and is rejected rather than
+    /// reinterpreted. Folding a blank into the absent case answered a broader question than the caller
+    /// asked and reported result=true without disclosing which system matched (LEGLINK-888).
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when the value is present but blank, which the caller surfaces as a 400.
+    /// </exception>
+    private static string? NormalizeSystem(string? system, string parameterName)
+    {
+        if (system == null)
+        {
+            return null;
+        }
+
+        // FHIR requires at least one character of non-whitespace content, so "   " is as malformed as "".
+        if (string.IsNullOrWhiteSpace(system))
+        {
+            throw new ArgumentException($"The '{parameterName}' parameter cannot be blank");
+        }
+
+        return SystemPlaceholders.Contains(system, StringComparer.OrdinalIgnoreCase) ? null : system;
+    }
+
     private Parameters ValidateCodeInCodeGroup(CodeGroup codeGroup, string code, string? system, string? display)
     {
+        // string.IsNullOrEmpty rather than a null check: this is shared with ValidateCodeInCodeSystem,
+        // which passes the code group's own Url here. That is cache content, not client input, so an
+        // empty one must keep falling back to a search rather than being blamed on the caller.
+        // ValueSet input reaching this point has already been through NormalizeSystem.
         return string.IsNullOrEmpty(system)
             ? ValidateCodeAcrossSystems(codeGroup, code, display)
             : ValidateCodeInSystem(codeGroup, code, system, display);

@@ -1422,4 +1422,135 @@ public class FhirServiceTests
     }
 
     #endregion
+
+    #region Blank system handling (LEGLINK-888)
+
+    private const string BlankSystemValueSetId = "test-vs-blank-system";
+    private const string BlankSystemCode = "test-code";
+    private const string BlankSystemSystem = "http://test.system";
+
+    /// <summary>
+    /// A single-system value set containing <see cref="BlankSystemCode"/>, so a request that reaches the
+    /// validator resolves successfully. Anything that still fails did so on the system, not the lookup.
+    /// </summary>
+    private void ArrangeBlankSystemValueSet()
+    {
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, BlankSystemValueSetId, It.IsAny<string>()))
+            .Returns(new CodeGroup
+            {
+                Id = BlankSystemValueSetId,
+                Type = CodeGroup.CodeGroupTypes.ValueSet,
+                Codes = new Dictionary<string, List<Code>>
+                {
+                    { BlankSystemSystem, new List<Code> { new() { Value = BlankSystemCode, Display = "Test Code" } } }
+                }
+            });
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public void ValidateCodeInValueSet_WithBlankQuerySystem_ThrowsArgumentException(string system)
+    {
+        // Arrange
+        ArrangeBlankSystemValueSet();
+
+        // Act / Assert - FHIR primitives require at least one non-whitespace character, so each of these
+        // is malformed input rather than a request to search every system
+        var exception = Assert.Throws<ArgumentException>(() =>
+            _service.ValidateCodeInValueSet(null, BlankSystemValueSetId, system, BlankSystemCode, null, null));
+
+        Assert.Equal("The 'system' parameter cannot be blank", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithBlankSystemParameterInBody_ThrowsArgumentException()
+    {
+        // Arrange
+        ArrangeBlankSystemValueSet();
+
+        var parameters = new Parameters();
+        parameters.Add("system", new FhirUri(string.Empty));
+        parameters.Add("code", new FhirString(BlankSystemCode));
+
+        // Act / Assert
+        var exception = Assert.Throws<ArgumentException>(() =>
+            _service.ValidateCodeInValueSet(null, BlankSystemValueSetId, null, null, null, parameters));
+
+        Assert.Equal("The 'system' parameter cannot be blank", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithBlankQuerySystemAndValidBodySystem_ThrowsArgumentException()
+    {
+        // Arrange - the body carries a usable system, so only up-front validation catches the blank:
+        // the merge treats an empty string as "not supplied" and would overwrite it before any check
+        ArrangeBlankSystemValueSet();
+
+        var parameters = new Parameters();
+        parameters.Add("system", new FhirUri(BlankSystemSystem));
+
+        // Act / Assert
+        var exception = Assert.Throws<ArgumentException>(() =>
+            _service.ValidateCodeInValueSet(
+                null, BlankSystemValueSetId, string.Empty, BlankSystemCode, null, parameters));
+
+        Assert.Equal("The 'system' parameter cannot be blank", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithBlankSystemInLaterCodeableConceptCoding_ThrowsArgumentException()
+    {
+        // Arrange - the first coding matches, so a check performed at the point of use would return
+        // result=true and never reach the malformed second coding
+        ArrangeBlankSystemValueSet();
+
+        var codeableConcept = new CodeableConcept();
+        codeableConcept.Coding.Add(new Coding(BlankSystemSystem, BlankSystemCode));
+        codeableConcept.Coding.Add(new Coding { Code = "other-code", System = string.Empty });
+
+        var parameters = new Parameters();
+        parameters.Add("codeableConcept", codeableConcept);
+
+        // Act / Assert - validation is up front, so the verdict does not depend on match order
+        var exception = Assert.Throws<ArgumentException>(() =>
+            _service.ValidateCodeInValueSet(null, BlankSystemValueSetId, null, null, null, parameters));
+
+        Assert.Equal("The 'codeableConcept.coding.system' parameter cannot be blank", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("undefined")]
+    [InlineData("NULL")]
+    public void ValidateCodeInValueSet_WithPlaceholderSystem_SearchesAllSystems(string system)
+    {
+        // Arrange - a client that interpolated an unset variable into the request rather than omitting it
+        ArrangeBlankSystemValueSet();
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(
+            null, BlankSystemValueSetId, system, BlankSystemCode, null, null);
+
+        // Assert - treated as absent, so the code is found; looking "null" up as a system URL would miss
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithAbsentSystem_StillSearchesAllSystems()
+    {
+        // Arrange - the behaviour a blank system used to borrow, which must survive the fix
+        ArrangeBlankSystemValueSet();
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(
+            null, BlankSystemValueSetId, null, BlankSystemCode, null, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+    }
+
+    #endregion
 }
