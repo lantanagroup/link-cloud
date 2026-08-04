@@ -33,16 +33,18 @@
           <th mat-header-cell *matHeaderCellDef class="actions-column"> Actions </th>
           <td mat-cell *matCellDef="let vendor" class="actions-column">
             <div class="actions">
-              <button
-                mat-icon-button
-                color="primary"
-                class="mat-elevation-z2"
-                (click)="onEdit(vendor)"
-                aria-label="Edit Vendor"
-                matTooltip="Edit Vendor"
-                >
-                <mat-icon>edit</mat-icon>
-              </button>
+              @if (vendorEditEnabled) {
+                <button
+                  mat-icon-button
+                  color="primary"
+                  class="mat-elevation-z2"
+                  (click)="onEdit(vendor)"
+                  aria-label="Edit Vendor"
+                  matTooltip="Edit Vendor"
+                  >
+                  <mat-icon>edit</mat-icon>
+                </button>
+              }
               <button
                 mat-icon-button
                 color="warn"

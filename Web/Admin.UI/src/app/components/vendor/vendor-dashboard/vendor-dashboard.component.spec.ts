@@ -9,12 +9,15 @@ import { VendorConfigDialogComponent } from '../vendor-config-dialog/vendor-conf
 import { VendorService } from '../../../services/gateway/vendor/vendor.service';
 import { FormMode } from '../../../models/FormMode.enum';
 import { IVendorConfigModel } from '../../../interfaces/vendor/vendor-config-model.interface';
+import { AppConfigService } from '../../../services/app-config.service';
 
 describe('VendorDashboardComponent', () => {
   let component: VendorDashboardComponent;
   let fixture: ComponentFixture<VendorDashboardComponent>;
   let vendorService: jasmine.SpyObj<VendorService>;
   let dialog: jasmine.SpyObj<MatDialog>;
+  /** Mutable so a test can set the flag before the first change detection. */
+  let appConfigService: { config: { vendorEditEnabled?: boolean } };
 
   const vendors: IVendorConfigModel[] = [
     { id: 'vendor-1', name: 'Epic', secretId: 'epic-signing-pem' },
@@ -27,11 +30,15 @@ describe('VendorDashboardComponent', () => {
 
     dialog = jasmine.createSpyObj<MatDialog>('MatDialog', ['open']);
 
+    // Editing is off by default in shipped config; most tests here cover the enabled behaviour.
+    appConfigService = { config: { vendorEditEnabled: true } };
+
     await TestBed.configureTestingModule({
       imports: [VendorDashboardComponent, NoopAnimationsModule, MatDialogModule, MatSnackBarModule],
       providers: [
         { provide: VendorService, useValue: vendorService },
-        { provide: MatDialog, useValue: dialog }
+        { provide: MatDialog, useValue: dialog },
+        { provide: AppConfigService, useValue: appConfigService }
       ]
     }).compileComponents();
 
@@ -101,5 +108,39 @@ describe('VendorDashboardComponent', () => {
     component.onEdit(vendors[1]);
 
     expect(vendorService.getVendors.calls.count()).toBe(before);
+  });
+
+  // Editing is gated because no vendor update endpoint exists yet -- VendorController offers
+  // list, add and delete only, so an enabled edit button would save into a 404.
+  describe('when vendorEditEnabled is off', () => {
+    beforeEach(() => {
+      appConfigService.config.vendorEditEnabled = false;
+      fixture.detectChanges();
+    });
+
+    it('offers no edit button', () => {
+      const edit = (fixture.nativeElement as HTMLElement).querySelector('[aria-label="Edit Vendor"]');
+      expect(edit).toBeNull();
+    });
+
+    it('keeps delete available', () => {
+      const remove = (fixture.nativeElement as HTMLElement).querySelector('[aria-label="Delete Vendor"]');
+      expect(remove).not.toBeNull();
+    });
+
+    it('opens no dialog even if onEdit is called directly', () => {
+      dialogClosingWith(null);
+
+      component.onEdit(vendors[0]);
+
+      expect(dialog.open).not.toHaveBeenCalled();
+    });
+  });
+
+  it('offers an edit button when the flag is on', () => {
+    fixture.detectChanges();
+
+    const edit = (fixture.nativeElement as HTMLElement).querySelector('[aria-label="Edit Vendor"]');
+    expect(edit).not.toBeNull();
   });
 });
