@@ -3,6 +3,7 @@ using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Controllers;
 using LantanaGroup.Link.Terminology.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -53,6 +54,26 @@ public class FhirControllerTests
         return Assert.IsType<Parameters>(okResult.Value);
     }
 
+    /// <summary>
+    /// Asserts that the action produced an RFC 9457 Problem Details 400 carrying <paramref name="expectedDetail"/>.
+    /// </summary>
+    /// <remarks>
+    /// No <see cref="HttpContext"/> is wired up, so the controller's <c>ProblemDetailsFactory</c> is null and
+    /// <c>ControllerBase.Problem</c> builds a plain <see cref="ProblemDetails"/> from its arguments. The runtime
+    /// <c>traceId</c> is injected by the app's configured factory and is out of scope here (see ConfigControllerTests).
+    /// </remarks>
+    private static void AssertBadRequestProblem(ActionResult<Parameters> result, string expectedDetail)
+    {
+        var objectResult = Assert.IsType<ObjectResult>(result.Result);
+        Assert.Equal(StatusCodes.Status400BadRequest, objectResult.StatusCode);
+
+        var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
+        Assert.Equal("Bad Request", problem.Title);
+        Assert.Equal(StatusCodes.Status400BadRequest, problem.Status);
+        Assert.Equal("https://tools.ietf.org/html/rfc9110#section-15.5.1", problem.Type);
+        Assert.Equal(expectedDetail, problem.Detail);
+    }
+
     [Fact]
     public void ValidateCodeInValueSet_WithDisplayContainingAmpersand_ReturnsTrue()
     {
@@ -99,8 +120,7 @@ public class FhirControllerTests
 
         // Assert - the display sanitizes away to nothing; passing the empty value on would skip the
         // display check and answer result=true, so the request is rejected instead
-        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Equal("Invalid value supplied for 'display'", badRequest.Value);
+        AssertBadRequestProblem(result, "Invalid value supplied for 'display'.");
     }
 
     [Fact]
@@ -116,8 +136,7 @@ public class FhirControllerTests
             CodeSystemUrl, null, LoincCode, "<script>alert('x')</script>", null);
 
         // Assert
-        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Equal("Invalid value supplied for 'display'", badRequest.Value);
+        AssertBadRequestProblem(result, "Invalid value supplied for 'display'.");
     }
 
     [Fact]
@@ -127,8 +146,7 @@ public class FhirControllerTests
         var result = _controller.ValidateCodeInValueSet(null, null, null, LoincCode, null, null);
 
         // Assert
-        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Equal("No id or url parameter specified", badRequest.Value);
+        AssertBadRequestProblem(result, "No id or url parameter specified.");
     }
 
     [Fact]
@@ -138,7 +156,21 @@ public class FhirControllerTests
         var result = _controller.ValidateCodeInValueSet(string.Empty, null, null, LoincCode, null, null);
 
         // Assert
-        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
-        Assert.Equal("No id or url parameter specified", badRequest.Value);
+        AssertBadRequestProblem(result, "No id or url parameter specified.");
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithEmptyValueUriInBody_ReturnsBadRequest()
+    {
+        // Arrange - LEGLINK-887's reported request: the url arrives in the POST body as an empty valueUri
+        var parameters = new Parameters();
+        parameters.Add("url", new FhirUri(string.Empty));
+        parameters.Add("code", new FhirString(LoincCode));
+
+        // Act
+        var result = _controller.ValidateCodeInValueSet(null, null, null, null, null, parameters);
+
+        // Assert
+        AssertBadRequestProblem(result, "No id or url parameter specified.");
     }
 }
