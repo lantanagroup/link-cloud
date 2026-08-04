@@ -1,11 +1,16 @@
 using Hl7.Fhir.Model;
+using LantanaGroup.Link.Terminology.Application.Extensions;
 using LantanaGroup.Link.Terminology.Application.Interfaces;
 using LantanaGroup.Link.Terminology.Application.Models;
 using LantanaGroup.Link.Terminology.Controllers;
 using LantanaGroup.Link.Terminology.Services;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Moq;
 using Xunit;
 using Code = LantanaGroup.Link.Terminology.Application.Models.Code;
@@ -55,24 +60,31 @@ public class FhirControllerTests
     }
 
     /// <summary>
-    /// Asserts that the action produced an RFC 9457 Problem Details 400 carrying <paramref name="expectedDetail"/>.
+    /// Asserts that the action produced an RFC 9457 Problem Details result with the given status, title,
+    /// type and detail.
     /// </summary>
     /// <remarks>
     /// No <see cref="HttpContext"/> is wired up, so the controller's <c>ProblemDetailsFactory</c> is null and
     /// <c>ControllerBase.Problem</c> builds a plain <see cref="ProblemDetails"/> from its arguments. The runtime
-    /// <c>traceId</c> is injected by the app's configured factory and is out of scope here (see ConfigControllerTests).
+    /// <c>traceId</c> extension and the scrubbing of 5xx detail are applied by the configured customization,
+    /// which is covered separately below (see ConfigControllerTests for the same note).
     /// </remarks>
-    private static void AssertBadRequestProblem(ActionResult<Parameters> result, string expectedDetail)
+    private static void AssertProblem(
+        ActionResult? result, int expectedStatus, string expectedTitle, string expectedType, string expectedDetail)
     {
-        var objectResult = Assert.IsType<ObjectResult>(result.Result);
-        Assert.Equal(StatusCodes.Status400BadRequest, objectResult.StatusCode);
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(expectedStatus, objectResult.StatusCode);
 
         var problem = Assert.IsType<ProblemDetails>(objectResult.Value);
-        Assert.Equal("Bad Request", problem.Title);
-        Assert.Equal(StatusCodes.Status400BadRequest, problem.Status);
-        Assert.Equal("https://tools.ietf.org/html/rfc9110#section-15.5.1", problem.Type);
+        Assert.Equal(expectedTitle, problem.Title);
+        Assert.Equal(expectedStatus, problem.Status);
+        Assert.Equal(expectedType, problem.Type);
         Assert.Equal(expectedDetail, problem.Detail);
     }
+
+    private static void AssertBadRequestProblem(ActionResult<Parameters> result, string expectedDetail) =>
+        AssertProblem(result.Result, StatusCodes.Status400BadRequest, "Bad Request",
+            "https://tools.ietf.org/html/rfc9110#section-15.5.1", expectedDetail);
 
     [Fact]
     public void ValidateCodeInValueSet_WithDisplayContainingAmpersand_ReturnsTrue()
@@ -172,5 +184,94 @@ public class FhirControllerTests
 
         // Assert
         AssertBadRequestProblem(result, "No id or url parameter specified.");
+    }
+
+    [Fact]
+    public void GetValueSetById_WhenValueSetNotLoaded_ReturnsNotFoundProblem()
+    {
+        // Arrange - the cache has no value set under this id
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, "missing-vs", It.IsAny<string>()))
+            .Returns((CodeGroup?)null);
+
+        // Act
+        var result = _controller.GetValueSetById("missing-vs");
+
+        // Assert
+        AssertProblem(result.Result, StatusCodes.Status404NotFound, "Not Found",
+            "https://tools.ietf.org/html/rfc9110#section-15.5.5", "Value set not found with ID missing-vs.");
+    }
+
+    [Fact]
+    public void GetValueSets_WhenCachedResourceIsNotAValueSet_ReturnsInternalServerErrorProblem()
+    {
+        // Arrange - a code group cached under the ValueSet type whose resource is a CodeSystem
+        var mismatched = BuildCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, CodeSystemUrl);
+        mismatched.Resource = new CodeSystem { Id = "not-a-value-set", Url = CodeSystemUrl };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, ValueSetUrl, It.IsAny<string>()))
+            .Returns(mismatched);
+
+        // Act
+        var result = _controller.GetValueSets(ValueSetUrl, null);
+
+        // Assert - the controller sets the 5xx contract; the customization scrubs the detail at runtime
+        AssertProblem(result.Result, StatusCodes.Status500InternalServerError, "Internal Server Error",
+            "https://tools.ietf.org/html/rfc9110#section-15.6.1", "Code group found is not a ValueSet.");
+    }
+
+    /// <summary>
+    /// Builds the <c>CustomizeProblemDetails</c> callback the service registers at startup, so the
+    /// runtime-only behaviour can be exercised without standing up a host or issuing an HTTP request.
+    /// </summary>
+    private static Action<ProblemDetailsContext> GetConfiguredCustomization()
+    {
+        var environment = new Mock<IWebHostEnvironment>();
+        environment.SetupGet(e => e.EnvironmentName).Returns(Environments.Production);
+
+        var options = new ServiceCollection()
+            .AddTerminologyProblemDetails(environment.Object)
+            .BuildServiceProvider()
+            .GetRequiredService<IOptions<ProblemDetailsOptions>>();
+
+        return Assert.IsType<Action<ProblemDetailsContext>>(options.Value.CustomizeProblemDetails);
+    }
+
+    private static ProblemDetailsContext BuildContext(int status, string detail) => new()
+    {
+        HttpContext = new DefaultHttpContext(),
+        ProblemDetails = new ProblemDetails { Status = status, Detail = detail }
+    };
+
+    [Fact]
+    public void ProblemDetailsCustomization_ForServerError_ReplacesRawExceptionDetail()
+    {
+        // Arrange - the raw message a 500 would otherwise carry out of the controller
+        var context = BuildContext(StatusCodes.Status500InternalServerError, "Value set could not be copied.");
+
+        // Act
+        GetConfiguredCustomization()(context);
+
+        // Assert - internal state is replaced by a generic message, and a traceId is added to correlate
+        Assert.Equal(
+            "An error occurred in our API. Please use the trace id when requesting assistance.",
+            context.ProblemDetails.Detail);
+        Assert.DoesNotContain("Value set could not be copied", context.ProblemDetails.Detail);
+        Assert.True(context.ProblemDetails.Extensions.ContainsKey("traceId"));
+    }
+
+    [Fact]
+    public void ProblemDetailsCustomization_ForClientError_PreservesDetail()
+    {
+        // Arrange - scrubbing must be limited to 5xx; a 4xx detail is actionable and must survive
+        var context = BuildContext(StatusCodes.Status404NotFound, "Value set not found with ID missing-vs.");
+
+        // Act
+        GetConfiguredCustomization()(context);
+
+        // Assert
+        Assert.Equal("Value set not found with ID missing-vs.", context.ProblemDetails.Detail);
+        Assert.True(context.ProblemDetails.Extensions.ContainsKey("traceId"));
     }
 }
