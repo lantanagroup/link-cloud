@@ -5,6 +5,6 @@
         public string? FacilityId { get; set; }
         public Guid? OperationId { get; set; }
         public string? ResourceType { get; set; }
-        public Guid? VendorId { get; set; }
+        public Guid? VendorVersionId { get; set; }
     }
 }

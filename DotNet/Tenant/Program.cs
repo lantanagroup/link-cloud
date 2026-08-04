@@ -15,6 +15,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
@@ -97,6 +98,9 @@ namespace Tenant
             //Managers and Queries
             builder.Services.AddScoped<IFacilityManager, FacilityManager>();
             builder.Services.AddScoped<IFacilityQueries, FacilityQueries>();
+            builder.Services.AddScoped<IVendorManager, VendorManager>();
+            builder.Services.AddScoped<IVendorQueries, VendorQueries>();
+            builder.Services.AddLinkSdk();
 
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
             builder.Services.AddSingleton<CreateAuditEventCommand>();
