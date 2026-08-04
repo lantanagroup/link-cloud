@@ -9,6 +9,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Application.Models.Responses;
 using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Commands;
@@ -25,6 +26,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Moq;
 using Quartz;
 using Quartz.Spi;
 using System.Diagnostics;
@@ -71,6 +73,10 @@ namespace IntegrationTests.Tenant
             // Register the service
             builder.Services.AddScoped<IFacilityQueries, FacilityQueries>();
             builder.Services.AddScoped<IFacilityManager, FacilityManager>();
+            builder.Services.AddScoped<IVendorManager, VendorManager>();
+            builder.Services.AddScoped<IVendorQueries, VendorQueries>();
+            builder.Services.AddSingleton<Mock<INormalizationServiceClient>>();
+            builder.Services.AddSingleton(provider => provider.GetRequiredService<Mock<INormalizationServiceClient>>().Object);
 
             // Add IHttpClientFactory
             builder.Services.AddHttpClient();

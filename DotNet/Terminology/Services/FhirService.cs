@@ -365,14 +365,16 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
             codeGroup = cacheService.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, id);
             url = codeGroup?.Url;
         }
+        else if (!string.IsNullOrEmpty(url))
+        {
+            codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, url);
+        }
         else
         {
-            if (url == null)
-            {
-                return CreateValidationParameters(false, "url parameter is required");
-            }
-
-            codeGroup = cacheService.GetCodeGroup(CodeGroup.CodeGroupTypes.ValueSet, url);
+            // A request that identifies no value set is malformed, not a failed validation. Throwing
+            // surfaces it as a 400 and matches ValidateCodeInCodeSystem; returning result=false here
+            // reported a well-formed "this code is invalid" answer to a question never asked (LEGLINK-887).
+            throw new ArgumentException("No id or url parameter specified");
         }
 
         if (codeGroup == null)
@@ -383,6 +385,11 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         // Priority 1: Direct parameters
         if (!string.IsNullOrEmpty(code))
         {
+            if (systemComponent?.Value != null && string.IsNullOrEmpty(system))
+            {
+                system = systemComponent.Value.ToString();
+            }
+
             if (displayComponent?.Value != null && string.IsNullOrEmpty(display))
             {
                 display = displayComponent.Value.ToString();
@@ -595,7 +602,10 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
             }
         }
 
-        return CreateValidationParameters(false);
+        // Carry the same message as the single-system path. Omitting it left callers with a bare
+        // result=false — the Java validation support reads the "message" parameter to populate its
+        // CodeValidationResult, so the failure reached the report with no explanation (LEGLINK-886).
+        return CreateValidationParameters(false, $"Code not found in {codeGroup.Type}");
     }
 
     /// <summary>
