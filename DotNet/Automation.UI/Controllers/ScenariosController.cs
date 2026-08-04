@@ -355,10 +355,11 @@ public class ScenariosController(
 
         var cfg = automationConfig.Value;
         var loader = new FhirDataLoader(cfg.FhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
+        var patientIdForLog = request.PatientId.Replace("\r", string.Empty).Replace("\n", string.Empty);
 
         logger.LogInformation(
             "Replacing FHIR-server data for patient '{PatientId}' using uploaded bundle '{BundleId}'. Deleting {DeleteCount} resource path(s) first.",
-            request.PatientId,
+            patientIdForLog,
             request.UploadedBundleId,
             resourcesToDelete.Count);
 
@@ -367,7 +368,7 @@ public class ScenariosController(
         {
             logger.LogWarning(
                 "FHIR purge before patient replace had failures for patient '{PatientId}': {Failed} failed, {Succeeded} succeeded. First errors: {Errors}",
-                request.PatientId,
+                patientIdForLog,
                 purge.Failed,
                 purge.Succeeded,
                 string.Join(" | ", purge.Failures.Take(5)));
@@ -375,7 +376,7 @@ public class ScenariosController(
 
         var replayBundles = BuildReplayBundles(entries, request.PatientId.Trim());
         var output = new RunAutomationOutput(message => logger.LogInformation("[FHIR Replay] {Message}", message));
-        var replayOk = await loader.UploadBundlesSequentiallyAsync(output, replayBundles, $"[replace:{request.PatientId}] ");
+        var replayOk = await loader.UploadBundlesSequentiallyAsync(output, replayBundles, $"[replace:{patientIdForLog}] ");
         if (!replayOk)
         {
             return StatusCode(StatusCodes.Status502BadGateway,
@@ -383,8 +384,8 @@ public class ScenariosController(
         }
 
         var messageText = purge.Failed > 0
-            ? $"Replaced FHIR-server data for patient '{request.PatientId}' with uploaded bundle, but purge had {purge.Failed} failed delete(s)."
-            : $"Successfully replaced FHIR-server data for patient '{request.PatientId}' with uploaded bundle.";
+            ? $"Replaced FHIR-server data for patient '{patientIdForLog}' with uploaded bundle, but purge had {purge.Failed} failed delete(s)."
+            : $"Successfully replaced FHIR-server data for patient '{patientIdForLog}' with uploaded bundle.";
 
         return Json(new
         {
