@@ -1,8 +1,17 @@
 package com.lantanagroup.link.validation.configs;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.context.support.DefaultProfileValidationSupport;
 import ca.uhn.fhir.fhirpath.IFhirPath;
 import ca.uhn.fhir.rest.client.api.IRestfulClientFactory;
+import ca.uhn.fhir.validation.FhirValidator;
+import org.hl7.fhir.common.hapi.validation.support.CachingValidationSupport;
+import org.hl7.fhir.common.hapi.validation.support.CommonCodeSystemsTerminologyService;
+import org.hl7.fhir.common.hapi.validation.support.InMemoryTerminologyServerValidationSupport;
+import org.hl7.fhir.common.hapi.validation.support.RemoteTerminologyServiceValidationSupport;
+import org.hl7.fhir.common.hapi.validation.support.SnapshotGeneratingValidationSupport;
+import org.hl7.fhir.common.hapi.validation.support.ValidationSupportChain;
+import org.hl7.fhir.common.hapi.validation.validator.FhirInstanceValidator;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpRequestRetryHandler;
 import org.apache.http.client.ServiceUnavailableRetryStrategy;
@@ -19,6 +28,7 @@ import org.springframework.context.annotation.Configuration;
 
 import javax.net.ssl.SSLException;
 import java.io.IOException;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 
 
@@ -49,6 +59,42 @@ public class FhirConfig {
     @Bean
     public IFhirPath fhirPath(FhirContext fhirContext) {
         return fhirContext.newFhirPath();
+    }
+
+    /**
+     * Terminology/profile validation support chain used by the rubric execution engine's
+     * FHIR-conformance, terminology, and value-set check executors. When
+     * {@code vaas.terminology-service-url} is set, a remote terminology service is added to the chain.
+     */
+    @Bean
+    public ValidationSupportChain validationSupportChain(
+            FhirContext fhirContext,
+            @Value("${vaas.terminology-service-url:}") String terminologyServiceUrl) {
+        ValidationSupportChain chain = new ValidationSupportChain(
+                new DefaultProfileValidationSupport(fhirContext),
+                new InMemoryTerminologyServerValidationSupport(fhirContext),
+                new CommonCodeSystemsTerminologyService(fhirContext),
+                new SnapshotGeneratingValidationSupport(fhirContext)
+        );
+        if (terminologyServiceUrl != null && !terminologyServiceUrl.isBlank()) {
+            chain.addValidationSupport(new RemoteTerminologyServiceValidationSupport(fhirContext, terminologyServiceUrl));
+        }
+        return chain;
+    }
+
+    /**
+     * FHIR instance validator used by the rubric execution engine's FHIR-conformance check executor.
+     */
+    @Bean
+    public FhirValidator fhirValidator(FhirContext fhirContext, ValidationSupportChain validationSupportChain) {
+        CachingValidationSupport cachingSupport = new CachingValidationSupport(validationSupportChain);
+        FhirInstanceValidator instanceValidator = new FhirInstanceValidator(cachingSupport);
+        instanceValidator.setAnyExtensionsAllowed(true);
+        FhirValidator validator = fhirContext.newValidator();
+        validator.registerValidatorModule(instanceValidator);
+        validator.setConcurrentBundleValidation(true);
+        validator.setExecutorService(ForkJoinPool.commonPool());
+        return validator;
     }
 
     /**
