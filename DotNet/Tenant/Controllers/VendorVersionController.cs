@@ -1,6 +1,7 @@
 using AutoMapper;
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -98,6 +99,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryOrBearerToken]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorVersionModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]

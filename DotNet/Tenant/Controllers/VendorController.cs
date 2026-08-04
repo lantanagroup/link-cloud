@@ -1,6 +1,7 @@
 using AutoMapper;
 using Confluent.Kafka;
 using LantanaGroup.Link.Shared.Application.Enums;
+using LantanaGroup.Link.Shared.Application.Filters;
 using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models;
@@ -87,6 +88,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryOrBearerToken]
         [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(VendorModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -109,6 +111,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         [HttpPut("{id}")]
+        [ValidateAntiForgeryOrBearerToken]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(VendorModel))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
@@ -141,6 +144,7 @@ namespace LantanaGroup.Link.Tenant.Controllers
         }
 
         [HttpDelete("{id}")]
+        [ValidateAntiForgeryOrBearerToken]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
