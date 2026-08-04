@@ -223,7 +223,9 @@
         if (!manifestData) return;
 
         renderEligibility(manifestData);
-        renderPatientBreakdown();
+        if (allPatientEntries.length > 0) {
+            renderPatientBreakdown();
+        }
     }
 
     fetch(`${manifestDataUrl}?id=${runId}`)
