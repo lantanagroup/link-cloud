@@ -1,6 +1,7 @@
 package com.lantanagroup.link.validation.configs;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.fhirpath.IFhirPath;
 import ca.uhn.fhir.rest.client.api.IRestfulClientFactory;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpRequestRetryHandler;
@@ -39,6 +40,15 @@ public class FhirConfig {
         logger.info("FHIR REST clients configured with transient-error retry: max {} attempts, {} ms backoff",
                 maxAttempts, backoffMillis);
         return fhirContext;
+    }
+
+    /**
+     * FHIRPath engine used by custom checks (e.g. {@code future-date}, {@code numeric-range}) to
+     * evaluate FHIRPath expressions against resources. Derived from the shared {@link FhirContext}.
+     */
+    @Bean
+    public IFhirPath fhirPath(FhirContext fhirContext) {
+        return fhirContext.newFhirPath();
     }
 
     /**
