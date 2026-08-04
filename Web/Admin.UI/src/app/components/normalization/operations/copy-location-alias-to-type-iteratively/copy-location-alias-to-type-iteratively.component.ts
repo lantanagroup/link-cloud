@@ -13,7 +13,7 @@ import {CopyLocationAliasToTypeIterativelyOperation} from "../../../../interface
 import {FormMode} from '../../../../models/FormMode.enum';
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {ISaveOperationModel} from "../../../../interfaces/normalization/operation-save-model.interface";
-import {IVendor} from "../../../../interfaces/tenant/vendor-interface";
+import {IVendorVersion} from "../../../../interfaces/tenant/vendor-interface";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
@@ -58,7 +58,7 @@ export class CopyLocationAliasToTypeIterativelyComponent implements OnInit, OnDe
 
   resourceTypes: string[] = [];
   form: FormGroup;
-  vendors: IVendor[] = [];
+  vendors: IVendorVersion[] = [];
   errorMessage: string = "";
   destroy$ = new Subject<void>();
 
@@ -91,7 +91,7 @@ export class CopyLocationAliasToTypeIterativelyComponent implements OnInit, OnDe
           })
       });
 
-    this.operationService.getVendors()
+    this.operationService.getVendorVersions()
       .pipe(takeUntil(this.destroy$))
       .subscribe({
       next: (data) => {
@@ -102,7 +102,7 @@ export class CopyLocationAliasToTypeIterativelyComponent implements OnInit, OnDe
           for (const preset of this.operation.vendorPresets) {
             const vendorName = preset.vendorVersion?.vendorName;
             if (vendorName) {
-              const match = this.vendors.find(v => v.name === vendorName);
+              const match = this.vendors.find(v => v.id === preset.vendorVersion?.id);
               if (match) {
                 matchedVendorIds.push(match.id);
               }
@@ -217,7 +217,7 @@ export class CopyLocationAliasToTypeIterativelyComponent implements OnInit, OnDe
       resourceTypes: this.selectedResourceTypesControl.value,
       operation: operationJsonObj,
       isDisabled: !this.isEnabledControl?.value,
-      vendorIds: this.selectedVendorControl?.value ?? []
+      vendorVersionIds: this.selectedVendorControl?.value ?? []
     };
 
     const request$ = this.formMode === FormMode.Create

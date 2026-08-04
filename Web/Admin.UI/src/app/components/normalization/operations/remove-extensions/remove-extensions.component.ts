@@ -32,7 +32,7 @@ import {MatIcon} from "@angular/material/icon";
 import {MatCheckbox} from "@angular/material/checkbox";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
-import {IVendor} from "../../../../interfaces/tenant/vendor-interface";
+import {IVendorVersion} from "../../../../interfaces/tenant/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 import {RemoveExtensionsOperation} from "../../../../interfaces/normalization/remove-extensions-operation-interface";
@@ -107,7 +107,7 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
   resourceTypes: string[] = [];
   filteredResourceTypes: string[] = [];
   form!: FormGroup;
-  vendors: IVendor[] = [];
+  vendors: IVendorVersion[] = [];
   errorMessage: string = "";
   urlListTouched: boolean = false;
   userClicked = false;
@@ -152,7 +152,7 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
       map(value => this._filter(value || ''))
     ).subscribe(filtered => this.filteredResourceTypes = filtered);
 
-    this.operationService.getVendors().subscribe({
+    this.operationService.getVendorVersions().subscribe({
       next: (data) => {
         this.vendors = data;
         if (this.formMode === FormMode.Edit && this.isVendorMode && Array.isArray(this.operation.vendorPresets)) {
@@ -160,7 +160,7 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
           for (const preset of this.operation.vendorPresets) {
             const vendorName = preset.vendorVersion?.vendorName;
             if (vendorName) {
-              const match = this.vendors.find(v => v.name === vendorName);
+              const match = this.vendors.find(v => v.id === preset.vendorVersion?.id);
               if (match) matchedVendorIds.push(match.id);
             }
           }
@@ -334,7 +334,7 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
       resourceTypes: this.selectedResourceTypesControl.value,
       operation: operationJsonObj,
       isDisabled: !this.isEnabledControl?.value,
-      vendorIds: this.selectedVendorControl?.value ?? []
+      vendorVersionIds: this.selectedVendorControl?.value ?? []
     };
 
     const request$ = this.formMode === FormMode.Create
@@ -354,10 +354,14 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
   }
 
   openCsvImportDialog(): void {
+    const selectedVendorVersionIds: string[] = this.selectedVendorControl.value ?? [];
     const dialogData: CsvImportDialogData = {
       facilityId: this.operation.facilityId,
       isVendorMode: this.isVendorMode,
-      vendorIds: this.selectedVendorControl.value ?? [],
+      vendorIds: [...new Set(selectedVendorVersionIds
+        .map((vendorVersionId: string) => this.vendors.find(vendor => vendor.id === vendorVersionId)?.vendorId)
+        .filter((vendorId): vendorId is string => !!vendorId))],
+      vendorVersionIds: selectedVendorVersionIds,
       validResourceTypes: this.resourceTypes
     };
 

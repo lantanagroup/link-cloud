@@ -27,7 +27,7 @@ import {MatCheckbox} from "@angular/material/checkbox";
 import {CopyPropertyOperation} from "../../../../interfaces/normalization/copy-property-interface";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
-import {IVendor} from "../../../../interfaces/tenant/vendor-interface";
+import {IVendorVersion} from "../../../../interfaces/tenant/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 
@@ -87,7 +87,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit {
 
   destroy$ = new Subject<void>()
 
-  vendors: IVendor[] = [];
+  vendors: IVendorVersion[] = [];
 
   errorMessage: string = "";
 
@@ -134,7 +134,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit {
       map(value => this._filter(value || ''))
     ).subscribe(filtered => this.filteredResourceTypes = filtered);
 
-    this.operationService.getVendors().subscribe({
+    this.operationService.getVendorVersions().subscribe({
       next: (data) => {
         this.vendors = data;
         if (this.formMode === FormMode.Edit) {
@@ -145,7 +145,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit {
               const vendorName = preset.vendorVersion?.vendorName;
 
               if (vendorName) {
-                const match = this.vendors.find(v => v.name === vendorName);
+                const match = this.vendors.find(v => v.id === preset.vendorVersion?.id);
                 if (match) {
                   matchedVendorIds.push(match.id);
                 }
@@ -362,7 +362,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit {
       resourceTypes: this.selectedResourceTypesControl.value,
       operation: operationJsonObj,
       isDisabled: !this.isEnabledControl?.value,
-      vendorIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
+      vendorVersionIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
     };
 
     const request$ = this.formMode === FormMode.Create ? this.operationService.createOperationConfiguration(saveModel) : this.operationService.updateOperationConfiguration(saveModel);

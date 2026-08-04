@@ -25,7 +25,7 @@ import {MatIcon} from "@angular/material/icon";
 import {MatCheckbox} from "@angular/material/checkbox";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
-import {IVendor} from "../../../../interfaces/tenant/vendor-interface";
+import {IVendorVersion} from "../../../../interfaces/tenant/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatAutocompleteTrigger} from "@angular/material/autocomplete";
 import {IOperation} from "../../../../interfaces/normalization/operation.interface";
@@ -81,7 +81,7 @@ export class CopyLocationComponent implements OnInit, OnDestroy {
 
     destroy$ = new Subject<void>()
 
-    vendors: IVendor[] = [];
+    vendors: IVendorVersion[] = [];
 
     errorMessage: string = "";
 
@@ -116,7 +116,7 @@ export class CopyLocationComponent implements OnInit, OnDestroy {
                     })
             });
 
-        this.operationService.getVendors().subscribe({
+        this.operationService.getVendorVersions().subscribe({
             next: (data) => {
                 this.vendors = data;
                 if (this.formMode === FormMode.Edit) {
@@ -127,7 +127,7 @@ export class CopyLocationComponent implements OnInit, OnDestroy {
                             const vendorName = preset.vendorVersion?.vendorName;
 
                             if (vendorName) {
-                                const match = this.vendors.find(v => v.name === vendorName);
+                                const match = this.vendors.find(v => v.id === preset.vendorVersion?.id);
                                 if (match) {
                                     matchedVendorIds.push(match.id);
                                 }
@@ -248,7 +248,7 @@ export class CopyLocationComponent implements OnInit, OnDestroy {
             resourceTypes: this.selectedResourceTypesControl.value,
             operation: operationJsonObj,
             isDisabled: !this.isEnabledControl?.value,
-            vendorIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
+            vendorVersionIds: this.selectedVendorControl?.value ? this.selectedVendorControl?.value : []
         };
 
         const request$ = this.formMode === FormMode.Create ? this.operationService.createOperationConfiguration(saveModel) : this.operationService.updateOperationConfiguration(saveModel);
