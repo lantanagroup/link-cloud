@@ -110,6 +110,10 @@ authentication:
 link:
   info-route: /api/validation/info
   terminology-service-url: ''
+  rubric:
+    # Max rubric definition payload size (256 KiB). Checked against Content-Length before
+    # body binding, and against the parsed body for chunked requests.
+    max-payload-bytes: 262144
   # Retry for all HAPI FHIR REST clients (terminology validate-code/$lookup/etc.).
   # Transient failures only: connection IOExceptions, HTTP 429, and 5xx (e.g. Envoy
   # "503 no healthy upstream" during a terminology-service rollout). 4xx never retries.
