@@ -71,6 +71,9 @@ global:
   - key: "InternalBlobStorage:BlobContainerName"
     description: "The name of the blob container used for internal storage."
     required: true
+  - key: "InternalBlobStorage:BlobRoot"
+    description: "Optional blob-path prefix used by services writing internal artifacts to Azure Blob Storage."
+    required: false
   - key: "ServiceRegistry:TenantService:TenantServiceUrl"
     description: "The base URL for the Tenant Service."
     required: true

@@ -43,6 +43,62 @@ public class FhirDataLoader
         GetAuthorization();
     }
 
+    public async Task<(int Succeeded, int Failed, IReadOnlyList<string> Failures)> DeleteResourcesWithExpungeAsync(
+        IEnumerable<string> resources,
+        CancellationToken ct = default)
+    {
+        var succeeded = 0;
+        var failed = 0;
+        var failures = new List<string>();
+
+        foreach (var resource in resources.Where(r => !string.IsNullOrWhiteSpace(r)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var request = new RestRequest(resource, Method.Delete);
+            request.AddHeader("Content-Type", "application/fhir+json");
+            if (!string.IsNullOrEmpty(_authorization))
+                request.AddHeader("Authorization", _authorization);
+            request.AddQueryParameter("_expunge", "true");
+
+            var response = await _restClient.ExecuteAsync(request, ct);
+            if (response.IsSuccessful)
+            {
+                succeeded++;
+            }
+            else
+            {
+                failed++;
+                if (failures.Count < 25)
+                    failures.Add($"{resource}: {(int)response.StatusCode} {response.StatusCode} {response.Content}");
+            }
+        }
+
+        return (succeeded, failed, failures);
+    }
+
+    public async Task<bool> PatientExistsAsync(string patientId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(patientId))
+            throw new ArgumentException("Patient ID is required.", nameof(patientId));
+
+        var request = new RestRequest($"Patient/{patientId.Trim()}", Method.Get);
+        request.AddHeader("Accept", "application/fhir+json");
+
+        if (!string.IsNullOrEmpty(_authorization))
+            request.AddHeader("Authorization", _authorization);
+
+        var response = await _restClient.ExecuteAsync(request, ct);
+        if (response.IsSuccessful)
+            return true;
+
+        if (response.StatusCode == HttpStatusCode.NotFound || response.StatusCode == HttpStatusCode.Gone)
+            return false;
+
+        throw new InvalidOperationException(
+            $"FHIR server returned {(int)response.StatusCode} {response.StatusCode} for Patient/{patientId}. Response body: {response.Content}");
+    }
+
     private void GetAuthorization()
     {
         if (_oauthConfig?.ShouldAuthenticate != true &&

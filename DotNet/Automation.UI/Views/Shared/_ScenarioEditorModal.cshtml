@@ -213,6 +213,7 @@
                                             <i class="bi bi-upload me-1"></i>Upload Bundle JSON
                                             <input type="file" id="importedBundleFile" accept="application/json,.json" multiple hidden />
                                         </label>
+                                        <span id="importedUploadStatus" class="small text-muted" style="display:none;"></span>
                                     </div>
                                 </div>
                             </div>
@@ -225,6 +226,43 @@
     </div>
 </div>
 <div id="scenarioModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
+
+<div id="replaceFhirModal" style="display:none;position:fixed;inset:0;z-index:1065;overflow-y:auto;">
+    <div id="replaceFhirBackdrop" style="position:absolute;inset:0;background:rgba(0,0,0,.45);"></div>
+    <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;position:relative;">
+        <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:700px;">
+            <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;" class="d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Patient Already Exists on FHIR Server</h6>
+                <button type="button" class="btn btn-sm btn-outline-light" id="btnReplaceFhirClose">Close</button>
+            </div>
+            <div class="p-3">
+                <p class="mb-2">This patient already exists on the FHIR server.</p>
+                <p class="mb-2">Choose one action:</p>
+                <ol class="mb-3">
+                    <li><strong>Purge + Replace</strong>: expunge matching server resources, then replay this uploaded bundle.</li>
+                    <li><strong>Use FHIR Server Data</strong>: discard this upload and import by Patient ID using server data.</li>
+                </ol>
+                <div class="alert alert-warning py-2 small mb-3">This is a destructive server operation. Only proceed if you intentionally want uploaded content to become authoritative on the FHIR server.</div>
+                <div id="replaceFhirLargeHint" class="alert alert-info py-2 small mb-3" style="display:none;">
+                    This bundle is considered large. For now, use <strong>Purge + Replace</strong> because pulling full patient data from the server can be incomplete for large patients.
+                </div>
+                <div class="small text-muted mb-1">Patient</div>
+                <div class="fw-semibold mb-2" id="replaceFhirPatientLabel"></div>
+                <div id="replaceFhirHoldHint" class="small text-muted mb-2">Press and hold the button to confirm destructive replace.</div>
+                <div class="progress mb-2" style="height:8px;">
+                    <div id="replaceFhirHoldFill" class="progress-bar bg-danger" role="progressbar" style="width:0%"></div>
+                </div>
+                <div class="d-flex justify-content-end gap-2 mt-3">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnReplaceFhirCancel">Cancel</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" id="btnUseServerData">Use FHIR Server Data</button>
+                    <button type="button" class="btn btn-danger btn-sm" id="btnReplaceFhirConfirm">
+                        <i class="bi bi-arrow-repeat me-1"></i>Purge + Replace
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script>
     (function () {
@@ -253,6 +291,18 @@
         var getJsonUrl = '@Url.Action("GetJson", "Scenarios")';
         var classifyImportedUrl = '@Url.Action("ClassifyImported", "Scenarios")';
         var uploadImportedBundleUrl = '@Url.Action("UploadImportedBundle", "Scenarios")';
+        var replacePatientOnFhirServerUrl = '@Url.Action("ReplacePatientOnFhirServer", "Scenarios")';
+        var discardUploadedBundleUrl = '@Url.Action("DiscardUploadedBundle", "Scenarios")';
+        var replaceFhirModal = document.getElementById('replaceFhirModal');
+        var replaceFhirBackdrop = document.getElementById('replaceFhirBackdrop');
+        var replaceFhirPatientLabel = document.getElementById('replaceFhirPatientLabel');
+        var replaceFhirLargeHint = document.getElementById('replaceFhirLargeHint');
+        var replaceFhirHoldHint = document.getElementById('replaceFhirHoldHint');
+        var replaceFhirHoldFill = document.getElementById('replaceFhirHoldFill');
+        var btnReplaceFhirConfirm = document.getElementById('btnReplaceFhirConfirm');
+        var btnUseServerData = document.getElementById('btnUseServerData');
+        var btnReplaceFhirCancel = document.getElementById('btnReplaceFhirCancel');
+        var btnReplaceFhirClose = document.getElementById('btnReplaceFhirClose');
 
         function notifyChanged(action, id, name) {
             document.dispatchEvent(new CustomEvent('scenario-editor:changed', {
@@ -286,6 +336,127 @@
             if (!idInput.value) idInput.value = crypto.randomUUID();
             return idInput.value;
         }
+
+        async function promptReplaceFhirPatient(patientId, canUseServerData, requiresReplaceForLargePatient) {
+            return new Promise(function (resolve) {
+                if (!replaceFhirModal || !btnReplaceFhirConfirm || !replaceFhirPatientLabel || !btnUseServerData) {
+                    resolve('cancel');
+                    return;
+                }
+
+                var holdDurationMs = 1500;
+                var holdStart = 0;
+                var holdTimer = null;
+                var holdAnimationFrame = 0;
+                var holdCompleted = false;
+                var postConfirmVisualDelayMs = 1000;
+
+                replaceFhirPatientLabel.textContent = String(patientId || '').trim();
+                btnReplaceFhirConfirm.disabled = false;
+                btnReplaceFhirConfirm.classList.remove('btn-success');
+                btnReplaceFhirConfirm.classList.add('btn-danger');
+                if (replaceFhirHoldHint) replaceFhirHoldHint.textContent = 'Press and hold the button to confirm destructive replace.';
+                if (replaceFhirHoldFill) replaceFhirHoldFill.style.width = '0%';
+                btnUseServerData.disabled = !canUseServerData;
+                if (replaceFhirLargeHint) replaceFhirLargeHint.style.display = requiresReplaceForLargePatient ? '' : 'none';
+                replaceFhirModal.style.display = '';
+                btnReplaceFhirConfirm.focus();
+
+                function stopHold(resetVisual) {
+                    if (holdTimer) {
+                        clearInterval(holdTimer);
+                        holdTimer = null;
+                    }
+                    if (holdAnimationFrame) {
+                        cancelAnimationFrame(holdAnimationFrame);
+                        holdAnimationFrame = 0;
+                    }
+                    if (resetVisual && !holdCompleted) {
+                        if (replaceFhirHoldFill) replaceFhirHoldFill.style.width = '0%';
+                        if (replaceFhirHoldHint) replaceFhirHoldHint.textContent = 'Press and hold the button to confirm destructive replace.';
+                    }
+                }
+
+                function completeHold() {
+                    if (holdCompleted) return;
+                    holdCompleted = true;
+                    stopHold(false);
+                    if (replaceFhirHoldFill) replaceFhirHoldFill.style.width = '100%';
+                    btnReplaceFhirConfirm.classList.remove('btn-danger');
+                    btnReplaceFhirConfirm.classList.add('btn-success');
+                    if (replaceFhirHoldHint) replaceFhirHoldHint.textContent = 'Confirmed. Starting purge + replace...';
+
+                    // Give the user a visible completion moment (full bar + green button)
+                    // before closing the modal and starting server-side work.
+                    setTimeout(function () { cleanup('replace'); }, postConfirmVisualDelayMs);
+                }
+
+                function startHold(ev) {
+                    if (ev) ev.preventDefault();
+                    if (btnReplaceFhirConfirm.disabled || holdCompleted) return;
+                    holdStart = Date.now();
+                    if (replaceFhirHoldHint) replaceFhirHoldHint.textContent = 'Keep holding...';
+                    stopHold(false);
+
+                    // Keep a short interval for legacy environments where RAF timing can be throttled,
+                    // but use RAF for smoother visual updates and reliable "fill to 100%" rendering.
+                    holdTimer = setInterval(function () {
+                        if (holdCompleted) return;
+                        var elapsed = Date.now() - holdStart;
+                        var pct = Math.min(100, Math.round((elapsed / holdDurationMs) * 100));
+                        if (replaceFhirHoldFill) replaceFhirHoldFill.style.width = pct + '%';
+                        if (pct >= 100) completeHold();
+                    }, 30);
+
+                    (function animateHold() {
+                        if (holdCompleted) return;
+                        var elapsed = Date.now() - holdStart;
+                        var pct = Math.min(100, Math.round((elapsed / holdDurationMs) * 100));
+                        if (replaceFhirHoldFill) replaceFhirHoldFill.style.width = pct + '%';
+                        if (pct >= 100) {
+                            completeHold();
+                            return;
+                        }
+                        holdAnimationFrame = requestAnimationFrame(animateHold);
+                    })();
+                }
+
+                function cancelHold(ev) {
+                    if (ev) ev.preventDefault();
+                    if (holdCompleted) return;
+                    stopHold(true);
+                }
+
+                function cleanup(result) {
+                    stopHold(false);
+                    replaceFhirModal.style.display = 'none';
+                    btnReplaceFhirConfirm.removeEventListener('pointerdown', startHold);
+                    btnReplaceFhirConfirm.removeEventListener('pointerup', cancelHold);
+                    btnReplaceFhirConfirm.removeEventListener('pointerleave', cancelHold);
+                    btnReplaceFhirConfirm.removeEventListener('pointercancel', cancelHold);
+                    btnReplaceFhirConfirm.removeEventListener('click', preventClick);
+                    btnUseServerData.removeEventListener('click', onUseServerData);
+                    btnReplaceFhirCancel.removeEventListener('click', onCancel);
+                    btnReplaceFhirClose.removeEventListener('click', onCancel);
+                    if (replaceFhirBackdrop) replaceFhirBackdrop.removeEventListener('click', onCancel);
+                    resolve(result);
+                }
+
+                function preventClick(ev) { ev.preventDefault(); }
+                function onUseServerData() { cleanup('use-server'); }
+                function onCancel() { cleanup('cancel'); }
+                btnReplaceFhirConfirm.addEventListener('pointerdown', startHold);
+                btnReplaceFhirConfirm.addEventListener('pointerup', cancelHold);
+                btnReplaceFhirConfirm.addEventListener('pointerleave', cancelHold);
+                btnReplaceFhirConfirm.addEventListener('pointercancel', cancelHold);
+                btnReplaceFhirConfirm.addEventListener('click', preventClick);
+                btnUseServerData.addEventListener('click', onUseServerData);
+                btnReplaceFhirCancel.addEventListener('click', onCancel);
+                btnReplaceFhirClose.addEventListener('click', onCancel);
+                if (replaceFhirBackdrop) replaceFhirBackdrop.addEventListener('click', onCancel);
+            });
+        }
+
         document.getElementById('btnModalClose').addEventListener('click', closeModal);
         backdrop.addEventListener('click', closeModal);
 
@@ -675,6 +846,21 @@
         // ---- Imported Patients ----
         var importedRows = document.getElementById('importedRows');
         var importedSummary = document.getElementById('importedSummary');
+        var importedUploadStatus = document.getElementById('importedUploadStatus');
+
+        function setImportedUploadStatus(message, isBusy) {
+            if (!importedUploadStatus) return;
+            if (!message) {
+                importedUploadStatus.style.display = 'none';
+                importedUploadStatus.textContent = '';
+                importedUploadStatus.className = 'small text-muted';
+                return;
+            }
+
+            importedUploadStatus.style.display = '';
+            importedUploadStatus.textContent = (isBusy ? '⏳ ' : '') + message;
+            importedUploadStatus.className = isBusy ? 'small text-primary' : 'small text-muted';
+        }
 
         function hasImportedRows() {
             return importedRows && importedRows.children && importedRows.children.length > 0;
@@ -961,13 +1147,64 @@
 
         document.getElementById('importedBundleFile').addEventListener('change', async function (ev) {
             var files = Array.prototype.slice.call(ev.target.files || []);
+            if (files.length > 0) {
+                setImportedUploadStatus('Uploading and classifying ' + files.length + ' file(s)...', true);
+            }
             for (var i = 0; i < files.length; i++) {
                 var file = files[i];
                 try {
+                    setImportedUploadStatus('Processing "' + file.name + '" (' + (i + 1) + '/' + files.length + ')...', true);
                     var fd = new FormData();
                     fd.append('file', file);
                     var uploaded = await postForm(uploadImportedBundleUrl, fd);
-                    if (uploaded && uploaded.warningMessage) {
+
+                    if (uploaded && uploaded.patientExistsOnServer && uploaded.bundleId && uploaded.patientId) {
+                        var decision = await promptReplaceFhirPatient(
+                            uploaded.patientId,
+                            !!uploaded.canUseServerData,
+                            !!uploaded.requiresReplaceForLargePatient);
+
+                        if (decision === 'cancel') {
+                            await postJson(discardUploadedBundleUrl, {
+                                uploadedBundleId: uploaded.bundleId
+                            });
+                            setImportedUploadStatus('Skipped import for "' + file.name + '" because no action was selected.', false);
+                            continue;
+                        }
+
+                        if (decision === 'use-server') {
+                            await postJson(discardUploadedBundleUrl, {
+                                uploadedBundleId: uploaded.bundleId
+                            });
+
+                            addImportedRow({ source: 'ExistingId', patientId: uploaded.patientId, autoDetect: true, measureEligibilities: {} });
+                            var serverRow = importedRows.lastElementChild;
+                            if (serverRow) await classifyImportedRow(serverRow);
+                            setImportedUploadStatus('Imported Patient/' + uploaded.patientId + ' from FHIR server data.', false);
+                            continue;
+                        }
+
+                        if (decision === 'replace') {
+                            setImportedUploadStatus('Replacing FHIR-server data for Patient/' + uploaded.patientId + '...', true);
+                            try {
+                                var replaceRes = await postJson(replacePatientOnFhirServerUrl, {
+                                    uploadedBundleId: uploaded.bundleId,
+                                    patientId: uploaded.patientId
+                                });
+                                if (replaceRes && replaceRes.message) {
+                                    setImportedUploadStatus(replaceRes.message, false);
+                                }
+                            } catch (replaceErr) {
+                                await postJson(discardUploadedBundleUrl, {
+                                    uploadedBundleId: uploaded.bundleId
+                                });
+                                showError('Failed to replace FHIR-server patient data for "' + uploaded.patientId + '": ' + (replaceErr.message || 'Unknown error'));
+                                continue;
+                            }
+                        }
+                    }
+
+                    if (uploaded && uploaded.warningMessage && !uploaded.patientExistsOnServer) {
                         showWarning(uploaded.warningMessage);
                     }
 
@@ -990,6 +1227,7 @@
                     showError('Failed to read "' + file.name + '": ' + (err.message || 'Unknown error'));
                 }
             }
+            setImportedUploadStatus(files.length > 0 ? ('Completed upload processing for ' + files.length + ' file(s).') : '', false);
             ev.target.value = '';
         });
 

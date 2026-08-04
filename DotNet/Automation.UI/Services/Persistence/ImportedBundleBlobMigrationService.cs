@@ -1,5 +1,4 @@
-﻿using MongoDB.Driver;
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 using System.Security.Cryptography;
