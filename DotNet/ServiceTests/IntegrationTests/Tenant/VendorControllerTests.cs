@@ -41,7 +41,7 @@ public class VendorControllerTests : IDisposable
 
         var result = await _controller.Post(new CreateVendorModel { Name = vendorName });
 
-        var conflict = Assert.IsType<ConflictObjectResult>(result.Result);
+        var conflict = Assert.IsType<ConflictResult>(result.Result);
         Assert.Equal(StatusCodes.Status409Conflict, conflict.StatusCode);
     }
 }
