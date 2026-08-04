@@ -29,13 +29,18 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 public class RemoteTermServiceValidation extends BaseValidationSupport implements IValidationSupport {
     private static final Logger ourLog = LoggerFactory.getLogger(RemoteTermServiceValidation.class);
     private String myBaseUrl;
     private final List<Object> myClientInterceptors = new ArrayList();
-    private List<String> whiteListCodeSystemRegex = new ArrayList<>();
-    private List<String> whiteListValueSetRegex = new ArrayList<>();
+    // longer than any legal canonical URL in this schema (columns cap at 512); bounds regex
+    // matching so a pathological whitelist pattern can't backtrack over unbounded input
+    private static final int MAX_URL_MATCH_LENGTH = 512;
+
+    private List<Pattern> whiteListCodeSystemPatterns = new ArrayList<>();
+    private List<Pattern> whiteListValueSetPatterns = new ArrayList<>();
     private ValidationCacheService validationCacheService;
 
     public RemoteTermServiceValidation(FhirContext theFhirContext) {
@@ -46,8 +51,9 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
         super(theFhirContext);
         this.validationCacheService = validationCacheService;
         this.myBaseUrl = theBaseUrl;
-        this.whiteListCodeSystemRegex = whiteListCodeSystemRegex;
-        this.whiteListValueSetRegex = whiteListValueSetRegex;
+        // compile once so a bad config pattern fails at startup instead of on every probe
+        this.whiteListCodeSystemPatterns = whiteListCodeSystemRegex.stream().map(Pattern::compile).toList();
+        this.whiteListValueSetPatterns = whiteListValueSetRegex.stream().map(Pattern::compile).toList();
     }
 
     public String getName() {
@@ -269,12 +275,12 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
     }
 
     public boolean isCodeSystemSupported(ValidationSupportContext theValidationSupportContext, String theSystem) {
-        if (theSystem == null) {
+        if (theSystem == null || theSystem.length() > MAX_URL_MATCH_LENGTH) {
             return false;
         }
 
-        for (String pattern : whiteListCodeSystemRegex) {
-            if (theSystem.matches(pattern)) {
+        for (Pattern pattern : whiteListCodeSystemPatterns) {
+            if (pattern.matcher(theSystem).matches()) {
                 return false;
             }
         }
@@ -283,12 +289,12 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
     }
 
     public boolean isValueSetSupported(ValidationSupportContext theValidationSupportContext, String theValueSetUrl) {
-        if (theValueSetUrl == null) {
+        if (theValueSetUrl == null || theValueSetUrl.length() > MAX_URL_MATCH_LENGTH) {
             return false;
         }
 
-        for (String pattern : whiteListValueSetRegex) {
-            if (theValueSetUrl.matches(pattern)) {
+        for (Pattern pattern : whiteListValueSetPatterns) {
+            if (pattern.matcher(theValueSetUrl).matches()) {
                 return false;
             }
         }
