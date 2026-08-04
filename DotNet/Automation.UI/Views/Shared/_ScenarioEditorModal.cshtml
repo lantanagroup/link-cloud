@@ -43,6 +43,7 @@
                 </div>
             </div>
             <div id="formErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
+            <div id="formWarnings" class="alert alert-warning m-3 mb-0 py-2 small" style="display:none;"></div>
             <div style="flex:1;overflow-y:auto;padding:1.25rem;" id="modalBody">
                 @Html.AntiForgeryToken()
                 <input type="hidden" id="ScenarioId" value="" />
@@ -298,7 +299,20 @@
 
         // ---- Error display ----
         var formErrors = document.getElementById('formErrors');
+        var formWarnings = document.getElementById('formWarnings');
         function showError(msg) { formErrors.textContent = msg; formErrors.style.display = ''; }
+        function showWarning(msg) {
+            if (!msg) return;
+            var text = String(msg);
+            var lines = formWarnings.textContent ? formWarnings.textContent.split('\n') : [];
+            if (lines.indexOf(text) >= 0) return;
+            formWarnings.textContent = formWarnings.textContent ? (formWarnings.textContent + '\n' + text) : text;
+            formWarnings.style.display = '';
+        }
+        function clearWarnings() {
+            formWarnings.style.display = 'none';
+            formWarnings.textContent = '';
+        }
         function clearErrors() { formErrors.style.display = 'none'; formErrors.textContent = ''; clearFieldErrors(); }
         function markFieldError(id, msg) {
             var el = document.getElementById(id);
@@ -953,6 +967,9 @@
                     var fd = new FormData();
                     fd.append('file', file);
                     var uploaded = await postForm(uploadImportedBundleUrl, fd);
+                    if (uploaded && uploaded.warningMessage) {
+                        showWarning(uploaded.warningMessage);
+                    }
 
                     addImportedRow({
                         source: 'Bundle',
@@ -1149,6 +1166,7 @@
         // ---- Open modal ----
         async function openEditor(id, mode) {
             clearErrors();
+            clearWarnings();
             if (id) {
                 try {
                     var res = await fetch(getJsonUrl + '?id=' + encodeURIComponent(id));

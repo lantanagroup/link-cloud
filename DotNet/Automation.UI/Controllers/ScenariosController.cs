@@ -8,6 +8,8 @@ using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Automation.UI.Controllers;
 
@@ -17,9 +19,11 @@ public class ScenariosController(
     INormalizationStore normalizationStore,
     IOrganizationResourceMapTemplateStore organizationResourceMapTemplateStore,
     IOptions<AutomationConfig> automationConfig,
-    IMongoDatabase database) : Controller
+    IMongoDatabase database,
+    IImportedBundleContentStore bundleContentStore,
+    ILogger<ScenariosController> logger) : Controller
 {
-    private const long MaxImportedBundleUploadBytes = 12 * 1024 * 1024;
+    private static readonly JsonSerializerOptions FhirJsonOptions = LantanaGroup.Link.Shared.Application.SerDes.LinkFhirSerializerOptions.ForFhirWithoutValidation();
     private readonly IMongoCollection<ImportedBundleDocument> _bundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
 
     [HttpGet]
@@ -121,7 +125,9 @@ public class ScenariosController(
                 var existing = await _bundles.Find(b => b.Id == p.UploadedBundleId.Value).FirstOrDefaultAsync(ct);
                 if (existing == null)
                     return $"Imported bundle '{p.FileName ?? p.PatientId}' was not found. Please re-upload the file.";
-                bundleJson = existing.BundleJson;
+                bundleJson = await bundleContentStore.ReadAsync(existing, ct);
+                if (string.IsNullOrWhiteSpace(bundleJson))
+                    return $"Imported bundle '{p.FileName ?? p.PatientId}' content is missing. Please re-upload the file.";
             }
 
             Bundle? bundle;
@@ -182,12 +188,14 @@ public class ScenariosController(
     /// </summary>
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [DisableRequestSizeLimit]
+    [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue)]
     public async Task<IActionResult> UploadImportedBundle([FromForm] UploadImportedBundleRequest request, CancellationToken ct)
     {
         if (request.File == null || request.File.Length == 0)
             return BadRequest("Bundle file is required.");
-        if (request.File.Length > MaxImportedBundleUploadBytes)
-            return BadRequest($"Bundle file is too large. Maximum allowed size is {MaxImportedBundleUploadBytes / (1024 * 1024)} MB.");
+
+        logger.LogInformation("Received imported bundle upload '{FileName}' ({LengthBytes} bytes).", request.File.FileName, request.File.Length);
 
         string json;
         using (var reader = new StreamReader(request.File.OpenReadStream(), Encoding.UTF8))
@@ -198,12 +206,13 @@ public class ScenariosController(
         Bundle? bundle;
         try
         {
-            bundle = System.Text.Json.JsonSerializer.Deserialize<Bundle>(
+            bundle = JsonSerializer.Deserialize<Bundle>(
                 json,
-                LantanaGroup.Link.Shared.Application.SerDes.LinkFhirSerializerOptions.ForFhirWithoutValidation());
+                FhirJsonOptions);
         }
         catch (Exception ex)
         {
+            logger.LogWarning(ex, "Failed to parse uploaded bundle '{FileName}' as FHIR JSON.", request.File.FileName);
             return BadRequest($"Bundle '{request.File.FileName}' could not be parsed as FHIR: {ex.Message}");
         }
 
@@ -217,7 +226,35 @@ public class ScenariosController(
         if (patientResource == null || string.IsNullOrWhiteSpace(patientResource.Id))
             return BadRequest($"Bundle '{request.File.FileName}' must contain a Patient resource with an id.");
 
-        var organizationIds = bundle.Entry
+        var effectiveBundle = bundle;
+        var effectiveBundleJson = json;
+        string? replacementWarning = null;
+
+        var verification = await TryFetchExistingPatientEverythingForVerificationAsync(patientResource.Id, request.File.FileName, ct);
+        if (!string.IsNullOrWhiteSpace(verification.WarningMessage))
+            replacementWarning = verification.WarningMessage;
+
+        if (!string.IsNullOrWhiteSpace(verification.BundleJson))
+        {
+            var existingBundle = JsonSerializer.Deserialize<Bundle>(verification.BundleJson, FhirJsonOptions)
+                ?? throw new InvalidOperationException("FHIR server returned an empty patient bundle.");
+
+            if (BundlesDiffer(bundle, existingBundle))
+            {
+                effectiveBundle = existingBundle;
+                effectiveBundleJson = verification.BundleJson;
+                replacementWarning =
+                    $"Uploaded bundle '{request.File.FileName}' for patient '{patientResource.Id}' does not match the resources currently on the FHIR server. " +
+                    "Automation UI will use the server-downloaded Patient/$everything bundle instead.";
+
+                logger.LogWarning(
+                    "Uploaded bundle '{FileName}' for patient '{PatientId}' differs from FHIR server data. Persisting canonical Patient/$everything bundle instead of uploaded payload.",
+                    request.File.FileName,
+                    patientResource.Id);
+            }
+        }
+
+        var organizationIds = (effectiveBundle.Entry ?? [])
             .Select(e => e?.Resource)
             .OfType<Organization>()
             .Select(o => o.Id)
@@ -227,16 +264,12 @@ public class ScenariosController(
             .ToList();
 
         var now = DateTimeOffset.UtcNow;
-        var hash = ComputeContentHash(json);
-        var byteCount = Encoding.UTF8.GetByteCount(json);
-        if (byteCount > MaxImportedBundleUploadBytes)
-            return BadRequest($"Bundle file is too large. Maximum allowed size is {MaxImportedBundleUploadBytes / (1024 * 1024)} MB.");
+        var hash = ComputeContentHash(effectiveBundleJson);
 
         var update = Builders<ImportedBundleDocument>.Update
             .SetOnInsert(b => b.Id, Guid.NewGuid())
             .SetOnInsert(b => b.ContentHash, hash)
-            .SetOnInsert(b => b.BundleJson, json)
-            .SetOnInsert(b => b.ByteCount, byteCount)
+            .SetOnInsert(b => b.ByteCount, 0)
             .SetOnInsert(b => b.CreatedAt, now)
             .SetOnInsert(b => b.IsLibraryEntry, false)
             .Set(b => b.PatientId, patientResource.Id)
@@ -249,12 +282,31 @@ public class ScenariosController(
             new FindOneAndUpdateOptions<ImportedBundleDocument> { IsUpsert = true, ReturnDocument = ReturnDocument.After },
             ct);
 
+        var stored = await bundleContentStore.StoreAsync(doc.Id, doc.ContentHash, effectiveBundleJson, ct);
+        await _bundles.UpdateOneAsync(
+            b => b.Id == doc.Id,
+            Builders<ImportedBundleDocument>.Update
+                .Set(b => b.BundleBlobName, stored.BlobName)
+                .Set(b => b.ByteCount, stored.ByteCount)
+                .Set(b => b.BundleJson, null)
+                .Set(b => b.UpdatedAt, now),
+            cancellationToken: ct);
+
+        logger.LogInformation(
+            "Stored imported bundle '{FileName}' for patient '{PatientId}' in ABS blob '{BlobName}' ({ByteCount} bytes).",
+            request.File.FileName,
+            patientResource.Id,
+            stored.BlobName,
+            stored.ByteCount);
+
         return Json(new
         {
             bundleId = doc.Id,
             patientId = patientResource.Id,
             fileName = request.File.FileName,
-            byteCount,
+            byteCount = stored.ByteCount,
+            usedServerBundle = !string.IsNullOrWhiteSpace(replacementWarning),
+            warningMessage = replacementWarning,
             organizationId = organizationIds.Count == 1 ? organizationIds[0] : null,
             organizationIds
         });
@@ -292,7 +344,9 @@ public class ScenariosController(
                     var existing = await _bundles.Find(b => b.Id == request.UploadedBundleId.Value).FirstOrDefaultAsync(ct);
                     if (existing == null)
                         return BadRequest("Uploaded bundle was not found. Please re-upload.");
-                    bundleJson = existing.BundleJson;
+                    bundleJson = await bundleContentStore.ReadAsync(existing, ct) ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(bundleJson))
+                        return BadRequest("Uploaded bundle content is missing. Please re-upload.");
                 }
                 else
                 {
@@ -475,5 +529,145 @@ public class ScenariosController(
     private static string GenerateRandomNhsnOrganizationId()
     {
         return Random.Shared.Next(10000, 100000).ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private async Task<(string? BundleJson, string? WarningMessage)> TryFetchExistingPatientEverythingForVerificationAsync(
+        string patientId,
+        string fileName,
+        CancellationToken ct)
+    {
+        var cfg = automationConfig.Value;
+        var loader = new FhirDataLoader(cfg.FhirServerBase, cfg.FhirServerOAuth, cfg.FhirServerBasicAuth);
+
+        try
+        {
+            var bundleJson = await loader.FetchPatientEverythingAsync(patientId, ct);
+            return (bundleJson, null);
+        }
+        catch (InvalidOperationException ex) when (IsFhirNotFound(ex))
+        {
+            logger.LogInformation("FHIR server returned not-found for Patient/{PatientId}/$everything during bundle verification.", patientId);
+            return (null, null);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Failed verifying uploaded bundle '{FileName}' for patient '{PatientId}' against FHIR server Patient/$everything. Falling back to uploaded bundle.",
+                fileName,
+                patientId);
+
+            var warning =
+                $"Automation UI could not verify uploaded bundle '{fileName}' against the FHIR server for patient '{patientId}' due to a FHIR server paging/read issue. " +
+                "The uploaded bundle will be used as provided.";
+
+            return (null, warning);
+        }
+    }
+
+    private static bool IsFhirNotFound(InvalidOperationException ex)
+    {
+        return ex.Message.Contains(" returned 404 ", StringComparison.OrdinalIgnoreCase)
+            || ex.Message.Contains(" returned 410 ", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool BundlesDiffer(Bundle uploadedBundle, Bundle existingBundle)
+    {
+        var uploaded = BuildResourceFingerprintBag(uploadedBundle);
+        var existing = BuildResourceFingerprintBag(existingBundle);
+
+        foreach (var (resourceKey, uploadedFingerprints) in uploaded)
+        {
+            if (!existing.TryGetValue(resourceKey, out var existingFingerprints))
+                return true;
+
+            foreach (var (fingerprint, requiredCount) in uploadedFingerprints)
+            {
+                if (!existingFingerprints.TryGetValue(fingerprint, out var existingCount)
+                    || existingCount < requiredCount)
+                {
+                    return true;
+                }
+            }
+        }
+
+        // Intentionally allow extra resources on the server-side $everything result.
+        // We only fail when uploaded resources are missing or materially different.
+        return false;
+    }
+
+    private static Dictionary<string, Dictionary<string, int>> BuildResourceFingerprintBag(Bundle bundle)
+    {
+        var bag = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
+
+        foreach (var resource in (bundle.Entry ?? [])
+                     .Select(e => e?.Resource)
+                     .Where(r => r != null)
+                     .Cast<Resource>())
+        {
+            var resourceType = resource.GetType().Name;
+            var id = resource.Id ?? string.Empty;
+            var resourceKey = $"{resourceType}/{id}";
+
+            var fingerprint = CanonicalizeJson(
+                JsonSerializer.Serialize(resource, FhirJsonOptions));
+
+            if (!bag.TryGetValue(resourceKey, out var fingerprints))
+            {
+                fingerprints = new Dictionary<string, int>(StringComparer.Ordinal);
+                bag[resourceKey] = fingerprints;
+            }
+
+            fingerprints[fingerprint] = fingerprints.TryGetValue(fingerprint, out var count)
+                ? count + 1
+                : 1;
+        }
+
+        return bag;
+    }
+
+    private static string CanonicalizeJson(string json)
+    {
+        var node = JsonNode.Parse(json) ?? throw new InvalidOperationException("FHIR resource JSON was empty.");
+        var normalized = CanonicalizeNode(node);
+        return normalized.ToJsonString();
+    }
+
+    private static JsonNode CanonicalizeNode(JsonNode node)
+    {
+        if (node is JsonObject obj)
+        {
+            var normalized = new JsonObject();
+            foreach (var property in obj.OrderBy(p => p.Key, StringComparer.Ordinal))
+            {
+                if (string.Equals(property.Key, "meta", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(property.Key, "text", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                normalized[property.Key] = property.Value == null ? null : CanonicalizeNode(property.Value);
+            }
+            return normalized;
+        }
+
+        if (node is JsonArray array)
+        {
+            var normalizedItems = array
+                .Select(item => item == null ? null : CanonicalizeNode(item))
+                .ToList();
+
+            var orderedItems = normalizedItems
+                .OrderBy(item => item?.ToJsonString() ?? string.Empty, StringComparer.Ordinal)
+                .ToList();
+
+            var normalized = new JsonArray();
+            foreach (var item in orderedItems)
+                normalized.Add(item);
+
+            return normalized;
+        }
+
+        return node.DeepClone();
     }
 }
