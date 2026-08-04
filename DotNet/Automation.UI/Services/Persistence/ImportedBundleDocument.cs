@@ -51,6 +51,12 @@ public sealed class ImportedBundleDocument
     [BsonRepresentation(BsonType.String)]
     public List<Guid> ScenarioIds { get; set; } = [];
 
+    [BsonRepresentation(BsonType.String)]
+    public Guid? CanonicalBundleId { get; set; }
+
+    public string? DeletionClaimToken { get; set; }
+    public DateTimeOffset? DeletionClaimedAt { get; set; }
+
     /// <summary>FHIR Patient.id this bundle represents (display + lookup convenience).</summary>
     public string PatientId { get; set; } = string.Empty;
 

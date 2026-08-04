@@ -213,26 +213,53 @@ public sealed class MongoScenarioStore : IScenarioStore
         DateTimeOffset now,
         CancellationToken ct)
     {
+        var bundleDoc = await TryAttachBundleByIdAsync(bundleId, input, scenarioId, now, ct);
+        if (bundleDoc != null)
+        {
+            return new ImportedBundleReference
+            {
+                BundleId = bundleDoc.Id,
+                PatientId = string.IsNullOrWhiteSpace(input.PatientId) ? bundleDoc.PatientId : input.PatientId
+            };
+        }
+
+        var redirect = await _bundles.Find(b => b.Id == bundleId).FirstOrDefaultAsync(ct);
+        if (redirect?.CanonicalBundleId is Guid canonicalBundleId)
+        {
+            bundleDoc = await TryAttachBundleByIdAsync(canonicalBundleId, input, scenarioId, now, ct);
+            if (bundleDoc != null)
+            {
+                return new ImportedBundleReference
+                {
+                    BundleId = bundleDoc.Id,
+                    PatientId = string.IsNullOrWhiteSpace(input.PatientId) ? bundleDoc.PatientId : input.PatientId
+                };
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<ImportedBundleDocument?> TryAttachBundleByIdAsync(
+        Guid bundleId,
+        ImportedPatientInput input,
+        Guid scenarioId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
         var update = Builders<ImportedBundleDocument>.Update
             .Set(b => b.UpdatedAt, now)
             .Set(b => b.PatientId, input.PatientId ?? string.Empty)
             .Set(b => b.FileName, input.FileName)
             .AddToSet(b => b.ScenarioIds, scenarioId);
 
-        var bundleDoc = await _bundles.FindOneAndUpdateAsync(
-            b => b.Id == bundleId,
+        return await _bundles.FindOneAndUpdateAsync(
+            b => b.Id == bundleId
+                 && (b.DeletionClaimToken == null || b.DeletionClaimToken == string.Empty)
+                 && b.CanonicalBundleId == null,
             update,
             new FindOneAndUpdateOptions<ImportedBundleDocument> { ReturnDocument = ReturnDocument.After },
             ct);
-
-        if (bundleDoc == null)
-            return null;
-
-        return new ImportedBundleReference
-        {
-            BundleId = bundleDoc.Id,
-            PatientId = string.IsNullOrWhiteSpace(input.PatientId) ? bundleDoc.PatientId : input.PatientId
-        };
     }
 
     /// <summary>
@@ -258,25 +285,77 @@ public sealed class MongoScenarioStore : IScenarioStore
             Builders<ImportedBundleDocument>.Update.Pull(b => b.ScenarioIds, scenarioId),
             cancellationToken: ct);
 
-        // Delete unreferenced, non-library bundles. Treats both an empty list and a missing
-        // ScenarioIds field as orphan so legacy single-owner rows (without ScenarioIds) can
-        // be cleaned up too.
+        // Claim orphaned docs first so concurrent attachments cannot race with blob delete.
+        // Delete only docs successfully claimed by this pass.
         var orphanFilter = Builders<ImportedBundleDocument>.Filter.And(
             Builders<ImportedBundleDocument>.Filter.Or(
                 Builders<ImportedBundleDocument>.Filter.Size(b => b.ScenarioIds, 0),
                 Builders<ImportedBundleDocument>.Filter.Exists(b => b.ScenarioIds, false)),
             Builders<ImportedBundleDocument>.Filter.Eq(b => b.IsLibraryEntry, false));
 
-        var orphanDocs = await _bundles.Find(orphanFilter).ToListAsync(ct);
-        foreach (var orphan in orphanDocs)
+        var claimToken = Guid.NewGuid().ToString("N");
+        var claimFilter = Builders<ImportedBundleDocument>.Filter.And(
+            orphanFilter,
+            Builders<ImportedBundleDocument>.Filter.Or(
+                Builders<ImportedBundleDocument>.Filter.Eq(b => b.DeletionClaimToken, null),
+                Builders<ImportedBundleDocument>.Filter.Eq(b => b.DeletionClaimToken, string.Empty)));
+
+        var claimUpdate = Builders<ImportedBundleDocument>.Update
+            .Set(b => b.DeletionClaimToken, claimToken)
+            .Set(b => b.DeletionClaimedAt, DateTimeOffset.UtcNow)
+            .Set(b => b.UpdatedAt, DateTimeOffset.UtcNow);
+
+        var claimedOrphans = new List<ImportedBundleDocument>();
+        while (true)
         {
-            await _bundleContentStore.DeleteAsync(orphan, ct);
+            var claimed = await _bundles.FindOneAndUpdateAsync(
+                claimFilter,
+                claimUpdate,
+                new FindOneAndUpdateOptions<ImportedBundleDocument>
+                {
+                    ReturnDocument = ReturnDocument.After,
+                    Sort = Builders<ImportedBundleDocument>.Sort.Ascending(b => b.CreatedAt)
+                },
+                ct);
+
+            if (claimed == null)
+                break;
+
+            claimedOrphans.Add(claimed);
         }
 
-        if (orphanDocs.Count > 0)
+        if (claimedOrphans.Count == 0)
+            return;
+
+        var deletableIds = new List<Guid>(claimedOrphans.Count);
+        foreach (var orphan in claimedOrphans)
         {
-            var orphanIds = orphanDocs.Select(o => o.Id).ToList();
-            await _bundles.DeleteManyAsync(Builders<ImportedBundleDocument>.Filter.In(b => b.Id, orphanIds), ct);
+            try
+            {
+                await _bundleContentStore.DeleteAsync(orphan, ct);
+                deletableIds.Add(orphan.Id);
+            }
+            catch
+            {
+                await _bundles.UpdateOneAsync(
+                    b => b.Id == orphan.Id && b.DeletionClaimToken == claimToken,
+                    Builders<ImportedBundleDocument>.Update
+                        .Set(b => b.DeletionClaimToken, null)
+                        .Set(b => b.DeletionClaimedAt, null)
+                        .Set(b => b.UpdatedAt, DateTimeOffset.UtcNow),
+                    cancellationToken: ct);
+                throw;
+            }
+        }
+
+        if (deletableIds.Count > 0)
+        {
+            var deleteFilter = Builders<ImportedBundleDocument>.Filter.And(
+                Builders<ImportedBundleDocument>.Filter.In(b => b.Id, deletableIds),
+                Builders<ImportedBundleDocument>.Filter.Eq(b => b.DeletionClaimToken, claimToken),
+                orphanFilter);
+
+            await _bundles.DeleteManyAsync(deleteFilter, ct);
         }
     }
 

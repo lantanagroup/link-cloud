@@ -560,6 +560,7 @@ public class FhirDataLoader
         for (var attempt = 1; attempt <= MaxRetries; attempt++)
         {
             ct.ThrowIfCancellationRequested();
+            response = null;
 
             try
             {

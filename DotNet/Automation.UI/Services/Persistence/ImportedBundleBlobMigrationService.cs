@@ -101,6 +101,7 @@ public sealed class ImportedBundleBlobMigrationService : IHostedService
     private async Task<int> MigrateInlinePayloadsToAbsAsync(CancellationToken ct)
     {
         var migrated = 0;
+        var failedDocIds = new HashSet<Guid>();
 
         var filter = Builders<ImportedBundleDocument>.Filter.And(
             Builders<ImportedBundleDocument>.Filter.Ne(b => b.BundleJson, null),
@@ -108,7 +109,13 @@ public sealed class ImportedBundleBlobMigrationService : IHostedService
 
         while (!ct.IsCancellationRequested)
         {
-            var docs = await _bundles.Find(filter)
+            var batchFilter = failedDocIds.Count == 0
+                ? filter
+                : Builders<ImportedBundleDocument>.Filter.And(
+                    filter,
+                    Builders<ImportedBundleDocument>.Filter.Nin(b => b.Id, failedDocIds));
+
+            var docs = await _bundles.Find(batchFilter)
                 .SortBy(b => b.CreatedAt)
                 .Limit(MigrationBatchSize)
                 .ToListAsync(ct);
@@ -116,36 +123,16 @@ public sealed class ImportedBundleBlobMigrationService : IHostedService
             if (docs.Count == 0)
                 break;
 
-            foreach (var doc in docs)
+            var batchResult = await MigrateInlinePayloadBatchAsync(docs, failedDocIds, ct);
+            migrated += batchResult.Migrated;
+
+            if (batchResult.Migrated == 0 && batchResult.Failed > 0)
             {
-                ct.ThrowIfCancellationRequested();
-
-                try
-                {
-                    var json = doc.BundleJson;
-                    if (string.IsNullOrWhiteSpace(json))
-                        continue;
-
-                    var contentHash = string.IsNullOrWhiteSpace(doc.ContentHash)
-                        ? ComputeContentHash(json)
-                        : doc.ContentHash;
-
-                    var stored = await _contentStore.StoreAsync(doc.Id, contentHash, json, ct);
-
-                    var update = Builders<ImportedBundleDocument>.Update
-                        .Set(b => b.ContentHash, contentHash)
-                        .Set(b => b.BundleBlobName, stored.BlobName)
-                        .Set(b => b.ByteCount, stored.ByteCount)
-                        .Set(b => b.UpdatedAt, DateTimeOffset.UtcNow)
-                        .Set(b => b.BundleJson, null);
-
-                    await _bundles.UpdateOneAsync(b => b.Id == doc.Id, update, cancellationToken: ct);
-                    migrated++;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed migrating imported bundle {BundleId} payload to ABS. Will retry next startup.", doc.Id);
-                }
+                _logger.LogWarning(
+                    "Imported bundle ABS migration batch made no progress ({FailedCount} failed). " +
+                    "Stopping further attempts this startup; failed docs will retry on next startup.",
+                    batchResult.Failed);
+                break;
             }
 
             _logger.LogInformation("Imported bundle ABS migration progress: migrated {Migrated} inline payload document(s).", migrated);
@@ -155,6 +142,51 @@ public sealed class ImportedBundleBlobMigrationService : IHostedService
         }
 
         return migrated;
+    }
+
+    internal async Task<(int Migrated, int Failed)> MigrateInlinePayloadBatchAsync(
+        IReadOnlyCollection<ImportedBundleDocument> docs,
+        ISet<Guid> failedDocIds,
+        CancellationToken ct)
+    {
+        var migrated = 0;
+        var failed = 0;
+
+        foreach (var doc in docs)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                var json = doc.BundleJson;
+                if (string.IsNullOrWhiteSpace(json))
+                    continue;
+
+                var contentHash = string.IsNullOrWhiteSpace(doc.ContentHash)
+                    ? ComputeContentHash(json)
+                    : doc.ContentHash;
+
+                var stored = await _contentStore.StoreAsync(doc.Id, contentHash, json, ct);
+
+                var update = Builders<ImportedBundleDocument>.Update
+                    .Set(b => b.ContentHash, contentHash)
+                    .Set(b => b.BundleBlobName, stored.BlobName)
+                    .Set(b => b.ByteCount, stored.ByteCount)
+                    .Set(b => b.UpdatedAt, DateTimeOffset.UtcNow)
+                    .Set(b => b.BundleJson, null);
+
+                await _bundles.UpdateOneAsync(b => b.Id == doc.Id, update, cancellationToken: ct);
+                migrated++;
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                failedDocIds.Add(doc.Id);
+                _logger.LogWarning(ex, "Failed migrating imported bundle {BundleId} payload to ABS. Will retry next startup.", doc.Id);
+            }
+        }
+
+        return (migrated, failed);
     }
 
     private async Task<int> DeduplicateBundleDocumentsAsync(CancellationToken ct)
@@ -184,6 +216,8 @@ public sealed class ImportedBundleBlobMigrationService : IHostedService
 
         var remap = new Dictionary<Guid, Guid>();
         var duplicatesToDelete = new List<ImportedBundleDocument>();
+        var dedupClaimToken = Guid.NewGuid().ToString("N");
+        var retainedCanonicalBlobNames = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var group in duplicateGroups)
         {
@@ -204,6 +238,15 @@ public sealed class ImportedBundleBlobMigrationService : IHostedService
                     canonicalScenarioIds.Add(sid);
                 remap[dup.Id] = canonical.Id;
                 duplicatesToDelete.Add(dup);
+
+                await _bundles.UpdateOneAsync(
+                    b => b.Id == dup.Id,
+                    Builders<ImportedBundleDocument>.Update
+                        .Set(b => b.CanonicalBundleId, canonical.Id)
+                        .Set(b => b.DeletionClaimToken, dedupClaimToken)
+                        .Set(b => b.DeletionClaimedAt, DateTimeOffset.UtcNow)
+                        .Set(b => b.UpdatedAt, DateTimeOffset.UtcNow),
+                    cancellationToken: ct);
             }
 
             if (string.IsNullOrWhiteSpace(canonical.BundleBlobName))
@@ -219,6 +262,9 @@ public sealed class ImportedBundleBlobMigrationService : IHostedService
                 if (donor != null)
                     canonical.ByteCount = donor.ByteCount;
             }
+
+            if (!string.IsNullOrWhiteSpace(canonical.BundleBlobName))
+                retainedCanonicalBlobNames.Add(canonical.BundleBlobName);
 
             var canonicalUpdate = Builders<ImportedBundleDocument>.Update
                 .Set(b => b.ScenarioIds, canonicalScenarioIds.ToList())
@@ -237,6 +283,12 @@ public sealed class ImportedBundleBlobMigrationService : IHostedService
 
         foreach (var dup in duplicatesToDelete)
         {
+            if (!string.IsNullOrWhiteSpace(dup.BundleBlobName)
+                && retainedCanonicalBlobNames.Contains(dup.BundleBlobName))
+            {
+                continue;
+            }
+
             try
             {
                 await _contentStore.DeleteAsync(dup, ct);
@@ -247,7 +299,10 @@ public sealed class ImportedBundleBlobMigrationService : IHostedService
             }
         }
 
-        await _bundles.DeleteManyAsync(Builders<ImportedBundleDocument>.Filter.In(b => b.Id, duplicatesToDelete.Select(d => d.Id)), ct);
+        var deleteFilter = Builders<ImportedBundleDocument>.Filter.And(
+            Builders<ImportedBundleDocument>.Filter.In(b => b.Id, duplicatesToDelete.Select(d => d.Id)),
+            Builders<ImportedBundleDocument>.Filter.Eq(b => b.DeletionClaimToken, dedupClaimToken));
+        await _bundles.DeleteManyAsync(deleteFilter, ct);
 
         _logger.LogInformation("Imported bundle deduplication remapped {RemapCount} reference(s) and removed {DuplicateCount} duplicate bundle document(s).", remap.Count, duplicatesToDelete.Count);
         return duplicatesToDelete.Count;
@@ -378,37 +433,74 @@ public sealed class ImportedBundleBlobMigrationService : IHostedService
         }
     }
 
-    private static string RemapUploadedBundleIdsInJson(string json, IReadOnlyDictionary<Guid, Guid> remap)
+    internal static string RemapUploadedBundleIdsInJson(string json, IReadOnlyDictionary<Guid, Guid> remap)
     {
         try
         {
-            var root = JsonNode.Parse(json) as JsonObject;
-            if (root == null)
+            var parsed = JsonNode.Parse(json);
+            if (parsed == null)
                 return json;
 
-            if (root["importedPatientBundles"] is not JsonArray bundles)
-                return json;
-
-            var changed = false;
-            foreach (var node in bundles.OfType<JsonObject>())
+            if (parsed is JsonArray rootArray)
             {
-                var raw = node["uploadedBundleId"]?.GetValue<string>();
-                if (!Guid.TryParse(raw, out var uploadedId))
-                    continue;
-
-                if (!remap.TryGetValue(uploadedId, out var replacement))
-                    continue;
-
-                node["uploadedBundleId"] = replacement.ToString();
-                changed = true;
+                var changed = RemapUploadedBundleIdsInArray(rootArray, remap);
+                return changed ? rootArray.ToJsonString() : json;
             }
 
-            return changed ? root.ToJsonString() : json;
+            if (parsed is not JsonObject rootObject)
+                return json;
+
+            JsonArray? bundles = null;
+            if (rootObject.TryGetPropertyValue("importedPatientBundles", out var camelNode)
+                && camelNode is JsonArray camelArray)
+            {
+                bundles = camelArray;
+            }
+            else if (rootObject.TryGetPropertyValue("ImportedPatientBundles", out var pascalNode)
+                     && pascalNode is JsonArray pascalArray)
+            {
+                bundles = pascalArray;
+            }
+
+            if (bundles == null)
+                return json;
+
+            var arrayChanged = RemapUploadedBundleIdsInArray(bundles, remap);
+            return arrayChanged ? rootObject.ToJsonString() : json;
         }
         catch
         {
             return json;
         }
+    }
+
+    private static bool RemapUploadedBundleIdsInArray(JsonArray bundles, IReadOnlyDictionary<Guid, Guid> remap)
+    {
+        var changed = false;
+
+        foreach (var node in bundles.OfType<JsonObject>())
+        {
+            var key = node.ContainsKey("UploadedBundleId")
+                ? "UploadedBundleId"
+                : node.ContainsKey("uploadedBundleId")
+                    ? "uploadedBundleId"
+                    : null;
+
+            if (key == null)
+                continue;
+
+            var raw = node[key]?.GetValue<string>();
+            if (!Guid.TryParse(raw, out var uploadedId))
+                continue;
+
+            if (!remap.TryGetValue(uploadedId, out var replacement))
+                continue;
+
+            node[key] = replacement.ToString();
+            changed = true;
+        }
+
+        return changed;
     }
 
     private static string ComputeContentHash(string json)

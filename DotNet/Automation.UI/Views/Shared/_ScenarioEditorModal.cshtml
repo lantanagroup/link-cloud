@@ -43,7 +43,7 @@
                 </div>
             </div>
             <div id="formErrors" class="alert alert-danger m-3 mb-0 py-2 small" style="display:none;"></div>
-            <div id="formWarnings" class="alert alert-warning m-3 mb-0 py-2 small" style="display:none;"></div>
+            <div id="formWarnings" class="alert alert-warning m-3 mb-0 py-2 small" style="display:none;white-space:pre-line;"></div>
             <div style="flex:1;overflow-y:auto;padding:1.25rem;" id="modalBody">
                 @Html.AntiForgeryToken()
                 <input type="hidden" id="ScenarioId" value="" />
@@ -227,12 +227,12 @@
 </div>
 <div id="scenarioModalBackdrop" style="position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:1050;display:none;"></div>
 
-<div id="replaceFhirModal" style="display:none;position:fixed;inset:0;z-index:1065;overflow-y:auto;">
+<div id="replaceFhirModal" role="dialog" aria-modal="true" aria-labelledby="replaceFhirModalTitle" style="display:none;position:fixed;inset:0;z-index:1065;overflow-y:auto;">
     <div id="replaceFhirBackdrop" style="position:absolute;inset:0;background:rgba(0,0,0,.45);"></div>
     <div style="min-height:100%;display:flex;align-items:center;justify-content:center;padding:2rem;position:relative;">
         <div style="background:#fff;border-radius:var(--au-radius);box-shadow:0 8px 40px rgba(0,0,0,.3);width:100%;max-width:700px;">
             <div style="background:var(--au-dark);color:#fff;padding:.75rem 1rem;border-radius:var(--au-radius) var(--au-radius) 0 0;" class="d-flex justify-content-between align-items-center">
-                <h6 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Patient Already Exists on FHIR Server</h6>
+                <h6 class="mb-0" id="replaceFhirModalTitle"><i class="bi bi-exclamation-triangle me-2"></i>Patient Already Exists on FHIR Server</h6>
                 <button type="button" class="btn btn-sm btn-outline-light" id="btnReplaceFhirClose">Close</button>
             </div>
             <div class="p-3">
@@ -250,7 +250,7 @@
                 <div class="fw-semibold mb-2" id="replaceFhirPatientLabel"></div>
                 <div id="replaceFhirHoldHint" class="small text-muted mb-2">Press and hold the button to confirm destructive replace.</div>
                 <div class="progress mb-2" style="height:8px;">
-                    <div id="replaceFhirHoldFill" class="progress-bar bg-danger" role="progressbar" style="width:0%"></div>
+                    <div id="replaceFhirHoldFill" class="progress-bar bg-danger" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="width:0%"></div>
                 </div>
                 <div class="d-flex justify-content-end gap-2 mt-3">
                     <button type="button" class="btn btn-outline-secondary btn-sm" id="btnReplaceFhirCancel">Cancel</button>
@@ -350,13 +350,17 @@
                 var holdAnimationFrame = 0;
                 var holdCompleted = false;
                 var postConfirmVisualDelayMs = 1000;
+                var keyboardHoldActive = false;
 
                 replaceFhirPatientLabel.textContent = String(patientId || '').trim();
                 btnReplaceFhirConfirm.disabled = false;
                 btnReplaceFhirConfirm.classList.remove('btn-success');
                 btnReplaceFhirConfirm.classList.add('btn-danger');
                 if (replaceFhirHoldHint) replaceFhirHoldHint.textContent = 'Press and hold the button to confirm destructive replace.';
-                if (replaceFhirHoldFill) replaceFhirHoldFill.style.width = '0%';
+                if (replaceFhirHoldFill) {
+                    replaceFhirHoldFill.style.width = '0%';
+                    replaceFhirHoldFill.setAttribute('aria-valuenow', '0');
+                }
                 btnUseServerData.disabled = !canUseServerData;
                 if (replaceFhirLargeHint) replaceFhirLargeHint.style.display = requiresReplaceForLargePatient ? '' : 'none';
                 replaceFhirModal.style.display = '';
@@ -372,7 +376,10 @@
                         holdAnimationFrame = 0;
                     }
                     if (resetVisual && !holdCompleted) {
-                        if (replaceFhirHoldFill) replaceFhirHoldFill.style.width = '0%';
+                        if (replaceFhirHoldFill) {
+                            replaceFhirHoldFill.style.width = '0%';
+                            replaceFhirHoldFill.setAttribute('aria-valuenow', '0');
+                        }
                         if (replaceFhirHoldHint) replaceFhirHoldHint.textContent = 'Press and hold the button to confirm destructive replace.';
                     }
                 }
@@ -381,7 +388,10 @@
                     if (holdCompleted) return;
                     holdCompleted = true;
                     stopHold(false);
-                    if (replaceFhirHoldFill) replaceFhirHoldFill.style.width = '100%';
+                    if (replaceFhirHoldFill) {
+                        replaceFhirHoldFill.style.width = '100%';
+                        replaceFhirHoldFill.setAttribute('aria-valuenow', '100');
+                    }
                     btnReplaceFhirConfirm.classList.remove('btn-danger');
                     btnReplaceFhirConfirm.classList.add('btn-success');
                     if (replaceFhirHoldHint) replaceFhirHoldHint.textContent = 'Confirmed. Starting purge + replace...';
@@ -404,7 +414,10 @@
                         if (holdCompleted) return;
                         var elapsed = Date.now() - holdStart;
                         var pct = Math.min(100, Math.round((elapsed / holdDurationMs) * 100));
-                        if (replaceFhirHoldFill) replaceFhirHoldFill.style.width = pct + '%';
+                        if (replaceFhirHoldFill) {
+                            replaceFhirHoldFill.style.width = pct + '%';
+                            replaceFhirHoldFill.setAttribute('aria-valuenow', String(pct));
+                        }
                         if (pct >= 100) completeHold();
                     }, 30);
 
@@ -412,7 +425,10 @@
                         if (holdCompleted) return;
                         var elapsed = Date.now() - holdStart;
                         var pct = Math.min(100, Math.round((elapsed / holdDurationMs) * 100));
-                        if (replaceFhirHoldFill) replaceFhirHoldFill.style.width = pct + '%';
+                        if (replaceFhirHoldFill) {
+                            replaceFhirHoldFill.style.width = pct + '%';
+                            replaceFhirHoldFill.setAttribute('aria-valuenow', String(pct));
+                        }
                         if (pct >= 100) {
                             completeHold();
                             return;
@@ -434,25 +450,52 @@
                     btnReplaceFhirConfirm.removeEventListener('pointerup', cancelHold);
                     btnReplaceFhirConfirm.removeEventListener('pointerleave', cancelHold);
                     btnReplaceFhirConfirm.removeEventListener('pointercancel', cancelHold);
-                    btnReplaceFhirConfirm.removeEventListener('click', preventClick);
                     btnUseServerData.removeEventListener('click', onUseServerData);
                     btnReplaceFhirCancel.removeEventListener('click', onCancel);
                     btnReplaceFhirClose.removeEventListener('click', onCancel);
+                    document.removeEventListener('keydown', onDocumentKeyDown, true);
+                    document.removeEventListener('keyup', onDocumentKeyUp, true);
                     if (replaceFhirBackdrop) replaceFhirBackdrop.removeEventListener('click', onCancel);
                     resolve(result);
                 }
 
-                function preventClick(ev) { ev.preventDefault(); }
                 function onUseServerData() { cleanup('use-server'); }
                 function onCancel() { cleanup('cancel'); }
+                function onDocumentKeyDown(ev) {
+                    if (replaceFhirModal.style.display === 'none') return;
+
+                    if (ev.key === 'Escape') {
+                        ev.preventDefault();
+                        onCancel();
+                        return;
+                    }
+
+                    if (holdCompleted) return;
+                    if (document.activeElement !== btnReplaceFhirConfirm) return;
+                    if (ev.repeat) return;
+                    if (ev.key !== ' ' && ev.key !== 'Enter') return;
+
+                    keyboardHoldActive = true;
+                    startHold(ev);
+                }
+
+                function onDocumentKeyUp(ev) {
+                    if (!keyboardHoldActive) return;
+                    if (ev.key !== ' ' && ev.key !== 'Enter') return;
+
+                    keyboardHoldActive = false;
+                    cancelHold(ev);
+                }
+
                 btnReplaceFhirConfirm.addEventListener('pointerdown', startHold);
                 btnReplaceFhirConfirm.addEventListener('pointerup', cancelHold);
                 btnReplaceFhirConfirm.addEventListener('pointerleave', cancelHold);
                 btnReplaceFhirConfirm.addEventListener('pointercancel', cancelHold);
-                btnReplaceFhirConfirm.addEventListener('click', preventClick);
                 btnUseServerData.addEventListener('click', onUseServerData);
                 btnReplaceFhirCancel.addEventListener('click', onCancel);
                 btnReplaceFhirClose.addEventListener('click', onCancel);
+                document.addEventListener('keydown', onDocumentKeyDown, true);
+                document.addEventListener('keyup', onDocumentKeyUp, true);
                 if (replaceFhirBackdrop) replaceFhirBackdrop.addEventListener('click', onCancel);
             });
         }
@@ -478,6 +521,7 @@
             var lines = formWarnings.textContent ? formWarnings.textContent.split('\n') : [];
             if (lines.indexOf(text) >= 0) return;
             formWarnings.textContent = formWarnings.textContent ? (formWarnings.textContent + '\n' + text) : text;
+            formWarnings.style.whiteSpace = 'pre-line';
             formWarnings.style.display = '';
         }
         function clearWarnings() {
@@ -1147,6 +1191,25 @@
 
         document.getElementById('importedBundleFile').addEventListener('change', async function (ev) {
             var files = Array.prototype.slice.call(ev.target.files || []);
+            var allImportedCleanly = files.length > 0;
+            var lastSpecialOutcomeMessage = '';
+
+            async function tryDiscardUploadedBundle(uploadedBundleId, fileName, contextLabel) {
+                try {
+                    await postJson(discardUploadedBundleUrl, {
+                        uploadedBundleId: uploadedBundleId
+                    });
+                    return true;
+                } catch (discardErr) {
+                    var discardMessage = 'Failed to discard uploaded bundle for "' + fileName + '" after ' + contextLabel + ': ' + (discardErr.message || 'Unknown error');
+                    showError(discardMessage);
+                    setImportedUploadStatus(discardMessage, false);
+                    lastSpecialOutcomeMessage = discardMessage;
+                    allImportedCleanly = false;
+                    return false;
+                }
+            }
+
             if (files.length > 0) {
                 setImportedUploadStatus('Uploading and classifying ' + files.length + ' file(s)...', true);
             }
@@ -1165,26 +1228,33 @@
                             !!uploaded.requiresReplaceForLargePatient);
 
                         if (decision === 'cancel') {
-                            await postJson(discardUploadedBundleUrl, {
-                                uploadedBundleId: uploaded.bundleId
-                            });
-                            setImportedUploadStatus('Skipped import for "' + file.name + '" because no action was selected.', false);
+                            var discardedAfterCancel = await tryDiscardUploadedBundle(uploaded.bundleId, file.name, 'canceling replacement choice');
+                            if (!discardedAfterCancel) {
+                                continue;
+                            }
+                            lastSpecialOutcomeMessage = 'Skipped import for "' + file.name + '" because no action was selected.';
+                            setImportedUploadStatus(lastSpecialOutcomeMessage, false);
+                            allImportedCleanly = false;
                             continue;
                         }
 
                         if (decision === 'use-server') {
-                            await postJson(discardUploadedBundleUrl, {
-                                uploadedBundleId: uploaded.bundleId
-                            });
+                            var discardedForServerUse = await tryDiscardUploadedBundle(uploaded.bundleId, file.name, 'choosing "Use FHIR Server Data"');
+                            if (!discardedForServerUse) {
+                                continue;
+                            }
 
                             addImportedRow({ source: 'ExistingId', patientId: uploaded.patientId, autoDetect: true, measureEligibilities: {} });
                             var serverRow = importedRows.lastElementChild;
                             if (serverRow) await classifyImportedRow(serverRow);
-                            setImportedUploadStatus('Imported Patient/' + uploaded.patientId + ' from FHIR server data.', false);
+                            lastSpecialOutcomeMessage = 'Imported Patient/' + uploaded.patientId + ' from FHIR server data.';
+                            setImportedUploadStatus(lastSpecialOutcomeMessage, false);
+                            allImportedCleanly = false;
                             continue;
                         }
 
                         if (decision === 'replace') {
+                            allImportedCleanly = false;
                             setImportedUploadStatus('Replacing FHIR-server data for Patient/' + uploaded.patientId + '...', true);
                             try {
                                 var replaceRes = await postJson(replacePatientOnFhirServerUrl, {
@@ -1192,13 +1262,15 @@
                                     patientId: uploaded.patientId
                                 });
                                 if (replaceRes && replaceRes.message) {
-                                    setImportedUploadStatus(replaceRes.message, false);
+                                    lastSpecialOutcomeMessage = replaceRes.message;
+                                    setImportedUploadStatus(lastSpecialOutcomeMessage, false);
                                 }
                             } catch (replaceErr) {
-                                await postJson(discardUploadedBundleUrl, {
-                                    uploadedBundleId: uploaded.bundleId
-                                });
-                                showError('Failed to replace FHIR-server patient data for "' + uploaded.patientId + '": ' + (replaceErr.message || 'Unknown error'));
+                                var replaceMessage = 'Failed to replace FHIR-server patient data for "' + uploaded.patientId + '": ' + (replaceErr.message || 'Unknown error');
+                                showError(replaceMessage);
+                                setImportedUploadStatus(replaceMessage, false);
+                                lastSpecialOutcomeMessage = replaceMessage;
+                                await tryDiscardUploadedBundle(uploaded.bundleId, file.name, 'replace failure');
                                 continue;
                             }
                         }
@@ -1224,10 +1296,21 @@
                     var row = importedRows.lastElementChild;
                     if (row) await classifyImportedRow(row);
                 } catch (err) {
-                    showError('Failed to read "' + file.name + '": ' + (err.message || 'Unknown error'));
+                    var readMessage = 'Failed to read "' + file.name + '": ' + (err.message || 'Unknown error');
+                    showError(readMessage);
+                    setImportedUploadStatus(readMessage, false);
+                    lastSpecialOutcomeMessage = readMessage;
+                    allImportedCleanly = false;
                 }
             }
-            setImportedUploadStatus(files.length > 0 ? ('Completed upload processing for ' + files.length + ' file(s).') : '', false);
+
+            if (files.length > 0) {
+                if (!allImportedCleanly && lastSpecialOutcomeMessage) {
+                    setImportedUploadStatus(lastSpecialOutcomeMessage, false);
+                } else {
+                    setImportedUploadStatus('Completed upload processing for ' + files.length + ' file(s).', false);
+                }
+            }
             ev.target.value = '';
         });
 

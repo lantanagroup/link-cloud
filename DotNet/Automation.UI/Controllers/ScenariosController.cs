@@ -4,6 +4,7 @@ using Automation.UI.Services;
 using Hl7.Fhir.Model;
 using LantanaGroup.Automation;
 using LantanaGroup.Link.Automation.Link.Configuration;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
@@ -196,7 +197,9 @@ public class ScenariosController(
         if (request.File == null || request.File.Length == 0)
             return BadRequest("Bundle file is required.");
 
-        logger.LogInformation("Received imported bundle upload '{FileName}' ({LengthBytes} bytes).", request.File.FileName, request.File.Length);
+        var sanitizedFileName = request.File.FileName.SanitizeAndRemove();
+
+        logger.LogInformation("Received imported bundle upload '{FileName}' ({LengthBytes} bytes).", sanitizedFileName, request.File.Length);
 
         string json;
         using (var reader = new StreamReader(request.File.OpenReadStream(), Encoding.UTF8))
@@ -213,7 +216,7 @@ public class ScenariosController(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to parse uploaded bundle '{FileName}' as FHIR JSON.", request.File.FileName);
+            logger.LogWarning(ex, "Failed to parse uploaded bundle '{FileName}' as FHIR JSON.", sanitizedFileName);
             return BadRequest($"Bundle '{request.File.FileName}' could not be parsed as FHIR: {ex.Message}");
         }
 
@@ -667,11 +670,12 @@ public class ScenariosController(
         }
         catch (Exception ex)
         {
+            var sanitizedFileName = fileName.SanitizeAndRemove();
             logger.LogWarning(
                 ex,
                 "Failed checking if uploaded patient '{PatientId}' from file '{FileName}' exists on FHIR server.",
-                fileName,
-                patientId);
+                patientId,
+                sanitizedFileName);
 
             var warning =
                 $"Automation UI could not check whether patient '{patientId}' exists on the FHIR server. " +

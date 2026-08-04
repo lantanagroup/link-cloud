@@ -289,8 +289,9 @@ global:
     required: true
     consumers: ["Report", "Submission", "AutomationUI"]
   - key: "InternalBlobStorage:BlobRoot"
-    description: "Optional blob-path prefix used by services writing internal artifacts to Azure Blob Storage."
+    description: "Optional blob-path prefix used by services writing internal artifacts to Azure Blob Storage. Automation.UI imported bundles default to automation/imported-bundles when this is unset."
     required: false
+    defaultValue: "automation/imported-bundles"
     consumers: ["Report", "Submission", "AutomationUI"]
   - key: "ServiceRegistry:TenantService:TenantServiceUrl"
     description: "The base URL for the Tenant Service."
