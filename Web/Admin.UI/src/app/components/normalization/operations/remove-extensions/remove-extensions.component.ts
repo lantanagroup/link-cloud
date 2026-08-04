@@ -32,7 +32,7 @@ import {MatIcon} from "@angular/material/icon";
 import {MatCheckbox} from "@angular/material/checkbox";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
-import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {IVendor} from "../../../../interfaces/tenant/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 import {RemoveExtensionsOperation} from "../../../../interfaces/normalization/remove-extensions-operation-interface";
@@ -158,7 +158,7 @@ export class RemoveExtensionsComponent implements OnInit, OnDestroy, AfterViewIn
         if (this.formMode === FormMode.Edit && this.isVendorMode && Array.isArray(this.operation.vendorPresets)) {
           const matchedVendorIds: string[] = [];
           for (const preset of this.operation.vendorPresets) {
-            const vendorName = preset.vendorVersion?.vendor?.name;
+            const vendorName = preset.vendorVersion?.vendorName;
             if (vendorName) {
               const match = this.vendors.find(v => v.name === vendorName);
               if (match) matchedVendorIds.push(match.id);

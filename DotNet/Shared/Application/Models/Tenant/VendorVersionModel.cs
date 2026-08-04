@@ -16,6 +16,10 @@ namespace LantanaGroup.Link.Shared.Application.Models.Tenant
         public Guid? VendorId { get; set; }
 
         [DataMember]
+        [JsonPropertyName("vendorName")]
+        public string? VendorName { get; set; }
+
+        [DataMember]
         [JsonPropertyName("version")]
         [Required]
         public string? Version { get; set; }

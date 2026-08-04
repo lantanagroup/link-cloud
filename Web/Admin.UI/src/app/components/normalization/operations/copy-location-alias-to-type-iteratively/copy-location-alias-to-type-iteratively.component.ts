@@ -13,7 +13,7 @@ import {CopyLocationAliasToTypeIterativelyOperation} from "../../../../interface
 import {FormMode} from '../../../../models/FormMode.enum';
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
 import {ISaveOperationModel} from "../../../../interfaces/normalization/operation-save-model.interface";
-import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {IVendor} from "../../../../interfaces/tenant/vendor-interface";
 import {OperationService} from "../../../../services/gateway/normalization/operation.service";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
@@ -100,7 +100,7 @@ export class CopyLocationAliasToTypeIterativelyComponent implements OnInit, OnDe
           const matchedVendorIds: string[] = [];
 
           for (const preset of this.operation.vendorPresets) {
-            const vendorName = preset.vendorVersion?.vendor?.name;
+            const vendorName = preset.vendorVersion?.vendorName;
             if (vendorName) {
               const match = this.vendors.find(v => v.name === vendorName);
               if (match) {

@@ -13,7 +13,7 @@ import {
 } from "../../../interfaces/normalization/conditional-transformation-operation-interface";
 import {IOperationModel, IPagedOperationModel} from 'src/app/interfaces/normalization/operation-get-model.interface';
 import {CodeMapOperation} from 'src/app/interfaces/normalization/code-map-operation-interface';
-import {IVendor} from "../../../interfaces/normalization/vendor-interface";
+import {IVendor} from "../../../interfaces/tenant/vendor-interface";
 import {IOperationSequenceModel} from "../../../interfaces/normalization/operation-sequence-get-model.interface";
 import {IOperationSequenceSaveModel} from "../../../interfaces/normalization/operation-sequence-save-model.interface";
 import {IOperation} from "../../../interfaces/normalization/operation.interface";

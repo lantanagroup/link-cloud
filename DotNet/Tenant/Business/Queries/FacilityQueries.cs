@@ -119,10 +119,11 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                     FacilityName = f.FacilityName,
                     TimeZone = f.TimeZone,
                     IsDeleted = f.IsDeleted,
+                    VendorVersionId = f.VendorVersion!.Id,
                     Vendor = new VendorModel()
                     {
-                        Id = f.VendorVersion!.Vendor!.Id,
-                        Name = f.VendorVersion!.Vendor!.Name
+                        Id = f.VendorVersion.Vendor!.Id,
+                        Name = f.VendorVersion.Vendor.Name
                     },  
                     ScheduledReports = new TenantScheduledReportConfig
                     {

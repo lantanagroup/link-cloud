@@ -10,10 +10,12 @@ using LantanaGroup.Link.Tenant.Business.Queries;
 using LantanaGroup.Link.Tenant.Controllers;
 using LantanaGroup.Link.Tenant.Data.Entities;
 using LantanaGroup.Link.Tenant.Entities;
+using LantanaGroup.Link.Tenant.Repository.Context;
 using LantanaGroup.Link.Tenant.Models;
 using LantanaGroup.Link.Tenant.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -33,6 +35,7 @@ public class FacilityControllerTests : IDisposable
     private readonly TenantIntegrationTestFixture _fixture;
     private readonly IServiceScope _scope;
     private readonly FacilityController _controller;
+    private readonly TenantDbContext _dbContext;
 
     public FacilityControllerTests(TenantIntegrationTestFixture fixture, ITestOutputHelper output)
     {
@@ -43,6 +46,7 @@ public class FacilityControllerTests : IDisposable
         // tests pass under DI scope validation (enabled when DOTNET_ENVIRONMENT=Development).
         _scope = fixture.ServiceProvider.CreateScope();
         var sp = _scope.ServiceProvider;
+        _dbContext = sp.GetRequiredService<TenantDbContext>();
 
         var logger = sp.GetRequiredService<ILogger<FacilityController>>();
         var scheduleService = sp.GetRequiredService<ScheduleService>();
@@ -75,6 +79,27 @@ public class FacilityControllerTests : IDisposable
     }
 
     public void Dispose() => _scope.Dispose();
+
+    private async Task<VendorVersion> CreateVendorVersionAsync()
+    {
+        var vendor = new Vendor
+        {
+            Id = Guid.NewGuid(),
+            Name = $"Vendor-{Guid.NewGuid():N}"
+        };
+        var vendorVersion = new VendorVersion
+        {
+            Id = Guid.NewGuid(),
+            VendorId = vendor.Id,
+            Version = "test"
+        };
+
+        await _dbContext.Vendors.AddAsync(vendor);
+        await _dbContext.VendorVersions.AddAsync(vendorVersion);
+        await _dbContext.SaveChangesAsync();
+
+        return vendorVersion;
+    }
 
     [Fact]
     public async Task GetFacilities_Success()
@@ -121,6 +146,7 @@ public class FacilityControllerTests : IDisposable
     {
         var facilityId = Guid.NewGuid().ToString();
         var facilityName = $"Store Test {facilityId}";
+        var vendorVersion = await CreateVendorVersionAsync();
         var facilityConfig = new FacilityModel
         {
             FacilityId = facilityId,
@@ -128,14 +154,20 @@ public class FacilityControllerTests : IDisposable
             TimeZone = "America/Chicago",
             Vendor = new VendorModel
             {
-                Id = Guid.NewGuid(),
-                Name = "Test Vendor"
+                Id = vendorVersion.VendorId,
+                Name = vendorVersion.Vendor!.Name
             },
+            VendorVersionId = vendorVersion.Id,
             ScheduledReports = new TenantScheduledReportConfig { Daily = new string[] { }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
 
         var result = await _controller.StoreFacility(facilityConfig, CancellationToken.None);
-        Assert.IsType<CreatedResult>(result);
+        var createdResult = Assert.IsType<CreatedResult>(result);
+        var createdFacility = Assert.IsType<FacilityModel>(createdResult.Value);
+        var storedFacility = await _dbContext.Facilities.AsNoTracking().SingleAsync(facility => facility.FacilityId == facilityId);
+
+        Assert.Equal(vendorVersion.Id, storedFacility.VendorVersionId);
+        Assert.Equal(vendorVersion.Id, createdFacility.VendorVersionId);
     }
 
     [Fact]
@@ -143,6 +175,7 @@ public class FacilityControllerTests : IDisposable
     {
         var facilityId = Guid.NewGuid().ToString();
         var facilityName = $"Put Test {facilityId}";
+        var vendorVersion = await CreateVendorVersionAsync();
         var facility = new Facility
         {
             FacilityId = facilityId,
@@ -159,9 +192,10 @@ public class FacilityControllerTests : IDisposable
             TimeZone = "America/New_York",
             Vendor = new VendorModel
             {
-                Id = Guid.NewGuid(),
-                Name = "Test Vendor"
+                Id = vendorVersion.VendorId,
+                Name = vendorVersion.Vendor!.Name
             },
+            VendorVersionId = vendorVersion.Id,
             ScheduledReports = new TenantScheduledReportConfig { Daily = new string[] { "NewReport" }, Weekly = new string[] { }, Monthly = new string[] { } }
         };
 
@@ -169,7 +203,11 @@ public class FacilityControllerTests : IDisposable
         var actionResult = result.Result as IActionResult;
         var objectResult = Assert.IsType<OkObjectResult>(actionResult);
         Assert.Equal(200, objectResult.StatusCode);
-        Assert.IsType<FacilityModel>(objectResult.Value);
+        var updatedFacility = Assert.IsType<FacilityModel>(objectResult.Value);
+        var storedFacility = await _dbContext.Facilities.AsNoTracking().SingleAsync(facility => facility.FacilityId == facilityId);
+
+        Assert.Equal(vendorVersion.Id, storedFacility.VendorVersionId);
+        Assert.Equal(vendorVersion.Id, updatedFacility.VendorVersionId);
     }
 
     [Fact]

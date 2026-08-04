@@ -52,6 +52,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                 {
                     Id = vv.Id,
                     VendorId = vv.VendorId,
+                    VendorName = vv.Vendor!.Name,
                     Version = vv.Version,
                 })
                 .FirstOrDefaultAsync();
@@ -64,6 +65,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                 {
                     Id = vv.Id,
                     VendorId = vv.VendorId,
+                    VendorName = vv.Vendor!.Name,
                     Version = vv.Version,
                 })
                 .ToListAsync();
@@ -77,6 +79,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                 {
                     Id = vv.Id,
                     VendorId = vv.VendorId,
+                    VendorName = vv.Vendor!.Name,
                     Version = vv.Version,
                 })
                 .ToListAsync();

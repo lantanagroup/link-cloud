@@ -32,7 +32,7 @@ import {
 } from "../../../../interfaces/normalization/conditional-transformation-operation-interface";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {MatTooltip} from "@angular/material/tooltip";
-import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {IVendor} from "../../../../interfaces/tenant/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatCheckbox} from "@angular/material/checkbox";
 import {
@@ -166,7 +166,7 @@ export class ConditionalTransformationComponent implements OnInit, OnDestroy, Af
             const matchedVendorIds: string[] = [];
 
             for (const preset of this.operation.vendorPresets) {
-              const vendorName = preset.vendorVersion?.vendor?.name;
+              const vendorName = preset.vendorVersion?.vendorName;
 
               if (vendorName) {
                 const match = this.vendors.find(v => v.name === vendorName);

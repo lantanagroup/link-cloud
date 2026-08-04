@@ -36,7 +36,7 @@ import {MatCard, MatCardContent, MatCardHeader} from "@angular/material/card";
 
 import {MatOption, MatSelect} from "@angular/material/select";
 import {AtLeastOneConditionValidator} from "../validators/AtLeastOneConditionValidator";
-import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {IVendor} from "../../../../interfaces/tenant/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatCheckbox} from "@angular/material/checkbox";
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
@@ -163,7 +163,7 @@ export class CodeMapComponent implements OnInit, OnDestroy, AfterViewInit {
             const matchedVendorIds: string[] = [];
 
             for (const preset of this.operation.vendorPresets) {
-              const vendorName = preset.vendorVersion?.vendor?.name;
+              const vendorName = preset.vendorVersion?.vendorName;
 
               if (vendorName) {
                 const match = this.vendors.find(v => v.name === vendorName);

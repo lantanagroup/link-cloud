@@ -27,6 +27,9 @@ namespace LantanaGroup.Link.Shared.Application.Models.Tenant
         [JsonPropertyName("vendor")]
         public VendorModel? Vendor { get; set; }
 
+        [JsonPropertyName("vendorVersionId")]
+        public Guid? VendorVersionId { get; set; }
+
         [JsonPropertyName("scheduledReports")]
         public TenantScheduledReportConfig ScheduledReports { get; set; } = new TenantScheduledReportConfig();
 

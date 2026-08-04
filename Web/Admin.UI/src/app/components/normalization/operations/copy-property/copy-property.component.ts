@@ -27,7 +27,7 @@ import {MatCheckbox} from "@angular/material/checkbox";
 import {CopyPropertyOperation} from "../../../../interfaces/normalization/copy-property-interface";
 import {OperationType} from "../../../../interfaces/normalization/operation-type-enumeration";
 import {IOperationModel} from "../../../../interfaces/normalization/operation-get-model.interface";
-import {IVendor} from "../../../../interfaces/normalization/vendor-interface";
+import {IVendor} from "../../../../interfaces/tenant/vendor-interface";
 import {facilityOrVendorRequiredValidator} from "../validators/facilityOrVendorRequiredValidator";
 import {MatAutocomplete, MatAutocompleteTrigger} from "@angular/material/autocomplete";
 
@@ -142,7 +142,7 @@ export class CopyPropertyComponent implements OnInit, OnDestroy, AfterViewInit {
             const matchedVendorIds: string[] = [];
 
             for (const preset of this.operation.vendorPresets) {
-              const vendorName = preset.vendorVersion?.vendor?.name;
+              const vendorName = preset.vendorVersion?.vendorName;
 
               if (vendorName) {
                 const match = this.vendors.find(v => v.name === vendorName);
