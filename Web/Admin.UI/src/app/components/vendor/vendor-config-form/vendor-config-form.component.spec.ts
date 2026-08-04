@@ -137,4 +137,20 @@ describe('VendorConfigFormComponent', () => {
     expect(vendorService.createVendor).toHaveBeenCalledWith('Veradigm');
     expect(vendorService.updateVendor).not.toHaveBeenCalled();
   });
+
+  it('emits failure without falling through to an update when the create fails', () => {
+    vendorService.createVendor.and.returnValue(throwError(() => new Error('boom')));
+    initWith(undefined, FormMode.Create);
+
+    const outcomes: { success: boolean; message: string }[] = [];
+    component.submittedConfiguration.subscribe(o => outcomes.push(o));
+
+    component.name.setValue('Veradigm');
+    component.submitConfiguration();
+
+    expect(outcomes.length).toBe(1);
+    expect(outcomes[0].success).toBeFalse();
+    expect(outcomes[0].message).toBe('boom');
+    expect(vendorService.updateVendor).not.toHaveBeenCalled();
+  });
 });
