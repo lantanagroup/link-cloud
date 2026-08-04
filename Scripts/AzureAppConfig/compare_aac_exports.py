@@ -52,6 +52,27 @@ def extract_key_vault_uri(value: str) -> str:
         return ''
 
 
+def diff_tags(left: Any, right: Any) -> List[str]:
+    """Describe how two tag dictionaries differ.
+
+    Tags carry no runtime meaning - neither provider selects on them - so they are safe to
+    write, but that also means a tagging pass is invisible unless something compares them.
+    """
+    left = left or {}
+    right = right or {}
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return []
+    changes = []
+    for name in sorted(set(left) | set(right)):
+        if name not in left:
+            changes.append(f"+ {name}={right[name]!r}")
+        elif name not in right:
+            changes.append(f"- {name}={left[name]!r}")
+        elif left[name] != right[name]:
+            changes.append(f"~ {name}: {left[name]!r} --> {right[name]!r}")
+    return changes
+
+
 def normalize_value(value: Any) -> Any:
     """Normalize values for comparison - convert booleans to strings to match Azure App Config behavior."""
     if isinstance(value, bool):
@@ -112,6 +133,7 @@ def compare_configs(left_items: Dict, right_items: Dict) -> Dict[str, List]:
         'newly_created': [],
         'deleted': [],
         'changed': [],
+        'tags_changed': [],
         'unchanged': []
     }
 
@@ -135,14 +157,22 @@ def compare_configs(left_items: Dict, right_items: Dict) -> Dict[str, List]:
         right_value = right_item['value']
         left_content_type = left_item.get('content_type', '')
 
+        # Tags were captured but never compared, so a run that only changed tags looked
+        # identical. Verifying a tagging pass needs this: the expected result is tag changes
+        # and nothing else.
+        tag_changes = diff_tags(left_item.get('tags'), right_item.get('tags'))
+
         # Check if it's a feature flag
         is_feature_flag = ('application/vnd.microsoft.appconfig.ff+json;charset=utf-8' in left_content_type or
                            'application/json' in left_content_type)
 
         if is_feature_flag:
             is_same, differences = deep_compare_feature_flag(left_value, right_value)
-            if is_same:
+            if is_same and not tag_changes:
                 results['unchanged'].append(composite_key)
+            elif is_same:
+                results['tags_changed'].append({
+                    'key': key, 'label': label, 'tag_changes': tag_changes})
             else:
                 results['changed'].append({
                     'key': key,
@@ -164,8 +194,11 @@ def compare_configs(left_items: Dict, right_items: Dict) -> Dict[str, List]:
                 # Not JSON, compare as strings
                 pass
 
-            if normalized_left == normalized_right:
+            if normalized_left == normalized_right and not tag_changes:
                 results['unchanged'].append(composite_key)
+            elif normalized_left == normalized_right:
+                results['tags_changed'].append({
+                    'key': key, 'label': label, 'tag_changes': tag_changes})
             else:
                 # Check if both values are Key Vault references
                 if is_key_vault_reference(left_value) and is_key_vault_reference(right_value):
@@ -202,7 +235,7 @@ def print_results(results: Dict[str, List]):
             label_str = f" [Label: {label}]" if label else " [No Label]"
             print(f"  + {key}{label_str}")
     else:
-        print(f"\n🆕 NEWLY CREATED KEYS: 0")
+        print("\n🆕 NEWLY CREATED KEYS: 0")
 
     # Deleted keys
     if results['deleted']:
@@ -213,7 +246,7 @@ def print_results(results: Dict[str, List]):
             label_str = f" [Label: {label}]" if label else " [No Label]"
             print(f"  - {key}{label_str}")
     else:
-        print(f"\n🗑️  DELETED KEYS: 0")
+        print("\n🗑️  DELETED KEYS: 0")
 
     # Changed keys
     if results['changed']:
@@ -235,7 +268,19 @@ def print_results(results: Dict[str, List]):
                 # Regular value differences
                 print(f"  {item['left_value']} --> {item['right_value']}")
     else:
-        print(f"\n🔄 CHANGED KEYS: 0")
+        print("\n🔄 CHANGED KEYS: 0")
+
+    # Tag-only changes
+    if results['tags_changed']:
+        print(f"\nTAG CHANGES ONLY: {len(results['tags_changed'])}")
+        print("-" * 80)
+        for item in results['tags_changed']:
+            label_str = f" [Label: {item['label']}]" if item['label'] else " [No Label]"
+            print(f"\n  Key: {item['key']}{label_str}")
+            for change in item['tag_changes']:
+                print(f"    {change}")
+    else:
+        print("\nTAG CHANGES ONLY: 0")
 
     # Unchanged keys
     if results['unchanged']:
@@ -246,7 +291,7 @@ def print_results(results: Dict[str, List]):
             label_str = f" [Label: {label}]" if label else " [No Label]"
             print(f"  = {key}{label_str}")
     else:
-        print(f"\n✅ UNCHANGED KEYS: 0")
+        print("\n✅ UNCHANGED KEYS: 0")
 
     print("\n" + "=" * 80)
     print("SUMMARY")
@@ -254,12 +299,17 @@ def print_results(results: Dict[str, List]):
     print(f"  Newly Created: {len(results['newly_created'])}")
     print(f"  Deleted:       {len(results['deleted'])}")
     print(f"  Changed:       {len(results['changed'])}")
+    print(f"  Tags only:     {len(results['tags_changed'])}")
     print(f"  Unchanged:     {len(results['unchanged'])}")
     print("=" * 80 + "\n")
 
 
 def main():
     """Main function to compare Azure App Config exports."""
+    # The report uses emoji section markers, which a Windows console running cp1252 cannot
+    # encode - the script died with UnicodeEncodeError before printing any results.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(
         description='Compare two Azure App Config JSON exports and identify differences.'
     )
