@@ -61,14 +61,28 @@ export class VendorConfigFormComponent {
 
   vendorForm!: FormGroup;
 
+  /**
+   * Whether the JWT / Authentication panel starts open. Expanded when the vendor already has a
+   * secret id so existing configuration is visible without hunting for it, collapsed otherwise
+   * so the common case stays uncluttered.
+   */
+  keySettingsExpanded = false;
+
   constructor(private snackBar: MatSnackBar, private vendorService: VendorService, private dialog: MatDialog, private fb: FormBuilder) {
     this.vendorForm = this.fb.group({
-      name: ["", Validators.required]
+      name: ["", Validators.required],
+      // No validator: the secret id is optional, and checking that it resolves in Key Vault is
+      // LEGLINK-566. A format rule here would reject ids this UI has no way to verify.
+      secretId: [""]
     });
   }
 
   get name() {
     return this.vendorForm.controls['name'];
+  }
+
+  get secretId() {
+    return this.vendorForm.controls['secretId'];
   }
 
   ngOnInit(): void {
@@ -77,6 +91,8 @@ export class VendorConfigFormComponent {
     if (this.item) {
       //set form values
       this.name.setValue(this.item.name);
+      this.secretId.setValue(this.item.secretId ?? "");
+      this.keySettingsExpanded = !!this.item.secretId;
     }
 
     this.vendorForm.valueChanges.subscribe(() => {
@@ -85,18 +101,49 @@ export class VendorConfigFormComponent {
   }
 
   submitConfiguration(): void {
-    if (this.vendorForm.status == 'VALID') {
-      if (this.formMode == FormMode.Create) {
-        this.vendorService.createVendor(this.name.value).subscribe({
-          next: (response) => {
-            if (response) {
-              this.submittedConfiguration.emit({success: true, message: ""});
-            }
-          },
-          error: (err) => {
-          }
-        });
-      }
+    if (this.vendorForm.status != 'VALID') {
+      return;
     }
+
+    if (this.formMode == FormMode.Create) {
+      this.vendorService.createVendor(this.name.value).subscribe({
+        next: (response) => {
+          if (response) {
+            this.submittedConfiguration.emit({success: true, message: ""});
+          }
+        },
+        error: (err) => {
+          this.submittedConfiguration.emit({success: false, message: this.failureMessage(err)});
+        }
+      });
+      return;
+    }
+
+    // An empty box means "no key associated", sent as an explicit null rather than undefined:
+    // JSON.stringify omits undefined keys, and an absent field reads as "leave unchanged" to
+    // any endpoint with partial-update semantics, which would make clearing a key silently
+    // do nothing. Null says remove it.
+    const updated: IVendorConfigModel = {
+      ...this.item,
+      name: this.name.value,
+      secretId: this.secretId.value?.trim() || null
+    };
+
+    this.vendorService.updateVendor(updated).subscribe({
+      next: () => {
+        this.submittedConfiguration.emit({success: true, message: ""});
+      },
+      error: (err) => {
+        this.submittedConfiguration.emit({success: false, message: this.failureMessage(err)});
+      }
+    });
+  }
+
+  /**
+   * ErrorHandlingService already surfaces the detail; this is the text the dialog shows in its
+   * snackbar while staying open so the admin's input is not thrown away.
+   */
+  private failureMessage(err: any): string {
+    return err?.message ?? 'Failed to save the vendor configuration. Please try again.';
   }
 }
