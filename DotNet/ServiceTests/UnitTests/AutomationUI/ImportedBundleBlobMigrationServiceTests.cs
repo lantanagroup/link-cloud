@@ -30,7 +30,7 @@ public class ImportedBundleBlobMigrationServiceTests
 
         bundlesMock
             .Setup(b => b.UpdateOneAsync(
-                It.IsAny<Expression<Func<ImportedBundleDocument, bool>>>(),
+                It.IsAny<FilterDefinition<ImportedBundleDocument>>(),
                 It.IsAny<UpdateDefinition<ImportedBundleDocument>>(),
                 It.IsAny<UpdateOptions>(),
                 It.IsAny<CancellationToken>()))
@@ -44,7 +44,7 @@ public class ImportedBundleBlobMigrationServiceTests
         Assert.Empty(failedIds);
         contentStoreMock.Verify(s => s.StoreAsync(doc.Id, It.IsAny<string>(), doc.BundleJson!, It.IsAny<CancellationToken>()), Times.Once);
         bundlesMock.Verify(b => b.UpdateOneAsync(
-            It.IsAny<Expression<Func<ImportedBundleDocument, bool>>>(),
+            It.IsAny<FilterDefinition<ImportedBundleDocument>>(),
             It.IsAny<UpdateDefinition<ImportedBundleDocument>>(),
             It.IsAny<UpdateOptions>(),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -81,7 +81,7 @@ public class ImportedBundleBlobMigrationServiceTests
 
         bundlesMock
             .Setup(b => b.UpdateOneAsync(
-                It.IsAny<Expression<Func<ImportedBundleDocument, bool>>>(),
+                It.IsAny<FilterDefinition<ImportedBundleDocument>>(),
                 It.IsAny<UpdateDefinition<ImportedBundleDocument>>(),
                 It.IsAny<UpdateOptions>(),
                 It.IsAny<CancellationToken>()))
@@ -95,7 +95,7 @@ public class ImportedBundleBlobMigrationServiceTests
         Assert.Contains(failedDoc.Id, failedIds);
         Assert.DoesNotContain(successDoc.Id, failedIds);
         bundlesMock.Verify(b => b.UpdateOneAsync(
-            It.IsAny<Expression<Func<ImportedBundleDocument, bool>>>(),
+            It.IsAny<FilterDefinition<ImportedBundleDocument>>(),
             It.IsAny<UpdateDefinition<ImportedBundleDocument>>(),
             It.IsAny<UpdateOptions>(),
             It.IsAny<CancellationToken>()), Times.Once);
@@ -120,7 +120,7 @@ public class ImportedBundleBlobMigrationServiceTests
         Assert.Contains(docA.Id, failedIds);
         Assert.Contains(docB.Id, failedIds);
         bundlesMock.Verify(b => b.UpdateOneAsync(
-            It.IsAny<Expression<Func<ImportedBundleDocument, bool>>>(),
+            It.IsAny<FilterDefinition<ImportedBundleDocument>>(),
             It.IsAny<UpdateDefinition<ImportedBundleDocument>>(),
             It.IsAny<UpdateOptions>(),
             It.IsAny<CancellationToken>()), Times.Never);
