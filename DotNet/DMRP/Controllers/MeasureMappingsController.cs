@@ -99,7 +99,9 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             try
             {
-                created = await _manager.CreateAsync(new MeasureMapping(), cancellationToken);
+                var entity = new MeasureMapping();
+                // TODO: Map `request` to `entity`
+                created = await _manager.CreateAsync(entity, cancellationToken);
             }
             catch (ApplicationException ex)
             {
@@ -112,6 +114,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             }
 
             var model = new MeasureMappingModel { Id = created.Id };
+            // TODO: Map `created` to `model`
 
             return Created($"/api/dmrp/measure-mappings/{model.Id}", model);
         }

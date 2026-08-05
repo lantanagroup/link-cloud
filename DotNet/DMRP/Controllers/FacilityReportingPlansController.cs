@@ -99,7 +99,9 @@ namespace LantanaGroup.Link.DMRP.Controllers
 
             try
             {
-                created = await _manager.CreateAsync(new FacilityReportingPlan(), cancellationToken);
+                var entity = new FacilityReportingPlan();
+                // TODO: Map `request` to `entity`
+                created = await _manager.CreateAsync(entity, cancellationToken);
             }
             catch (ApplicationException ex)
             {
@@ -112,6 +114,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             }
 
             var model = new FacilityReportingPlanModel { Id = created.Id };
+            // TODO: Map `created` to `model`
 
             return Created($"/api/dmrp/facility-reporting-plans/{model.Id}", model);
         }
