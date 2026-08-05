@@ -33,6 +33,10 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                 await _repository.AddAsync(newFacilityReportingPlan, cancellationToken);
                 await _repository.SaveChangesAsync(cancellationToken);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
@@ -61,6 +65,10 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
                 _repository.Update(existing);
                 await _repository.SaveChangesAsync(cancellationToken);
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 Activity.Current?.SetStatus(ActivityStatusCode.Error);
@@ -84,6 +92,10 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             {
                 _repository.Remove(existing);
                 await _repository.SaveChangesAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
