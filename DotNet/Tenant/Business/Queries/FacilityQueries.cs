@@ -123,8 +123,9 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                     Vendor = new VendorModel()
                     {
                         Id = f.VendorVersion.Vendor!.Id,
-                        Name = f.VendorVersion.Vendor.Name
-                    },  
+                        Name = f.VendorVersion.Vendor.Name,
+                        Authentication = f.VendorVersion.Vendor.Authentication
+                    },
                     ScheduledReports = new TenantScheduledReportConfig
                     {
                         Daily = f.ScheduledReports.Daily,
