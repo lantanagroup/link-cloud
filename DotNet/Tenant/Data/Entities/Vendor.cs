@@ -1,3 +1,4 @@
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -14,6 +15,8 @@ public partial class Vendor
     [StringLength(255)]
     [Unicode(false)]
     public string Name { get; set; } = "";
+
+    public VendorAuthenticationSettings? Authentication { get; set; }
 
     [InverseProperty("Vendor")]
     public virtual ICollection<VendorVersion> VendorVersions { get; set; } = new List<VendorVersion>();
