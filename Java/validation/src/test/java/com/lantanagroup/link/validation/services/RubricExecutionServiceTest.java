@@ -9,6 +9,7 @@ import com.lantanagroup.link.validation.entities.RubricResult;
 import com.lantanagroup.link.validation.entities.RubricVersion;
 import com.lantanagroup.link.validation.enums.CheckType;
 import com.lantanagroup.link.validation.enums.PiqiDimension;
+import com.lantanagroup.link.validation.enums.RubricResultStatus;
 import com.lantanagroup.link.validation.enums.Severity;
 import com.lantanagroup.link.validation.models.EvaluateRequestDto;
 import com.lantanagroup.link.validation.models.ExecutionContext;
@@ -16,6 +17,7 @@ import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.repositories.RubricCheckRepository;
+import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
 import com.lantanagroup.link.validation.services.execution.CheckExecutor;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +42,7 @@ class RubricExecutionServiceTest {
 
     private final RubricVersionResolver resolver = mock(RubricVersionResolver.class);
     private final RubricCheckRepository checkRepository = mock(RubricCheckRepository.class);
+    private final RubricVersionRepository versionRepository = mock(RubricVersionRepository.class);
     private final CheckExecutorRegistry registry = mock(CheckExecutorRegistry.class);
     private final ResultEnvelopeAssembler assembler = mock(ResultEnvelopeAssembler.class);
     private final RubricResultPersister resultPersister = mock(RubricResultPersister.class);
@@ -47,7 +50,7 @@ class RubricExecutionServiceTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final RubricExecutionService service = new RubricExecutionService(
-            resolver, checkRepository, registry, assembler,
+            resolver, checkRepository, versionRepository, registry, assembler,
             resultPersister, fhirContext, objectMapper);
 
     private final UUID versionId = UUID.randomUUID();
@@ -74,7 +77,10 @@ class RubricExecutionServiceTest {
 
     private ResultEnvelopeAssembler.AssembleOutput stubAssembler() {
         ValidationResultEnvelope envelope = ValidationResultEnvelope.builder().requestId(UUID.randomUUID()).build();
-        RubricResult resultEntity = RubricResult.builder().resultId(UUID.randomUUID()).build();
+        RubricResult resultEntity = RubricResult.builder()
+                .resultId(UUID.randomUUID())
+                .status(RubricResultStatus.ACCEPTABLE_WITH_WARNINGS)
+                .build();
         List<RubricFinding> findingEntities = List.of(RubricFinding.builder().findingId(UUID.randomUUID()).build());
         ResultEnvelopeAssembler.AssembleOutput out =
                 new ResultEnvelopeAssembler.AssembleOutput(envelope, resultEntity, findingEntities);
@@ -100,10 +106,12 @@ class RubricExecutionServiceTest {
 
         assertThat(result).isSameAs(out.envelope());
         verify(resultPersister).persist(out.resultEntity(), out.findingEntities());
+        // a real evaluation must not masquerade as a dry run on the version
+        verify(versionRepository, never()).recordDryRun(any(), any(), any());
     }
 
     @Test
-    @DisplayName("evaluate(persist=false) is a dry run: nothing is persisted")
+    @DisplayName("evaluate(persist=false) is a dry run: no result row, but the outcome is recorded on the version")
     void dryRunDoesNotPersist() throws Exception {
         when(resolver.resolve("piqi.core", "1.0.0", false)).thenReturn(version);
         when(checkRepository.findByRubricVersionIdOrderByOrdinalAsc(versionId)).thenReturn(List.of());
@@ -112,6 +120,8 @@ class RubricExecutionServiceTest {
         service.evaluate("piqi.core", "1.0.0", request(), false);
 
         verify(resultPersister, never()).persist(any(), any());
+        verify(versionRepository).recordDryRun(
+                eq(versionId), eq(RubricResultStatus.ACCEPTABLE_WITH_WARNINGS), any(OffsetDateTime.class));
     }
 
     @Test

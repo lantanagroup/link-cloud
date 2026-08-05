@@ -12,6 +12,7 @@ import com.lantanagroup.link.validation.models.RawFinding;
 import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.repositories.RubricCheckRepository;
+import com.lantanagroup.link.validation.repositories.RubricVersionRepository;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
 import com.lantanagroup.link.validation.enums.Severity;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class RubricExecutionService {
 
     private final RubricVersionResolver versionResolver;
     private final RubricCheckRepository rubricCheckRepository;
+    private final RubricVersionRepository rubricVersionRepository;
     private final CheckExecutorRegistry executorRegistry;
     private final ResultEnvelopeAssembler envelopeAssembler;
     private final RubricResultPersister resultPersister;
@@ -103,6 +105,13 @@ public class RubricExecutionService {
 
         if (persist) {
             resultPersister.persist(out.resultEntity(), out.findingEntities());
+        } else {
+            // Dry run: no result row, but record the outcome on the version so the
+            // dry-run publish gate (link.rubric.dry-run.required-for-publish) can read it.
+            rubricVersionRepository.recordDryRun(
+                    version.getRubricVersionId(), out.resultEntity().getStatus(), completedAt);
+            log.info("Recorded dry run for rubric {} v{}: {}",
+                    version.getRubricId(), version.getSemver(), out.resultEntity().getStatus());
         }
         return out.envelope();
     }

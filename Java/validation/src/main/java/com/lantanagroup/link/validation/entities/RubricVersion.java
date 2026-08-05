@@ -72,7 +72,7 @@ public class RubricVersion {
     @Column(name = "retired_by", length = 128)
     private String retiredBy;
 
-    // Dry-run gate: written by the (future) dry-run recording feature, read at publish time
+    // Dry-run gate: written when a $dry-run completes for this version, read at publish time
     // when link.rubric.dry-run.required-for-publish is enabled. Null = no dry run completed.
     @Column(name = "dry_run_completed_at")
     private OffsetDateTime dryRunCompletedAt;
