@@ -219,9 +219,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return BadRequest();
             }
 
-            if (newFacility.Vendor == null)
+            if (newFacility.VendorVersionId == null)
             {
-                return BadRequest("Vendor must be provided.");
+                return BadRequest("Vendor version must be provided.");
             }
 
             try
@@ -324,9 +324,9 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return NotFound();
             }
 
-            if (facilityConfig.Vendor == null)
+            if (facilityConfig.VendorVersionId == null)
             {
-                return BadRequest("Vendor must be provided.");
+                return BadRequest("Vendor version must be provided.");
             }
 
             var oldFacility = _mapperDtoToModel.Map<FacilityModel, Facility>(existingModel);
