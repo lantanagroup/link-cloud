@@ -12,12 +12,12 @@ namespace Automation.UI.Services.Persistence;
 ///
 /// <para>
 /// Imported FHIR transaction bundles attached to a scenario are <b>not</b> embedded in
-/// the scenario document &mdash; they are persisted to a sibling
-/// <c>automation_imported_bundles</c> collection and referenced by id via
-/// <see cref="TestScenarioDocument.ImportedBundleRefs"/>. This avoids breaching
-/// MongoDB's 16&#8239;MB document limit when a scenario carries several large bundles
-/// while keeping reads transparent to callers (the bundle JSON is hydrated back into
-/// each <see cref="ImportedPatientInput.BundleJson"/> on load).
+/// the scenario document. Metadata is persisted to the sibling
+/// <c>automation_imported_bundles</c> collection, content is externalized to Azure Blob
+/// Storage, and scenarios reference bundle ids via
+/// <see cref="TestScenarioDocument.ImportedBundleRefs"/>. This avoids Mongo/Cosmos document
+/// size limits while keeping reads transparent to callers (bundle JSON is hydrated back
+/// into each <see cref="ImportedPatientInput.BundleJson"/> on load).
 /// </para>
 ///
 /// <para>
@@ -31,10 +31,12 @@ namespace Automation.UI.Services.Persistence;
 /// </para>
 ///
 /// <para>
-/// <b>Back-compat.</b> Two legacy on-disk shapes are accepted on read:
+/// <b>Back-compat.</b> Legacy on-disk shapes are accepted on read:
 /// <list type="number">
 ///   <item>Pre-externalization: bundle JSON embedded inline in
 ///         <see cref="TestScenarioDocument.ImportedPatientBundlesJson"/> with no refs.</item>
+///   <item>Mongo-payload era: bundle JSON stored directly on <see cref="ImportedBundleDocument.BundleJson"/>.
+///         Startup migration pushes payloads to ABS and clears the Mongo field.</item>
 ///   <item>First externalization (single-owner): one bundle row per scenario keyed by a
 ///         singular <c>ScenarioId</c> field. <see cref="MongoIndexManager"/> ignores extra
 ///         elements via <see cref="MongoDB.Bson.Serialization.Attributes.BsonIgnoreExtraElementsAttribute"/>,
@@ -54,16 +56,18 @@ public sealed class MongoScenarioStore : IScenarioStore
 
     private readonly IMongoCollection<TestScenarioDocument> _scenarios;
     private readonly IMongoCollection<ImportedBundleDocument> _bundles;
+    private readonly IImportedBundleContentStore _bundleContentStore;
 
     static MongoScenarioStore()
     {
         CohortJsonOptions.Converters.Add(new JsonStringEnumConverter());
     }
 
-    public MongoScenarioStore(IMongoDatabase database)
+    public MongoScenarioStore(IMongoDatabase database, IImportedBundleContentStore bundleContentStore)
     {
         _scenarios = database.GetCollection<TestScenarioDocument>("automation_scenarios");
         _bundles = database.GetCollection<ImportedBundleDocument>("automation_imported_bundles");
+        _bundleContentStore = bundleContentStore;
     }
 
     public async Task<List<TestScenarioDefinition>> GetAllAsync(CancellationToken ct = default)
@@ -165,7 +169,6 @@ public sealed class MongoScenarioStore : IScenarioStore
             var update = Builders<ImportedBundleDocument>.Update
                 .SetOnInsert(b => b.Id, Guid.NewGuid())
                 .SetOnInsert(b => b.ContentHash, hash)
-                .SetOnInsert(b => b.BundleJson, input.BundleJson!)
                 .SetOnInsert(b => b.ByteCount, byteCount)
                 .SetOnInsert(b => b.CreatedAt, now)
                 .SetOnInsert(b => b.IsLibraryEntry, false)
@@ -182,6 +185,16 @@ public sealed class MongoScenarioStore : IScenarioStore
 
             var bundleDoc = await _bundles.FindOneAndUpdateAsync<ImportedBundleDocument>(
                 b => b.ContentHash == hash, update, options, ct);
+
+            var stored = await _bundleContentStore.StoreAsync(bundleDoc.Id, bundleDoc.ContentHash, input.BundleJson!, ct);
+            await _bundles.UpdateOneAsync(
+                b => b.Id == bundleDoc.Id,
+                Builders<ImportedBundleDocument>.Update
+                    .Set(b => b.BundleBlobName, stored.BlobName)
+                    .Set(b => b.ByteCount, stored.ByteCount)
+                    .Set(b => b.BundleJson, null)
+                    .Set(b => b.UpdatedAt, now),
+                cancellationToken: ct);
 
             refs.Add(new ImportedBundleReference
             {
@@ -200,26 +213,53 @@ public sealed class MongoScenarioStore : IScenarioStore
         DateTimeOffset now,
         CancellationToken ct)
     {
+        var bundleDoc = await TryAttachBundleByIdAsync(bundleId, input, scenarioId, now, ct);
+        if (bundleDoc != null)
+        {
+            return new ImportedBundleReference
+            {
+                BundleId = bundleDoc.Id,
+                PatientId = string.IsNullOrWhiteSpace(input.PatientId) ? bundleDoc.PatientId : input.PatientId
+            };
+        }
+
+        var redirect = await _bundles.Find(b => b.Id == bundleId).FirstOrDefaultAsync(ct);
+        if (redirect?.CanonicalBundleId is Guid canonicalBundleId)
+        {
+            bundleDoc = await TryAttachBundleByIdAsync(canonicalBundleId, input, scenarioId, now, ct);
+            if (bundleDoc != null)
+            {
+                return new ImportedBundleReference
+                {
+                    BundleId = bundleDoc.Id,
+                    PatientId = string.IsNullOrWhiteSpace(input.PatientId) ? bundleDoc.PatientId : input.PatientId
+                };
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<ImportedBundleDocument?> TryAttachBundleByIdAsync(
+        Guid bundleId,
+        ImportedPatientInput input,
+        Guid scenarioId,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
         var update = Builders<ImportedBundleDocument>.Update
             .Set(b => b.UpdatedAt, now)
             .Set(b => b.PatientId, input.PatientId ?? string.Empty)
             .Set(b => b.FileName, input.FileName)
             .AddToSet(b => b.ScenarioIds, scenarioId);
 
-        var bundleDoc = await _bundles.FindOneAndUpdateAsync(
-            b => b.Id == bundleId,
+        return await _bundles.FindOneAndUpdateAsync(
+            b => b.Id == bundleId
+                 && (b.DeletionClaimToken == null || b.DeletionClaimToken == string.Empty)
+                 && b.CanonicalBundleId == null,
             update,
             new FindOneAndUpdateOptions<ImportedBundleDocument> { ReturnDocument = ReturnDocument.After },
             ct);
-
-        if (bundleDoc == null)
-            return null;
-
-        return new ImportedBundleReference
-        {
-            BundleId = bundleDoc.Id,
-            PatientId = string.IsNullOrWhiteSpace(input.PatientId) ? bundleDoc.PatientId : input.PatientId
-        };
     }
 
     /// <summary>
@@ -245,16 +285,78 @@ public sealed class MongoScenarioStore : IScenarioStore
             Builders<ImportedBundleDocument>.Update.Pull(b => b.ScenarioIds, scenarioId),
             cancellationToken: ct);
 
-        // Delete unreferenced, non-library bundles. Treats both an empty list and a missing
-        // ScenarioIds field as orphan so legacy single-owner rows (without ScenarioIds) can
-        // be cleaned up too.
+        // Claim orphaned docs first so concurrent attachments cannot race with blob delete.
+        // Delete only docs successfully claimed by this pass.
         var orphanFilter = Builders<ImportedBundleDocument>.Filter.And(
             Builders<ImportedBundleDocument>.Filter.Or(
                 Builders<ImportedBundleDocument>.Filter.Size(b => b.ScenarioIds, 0),
                 Builders<ImportedBundleDocument>.Filter.Exists(b => b.ScenarioIds, false)),
             Builders<ImportedBundleDocument>.Filter.Eq(b => b.IsLibraryEntry, false));
 
-        await _bundles.DeleteManyAsync(orphanFilter, ct);
+        var claimToken = Guid.NewGuid().ToString("N");
+        var claimFilter = Builders<ImportedBundleDocument>.Filter.And(
+            orphanFilter,
+            Builders<ImportedBundleDocument>.Filter.Or(
+                Builders<ImportedBundleDocument>.Filter.Eq(b => b.DeletionClaimToken, null),
+                Builders<ImportedBundleDocument>.Filter.Eq(b => b.DeletionClaimToken, string.Empty)));
+
+        var claimUpdate = Builders<ImportedBundleDocument>.Update
+            .Set(b => b.DeletionClaimToken, claimToken)
+            .Set(b => b.DeletionClaimedAt, DateTimeOffset.UtcNow)
+            .Set(b => b.UpdatedAt, DateTimeOffset.UtcNow);
+
+        var claimedOrphans = new List<ImportedBundleDocument>();
+        while (true)
+        {
+            var claimed = await _bundles.FindOneAndUpdateAsync(
+                claimFilter,
+                claimUpdate,
+                new FindOneAndUpdateOptions<ImportedBundleDocument>
+                {
+                    ReturnDocument = ReturnDocument.After,
+                    Sort = Builders<ImportedBundleDocument>.Sort.Ascending(b => b.CreatedAt)
+                },
+                ct);
+
+            if (claimed == null)
+                break;
+
+            claimedOrphans.Add(claimed);
+        }
+
+        if (claimedOrphans.Count == 0)
+            return;
+
+        var deletableIds = new List<Guid>(claimedOrphans.Count);
+        foreach (var orphan in claimedOrphans)
+        {
+            try
+            {
+                await _bundleContentStore.DeleteAsync(orphan, ct);
+                deletableIds.Add(orphan.Id);
+            }
+            catch
+            {
+                await _bundles.UpdateOneAsync(
+                    b => b.Id == orphan.Id && b.DeletionClaimToken == claimToken,
+                    Builders<ImportedBundleDocument>.Update
+                        .Set(b => b.DeletionClaimToken, null)
+                        .Set(b => b.DeletionClaimedAt, null)
+                        .Set(b => b.UpdatedAt, DateTimeOffset.UtcNow),
+                    cancellationToken: ct);
+                throw;
+            }
+        }
+
+        if (deletableIds.Count > 0)
+        {
+            var deleteFilter = Builders<ImportedBundleDocument>.Filter.And(
+                Builders<ImportedBundleDocument>.Filter.In(b => b.Id, deletableIds),
+                Builders<ImportedBundleDocument>.Filter.Eq(b => b.DeletionClaimToken, claimToken),
+                orphanFilter);
+
+            await _bundles.DeleteManyAsync(deleteFilter, ct);
+        }
     }
 
     /// <summary>
@@ -305,7 +407,15 @@ public sealed class MongoScenarioStore : IScenarioStore
         var docs = await _bundles.Find(Builders<ImportedBundleDocument>.Filter.In(b => b.Id, ids))
             .ToListAsync(ct);
 
-        return docs.ToDictionary(b => b.Id, b => b.BundleJson);
+        var result = new Dictionary<Guid, string>();
+        foreach (var doc in docs)
+        {
+            var json = await _bundleContentStore.ReadAsync(doc, ct);
+            if (!string.IsNullOrWhiteSpace(json))
+                result[doc.Id] = json;
+        }
+
+        return result;
     }
 
     private static TestScenarioDocument ToDocument(
