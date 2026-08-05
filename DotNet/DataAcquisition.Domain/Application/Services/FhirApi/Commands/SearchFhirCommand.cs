@@ -104,7 +104,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                 "Semaphore: SearchPaging acquired facility={FacilityId} resource={ResourceType} correlationId={CorrelationId} waitMs={WaitMs}",
                 request.facilityId.SanitizeForLog(), request.resourceType.SanitizeForLog(), request.correlationId.SanitizeForLog(), (long)(semAcquiredAt - semWaitStart).TotalMilliseconds);
 
-            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
+            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication, cancellationToken);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
                 if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)
@@ -229,7 +229,7 @@ public class SearchFhirCommand : ISearchFhirCommand
                 PreferredFormat = ResourceFormat.Json
             });
 
-            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication);
+            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.queryConfig.Authentication, cancellationToken);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
                 if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)

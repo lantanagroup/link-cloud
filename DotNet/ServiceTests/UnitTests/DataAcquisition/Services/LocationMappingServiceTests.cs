@@ -88,13 +88,14 @@ public class LocationMappingServiceTests
         // Stateful cache: Get returns the last Set value (seeded above with a non-matching
         // condition so the facility is "configured" but generic locations are not org locations).
         _mockCache
-            .Setup(c => c.Get<List<OrganizationLocationConditionModel>?>(It.IsAny<string>()))
-            .Returns(() => _cachedConditions);
+            .Setup(c => c.GetAsync<List<OrganizationLocationConditionModel>?>(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() => _cachedConditions);
         _mockCache
-            .Setup(c => c.Set(It.IsAny<string>(), It.IsAny<List<OrganizationLocationConditionModel>>(),
-                It.IsAny<TimeSpan>(), It.IsAny<ExpirationType>()))
-            .Callback<string, List<OrganizationLocationConditionModel>, TimeSpan, ExpirationType>(
-                (_, value, _, _) => _cachedConditions = value);
+            .Setup(c => c.SetAsync(It.IsAny<string>(), It.IsAny<List<OrganizationLocationConditionModel>>(),
+                It.IsAny<TimeSpan>(), It.IsAny<ExpirationType>(), It.IsAny<CancellationToken>()))
+            .Callback<string, List<OrganizationLocationConditionModel>, TimeSpan, ExpirationType, CancellationToken>(
+                (_, value, _, _, _) => _cachedConditions = value)
+            .Returns(Task.CompletedTask);
 
         _mockConfigQueries
             .Setup(q => q.GetByFacilityIdAsync(It.IsAny<string>()))
@@ -485,11 +486,12 @@ public class LocationMappingServiceTests
 
         // Assert
         _mockConfigQueries.Verify(q => q.GetByFacilityIdAsync(FacilityId), Times.Once);
-        _mockCache.Verify(c => c.Set(
+        _mockCache.Verify(c => c.SetAsync(
             It.IsAny<string>(),
             It.Is<List<OrganizationLocationConditionModel>>(l => l.Count == 1 && l[0].ConditionId == 1),
             It.IsAny<TimeSpan>(),
-            ExpirationType.Absolute), Times.Once);
+            ExpirationType.Absolute,
+            It.IsAny<CancellationToken>()), Times.Once);
         _mockManager.Verify(m => m.CreateAsync(It.Is<CreateOrganizationLocationMappingModel>(c =>
             c.IsOrgLocation)), Times.Once);
     }

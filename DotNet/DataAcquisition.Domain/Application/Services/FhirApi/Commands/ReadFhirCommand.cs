@@ -93,7 +93,7 @@ public class ReadFhirCommand : IReadFhirCommand
                 PreferredFormat = ResourceFormat.Json
             });
 
-            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.fhirQueryConfiguration.Authentication);
+            var authBuilderResults = await AuthMessageHandlerFactory.Build(request.facilityId, _authenticationRetrievalService, request.fhirQueryConfiguration.Authentication, cancellationToken);
             if (!authBuilderResults.isQueryParam && authBuilderResults.authHeader != null)
             {
                 if (authBuilderResults.authHeader is AuthenticationHeaderValue authHeaderValue)
