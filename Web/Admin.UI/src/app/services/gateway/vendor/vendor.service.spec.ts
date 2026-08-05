@@ -47,30 +47,80 @@ describe('VendorService', () => {
     return errorHandler.handleError.calls.mostRecent().args[1] !== false;
   }
 
-  it('puts the vendor, secret id included, to the update route', () => {
+  it('lists vendors from the tenant route', () => {
+    service.getVendors().subscribe();
+
+    const req = http.expectOne(`${BASE}/vendor`);
+    expect(req.request.method).toBe('GET');
+    req.flush([]);
+  });
+
+  it('flattens the nested signing key secret id when listing', () => {
+    let vendors: IVendorConfigModel[] = [];
+    service.getVendors().subscribe(result => (vendors = result));
+
+    http.expectOne(`${BASE}/vendor`).flush([
+      { id: 'vendor-1', name: 'Epic', authentication: { signingKeySecretId: 'epic-signing-pem' } },
+      { id: 'vendor-2', name: 'Cerner', authentication: null }
+    ]);
+
+    expect(vendors).toEqual([
+      { id: 'vendor-1', name: 'Epic', secretId: 'epic-signing-pem' },
+      { id: 'vendor-2', name: 'Cerner', secretId: null }
+    ]);
+  });
+
+  it('creates a vendor by posting a body to the tenant route', () => {
+    service.createVendor({ id: '', name: 'Acme / Health', secretId: null }).subscribe();
+
+    const req = http.expectOne(`${BASE}/vendor`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({
+      name: 'Acme / Health',
+      authentication: { signingKeySecretId: null }
+    });
+    req.flush({});
+  });
+
+  it('creates a vendor with the secret id entered on the add form', () => {
+    service.createVendor({ id: '', name: 'Epic', secretId: 'epic-signing-pem' }).subscribe();
+
+    const req = http.expectOne(`${BASE}/vendor`);
+    expect(req.request.body).toEqual({
+      name: 'Epic',
+      authentication: { signingKeySecretId: 'epic-signing-pem' }
+    });
+    req.flush({});
+  });
+
+  it('puts the vendor with its secret id nested under authentication', () => {
     const vendor: IVendorConfigModel = { id: 'vendor-1', name: 'Epic', secretId: 'epic-signing-pem' };
 
     service.updateVendor(vendor).subscribe();
 
-    const req = http.expectOne(`${BASE}/normalization/Vendor/vendor-1`);
+    const req = http.expectOne(`${BASE}/vendor/vendor-1`);
     expect(req.request.method).toBe('PUT');
-    expect(req.request.body).toEqual(vendor);
+    expect(req.request.body).toEqual({
+      name: 'Epic',
+      authentication: { signingKeySecretId: 'epic-signing-pem' }
+    });
     req.flush({ success: true, message: '' });
   });
 
-  it('sends a cleared secret id as null rather than omitting it', () => {
+  it('sends a cleared secret id as an explicit null inside authentication', () => {
     service.updateVendor({ id: 'vendor-1', name: 'Epic', secretId: null }).subscribe();
 
-    const req = http.expectOne(`${BASE}/normalization/Vendor/vendor-1`);
-    expect(JSON.parse(JSON.stringify(req.request.body)).secretId).toBeNull();
+    const req = http.expectOne(`${BASE}/vendor/vendor-1`);
+    const body = JSON.parse(JSON.stringify(req.request.body));
+    expect(body.authentication).toEqual({ signingKeySecretId: null });
     req.flush({ success: true, message: '' });
   });
 
-  it('escapes vendor names in the create route', () => {
-    service.createVendor('Acme / Health').subscribe();
+  it('deletes a vendor through the tenant route', () => {
+    service.deleteVendor('vendor-1').subscribe();
 
-    const req = http.expectOne(`${BASE}/normalization/Vendor/Acme%20%2F%20Health`);
-    expect(req.request.method).toBe('POST');
+    const req = http.expectOne(`${BASE}/vendor/vendor-1`);
+    expect(req.request.method).toBe('DELETE');
     req.flush({});
   });
 
@@ -79,12 +129,12 @@ describe('VendorService', () => {
   it('suppresses the global toastr when a save fails', () => {
     failRequest(
       () => service.updateVendor({ id: 'vendor-1', name: 'Epic' }).subscribe({ error: () => {} }),
-      'PUT', `${BASE}/normalization/Vendor/vendor-1`);
+      'PUT', `${BASE}/vendor/vendor-1`);
     expect(toastrShown()).toBeFalse();
 
     failRequest(
-      () => service.createVendor('Veradigm').subscribe({ error: () => {} }),
-      'POST', `${BASE}/normalization/Vendor/Veradigm`);
+      () => service.createVendor({ id: '', name: 'Veradigm' }).subscribe({ error: () => {} }),
+      'POST', `${BASE}/vendor`);
     expect(toastrShown()).toBeFalse();
   });
 
@@ -92,12 +142,12 @@ describe('VendorService', () => {
   it('keeps the global toastr for list and delete failures', () => {
     failRequest(
       () => service.getVendors().subscribe({ error: () => {} }),
-      'GET', `${BASE}/normalization/Vendor/vendors`);
+      'GET', `${BASE}/vendor`);
     expect(toastrShown()).toBeTrue();
 
     failRequest(
       () => service.deleteVendor('vendor-1').subscribe({ error: () => {} }),
-      'DELETE', `${BASE}/normalization/Vendor/vendor-1`);
+      'DELETE', `${BASE}/vendor/vendor-1`);
     expect(toastrShown()).toBeTrue();
   });
 });
