@@ -51,4 +51,46 @@ public class ServiceRegistryTests
 
         sut.PublicAdminBffServiceApiUrl.Should().Be(expected);
     }
+
+    [Fact]
+    public void DmrpServiceApiUrl_returns_null_when_source_is_missing()
+    {
+        var sut = new ServiceRegistry();
+
+        sut.DmrpServiceApiUrl.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("http://dmrp:8077", "http://dmrp:8077/api")]
+    [InlineData("http://dmrp:8077/", "http://dmrp:8077/api")]
+    public void DmrpServiceApiUrl_normalizes_expected_shapes(string input, string expected)
+    {
+        var sut = new ServiceRegistry
+        {
+            DmrpServiceUrl = input
+        };
+
+        sut.DmrpServiceApiUrl.Should().Be(expected);
+    }
+
+    [Fact]
+    public void PublicDmrpServiceApiUrl_returns_null_when_source_is_missing()
+    {
+        var sut = new ServiceRegistry();
+
+        sut.PublicDmrpServiceApiUrl.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("https://dmrp.example.org", "https://dmrp.example.org/api")]
+    [InlineData("https://dmrp.example.org/", "https://dmrp.example.org/api")]
+    public void PublicDmrpServiceApiUrl_normalizes_expected_shapes(string input, string expected)
+    {
+        var sut = new ServiceRegistry
+        {
+            PublicDmrpServiceUrl = input
+        };
+
+        sut.PublicDmrpServiceApiUrl.Should().Be(expected);
+    }
 }
