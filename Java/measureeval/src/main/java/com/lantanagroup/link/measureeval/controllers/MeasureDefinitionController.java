@@ -1,6 +1,7 @@
 package com.lantanagroup.link.measureeval.controllers;
 
 import ca.uhn.fhir.context.FhirContext;
+import ca.uhn.fhir.rest.client.api.IGenericClient;
 import com.fasterxml.jackson.annotation.JsonView;
 import com.lantanagroup.link.measureeval.entities.MeasureDefinition;
 import com.lantanagroup.link.measureeval.models.DebugSections;
@@ -22,6 +23,8 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.Parameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -42,6 +45,16 @@ public class MeasureDefinitionController {
     private final MeasureDefinitionBundleValidator bundleValidator;
     private final MeasureEvaluatorCache evaluatorCache;
     private final MeasureValidationService validationService;
+
+    /**
+     * Optional remote FHIR terminology client bean produced by
+     * {@link com.lantanagroup.link.measureeval.configs.LinkConfig#remoteTerminologyClient}.
+     * {@code null} when {@code link.fhirTerminologyServiceUrl} is not configured — in that
+     * case {@link MeasureEvaluator} uses the plain in-memory repository and behavior is unchanged.
+     */
+    @Autowired(required = false)
+    @Qualifier("remoteTerminologyClient")
+    private IGenericClient remoteTerminologyClient;
 
     final String[] DISALLOWED_FIELDS = new String[]{};
     @InitBinder
@@ -189,7 +202,7 @@ public class MeasureDefinitionController {
 
         try {
             MeasureEvaluationResult result = MeasureEvaluator.compileAndEvaluate(
-                    FhirContext.forR4(), evaluator.getBundle(), parameters, debug);
+                    FhirContext.forR4(), evaluator.getBundle(), parameters, debug, remoteTerminologyClient);
             // Preserve the original wire contract: when no debug sections are
             // requested, return a bare MeasureReport. Only emit the wrapper for
             // callers who opted in via the `debug` query parameter.
