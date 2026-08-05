@@ -11,6 +11,7 @@ using LantanaGroup.Link.Shared.Application.Services.Security.Token;
 using LantanaGroup.Link.Shared.Settings;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
@@ -36,6 +37,7 @@ if (!string.IsNullOrEmpty(externalConfigSource))
 
 // -- Bind options --
 builder.Services.Configure<AutomationConfig>(builder.Configuration.GetSection("Automation"));
+builder.Services.Configure<ImportedBundleBlobStorageSettings>(builder.Configuration.GetSection(ImportedBundleBlobStorageSettings.Key));
 
 var lokiUrl = builder.Configuration["Loki:Url"];
 if (string.IsNullOrWhiteSpace(lokiUrl))
@@ -225,6 +227,7 @@ builder.Services.AddOptions<KeyManagementOptions>()
     });
 
 builder.Services.AddSingleton<MongoIndexManager>();
+builder.Services.AddSingleton<IImportedBundleContentStore, AzureBlobImportedBundleContentStore>();
 builder.Services.AddSingleton<ISnapshotStore, MongoSnapshotStore>();
 builder.Services.AddSingleton<IScenarioStore, MongoScenarioStore>();
 builder.Services.AddSingleton<IQueryPlanTemplateStore, MongoQueryPlanTemplateStore>();
@@ -255,6 +258,7 @@ builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.ApiHealthExecutio
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedContextAccessor, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedContextAccessor>();
 builder.Services.AddSingleton<Automation.UI.Services.ApiHealth.Seeding.IApiHealthSeedOrchestrator, Automation.UI.Services.ApiHealth.Seeding.ApiHealthSeedOrchestrator>();
 builder.Services.AddHostedService<ScenarioRunStartupRecoveryService>();
+builder.Services.AddHostedService<ImportedBundleBlobMigrationService>();
 builder.Services.AddHostedService<Automation.UI.Services.ApiHealth.ApiHealthStartupRecoveryService>();
 builder.Services.AddHttpClient("ApiHealthTest");
 builder.Services.AddHealthChecks();
@@ -277,6 +281,14 @@ builder.Services.AddHostedService<ScenarioSeedService>();
 builder.Services.AddHostedService<QueryPlanTemplateSeedService>();
 builder.Services.AddHostedService<NormalizationSuiteSeedService>();
 builder.Services.AddHostedService<OrganizationResourceMapTemplateSeedService>();
+
+// Allow large imported-patient bundle uploads in the Automation UI.
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.MultipartBodyLengthLimit = long.MaxValue;
+    options.ValueLengthLimit = int.MaxValue;
+    options.MultipartHeadersLengthLimit = int.MaxValue;
+});
 
 // -- Seed synthetic runs for dashboard verification.
 //    Gated on config (Dashboard:SeedFakeRuns). Used for Debugging Dashbhoard.

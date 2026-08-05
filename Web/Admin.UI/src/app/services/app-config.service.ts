@@ -6,12 +6,6 @@ export interface AppConfig {
   baseApiUrl: string;
   authRequired: boolean;
   allowAlphaNumericFacilityId: boolean;
-  /**
-   * Whether vendor editing is offered. Off until Normalization (or Tenant, under LEGLINK-743)
-   * exposes an update endpoint: VendorController has no PUT, so the save would 404. Absent from
-   * config reads as off -- the UI must not offer an operation the API cannot serve.
-   */
-  vendorEditEnabled?: boolean;
   oauth2?: {
     enabled: boolean;
     issuer: string;

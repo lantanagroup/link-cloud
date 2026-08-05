@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics.CodeAnalysis;
+using TenantVendorVersionModel = LantanaGroup.Link.Shared.Application.Models.Tenant.VendorVersionModel;
 
 namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
 {
@@ -11,6 +12,6 @@ namespace LantanaGroup.Link.Normalization.Application.Models.Operations.Business
         public Guid VendorVersionId { get; internal set; }
         public Guid OperationResourceTypeId { get; internal set; }
         public OperationResourceTypeModel OperationResourceType { get; set; } = new();
-        public VendorVersionModel VendorVersion { get; set; } = new();
+        public TenantVendorVersionModel VendorVersion { get; set; } = new();
     }
 }
