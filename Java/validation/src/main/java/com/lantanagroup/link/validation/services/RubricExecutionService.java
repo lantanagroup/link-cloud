@@ -15,6 +15,7 @@ import com.lantanagroup.link.validation.repositories.RubricCheckRepository;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
 import com.lantanagroup.link.validation.services.execution.CheckOutcome;
 import com.lantanagroup.link.validation.enums.Severity;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
@@ -152,14 +153,14 @@ public class RubricExecutionService {
             findings = executorRegistry.get(c.getType()).execute(c, ctx);
             findings.forEach(f -> f.setCheckId(c.getCheckId()));
         } catch (Exception e) {
-            log.error("Check {} ({}) failed during execution", c.getCheckLocalId(), c.getType(), e);
+            log.error("Check {} ({}) failed during execution", LogUtils.sanitize(c.getCheckLocalId()), c.getType(), e);
             findings = List.of(RawFinding.builder()
                     .checkId(c.getCheckId())
                     .checkLocalId(c.getCheckLocalId())
                     .dimension(c.getDimension())
                     .severity(Severity.ERROR)
                     .code("check-execution-error")
-                    .message("Check executor threw: " + e.getMessage())
+                    .message("Check execution failed")
                     .location(resource.fhirType())
                     .build());
         }

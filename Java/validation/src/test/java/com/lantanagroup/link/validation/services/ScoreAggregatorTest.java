@@ -81,4 +81,16 @@ class ScoreAggregatorTest {
 
         assertThat(score.getInterpretation()).isEqualTo(RubricResultStatus.UNACCEPTABLE);
     }
+
+    @Test
+    @DisplayName("a finding with a null dimension is skipped, not crashing the EnumMap-backed aggregation")
+    void nullDimensionIsSkipped() {
+        ScoreCardDto score = aggregator.aggregate(List.of(
+                finding(null, Severity.ERROR),
+                finding(PiqiDimension.CONFORMANCE, Severity.WARNING)));
+
+        // The null-dimension finding is ignored; the valid finding still downgrades its dimension.
+        assertThat(score.getByDimension().get(PiqiDimension.CONFORMANCE))
+                .isEqualTo(RubricResultStatus.ACCEPTABLE_WITH_WARNINGS);
+    }
 }

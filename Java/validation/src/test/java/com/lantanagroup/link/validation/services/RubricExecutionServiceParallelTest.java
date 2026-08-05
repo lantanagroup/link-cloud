@@ -125,7 +125,8 @@ class RubricExecutionServiceParallelTest {
         FindingDto failed = byCheck.get("check-01");
         assertEquals("check-execution-error", failed.getCode());
         assertEquals(Severity.ERROR, failed.getSeverity());
-        assertTrue(failed.getMessage().contains("boom"), "message should carry the cause: " + failed.getMessage());
+        // The finding must not leak the raw exception text — the cause ("boom") stays in the log only.
+        assertEquals("Check execution failed", failed.getMessage());
         assertEquals("Patient", failed.getLocation());
 
         // The other two checks are untouched, and the failure is still timed.
