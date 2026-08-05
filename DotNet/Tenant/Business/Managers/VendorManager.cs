@@ -77,7 +77,8 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             var vendorEntity = new Vendor
             {
                 Id = Guid.NewGuid(),
-                Name = newVendor.Name
+                Name = newVendor.Name,
+                Authentication = newVendor.Authentication
             };
             var vendorVersionEntity = new VendorVersion
             {
@@ -91,7 +92,8 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             return new VendorModel
             {
                 Id = vendorEntity.Id,
-                Name = vendorEntity.Name
+                Name = vendorEntity.Name,
+                Authentication = vendorEntity.Authentication
             };
         }
 
@@ -187,12 +189,15 @@ namespace LantanaGroup.Link.Tenant.Business.Managers
             
             existingVendor.Name = vendor.Name ?? existingVendor.Name;
 
+            existingVendor.Authentication = vendor.Authentication ?? existingVendor.Authentication;
+
             _dbContext.Vendors.Update(existingVendor);
             await _dbContext.SaveChangesAsync(cancellationToken);
             return new VendorModel
             {
                 Id = existingVendor.Id,
-                Name = existingVendor.Name
+                Name = existingVendor.Name,
+                Authentication = existingVendor.Authentication
             };
         }
 

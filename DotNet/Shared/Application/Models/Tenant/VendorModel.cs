@@ -13,5 +13,9 @@ namespace LantanaGroup.Link.Shared.Application.Models.Tenant
         [DataMember]
         [JsonPropertyName("name")]
         public string? Name { get; set; }
+
+        [DataMember]
+        [JsonPropertyName("authentication")]
+        public VendorAuthenticationSettings? Authentication { get; set; }
     }
 }
