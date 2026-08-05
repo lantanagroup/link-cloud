@@ -2024,6 +2024,15 @@
 			}
 		},
 		{
+			"key": "ServiceRegistry:DmrpServiceUrl",
+			"value": "https://test-dmrp.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
 			"key": "ServiceRegistry:MeasureServiceUrl",
 			"value": "https://test-measure.nhsnlink.org",
 			"label": null,
@@ -2053,6 +2062,15 @@
 		{
 			"key": "ServiceRegistry:PublicAdminBffServiceUrl",
 			"value": "https://test-admin.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:PublicDmrpServiceUrl",
+			"value": "https://test-dmrp.nhsnlink.org",
 			"label": null,
 			"content_type": "",
 			"tags": {

@@ -2304,6 +2304,15 @@
 			}
 		},
 		{
+			"key": "ServiceRegistry:DmrpServiceUrl",
+			"value": "https://qa-dmrp.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
 			"key": "ServiceRegistry:MeasureServiceUrl",
 			"value": "https://qa-measure.nhsnlink.org",
 			"label": null,
@@ -2324,6 +2333,15 @@
 		{
 			"key": "ServiceRegistry:NotificationServiceUrl",
 			"value": "https://qa-notification.nhsnlink.org",
+			"label": null,
+			"content_type": "",
+			"tags": {
+				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
+			}
+		},
+		{
+			"key": "ServiceRegistry:PublicDmrpServiceUrl",
+			"value": "https://qa-dmrp.nhsnlink.org",
 			"label": null,
 			"content_type": "",
 			"tags": {
