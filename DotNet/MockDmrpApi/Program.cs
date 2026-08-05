@@ -14,6 +14,12 @@ using System.Reflection;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load external configuration first: Azure App Configuration is appended after the
+// built-in sources, so anything it defines outranks appsettings and environment
+// variables. Reading it before the availability check is deliberate -- the check should
+// see the same values every other consumer of configuration sees.
+builder.AddExternalConfiguration(DmrpApiConstants.ServiceName);
+
 builder.Services.Configure<DmrpApiSettings>(
     builder.Configuration.GetSection(DmrpApiSettings.ConfigSectionName));
 

@@ -1,0 +1,111 @@
+resources:
+  pipelines:
+  - pipeline: pipeline-trigger
+    source: Build_And_Push_All
+    trigger: true
+
+trigger:
+  branches:
+    include:
+    - dev
+    - release/*
+    - linkathon/*
+  paths:
+    include:
+    - DotNet/MockDmrpApi/*
+    - DotNet/Shared/*
+    exclude:
+    - '*'
+
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- group: link-cloud-variables
+- name: project
+  value: 'DotNet/MockDmrpApi/MockDmrpApi.csproj'
+# ServiceTests holds this service's unit tests alongside every other service's. The filter
+# excludes the integration suite, which needs Docker and a database the agent does not have.
+- name: testProject
+  value: 'DotNet/ServiceTests/ServiceTests.csproj'
+- name: testFilter
+  value: 'FullyQualifiedName~MockDmrpApi&Category!=IntegrationTests'
+- name: registry-repo-Name
+  value: 'link-mock-dmrp'
+- name: dockerPath
+  value: '**/DotNet/MockDmrpApi/Dockerfile'
+- name: serviceName
+  value: 'MockDmrpApi'
+- name: projectDir
+  value: 'DotNet/MockDmrpApi'
+
+steps:
+  - task: DotNetCoreCLI@2
+    displayName: Restore
+    inputs:
+      command: restore
+      projects: '$(project)'
+
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        GIT_COMMIT=$(git rev-parse --short HEAD)
+        echo "GIT_COMMIT: ${GIT_COMMIT}"
+        echo "##vso[task.setvariable variable=GIT_COMMIT]${GIT_COMMIT}"
+
+  - task: PythonScript@0
+    displayName: "Inject Service Info"
+    inputs:
+      scriptSource: 'filePath'
+      scriptPath: '$(Build.SourcesDirectory)/Scripts/set_service_info.py'
+      workingDirectory: '$(Build.SourcesDirectory)'
+      arguments: './ "$(projectDir)" "$(GIT_COMMIT)" "$(Build.BuildNumber)"'
+
+  - task: PowerShell@2
+    inputs:
+      targetType: 'inline'
+      script: |
+        if ("$(Build.SourceBranch)" -like "*release/*") {
+        $myTag1 = "release-$(Build.SourceBranchName)-$(GIT_COMMIT)"
+        }
+        else {
+        $myTag1 = "$(Build.SourceBranchName)-$(GIT_COMMIT)"
+        }
+        Write-Host "##vso[task.setvariable variable=MyTag]$myTag1"
+        Write-Host "Set MyTag to: $myTag1"
+
+  # Regenerates the API contract from Contracts/dmrp-openapi.yaml before compiling, so a
+  # build here fails if the spec and the implementation have diverged.
+  - task: DotNetCoreCLI@2
+    displayName: Build
+    inputs:
+      command: build
+      projects: '$(project)'
+
+  - task: DotNetCoreCLI@2
+    inputs:
+      command: 'test'
+      projects: '$(testProject)'
+      arguments: '--filter "$(testFilter)"'
+    displayName: 'Run Tests'
+
+  - task: Docker@2
+    displayName: "Build & Push Mock DMRP API Docker Image"
+    condition: always()
+    inputs:
+      containerRegistry: $(containerRegistry) # Variable Group
+      repository: $(registry-repo-name)
+      command: 'buildAndPush'
+      Dockerfile: $(dockerPath)
+      tags: |
+        latest
+        $(MyTag)
+      buildContext: '$(Build.Repository.LocalPath)'
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: 'manifest'

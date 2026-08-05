@@ -67,6 +67,7 @@ serviceMeta:
   DataAcquisition:       { label: "DataAcquisition",       runtime: "dotnet" }
   DataAcquisitionWorker: { label: "DataAcquisitionWorker", runtime: "dotnet" }
   MeasureEval:           { label: "MeasureEval",           runtime: "java" }
+  MockDmrpApi:           { label: "MockDmrpApi",           runtime: "dotnet" }
   Normalization:         { label: "Normalization",         runtime: "dotnet" }
   Notification:          { label: "Notification",          runtime: "dotnet" }
   QueryDispatch:         { label: "QueryDispatch",         runtime: "dotnet" }
@@ -576,6 +577,28 @@ services:
   # No service-specific required config: this service reads only global keys. An explicit
   # empty list keeps it paired with its serviceMeta entry.
   Census: []
+
+  # Stand-in for the CDC DMRP API, deployed to the lower environments only. Nothing is
+  # required: true because the service does not run in every environment -- provision these
+  # only where the mock is deployed, and never in a production store.
+  MockDmrpApi:
+    - key: "MockDmrpApi:Enabled"
+      description: "Master switch for the mock DMRP surface. When false, every route except /health and /api/mock-dmrp/info answers 503 and schema migration is skipped. Absent means enabled, so provision a row only where the mock should be off. A production row would be misleading rather than effective: the service refuses to serve in the Production environment regardless of configuration."
+      required: false
+      defaultValue: "true"
+    - key: "MockDmrpApi:AuthClientId"
+      description: "Client id the mock's token endpoint accepts. Provision per environment to move off the shipped non-production value."
+      required: false
+      defaultValue: "link-cloud-dev"
+    - key: "MockDmrpApi:AuthClientSecret"
+      description: "Client secret the mock's token endpoint accepts. The shipped default is published in docker-compose, so any deployed environment should override it with a Key Vault reference."
+      required: false
+      sensitive: true
+    - key: "MockDmrpApi:SigningKey"
+      description: "HMAC key used to sign issued tokens. Must be at least 64 bytes (HS512 signs with a 512-bit key) or the service fails at startup. Every replica must carry the same value: tokens are validated by the service that issues them, so a per-instance key means a token minted by one pod is rejected by another."
+      required: false
+      sensitive: true
+
   MeasureEval:
     - key: "spring.data.mongodb.uri"
       description: "The MongoDB connection string."
