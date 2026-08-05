@@ -28,10 +28,18 @@ value set in a store can never take effect.
 
 ### (unattributed)
 
-6 keys.
+14 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
+| `MockDmrpApi` | dotnet | - | - | `DotNet/MockDmrpApi/Program.cs:23` |
+| `MockDmrpApi:Audience` | dotnet | - | - | `DotNet/MockDmrpApi/Program.cs:23` |
+| `MockDmrpApi:AuthClientId` | dotnet | yes | - | `DotNet/MockDmrpApi/Program.cs:23` |
+| `MockDmrpApi:AuthClientSecret` | dotnet | yes | - | `DotNet/MockDmrpApi/Program.cs:23` |
+| `MockDmrpApi:Enabled` | dotnet | yes | - | `DotNet/MockDmrpApi/Program.cs:23` |
+| `MockDmrpApi:Issuer` | dotnet | - | - | `DotNet/MockDmrpApi/Program.cs:23` |
+| `MockDmrpApi:SigningKey` | dotnet | yes | - | `DotNet/MockDmrpApi/Program.cs:23` |
+| `MockDmrpApi:TokenLifetimeSeconds` | dotnet | - | - | `DotNet/MockDmrpApi/Program.cs:23` |
 | `MockFhirServer` | dotnet | - | - | `DotNet/MockFhirServer/Program.cs:9` |
 | `MockFhirServer:ClinicalPeriodEnd` | dotnet | - | - | `DotNet/MockFhirServer/Program.cs:9` |
 | `MockFhirServer:ClinicalPeriodStart` | dotnet | - | - | `DotNet/MockFhirServer/Program.cs:9` |
@@ -81,7 +89,7 @@ value set in a store can never take effect.
 | `DistributedLockSettings:Password` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `EnableSwagger` | dotnet | - | dev, qa, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:25` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:26` |
 | `KafkaConnection` | dotnet | - | - | `DotNet/Account/Program.cs:77` |
 | `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:77` |
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Account/Program.cs:77` |
@@ -234,7 +242,7 @@ value set in a store can never take effect.
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `EnableIntegrationFeature` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:237` |
 | `EnableSwagger` | dotnet | - | dev, qa, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:25` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:26` |
 | `KafkaConnection` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:96` |
 | `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Admin.BFF/Program.cs:96` |
@@ -366,7 +374,7 @@ value set in a store can never take effect.
 | `DistributedLockSettings:Password` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `EnableSwagger` | dotnet | - | dev, qa, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:25` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:26` |
 | `KafkaConnection` | dotnet | - | - | `DotNet/Audit/Program.cs:69` |
 | `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:69` |
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Audit/Program.cs:69` |
@@ -452,50 +460,50 @@ value set in a store can never take effect.
 
 ### AutomationUI
 
-134 keys.
+138 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `ApiHealth:EnableAdminBffAuthSuite` | dotnet | yes | test | `DotNet/Automation.UI/Program.cs:247` |
-| `Authentication:ApiBearer:Audience` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:100` |
-| `Authentication:ApiBearer:Authority` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:99` |
-| `Authentication:ApiBearer:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:98` |
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:92` |
-| `Authentication:UseBearerForServiceCalls` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:73` |
+| `ApiHealth:EnableAdminBffAuthSuite` | dotnet | yes | test | `DotNet/Automation.UI/Program.cs:250` |
+| `Authentication:ApiBearer:Audience` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:102` |
+| `Authentication:ApiBearer:Authority` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:101` |
+| `Authentication:ApiBearer:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:100` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:94` |
+| `Authentication:UseBearerForServiceCalls` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:75` |
 | `AutoMigrate` | dotnet | - | dev, qa, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
-| `Automation` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:DownloadPath` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FacilityFhirServerBase` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirGeneration:IncludeLowValueOptionalReferences` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirGeneration:ResourceDistribution` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirGeneration:ResourceDistribution:{Placeholder}` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirQuery:MaxAcquisitionPullTime` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirQuery:MaxConcurrentRequests` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirQuery:MinAcquisitionPullTime` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirQuery:TimeZone` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirServerBase` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirServerBasicAuth:Password` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirServerBasicAuth:ShouldAuthenticate` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirServerBasicAuth:Username` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirServerOAuth:ClientId` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirServerOAuth:ClientSecret` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirServerOAuth:Password` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirServerOAuth:Scope` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirServerOAuth:ShouldAuthenticate` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirServerOAuth:TokenEndpoint` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:FhirServerOAuth:Username` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:Kafka:RestProxyBaseUrl` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:LokiAppLabel` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
-| `Automation:LokiBaseUrl` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:38` |
+| `Automation` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:DownloadPath` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FacilityFhirServerBase` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirGeneration:IncludeLowValueOptionalReferences` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirGeneration:ResourceDistribution` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirGeneration:ResourceDistribution:{Placeholder}` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirQuery:MaxAcquisitionPullTime` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirQuery:MaxConcurrentRequests` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirQuery:MinAcquisitionPullTime` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirQuery:TimeZone` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirServerBase` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirServerBasicAuth:Password` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirServerBasicAuth:ShouldAuthenticate` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirServerBasicAuth:Username` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirServerOAuth:ClientId` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirServerOAuth:ClientSecret` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirServerOAuth:Password` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirServerOAuth:Scope` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirServerOAuth:ShouldAuthenticate` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirServerOAuth:TokenEndpoint` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:FhirServerOAuth:Username` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:Kafka:RestProxyBaseUrl` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:LokiAppLabel` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
+| `Automation:LokiBaseUrl` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:39` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
-| `Dashboard:SeedFakeRuns` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:283` |
-| `DataProtection:ApplicationName` | dotnet | yes | dev | `DotNet/Automation.UI/Program.cs:208` |
-| `DataProtection:KeyCollectionName` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:210` |
+| `Dashboard:SeedFakeRuns` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:295` |
+| `DataProtection:ApplicationName` | dotnet | yes | dev | `DotNet/Automation.UI/Program.cs:210` |
+| `DataProtection:KeyCollectionName` | dotnet | yes | - | `DotNet/Automation.UI/Program.cs:212` |
 | `DatabaseProvider` | dotnet | yes | - | `DotNet/Account/Program.cs:159` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -505,30 +513,34 @@ value set in a store can never take effect.
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `EnableSwagger` | dotnet | - | dev, qa, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `ExternalBlobStorage:SuppressManifest` | dotnet | yes | test | `DotNet/Automation.UI/Services/RunExecutor.cs:71` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:25` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:58` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:67` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:67` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:67` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:67` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:67` |
-| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:67` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:67` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:26` |
+| `InternalBlobStorage` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:40` |
+| `InternalBlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:40` |
+| `InternalBlobStorage:BlobRoot` | dotnet | yes | - | `DotNet/Automation.UI/Program.cs:40` |
+| `InternalBlobStorage:ConnectionString` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:40` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:60` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:60` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:60` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:60` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:60` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:60` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:60` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:60` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:60` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:60` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:60` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:69` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:69` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:69` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:69` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:69` |
+| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:69` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:69` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
-| `Loki:App` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:46` |
-| `Loki:Url` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:40` |
-| `MongoDB:ConnectionString` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:178` |
-| `MongoDB:DatabaseName` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:179` |
+| `Loki:App` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:48` |
+| `Loki:Url` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:42` |
+| `MongoDB:ConnectionString` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:180` |
+| `MongoDB:DatabaseName` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:181` |
 | `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -544,40 +556,40 @@ value set in a store can never take effect.
 | `ServiceInformation:Commit` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:ProductVersion` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:ServiceConfigName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
-| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:31` |
+| `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:32` |
 | `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:66` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Automation.UI/Program.cs:68` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
@@ -633,7 +645,7 @@ value set in a store can never take effect.
 | `DistributedLockSettings:Password` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `EnableSwagger` | dotnet | - | dev, qa, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:25` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:26` |
 | `KafkaConnection` | dotnet | - | - | `DotNet/Census/Program.cs:72` |
 | `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:72` |
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Census/Program.cs:72` |
@@ -726,7 +738,7 @@ value set in a store can never take effect.
 | `ApiSettings` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:135` |
 | `ApiSettings:FhirListSettings:ValidStatuses:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:135` |
 | `ApiSettings:FhirListSettings:ValidTimeFrames:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:135` |
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Filters/ValidateAntiForgeryOrBearerTokenAttribute.cs:43` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Program.cs:101` |
 | `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, test | `DotNet/DataAcquisition/Program.cs:106` |
 | `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition/Program.cs:107` |
 | `AutoMigrate` | dotnet | - | dev, qa, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
@@ -768,7 +780,7 @@ value set in a store can never take effect.
 | `DistributedLockSettings:Password` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `EnableSwagger` | dotnet | - | dev, qa, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:25` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:26` |
 | `KafkaConnection` | dotnet | - | - | `DotNet/DataAcquisition/Program.cs:158` |
 | `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition/Program.cs:158` |
@@ -875,7 +887,7 @@ value set in a store can never take effect.
 
 ### DataAcquisitionWorker
 
-148 keys.
+149 keys.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
@@ -890,6 +902,7 @@ value set in a store can never take effect.
 | `ApiSettings` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:135` |
 | `ApiSettings:FhirListSettings:ValidStatuses:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:135` |
 | `ApiSettings:FhirListSettings:ValidTimeFrames:0` | dotnet | - | - | `DotNet/DataAcquisition.Domain/Extensions/GeneralStartupExtensions.cs:135` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:140` |
 | `AutoMigrate` | dotnet | - | dev, qa, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
@@ -928,7 +941,7 @@ value set in a store can never take effect.
 | `DistributedLockSettings:Password` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `EnableSwagger` | dotnet | - | dev, qa, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:25` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:26` |
 | `KafkaConnection` | dotnet | - | - | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
 | `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/DataAcquisition.AcquisitionWorker/Program.cs:49` |
@@ -1063,36 +1076,36 @@ value set in a store can never take effect.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:115` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:120` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:121` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:118` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:123` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:124` |
 | `AutoMigrate` | dotnet | - | dev, qa, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/Normalization/Program.cs:73` |
-| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
-| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
-| `CORS:EnableCors` | dotnet | - | - | `DotNet/Normalization/Program.cs:73` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/Normalization/Program.cs:73` |
-| `CacheBlobStorage` | dotnet | - | - | `DotNet/Normalization/Program.cs:70` |
-| `CacheBlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Normalization/Program.cs:70` |
-| `CacheBlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Normalization/Program.cs:70` |
-| `CacheBlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Normalization/Program.cs:70` |
+| `CORS` | dotnet | - | - | `DotNet/Normalization/Program.cs:75` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:75` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:75` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:75` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:75` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:75` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:75` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:75` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:75` |
+| `CORS:EnableCors` | dotnet | - | - | `DotNet/Normalization/Program.cs:75` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:75` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/Normalization/Program.cs:75` |
+| `CacheBlobStorage` | dotnet | - | - | `DotNet/Normalization/Program.cs:72` |
+| `CacheBlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Normalization/Program.cs:72` |
+| `CacheBlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Normalization/Program.cs:72` |
+| `CacheBlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Normalization/Program.cs:72` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:135` |
-| `ConsumerSettings` | dotnet | - | - | `DotNet/Normalization/Program.cs:66` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:122` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Normalization/Program.cs:130` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:138` |
+| `ConsumerSettings` | dotnet | - | - | `DotNet/Normalization/Program.cs:68` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:125` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Normalization/Program.cs:133` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -1100,25 +1113,25 @@ value set in a store can never take effect.
 | `DistributedLockSettings:Password` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `EnableSwagger` | dotnet | - | dev, qa, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:25` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:72` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Normalization/Program.cs:74` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
-| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:26` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/Normalization/Program.cs:74` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Normalization/Program.cs:74` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Normalization/Program.cs:74` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:74` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Normalization/Program.cs:76` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:76` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:76` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:76` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:76` |
+| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:76` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:76` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
 | `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
@@ -1138,37 +1151,37 @@ value set in a store can never take effect.
 | `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:71` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Normalization/Program.cs:73` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
@@ -1358,7 +1371,7 @@ value set in a store can never take effect.
 | `DistributedLockSettings:Password` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `EnableSwagger` | dotnet | - | dev, qa, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:25` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:26` |
 | `KafkaConnection` | dotnet | - | - | `DotNet/QueryDispatch/Program.cs:54` |
 | `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
 | `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/QueryDispatch/Program.cs:54` |
@@ -1485,10 +1498,10 @@ value set in a store can never take effect.
 | `EnableSwagger` | dotnet | - | dev, qa, test | `DotNet/MockFhirServer/Program.cs:24` |
 | `EnhancedQueryLoggingSettings` | dotnet | - | - | `DotNet/Report/Program.cs:107` |
 | `EnhancedQueryLoggingSettings:EnableEnhancedQueryLogging` | dotnet | yes | test | `DotNet/Report/Program.cs:107` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:25` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:26` |
 | `InternalBlobStorage` | dotnet | - | - | `DotNet/Report/Program.cs:97` |
 | `InternalBlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:97` |
-| `InternalBlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Report/Program.cs:97` |
+| `InternalBlobStorage:BlobRoot` | dotnet | yes | - | `DotNet/Report/Program.cs:97` |
 | `InternalBlobStorage:ConnectionString` | dotnet | yes | dev, qa, test | `DotNet/Report/Program.cs:97` |
 | `KafkaConnection` | dotnet | - | - | `DotNet/Report/Program.cs:92` |
 | `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/Report/Program.cs:92` |
@@ -1627,11 +1640,11 @@ value set in a store can never take effect.
 | `ExternalBlobStorage:MeasurePrefixesByReportType:{Placeholder}` | dotnet | - | - | `DotNet/Submission/Program.cs:81` |
 | `ExternalBlobStorage:SuppressManifest` | dotnet | yes | test | `DotNet/Submission/Program.cs:81` |
 | `ExternalBlobStorage:UseMeasurePrefix` | dotnet | yes | test | `DotNet/Submission/Program.cs:81` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:25` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:26` |
 | `Features:DownloadReportEnabled` | dotnet | - | dev, qa, test | `DotNet/Submission/Application/Middleware/ConditionalEndpoint.cs:32` |
 | `InternalBlobStorage` | dotnet | - | - | `DotNet/Submission/Program.cs:80` |
 | `InternalBlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:80` |
-| `InternalBlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Submission/Program.cs:80` |
+| `InternalBlobStorage:BlobRoot` | dotnet | yes | - | `DotNet/Submission/Program.cs:80` |
 | `InternalBlobStorage:ConnectionString` | dotnet | yes | dev, qa, test | `DotNet/Submission/Program.cs:80` |
 | `KafkaConnection` | dotnet | - | - | `DotNet/Submission/Program.cs:75` |
 | `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/Submission/Program.cs:75` |
@@ -1726,31 +1739,31 @@ value set in a store can never take effect.
 
 | Key | Runtime | Catalog | Stores | Source |
 |---|---|---|---|---|
-| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:64` |
-| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:69` |
-| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:70` |
+| `Authentication:EnableAnonymousAccess` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:65` |
+| `Authentication:Schemas:LinkBearer:Authority` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:70` |
+| `Authentication:Schemas:LinkBearer:ValidateToken` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:71` |
 | `AutoMigrate` | dotnet | - | dev, qa, test | `DotNet/Shared/Application/Extensions/EFMigrations.cs:13` |
 | `BlobStorage` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobContainerName` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:BlobRoot` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
 | `BlobStorage:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:68` |
-| `CORS` | dotnet | - | - | `DotNet/Tenant/Program.cs:91` |
-| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
-| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
-| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
-| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
-| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
-| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
-| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
-| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
-| `CORS:EnableCors` | dotnet | - | - | `DotNet/Tenant/Program.cs:91` |
-| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:91` |
-| `CORS:PolicyName` | dotnet | - | - | `DotNet/Tenant/Program.cs:91` |
+| `CORS` | dotnet | - | - | `DotNet/Tenant/Program.cs:92` |
+| `CORS:AllowAllHeaders` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
+| `CORS:AllowAllMethods` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
+| `CORS:AllowAllOrigins` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
+| `CORS:AllowCredentials` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
+| `CORS:AllowedExposedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
+| `CORS:AllowedHeaders:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
+| `CORS:AllowedMethods:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
+| `CORS:AllowedOrigins:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
+| `CORS:EnableCors` | dotnet | - | - | `DotNet/Tenant/Program.cs:92` |
+| `CORS:MaxAge` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
+| `CORS:PolicyName` | dotnet | - | - | `DotNet/Tenant/Program.cs:92` |
 | `ConnectionStrings:AzureAppConfiguration` | dotnet | - | - | `DotNet/Notification/Program.cs:64` |
 | `ConnectionStrings:AzureMonitor` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:62` |
-| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:109` |
-| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:71` |
-| `DatabaseProvider` | dotnet | yes | - | `DotNet/Tenant/Program.cs:104` |
+| `ConnectionStrings:DatabaseConnection` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:113` |
+| `DataProtection:Enabled` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:72` |
+| `DatabaseProvider` | dotnet | yes | - | `DotNet/Tenant/Program.cs:108` |
 | `DistributedLockSettings` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:ConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:Expiration` | dotnet | yes | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
@@ -1758,30 +1771,30 @@ value set in a store can never take effect.
 | `DistributedLockSettings:Password` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `EnableSwagger` | dotnet | - | dev, qa, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:25` |
-| `FacilityIdSettings` | dotnet | - | - | `DotNet/Tenant/Program.cs:83` |
-| `FacilityIdSettings:NumericOnlyFacilityId` | dotnet | yes | - | `DotNet/Tenant/Program.cs:83` |
-| `KafkaConnection` | dotnet | - | - | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
-| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
-| `LinkTokenService` | dotnet | - | - | `DotNet/Tenant/Program.cs:92` |
-| `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
-| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
-| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
-| `LinkTokenService:LogToken` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
-| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
-| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:92` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:26` |
+| `FacilityIdSettings` | dotnet | - | - | `DotNet/Tenant/Program.cs:84` |
+| `FacilityIdSettings:NumericOnlyFacilityId` | dotnet | yes | - | `DotNet/Tenant/Program.cs:84` |
+| `KafkaConnection` | dotnet | - | - | `DotNet/Tenant/Program.cs:90` |
+| `KafkaConnection:ApiVersionRequest` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:90` |
+| `KafkaConnection:BootstrapServers:0` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:90` |
+| `KafkaConnection:ClientId` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:90` |
+| `KafkaConnection:GroupId` | dotnet | - | - | `DotNet/Tenant/Program.cs:90` |
+| `KafkaConnection:Mechanism` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:90` |
+| `KafkaConnection:Protocol` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:90` |
+| `KafkaConnection:ReceiveMessageMaxBytes` | dotnet | - | - | `DotNet/Tenant/Program.cs:90` |
+| `KafkaConnection:SaslPassword` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:90` |
+| `KafkaConnection:SaslProtocolEnabled` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:90` |
+| `KafkaConnection:SaslUsername` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:90` |
+| `LinkTokenService` | dotnet | - | - | `DotNet/Tenant/Program.cs:93` |
+| `LinkTokenService:Authority` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:93` |
+| `LinkTokenService:EnableTokenGenerationEndpoint` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:93` |
+| `LinkTokenService:LinkAdminEmail` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:93` |
+| `LinkTokenService:LogToken` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:93` |
+| `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:93` |
+| `LinkTokenService:TokenLifespan` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:93` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
-| `MeasureConfig` | dotnet | - | - | `DotNet/Tenant/Program.cs:87` |
-| `MeasureConfig:CheckIfMeasureExists` | dotnet | - | - | `DotNet/Tenant/Program.cs:87` |
+| `MeasureConfig` | dotnet | - | - | `DotNet/Tenant/Program.cs:88` |
+| `MeasureConfig:CheckIfMeasureExists` | dotnet | - | - | `DotNet/Tenant/Program.cs:88` |
 | `Redis:Password` | dotnet | yes | dev, qa, test | `DotNet/Account/Program.cs:120` |
 | `ResourceCache` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:53` |
 | `ResourceCache:BlobStorage:BlobContainerName` | dotnet | yes | dev, qa, test | `DotNet/Shared/Application/Extensions/ResourceCacheExtensions.cs:54` |
@@ -1800,37 +1813,37 @@ value set in a store can never take effect.
 | `ServiceInformation:ServiceName` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:SwaggerUrl` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
 | `ServiceInformation:Version` | dotnet | - | - | `DotNet/Admin.BFF/Program.cs:74` |
-| `ServiceRegistry` | dotnet | - | - | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
-| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:88` |
+| `ServiceRegistry` | dotnet | - | - | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:AccountServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:AdminBffServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:AuditServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:CensusServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:DataAcquisitionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:MeasureServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:NormalizationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:NotificationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:PublicAccountServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:PublicAdminBffServiceUrl` | dotnet | - | dev, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:PublicAuditServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:PublicCensusServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:PublicDataAcquisitionServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:PublicMeasureServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:PublicNormalizationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:PublicNotificationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:PublicQueryDispatchServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:PublicReportServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:PublicSubmissionServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:PublicTerminologyServiceUrl` | dotnet | - | dev, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:PublicValidationServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:QueryDispatchServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:ReportServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:SubmissionServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:TenantService:CheckIfTenantExists` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:TenantService:GetTenantRelativeEndpoint` | dotnet | - | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:TenantService:PublicTenantServiceUrl` | dotnet | - | dev | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:TenantService:TenantServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:TerminologyServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
+| `ServiceRegistry:ValidationServiceUrl` | dotnet | yes | dev, qa, test | `DotNet/Tenant/Program.cs:89` |
 | `Telemetry` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
 | `Telemetry:AzureMonitorConnectionString` | dotnet | - | - | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
 | `Telemetry:EnableAzureMonitor` | dotnet | - | dev, qa, test | `DotNet/Shared/Application/Extensions/Telemetry/TelemetryServiceExtension.cs:31` |
@@ -1869,7 +1882,7 @@ value set in a store can never take effect.
 | `DistributedLockSettings:Password` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `DistributedLockSettings:RetryDelay` | dotnet | - | - | `DotNet/Shared/Application/Models/Configs/DistributedLockSettings.cs:41` |
 | `EnableSwagger` | dotnet | - | dev, qa, test | `DotNet/MockFhirServer/Program.cs:24` |
-| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:25` |
+| `ExternalConfigurationSource` | dotnet | - | - | `DotNet/Automation.UI/Program.cs:26` |
 | `LinkTokenService:SigningKey` | dotnet | yes | dev, qa, test | `DotNet/Terminology/Program.cs:48` |
 | `Logging` | dotnet | - | - | `DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:20` |
 | `ProblemDetails:IncludeExceptionDetails` | dotnet | - | - | `DotNet/Terminology/Program.cs:59` |
