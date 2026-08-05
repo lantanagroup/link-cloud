@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lantanagroup.link.validation.entities.RubricCheck;
 import com.lantanagroup.link.validation.entities.RubricVersion;
+import com.lantanagroup.link.validation.enums.RubricResultStatus;
 import com.lantanagroup.link.validation.enums.RubricVersionStatus;
 import lombok.Builder;
 import lombok.Getter;
@@ -31,6 +32,8 @@ public class RubricVersionDetailDto {
     private String publishedBy;
     private OffsetDateTime retiredAt;
     private String retiredBy;
+    private OffsetDateTime dryRunCompletedAt;
+    private RubricResultStatus dryRunStatus;
 
     public static RubricVersionDetailDto from(RubricVersion version, List<RubricCheck> checks,
                                               ObjectMapper objectMapper) {
@@ -48,6 +51,8 @@ public class RubricVersionDetailDto {
                 .publishedBy(version.getPublishedBy())
                 .retiredAt(version.getRetiredAt())
                 .retiredBy(version.getRetiredBy())
+                .dryRunCompletedAt(version.getDryRunCompletedAt())
+                .dryRunStatus(version.getDryRunStatus())
                 .build();
     }
 
