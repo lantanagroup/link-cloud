@@ -4,6 +4,7 @@ using LantanaGroup.Link.Shared.Application.Extensions.Security;
 using LantanaGroup.Link.Shared.Application.Interfaces.Services.Security.Token;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Integration.DMRP;
+using LantanaGroup.Link.Shared.Application.Models.Responses;
 using Microsoft.Extensions.Options;
 
 namespace LantanaGroup.Link.Sdk.Clients;
@@ -47,11 +48,11 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
         SendAsync(() => Request($"/dmrp/measure-mappings/{id}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
-    public Task<LinkApiResponse> SearchMeasureMappingsAsync(
+    public Task<LinkApiResponse<PagedConfigModel<MeasureMappingModel>>> SearchMeasureMappingsAsync(
         int pageSize = 10,
         int pageNumber = 1,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request("/dmrp/measure-mappings")
+        SendAsync<PagedConfigModel<MeasureMappingModel>>(() => Request("/dmrp/measure-mappings")
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
             .GetAsync(cancellationToken: cancellationToken));
@@ -81,11 +82,11 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
         SendAsync(() => Request($"/dmrp/facility-reporting-plans/{id}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
-    public Task<LinkApiResponse> SearchFacilityReportingPlansAsync(
+    public Task<LinkApiResponse<PagedConfigModel<FacilityReportingPlanModel>>> SearchFacilityReportingPlansAsync(
         int pageSize = 10,
         int pageNumber = 1,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request("/dmrp/facility-reporting-plans")
+        SendAsync<PagedConfigModel<FacilityReportingPlanModel>>(() => Request("/dmrp/facility-reporting-plans")
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
             .GetAsync(cancellationToken: cancellationToken));
