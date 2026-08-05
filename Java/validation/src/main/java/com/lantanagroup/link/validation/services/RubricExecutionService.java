@@ -13,19 +13,22 @@ import com.lantanagroup.link.validation.models.SubjectDto;
 import com.lantanagroup.link.validation.models.ValidationResultEnvelope;
 import com.lantanagroup.link.validation.repositories.RubricCheckRepository;
 import com.lantanagroup.link.validation.services.execution.CheckExecutorRegistry;
+import com.lantanagroup.link.validation.services.execution.CheckOutcome;
 import com.lantanagroup.link.validation.enums.Severity;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.hl7.fhir.r4.model.Bundle;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class RubricExecutionService {
 
@@ -36,7 +39,31 @@ public class RubricExecutionService {
     private final RubricResultPersister resultPersister;
     private final FhirContext fhirContext;
     private final ObjectMapper objectMapper;
+    private final Executor checkExecutorPool;
 
+    private final boolean parallel;
+
+    public RubricExecutionService(RubricVersionResolver versionResolver,
+                                  RubricCheckRepository rubricCheckRepository,
+                                  CheckExecutorRegistry executorRegistry,
+                                  ResultEnvelopeAssembler envelopeAssembler,
+                                  RubricResultPersister resultPersister,
+                                  FhirContext fhirContext,
+                                  ObjectMapper objectMapper,
+                                  @Qualifier("checkExecutorPool") Executor checkExecutorPool,
+                                  @Value("${vaas.checks.parallel:false}") boolean parallel) {
+        this.versionResolver = versionResolver;
+        this.rubricCheckRepository = rubricCheckRepository;
+        this.executorRegistry = executorRegistry;
+        this.envelopeAssembler = envelopeAssembler;
+        this.resultPersister = resultPersister;
+        this.fhirContext = fhirContext;
+        this.objectMapper = objectMapper;
+        this.checkExecutorPool = checkExecutorPool;
+        this.parallel = parallel;
+        log.info("Rubric check execution mode: {} (vaas.checks.parallel={})",
+                parallel ? "parallel fan-out" : "sequential", parallel);
+    }
 
     public ValidationResultEnvelope evaluate(String rubricId, String semver, EvaluateRequestDto request, boolean persist) {
         OffsetDateTime requestedAt = OffsetDateTime.now();
@@ -73,28 +100,19 @@ public class RubricExecutionService {
                 .requestedAt(requestedAt)
                 .build();
 
+        List<RubricCheck> enabled = checks.stream()
+                .filter(RubricCheck::isEnabled)
+                .collect(Collectors.toList());
+
+        List<CheckOutcome> outcomes = parallel
+                ? runParallel(enabled, ctx, resource)
+                : runSequential(enabled, ctx, resource);
+
         List<RawFinding> allFindings = new ArrayList<>();
         Map<String, Long> checkDurations = new LinkedHashMap<>();
-        for (RubricCheck c : checks) {
-            if (!c.isEnabled()) continue;
-            long start = System.currentTimeMillis();
-            try {
-                List<RawFinding> findings = executorRegistry.get(c.getType()).execute(c, ctx);
-                findings.forEach(f -> f.setCheckId(c.getCheckId()));
-                allFindings.addAll(findings);
-            } catch (Exception e) {
-                log.error("Check {} ({}) failed during execution", c.getCheckLocalId(), c.getType(), e);
-                allFindings.add(RawFinding.builder()
-                        .checkId(c.getCheckId())
-                        .checkLocalId(c.getCheckLocalId())
-                        .dimension(c.getDimension())
-                        .severity(Severity.ERROR)
-                        .code("check-execution-error")
-                        .message("Check executor threw: " + e.getMessage())
-                        .location(resource.fhirType())
-                        .build());
-            }
-            checkDurations.put(c.getCheckLocalId(), System.currentTimeMillis() - start);
+        for (CheckOutcome outcome : outcomes) {
+            allFindings.addAll(outcome.findings());
+            checkDurations.put(outcome.checkLocalId(), outcome.durationMs());
         }
 
         OffsetDateTime completedAt = OffsetDateTime.now();
@@ -105,6 +123,48 @@ public class RubricExecutionService {
             resultPersister.persist(out.resultEntity(), out.findingEntities());
         }
         return out.envelope();
+    }
+
+    private List<CheckOutcome> runSequential(List<RubricCheck> checks, ExecutionContext ctx, IBaseResource resource) {
+        List<CheckOutcome> outcomes = new ArrayList<>(checks.size());
+        for (RubricCheck c : checks) {
+            outcomes.add(runOne(c, ctx, resource));
+        }
+        return outcomes;
+    }
+
+    private List<CheckOutcome> runParallel(List<RubricCheck> checks, ExecutionContext ctx, IBaseResource resource) {
+        List<CompletableFuture<CheckOutcome>> futures = checks.stream()
+                .map(c -> CompletableFuture.supplyAsync(() -> runOne(c, ctx, resource), checkExecutorPool))
+                .collect(Collectors.toList());
+
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+        return futures.stream()
+                .map(CompletableFuture::join)
+                .collect(Collectors.toList());
+    }
+
+    private CheckOutcome runOne(RubricCheck c, ExecutionContext ctx, IBaseResource resource) {
+        long start = System.currentTimeMillis();
+        List<RawFinding> findings;
+        try {
+            findings = executorRegistry.get(c.getType()).execute(c, ctx);
+            findings.forEach(f -> f.setCheckId(c.getCheckId()));
+        } catch (Exception e) {
+            log.error("Check {} ({}) failed during execution", c.getCheckLocalId(), c.getType(), e);
+            findings = List.of(RawFinding.builder()
+                    .checkId(c.getCheckId())
+                    .checkLocalId(c.getCheckLocalId())
+                    .dimension(c.getDimension())
+                    .severity(Severity.ERROR)
+                    .code("check-execution-error")
+                    .message("Check executor threw: " + e.getMessage())
+                    .location(resource.fhirType())
+                    .build());
+        }
+        long durationMs = System.currentTimeMillis() - start;
+        return new CheckOutcome(c.getCheckLocalId(), findings, durationMs);
     }
 
     private IBaseResource parseResource(JsonNode payload) {
