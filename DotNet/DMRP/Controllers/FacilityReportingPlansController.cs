@@ -42,6 +42,11 @@ namespace LantanaGroup.Link.DMRP.Controllers
         {
             sortBy = sortBy?.Sanitize();
 
+            if (pageSize < 1 || pageSize > 100)
+            {
+                pageSize = 10;
+            }
+
             if (pageNumber < 1)
             {
                 pageNumber = 1;
