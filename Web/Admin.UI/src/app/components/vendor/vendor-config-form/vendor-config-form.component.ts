@@ -105,8 +105,14 @@ export class VendorConfigFormComponent {
       return;
     }
 
+    const submitted: IVendorConfigModel = {
+      ...this.item,
+      name: this.name.value,
+      secretId: this.secretId.value?.trim() || null
+    };
+
     if (this.formMode == FormMode.Create) {
-      this.vendorService.createVendor(this.name.value).subscribe({
+      this.vendorService.createVendor(submitted).subscribe({
         next: (response) => {
           if (response) {
             this.submittedConfiguration.emit({success: true, message: ""});
@@ -119,17 +125,7 @@ export class VendorConfigFormComponent {
       return;
     }
 
-    // An empty box means "no key associated", sent as an explicit null rather than undefined:
-    // JSON.stringify omits undefined keys, and an absent field reads as "leave unchanged" to
-    // any endpoint with partial-update semantics, which would make clearing a key silently
-    // do nothing. Null says remove it.
-    const updated: IVendorConfigModel = {
-      ...this.item,
-      name: this.name.value,
-      secretId: this.secretId.value?.trim() || null
-    };
-
-    this.vendorService.updateVendor(updated).subscribe({
+    this.vendorService.updateVendor(submitted).subscribe({
       next: () => {
         this.submittedConfiguration.emit({success: true, message: ""});
       },

@@ -127,15 +127,28 @@ describe('VendorConfigFormComponent', () => {
     expect(vendorService.updateVendor).not.toHaveBeenCalled();
   });
 
-  it('creates with the name only, leaving the secret id to a later edit', () => {
+  it('creates with the secret id entered on the add form', () => {
+    vendorService.createVendor.and.returnValue(of({ success: true }));
+    initWith(undefined, FormMode.Create);
+
+    component.name.setValue('Veradigm');
+    component.secretId.setValue('veradigm-signing-pem');
+    component.submitConfiguration();
+
+    expect(vendorService.createVendor).toHaveBeenCalledWith(
+      jasmine.objectContaining({ name: 'Veradigm', secretId: 'veradigm-signing-pem' }));
+    expect(vendorService.updateVendor).not.toHaveBeenCalled();
+  });
+
+  it('creates with a null secret id when the field is left blank', () => {
     vendorService.createVendor.and.returnValue(of({ success: true }));
     initWith(undefined, FormMode.Create);
 
     component.name.setValue('Veradigm');
     component.submitConfiguration();
 
-    expect(vendorService.createVendor).toHaveBeenCalledWith('Veradigm');
-    expect(vendorService.updateVendor).not.toHaveBeenCalled();
+    expect(vendorService.createVendor).toHaveBeenCalledWith(
+      jasmine.objectContaining({ name: 'Veradigm', secretId: null }));
   });
 
   it('emits failure without falling through to an update when the create fails', () => {

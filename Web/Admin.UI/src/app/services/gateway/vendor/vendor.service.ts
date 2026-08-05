@@ -5,6 +5,7 @@ import {Observable, catchError, map, tap} from 'rxjs';
 import {AppConfigService} from '../../app-config.service';
 import {IApiResponse} from "../../../interfaces/api-response.interface";
 import {IVendorConfigModel} from "../../../interfaces/vendor/vendor-config-model.interface";
+import {IVendor} from "../../../interfaces/tenant/vendor-interface";
 
 @Injectable({
   providedIn: 'root'
@@ -15,21 +16,21 @@ export class VendorService {
 
   baseApiPath: string = `${this.appConfigService.config?.baseApiUrl}`;
 
-  getVendors(): Observable<any> {
-    return this.http.get<any>(`${this.baseApiPath}/normalization/Vendor/vendors`,)
+  private get vendorApiPath(): string {
+    return `${this.baseApiPath}/vendor`;
+  }
+
+  getVendors(): Observable<IVendorConfigModel[]> {
+    return this.http.get<IVendor[]>(this.vendorApiPath)
       .pipe(
         tap(_ => console.log(`fetched vendors.`)),
+        map(vendors => (vendors ?? []).map(vendor => this.toConfigModel(vendor))),
         catchError(this.handleError.bind(this))
       )
   }
 
-  /**
-   * The vendor name travels in the route, not a body. Typed as a string because that is what
-   * callers pass -- it was previously declared as IVendorConfigModel and interpolated straight
-   * into the URL, which produced "[object Object]" for anything but a bare string.
-   */
-  createVendor(name: string): Observable<any> {
-    return this.http.post<any>(`${this.baseApiPath}/normalization/Vendor/${encodeURIComponent(name)}`, "")
+  createVendor(vendor: IVendorConfigModel): Observable<any> {
+    return this.http.post<any>(this.vendorApiPath, this.toRequestBody(vendor))
       .pipe(
         tap(_ => console.log(`created vendor.`)),
         map((response) => {
@@ -39,18 +40,8 @@ export class VendorService {
       )
   }
 
-  /**
-   * Persists changes to a vendor, including its Key Vault secret id.
-   *
-   * PROVISIONAL ROUTE. No update endpoint exists yet: the Vendor model is moving out of
-   * Normalization and into Tenant under LEGLINK-743, whose acceptance criteria cover list,
-   * add and delete but not update, so this operation is owned by neither ticket. The route
-   * below mirrors the sibling delete endpoint so the shape is a reasonable guess, and this
-   * method is deliberately the only place in the UI that knows it -- when the contract is
-   * confirmed, this body is the sole edit required. Until then it is exercised through mocks.
-   */
   updateVendor(vendor: IVendorConfigModel): Observable<IApiResponse> {
-    return this.http.put<IApiResponse>(`${this.baseApiPath}/normalization/Vendor/${encodeURIComponent(vendor.id)}`, vendor)
+    return this.http.put<IApiResponse>(`${this.vendorApiPath}/${encodeURIComponent(vendor.id)}`, this.toRequestBody(vendor))
       .pipe(
         tap(_ => console.log(`updated vendor.`)),
         map((response) => {
@@ -61,7 +52,7 @@ export class VendorService {
   }
 
   deleteVendor(vendorId: string): Observable<IApiResponse> {
-    return this.http.delete<IApiResponse>(`${this.baseApiPath}/normalization/Vendor/${vendorId}`)
+    return this.http.delete<IApiResponse>(`${this.vendorApiPath}/${encodeURIComponent(vendorId)}`)
       .pipe(
         tap(_ => console.log(`delete user.`)),
         map((response) => {
@@ -69,6 +60,23 @@ export class VendorService {
         }),
         catchError(this.handleError.bind(this))
       )
+  }
+
+  private toRequestBody(vendor: IVendorConfigModel) {
+    return {
+      name: vendor.name,
+      authentication: {
+        signingKeySecretId: vendor.secretId ?? null
+      }
+    };
+  }
+
+  private toConfigModel(vendor: IVendor): IVendorConfigModel {
+    return {
+      id: vendor.id,
+      name: vendor.name,
+      secretId: vendor.authentication?.signingKeySecretId ?? null
+    };
   }
 
   private handleError(err: HttpErrorResponse) {

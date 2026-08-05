@@ -97,7 +97,11 @@ namespace LantanaGroup.Link.Tenant.Controllers
         {
             try
             {
-                var newVendor = await _vendorManager.CreateVendorAsync(new VendorModel { Name = createVendorModel.Name });
+                var newVendor = await _vendorManager.CreateVendorAsync(new VendorModel
+                {
+                    Name = createVendorModel.Name,
+                    Authentication = createVendorModel.Authentication
+                });
                 return CreatedAtAction(nameof(Get), new { id = newVendor.Id }, newVendor);
             }
             catch (InvalidOperationException ex)
@@ -132,7 +136,8 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 var vendorModel = new VendorModel
                 {
                     Id = existingVendor.Id,
-                    Name = updateVendorModel.Name
+                    Name = updateVendorModel.Name,
+                    Authentication = updateVendorModel.Authentication
                 };
                 var updatedVendor = await _vendorManager.UpdateVendorAsync(parsedId, vendorModel);
                 return Ok(updatedVendor);

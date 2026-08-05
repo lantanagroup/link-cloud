@@ -2,9 +2,12 @@
 #nullable disable
 using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Tenant.Data.Repository.Mappings;
 using LantanaGroup.Link.Tenant.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using System.Text.Json;
 
 namespace LantanaGroup.Link.Tenant.Repository.Context;
 
@@ -18,6 +21,8 @@ public partial class TenantDbContext : DbContext
     public virtual DbSet<Facility> Facilities { get; set; }
     public virtual DbSet<Vendor> Vendors { get; set; }
     public virtual DbSet<VendorVersion> VendorVersions { get; set; }
+
+    private static readonly JsonSerializerOptions VendorAuthenticationJsonOptions = new();
 
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
@@ -34,6 +39,23 @@ public partial class TenantDbContext : DbContext
             entity.HasKey(e => e.Id).IsClustered(false);
 
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
+        });
+
+        modelBuilder.Entity<Vendor>(entity =>
+        {
+            entity.Property(e => e.Authentication)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, VendorAuthenticationJsonOptions),
+                    v => JsonSerializer.Deserialize<VendorAuthenticationSettings>(v, VendorAuthenticationJsonOptions))
+                .Metadata.SetValueComparer(new ValueComparer<VendorAuthenticationSettings?>(
+                    (left, right) => JsonSerializer.Serialize(left, VendorAuthenticationJsonOptions)
+                                     == JsonSerializer.Serialize(right, VendorAuthenticationJsonOptions),
+                    value => value == null
+                        ? 0
+                        : JsonSerializer.Serialize(value, VendorAuthenticationJsonOptions).GetHashCode(),
+                    value => JsonSerializer.Deserialize<VendorAuthenticationSettings>(
+                        JsonSerializer.Serialize(value, VendorAuthenticationJsonOptions),
+                        VendorAuthenticationJsonOptions)));
         });
 
         OnModelCreatingPartial(modelBuilder);

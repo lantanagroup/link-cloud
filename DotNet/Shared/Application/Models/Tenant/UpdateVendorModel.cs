@@ -9,5 +9,8 @@ namespace LantanaGroup.Link.Shared.Application.Models.Tenant
         [Required]
         [DataMember]
         public string? Name { get; set; }
+
+        [DataMember]
+        public VendorAuthenticationSettings? Authentication { get; set; }
     }
 }
