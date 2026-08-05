@@ -2576,6 +2576,7 @@
         "type": "Project",
         "dependencies": {
           "Automation.Link": "[1.0.0, )",
+          "Azure.Storage.Blobs": "[12.29.0, )",
           "LinkSdk": "[1.0.0, )",
           "Microsoft.AspNetCore.Authentication.OpenIdConnect": "[8.0.27, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
