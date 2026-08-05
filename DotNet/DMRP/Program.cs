@@ -89,7 +89,7 @@ namespace DMRP
             {
                 options.CustomizeProblemDetails = ctx =>
                 {
-                    ctx.ProblemDetails.Detail = "An error occured in our API. Please use the trace id when requesting assistence.";
+                    ctx.ProblemDetails.Detail = "An error occurred in our API. Please use the trace id when requesting assistance.";
                     if (!ctx.ProblemDetails.Extensions.ContainsKey("traceId"))
                     {
                         string? traceId = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier;
