@@ -139,3 +139,6 @@ internal-blob-storage:
 pre-qualification:
   write-pre-qual-operation-outcome: false
   write-expressions-in-operation-outcome: true
+
+vaas:
+  terminology-service-url: ''
