@@ -78,27 +78,8 @@ public class ScenariosController(
         model.NhsnOrganizationId = string.IsNullOrWhiteSpace(model.NhsnOrganizationId)
             ? GenerateRandomNhsnOrganizationId()
             : model.NhsnOrganizationId.Trim();
-        var now = DateTimeOffset.UtcNow;
-
-        // Preserve the original creation timestamp during edits.
-        // Existing documents created before CreatedAt was introduced fall back to
-        // their current UpdatedAt value.
-        if (existing != null)
-        {
-            model.CreatedAt = existing.CreatedAt != default
-                ? existing.CreatedAt
-                : existing.UpdatedAt;
-
-            // Last-used information is operational metadata and should not be
-            // overwritten by an editor payload that does not include it.
-            model.LastUsedAt = existing.LastUsedAt;
-        }
-        else
-        {
-            model.CreatedAt = now;
-        }
-
-        model.UpdatedAt = now;
+        
+        model.UpdatedAt = DateTimeOffset.UtcNow;
 
         await scenarioStore.UpsertAsync(model, ct);
         return Json(new { id = model.Id });
@@ -473,9 +454,7 @@ public class ScenariosController(
                     DetectedClinicalScenarioId = p.DetectedClinicalScenarioId
                 })
                 .ToList(),
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow,
-            LastUsedAt = null
+            UpdatedAt = DateTimeOffset.UtcNow
         };
 
         await scenarioStore.UpsertAsync(clone, ct);

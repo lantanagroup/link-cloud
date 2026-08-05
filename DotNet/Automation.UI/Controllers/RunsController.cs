@@ -166,28 +166,7 @@ public class RunsController(
 
             // Build the run request from the complete persisted scenario rather than
             // relying on the default hidden values submitted by the Quick Launch form.
-            var scenarioRequest = StartScenarioRequest.FromScenario(scenario);
-
-            // Do not update LastUsedAt until the run has been accepted successfully.
-            await runManager.StartAsync(scenarioRequest, cancellationToken);
-
-            try
-            {
-                scenario.LastUsedAt = DateTimeOffset.UtcNow;
-
-                // LastUsedAt is usage metadata, so preserve UpdatedAt. Launching a
-                // scenario should not make it appear as recently modified.
-                await scenarioStore.UpsertAsync(scenario, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                // The run has already started. A usage-tracking failure should not
-                // cause the UI to report that launching the run failed.
-                logger.LogWarning(
-                    ex,
-                    "Run started successfully, but LastUsedAt could not be updated for scenario {ScenarioId}",
-                    scenarioId);
-            }
+            await runManager.StartAsync(StartScenarioRequest.FromScenario(scenario), cancellationToken);
 
             return RedirectToAction(nameof(Index));
         }
