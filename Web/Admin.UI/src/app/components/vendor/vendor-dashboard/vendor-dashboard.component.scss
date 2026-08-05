@@ -25,6 +25,13 @@ button[color="warn"] {
   text-align: right;
 }
 
+// Distinguishes "no key associated" from a real secret id at a glance, without reading it as
+// an error -- an unset key is the expected state for a vendor that does not sign requests.
+.not-set {
+  color: rgba(0, 0, 0, 0.54);
+  font-style: italic;
+}
+
 .badge {
   background-color: $primary;
   color: white;

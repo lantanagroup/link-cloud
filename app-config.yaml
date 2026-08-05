@@ -15,19 +15,119 @@ properties:
       type: "array"
       items:
         $ref: "#/$defs/configEntry"
+  serviceMeta:
+    type: "object"
+    description: "Per-service deployment facts: the Azure App Configuration label the running service selects, and which runtime it is. Tooling reads this rather than hardcoding the mapping."
+    additionalProperties:
+      $ref: "#/$defs/serviceMetaEntry"
+  environments:
+    type: "object"
+    description: "The environments this catalog is checked against, keyed by the suffix of their export file (Config/app-config.<key>.json). Declared here so adding a store is one line plus its export rather than four hardcoded lists."
+    additionalProperties:
+      $ref: "#/$defs/environmentEntry"
 required:
   - "global"
   - "services"
+  - "serviceMeta"
+  - "environments"
+
+# Label values are hardcoded in the services themselves and must match exactly:
+#   .NET  - a compile-time constant passed to AddExternalConfiguration(), e.g.
+#           LinkAdminConstants.ServiceName = "LinkAdminBFF"
+#           (DotNet/Shared/Application/Extensions/ExternalConfigurationExtension.cs:61)
+#   Java  - the label-filter in bootstrap.yml, e.g. ',MeasureEval'
+#           (Java/measureeval/src/main/resources/bootstrap.yml:9)
+# Each service selects unlabeled keys first, then its own label, so a labeled row
+# overrides an unlabeled one for that service only. Changing a label requires a redeploy.
+# The environments every required: true key must be present in. Each key is the suffix of its
+# export file, so `qa2` means Config/app-config.qa2.json. A declared environment with no export
+# is an error, not a quietly smaller check.
+#
+# The store names are not consistently spelled. dev is `nhsnlink`; qa, qa2 and test are
+# `nhnslink`, with the middle letters transposed. That is in the actual Azure resource names,
+# so anything addressing a store must use it verbatim. The Key Vaults spell it the other way
+# again (`nhsnlink-kv-*`), and dev's vault does not follow the pattern at all.
+environments:
+  dev:  { store: "nhsnlink-ac-dev",  keyVault: "link-vault" }
+  qa:   { store: "nhnslink-ac-qa",   keyVault: "nhsnlink-kv-qa" }
+  test: { store: "nhnslink-ac-test", keyVault: "nhsnlink-kv-test" }
+  # nhnslink-ac-qa2 exists in Azure but holds no key-values yet, so listing it here would
+  # report all 95 required keys as missing - true, but not actionable until LEGLINK-775
+  # imports into it. Add it with its first export, in that change:
+  #   qa2: { store: "nhnslink-ac-qa2", keyVault: "nhsnlink-kv-qa2" }
+  # The keyVault above is inferred from the qa/test pattern; confirm it from the keyvaultref
+  # values in the export rather than trusting the guess.
+
+serviceMeta:
+  Account:               { label: "Account",               runtime: "dotnet" }
+  AdminBFF:              { label: "LinkAdminBFF",          runtime: "dotnet" }
+  Audit:                 { label: "Audit",                 runtime: "dotnet" }
+  AutomationUI:          { label: "Link Automation UI",    runtime: "dotnet" }
+  Census:                { label: "Census",                runtime: "dotnet" }
+  DataAcquisition:       { label: "DataAcquisition",       runtime: "dotnet" }
+  DataAcquisitionWorker: { label: "DataAcquisitionWorker", runtime: "dotnet" }
+  MeasureEval:           { label: "MeasureEval",           runtime: "java" }
+  Normalization:         { label: "Normalization",         runtime: "dotnet" }
+  Notification:          { label: "Notification",          runtime: "dotnet" }
+  QueryDispatch:         { label: "QueryDispatch",         runtime: "dotnet" }
+  Report:                { label: "Report",                runtime: "dotnet" }
+  Submission:            { label: "Submission",            runtime: "dotnet" }
+  Tenant:                { label: "Tenant",                runtime: "dotnet" }
+  Terminology:           { label: "Terminology",           runtime: "dotnet" }
+  Validation:            { label: "Validation",            runtime: "java" }
+
 global:
   - key: "KafkaConnection:BootstrapServers"
     description: "Comma-separated list of Kafka bootstrap servers for event messaging."
     required: true
-  - key: "DatabaseProvider"
-    description: "The type of database provider to use (e.g., SqlServer, MongoDB)."
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  - key: "KafkaConnection:SaslUsername"
+    description: "The SASL username for authenticating to Kafka. Read by every .NET service through the shared Kafka wiring."
     required: true
+    sensitive: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  - key: "KafkaConnection:SaslPassword"
+    description: "The SASL password for authenticating to Kafka. Read by every .NET service through the shared Kafka wiring."
+    required: true
+    sensitive: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  # SASL_PLAINTEXT is deliberate, and is catalogued so review tooling stops proposing SASL_SSL.
+  # Three things would all have to change together first:
+  #   1. The brokers have no TLS listener. docker-compose maps every listener to SASL_PLAINTEXT,
+  #      and the deployed Strimzi clusters are addressed on :9092, the plain listener (:9093 is
+  #      TLS). A SASL_SSL client against a plaintext listener fails the handshake outright.
+  #   2. The client has no TLS surface. KafkaConnection.cs sets SecurityProtocol, SaslUsername,
+  #      SaslPassword and SaslMechanism only - there is no SslCaLocation or truststore setting
+  #      anywhere in either runtime.
+  #   3. The bootstrap address is a Kubernetes internal service name
+  #      (kafka-kafka-bootstrap.kafka-<env>), so this is pod-to-pod traffic on the cluster
+  #      network, not an exposed endpoint.
+  # The residual risk is real but not fixable here: SCRAM credentials cross the cluster network
+  # unencrypted, so a compromised pod could capture them. Hardening that is a broker-and-code
+  # change, and these values move last, not first.
+  - key: "KafkaConnection:Protocol"
+    description: "Confluent.Kafka SecurityProtocol for the .NET clients. SaslPlaintext today; see the note above before changing it."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  - key: "KafkaConnection:Mechanism"
+    description: "Confluent.Kafka SaslMechanism for the .NET clients. ScramSha512, matching the brokers' SCRAM-SHA-512 credentials."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  - key: "KafkaConnection:SaslProtocolEnabled"
+    description: "Whether the .NET clients send SASL credentials at all. When false, KafkaConnection.CreateConsumerConfig/CreateProducerConfig skip the security protocol, username, password and mechanism entirely, producing an unauthenticated connection."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  - key: "DatabaseProvider"
+    description: "The database provider to use. SqlServer is the only value the code handles; the key exists for a future provider swap."
+    required: false
+    defaultValue: "SqlServer"
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "ConnectionStrings:DatabaseConnection"
     description: "The connection string for the primary service database."
     required: true
+    sensitive: true
+    consumers: ["Account", "Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+
   # Automation.UI inbound-auth coordination note:
   # In Automation.UI Program.cs, the anonymous-access short-circuit middleware runs
   # before UseAuthentication(). When Authentication:EnableAnonymousAccess is false,
@@ -38,102 +138,240 @@ global:
   - key: "Authentication:Schemas:LinkBearer:Authority"
     description: "The OIDC authority URL used for validating bearer tokens."
     required: true
+    consumers: ["Account", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "Authentication:EnableAnonymousAccess"
-    description: "Controls whether Automation.UI serves non-health traffic. Must be true for requests to reach UseAuthentication()/ApiBearer policy evaluation."
+    description: "Whether services skip authentication. The effect differs by consumer and the polarity is easy to misread. In the eleven backend services, false registers UseAuthentication() and UserScopeMiddleware, so true serves requests without authenticating them. Admin.BFF additionally stops attaching a bearer token to its downstream service calls and drops the YARP authorization transforms. Automation.UI is the exception: it has no built-in authentication, so false makes it serve nothing - every non-/health request is short-circuited with 503 - and true serves the UI anonymously, intended only behind an authenticating proxy. Must be true for requests to reach UseAuthentication()/ApiBearer policy evaluation in Automation.UI; see the note above."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "Authentication:ApiBearer:Enabled"
     description: "Boolean flag that enables inbound API bearer-token validation in Automation.UI for /api/runs endpoints."
     required: true
+    consumers: ["AutomationUI"]
   - key: "Authentication:ApiBearer:Authority"
     description: "OIDC authority URL for validating inbound Automation.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true."
     required: true
+    consumers: ["AutomationUI"]
   - key: "Authentication:ApiBearer:Audience"
     description: "Expected audience for inbound Automation.UI API bearer tokens. Required when Authentication:ApiBearer:Enabled is true."
     required: true
+    consumers: ["AutomationUI"]
   - key: "LinkTokenService:Authority"
     description: "The authority URL used by the LinkTokenService for internal token generation and validation."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "LinkTokenService:SigningKey"
     description: "The secret key used for signing internal tokens. Must be kept secure."
     required: true
+    sensitive: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "Logging:HmacKey"
+    description: "The HMAC key used to pseudonymise identifiers before they reach the logs. Read by Account, Admin BFF, Audit and Notification."
+    required: true
+    sensitive: true
+    consumers: ["Account", "AdminBFF", "Audit", "Notification"]
+  # Security posture, and the stores currently contradict the shipped default: appsettings.json
+  # ships Enabled: true, every store sets it to False, and App Configuration outranks the file.
+  # With it off, Admin.BFF caches the serialized Account - email, name, roles and claims - into
+  # Redis unencrypted (LinkClaimsTransformer.cs:65-95). Catalogued so the divergence is visible
+  # rather than buried in a store nobody diffs.
+  - key: "DataProtection:Enabled"
+    description: "Whether ASP.NET Data Protection encrypts values before they are cached. When false, Admin.BFF writes the serialized Account to the shared cache as plain JSON. Set to False in all three stores today, overriding the true shipped in appsettings.json."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "DataProtection:KeyRing"
+    description: "The Data Protection key ring name, used to scope keys so services sharing a store do not read each other's protected payloads. Only meaningful when DataProtection:Enabled is true."
+    required: true
+    consumers: ["Account", "AdminBFF", "DataAcquisition", "DataAcquisitionWorker"]
   - key: "Telemetry:EnableTelemetry"
     description: "Boolean flag to enable or disable OpenTelemetry tracing and metrics."
     required: true
-  - key: "Serilog:WriteTo:GrafanaLoki:Args:uri"
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+    
+  # Serilog's WriteTo is an array, so sinks are addressed positionally, not by name. Index 1
+  # is GrafanaLoki because every appsettings.json orders the array [GrafanaLoki, Console] and
+  # the stores overlay WriteTo:0:Name=Console / WriteTo:1:Name=GrafanaLoki, which .NET merges
+  # by index. Reordering that array in any service silently moves this setting.
+  # No consumers listed: Serilog reads its own configuration section, so there is no call site
+  # for the extractor to attribute and no service to name. Every .NET service ships Serilog.
+  - key: "Serilog:WriteTo:1:Args:uri"
     description: "The endpoint URI for the Grafana Loki log aggregator."
     required: true
-  - key: "ConnectionStrings:Redis"
-    description: "The connection string for the Redis cache (e.g., 'localhost:6379,password=...')."
+  # Read by logback-spring.xml via <springProperty>, not by any @ConfigurationProperties
+  # class, so a scan of the Java binding classes alone reports it as dead. It is not.
+  - key: "loki.app"
+    description: "The application label attached to log lines shipped to Loki by the Java services."
+    required: false
+    runtime: "java"
+    defaultValue: "link-cloud"
+    consumers: ["MeasureEval", "Validation"]
+  - key: "authentication.signing-key"
+    description: "Java-side signing key for internal Link tokens, the counterpart to LinkTokenService:SigningKey. Read by MeasureEval and Validation."
     required: true
+    sensitive: true
+    runtime: "java"
+    consumers: ["MeasureEval", "Validation"]
+  - key: "internal-blob-storage.connection-string"
+    description: "Java-side connection string for the internal blob container, the counterpart to InternalBlobStorage:ConnectionString. Read by MeasureEval and Validation."
+    required: true
+    sensitive: true
+    runtime: "java"
+    consumers: ["MeasureEval", "Validation"]
+  # The Java half of the Kafka client security settings, mirroring the KafkaConnection:* keys
+  # above - see the SASL_PLAINTEXT note there before changing either side. None of the three
+  # lists consumers, for the same reason as Serilog: Spring Boot binds spring.kafka.* itself,
+  # so no Link class reads them. Both Java services authenticate to Kafka with them.
+  - key: "spring.kafka.properties.sasl.jaas.config"
+    description: "The JAAS login module configuration Spring Kafka uses to authenticate to Kafka. Bound by Spring Boot auto-configuration, not by any Link class, and commented out in application.yml so the store is its only source."
+    required: true
+    sensitive: true
+    runtime: "java"
+  - key: "spring.kafka.properties.security.protocol"
+    description: "Spring Kafka security protocol, the Java counterpart to KafkaConnection:Protocol. SASL_PLAINTEXT today; the two must stay in step or the runtimes disagree about how to reach the same brokers."
+    required: true
+    runtime: "java"
+  - key: "spring.kafka.properties.sasl.mechanism"
+    description: "Spring Kafka SASL mechanism, the Java counterpart to KafkaConnection:Mechanism. SCRAM-SHA-512, spelled in Kafka's convention rather than Confluent.Kafka's ScramSha512."
+    required: true
+    runtime: "java"
+  # CORS. The unlabeled rows are the platform default that the eleven backend services apply;
+  # Admin.BFF overrides them under its own label because it is the only one a browser calls
+  # directly. Automation.UI reads this section but never registers a CORS policy, so nothing
+  # it holds affects that service.
+  #
+  # AllowAllOrigins and AllowCredentials are a pair, and the combination is the trap. The
+  # shared builder does not emit a wildcard when AllowAllOrigins is true - CorsServiceExtension
+  # calls SetIsOriginAllowed(_ => true), which reflects the caller's own Origin header back.
+  # That is legal alongside Access-Control-Allow-Credentials, so the browser does not block it
+  # and nothing throws; any site could then make credentialed cross-origin requests and read
+  # the responses. Both are false on the unlabeled rows for that reason. Admin.BFF keeps
+  # AllowCredentials true, which is correct because it pairs it with an explicit AllowedOrigins
+  # list rather than reflection.
+  - key: "CORS:AllowAllOrigins"
+    description: "Whether any origin is accepted. When true the shared builder reflects the caller's Origin header rather than emitting a wildcard, which is legal with credentials and therefore dangerous when paired with them. False on the unlabeled rows; Admin.BFF sets it false and lists origins explicitly."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "CORS:AllowCredentials"
+    description: "Whether cross-origin requests may carry cookies or TLS client certificates. False on the unlabeled rows: the backend services are reached server-side through Admin.BFF, so no browser sends them credentials. Admin.BFF sets it true, paired with an explicit AllowedOrigins list."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "CORS:AllowAllMethods"
+    description: "Whether any HTTP method is accepted. When false the service uses AllowedMethods, falling back to a built-in default list."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "CORS:AllowAllHeaders"
+    description: "Whether any request header is accepted. When false the service uses AllowedHeaders, falling back to a built-in default list."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "CORS:AllowedExposedHeaders"
+    description: "Response headers a browser may read cross-origin. Stored element by element (CORS:AllowedExposedHeaders:0). X-Pagination, so paged responses expose their metadata."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "CORS:MaxAge"
+    description: "Preflight cache lifetime in seconds."
+    required: true
+    consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
+  - key: "ConnectionStrings:Redis"
+    description: "The Redis endpoint (host:port). The password is supplied separately via Redis:Password. Required when Cache:Type is Redis; the resource cache uses ResourceCache:Redis:ConnectionString instead."
+    required: true
+    consumers: ["Account", "AdminBFF", "DataAcquisition", "DataAcquisitionWorker"]
+  - key: "Redis:Password"
+    description: "The password for the Redis instance addressed by ConnectionStrings:Redis. Supplied separately because that key holds only host:port."
+    required: true
+    sensitive: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "InternalBlobStorage:ConnectionString"
     description: "The connection string for the internal Azure Blob Storage (or Azurite)."
     required: true
+    sensitive: true
+    consumers: ["Report", "Submission"]
   - key: "InternalBlobStorage:BlobContainerName"
     description: "The name of the blob container used for internal storage."
     required: true
+    consumers: ["Report", "Submission"]
   - key: "ServiceRegistry:TenantService:TenantServiceUrl"
     description: "The base URL for the Tenant Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:AccountServiceUrl"
     description: "The base URL for the Account Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:ReportServiceUrl"
     description: "The base URL for the Report Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:MeasureServiceUrl"
     description: "The base URL for the Measure Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:CensusServiceUrl"
     description: "The base URL for the Census Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:DataAcquisitionServiceUrl"
     description: "The base URL for the Data Acquisition Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:AdminBffServiceUrl"
     description: "The base URL for the Admin BFF service used by Automation.UI and LinkSdk Admin.BFF integration calls."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:NormalizationServiceUrl"
     description: "The base URL for the Normalization Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:ValidationServiceUrl"
     description: "The base URL for the Validation Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:SubmissionServiceUrl"
     description: "The base URL for the Submission Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:TerminologyServiceUrl"
     description: "The base URL for the Terminology Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:AuditServiceUrl"
     description: "The base URL for the Audit Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:QueryDispatchServiceUrl"
     description: "The base URL for the Query Dispatch Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:NotificationServiceUrl"
     description: "The base URL for the Notification Service."
     required: true
+    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
+  # Java-notation key under global, which has no owning service to infer a runtime from.
+  # Without the marker it is looked up as a .NET key and its /link/report/base-url row is
+  # never matched.
   - key: "link.report.base-url"
     description: "The base URL for the Report Service (used by Java services)."
     required: true
-  - key: "SecretManagement:Enabled"
-    description: "Boolean flag to enable or disable secret management."
-    required: true
+    runtime: "java"
+    consumers: ["MeasureEval", "Validation"]
   - key: "SecretManagement:Manager"
     description: "The type of secret manager to use (e.g., AzureKeyVault)."
     required: true
+    consumers: ["Account", "AdminBFF", "DataAcquisition", "DataAcquisitionWorker"]
   - key: "SecretManagement:ManagerUri"
     description: "The URI for the secret manager."
     required: true
+    consumers: ["AdminBFF", "DataAcquisition", "DataAcquisitionWorker"]
   - key: "ConsumerSettings:ConsumerRetryDuration"
     description: "List of ISO 8601 durations defining the retry intervals for Kafka consumers."
     required: true
+    consumers: ["Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Report", "Submission"]
   - key: "ConsumerSettings:DisableRetryConsumer"
     description: "Boolean flag to disable the retry consumer for Kafka events."
     required: true
+    consumers: ["Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Report", "Submission"]
   - key: "ConsumerSettings:DisableConsumer"
     description: "Boolean flag to disable the Kafka consumer entirely for the service."
     required: true
+    consumers: ["Audit", "Census", "DataAcquisition", "DataAcquisitionWorker", "Report", "Submission"]
   # PAIRED KEYS — one decision, one key per runtime, and they MUST be set to the same value.
   # Enabling only the Java side puts two OperationOutcomes in the patient NDJSON; enabling only the
   # .NET side puts none there. Neither failure is loud, so treat these as a single change.
@@ -147,14 +385,18 @@ global:
   - key: "PreQualification:WritePreQualOperationOutcome"
     description: "Boolean flag (default false), read by the .NET Report service. When true, Report skips its legacy 'Patient has failed Validation' OperationOutcome append to the patient NDJSON, because the Validation service is the sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as pre-qualification.write-pre-qual-operation-outcome."
     required: false
+    consumers: ["Report"]
   - key: "pre-qualification.write-pre-qual-operation-outcome"
     description: "Boolean flag (default false), read by the Java Validation service. When true, Validation writes the category-grouped pre-qualification OperationOutcome to the patient NDJSON and is its sole writer (LEGLINK-425/LEGLINK-466). Must be set to the same value as PreQualification:WritePreQualOperationOutcome."
     required: false
+    runtime: "java"
+    consumers: ["Report", "Validation"]
 services:
   Account:
     - key: "UserManagement:EnableAutomaticUserActivation"
-      description: "Boolean flag to enable automatic activation of new users."
-      required: true
+      description: "Boolean flag to enable automatic activation of new users. Every environment currently runs the default; provision a row only where the posture should differ."
+      required: false
+      defaultValue: "true"
   AdminBFF:
     - key: "Authentication:Schemas:Oauth2:ClientId"
       description: "The OAuth2 client ID for the Admin BFF."
@@ -162,6 +404,7 @@ services:
     - key: "Authentication:Schemas:Oauth2:ClientSecret"
       description: "The OAuth2 client secret for the Admin BFF."
       required: true
+      sensitive: true
     - key: "Authentication:Schemas:Oauth2:Endpoints:Authorization"
       description: "The OAuth2 authorization endpoint URL."
       required: true
@@ -177,33 +420,71 @@ services:
     - key: "MonitorBackendHealthChecks"
       description: "Boolean flag to enable monitoring of backend service health."
       required: true
+    # The explicit lists that make Admin.BFF's AllowCredentials safe. They exist only under
+    # the LinkAdminBFF label - no unlabeled rows - because it is the one service a browser
+    # calls cross-origin: the Admin UI is served from <env>-demo/<env>-dash and calls the BFF
+    # at <env>-admin. Each is stored element by element (CORS:AllowedOrigins:0, :1, ...).
+    - key: "CORS:AllowedOrigins"
+      description: "The origins allowed to call the Admin BFF: the hosts serving the Admin UI, plus http://localhost:4200 for local development. Keep this list exact - it is what makes AllowCredentials: true safe, and a cross-environment entry here lets one environment's UI reach another's BFF with credentials."
+      required: true
+      consumers: ["AdminBFF"]
+    - key: "CORS:AllowedMethods"
+      description: "HTTP methods the Admin BFF accepts cross-origin, used because AllowAllMethods is false under this label."
+      required: true
+      consumers: ["AdminBFF"]
+    - key: "CORS:AllowedHeaders"
+      description: "Request headers the Admin BFF accepts cross-origin, used because AllowAllHeaders is false under this label. Includes Authorization and Set-Cookie, which its cookie-based authentication needs."
+      required: true
+      consumers: ["AdminBFF"]
+    - key: "Authentication:Schemas:OpenIdConnect:Authority"
+      description: "The OpenID Connect authority the Admin BFF authenticates against. Stored as a Key Vault reference even though it is a URL, so it is flagged sensitive to match the store."
+      required: true
+      sensitive: true
+    - key: "Authentication:Schemas:OpenIdConnect:ClientId"
+      description: "The OpenID Connect client ID for the Admin BFF."
+      required: true
+      sensitive: true
+    - key: "Authentication:Schemas:OpenIdConnect:ClientSecret"
+      description: "The OpenID Connect client secret for the Admin BFF."
+      required: true
+      sensitive: true
   Audit:
     - key: "KafkaConnection:ClientId"
       description: "The client ID for the Kafka connection."
       required: true
   AutomationUI:
-    - key: "Automation:ExternalFhirServerBase"
-      description: "The base URL for the external FHIR server used for testing."
+    - key: "Automation:FhirServerBase"
+      description: "The base URL of the FHIR server the generator writes test data to."
       required: true
-    - key: "Automation:InternalFhirServerBase"
-      description: "The base URL for the internal FHIR server used for testing."
+    - key: "Automation:FacilityFhirServerBase"
+      description: "The base URL of the FHIR server as the facility reaches it. Differs from Automation:FhirServerBase only when the consumer's network vantage point differs."
       required: true
     - key: "MongoDB:ConnectionString"
       description: "The MongoDB connection string for automation data."
       required: true
+      sensitive: true
     - key: "MongoDB:DatabaseName"
       description: "The MongoDB database name for automation data."
       required: true
     - key: "ApiHealth:EnableAdminBffAuthSuite"
       description: "Boolean flag to enable the Admin BFF authentication API Health suite in Automation.UI."
       required: false
+    - key: "Automation:SlackWebhookUrl"
+      description: "The Slack webhook the Automation.UI test pipeline posts consolidated results to. Consumed by Tests/AutomationUI.Pipeline/azure-pipelines.yml at runtime, not by any service, which is why it does not appear in the code-derived inventory."
+      required: true
+      sensitive: true
+    - key: "DataProtection:ApplicationName"
+      description: "The Data Protection application name isolating Automation.UI's key ring from other services sharing the store. Falls back to 'Link.Automation.UI:{Environment}' when unset (Automation.UI/Program.cs:208), so it is only provisioned where that default is not wanted - currently dev alone."
+      required: false
   DataAcquisition:
     - key: "AcquisitionJobSettings:CronSchedule"
       description: "The cron expression defining how often data acquisition jobs should run."
-      required: true
+      required: false
+      defaultValue: "0/10 * * * * ?"
     - key: "DistributedLockSettings:Expiration"
       description: "The expiration time in minutes for distributed locks."
-      required: true
+      required: false
+      defaultValue: "10"
     - key: "DistributedLockSettings:PoolSize"
       description: "Optional Redis connection-pool size for distributed locks. Defaults to 5."
       required: false
@@ -219,6 +500,7 @@ services:
     - key: "ResourceCache:Redis:Password"
       description: "Optional Redis password for the resource cache. Defaults to empty."
       required: false
+      sensitive: true
     - key: "ResourceCache:Redis:PoolSize"
       description: "Optional Redis connection-pool size for the resource cache. Defaults to 5."
       required: false
@@ -228,9 +510,14 @@ services:
     - key: "ResourceCache:Redis:MaxMemoryBytes"
       description: "The Redis max-memory limit in bytes, used as the denominator for Hybrid cache memory-pressure fallback. Supplied via configuration because Azure Managed Redis does not return maxmemory via INFO. Recommended for Hybrid; when unset or <= 0 Redis is always used (a warning is logged). All LCG Redis instances are currently 1 GB (1073741824); this must be updated if Redis capacity is scaled. Defaults to 268435456 (256 MB) to match local Docker Redis."
       required: false
+    # Normalization binds a top-level "CacheBlobStorage" section for the same three settings
+    # (Normalization/Program.cs), while DataAcquisition and Shared bind the nested
+    # ResourceCache:BlobStorage form. Both spellings are live; unifying them needs a code
+    # change and is tracked separately.
     - key: "ResourceCache:BlobStorage:ConnectionString"
       description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
       required: true
+      sensitive: true
     - key: "ResourceCache:BlobStorage:BlobContainerName"
       description: "Optional blob container name used by the resource cache. Defaults to empty."
       required: false
@@ -239,8 +526,9 @@ services:
       required: false
   DataAcquisitionWorker:
     - key: "AcquisitionWorkerProcessorSettings:MaxConcurrentAcquisitions"
-      description: "The maximum number of concurrent data acquisition tasks."
-      required: true
+      description: "The maximum number of concurrent data acquisition tasks. Declared in appsettings.json as a flat colon key rather than a nested object."
+      required: false
+      defaultValue: "8"
     - key: "AcquisitionWorkerProcessorSettings:WorkChannelCapacity"
       description: "The capacity of the internal work channel for acquisition tasks."
       required: true
@@ -256,6 +544,7 @@ services:
     - key: "ResourceCache:Redis:Password"
       description: "Optional Redis password for the resource cache. Defaults to empty."
       required: false
+      sensitive: true
     - key: "ResourceCache:Redis:PoolSize"
       description: "Optional Redis connection-pool size for the resource cache. Defaults to 5."
       required: false
@@ -268,20 +557,21 @@ services:
     - key: "ResourceCache:BlobStorage:ConnectionString"
       description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
       required: true
+      sensitive: true
     - key: "ResourceCache:BlobStorage:BlobContainerName"
       description: "Optional blob container name used by the resource cache. Defaults to empty."
       required: false
     - key: "ResourceCache:BlobStorage:BlobRoot"
       description: "Optional blob name prefix used by the resource cache. Defaults to empty."
       required: false
-  Census:
-    - key: "CensusSettings:ObservationCodes"
-      description: "Comma-separated list of FHIR Observation codes used to identify census events."
-      required: true
+  # No service-specific required config: this service reads only global keys. An explicit
+  # empty list keeps it paired with its serviceMeta entry.
+  Census: []
   MeasureEval:
     - key: "spring.data.mongodb.uri"
       description: "The MongoDB connection string."
       required: true
+      sensitive: true
     - key: "spring.kafka.bootstrap-servers"
       description: "Kafka bootstrap servers for the measure evaluation service."
       required: true
@@ -289,14 +579,17 @@ services:
       description: "The OIDC authority URL for token validation."
       required: true
     - key: "link.reportability-predicate"
-      description: "Fully qualified class name of the reportability predicate to use."
-      required: true
+      description: "Fully qualified class name of the reportability predicate. Changing it changes evaluation behaviour, not deployment topology, so it is not an environment concern."
+      required: false
+      defaultValue: "com.lantanagroup.link.measureeval.reportability.IsInInitialPopulation"
     - key: "link.cql-debug"
       description: "Boolean flag to enable CQL debugging."
-      required: true
+      required: false
+      defaultValue: "false"
     - key: "resource-cache.blob-storage.connection-string"
       description: "Azure Blob Storage (or Azurite) connection string for the ABS resource cache. Required only when the ABS resource-cache backend is used instead of Redis; leave empty to disable ABS caching."
       required: false
+      sensitive: true
     - key: "resource-cache.blob-storage.blob-container-name"
       description: "Name of the blob container backing the ABS resource cache. Required only when the ABS resource-cache backend is used."
       required: false
@@ -313,6 +606,7 @@ services:
     - key: "ResourceCache:Redis:Password"
       description: "Optional Redis password for the resource cache. Defaults to empty."
       required: false
+      sensitive: true
     - key: "ResourceCache:Redis:MemoryThresholdPercent"
       description: "Optional percentage of ResourceCache:Redis:MaxMemoryBytes at which Hybrid caching falls back to blob storage. Defaults to 80.0."
       required: false
@@ -322,6 +616,7 @@ services:
     - key: "ResourceCache:BlobStorage:ConnectionString"
       description: "The Azure Blob Storage connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or ABS."
       required: true
+      sensitive: true
     - key: "ResourceCache:BlobStorage:BlobContainerName"
       description: "Optional blob container name used by the resource cache. Defaults to empty."
       required: false
@@ -335,14 +630,30 @@ services:
     - key: "SmtpConnection:Port"
       description: "The SMTP server port."
       required: true
-  QueryDispatch:
-    - key: "QuartzCollectionPrefix"
-      description: "The prefix for Quartz job collections in the database."
+    - key: "SmtpConnection:Username"
+      description: "The SMTP account username used to send notifications."
       required: true
+      sensitive: true
+    - key: "SmtpConnection:ClientId"
+      description: "The Entra application (client) ID used for SMTP OAuth authentication."
+      required: true
+      sensitive: true
+    - key: "SmtpConnection:ClientSecret"
+      description: "The Entra application client secret used for SMTP OAuth authentication."
+      required: true
+      sensitive: true
+    - key: "SmtpConnection:TenantId"
+      description: "The Entra tenant ID used for SMTP OAuth authentication."
+      required: true
+      sensitive: true
+  # No service-specific required config: this service reads only global keys. An explicit
+  # empty list keeps it paired with its serviceMeta entry.
+  QueryDispatch: []
   Report:
     - key: "EnhancedQueryLoggingSettings:EnableEnhancedQueryLogging"
-      description: "Boolean flag to enable detailed logging of database queries."
-      required: true
+      description: "Boolean flag to enable detailed logging of database queries. Diagnostic toggle; provision a row where it should be on."
+      required: false
+      defaultValue: "false"
     - key: "PatientAggregator:IncludeOrganizationResource"
       description: "Whether to include the submitting Organization in patient bundles."
       required: false
@@ -356,12 +667,14 @@ services:
     - key: "InternalBlobStorage:ConnectionString"
       description: "The connection string for the internal Azure Blob Storage (where submissions are stored)."
       required: true
+      sensitive: true
     - key: "InternalBlobStorage:BlobContainerName"
       description: "The name of the blob container used for internal storage."
       required: true
     - key: "ExternalBlobStorage:ConnectionString"
       description: "The connection string for the external Azure Blob Storage (where submissions are stored)."
       required: true
+      sensitive: true
     - key: "ExternalBlobStorage:BlobContainerName"
       description: "The name of the blob container used for external storage."
       required: true
@@ -380,11 +693,13 @@ services:
   Tenant:
     - key: "FacilityIdSettings:NumericOnlyFacilityId"
       description: "Boolean flag to restrict facility IDs to numeric values only."
-      required: true
+      required: false
+      defaultValue: "false"
   Terminology:
     - key: "Terminology:Path"
-      description: "The path to the terminology data files."
-      required: true
+      description: "Path to the terminology data files. A path inside the container image, so it does not vary by environment. Validated at startup: a missing directory is a hard startup failure."
+      required: false
+      defaultValue: "data/"
   Validation:
     - key: "spring.datasource.url"
       description: "The SQL Server database connection URL for the validation service."
@@ -392,21 +707,25 @@ services:
     - key: "spring.datasource.username"
       description: "The database username."
       required: true
+      sensitive: true
     - key: "spring.datasource.password"
       description: "The database password."
       required: true
+      sensitive: true
     - key: "spring.kafka.bootstrap-servers"
       description: "Kafka bootstrap servers for the validation service."
       required: true
     - key: "spring.data.redis.host"
       description: "The Redis host for the validation service."
       required: true
+      sensitive: true
     - key: "spring.data.redis.port"
       description: "The Redis port for the validation service."
       required: true
     - key: "spring.data.redis.password"
       description: "The Redis password."
       required: true
+      sensitive: true
     - key: "authentication.authority"
       description: "The OIDC authority URL for token validation."
       required: true
@@ -420,8 +739,35 @@ services:
       description: "Boolean flag (default true). When false, the expression[] of each issue is omitted from the pre-qualification OperationOutcome written by the Validation service."
       required: false
 $defs:
+  serviceMetaEntry:
+    type: "object"
+    additionalProperties: false
+    required:
+      - "label"
+      - "runtime"
+    properties:
+      label:
+        type: "string"
+        description: "The App Configuration label this service selects at startup. Hardcoded per service (a compile-time constant in .NET, the bootstrap.yml label-filter in Java), so it cannot be changed without a redeploy. Must match exactly, including case and spaces."
+      runtime:
+        type: "string"
+        enum: ["dotnet", "java"]
+        description: "Which runtime the service is. Determines key notation: .NET reads 'Section:Key' rows, Java reads '/section/key' rows which the Spring provider maps to 'section.key'."
+  environmentEntry:
+    type: "object"
+    additionalProperties: false
+    required:
+      - "store"
+    properties:
+      store:
+        type: "string"
+        description: "The Azure App Configuration resource name. Used verbatim by export and import tooling, so the nhnslink/nhsnlink spelling matters."
+      keyVault:
+        type: "string"
+        description: "The Key Vault the store's keyvaultref rows resolve against. Optional: it is documentation, and a new environment may not have one recorded yet."
   configEntry:
     type: "object"
+    additionalProperties: false
     required:
       - "key"
       - "description"
@@ -436,3 +782,38 @@ $defs:
         type: "boolean"
         default: true
         description: "Whether the setting is strictly required for the service to start/function correctly."
+      label:
+        type: "string"
+        description: "An optional label for the configuration key, if applicable."
+      sensitive:
+        type: "boolean"
+        default: false
+        description: "Whether the setting contains sensitive information (e.g., passwords, secrets) that should be protected."
+      defaultValue:
+        type: "string"
+        description: "An optional default value for the configuration key, if applicable."
+      runtime:
+        type: "string"
+        enum: ["dotnet", "java"]
+        description: "Overrides the runtime inferred from the owning service, for the rare entry whose notation does not match its section. Needed for Java-notation keys listed under 'global', which has no owning service."
+      consumers:
+        type: "array"
+        items:
+          type: "string"
+        description: "Services that read this key. Populated on 'global' entries only - under 'services' the owning section already names the consumer. Values come from the link:consumers tag the exports carry, which apply_appconfig_tags.py derives from the code inventory. Documentation only; nothing resolves configuration from it. Absent where the key is bound by a framework rather than by Link code, so no call site exists to attribute."
+    # A sensitive setting must never carry a defaultValue - secrets and Key Vault
+    # references are supplied per environment, never seeded from this file.
+    # The "required: sensitive" guard below is load-bearing: without it, an entry that
+    # omits "sensitive" still matches the "if" (a properties clause is vacuously true for
+    # an absent property) and would be blocked from having a defaultValue. The
+    # "default: false" above does not help - JSON Schema defaults are annotation only
+    # and are not applied during validation.
+    if:
+      properties:
+        sensitive:
+          const: true
+      required:
+        - "sensitive"
+    then:
+      properties:
+        defaultValue: false
