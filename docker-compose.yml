@@ -1014,6 +1014,36 @@ services:
       interval: 5s
       retries: 10
 
+  mock-dmrp-api:
+    image: mock-dmrp-api
+    container_name: mock-dmrp-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Docker
+      MockDmrpApi__Enabled: "true"
+      MockDmrpApi__AuthClientId: ${MOCK_DMRP_CLIENT_ID:-link-cloud-dev}
+      MockDmrpApi__AuthClientSecret: ${MOCK_DMRP_CLIENT_SECRET:-link-cloud-dev-secret}
+      MockDmrpApi__SigningKey: ${MOCK_DMRP_SIGNING_KEY:-mock-dmrp-local-development-signing-key-not-for-any-deployed-environment}
+      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-mock-dmrp;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
+    ports:
+      - "6159:8080"
+    build:
+      context: .
+      dockerfile: DotNet/MockDmrpApi/Dockerfile
+      args:
+        BUILD_CONFIGURATION: Debug
+    networks:
+      - link-nw
+    depends_on:
+      # Unlike mock-fhir-server this has a database, and migration runs at startup against
+      # a catalog create-dbs.sql has to create first.
+      mssql_init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      start_period: 15s
+      interval: 5s
+      retries: 10
+
   terminology:
     image: link-terminology
     container_name: link-terminology

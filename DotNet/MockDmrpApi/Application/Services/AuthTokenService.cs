@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -66,6 +67,13 @@ public class AuthTokenService : IAuthTokenService
         {
             new(JwtRegisteredClaimNames.Sub, clientId),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+
+            // JwtSecurityToken writes nbf and exp from the constructor arguments but not
+            // iat, and callers commonly read it to reason about token age.
+            new(JwtRegisteredClaimNames.Iat,
+                EpochTime.GetIntDate(issuedAt.UtcDateTime).ToString(CultureInfo.InvariantCulture),
+                ClaimValueTypes.Integer64),
+
             new(ScopeClaim, scope ?? string.Empty)
         };
 

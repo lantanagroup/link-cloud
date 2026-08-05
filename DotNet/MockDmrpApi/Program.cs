@@ -37,6 +37,17 @@ builder.Services.AddScoped<DmrpController>();
 
 builder.Services.AddProblemDetails();
 
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }
+});
+
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<ReportingPlanDbContext>("database");
 
@@ -58,10 +69,17 @@ else
 }
 
 // Before routing, so nothing added later can be reached while the service is disabled.
+// Swagger is registered after it deliberately: a disabled deployment should not advertise
+// a surface it will not serve.
 app.UseDmrpAvailabilityGate();
 
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+
+// Reflected from the controllers, so it shows the routes as this service actually hosts
+// them -- under /dmrp/mock. It is NOT the contract; Contracts/dmrp-openapi.yaml is, and it
+// describes the API rooted at / as it is expected to be published.
+app.ConfigureSwagger();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
 {

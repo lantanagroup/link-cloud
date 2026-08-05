@@ -65,6 +65,12 @@ public class AuthTokenServiceTests
         jwt.Subject.Should().Be(ClientId);
         jwt.Claims.Should().Contain(c => c.Type == "scope" && c.Value == "dmrp.read");
         jwt.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Jti);
+
+        // JwtSecurityToken writes nbf and exp on its own but not iat, so this asserts a
+        // claim that has to be added deliberately.
+        jwt.Claims.Should().Contain(c => c.Type == JwtRegisteredClaimNames.Iat);
+        jwt.IssuedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
+        jwt.ValidFrom.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromMinutes(1));
         jwt.Header.Alg.Should().Be(SecurityAlgorithms.HmacSha512);
         jwt.ValidTo.Should().BeAfter(DateTime.UtcNow);
     }
