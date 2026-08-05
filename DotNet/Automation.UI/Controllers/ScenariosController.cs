@@ -533,6 +533,30 @@ public class ScenariosController(
         });
     }
 
+    [HttpGet]
+    public async Task<IActionResult> GetQuickLaunchMetadata(
+    Guid id,
+    CancellationToken ct)
+    {
+        var scenario = await scenarioStore.GetByIdAsync(id, ct);
+
+        if (scenario == null)
+            return NotFound();
+
+        return Json(new
+        {
+            id = scenario.Id,
+            name = scenario.Name,
+            description = scenario.Description ?? string.Empty,
+            method = scenario.ReportMethod.ToString(),
+            type = scenario.IsSystemScenario ? "System" : "Custom",
+            measures = scenario.SelectedMeasures
+                .Select(ProfiledMeasureCatalog.GetDisplayName)
+                .ToList(),
+            updatedAt = scenario.UpdatedAt.ToUnixTimeMilliseconds()
+        });
+    }
+
     public sealed class ClassifyImportedRequest
     {
         public ImportedPatientSource Source { get; set; } = ImportedPatientSource.ExistingId;

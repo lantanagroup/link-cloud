@@ -298,6 +298,7 @@
 (function () {
     var detailsBaseUrl = '@Url.Action("Details", "Runs", new { id = "__ID__" })';
     var dashboardStatsUrl = '@Url.Action("DashboardStats", "Runs")';
+    var quickLaunchMetadataUrl = '@Url.Action("GetQuickLaunchMetadata", "Scenarios")';
     var recentRunsPartialUrl = '@Url.Action("RecentRunsPartial", "Runs")';
     var cancelUrl = '@Url.Action("CancelJson", "Runs")';
     var deleteUrl = '@Url.Action("DeleteJson", "Runs")';
@@ -832,67 +833,105 @@
         }
 
         var id = String(detail.id);
-        var label = detail.name || 'Scenario';
-        var now = String(Date.now());
+        var url = quickLaunchMetadataUrl + '?id=' + encodeURIComponent(id);
 
-        // Update the hidden native select.
-        var hiddenOption = selector
-            ? selector.querySelector('option[value="' + id + '"]')
-            : null;
+        fetch(url)
+             then(function (response) {
+                if (!response.ok) {
+                    throw new Error(
+                        'Unable to reload saved scenario metadata. HTTP ' +
+                        response.status
+                    );
+                }
 
-        if (hiddenOption) {
-            hiddenOption.textContent = label;
-            hiddenOption.dataset.name = label;
-            hiddenOption.dataset.updated = now;
-        } else if (selector) {
-            hiddenOption = document.createElement('option');
-            hiddenOption.value = id;
-            hiddenOption.textContent = label;
-            hiddenOption.dataset.name = label;
-            hiddenOption.dataset.description = '';
-            hiddenOption.dataset.method = '';
-            hiddenOption.dataset.type = 'Custom';
-            hiddenOption.dataset.measures = '';
-            hiddenOption.dataset.updated = now;
+                return response.json();
+            })
+            .then(function (scenario) {
+                var label = scenario.name || 'Scenario';
+                    var description = scenario.description || '';
+                var method = scenario.method || '';
+                var type = scenario.type || 'Custom';
+                var measures = Array.isArray(scenario.measures)
+                    ? scenario.measures.join(' ')
+                    : '';
+                var updatedAt = String(scenario.updatedAt || Date.now());
 
-            selector.appendChild(hiddenOption);
-        }
+                // Update or add the hidden native option.
+                var hiddenOption = selector
+                    ? selector.querySelector(
+                        'option[value="' + id + '"]'
+                    )
+                    : null;
 
-        // Update the visible searchable dropdown.
-        var visibleOption = document.querySelector(
-            '#quickLaunchDropdown .quick-launch-option[data-id="' + id + '"]'
-        );
+                if (!hiddenOption && selector) {
+                    hiddenOption = document.createElement('option');
+                    hiddenOption.value = id;
+                        selector.appendChild(hiddenOption);
+                }
 
-        if (visibleOption) {
-            visibleOption.dataset.name = label;
-            visibleOption.dataset.updated = now;
-            visibleOption.textContent = label;
-        } else {
-            var customGroup = document.querySelector(
-                '#quickLaunchDropdown .quick-launch-group[data-group="Custom"]'
-            );
+                if (hiddenOption) {
+                    hiddenOption.textContent =
+                        label + (type === 'System' ? ' [System]' : '');
+                    hiddenOption.dataset.name = label;
+                    hiddenOption.dataset.description = description;
+                    hiddenOption.dataset.method = method;
+                    hiddenOption.dataset.type = type;
+                    hiddenOption.dataset.measures = measures;
+                    hiddenOption.dataset.updated = updatedAt;
+                }
 
-            if (customGroup) {
-                visibleOption = document.createElement('button');
-                visibleOption.type = 'button';
-                visibleOption.className =
-                    'dropdown-item quick-launch-option';
-                visibleOption.dataset.id = id;
+                // Update or add the visible searchable dropdown button.
+                var visibleOption = document.querySelector(
+                    '#quickLaunchDropdown ' +
+                    '.quick-launch-option[data-id="' +
+                    id +
+                    '"]'
+                );
+
+                if (!visibleOption) {
+                    visibleOption = document.createElement('button');
+                    visibleOption.type = 'button';
+                    visibleOption.className =
+                        'dropdown-item quick-launch-option';
+                    visibleOption.dataset.id = id;
+                }
+
                 visibleOption.dataset.name = label;
-                visibleOption.dataset.description = '';
-                visibleOption.dataset.method = '';
-                visibleOption.dataset.type = 'Custom';
-                visibleOption.dataset.measures = '';
-                visibleOption.dataset.updated = now;
-                visibleOption.textContent = label;
+                visibleOption.dataset.description = description;
+                visibleOption.dataset.method = method;
+                visibleOption.dataset.type = type;
+                visibleOption.dataset.measures = measures;
+                visibleOption.dataset.updated = updatedAt;
 
-                customGroup.appendChild(visibleOption);
-            }
-        }
+                // textContent is safe because label comes from persisted data.
+                visibleOption.textContent =
+                    label + (type === 'System' ? ' [System]' : '');
 
-        sortQuickLaunchDropdownOptions();
-        applyQuickLaunchSearch();
-        selectQuickLaunchScenario(id, label);
+                var targetGroup = document.querySelector(
+                    '#quickLaunchDropdown ' +
+                    '.quick-launch-group[data-group="' +
+                    type +
+                    '"]'
+                );
+
+                if (targetGroup) {
+                    targetGroup.appendChild(visibleOption);
+                }
+
+                sortQuickLaunchDropdownOptions();
+                applyQuickLaunchSearch();
+                selectQuickLaunchScenario(id, label);
+            })
+            .catch(function (error) {
+                console.error(
+                   'Failed to refresh Quick Launch scenario metadata',
+                    error
+                );
+
+                // The scenario was still saved successfully. Reloading ensures the
+                // persisted data appears correctly if metadata refresh fails.
+                window.location.reload();
+            });
     });
 
     // Re-orders <option>s inside the Quick Launch selector to match the server-side
