@@ -1,5 +1,6 @@
 ﻿using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.Shared.Application.Models;
+using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using OpenTelemetry.Trace;
 using System.Diagnostics;
@@ -54,7 +55,7 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             var existing = await _repository.GetAsync(id, cancellationToken);
             if (existing is null)
             {
-                _logger.LogError("Measure mapping with Id: {Id} not found", id);
+                _logger.LogError("Measure mapping with Id: {Id} not found", id.SanitizeForLog());
                 throw new ApplicationException($"Measure mapping with Id: {id} not found");
             }
 
@@ -84,7 +85,7 @@ namespace LantanaGroup.Link.DMRP.Business.Managers
             var existing = await _repository.GetAsync(id, cancellationToken);
             if (existing is null)
             {
-                _logger.LogError("Measure mapping with Id: {Id} not found", id);
+                _logger.LogError("Measure mapping with Id: {Id} not found", id.SanitizeForLog());
                 throw new ApplicationException($"Measure mapping with Id: {id} not found");
             }
 
