@@ -313,8 +313,7 @@ public sealed class MongoScenarioStore : IScenarioStore
                 claimUpdate,
                 new FindOneAndUpdateOptions<ImportedBundleDocument>
                 {
-                    ReturnDocument = ReturnDocument.After,
-                    Sort = Builders<ImportedBundleDocument>.Sort.Ascending(b => b.CreatedAt)
+                    ReturnDocument = ReturnDocument.After
                 },
                 ct);
 

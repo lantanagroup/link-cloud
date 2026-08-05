@@ -116,7 +116,6 @@ public sealed class ImportedBundleBlobMigrationService : IHostedService
                     Builders<ImportedBundleDocument>.Filter.Nin(b => b.Id, failedDocIds));
 
             var docs = await _bundles.Find(batchFilter)
-                .SortBy(b => b.CreatedAt)
                 .Limit(MigrationBatchSize)
                 .ToListAsync(ct);
 
