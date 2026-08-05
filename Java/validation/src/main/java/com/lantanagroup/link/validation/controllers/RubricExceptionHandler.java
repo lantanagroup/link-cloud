@@ -13,8 +13,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.List;
 
 /**
  * Maps the rubric-registry domain exceptions to the HTTP status codes documented on
@@ -63,5 +66,16 @@ public class RubricExceptionHandler {
     public ProblemDetail handlePayloadParse(PayloadParseException ex) {
         logger.warn("Rejected unparseable rubric payload: {}", LogUtils.sanitize(ex.getMessage()));
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
+        List<String> errors = ex.getBindingResult().getFieldErrors().stream()
+                .map(e -> e.getField() + ": " + e.getDefaultMessage())
+                .toList();
+        logger.warn("Rejected invalid request payload: {}", LogUtils.sanitize(errors.toString()));
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Request validation failed");
+        problem.setProperty("errors", errors);
+        return problem;
     }
 }

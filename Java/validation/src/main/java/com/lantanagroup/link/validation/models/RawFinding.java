@@ -8,12 +8,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.UUID;
+
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class RawFinding {
+
+    private UUID checkId;
     private String checkLocalId;
     private PiqiDimension dimension;
     private Severity severity;
