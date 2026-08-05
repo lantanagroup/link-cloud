@@ -9,6 +9,7 @@ using LantanaGroup.Link.Normalization.Domain.Entities;
 using LantanaGroup.Link.Normalization.Domain.Managers;
 using LantanaGroup.Link.Normalization.Domain.Queries;
 using LantanaGroup.Link.Normalization.Domain.Repositories;
+using LantanaGroup.Link.Normalization.Domain.Services;
 using LantanaGroup.Link.Normalization.Listeners;
 using LantanaGroup.Link.Report.Application.Interfaces;
 using LantanaGroup.Link.Report.Application.Options;
@@ -23,6 +24,7 @@ using LantanaGroup.Link.Shared.Application.Interfaces;
 using LantanaGroup.Link.Shared.Application.Models;
 using LantanaGroup.Link.Shared.Application.Models.Configs;
 using LantanaGroup.Link.Shared.Application.Models.Kafka;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Shared.Application.Services.ResourceCache;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -53,6 +55,7 @@ namespace IntegrationTests.Normalization
         public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, ResourcesAcquiredValue>> ResourcesAcquiredDeadLetterHandlerMock { get; } = new();
         public Mock<IDeadLetterExceptionHandler<ResourcesAcquiredListener, ResourceKey, string>> ConsumeExceptionHandlerMock { get; } = new();
         public Mock<IProducer<ResourceKey, ResourcesNormalizedValue>> ResourcesNormalizedProducerMock { get; } = new();
+        public Mock<IVendorVersionResolver> VendorVersionResolverMock { get; } = new();
 
         public string AzuriteConnectionString => _azuriteContainer.GetConnectionString();
         public string RedisConnectionString => _redisContainer.GetConnectionString();
@@ -111,18 +114,30 @@ namespace IntegrationTests.Normalization
             builder.Services.AddScoped<IEntityRepository<OperationSequence>, OperationSequenceRepository>();
             builder.Services.AddScoped<IEntityRepository<ResourceType>, ResourceTypeRepository>();
             builder.Services.AddScoped<IEntityRepository<OperationResourceType>, OperationResourceTypeRepository>();
-            builder.Services.AddScoped<IEntityRepository<Vendor>, VendorRepository>();
-            builder.Services.AddScoped<IEntityRepository<VendorVersion>, VendorVersionRepository>();
             builder.Services.AddScoped<IEntityRepository<VendorVersionOperationPreset>, VendorVersionOperationPresetRepository>();
 
             builder.Services.AddScoped<LantanaGroup.Link.Normalization.Domain.IDatabase, LantanaGroup.Link.Normalization.Domain.Database>();
             builder.Services.AddScoped<IOperationManager, OperationManager>();
             builder.Services.AddScoped<IResourceManager, LantanaGroup.Link.Normalization.Domain.Managers.ResourceManager>();
-            builder.Services.AddScoped<IVendorManager, VendorManager>();
+            builder.Services.AddScoped<IVendorVersionOperationPresetManager, VendorVersionOperationPresetManager>();
             builder.Services.AddScoped<IOperationQueries, OperationQueries>();
             builder.Services.AddScoped<IOperationSequenceQueries, OperationSequenceQueries>();
-            builder.Services.AddScoped<IVendorQueries, VendorQueries>();
+            builder.Services.AddScoped<IVendorVersionOperationPresetQueries, VendorVersionOperationPresetQueries>();
             builder.Services.AddScoped<IResourceQueries, ResourceQueries>();
+            VendorVersionResolverMock
+                .Setup(resolver => resolver.ResolveAsync(It.IsAny<IEnumerable<Guid>>(), It.IsAny<CancellationToken>()))
+                .Returns((IEnumerable<Guid> vendorVersionIds, CancellationToken _) =>
+                    Task.FromResult<IReadOnlyDictionary<Guid, VendorVersionModel>>(vendorVersionIds
+                        .Distinct()
+                        .ToDictionary(
+                            vendorVersionId => vendorVersionId,
+                            vendorVersionId => new VendorVersionModel
+                            {
+                                Id = vendorVersionId,
+                                VendorId = Guid.Empty,
+                                Version = "test"
+                            })));
+            builder.Services.AddSingleton<IVendorVersionResolver>(VendorVersionResolverMock.Object);
             builder.Services.AddSingleton(ResourcesAcquiredConsumerFactoryMock.Object);
             builder.Services.AddSingleton(ResourcesAcquiredDeadLetterHandlerMock.Object);
             builder.Services.AddSingleton(ResourcesAcquiredTransientHandlerMock.Object);

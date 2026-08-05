@@ -16,6 +16,8 @@ public partial class TenantDbContext : DbContext
     }
 
     public virtual DbSet<Facility> Facilities { get; set; }
+    public virtual DbSet<Vendor> Vendors { get; set; }
+    public virtual DbSet<VendorVersion> VendorVersions { get; set; }
 
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

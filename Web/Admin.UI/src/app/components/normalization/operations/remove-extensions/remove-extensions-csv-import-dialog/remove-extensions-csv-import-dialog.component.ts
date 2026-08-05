@@ -29,6 +29,7 @@ export interface CsvImportDialogData {
   facilityId?: string;
   isVendorMode: boolean;
   vendorIds: string[];
+  vendorVersionIds: string[];
   validResourceTypes: string[];
 }
 
@@ -280,7 +281,7 @@ export class RemoveExtensionsCsvImportDialogComponent {
         resourceTypes: [group.resourceType],
         operation,
         isDisabled: false,
-        vendorIds: this.data.vendorIds
+        vendorVersionIds: this.data.vendorVersionIds
       };
 
       try {
