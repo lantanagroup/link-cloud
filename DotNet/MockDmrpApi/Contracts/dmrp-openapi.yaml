@@ -42,8 +42,8 @@ info:
     meaningful answer, not an absent resource.
 
 servers:
-  - url: /
-    description: The API root.
+  - url: http://localhost:6159/dmrp/mock
+    description: Docker compose root
 
 tags:
   - name: Reporting Plans

@@ -143,6 +143,21 @@ public class DmrpControllerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ThePrefixIsAppliedExactlyOnce()
+    {
+        // The spec's server URL carries the dmrp/mock path, so NSwag emits a class-level
+        // [Route("dmrp/mock")] on the generated base -- and DmrpController declares the same
+        // route itself. Attribute routing takes the most-derived declaration rather than
+        // combining them, so the prefix is not doubled. If that ever changed, every route
+        // would move to /dmrp/mock/dmrp/mock and this test is what would say so.
+        (await _client.GetAsync("/dmrp/mock/search")).StatusCode
+            .Should().Be(HttpStatusCode.NoContent, "the prefix is applied once");
+
+        (await _client.GetAsync("/dmrp/mock/dmrp/mock/search")).StatusCode
+            .Should().Be(HttpStatusCode.NotFound, "the prefix must not be applied twice");
+    }
+
+    [Fact]
     public async Task GetById_DoesNotShadowTheLiteralRoutes()
     {
         // /search and /reporting-plans must win over /{id}; otherwise they would be read

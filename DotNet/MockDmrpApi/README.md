@@ -30,11 +30,28 @@ This is the part worth reading before changing anything.
 
 ### 2.1 The spec is the source of truth
 
-`Contracts/dmrp-openapi.yaml` describes the API **as it is expected to be published**: rooted
-at `/`, with production operation names. The words "test" and "mock" appear nowhere in it.
+`Contracts/dmrp-openapi.yaml` describes the API with production operation names. The words
+"test" and "mock" appear nowhere in it.
 
-This service hosts that contract under the `/dmrp/mock` prefix, so repointing a consumer from
-the stand-in to the real DMRP is a base-URL change and nothing else.
+Every path is **relative to the server URL**, and that URL carries the `dmrp/mock` prefix:
+
+```yaml
+servers:
+  - url: http://localhost:6159/dmrp/mock
+```
+
+So the spec's `/search` resolves to `http://localhost:6159/dmrp/mock/search`, matching the
+`[Route("dmrp/mock")]` on the controller. Repointing a consumer at another instance — or
+eventually at the real DMRP — is a change to that one server URL and nothing else.
+
+⚠️ **The prefix is declared twice, and that is deliberate.** Because the server URL has a path
+component, NSwag emits a class-level `[Route("dmrp/mock")]` on the generated base as well.
+Attribute routing takes the most-derived declaration rather than combining them, so the prefix
+is applied once — `ThePrefixIsAppliedExactlyOnce` in `DmrpControllerTests` pins that.
+
+The explicit route on the controller is what actually decides the served path. Keep it: if the
+server URL were ever shortened to `http://localhost:6159`, the generated route would become
+empty and, without the explicit one, every endpoint would silently move to `/`.
 
 ### 2.2 What happens on build
 
@@ -134,7 +151,8 @@ spec — those belong in `NhsnAuthController`.
 
 ## 3. Route map
 
-The spec declares these rooted at `/`. This service hosts them under `/dmrp/mock`.
+Spec paths are relative to the server URL, which carries the `dmrp/mock` prefix (§2.1), so
+the served URL is the prefix plus the path.
 
 | Spec path | Served at | Purpose |
 |---|---|---|
@@ -312,8 +330,10 @@ pointing schema changes at a server.
 ### ⚠️ Swagger is not the contract
 
 `/swagger` is available when `EnableSwagger` is true. It is a Swashbuckle-reflected OpenAPI
-**2.0** document showing routes under `/dmrp/mock`. `Contracts/dmrp-openapi.yaml` is OpenAPI
-3.0.3 rooted at `/`. **Read the yaml, not the Swagger page**, when you need the contract.
+**2.0** document generated from the controllers; `Contracts/dmrp-openapi.yaml` is a
+hand-authored OpenAPI **3.0.3** document and is the actual contract. The two describe the same
+routes but are produced by opposite processes, so they can disagree in detail. **Read the
+yaml, not the Swagger page**, when you need the contract.
 
 ---
 

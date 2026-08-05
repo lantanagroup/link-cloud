@@ -15,9 +15,10 @@ namespace LantanaGroup.Link.MockDmrpApi.Presentation.Controllers;
 /// The base class, its routes and its DTOs are generated from that document, so replacing
 /// the document surfaces every contract change as a compile error here.
 /// <para>
-/// The contract is rooted at <c>/</c> because it describes the API as it is expected to be
-/// published. This service stands in for that API, so it hosts the whole contract under a
-/// prefix instead.
+/// The contract's paths are relative to its server URL, which carries the <c>dmrp/mock</c>
+/// prefix. The route below supplies that same prefix, so the served URLs match what the
+/// contract describes. Changing one without the other silently moves the API away from its
+/// own contract.
 /// </para>
 /// <para>
 /// Two things must be restated on every override, neither of which is inherited from the
