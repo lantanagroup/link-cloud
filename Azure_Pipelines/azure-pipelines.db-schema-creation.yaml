@@ -448,3 +448,33 @@ stages:
             SqlPassword: '$(link-db_pass)'
             deployType: 'SqlTask'
             SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'
+
+############################################################################################
+# SQL Script Apply QA2
+############################################################################################
+- stage: Apply_QA2_Update_SQL_DBs
+  displayName: Apply QA2 SQL Updates
+  trigger: manual
+  condition: always()
+
+  pool:
+    vmImage: windows-latest
+
+  jobs:
+  - ${{ each db in parameters.databases }}:
+    - job: Update_${{ db.name }}_QA
+      displayName: Update ${{ db.name }}
+      steps:
+        - download: current
+          artifact: ${{ db.artifact }}
+
+        - task: SqlAzureDacpacDeployment@1
+          displayName: Apply ${{ db.name }} DB Schema
+          inputs:
+            azureSubscription: "NHSNLink Resource Manager"
+            ServerName: '$(link-db_server)'
+            DatabaseName: 'link-qa2-botw-${{ db.name }}'
+            SqlUsername: '$(link-db_username)'
+            SqlPassword: '$(link-db_pass)'
+            deployType: 'SqlTask'
+            SqlFile: '$(Pipeline.Workspace)/${{ db.artifact }}/${{ db.file }}'

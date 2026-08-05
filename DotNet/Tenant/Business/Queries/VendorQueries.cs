@@ -29,6 +29,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                 {
                     Id = v.Id,
                     Name = v.Name,
+                    Authentication = v.Authentication,
                 })
                 .FirstOrDefaultAsync();
         }
@@ -40,6 +41,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                 {
                     Id = v.Id,
                     Name = v.Name,
+                    Authentication = v.Authentication,
                 })
                 .ToListAsync();
         }
@@ -54,6 +56,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                     VendorId = vv.VendorId,
                     VendorName = vv.Vendor!.Name,
                     Version = vv.Version,
+                    Authentication = vv.Vendor!.Authentication,
                 })
                 .FirstOrDefaultAsync();
         }
@@ -67,6 +70,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                     VendorId = vv.VendorId,
                     VendorName = vv.Vendor!.Name,
                     Version = vv.Version,
+                    Authentication = vv.Vendor!.Authentication,
                 })
                 .ToListAsync();
         }
@@ -81,6 +85,7 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                     VendorId = vv.VendorId,
                     VendorName = vv.Vendor!.Name,
                     Version = vv.Version,
+                    Authentication = vv.Vendor!.Authentication,
                 })
                 .ToListAsync();
         }

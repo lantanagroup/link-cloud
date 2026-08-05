@@ -1,6 +1,7 @@
 using LantanaGroup.Link.Sdk.ApiClient;
 using LantanaGroup.Link.Sdk.Clients;
 using LantanaGroup.Link.Shared.Application.Models.Integration.Normalization;
+using LantanaGroup.Link.Shared.Application.Models.Tenant;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Entities;
 using LantanaGroup.Link.Tenant.Repository.Context;
@@ -73,6 +74,96 @@ public class VendorManagerTests : IDisposable
         Assert.Null(await _dbContext.VendorVersions
             .AsNoTracking()
             .SingleOrDefaultAsync(version => version.Id == vendorVersion.Id));
+    }
+
+    [Fact]
+    public async Task CreateVendor_WithAuthentication_PersistsSigningKeySecretId()
+    {
+        var created = await _vendorManager.CreateVendorAsync(new VendorModel
+        {
+            Name = $"Vendor-{Guid.NewGuid():N}",
+            Authentication = new VendorAuthenticationSettings { SigningKeySecretId = "epic-signing-key" }
+        });
+
+        var persisted = await _dbContext.Vendors
+            .AsNoTracking()
+            .SingleAsync(v => v.Id == created.Id);
+
+        Assert.Equal("epic-signing-key", persisted.Authentication?.SigningKeySecretId);
+    }
+
+    [Fact]
+    public async Task UpdateVendor_WithAuthentication_PersistsSigningKeySecretId()
+    {
+        var vendor = await CreateVendorAsync();
+
+        await _vendorManager.UpdateVendorAsync(vendor.Id, new VendorModel
+        {
+            Id = vendor.Id,
+            Name = vendor.Name,
+            Authentication = new VendorAuthenticationSettings { SigningKeySecretId = "epic-signing-key" }
+        });
+
+        var persisted = await _dbContext.Vendors
+            .AsNoTracking()
+            .SingleAsync(v => v.Id == vendor.Id);
+
+        Assert.Equal("epic-signing-key", persisted.Authentication?.SigningKeySecretId);
+    }
+
+    [Fact]
+    public async Task UpdateVendor_WithoutAuthentication_LeavesTheConfiguredSecretIdIntact()
+    {
+        var vendor = await CreateVendorAsync();
+        await _vendorManager.UpdateVendorAsync(vendor.Id, new VendorModel
+        {
+            Name = vendor.Name,
+            Authentication = new VendorAuthenticationSettings { SigningKeySecretId = "epic-signing-key" }
+        });
+
+        await _vendorManager.UpdateVendorAsync(vendor.Id, new VendorModel { Name = "Renamed Vendor" });
+
+        var persisted = await _dbContext.Vendors
+            .AsNoTracking()
+            .SingleAsync(v => v.Id == vendor.Id);
+
+        Assert.Equal("epic-signing-key", persisted.Authentication?.SigningKeySecretId);
+    }
+
+    [Fact]
+    public async Task SaveChanges_AfterMutatingAuthenticationInPlace_PersistsTheChange()
+    {
+        var vendor = await CreateVendorAsync();
+        await _vendorManager.UpdateVendorAsync(vendor.Id, new VendorModel
+        {
+            Name = vendor.Name,
+            Authentication = new VendorAuthenticationSettings { SigningKeySecretId = "original-key" }
+        });
+
+        var tracked = await _dbContext.Vendors.SingleAsync(v => v.Id == vendor.Id);
+        tracked.Authentication!.SigningKeySecretId = "rotated-key";
+        await _dbContext.SaveChangesAsync();
+
+        _dbContext.ChangeTracker.Clear();
+        var persisted = await _dbContext.Vendors
+            .AsNoTracking()
+            .SingleAsync(v => v.Id == vendor.Id);
+
+        Assert.Equal("rotated-key", persisted.Authentication?.SigningKeySecretId);
+    }
+
+    private async Task<Vendor> CreateVendorAsync()
+    {
+        var vendor = new Vendor
+        {
+            Id = Guid.NewGuid(),
+            Name = $"Vendor-{Guid.NewGuid():N}"
+        };
+
+        await _dbContext.Vendors.AddAsync(vendor);
+        await _dbContext.SaveChangesAsync();
+
+        return vendor;
     }
 
     private async Task<VendorVersion> CreateVendorVersionAsync()
