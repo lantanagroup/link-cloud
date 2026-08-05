@@ -226,7 +226,7 @@ public class RubricController {
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version is already published, or retired")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Version is already published or retired, or dry-run enforcement is enabled and no acceptable dry run exists for this version")
     })
     @PostMapping("/{rubricId}/versions/{semver}/$publish")
     public ResponseEntity<ApiResponse<RubricVersionSummaryDto>> publish(

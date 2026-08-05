@@ -2,6 +2,7 @@ package com.lantanagroup.link.validation.controllers;
 
 import com.lantanagroup.link.validation.exceptions.FacilityOverrideNotFoundException;
 import com.lantanagroup.link.validation.exceptions.InvalidRubricDefinitionException;
+import com.lantanagroup.link.validation.exceptions.RubricDryRunRequiredException;
 import com.lantanagroup.link.validation.exceptions.PayloadParseException;
 import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricNotFoundException;
@@ -41,7 +42,8 @@ public class RubricExceptionHandler {
 
     @ExceptionHandler({
             RubricVersionConflictException.class,
-            RubricLifecycleException.class
+            RubricLifecycleException.class,
+            RubricDryRunRequiredException.class
     })
     public ProblemDetail handleConflict(RuntimeException ex) {
         logger.warn("Rubric lifecycle conflict: {}", LogUtils.sanitize(ex.getMessage()));

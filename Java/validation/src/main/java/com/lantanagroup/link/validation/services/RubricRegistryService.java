@@ -1,12 +1,15 @@
 package com.lantanagroup.link.validation.services;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lantanagroup.link.validation.configs.RubricDryRunConfig;
 import com.lantanagroup.link.validation.entities.Rubric;
 import com.lantanagroup.link.validation.entities.RubricCheck;
 import com.lantanagroup.link.validation.entities.RubricLifecycleEvent;
 import com.lantanagroup.link.validation.entities.RubricVersion;
 import com.lantanagroup.link.validation.enums.RubricLifecycleAction;
+import com.lantanagroup.link.validation.enums.RubricResultStatus;
 import com.lantanagroup.link.validation.enums.RubricVersionStatus;
+import com.lantanagroup.link.validation.exceptions.RubricDryRunRequiredException;
 import com.lantanagroup.link.validation.exceptions.RubricLifecycleException;
 import com.lantanagroup.link.validation.exceptions.RubricNotFoundException;
 import com.lantanagroup.link.validation.exceptions.RubricVersionConflictException;
@@ -52,6 +55,7 @@ public class RubricRegistryService {
     private final RubricLifecycleEventRepository lifecycleEventRepository;
     private final RubricDefinitionValidator definitionValidator;
     private final ObjectMapper objectMapper;
+    private final RubricDryRunConfig dryRunConfig;
 
     @Transactional
     public RubricVersion registerVersion(RubricVersionPayloadDto payload, String actor) {
@@ -128,6 +132,14 @@ public class RubricRegistryService {
                 .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, semver));
         if (v.getStatus() != RubricVersionStatus.DRAFT) {
             throw new RubricLifecycleException(rubricId, semver, v.getStatus(), "publish");
+        }
+        if (dryRunConfig.isRequiredForPublish()) {
+            boolean acceptable = v.getDryRunCompletedAt() != null
+                    && (v.getDryRunStatus() == RubricResultStatus.ACCEPTABLE
+                        || v.getDryRunStatus() == RubricResultStatus.ACCEPTABLE_WITH_WARNINGS);
+            if (!acceptable) {
+                throw new RubricDryRunRequiredException(rubricId, semver, v.getDryRunStatus());
+            }
         }
         v.setStatus(RubricVersionStatus.PUBLISHED);
         v.setPublishedAt(OffsetDateTime.now());
