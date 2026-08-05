@@ -89,7 +89,10 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
 
             if (model.Vendor != null)
             {
-                query = query.Where(f => f.Vendor == model.Vendor);
+                if(model.Vendor.Id != null)
+                    query = query.Where(f => f.VendorVersion!.Vendor!.Id == model.Vendor.Id);
+                else if(!string.IsNullOrEmpty(model.Vendor.Name))
+                    query = query.Where(f => f.VendorVersion!.Vendor!.Name == model.Vendor.Name);
             }
 
             if (model.Id != null)
@@ -116,7 +119,12 @@ namespace LantanaGroup.Link.Tenant.Business.Queries
                     FacilityName = f.FacilityName,
                     TimeZone = f.TimeZone,
                     IsDeleted = f.IsDeleted,
-                    Vendor = f.Vendor,
+                    VendorVersionId = f.VendorVersion!.Id,
+                    Vendor = new VendorModel()
+                    {
+                        Id = f.VendorVersion.Vendor!.Id,
+                        Name = f.VendorVersion.Vendor.Name
+                    },  
                     ScheduledReports = new TenantScheduledReportConfig
                     {
                         Daily = f.ScheduledReports.Daily,
