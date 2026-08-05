@@ -29,6 +29,11 @@
             <input matInput formControlName="secretId" [readonly]="viewOnly"
                    data-testid="vendor-secret-id-input">
             <mat-hint>Name of the Key Vault secret holding the PEM signing key.</mat-hint>
+            @if (secretId.hasError('pattern')) {
+              <mat-error data-testid="vendor-secret-id-error">
+                Use the secret's name, not its URL: 1 to 127 letters, digits or dashes.
+              </mat-error>
+            }
           </mat-form-field>
         </div>
       </mat-expansion-panel>
