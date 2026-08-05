@@ -20,20 +20,36 @@ while true; do
   unhealthy_services=0
   unhealthy_services_list=()
 
-  # Get correct container names (avoids JSON formatting issues)
-  containers=$(docker ps --filter "name=${PROJECT_NAME}|fhir-" --format '{{.Names}}')
-  
-  for container in $containers; do
-    health_status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}healthy{{end}}' "$container" 2>/dev/null)
-    
-    # Fallback to 'healthy' if empty (no health check defined)
-    if [[ -z "$health_status" ]]; then
+  # Enumerate every container in the compose project. The old name filter
+  # ("name=link|fhir-") silently skipped infrastructure containers whose
+  # names match neither pattern (sftp-server, azurite, sql-server, mongo,
+  # kafka-broker, ...), so tests could start while those were still booting.
+  containers=$(docker compose ps --all -q 2>/dev/null)
+  if [[ -z "$containers" ]]; then
+    # Fallback for callers outside a compose working directory.
+    containers=$(docker ps -a --filter "name=${PROJECT_NAME}|fhir-" -q)
+  fi
+
+  for container_id in $containers; do
+    container=$(docker inspect --format '{{.Name}}' "$container_id" 2>/dev/null | sed 's|^/||')
+    state=$(docker inspect --format '{{.State.Status}}' "$container_id" 2>/dev/null)
+    exit_code=$(docker inspect --format '{{.State.ExitCode}}' "$container_id" 2>/dev/null)
+    health_status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$container_id" 2>/dev/null)
+
+    # One-shot init containers (azurite-init, sql-init, ...) exit 0 on success.
+    if [[ "$state" == "exited" && "$exit_code" == "0" ]]; then
+      echo "$container health: completed (init container)"
+      continue
+    fi
+
+    # Running with no healthcheck defined counts as healthy.
+    if [[ "$state" == "running" && "$health_status" == "none" ]]; then
       health_status="healthy"
     fi
 
-    echo "$container health: $health_status"
+    echo "$container health: $health_status (state=$state)"
 
-    if [[ "$health_status" != "healthy" ]]; then
+    if [[ "$state" != "running" || "$health_status" != "healthy" ]]; then
       unhealthy_services=$((unhealthy_services + 1))
       unhealthy_services_list+=("$container")
     fi

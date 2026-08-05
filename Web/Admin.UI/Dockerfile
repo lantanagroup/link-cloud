@@ -1,8 +1,11 @@
 # Build Stage: Angular App
 FROM node:23-alpine AS build
 WORKDIR /app
-COPY . .
+
+COPY package.json package-lock.json ./
 RUN npm ci
+
+COPY . .
 RUN npm run build
 
 # Runtime Stage: Node.js Server
