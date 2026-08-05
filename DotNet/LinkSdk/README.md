@@ -6,7 +6,7 @@
 
 | Client | Service | Interface |
 |---|---|---|
-| `FacilityServiceClient` | Tenant/Facility | `IFacilityServiceClient` |
+| `FacilityServiceClient` | Tenant (Facility, Vendor, VendorVersion) | `IFacilityServiceClient` |
 | `CensusServiceClient` | Census | `ICensusServiceClient` |
 | `DataAcquisitionServiceClient` | Data Acquisition | `IDataAcquisitionServiceClient` |
 | `NormalizationServiceClient` | Normalization | `INormalizationServiceClient` |

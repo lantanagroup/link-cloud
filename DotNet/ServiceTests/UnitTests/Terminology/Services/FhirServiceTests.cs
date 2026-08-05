@@ -1438,4 +1438,119 @@ public class FhirServiceTests
     }
 
     #endregion
+
+    #region ValueSet $validate-code request handling (LEGLINK-886 / LEGLINK-887)
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithCodeNotInAnySystem_ReturnsMessage()
+    {
+        // Arrange
+        var valueSetId = "test-vs-no-system";
+        var system = "http://test.system";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new() { Value = "valid-code", Display = "Valid Code" } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act (no system supplied -> the across-systems path, which previously omitted the message)
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, null, "missing-code", null, null);
+
+        // Assert
+        var resultParameter = result.GetSingleValue<FhirBoolean>("result");
+        var messageParameter = result.GetSingleValue<FhirString>("message");
+
+        Assert.NotNull(resultParameter);
+        Assert.False(resultParameter.Value);
+        Assert.Equal("Code not found in ValueSet", messageParameter?.Value);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithCodeNotInAnySystem_MatchesSingleSystemMessage()
+    {
+        // Arrange
+        var valueSetId = "test-vs-message-parity";
+        var system = "http://test.system";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { system, new List<Code> { new() { Value = "valid-code", Display = "Valid Code" } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        // Act
+        var withoutSystem = _service.ValidateCodeInValueSet(null, valueSetId, null, "missing-code", null, null);
+        var withSystem = _service.ValidateCodeInValueSet(null, valueSetId, system, "missing-code", null, null);
+
+        // Assert - supplying the system must not change the shape of the answer
+        Assert.Equal(
+            withSystem.GetSingleValue<FhirString>("message")?.Value,
+            withoutSystem.GetSingleValue<FhirString>("message")?.Value);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void ValidateCodeInValueSet_WithNoValueSetIdentifier_ThrowsArgumentException(string? url)
+    {
+        // Act / Assert - a request that names no value set is malformed, so it must surface as a 400
+        var exception = Assert.Throws<ArgumentException>(() =>
+            _service.ValidateCodeInValueSet(url, null, null, "any-code", null, null));
+
+        Assert.Equal("No id or url parameter specified", exception.Message);
+    }
+
+    [Fact]
+    public void ValidateCodeInValueSet_WithQueryCodeAndParametersSystem_UsesParametersSystem()
+    {
+        // Arrange
+        var valueSetId = "test-vs-mixed-inputs";
+        var code = "test-code";
+        var matchingSystem = "http://test.system/b";
+
+        var mockCodeGroup = new CodeGroup
+        {
+            Id = valueSetId,
+            Type = CodeGroup.CodeGroupTypes.ValueSet,
+            Codes = new Dictionary<string, List<Code>>
+            {
+                { "http://test.system/a", new List<Code> { new() { Value = code, Display = "Wrong System" } } },
+                { matchingSystem, new List<Code> { new() { Value = code, Display = "Right System" } } }
+            }
+        };
+
+        _mockCacheService
+            .Setup(x => x.GetCodeGroupById(CodeGroup.CodeGroupTypes.ValueSet, valueSetId, It.IsAny<string>()))
+            .Returns(mockCodeGroup);
+
+        var parameters = new Parameters();
+        parameters.Add("system", new FhirUri(matchingSystem));
+
+        // Act - code arrives as a query parameter, system only in the body
+        var result = _service.ValidateCodeInValueSet(null, valueSetId, null, code, "Right System", parameters);
+
+        // Assert - without the body system the code resolves against the first system and the display fails
+        var resultParameter = result.GetSingleValue<FhirBoolean>("result");
+        Assert.NotNull(resultParameter);
+        Assert.True(resultParameter.Value);
+    }
+
+    #endregion
 }

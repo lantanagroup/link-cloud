@@ -1,4 +1,5 @@
-﻿using Hl7.Fhir.Model;
+﻿using System.Net;
+using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 using LantanaGroup.Link.Shared.Application.Services.Security;
 using LantanaGroup.Link.Terminology.Services;
@@ -20,6 +21,39 @@ namespace LantanaGroup.Link.Terminology.Controllers;
 [ApiController]
 public class FhirController(FhirService fhirService) : Controller
 {
+    /// <summary>
+    /// Sanitizes an untrusted terminology value (url, system, code or display) that is compared
+    /// against loaded terminology content rather than rendered as markup.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="HtmlInputSanitizer.Sanitize"/> strips markup but also HTML-encodes the surviving text,
+    /// which corrupts values that legitimately contain reserved characters — over 2,000 LOINC displays
+    /// contain "&amp;", and encoding one to "&amp;amp;" turns a correct display into a spurious
+    /// "Display does not match code". Decoding afterwards restores the plain text while still dropping
+    /// any markup the sanitizer removed.
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// Thrown when a non-empty value sanitizes away to nothing, i.e. the caller supplied markup and no
+    /// content. The emptied value must not be passed on: an empty display disables the display check
+    /// entirely, so the request would be answered with result=true instead of being rejected.
+    /// </exception>
+    private static string? SanitizeTerminologyValue(string? value, string parameterName)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        var sanitized = WebUtility.HtmlDecode(value.Sanitize());
+
+        if (value.Length > 0 && sanitized.Length == 0)
+        {
+            throw new ArgumentException($"Invalid value supplied for '{parameterName}'");
+        }
+
+        return sanitized;
+    }
+
     #region Value Sets
 
     /// <summary>
@@ -193,10 +227,10 @@ public class FhirController(FhirService fhirService) : Controller
         try
         {
             return Ok(fhirService.ValidateCodeInCodeSystem(
-                url?.Sanitize(),
-                id?.Sanitize(),
-                code?.Sanitize(),
-                display?.Sanitize(),
+                SanitizeTerminologyValue(url, nameof(url)),
+                SanitizeTerminologyValue(id, nameof(id)),
+                SanitizeTerminologyValue(code, nameof(code)),
+                SanitizeTerminologyValue(display, nameof(display)),
                 parameters));
         }
         catch (ArgumentException ex)
@@ -302,7 +336,8 @@ public class FhirController(FhirService fhirService) : Controller
     /// <param name="parameters">Additional parameters supplied in the request body to guide the validation operation. This parameter is optional.</param>
     /// <returns>
     /// A <see cref="Parameters"/> resource that indicates the result of the validation and may contain
-    /// additional information about the validation outcome.
+    /// additional information about the validation outcome, or a 400 Bad Request response when neither
+    /// <paramref name="url"/> nor <paramref name="id"/> identifies a ValueSet.
     /// </returns>
     [HttpPost("ValueSet/$validate-code")]
     [HttpPost("ValueSet/{id}/$validate-code")]
@@ -312,7 +347,13 @@ public class FhirController(FhirService fhirService) : Controller
     {
         try
         {
-            return Ok(fhirService.ValidateCodeInValueSet(url, id, system, code, display, parameters));
+            return Ok(fhirService.ValidateCodeInValueSet(
+                SanitizeTerminologyValue(url, nameof(url)),
+                SanitizeTerminologyValue(id, nameof(id)),
+                SanitizeTerminologyValue(system, nameof(system)),
+                SanitizeTerminologyValue(code, nameof(code)),
+                SanitizeTerminologyValue(display, nameof(display)),
+                parameters));
         }
         catch (ArgumentException ex)
         {
