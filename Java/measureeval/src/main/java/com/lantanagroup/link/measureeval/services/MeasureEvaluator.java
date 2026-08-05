@@ -3,8 +3,10 @@ package com.lantanagroup.link.measureeval.services;
 import ca.uhn.fhir.context.FhirContext;
 import ca.uhn.fhir.context.FhirVersionEnum;
 import ca.uhn.fhir.model.api.TemporalPrecisionEnum;
+import ca.uhn.fhir.rest.client.api.IGenericClient;
 import com.lantanagroup.link.measureeval.models.DebugSections;
 import com.lantanagroup.link.measureeval.models.MeasureEvaluationResult;
+import com.lantanagroup.link.measureeval.repositories.FederatedFhirRepository;
 import com.lantanagroup.link.measureeval.repositories.LinkInMemoryFhirRepository;
 import com.lantanagroup.link.measureeval.utils.ParametersUtils;
 import com.lantanagroup.link.measureeval.utils.StreamUtils;
@@ -74,6 +76,13 @@ public class MeasureEvaluator {
     @Getter
     private final Bundle bundle;
     private final Measure measure;
+
+    /**
+     * Optional remote FHIR terminology client. When non-null, the CQL evaluation IRepository
+     * is a {@link FederatedFhirRepository} that falls through to this client for ValueSet /
+     * CodeSystem lookups not present in the bundle. Null means "bundle-only, no federation."
+     */
+    private IGenericClient remoteTerminologyClient;
 
     private MeasureEvaluator(FhirContext fhirContext, Bundle bundle) {
         this(fhirContext, bundle, EnumSet.noneOf(DebugSections.class));
@@ -145,7 +154,18 @@ public class MeasureEvaluator {
 
     public static MeasureEvaluationResult compileAndEvaluate(
             FhirContext fhirContext, Bundle bundle, Parameters parameters, Set<DebugSections> debugSections) {
+        return compileAndEvaluate(fhirContext, bundle, parameters, debugSections, null);
+    }
+
+    /**
+     * Overload that lets the caller supply a remote FHIR terminology client for federated
+     * ValueSet / CodeSystem lookups. Pass {@code null} for the original bundle-only behavior.
+     */
+    public static MeasureEvaluationResult compileAndEvaluate(
+            FhirContext fhirContext, Bundle bundle, Parameters parameters, Set<DebugSections> debugSections,
+            IGenericClient remoteTerminologyClient) {
         MeasureEvaluator evaluator = new MeasureEvaluator(fhirContext, bundle, debugSections);
+        evaluator.remoteTerminologyClient = remoteTerminologyClient;
         DateTimeType periodStart = ParametersUtils.getValue(parameters, "periodStart", DateTimeType.class);
         DateTimeType periodEnd = ParametersUtils.getValue(parameters, "periodEnd", DateTimeType.class);
         StringType subject = ParametersUtils.getValue(parameters, "subject", StringType.class);
@@ -173,7 +193,7 @@ public class MeasureEvaluator {
             DateTimeType periodEnd,
             StringType subject,
             Bundle additionalData) {
-        IRepository repository = new LinkInMemoryFhirRepository(fhirContext, bundle);
+        IRepository repository = buildRepository();
         R4MultiMeasureService measureService = new R4MultiMeasureService(repository, options, null, new MeasurePeriodValidator());
         ZonedDateTime start = periodStart != null && periodStart.getValue() != null
                 ? periodStart.getValue().toInstant().atZone(ZoneOffset.UTC) : null;
@@ -424,6 +444,64 @@ public class MeasureEvaluator {
         return trace;
     }
 
+    /**
+     * Constructs the IRepository the CQF stack consumes. Without a remote terminology client
+     * this returns the plain in-memory bundle repo. With one, we return a
+     * {@link FederatedFhirRepository} that provides <em>bundle-first, fall-through-on-empty</em>
+     * federation for ValueSet and CodeSystem lookups only. Patient data, Measure, Library, and
+     * every other resource type continue to be served locally from the bundle.
+     *
+     * <h4>Why not CQF's endpoint parameters or {@code Repositories.proxy(...)}?</h4>
+     *
+     * <p>Two upstream mechanisms exist that look like they could handle this natively.
+     * Neither actually gives us the semantics we want.
+     *
+     * <p><strong>1. {@code R4MultiMeasureService.evaluate(...)} endpoint parameters.</strong>
+     * The service accepts three {@code Endpoint} parameters (content, terminology, data).
+     * Reading the cqf-fhir 4.5.1 bytecode: {@code evaluateToListOfList} guards the internal
+     * {@code Repositories.proxy(...)} call on <em>all three</em> endpoints being non-null.
+     * If any are null, the proxy step is skipped silently and CQF uses the plain base
+     * repository. Passing only {@code terminologyEndpoint} does not enable terminology-only
+     * federation — it does nothing. This diverges from the R5 {@code $evaluate-measure}
+     * operation spec, which defines the three parameters as independently optional (0..1
+     * each). Feedback worth sending upstream.
+     *
+     * <p><strong>2. Composing {@code Repositories.proxy + FederatedRepository + RestRepository}
+     * ourselves.</strong> Also doesn't work — but only reveals its flaw at runtime. Reading
+     * {@code FederatedRepository}'s bytecode: {@code read(...)} implements sequential
+     * first-non-null-wins semantics, but {@code search(...)} submits a
+     * {@link java.util.concurrent.CompletableFuture} per constituent repository, joins all
+     * of them, and merges the returned entries into a single searchset bundle. That means:
+     * <ul>
+     *   <li>The remote TS is called on every ValueSet search even when the bundle has the
+     *       VS. Bundle-embedded expansions no longer take precedence — they get merged
+     *       with remote expansions, which can silently change measure results if the two
+     *       diverge.</li>
+     *   <li>Any remote failure throws a {@code CompletionException} from
+     *       {@code CompletableFuture.join()}, which propagates through the CQL engine and
+     *       aborts evaluation. There is no graceful degradation.</li>
+     * </ul>
+     *
+     * <p>For measure evaluation, reproducibility depends on bundle-embedded ValueSets being
+     * authoritative — the measure author validated against those specific expansions.
+     * {@code FederatedFhirRepository} enforces that with true sequential fall-through: local
+     * first, remote only if local is empty, remote failure degrades to (empty) local result.
+     *
+     * <h4>Alignment with the CQF upgrade path</h4>
+     *
+     * <p>The endpoint-parameter API in 4.5.1 is a dead end. In cqf-fhir 4.7.0-SNAPSHOT
+     * {@code R4MultiMeasureService.evaluate(...)} no longer takes the three {@code Endpoint}
+     * parameters at all — endpoint resolution has been pushed out of the framework and onto
+     * the caller, who now hands CQF a fully-resolved {@code IRepository}. Composing the
+     * repository ourselves is exactly the shape the newer API expects, so this decision
+     * carries forward cleanly on upgrade.
+     */
+    private IRepository buildRepository() {
+        return remoteTerminologyClient != null
+                ? new FederatedFhirRepository(fhirContext, bundle, remoteTerminologyClient)
+                : new LinkInMemoryFhirRepository(fhirContext, bundle);
+    }
+
     private static String formatValue(Object value) {
         if (value == null) {
             return "null";
@@ -475,7 +553,7 @@ public class MeasureEvaluator {
             DateTimeType periodEnd,
             StringType subject,
             Bundle additionalData) {
-        IRepository repository = new LinkInMemoryFhirRepository(fhirContext, bundle);
+        IRepository repository = buildRepository();
         R4MultiMeasureService measureService = new R4MultiMeasureService(repository, options, null, new MeasurePeriodValidator());
         ZonedDateTime start = periodStart != null && periodStart.getValue() != null
                 ? periodStart.getValue().toInstant().atZone(ZoneOffset.UTC) : null;
