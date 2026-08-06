@@ -1,5 +1,5 @@
 ﻿using LantanaGroup.Link.Shared.Settings;
-using Medallion.Threading.Redis;
+using LantanaGroup.Link.Shared.Application.Services.DistributedLock;
 using Medallion.Threading;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -103,10 +103,6 @@ public static class DistributedLockSettingsExtensions
             PoolSize = distributedLockSettings?.PoolSize ?? 5
         });
         
-        services.AddSingleton<IDistributedSemaphoreProvider>(sp =>
-        {
-            var database = sp.GetRequiredService<IRedisDatabase>();
-            return new RedisDistributedSynchronizationProvider(database.Database);
-        });
+        services.AddSingleton<IDistributedSemaphoreProvider, PooledRedisDistributedSemaphoreProvider>();
     }
 }

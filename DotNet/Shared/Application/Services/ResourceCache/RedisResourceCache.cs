@@ -13,23 +13,24 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
 {
     public class RedisResourceCache : IResourceCache
     {
-        private readonly IDatabase _db;
+        private readonly IRedisDatabase _redisDatabase;
         private readonly ILogger<RedisResourceCache> _logger;
 
         public RedisResourceCache(IRedisDatabase redisDatabase, ILogger<RedisResourceCache> logger)
         {
-            _db = redisDatabase.Database;
+            _redisDatabase = redisDatabase;
             _logger = logger;
         }
 
         public async Task DeleteAsync(List<string> cacheKeys, CancellationToken cancellationToken = default)
         {
-            await Task.WhenAll(cacheKeys.Select(cacheKey => _db.KeyDeleteAsync(cacheKey))).WaitAsync(cancellationToken);
+            var database = _redisDatabase.Database;
+            await Task.WhenAll(cacheKeys.Select(cacheKey => database.KeyDeleteAsync(cacheKey))).WaitAsync(cancellationToken);
         }
 
         public async Task<List<DomainResource>> GetAsync(string cacheKey, CancellationToken cancellationToken = default)
         {
-            var hashEntries = await _db.HashGetAllAsync(cacheKey).WaitAsync(cancellationToken);
+            var hashEntries = await _redisDatabase.Database.HashGetAllAsync(cacheKey).WaitAsync(cancellationToken);
 
             if (hashEntries == null || hashEntries.Length == 0) {
                 return new List<DomainResource>();
@@ -81,7 +82,7 @@ namespace LantanaGroup.Link.Shared.Application.Services.ResourceCache
                 correlationHash.Add(new HashEntry(resource.TypeName + "/" + resource.Id, resource.ToJson()));
             }
 
-            await _db.HashSetAsync(correlationId, correlationHash.ToArray()).WaitAsync(cancellationToken);
+            await _redisDatabase.Database.HashSetAsync(correlationId, correlationHash.ToArray()).WaitAsync(cancellationToken);
         }
 
         public ResourceCacheType GetCacheTypeForCorrelationId(string correlationId)
