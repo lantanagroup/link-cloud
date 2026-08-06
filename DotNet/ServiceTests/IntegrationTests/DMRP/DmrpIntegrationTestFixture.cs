@@ -1,11 +1,13 @@
 using LantanaGroup.Link.DMRP.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using System.Reflection;
 
 namespace IntegrationTests.DMRP
@@ -19,6 +21,13 @@ namespace IntegrationTests.DMRP
     public class DmrpIntegrationTestFixture : IDisposable
     {
         public IServiceProvider ServiceProvider { get; private set; }
+
+        /// <summary>
+        /// Stands in for the host service's facility lookup, which the module normally reaches over
+        /// HTTP. Facilities exist by default; a test that needs an unknown facility re-stubs it.
+        /// </summary>
+        public Mock<ITenantApiService> TenantApiServiceMock { get; } = new();
+
         private readonly WebApplication _host;
         private readonly string _dbPath;
 
@@ -49,6 +58,14 @@ namespace IntegrationTests.DMRP
             {
                 ["DMRP:Enabled"] = "true"
             });
+
+            // Registered ahead of the module, which adds the real HTTP-backed lookup only when the host
+            // has not supplied one.
+            TenantApiServiceMock
+                .Setup(s => s.CheckFacilityExists(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(true);
+
+            builder.Services.AddSingleton<ITenantApiService>(TenantApiServiceMock.Object);
 
             var registered = builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
             if (!registered)

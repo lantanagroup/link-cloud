@@ -3,6 +3,8 @@ using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Controllers;
 using LantanaGroup.Link.DMRP.Data.Entities;
 using LantanaGroup.Link.DMRP.DependencyInjection;
+using LantanaGroup.Link.Shared.Application.Models.Configs;
+using LantanaGroup.Link.Shared.Application.Services;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.AspNetCore.Builder;
@@ -10,6 +12,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Moq;
 
 namespace UnitTests.DMRP
 {
@@ -99,6 +103,49 @@ namespace UnitTests.DMRP
                 .Single();
 
             Assert.Equal(expectedRoute, route.Template);
+        }
+
+        [Fact]
+        public void AddDmrpModule_registers_the_facility_lookup_reporting_plans_validate_against()
+        {
+            var builder = CreateBuilder(enabled: true);
+
+            builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
+
+            Assert.Contains(builder.Services, d => d.ServiceType == typeof(ITenantApiService));
+        }
+
+        [Fact]
+        public void AddDmrpModule_keeps_a_facility_lookup_the_host_already_registered()
+        {
+            var builder = CreateBuilder(enabled: true);
+            var hostLookup = Mock.Of<ITenantApiService>();
+
+            builder.Services.AddSingleton(hostLookup);
+
+            builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
+
+            // The module must not displace the host's implementation, which is what lets a test host
+            // (or a future in-process lookup) avoid the HTTP round trip.
+            var registration = Assert.Single(builder.Services, d => d.ServiceType == typeof(ITenantApiService));
+            Assert.Same(hostLookup, registration.ImplementationInstance);
+        }
+
+        [Fact]
+        public void AddDmrpModule_defaults_the_facility_lookup_endpoint_when_the_host_has_no_tenant_configuration()
+        {
+            var builder = CreateBuilder(enabled: true);
+
+            builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
+
+            var registry = builder.Services.BuildServiceProvider()
+                .GetRequiredService<IOptions<ServiceRegistry>>().Value;
+
+            // The Tenant service does not configure a client for itself, so an absent section must not
+            // leave the module resolving a null registration at request time.
+            Assert.NotNull(registry.TenantService);
+            Assert.Equal("facility/", registry.TenantService.GetTenantRelativeEndpoint);
+            Assert.False(registry.TenantService.CheckIfTenantExists);
         }
 
         [Theory]
