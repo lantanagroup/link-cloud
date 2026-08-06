@@ -1096,7 +1096,7 @@
 		},
 		{
 			"key": "ConnectionStrings:Redis",
-			"value": "nhsnlink-test-redis-managed.southcentralus.redis.azure.net:10000",
+			"value": "nhsnlink-test-redis-managed.southcentralus.redis.azure.net:10000,abortConnect=false,resolveDns=true,allowAdmin=true",
 			"label": null,
 			"content_type": "",
 			"tags": {
@@ -1648,7 +1648,7 @@
 		},
 		{
 			"key": "ResourceCache:Redis:ConnectionString",
-			"value": "nhsnlink-test-redis-managed.southcentralus.redis.azure.net:10000",
+			"value": "nhsnlink-test-redis-managed.southcentralus.redis.azure.net:10000,abortConnect=false,resolveDns=true,allowAdmin=true",
 			"label": null,
 			"content_type": "",
 			"tags": {
