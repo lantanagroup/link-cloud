@@ -116,8 +116,7 @@ link:
     max-payload-bytes: 262144
     dry-run:
       # When true, publishing a rubric version requires a completed dry run with status
-      # ACCEPTABLE or ACCEPTABLE_WITH_WARNINGS. The $dry-run endpoint records the outcome
-      # on the version.
+      # ACCEPTABLE or ACCEPTABLE_WITH_WARNINGS. Outcomes are recorded by the $dry-run endpoint.
       required-for-publish: false
   # Retry for all HAPI FHIR REST clients (terminology validate-code/$lookup/etc.).
   # Transient failures only: connection IOExceptions, HTTP 429, and 5xx (e.g. Envoy

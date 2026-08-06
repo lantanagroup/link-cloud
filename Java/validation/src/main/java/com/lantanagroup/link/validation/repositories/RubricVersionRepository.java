@@ -29,8 +29,7 @@ public interface RubricVersionRepository extends JpaRepository<RubricVersion, UU
     // Batch-load versions for a page of rubrics (avoids N+1 in the rubric list endpoint)
     List<RubricVersion> findByRubricIdIn(Collection<String> rubricIds);
 
-    // Targeted update so a dry run only touches the dry-run columns — the version row may be
-    // concurrently published/retired and a full entity save would clobber those fields.
+    // only touch the dry-run columns, a full entity save could clobber a concurrent publish/retire
     @Transactional
     @Modifying
     @Query("update RubricVersion v set v.dryRunCompletedAt = :completedAt, v.dryRunStatus = :status "

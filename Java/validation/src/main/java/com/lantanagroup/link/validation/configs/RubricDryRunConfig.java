@@ -6,8 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Dry-run gate on rubric publish. Dry-run outcomes are recorded on the version by the
- * $dry-run endpoint; this flag only controls whether $publish requires one.
+ * Dry-run gate on rubric publish. The $dry-run endpoint records outcomes on the version,
+ * this flag just controls whether $publish requires one.
  */
 @Getter
 @Setter
