@@ -38,11 +38,6 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
         var facilityId = $"ApiHealth-Norm-{Guid.NewGuid():N}";
         var facilityCreated = false;
         var operationCreated = false;
-        var vendorName = $"ApiHealthVendor-{Guid.NewGuid():N}";
-        var vendorCreated = false;
-        Guid? presetId = null;
-        Guid operationResourceTypeId = Guid.Empty;
-        var vendorPresetOperationName = $"ApiHealth Vendor Preset Op {Guid.NewGuid():N}";
 
         try
         {
@@ -66,7 +61,7 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                         TargetFhirPath = "type[0].coding.code"
                     },
                     Description = "ApiHealth test — CopyProperty",
-                    VendorIds = []
+                    VendorVersionIds = []
                 };
                 var resp = await _client.CreateOperationAsync(request, ct);
                 if (resp.IsSuccessStatusCode) operationCreated = true;
@@ -88,7 +83,7 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                         TargetFhirPath = "type[0].coding.code"
                     },
                     Description = "ApiHealth invalid test",
-                    VendorIds = []
+                    VendorVersionIds = []
                 }, ct), ct: ct));
 
             // POST → 400 (empty resourceTypes)
@@ -106,7 +101,7 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                         TargetFhirPath = "type[0].coding.code"
                     },
                     Description = "ApiHealth invalid test",
-                    VendorIds = []
+                    VendorVersionIds = []
                 }, ct), ct: ct));
 
             // GET → 200 (has results)
@@ -174,143 +169,6 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
             results.Add(await RunStepAsync(StepNames.SequencesDelete204, 204, async () =>
                 await _client.DeleteOperationSequencesAsync(facilityId, "Location", ct), ct: ct));
 
-            // VENDOR POST → 201
-            Guid vendorId = Guid.Empty;
-            results.Add(await RunStepAsync(StepNames.VendorPost201, 201, async () =>
-            {
-                var resp = await _client.CreateVendorAsync(vendorName, ct);
-                if (resp.IsSuccessStatusCode)
-                {
-                    vendorCreated = true;
-                    vendorId = resp.Body?.Id ?? Guid.Empty;
-                }
-                return resp;
-            }, ct: ct));
-
-            // VENDOR POST → 409
-            results.Add(await RunStepAsync(StepNames.VendorPost409, 409, async () =>
-                await _client.CreateVendorAsync(vendorName, ct), ct: ct));
-
-            // VENDOR GET → 200
-            results.Add(await RunStepAsync(StepNames.VendorGet200, 200, async () =>
-                await _client.GetVendorAsync(vendorName, ct), ct: ct));
-
-            // VENDORS GET → 200
-            results.Add(await RunStepAsync(StepNames.VendorsGet200, 200, async () =>
-                await _client.GetAllVendorsAsync(ct), ct: ct));
-
-            // PRESET POST → 201
-            results.Add(await RunStepAsync(StepNames.PresetPost201, 201, async () =>
-            {
-                if (vendorId == Guid.Empty)
-                {
-                    var v = await _client.GetVendorAsync(vendorName, ct);
-                    vendorId = v.Body?.FirstOrDefault()?.Id ?? Guid.Empty;
-                }
-
-                if (vendorId == Guid.Empty)
-                {
-                    var vendors = await _client.GetAllVendorsAsync(ct);
-                    vendorId = vendors.Body?.FirstOrDefault(x => string.Equals(x.Name, vendorName, StringComparison.OrdinalIgnoreCase))?.Id ?? Guid.Empty;
-                }
-
-                // Create a vendor-linked operation specifically for preset testing.
-                // This mirrors the integration test setup and avoids edge-cases where
-                // deleting presets can cascade differently for non-vendor-linked operations.
-                await _client.CreateOperationAsync(new CreateNormalizationOperationRequestApiModel
-                {
-                    ResourceTypes = ["Location"],
-                    FacilityId = facilityId,
-                    Operation = new CreateNormalizationOperationDetailsApiModel
-                    {
-                        OperationType = "CopyProperty",
-                        Name = vendorPresetOperationName,
-                        Description = "Api Health vendor preset operation",
-                        SourceFhirPath = "identifier.value",
-                        TargetFhirPath = "type[0].coding.code"
-                    },
-                    Description = "ApiHealth vendor preset operation",
-                    VendorIds = vendorId == Guid.Empty ? [] : [vendorId.ToString()]
-                }, ct);
-
-                // Operation indexing can lag briefly; poll a few times for the newly created op.
-                for (var i = 0; i < 8 && operationResourceTypeId == Guid.Empty; i++)
-                {
-                    var ops = await _client.SearchFacilityOperationsAsync(facilityId, cancellationToken: ct);
-
-                    operationResourceTypeId = ops.Body?.Records?
-                        .FirstOrDefault(r => string.Equals(r.Name, vendorPresetOperationName, StringComparison.Ordinal))
-                        ?.OperationResourceTypes?.FirstOrDefault()?.Id ?? Guid.Empty;
-
-                    if (operationResourceTypeId == Guid.Empty)
-                    {
-                        operationResourceTypeId = ops.Body?.Records?
-                            .SelectMany(r => r.OperationResourceTypes ?? [])
-                            .Select(rt => rt.Id)
-                            .FirstOrDefault(id => id != Guid.Empty) ?? Guid.Empty;
-                    }
-
-                    if (operationResourceTypeId == Guid.Empty)
-                        await Task.Delay(250, ct);
-                }
-
-                if (vendorId == Guid.Empty || operationResourceTypeId == Guid.Empty)
-                    throw new InvalidOperationException("Expected vendorId and operationResourceTypeId before creating preset.");
-
-                var resp = await _client.CreateVendorPresetAsync(new CreateNormalizationVendorPresetRequestApiModel
-                {
-                    VendorId = vendorId,
-                    OperationResourceTypeId = operationResourceTypeId
-                }, ct);
-
-                if (resp.IsSuccessStatusCode)
-                    presetId = resp.Body?.Id;
-
-                return resp;
-            }, ct: ct));
-
-            // PRESETS GET → 200
-            results.Add(await RunStepAsync(StepNames.PresetsGet200, 200, async () =>
-                await _client.GetVendorPresetsAsync(vendorName, cancellationToken: ct), ct: ct));
-
-            // PRESET DELETE → 204
-            // Some deployed environments may still run a Normalization build that throws 500
-            // when the preset has already been removed as a side effect of operation cleanup.
-            // Treat that specific legacy error body as success-equivalent delete behavior.
-            results.Add(await RunStepAsync(StepNames.PresetDelete204, [204, 500], async () =>
-            {
-                var presets = await _client.GetVendorPresetsAsync(vendorName, cancellationToken: ct);
-                var toDelete = presets.Body?.FirstOrDefault(p => operationResourceTypeId == Guid.Empty || p.OperationResourceTypeId == operationResourceTypeId)?.Id
-                    ?? presetId
-                    ?? Guid.Empty;
-
-                if (toDelete == Guid.Empty)
-                    throw new InvalidOperationException("Expected an existing preset id before deleting preset.");
-
-                var resp = await _client.DeleteVendorPresetAsync(vendorName, toDelete, ct);
-                if (resp.StatusCode == 204)
-                {
-                    presetId = null;
-                    return resp;
-                }
-
-                if (resp.StatusCode == 500 && (resp.RawBody?.Contains("No Vendor Operation Preset exists for the provided id", StringComparison.OrdinalIgnoreCase) ?? false))
-                {
-                    presetId = null;
-                    return resp;
-                }
-
-                throw new InvalidOperationException($"Expected HTTP 204 but got {resp.StatusCode}.{(resp.RawBody != null ? $" Body: {resp.RawBody}" : "")}");
-            }, ct: ct));
-
-            // VENDOR DELETE → 204
-            results.Add(await RunStepAsync(StepNames.VendorDelete204, 204, async () =>
-            {
-                var resp = await _client.DeleteVendorAsync(vendorName, ct);
-                if (resp.IsSuccessStatusCode) vendorCreated = false;
-                return resp;
-            }, ct: ct));
-
             // DELETE → 204
             results.Add(await RunStepAsync(StepNames.Delete204, 204, async () =>
             {
@@ -330,7 +188,7 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
                             TargetFhirPath = "type[0].coding.code"
                         },
                         Description = "ApiHealth recovery operation",
-                        VendorIds = []
+                        VendorVersionIds = []
                     }, ct);
                 }
 
@@ -352,8 +210,6 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
         }
         finally
         {
-            if (presetId is Guid pid && pid != Guid.Empty) await TryCleanupAsync(() => _client.DeleteVendorPresetAsync(vendorName, pid, ct));
-            if (vendorCreated) await TryCleanupAsync(() => _client.DeleteVendorAsync(vendorName, ct));
             if (operationCreated) await TryCleanupAsync(() => _client.DeleteFacilityOperationsAsync(facilityId, ct));
             if (facilityCreated) await TryCleanupAsync(() => _facilityClient.DeleteAsync(facilityId, ct));
         }
@@ -368,7 +224,10 @@ public sealed class NormalizationTestSuite : ServiceTestSuiteBase
             FacilityId = facilityId,
             FacilityName = facilityId,
             TimeZone = "America/Chicago",
-            Vendor = Vendor.Epic,
+            Vendor = new VendorModel
+            {
+                Name = "Epic"
+            },
             ScheduledReports = new TenantScheduledReportConfig { Daily = [], Weekly = [], Monthly = [] }
         };
         await _facilityClient.CreateAsync(model, ct);
