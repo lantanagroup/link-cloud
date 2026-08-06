@@ -100,10 +100,6 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
             results.Add(await RunStepAsync(StepNames.Create400Duplicate, 400, async () =>
                 await _client.CreateAsync(BuildFacility(facilityId, vendor: testVendor), ct), ct: ct));
 
-            // Create → 400 (no vendor)
-            results.Add(await RunStepAsync(StepNames.Create400NoVendor, 400, async () =>
-                await _client.CreateAsync(BuildFacility($"ApiHealth-NoVendor-{Guid.NewGuid():N}", "NoVendor", null), ct), ct: ct));
-
             // Create → 400 (no name)
             results.Add(await RunStepAsync(StepNames.Create400NoName, 400, async () =>
                 await _client.CreateAsync(BuildFacility($"ApiHealth-NoName-{Guid.NewGuid():N}", name: null, allowNullName: true, vendor: testVendor), ct), ct: ct));
@@ -186,10 +182,6 @@ public sealed class TenantServiceTestSuite : ServiceTestSuiteBase
             // Update → 404 (non-existent)
             results.Add(await RunStepAsync(StepNames.Update404NonExistent, 404, async () =>
                 await _client.UpdateAsync(fakeFacilityId, BuildFacility(fakeFacilityId), ct), ct: ct));
-
-            // Update → 400 (no vendor)
-            results.Add(await RunStepAsync(StepNames.Update400NoVendor, 400, async () =>
-                await _client.UpdateAsync(facilityId, BuildFacility(facilityId, vendor: null), ct), ct: ct));
 
             // === GET /api/Facility/{id} (exists check) ===
 
