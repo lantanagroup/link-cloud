@@ -677,7 +677,7 @@ services:
        start_period: 3s
        interval: 3s
        retries: 10
-
+  
   admin-ui:
     image: link-admin-ui
     container_name: link-admin-ui
