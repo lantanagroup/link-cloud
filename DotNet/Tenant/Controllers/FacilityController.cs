@@ -219,11 +219,6 @@ namespace LantanaGroup.Link.Tenant.Controllers
                 return BadRequest();
             }
 
-            if (newFacility.Vendor == null)
-            {
-                return BadRequest("Vendor must be provided.");
-            }
-
             try
             {
                 await _facilityManager.CreateAsync(facilityEntity, cancellationToken);
@@ -322,11 +317,6 @@ namespace LantanaGroup.Link.Tenant.Controllers
             if (existingModel == null)
             {
                 return NotFound();
-            }
-
-            if (facilityConfig.Vendor == null)
-            {
-                return BadRequest("Vendor must be provided.");
             }
 
             var oldFacility = _mapperDtoToModel.Map<FacilityModel, Facility>(existingModel);
