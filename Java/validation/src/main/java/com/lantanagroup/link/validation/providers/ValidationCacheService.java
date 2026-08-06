@@ -5,11 +5,11 @@ import org.hl7.fhir.instance.model.api.IBaseResource;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+
 @Service
 public class ValidationCacheService {
     /**
      * Cache wrapper for RemoteTermServiceValidation.invokeRemoteValidateCode().
-     *
      * NOTE: This assumes `RemoteTermServiceValidation` is stateless for this call (safe to inject or pass).
      */
     @Cacheable(
@@ -45,5 +45,25 @@ public class ValidationCacheService {
     @Cacheable(value = "isValueSetSupportedCache", key = "#valueSetUrl")
     public boolean cachedIsValueSetSupported(RemoteTermServiceValidation delegate, String valueSetUrl) {
         return delegate.invokeIsValueSetSupported(valueSetUrl);
+    }
+
+    /**
+     * Cache wrapper for {@link RemoteTermServiceValidation#invokeLookupCode(String, String, String, String)}.
+     * Lookup results are stable for a given code/system/language/properties combination and are expensive
+     * network calls, so caching prevents redundant remote round-trips during validation.
+     */
+    @Cacheable(
+            value = "lookupCodeCache",
+            key = "T(java.util.Objects).hash(#code, #system, #displayLanguage, #propertyNames)",
+            unless = "#result == null"
+    )
+    public IValidationSupport.LookupCodeResult cachedLookupCode(
+            RemoteTermServiceValidation delegate,
+            String code,
+            String system,
+            String displayLanguage,
+            String propertyNames
+    ) {
+        return delegate.invokeLookupCode(code, system, displayLanguage, propertyNames);
     }
 }

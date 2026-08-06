@@ -15,6 +15,7 @@ import ca.uhn.fhir.util.BundleUtil;
 import ca.uhn.fhir.util.ParametersUtil;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
+import com.lantanagroup.link.shared.utils.LogUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.hl7.fhir.common.hapi.validation.support.BaseValidationSupport;
@@ -89,13 +90,22 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
 
     public IValidationSupport.LookupCodeResult lookupCode(ValidationSupportContext theValidationSupportContext, @Nonnull LookupCodeRequest theLookupCodeRequest) {
         String code = theLookupCodeRequest.getCode();
-        String system = theLookupCodeRequest.getSystem();
-        String displayLanguage = theLookupCodeRequest.getDisplayLanguage();
         Validate.notBlank(code, "theCode must be provided", new Object[0]);
+        return validationCacheService.cachedLookupCode(this, code, theLookupCodeRequest.getSystem(), theLookupCodeRequest.getDisplayLanguage(), String.join(",", theLookupCodeRequest.getPropertyNames()));
+    }
+
+    /**
+     * Remote lookup for {@link #lookupCode}, extracted so the result can be cached at the
+     * {@link ValidationCacheService} layer. Package-private so the cache service can invoke it via the
+     * delegate reference passed into the {@code @Cacheable} method.
+     */
+    IValidationSupport.LookupCodeResult invokeLookupCode(String code, String system, String displayLanguage, String propertyNames) {
         IGenericClient client = this.provideClient();
         FhirContext fhirContext = client.getFhirContext();
         FhirVersionEnum fhirVersion = fhirContext.getVersion().getVersion();
         if (!fhirVersion.isNewerThan(FhirVersionEnum.R4) && !fhirVersion.isOlderThan(FhirVersionEnum.DSTU3)) {
+            ourLog.debug("Invoking remote lookup on CodeSystem for code system {} and code {} (properties: '{}')", LogUtils.sanitize(system), LogUtils.sanitize(code), LogUtils.sanitize(propertyNames));
+
             IBaseParameters params = ParametersUtil.newInstance(fhirContext);
             ParametersUtil.addParameterToParametersString(fhirContext, params, "code", code);
             if (!StringUtils.isEmpty(system)) {
@@ -106,8 +116,10 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
                 ParametersUtil.addParameterToParametersString(fhirContext, params, "language", displayLanguage);
             }
 
-            for(String propertyName : theLookupCodeRequest.getPropertyNames()) {
-                ParametersUtil.addParameterToParametersCode(fhirContext, params, "property", propertyName);
+            if (!StringUtils.isEmpty(propertyNames)) {
+                for (String propertyName : propertyNames.split(",")) {
+                    ParametersUtil.addParameterToParametersCode(fhirContext, params, "property", propertyName);
+                }
             }
 
             Class<? extends IBaseResource> codeSystemClass = this.myCtx.getResourceDefinition("CodeSystem").getImplementingClass();
@@ -116,9 +128,9 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
             try {
                 outcome = (IBaseParameters)((IOperationUnnamed)client.operation().onType(codeSystemClass)).named("$lookup").withParameters(params).useHttpGet().execute();
             } catch (InvalidRequestException | ResourceNotFoundException e) {
-                ourLog.error(((BaseServerResponseException)e).getMessage(), e);
+                ourLog.debug("Failed to lookup code {} in system {}: {}", LogUtils.sanitize(code), LogUtils.sanitize(system), LogUtils.sanitize(e.getMessage()));
                 IValidationSupport.LookupCodeResult result = LookupCodeResult.notFound(system, code);
-                result.setErrorMessage(this.getErrorMessage("unknownCodeInSystem", system, code, client.getServerBase(), ((BaseServerResponseException)e).getMessage()));
+                result.setErrorMessage(this.getErrorMessage("unknownCodeInSystem", system, code, client.getServerBase(), e.getMessage()));
                 return result;
             }
 
@@ -344,13 +356,16 @@ public class RemoteTermServiceValidation extends BaseValidationSupport implement
             String resourceType = "ValueSet";
             if (theValueSet == null && theValueSetUrl == null) {
                 resourceType = "CodeSystem";
+                ourLog.debug("Invoking remote validate-code on CodeSystem for code system {} and code {}", LogUtils.sanitize(theCodeSystem), LogUtils.sanitize(theCode));
+            } else {
+                ourLog.debug("Invoking remote validate-code on ValueSet for value set {} and code {}", LogUtils.sanitize(theValueSetUrl), LogUtils.sanitize(theCode));
             }
 
             IBaseParameters output;
             try {
                 output = (IBaseParameters)((IOperationUnnamed)client.operation().onType(resourceType)).named("validate-code").withParameters(input).execute();
             } catch (InvalidRequestException | ResourceNotFoundException ex) {
-                ourLog.error(((BaseServerResponseException)ex).getMessage(), ex);
+                ourLog.error("{}", LogUtils.sanitize(((BaseServerResponseException)ex).getMessage()), ex);
                 IValidationSupport.CodeValidationResult result = new IValidationSupport.CodeValidationResult();
                 result.setSeverity(IssueSeverity.ERROR);
                 String errorMessage = this.buildErrorMessage(theCodeSystem, theCode, theValueSetUrl, theValueSet, client.getServerBase(), ((BaseServerResponseException)ex).getMessage());

@@ -274,6 +274,92 @@ public class FhirController(FhirService fhirService) : Controller
     }
 
     /// <summary>
+    /// Looks up details for a code in a specific CodeSystem using query parameters.
+    /// </summary>
+    [HttpGet("CodeSystem/$lookup")]
+    [HttpGet("CodeSystem/{id}/$lookup")]
+    public ActionResult<Parameters> LookupCodeInCodeSystem([FromQuery] string? system, [FromRoute] string? id,
+        [FromQuery] string? code, [FromQuery] string? version)
+    {
+        try
+        {
+            return Ok(fhirService.LookupCodeInCodeSystem(
+                null,
+                id?.Sanitize(),
+                system?.Sanitize(),
+                code?.Sanitize(),
+                version?.Sanitize(),
+                null));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Looks up details for a code in a specific CodeSystem using query/body parameters.
+    /// </summary>
+    [HttpPost("CodeSystem/$lookup")]
+    [HttpPost("CodeSystem/{id}/$lookup")]
+    [ValidateAntiForgeryToken]
+    public ActionResult<Parameters> LookupCodeInCodeSystem([FromQuery] string? system, [FromRoute] string? id,
+        [FromQuery] string? code, [FromQuery] string? version, [FromBody] Parameters? parameters)
+    {
+        try
+        {
+            var sanitizedParameters = SanitizeLookupCodeParameters(parameters);
+
+            return Ok(fhirService.LookupCodeInCodeSystem(
+                null,
+                id?.Sanitize(),
+                system?.Sanitize(),
+                code?.Sanitize(),
+                version?.Sanitize(),
+                sanitizedParameters));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    private static Parameters? SanitizeLookupCodeParameters(Parameters? parameters)
+    {
+        if (parameters == null)
+        {
+            return null;
+        }
+
+        foreach (var parameter in parameters.Parameter)
+        {
+            if (parameter.Name is "code" or "system" or "version")
+            {
+                var sanitizedValue = parameter.Value?.ToString()?.Sanitize();
+                parameter.Value = sanitizedValue == null ? null : new FhirString(sanitizedValue);
+                continue;
+            }
+
+            if (parameter.Name == "coding" && parameter.Value is Coding coding)
+            {
+                coding.Code = coding.Code?.Sanitize();
+                coding.System = coding.System?.Sanitize();
+                coding.Version = coding.Version?.Sanitize();
+            }
+        }
+
+        return parameters;
+    }
+
+    /// <summary>
     /// Validates a given code, optionally with its system and display, against a specified ValueSet.
     /// </summary>
     /// <param name="url">The canonical URL of the ValueSet to validate against. This parameter is optional if the id is provided.</param>
