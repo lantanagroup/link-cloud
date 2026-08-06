@@ -14,7 +14,9 @@ import org.springframework.stereotype.Service;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -94,6 +96,9 @@ public class RubricDefinitionValidator {
 
         Set<String> seenIds = new HashSet<>();
         Set<Integer> seenOrdinals = new HashSet<>();
+        // (type, dimension, parameters) -> id of the first check seen with that definition.
+        // two checks differing only by id/ordinal are almost certainly an authoring mistake
+        Map<List<Object>, String> seenDefinitions = new HashMap<>();
         for (CheckDto check : payload.getChecks()) {
             String label = check.getId() != null ? check.getId() : "<no id>";
             if (check.getId() == null || check.getId().isBlank()) {
@@ -101,11 +106,14 @@ public class RubricDefinitionValidator {
             } else if (!seenIds.add(check.getId())) {
                 errors.add("checks[" + label + "]: duplicate check id");
             }
-            if (check.getOrdinal() < 0) {
-                errors.add("checks[" + label + "]: ordinal must be >= 0");
-            } else if (!seenOrdinals.add(check.getOrdinal())) {
-                // execution order is by ordinal (getChecks orders by it); duplicates make it nondeterministic
-                errors.add("checks[" + label + "]: duplicate ordinal " + check.getOrdinal());
+            // ordinal is optional (any number of checks can omit it) but explicit ones must be
+            // unique, execution order is by ordinal and duplicates make it nondeterministic
+            if (check.getOrdinal() != null) {
+                if (check.getOrdinal() < 0) {
+                    errors.add("checks[" + label + "]: ordinal must be >= 0");
+                } else if (!seenOrdinals.add(check.getOrdinal())) {
+                    errors.add("checks[" + label + "]: duplicate ordinal " + check.getOrdinal());
+                }
             }
             if (check.getSeverityOverride() == null) {
                 errors.add("checks[" + label + "]: severityOverride is required");
@@ -125,6 +133,12 @@ public class RubricDefinitionValidator {
                 if (required != null && check.getDimension() != required) {
                     errors.add("checks[" + label + "]: type " + check.getType()
                             + " must use dimension " + required + ", got " + check.getDimension());
+                }
+                String first = seenDefinitions.putIfAbsent(
+                        Arrays.asList(check.getType(), check.getDimension(), check.getParameters()), label);
+                if (first != null) {
+                    errors.add("checks[" + label + "]: duplicate of check '" + first
+                            + "' (same type, dimension, and parameters)");
                 }
             }
             validateParameters(check, label, errors);
