@@ -406,7 +406,6 @@ public static class ApiEndPointLibrary
     {
         public const string Create201 = "Create → 201";
         public const string Create400Duplicate = "Create → 400 (duplicate)";
-        public const string Create400NoVendor = "Create → 400 (no vendor)";
         public const string Create400NoName = "Create → 400 (no name)";
         public const string Search200 = "Search → 200";
         public const string Search204NoResults = "Search → 204 (no results)";
@@ -416,7 +415,6 @@ public static class ApiEndPointLibrary
         public const string Get404 = "Get → 404";
         public const string Update200 = "Update → 200";
         public const string Update404NonExistent = "Update → 404 (non-existent)";
-        public const string Update400NoVendor = "Update → 400 (no vendor)";
         public const string CheckExists200 = "CheckExists → 200";
         public const string CheckExists404 = "CheckExists → 404";
         public const string SoftDelete204 = "SoftDelete → 204";

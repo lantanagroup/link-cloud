@@ -54,6 +54,40 @@ public class FhirController(FhirService fhirService) : Controller
         return sanitized;
     }
 
+    /// <summary>
+    /// Builds an RFC 9457 Problem Details result for a failed terminology request, matching the shape
+    /// <see cref="ConfigController"/> already returns. The <c>traceId</c> extension is added by the
+    /// service-wide customization in <c>TerminologyProblemDetailsExtensions</c>.
+    /// </summary>
+    /// <remarks>
+    /// Exception messages are written as fragments ("Value set not found with ID x") because they are
+    /// also read from logs and asserted in unit tests. <c>detail</c> is prose, so a terminating period
+    /// is added here rather than baked into every message at the throw site.
+    /// </remarks>
+    private ObjectResult TerminologyProblem(HttpStatusCode statusCode, string title, string type, string detail)
+    {
+        var sentence = detail.EndsWith('.') || detail.EndsWith('?') || detail.EndsWith('!')
+            ? detail
+            : detail + ".";
+
+        return Problem(detail: sentence, statusCode: (int)statusCode, title: title, type: type);
+    }
+
+    /// <summary>Client input failed validation. RFC 9110 section 15.5.1.</summary>
+    private ObjectResult BadRequestProblem(string detail) => TerminologyProblem(
+        HttpStatusCode.BadRequest, "Bad Request", "https://tools.ietf.org/html/rfc9110#section-15.5.1", detail);
+
+    /// <summary>The requested terminology resource is not loaded. RFC 9110 section 15.5.5.</summary>
+    private ObjectResult NotFoundProblem(string detail) => TerminologyProblem(
+        HttpStatusCode.NotFound, "Not Found", "https://tools.ietf.org/html/rfc9110#section-15.5.5", detail);
+
+    /// <summary>
+    /// A loaded code group could not be used as requested. RFC 9110 section 15.6.1. The customization
+    /// replaces <c>detail</c> with a generic message so internal state is not exposed to the caller.
+    /// </summary>
+    private ObjectResult InternalServerErrorProblem(string detail) => TerminologyProblem(
+        HttpStatusCode.InternalServerError, "Internal Server Error", "https://tools.ietf.org/html/rfc9110#section-15.6.1", detail);
+
     #region Value Sets
 
     /// <summary>
@@ -75,11 +109,11 @@ public class FhirController(FhirService fhirService) : Controller
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequestProblem(ex.Message);
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(ex.Message);
+            return NotFoundProblem(ex.Message);
         }
     }
 
@@ -105,11 +139,11 @@ public class FhirController(FhirService fhirService) : Controller
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequestProblem(ex.Message);
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            return InternalServerErrorProblem(ex.Message);
         }
     }
 
@@ -134,15 +168,15 @@ public class FhirController(FhirService fhirService) : Controller
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequestProblem(ex.Message);
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(ex.Message);
+            return NotFoundProblem(ex.Message);
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            return InternalServerErrorProblem(ex.Message);
         }
     }
 
@@ -168,11 +202,11 @@ public class FhirController(FhirService fhirService) : Controller
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequestProblem(ex.Message);
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(ex.Message);
+            return NotFoundProblem(ex.Message);
         }
     }
 
@@ -198,11 +232,11 @@ public class FhirController(FhirService fhirService) : Controller
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequestProblem(ex.Message);
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError, ex.Message);
+            return InternalServerErrorProblem(ex.Message);
         }
     }
 
@@ -235,8 +269,94 @@ public class FhirController(FhirService fhirService) : Controller
         }
         catch (ArgumentException ex)
         {
+            return BadRequestProblem(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Looks up details for a code in a specific CodeSystem using query parameters.
+    /// </summary>
+    [HttpGet("CodeSystem/$lookup")]
+    [HttpGet("CodeSystem/{id}/$lookup")]
+    public ActionResult<Parameters> LookupCodeInCodeSystem([FromQuery] string? system, [FromRoute] string? id,
+        [FromQuery] string? code, [FromQuery] string? version)
+    {
+        try
+        {
+            return Ok(fhirService.LookupCodeInCodeSystem(
+                null,
+                id?.Sanitize(),
+                system?.Sanitize(),
+                code?.Sanitize(),
+                version?.Sanitize(),
+                null));
+        }
+        catch (ArgumentException ex)
+        {
             return BadRequest(ex.Message);
         }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Looks up details for a code in a specific CodeSystem using query/body parameters.
+    /// </summary>
+    [HttpPost("CodeSystem/$lookup")]
+    [HttpPost("CodeSystem/{id}/$lookup")]
+    [ValidateAntiForgeryToken]
+    public ActionResult<Parameters> LookupCodeInCodeSystem([FromQuery] string? system, [FromRoute] string? id,
+        [FromQuery] string? code, [FromQuery] string? version, [FromBody] Parameters? parameters)
+    {
+        try
+        {
+            var sanitizedParameters = SanitizeLookupCodeParameters(parameters);
+
+            return Ok(fhirService.LookupCodeInCodeSystem(
+                null,
+                id?.Sanitize(),
+                system?.Sanitize(),
+                code?.Sanitize(),
+                version?.Sanitize(),
+                sanitizedParameters));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
+    private static Parameters? SanitizeLookupCodeParameters(Parameters? parameters)
+    {
+        if (parameters == null)
+        {
+            return null;
+        }
+
+        foreach (var parameter in parameters.Parameter)
+        {
+            if (parameter.Name is "code" or "system" or "version")
+            {
+                var sanitizedValue = parameter.Value?.ToString()?.Sanitize();
+                parameter.Value = sanitizedValue == null ? null : new FhirString(sanitizedValue);
+                continue;
+            }
+
+            if (parameter.Name == "coding" && parameter.Value is Coding coding)
+            {
+                coding.Code = coding.Code?.Sanitize();
+                coding.System = coding.System?.Sanitize();
+                coding.Version = coding.Version?.Sanitize();
+            }
+        }
+
+        return parameters;
     }
 
     /// <summary>
@@ -271,7 +391,7 @@ public class FhirController(FhirService fhirService) : Controller
         }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequestProblem(ex.Message);
         }
     }
 
