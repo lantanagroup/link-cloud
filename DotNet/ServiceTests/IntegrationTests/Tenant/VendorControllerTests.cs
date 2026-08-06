@@ -34,6 +34,36 @@ public class VendorControllerTests : IDisposable
     public void Dispose() => _scope.Dispose();
 
     [Fact]
+    public async Task Post_WithAuthentication_ReturnsTheSavedSigningKeySecretId()
+    {
+        var result = await _controller.Post(new CreateVendorModel
+        {
+            Name = $"Vendor-{Guid.NewGuid():N}",
+            Authentication = new VendorAuthenticationSettings { SigningKeySecretId = "epic-signing-key" }
+        });
+
+        var created = Assert.IsType<CreatedAtActionResult>(result.Result);
+        var vendor = Assert.IsType<VendorModel>(created.Value);
+        Assert.Equal("epic-signing-key", vendor.Authentication?.SigningKeySecretId);
+    }
+
+    [Fact]
+    public async Task Put_WithAuthentication_ReturnsTheSavedSigningKeySecretId()
+    {
+        var created = await _vendorManager.CreateVendorAsync(new VendorModel { Name = $"Vendor-{Guid.NewGuid():N}" });
+
+        var result = await _controller.Put(created.Id!.Value.ToString(), new UpdateVendorModel
+        {
+            Name = created.Name,
+            Authentication = new VendorAuthenticationSettings { SigningKeySecretId = "epic-signing-key" }
+        });
+
+        var ok = Assert.IsType<OkObjectResult>(result.Result);
+        var vendor = Assert.IsType<VendorModel>(ok.Value);
+        Assert.Equal("epic-signing-key", vendor.Authentication?.SigningKeySecretId);
+    }
+
+    [Fact]
     public async Task Post_DuplicateVendor_ReturnsConflict()
     {
         var vendorName = $"Vendor-{Guid.NewGuid():N}";
