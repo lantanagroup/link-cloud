@@ -149,7 +149,7 @@ public class ReportAbsManifestValidatorTests
     }
 
     [Fact]
-    public async Task ValidateAllAsync_WhenTerminalReportabilityDiffers_FailsOnCountMismatches()
+    public async Task ValidateAllAsync_WhenTerminalReportabilityDiffers_AlignsMeasureReportExpectationToTerminalState()
     {
         var output = new BufferingAutomationOutput();
         var patientId = "Patient-UT-001";
@@ -183,8 +183,6 @@ public class ReportAbsManifestValidatorTests
                 {
                     $"Patient/{patientId}",
                     $"Condition/{patientId}-Condition-001",
-                    $"Condition/{patientId}-Condition-032",
-                    $"Condition/{patientId}-Condition-037",
                 }
             },
             ExpectedAbsPatientIdsOverride = new HashSet<string>(StringComparer.Ordinal) { patientId }
@@ -233,23 +231,21 @@ public class ReportAbsManifestValidatorTests
 
         var validator = new ReportAbsManifestValidator(output, CreatePipelineDataReader(reportClient.Object));
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            validator.ValidateAllAsync(
-                internalAbsResources,
-                new[] { patientId },
-                new[] { achMeasureId, hypoMeasureId },
-                ExpectedStart,
-                ExpectedEnd,
-                facilityId: "Facility-UT",
-                reportId: scheduleId.ToString(),
-                generatedBundles: null,
-                expectedManifestPatientListIds: new[] { patientId },
-                expectDataAcquisitionData: true,
-                manifest: manifest));
+        await validator.ValidateAllAsync(
+            internalAbsResources,
+            new[] { patientId },
+            new[] { achMeasureId, hypoMeasureId },
+            ExpectedStart,
+            ExpectedEnd,
+            facilityId: "Facility-UT",
+            reportId: scheduleId.ToString(),
+            generatedBundles: null,
+            expectedManifestPatientListIds: new[] { patientId },
+            expectDataAcquisitionData: true,
+            manifest: manifest);
 
-        Assert.Contains("predicted reportable MeasureReport count=2, actual terminal reportable count=1", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("type=Condition: expected=3", ex.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("type=MeasureReport: expected=2", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(output.Lines, line =>
+            line.Contains("Aligning predicted reportable MeasureReport count to terminal state", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
