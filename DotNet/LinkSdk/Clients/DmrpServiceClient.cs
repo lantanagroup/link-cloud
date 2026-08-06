@@ -62,33 +62,33 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
     public Task<LinkApiResponse<FacilityReportingPlanModel>> CreateFacilityReportingPlanAsync(
         FacilityReportingPlanModel request,
         CancellationToken cancellationToken = default) =>
-        SendAsync<FacilityReportingPlanModel>(() => Request("/dmrp/facility-reporting-plans")
+        SendAsync<FacilityReportingPlanModel>(() => Request("/dmrp/reporting-plans")
             .PostJsonAsync(request, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<FacilityReportingPlanModel>> GetFacilityReportingPlanAsync(
         string id,
         CancellationToken cancellationToken = default) =>
-        SendAsync<FacilityReportingPlanModel>(() => Request($"/dmrp/facility-reporting-plans/{id}")
+        SendAsync<FacilityReportingPlanModel>(() => Request($"/dmrp/reporting-plans/{id}")
             .GetAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<FacilityReportingPlanModel>> UpdateFacilityReportingPlanAsync(
         string id,
         FacilityReportingPlanModel request,
         CancellationToken cancellationToken = default) =>
-        SendAsync<FacilityReportingPlanModel>(() => Request($"/dmrp/facility-reporting-plans/{id}")
+        SendAsync<FacilityReportingPlanModel>(() => Request($"/dmrp/reporting-plans/{id}")
             .PutJsonAsync(request, cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse> DeleteFacilityReportingPlanAsync(
         string id,
         CancellationToken cancellationToken = default) =>
-        SendAsync(() => Request($"/dmrp/facility-reporting-plans/{id}")
+        SendAsync(() => Request($"/dmrp/reporting-plans/{id}")
             .DeleteAsync(cancellationToken: cancellationToken));
 
     public Task<LinkApiResponse<PagedConfigModel<FacilityReportingPlanModel>>> SearchFacilityReportingPlansAsync(
         int pageSize = 10,
         int pageNumber = 1,
         CancellationToken cancellationToken = default) =>
-        SendAsync<PagedConfigModel<FacilityReportingPlanModel>>(() => Request("/dmrp/facility-reporting-plans")
+        SendAsync<PagedConfigModel<FacilityReportingPlanModel>>(() => Request("/dmrp/reporting-plans")
             .SetQueryParam("pageSize", pageSize)
             .SetQueryParam("pageNumber", pageNumber)
             .GetAsync(cancellationToken: cancellationToken));

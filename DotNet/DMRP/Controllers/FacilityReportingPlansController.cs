@@ -14,7 +14,7 @@ using System.Diagnostics;
 
 namespace LantanaGroup.Link.DMRP.Controllers
 {
-    [Route("api/dmrp/facility-reporting-plans")]
+    [Route("api/dmrp/reporting-plans")]
     [Authorize(Policy = PolicyNames.IsLinkAdmin)]
     [ApiController]
     public class FacilityReportingPlansController : ControllerBase
@@ -121,7 +121,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
             var model = new FacilityReportingPlanModel { Id = created.Id };
             // TODO: Map `created` to `model`
 
-            return Created($"/api/dmrp/facility-reporting-plans/{model.Id}", model);
+            return Created($"/api/dmrp/reporting-plans/{model.Id}", model);
         }
 
         /// <summary>
