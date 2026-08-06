@@ -1521,10 +1521,27 @@ public class FhirServiceTests
         Assert.Equal("The 'codeableConcept.coding.system' parameter cannot be blank", exception.Message);
     }
 
+    [Fact]
+    public void ValidateCodeInValueSet_WithPaddedSystem_StillMatchesThatSystem()
+    {
+        // Arrange - the code system lookup is an exact dictionary match, so an untrimmed value would
+        // report "Code system not found" for a system that is right there in the value set.
+        ArrangeBlankSystemValueSet();
+
+        // Act
+        var result = _service.ValidateCodeInValueSet(
+            null, BlankSystemValueSetId, $"  {BlankSystemSystem}  ", BlankSystemCode, null, null);
+
+        // Assert
+        Assert.True(result.GetSingleValue<FhirBoolean>("result")?.Value);
+    }
+
     [Theory]
     [InlineData("null")]
     [InlineData("undefined")]
     [InlineData("NULL")]
+    [InlineData("  null  ")]
+    [InlineData("\tundefined\t")]
     public void ValidateCodeInValueSet_WithPlaceholderSystem_SearchesAllSystems(string system)
     {
         // Arrange - a client that interpolated an unset variable into the request rather than omitting it

@@ -602,12 +602,19 @@ public class FhirService(ICodeGroupCacheService cacheService, ILogger<FhirServic
         }
 
         // FHIR requires at least one character of non-whitespace content, so "   " is as malformed as "".
+        // Checked before trimming, so a whitespace-only value is rejected rather than trimmed to empty.
         if (string.IsNullOrWhiteSpace(system))
         {
             throw new ArgumentException($"The '{parameterName}' parameter cannot be blank");
         }
 
-        return SystemPlaceholders.Contains(system, StringComparer.OrdinalIgnoreCase) ? null : system;
+        // Surrounding whitespace is not significant, but the lookup in ValidateCodeInSystem is an exact
+        // dictionary match, so an untrimmed " http://x " reports "Code system not found" for a system
+        // that is present -- the same confidently-wrong answer to a malformed request this method exists
+        // to prevent. Trimming also lets a padded placeholder resolve to null.
+        var trimmed = system.Trim();
+
+        return SystemPlaceholders.Contains(trimmed, StringComparer.OrdinalIgnoreCase) ? null : trimmed;
     }
 
     private Parameters ValidateCodeInCodeGroup(CodeGroup codeGroup, string code, string? system, string? display)
