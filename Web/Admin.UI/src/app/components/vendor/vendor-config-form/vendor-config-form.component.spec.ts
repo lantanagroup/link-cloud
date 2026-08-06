@@ -56,6 +56,89 @@ describe('VendorConfigFormComponent', () => {
     expect(bare.componentInstance.keySettingsExpanded).toBeFalse();
   });
 
+  ['has space', 'has/slash', 'has_underscore', 'https://v.vault.azure.net/secrets/k', 'a'.repeat(128)]
+    .forEach(invalid => {
+      it(`rejects a secret id Key Vault cannot accept: "${invalid.slice(0, 24)}"`, () => {
+        initWith(cerner, FormMode.Edit);
+
+        component.secretId.setValue(invalid);
+
+        expect(component.secretId.valid).toBeFalse();
+        expect(component.vendorForm.valid).toBeFalse();
+      });
+    });
+
+  it('marks the form invalid on the keystroke, before the field is blurred', () => {
+    initWith(cerner, FormMode.Edit);
+
+    component.secretId.setValue('has space');
+
+    expect(component.secretId.touched).toBeFalse();
+    expect(component.vendorForm.invalid).toBeTrue();
+  });
+
+  it('shows the inline message once the field is blurred', () => {
+    initWith(cerner, FormMode.Edit);
+
+    component.secretId.setValue('has space');
+    fixture.detectChanges();
+    const whileTyping = (fixture.nativeElement as HTMLElement)
+      .querySelector('[data-testid="vendor-secret-id-error"]');
+
+    component.secretId.markAsTouched();
+    fixture.detectChanges();
+    const afterBlur = (fixture.nativeElement as HTMLElement)
+      .querySelector('[data-testid="vendor-secret-id-error"]');
+
+    expect(whileTyping).toBeNull();
+    expect(afterBlur).not.toBeNull();
+  });
+
+  it('accepts a secret id Key Vault can resolve', () => {
+    initWith(cerner, FormMode.Edit);
+
+    component.secretId.setValue('epic-signing-key');
+
+    expect(component.secretId.valid).toBeTrue();
+  });
+
+  it('accepts an empty secret id, which clears the association', () => {
+    initWith(epic, FormMode.Edit);
+
+    component.secretId.setValue('');
+
+    expect(component.secretId.valid).toBeTrue();
+  });
+
+  it('does not call the service when the secret id is invalid', () => {
+    initWith(epic, FormMode.Edit);
+
+    component.secretId.setValue('has space');
+    component.submitConfiguration();
+
+    expect(vendorService.updateVendor).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the field message when the API rejects the value', () => {
+    vendorService.updateVendor.and.returnValue(throwError(() => ({
+      message: 'An error occured in our API. Please use the trace id when requesting assistence. - 00-abc',
+      error: {
+        errors: {
+          'Authentication.SigningKeySecretId': ['SigningKeySecretId must be a Key Vault secret name.']
+        }
+      }
+    })));
+    initWith(epic, FormMode.Edit);
+
+    const outcomes: { success: boolean; message: string }[] = [];
+    component.submittedConfiguration.subscribe(o => outcomes.push(o));
+
+    component.submitConfiguration();
+
+    expect(outcomes[0].success).toBeFalse();
+    expect(outcomes[0].message).toContain('SigningKeySecretId must be a Key Vault secret name.');
+  });
+
   it('requires a name but not a secret id', () => {
     initWith(cerner, FormMode.Edit);
 
@@ -127,15 +210,28 @@ describe('VendorConfigFormComponent', () => {
     expect(vendorService.updateVendor).not.toHaveBeenCalled();
   });
 
-  it('creates with the name only, leaving the secret id to a later edit', () => {
+  it('creates with the secret id entered on the add form', () => {
+    vendorService.createVendor.and.returnValue(of({ success: true }));
+    initWith(undefined, FormMode.Create);
+
+    component.name.setValue('Veradigm');
+    component.secretId.setValue('veradigm-signing-pem');
+    component.submitConfiguration();
+
+    expect(vendorService.createVendor).toHaveBeenCalledWith(
+      jasmine.objectContaining({ name: 'Veradigm', secretId: 'veradigm-signing-pem' }));
+    expect(vendorService.updateVendor).not.toHaveBeenCalled();
+  });
+
+  it('creates with a null secret id when the field is left blank', () => {
     vendorService.createVendor.and.returnValue(of({ success: true }));
     initWith(undefined, FormMode.Create);
 
     component.name.setValue('Veradigm');
     component.submitConfiguration();
 
-    expect(vendorService.createVendor).toHaveBeenCalledWith('Veradigm');
-    expect(vendorService.updateVendor).not.toHaveBeenCalled();
+    expect(vendorService.createVendor).toHaveBeenCalledWith(
+      jasmine.objectContaining({ name: 'Veradigm', secretId: null }));
   });
 
   it('emits failure without falling through to an update when the create fails', () => {

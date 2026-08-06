@@ -20,7 +20,6 @@ import {MatSnackBar} from "@angular/material/snack-bar";
 import {DeleteConfirmationDialogComponent} from "../../core/delete-confirmation-dialog/delete-confirmation-dialog.component";
 import {VendorService} from "../../../services/gateway/vendor/vendor.service";
 import {IVendorConfigModel} from "../../../interfaces/vendor/vendor-config-model.interface";
-import {AppConfigService} from "../../../services/app-config.service";
 
 
 @Component({
@@ -57,17 +56,7 @@ export class VendorDashboardComponent {
   loading = false;
   error: string | null = null;
 
-  constructor(private vendorService: VendorService, private dialog: MatDialog, private snackBar: MatSnackBar, private appConfigService: AppConfigService) {
-  }
-
-  /**
-   * Vendor editing is behind config because no update endpoint exists yet -- VendorController
-   * offers list, add and delete only, so a save would 404. Defaults to off when the flag is
-   * absent; flip `vendorEditEnabled` once the contract (including clearing secretId with null)
-   * is confirmed.
-   */
-  get vendorEditEnabled(): boolean {
-    return this.appConfigService.config?.vendorEditEnabled ?? false;
+  constructor(private vendorService: VendorService, private dialog: MatDialog, private snackBar: MatSnackBar) {
   }
 
   ngOnInit(): void {
@@ -96,11 +85,6 @@ export class VendorDashboardComponent {
   }
 
   onEdit(row: IVendorConfigModel): void {
-    // Guarded here as well as in the template so the disabled flow cannot be reached at all.
-    if (!this.vendorEditEnabled) {
-      return;
-    }
-
     this.dialog.open(VendorConfigDialogComponent,
       {
         width: '75%',
