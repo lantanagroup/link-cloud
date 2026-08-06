@@ -18,6 +18,8 @@ namespace Automation.UI.Services.Persistence;
 /// </summary>
 public sealed class MongoSnapshotStore : ISnapshotStore
 {
+    private const int MaxLogLinesPerChunk = 1_000;
+
     private readonly IMongoCollection<AutomationRunDocument> _runs;
     private readonly IMongoCollection<AutomationRunInputDocument> _runInputs;
     private readonly IMongoCollection<DomainSnapshotDocument> _snapshots;
@@ -244,7 +246,8 @@ public sealed class MongoSnapshotStore : ISnapshotStore
         await _runs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _runInputs.DeleteOneAsync(r => r.RunId == runId, ct);
         await _snapshots.DeleteManyAsync(s => s.RunId == runId, ct);
-        await _logs.DeleteOneAsync(l => l.RunId == runId, ct);
+        await _logs.DeleteManyAsync(CreateLogChunkFilter(runId), ct);
+        await _logs.DeleteOneAsync(l => l.Id == runId.ToString(), ct);
     }
 
     private async Task<string?> BuildHydratedRunConfigurationJsonAsync(AutomationRunInputSnapshot input, CancellationToken ct)
@@ -398,40 +401,78 @@ public sealed class MongoSnapshotStore : ISnapshotStore
 
     public async Task AppendLogsAsync(Guid runId, IReadOnlyList<string> newLines, CancellationToken ct = default)
     {
-        if (newLines.Count == 0) return;
-
-        var filter = Builders<RunLogDocument>.Filter.Eq(l => l.RunId, runId);
-
-        try
+        foreach (var line in newLines)
         {
-            var update = Builders<RunLogDocument>.Update
-                .PushEach(l => l.Lines, newLines)
-                .Set(l => l.UpdatedAt, DateTimeOffset.UtcNow)
-                .SetOnInsert(l => l.RunId, runId);
+            while (true)
+            {
+                var currentChunk = await _logs.Find(CreateLogChunkFilter(runId))
+                    .SortByDescending(l => l.Id)
+                    .FirstOrDefaultAsync(ct);
 
-            await _logs.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, ct);
-        }
-        catch (MongoCommandException)
-        {
-            // Cosmos DB may reject $push/$each in some configurations — fall back to read-modify-write.
-            var doc = await _logs.Find(filter).FirstOrDefaultAsync(ct);
-            if (doc == null)
-            {
-                doc = new RunLogDocument { RunId = runId, Lines = new List<string>(newLines), UpdatedAt = DateTimeOffset.UtcNow };
-                await _logs.InsertOneAsync(doc, cancellationToken: ct);
-            }
-            else
-            {
-                doc.Lines.AddRange(newLines);
-                doc.UpdatedAt = DateTimeOffset.UtcNow;
-                await _logs.ReplaceOneAsync(filter, doc, cancellationToken: ct);
+                if (currentChunk == null || currentChunk.LineCount >= MaxLogLinesPerChunk)
+                {
+                    var nextChunkNumber = currentChunk?.ChunkNumber + 1 ?? 0;
+                    var nextChunk = new RunLogDocument
+                    {
+                        Id = CreateLogChunkId(runId, nextChunkNumber),
+                        RunId = runId,
+                        ChunkNumber = nextChunkNumber,
+                        LineCount = 1,
+                        Lines = [line],
+                        UpdatedAt = DateTimeOffset.UtcNow
+                    };
+
+                    try
+                    {
+                        await _logs.InsertOneAsync(nextChunk, cancellationToken: ct);
+                        break;
+                    }
+                    catch (MongoWriteException)
+                    {
+                        // Another concurrent logger created this chunk first. Re-read and append to it.
+                    }
+
+                    continue;
+                }
+
+                var filter = Builders<RunLogDocument>.Filter.And(
+                    Builders<RunLogDocument>.Filter.Eq(l => l.Id, currentChunk.Id),
+                    Builders<RunLogDocument>.Filter.Lt(l => l.LineCount, MaxLogLinesPerChunk));
+                var update = Builders<RunLogDocument>.Update
+                    .Push(l => l.Lines, line)
+                    .Inc(l => l.LineCount, 1)
+                    .Set(l => l.UpdatedAt, DateTimeOffset.UtcNow);
+
+                var result = await _logs.UpdateOneAsync(filter, update, cancellationToken: ct);
+                if (result.ModifiedCount == 1)
+                    break;
             }
         }
     }
 
     public async Task<List<string>> GetLogsAsync(Guid runId, CancellationToken ct = default)
     {
-        var doc = await _logs.Find(l => l.RunId == runId).FirstOrDefaultAsync(ct);
-        return doc?.Lines ?? [];
+        var legacyLog = await _logs.Find(l => l.Id == runId.ToString()).FirstOrDefaultAsync(ct);
+        var chunks = await _logs.Find(CreateLogChunkFilter(runId))
+            .SortBy(l => l.Id)
+            .ToListAsync(ct);
+
+        var lines = legacyLog?.Lines.ToList() ?? [];
+        foreach (var chunk in chunks)
+            lines.AddRange(chunk.Lines);
+
+        return lines;
     }
+
+    private static FilterDefinition<RunLogDocument> CreateLogChunkFilter(Guid runId)
+    {
+        var prefix = CreateLogChunkPrefix(runId);
+        return Builders<RunLogDocument>.Filter.And(
+            Builders<RunLogDocument>.Filter.Gte(l => l.Id, prefix),
+            Builders<RunLogDocument>.Filter.Lt(l => l.Id, prefix + '\uffff'));
+    }
+
+    private static string CreateLogChunkId(Guid runId, int chunkNumber) => $"{CreateLogChunkPrefix(runId)}{chunkNumber:D8}";
+
+    private static string CreateLogChunkPrefix(Guid runId) => $"{runId:N}:";
 }

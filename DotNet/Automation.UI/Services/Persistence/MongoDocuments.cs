@@ -89,13 +89,17 @@ public sealed class DomainSnapshotDocument
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
-/// <summary>MongoDB document for automation_run_logs collection (one per run).</summary>
+/// <summary>MongoDB document for an ordered chunk in automation_run_logs.</summary>
 public sealed class RunLogDocument
 {
     [BsonId]
+    public string Id { get; set; } = string.Empty;
+
     [BsonRepresentation(BsonType.String)]
     public Guid RunId { get; set; }
 
+    public int ChunkNumber { get; set; }
+    public int LineCount { get; set; }
     public List<string> Lines { get; set; } = [];
     public DateTimeOffset UpdatedAt { get; set; }
 }
