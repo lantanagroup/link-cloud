@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using StackExchange.Redis;
+using StackExchange.Redis.Extensions.Core.Abstractions;
 using StackExchange.Redis.Extensions.System.Text.Json;
 
 namespace LantanaGroup.Link.Shared.Application.Extensions
@@ -47,7 +48,8 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
         /// </exception>
         public static IServiceCollection AddResourceCache(
             this IServiceCollection services,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            bool useExistingRedisConnection = false)
         {
             var section = configuration.GetSection(ResourceCacheSettings.SectionName);
             services.Configure<ResourceCacheSettings>(section);
@@ -57,8 +59,7 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             switch (settings.CacheImplementation)
             {
                 case ResourceCacheType.Redis:
-                    ValidateRedisSettings(settings.Redis);
-                    RegisterRedisConnectionPool(services, settings.Redis);
+                    RegisterOrUseRedisConnection(services, settings.Redis, useExistingRedisConnection);
                     services.AddSingleton<IResourceCache, RedisResourceCache>();
                     break;
 
@@ -69,9 +70,8 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
                     break;
 
                 default: // Hybrid
-                    ValidateRedisSettings(settings.Redis);
                     ValidateBlobStorageSettings(settings.BlobStorage);
-                    RegisterRedisConnectionPool(services, settings.Redis);
+                    RegisterOrUseRedisConnection(services, settings.Redis, useExistingRedisConnection);
                     services.Configure<ResourceCacheBlobStorageSettings>(section.GetSection("BlobStorage"));
                     services.AddKeyedSingleton<IResourceCache, RedisResourceCache>(ResourceCacheType.Redis);
                     services.AddKeyedSingleton<IResourceCache, ABSResourceCache>(ResourceCacheType.ABS);
@@ -80,6 +80,26 @@ namespace LantanaGroup.Link.Shared.Application.Extensions
             }
 
             return services;
+        }
+
+        private static void RegisterOrUseRedisConnection(
+            IServiceCollection services,
+            ResourceCacheRedisSettings redisSettings,
+            bool useExistingRedisConnection)
+        {
+            if (useExistingRedisConnection)
+            {
+                if (!services.Any(descriptor => descriptor.ServiceType == typeof(IRedisDatabase)))
+                {
+                    throw new InvalidOperationException(
+                        "An IRedisDatabase registration is required when useExistingRedisConnection is enabled.");
+                }
+
+                return;
+            }
+
+            ValidateRedisSettings(redisSettings);
+            RegisterRedisConnectionPool(services, redisSettings);
         }
 
         private static void RegisterRedisConnectionPool(IServiceCollection services, ResourceCacheRedisSettings redisSettings)
