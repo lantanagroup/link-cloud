@@ -47,7 +47,9 @@ public class RubricExecutionService {
         RubricVersion version = versionResolver.resolve(rubricId, semver, persist);
         log.debug("Resolved rubric {} v{} ({})", version.getRubricId(), version.getSemver(), version.getRubricVersionId());
 
-        List<RubricCheck> checks = rubricCheckRepository.findByRubricVersionIdOrderByOrdinalAsc(version.getRubricVersionId());
+        // soft-deleted checks are excluded here
+        List<RubricCheck> checks =
+                rubricCheckRepository.findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(version.getRubricVersionId());
 
         SubjectDto subject = request.getSubject();
 
@@ -106,8 +108,8 @@ public class RubricExecutionService {
         if (persist) {
             resultPersister.persist(out.resultEntity(), out.findingEntities());
         } else {
-            // Dry run: no result row, but record the outcome on the version so the
-            // dry-run publish gate (link.rubric.dry-run.required-for-publish) can read it.
+            // no result row for dry runs, but the outcome is stored on the version
+            // so the publish gate can check it later
             rubricVersionRepository.recordDryRun(
                     version.getRubricVersionId(), out.resultEntity().getStatus(), completedAt);
             log.info("Recorded dry run for rubric {} v{}: {}",

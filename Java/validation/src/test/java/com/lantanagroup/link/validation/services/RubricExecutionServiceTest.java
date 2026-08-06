@@ -94,7 +94,7 @@ class RubricExecutionServiceTest {
     void evaluatePersistsWhenRequested() throws Exception {
         when(resolver.resolve("piqi.core", "1.0.0", true)).thenReturn(version);
         RubricCheck c = check(true);
-        when(checkRepository.findByRubricVersionIdOrderByOrdinalAsc(versionId)).thenReturn(List.of(c));
+        when(checkRepository.findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(versionId)).thenReturn(List.of(c));
         CheckExecutor executor = mock(CheckExecutor.class);
         when(executor.execute(eq(c), any(ExecutionContext.class)))
                 .thenReturn(List.of(RawFinding.builder().checkLocalId("c1").dimension(PiqiDimension.CONFORMANCE)
@@ -114,7 +114,7 @@ class RubricExecutionServiceTest {
     @DisplayName("evaluate(persist=false) is a dry run: no result row, but the outcome is recorded on the version")
     void dryRunDoesNotPersist() throws Exception {
         when(resolver.resolve("piqi.core", "1.0.0", false)).thenReturn(version);
-        when(checkRepository.findByRubricVersionIdOrderByOrdinalAsc(versionId)).thenReturn(List.of());
+        when(checkRepository.findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(versionId)).thenReturn(List.of());
         stubAssembler();
 
         service.evaluate("piqi.core", "1.0.0", request(), false);
@@ -128,7 +128,7 @@ class RubricExecutionServiceTest {
     @DisplayName("disabled checks are skipped — no executor is resolved for them")
     void disabledChecksAreSkipped() throws Exception {
         when(resolver.resolve("piqi.core", "1.0.0", true)).thenReturn(version);
-        when(checkRepository.findByRubricVersionIdOrderByOrdinalAsc(versionId)).thenReturn(List.of(check(false)));
+        when(checkRepository.findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(versionId)).thenReturn(List.of(check(false)));
         stubAssembler();
 
         service.evaluate("piqi.core", "1.0.0", request(), true);
@@ -141,7 +141,7 @@ class RubricExecutionServiceTest {
     void executorFailureBecomesErrorFinding() throws Exception {
         when(resolver.resolve("piqi.core", "1.0.0", true)).thenReturn(version);
         RubricCheck c = check(true);
-        when(checkRepository.findByRubricVersionIdOrderByOrdinalAsc(versionId)).thenReturn(List.of(c));
+        when(checkRepository.findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(versionId)).thenReturn(List.of(c));
         CheckExecutor executor = mock(CheckExecutor.class);
         when(executor.execute(any(), any())).thenThrow(new RuntimeException("boom"));
         when(registry.get(CheckType.FHIRPATH)).thenReturn(executor);
@@ -165,7 +165,7 @@ class RubricExecutionServiceTest {
     void stampsRealCheckIdOntoFindings() throws Exception {
         RubricCheck c = check(true);
         when(resolver.resolve("piqi.core", "1.0.0", true)).thenReturn(version);
-        when(checkRepository.findByRubricVersionIdOrderByOrdinalAsc(versionId)).thenReturn(List.of(c));
+        when(checkRepository.findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(versionId)).thenReturn(List.of(c));
         CheckExecutor executor = mock(CheckExecutor.class);
         // executor returns a finding WITHOUT a checkId — the service must stamp it from the check
         when(executor.execute(eq(c), any(ExecutionContext.class)))
@@ -183,3 +183,5 @@ class RubricExecutionServiceTest {
         assertThat(captor.getValue()).allSatisfy(f -> assertThat(f.getCheckId()).isEqualTo(c.getCheckId()));
     }
 }
+
+

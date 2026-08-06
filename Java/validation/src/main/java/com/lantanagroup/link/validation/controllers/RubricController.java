@@ -124,12 +124,13 @@ public class RubricController {
         return ResponseEntity.ok(ApiResponse.ok("Rubric version fetched successfully", dto));
     }
 
-    @Operation(summary = "Register a new rubric version (status = DRAFT); a semver can be registered exactly once. "
+    @Operation(summary = "Register a rubric version (status = DRAFT). Re-registering a semver that is still a "
+            + "DRAFT replaces its definition and checks in place; a PUBLISHED or RETIRED semver is immutable. "
             + "The payload may be submitted as JSON or YAML (Content-Type: application/yaml).")
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "This semver is already registered (even with identical content)")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "This semver is already PUBLISHED or RETIRED and cannot be re-registered")
     })
     @PostMapping(value = "/{rubricId}/versions",
             consumes = {MediaType.APPLICATION_JSON_VALUE, APPLICATION_YAML_VALUE, APPLICATION_X_YAML_VALUE, TEXT_YAML_VALUE})

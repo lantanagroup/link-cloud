@@ -16,7 +16,6 @@ import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,10 +25,12 @@ import lombok.Setter;
 
 import java.util.UUID;
 
+// note: (rubric_version_id, check_local_id) uniqueness only applies to live rows, so it's a
+// filtered unique index in the migration (uq_check_rv_local_active) rather than a
+// @UniqueConstraint here since JPA can't express the filter
 @Entity
 @Table(
         name = "rubric_check",
-        uniqueConstraints = @UniqueConstraint(name = "uq_check_rv_local", columnNames = {"rubric_version_id", "check_local_id"}),
         indexes = {
                 @Index(name = "ix_check_rv_ordinal", columnList = "rubric_version_id, ordinal")
         }
@@ -76,11 +77,17 @@ public class RubricCheck {
     @Column(name = "severity_override", length = 16)
     private Severity severityOverride;
 
-    @Column(nullable = false)
-    private int ordinal;
+    // nullable, checks without an ordinal run first (NULL sorts first in sql server)
+    @Column
+    private Integer ordinal;
 
     @Column(nullable = false)
     private boolean enabled;
+
+    // soft delete, set when a draft re-registration replaces this version's checks.
+    // kept for history but hidden from evaluate/dry-run and the read APIs
+    @Column(nullable = false)
+    private boolean deleted;
 
     @PrePersist
     void onCreate() {

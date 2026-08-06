@@ -64,9 +64,13 @@ public class RubricRegistryService {
         String definitionJson = writeJson(payload);
         String checksum = sha256(definitionJson);
 
-        // a semver may be registered exactly once — re-registration conflicts even for
-        if (rubricVersionRepository.findByRubricIdAndSemver(payload.getId(), payload.getSemver()).isPresent()) {
-            throw new RubricVersionConflictException(payload.getId(), payload.getSemver());
+        // re-registering a DRAFT replaces it in place. published/retired versions are
+        // immutable, callers have to bump the semver
+        Optional<RubricVersion> existing =
+                rubricVersionRepository.findByRubricIdAndSemver(payload.getId(), payload.getSemver());
+        if (existing.isPresent() && existing.get().getStatus() != RubricVersionStatus.DRAFT) {
+            throw new RubricVersionConflictException(
+                    payload.getId(), payload.getSemver(), existing.get().getStatus());
         }
 
         // The rubric row is identity only (id, title, owner). Declarative metadata (dimensions,
@@ -87,23 +91,43 @@ public class RubricRegistryService {
             rubricRepository.save(rubric);
         }
 
-        RubricVersion version = RubricVersion.builder()
-                .rubricId(rubric.getRubricId())
-                .semver(payload.getSemver())
-                .status(RubricVersionStatus.DRAFT)
-                .checksum(checksum)
-                .definitionJson(definitionJson)
-                .dimensionsJson(writeJson(payload.getDimensions()))
-                .applicableContextJson(writeJson(payload.getApplicableContext()))
-                .scoringPolicyJson(writeJson(payload.getScoringPolicy()))
-                .createdBy(actor)
-                .build();
-        try {
-            // flush so a concurrent registration that won the uq_rv_rubric_semver race
-            // surfaces here rather than at commit, and reports the same 409 as the pre-check
-            version = rubricVersionRepository.saveAndFlush(version);
-        } catch (DataIntegrityViolationException e) {
-            throw new RubricVersionConflictException(payload.getId(), payload.getSemver());
+        RubricVersion version;
+        if (existing.isPresent()) {
+            version = existing.get();
+            boolean definitionChanged = !checksum.equals(version.getChecksum());
+            version.setChecksum(checksum);
+            version.setDefinitionJson(definitionJson);
+            version.setDimensionsJson(writeJson(payload.getDimensions()));
+            version.setApplicableContextJson(writeJson(payload.getApplicableContext()));
+            version.setScoringPolicyJson(writeJson(payload.getScoringPolicy()));
+            version.setCreatedBy(actor);
+            if (definitionChanged) {
+                // the old dry run was against a different definition, so it no longer counts
+                version.setDryRunCompletedAt(null);
+                version.setDryRunStatus(null);
+            }
+            version = rubricVersionRepository.save(version);
+            // soft-delete the old checks, the new payload's checks replace them
+            rubricCheckRepository.softDeleteByRubricVersionId(version.getRubricVersionId());
+        } else {
+            version = RubricVersion.builder()
+                    .rubricId(rubric.getRubricId())
+                    .semver(payload.getSemver())
+                    .status(RubricVersionStatus.DRAFT)
+                    .checksum(checksum)
+                    .definitionJson(definitionJson)
+                    .dimensionsJson(writeJson(payload.getDimensions()))
+                    .applicableContextJson(writeJson(payload.getApplicableContext()))
+                    .scoringPolicyJson(writeJson(payload.getScoringPolicy()))
+                    .createdBy(actor)
+                    .build();
+            try {
+                // flush so a concurrent registration that won the uq_rv_rubric_semver race
+                // surfaces here rather than at commit, and reports the same 409 as the pre-check
+                version = rubricVersionRepository.saveAndFlush(version);
+            } catch (DataIntegrityViolationException e) {
+                throw new RubricVersionConflictException(payload.getId(), payload.getSemver());
+            }
         }
 
         List<RubricCheck> checks = new ArrayList<>();
@@ -121,7 +145,8 @@ public class RubricRegistryService {
         }
         rubricCheckRepository.saveAll(checks);
         recordEvent(rubric.getRubricId(), payload.getSemver(), RubricLifecycleAction.REGISTERED, actor, checksum);
-        logger.info("Registered rubric {} v{} with {} checks (status=DRAFT)",
+        logger.info("{} rubric {} v{} with {} checks (status=DRAFT)",
+                existing.isPresent() ? "Re-registered (draft replaced)" : "Registered",
                 LogUtils.sanitize(rubric.getRubricId()), LogUtils.sanitize(payload.getSemver()), checks.size());
         return version;
     }
@@ -214,7 +239,7 @@ public class RubricRegistryService {
     }
 
     public List<RubricCheck> getChecks(UUID rubricVersionId) {
-        return rubricCheckRepository.findByRubricVersionIdOrderByOrdinalAsc(rubricVersionId);
+        return rubricCheckRepository.findByRubricVersionIdAndDeletedFalseOrderByOrdinalAsc(rubricVersionId);
     }
 
     public List<RubricLifecycleEvent> listLifecycleEvents(String rubricId) {
