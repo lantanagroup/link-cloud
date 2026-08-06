@@ -271,7 +271,7 @@ global:
     required: true
     consumers: ["Account", "AdminBFF", "Audit", "Census", "DataAcquisition", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant", "Terminology"]
   - key: "ConnectionStrings:Redis"
-    description: "The Redis endpoint (host:port). The password is supplied separately via Redis:Password. Required for distributed locks and Redis/Hybrid resource caching in DataAcquisition and DataAcquisitionWorker."
+    description: "The Redis connection string. The password is supplied separately via Redis:Password. Required for distributed locks and Redis/Hybrid resource caching in DataAcquisition and DataAcquisitionWorker."
     required: true
     consumers: ["Account", "AdminBFF", "DataAcquisition", "DataAcquisitionWorker"]
   - key: "Redis:Password"
@@ -602,7 +602,7 @@ services:
       description: "The resource cache implementation to register. Defaults to Hybrid; supported values are Hybrid, Redis, and ABS."
       required: false
     - key: "ResourceCache:Redis:ConnectionString"
-      description: "The Redis endpoint used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
+      description: "The Redis connection string used by the resource cache. Required when ResourceCache:CacheImplementation is Hybrid or Redis."
       required: true
     - key: "ResourceCache:Redis:Password"
       description: "Optional Redis password for the resource cache. Defaults to empty."
