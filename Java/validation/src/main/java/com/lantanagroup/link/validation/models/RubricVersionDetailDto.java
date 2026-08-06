@@ -1,5 +1,6 @@
 package com.lantanagroup.link.validation.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,6 +26,7 @@ public class RubricVersionDetailDto {
     private RubricVersionStatus status;
     private String checksum;
     private JsonNode definition;
+    @JsonIgnore
     private List<CheckDto> checks;
     private OffsetDateTime createdAt;
     private String createdBy;

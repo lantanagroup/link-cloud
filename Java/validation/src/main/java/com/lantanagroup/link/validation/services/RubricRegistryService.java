@@ -180,9 +180,9 @@ public class RubricRegistryService {
     public RubricVersion retire(String rubricId, String semver, String retiredBy) {
         RubricVersion v = rubricVersionRepository.findByRubricIdAndSemver(rubricId, semver)
                 .orElseThrow(() -> new RubricVersionNotFoundException(rubricId, semver));
-        if (v.getStatus() != RubricVersionStatus.PUBLISHED) {
-            throw new RubricLifecycleException(rubricId, semver, v.getStatus(), "retire");
-        }
+//        if (v.getStatus() != RubricVersionStatus.PUBLISHED) {
+//            throw new RubricLifecycleException(rubricId, semver, v.getStatus(), "retire");
+//        }
         v.setStatus(RubricVersionStatus.RETIRED);
         v.setRetiredAt(OffsetDateTime.now());
         v.setRetiredBy(retiredBy);
