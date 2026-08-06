@@ -92,6 +92,39 @@ public class FhirControllerHttpTests
         return (response.StatusCode, await response.Content.ReadAsStringAsync());
     }
 
+    /// <summary>
+    /// Asserts a 200 carrying a FHIR Parameters resource whose <c>result</c> is the expected verdict.
+    /// </summary>
+    /// <remarks>
+    /// A substring check over the raw payload cannot tell result=true from result=false: the placeholder
+    /// test below exists to pin that "?system=null" is treated as an omitted parameter rather than looked
+    /// up as a code system literally named "null", and those two outcomes differ only in this boolean.
+    /// </remarks>
+    private static void AssertValidationResult(HttpStatusCode status, string body, bool expectedResult)
+    {
+        Assert.Equal(HttpStatusCode.OK, status);
+
+        using var document = JsonDocument.Parse(body);
+        var root = document.RootElement;
+
+        Assert.Equal("Parameters", root.GetProperty("resourceType").GetString());
+
+        var found = false;
+        var result = default(JsonElement);
+        foreach (var parameter in root.GetProperty("parameter").EnumerateArray())
+        {
+            if (parameter.GetProperty("name").GetString() == "result")
+            {
+                result = parameter;
+                found = true;
+                break;
+            }
+        }
+
+        Assert.True(found, "no 'result' parameter in the response");
+        Assert.Equal(expectedResult, result.GetProperty("valueBoolean").GetBoolean());
+    }
+
     private static void AssertBadRequestDetail(HttpStatusCode status, string body, string expectedDetail)
     {
         Assert.Equal(HttpStatusCode.BadRequest, status);
@@ -220,9 +253,7 @@ public class FhirControllerHttpTests
 
         var (status, payload) = await PostAsync(string.Empty, body);
 
-        Assert.Equal(HttpStatusCode.OK, status);
-        Assert.Contains("\"result\"", payload);
-        Assert.Contains("true", payload);
+        AssertValidationResult(status, payload, expectedResult: true);
     }
 
     /// <summary>
@@ -249,7 +280,9 @@ public class FhirControllerHttpTests
 
         var (status, payload) = await PostAsync(query, body);
 
-        Assert.Equal(HttpStatusCode.OK, status);
-        Assert.Contains("\"result\"", payload);
+        // result=true is the whole point: the placeholder must be treated as an omitted system, so the
+        // code is found across every system in the value set. Looking "null" up as a code system would
+        // answer result=false, which the previous payload-substring assertion could not distinguish.
+        AssertValidationResult(status, payload, expectedResult: true);
     }
 }
