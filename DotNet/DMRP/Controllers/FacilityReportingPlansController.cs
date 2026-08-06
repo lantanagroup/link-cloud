@@ -95,11 +95,6 @@ namespace LantanaGroup.Link.DMRP.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateFacilityReportingPlan(FacilityReportingPlanModel request, CancellationToken cancellationToken)
         {
-            if (request == null)
-            {
-                return BadRequest();
-            }
-
             FacilityReportingPlan created;
 
             try
@@ -136,7 +131,7 @@ namespace LantanaGroup.Link.DMRP.Controllers
         {
             id = id.Sanitize();
 
-            if (request?.Id != null && request.Id != id)
+            if (request.Id != null && request.Id != id)
             {
                 return BadRequest("Id in the URL must match the Id in the request body.");
             }
