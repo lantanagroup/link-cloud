@@ -15,6 +15,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.DMRP.DependencyInjection;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Tenant.Business.Managers;
@@ -239,6 +240,10 @@ namespace Tenant
         {
             // Configure the HTTP request pipeline.
             app.ConfigureSwagger();
+
+            // The DMRP module changes which routes this service serves, so record the flag's state.
+            var dmrpSettings = app.Services.GetRequiredService<IOptions<DmrpSettings>>().Value;
+            app.Logger.LogInformation("DMRP module enabled: {DmrpEnabled}", dmrpSettings.Enabled);
 
             app.AutoMigrateEF<TenantDbContext>();
 
