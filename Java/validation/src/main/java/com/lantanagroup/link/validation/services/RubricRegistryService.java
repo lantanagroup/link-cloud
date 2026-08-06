@@ -193,8 +193,12 @@ public class RubricRegistryService {
         return v;
     }
 
-    public Page<Rubric> listRubrics(Pageable pageable) {
-        return rubricRepository.findAll(pageable);
+    // status filter is optional: when set, only rubrics having at least one version in
+    // that status come back
+    public Page<Rubric> listRubrics(RubricVersionStatus status, Pageable pageable) {
+        return status != null
+                ? rubricRepository.findByVersionStatus(status, pageable)
+                : rubricRepository.findAll(pageable);
     }
 
     public Rubric getRubric(String rubricId) {
@@ -210,10 +214,15 @@ public class RubricRegistryService {
     }
 
     // Batch-load versions for a set of rubrics, grouped by rubric id and sorted newest-first per rubric.
-    // Used by the rubric list endpoint to avoid an N+1 query.
-    public Map<String, List<RubricVersion>> versionsByRubricId(Collection<String> rubricIds) {
+    // Used by the rubric list endpoint to avoid an N+1 query. Optional status filter trims the
+    // versions to that status only.
+    public Map<String, List<RubricVersion>> versionsByRubricId(Collection<String> rubricIds,
+                                                               RubricVersionStatus status) {
         if (rubricIds.isEmpty()) return Map.of();
-        Map<String, List<RubricVersion>> grouped = rubricVersionRepository.findByRubricIdIn(rubricIds).stream()
+        List<RubricVersion> versions = status != null
+                ? rubricVersionRepository.findByRubricIdInAndStatus(rubricIds, status)
+                : rubricVersionRepository.findByRubricIdIn(rubricIds);
+        Map<String, List<RubricVersion>> grouped = versions.stream()
                 .collect(Collectors.groupingBy(RubricVersion::getRubricId));
         grouped.values().forEach(list -> list.sort(Semver.versionComparator().reversed()));
         return grouped;

@@ -29,6 +29,8 @@ public interface RubricVersionRepository extends JpaRepository<RubricVersion, UU
     // Batch-load versions for a page of rubrics (avoids N+1 in the rubric list endpoint)
     List<RubricVersion> findByRubricIdIn(Collection<String> rubricIds);
 
+    List<RubricVersion> findByRubricIdInAndStatus(Collection<String> rubricIds, RubricVersionStatus status);
+
     // only touch the dry-run columns, a full entity save could clobber a concurrent publish/retire
     @Transactional
     @Modifying

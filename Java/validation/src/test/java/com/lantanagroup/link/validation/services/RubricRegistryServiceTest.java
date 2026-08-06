@@ -304,6 +304,77 @@ class RubricRegistryServiceTest {
         assertThatThrownBy(() -> service().publish("piqi.core", "1.0.0", "qa"))
                 .isInstanceOf(RubricLifecycleException.class);
     }
+
+    private RubricVersion versionOf(String rubricId, String semver, RubricVersionStatus status) {
+        return RubricVersion.builder()
+                .rubricVersionId(UUID.randomUUID())
+                .rubricId(rubricId)
+                .semver(semver)
+                .status(status)
+                .checksum("x")
+                .build();
+    }
+
+    @Test
+    @DisplayName("listRubrics without a status filter -> plain findAll")
+    void listRubrics_noFilter() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.Pageable.ofSize(20);
+        org.springframework.data.domain.Page<Rubric> page =
+                new org.springframework.data.domain.PageImpl<>(List.of(Rubric.builder().rubricId("piqi.core").title("t").build()));
+        when(rubricRepository.findAll(pageable)).thenReturn(page);
+
+        assertThat(service().listRubrics(null, pageable)).isSameAs(page);
+        verify(rubricRepository, never()).findByVersionStatus(any(), any());
+    }
+
+    @Test
+    @DisplayName("listRubrics with a status filter -> status-scoped query")
+    void listRubrics_withFilter() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.Pageable.ofSize(20);
+        org.springframework.data.domain.Page<Rubric> page =
+                new org.springframework.data.domain.PageImpl<>(List.of(Rubric.builder().rubricId("piqi.core").title("t").build()));
+        when(rubricRepository.findByVersionStatus(RubricVersionStatus.PUBLISHED, pageable)).thenReturn(page);
+
+        assertThat(service().listRubrics(RubricVersionStatus.PUBLISHED, pageable)).isSameAs(page);
+        verify(rubricRepository, never()).findAll(pageable);
+    }
+
+    @Test
+    @DisplayName("versionsByRubricId without a filter -> all versions, grouped and newest-first")
+    void versionsByRubricId_noFilter() {
+        when(versionRepository.findByRubricIdIn(List.of("piqi.core"))).thenReturn(List.of(
+                versionOf("piqi.core", "1.0.0", RubricVersionStatus.RETIRED),
+                versionOf("piqi.core", "1.10.0", RubricVersionStatus.PUBLISHED),
+                versionOf("piqi.core", "1.2.0", RubricVersionStatus.PUBLISHED)));
+
+        var grouped = service().versionsByRubricId(List.of("piqi.core"), null);
+
+        // semantic semver ordering: 1.10.0 is newer than 1.2.0
+        assertThat(grouped.get("piqi.core")).extracting(RubricVersion::getSemver)
+                .containsExactly("1.10.0", "1.2.0", "1.0.0");
+        verify(versionRepository, never()).findByRubricIdInAndStatus(any(), any());
+    }
+
+    @Test
+    @DisplayName("versionsByRubricId with a status filter -> only that status is loaded")
+    void versionsByRubricId_withFilter() {
+        when(versionRepository.findByRubricIdInAndStatus(List.of("piqi.core"), RubricVersionStatus.PUBLISHED))
+                .thenReturn(List.of(versionOf("piqi.core", "1.2.0", RubricVersionStatus.PUBLISHED)));
+
+        var grouped = service().versionsByRubricId(List.of("piqi.core"), RubricVersionStatus.PUBLISHED);
+
+        assertThat(grouped.get("piqi.core")).hasSize(1);
+        assertThat(grouped.get("piqi.core").get(0).getStatus()).isEqualTo(RubricVersionStatus.PUBLISHED);
+        verify(versionRepository, never()).findByRubricIdIn(any());
+    }
+
+    @Test
+    @DisplayName("versionsByRubricId with no rubric ids -> empty map, no query at all")
+    void versionsByRubricId_emptyIds() {
+        assertThat(service().versionsByRubricId(List.of(), RubricVersionStatus.PUBLISHED)).isEmpty();
+        verify(versionRepository, never()).findByRubricIdIn(any());
+        verify(versionRepository, never()).findByRubricIdInAndStatus(any(), any());
+    }
 }
 
 

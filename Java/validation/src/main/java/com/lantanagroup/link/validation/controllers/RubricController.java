@@ -78,13 +78,15 @@ public class RubricController {
         this.strictYamlMapper.enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 
-    @Operation(summary = "List rubrics (paged), each with all its versions and their status")
+    @Operation(summary = "List rubrics (paged), each with its versions. Optional status filter: only rubrics "
+            + "having a version in that status are returned, and their versions are trimmed to it")
     @GetMapping
     public ResponseEntity<ApiResponse<PagedData<RubricSummaryDto>>> listRubrics(
+            @RequestParam(required = false) RubricVersionStatus status,
             @PageableDefault(size = 20, sort = "rubricId") Pageable pageable) {
-        var rubricPage = registry.listRubrics(pageable);
+        var rubricPage = registry.listRubrics(status, pageable);
         List<String> rubricIds = rubricPage.getContent().stream().map(Rubric::getRubricId).toList();
-        Map<String, List<RubricVersion>> versionsByRubric = registry.versionsByRubricId(rubricIds);
+        Map<String, List<RubricVersion>> versionsByRubric = registry.versionsByRubricId(rubricIds, status);
         PagedData<RubricSummaryDto> page = PagedData.from(rubricPage, r ->
                 RubricSummaryDto.from(r, versionSummaries(versionsByRubric.getOrDefault(r.getRubricId(), List.of()))));
         return ResponseEntity.ok(ApiResponse.ok("Rubrics fetched successfully", page));

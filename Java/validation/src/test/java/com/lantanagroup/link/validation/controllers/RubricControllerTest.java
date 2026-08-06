@@ -504,13 +504,33 @@ class RubricControllerTest {
         @DisplayName("list rubrics -> 200 paged envelope")
         void listRubrics() throws Exception {
             Page<Rubric> page = new PageImpl<>(List.of(rubric("piqi.core")), Pageable.ofSize(20), 1);
-            when(registry.listRubrics(any())).thenReturn(page);
-            when(registry.versionsByRubricId(any()))
+            when(registry.listRubrics(isNull(), any())).thenReturn(page);
+            when(registry.versionsByRubricId(any(), isNull()))
                     .thenReturn(Map.of("piqi.core", List.of(version("piqi.core", "1.0.0", RubricVersionStatus.DRAFT))));
 
             mockMvc.perform(get(BASE))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.content[0].rubricId").value("piqi.core"));
+        }
+
+        @Test
+        @DisplayName("list rubrics filtered by status -> 200, filter passed through")
+        void listRubrics_statusFilter() throws Exception {
+            Page<Rubric> page = new PageImpl<>(List.of(rubric("piqi.core")), Pageable.ofSize(20), 1);
+            when(registry.listRubrics(eq(RubricVersionStatus.PUBLISHED), any())).thenReturn(page);
+            when(registry.versionsByRubricId(any(), eq(RubricVersionStatus.PUBLISHED)))
+                    .thenReturn(Map.of("piqi.core", List.of(version("piqi.core", "1.0.0", RubricVersionStatus.PUBLISHED))));
+
+            mockMvc.perform(get(BASE + "?status=PUBLISHED"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.content[0].rubricId").value("piqi.core"))
+                    .andExpect(jsonPath("$.data.content[0].versions[0].status").value("PUBLISHED"));
+        }
+
+        @Test
+        @DisplayName("list rubrics with an invalid status value -> 400")
+        void listRubrics_invalidStatus() throws Exception {
+            expectStatus(get(BASE + "?status=NOPE"), 400);
         }
 
         @Test
