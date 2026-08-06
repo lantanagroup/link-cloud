@@ -1,32 +1,30 @@
-﻿using LantanaGroup.Link.DMRP.Business.Managers;
-using LantanaGroup.Link.DMRP.Business.Queries;
-using LantanaGroup.Link.DMRP.Config;
-using LantanaGroup.Link.DMRP.Data.Entities;
+using LantanaGroup.Link.DMRP.DependencyInjection;
 using LantanaGroup.Link.Shared.Application.Extensions;
-using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
-using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Tenant.Repository.Context;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using System.Reflection;
 
 namespace IntegrationTests.DMRP
 {
     /// <summary>
     /// DMRP persists through the Tenant service's context, so the fixture stands up a
-    /// <see cref="TenantDbContext"/> and resolves the module's services against it.
+    /// <see cref="TenantDbContext"/> and registers the module against it through
+    /// <see cref="DmrpModuleExtensions.AddDmrpModule{TDbContext}"/> — the same entry point the Tenant
+    /// service uses, so the two cannot drift.
     /// </summary>
     public class DmrpIntegrationTestFixture : IDisposable
     {
         public IServiceProvider ServiceProvider { get; private set; }
-        private readonly IHost _host;
+        private readonly WebApplication _host;
         private readonly string _dbPath;
 
         public DmrpIntegrationTestFixture()
         {
-            var builder = Host.CreateApplicationBuilder();
+            var builder = WebApplication.CreateBuilder();
 
             var assemblyVersion = Assembly.GetExecutingAssembly()
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
@@ -46,19 +44,23 @@ namespace IntegrationTests.DMRP
                 options.AddInterceptors(updateBaseEntityInterceptor);
             });
 
-            builder.Services.AddScoped<IEntityRepository<MeasureMapping>, EntityRepository<MeasureMapping, TenantDbContext>>();
-            builder.Services.AddScoped<IEntityRepository<FacilityReportingPlan>, EntityRepository<FacilityReportingPlan, TenantDbContext>>();
+            // The module only registers itself when the flag is set, so turn it on for the fixture.
+            builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DMRP:Enabled"] = "true"
+            });
 
-            builder.Services.AddScoped<IMeasureMappingManager, MeasureMappingManager>();
-            builder.Services.AddScoped<IMeasureMappingQueries, MeasureMappingQueries>();
-            builder.Services.AddScoped<IFacilityReportingPlanManager, FacilityReportingPlanManager>();
-            builder.Services.AddScoped<IFacilityReportingPlanQueries, FacilityReportingPlanQueries>();
+            var registered = builder.AddDmrpModule<TenantDbContext>(builder.Services.AddControllers());
+            if (!registered)
+            {
+                throw new InvalidOperationException("The DMRP module did not register; the fixture cannot resolve its services.");
+            }
 
             builder.Services.AddLogging();
 
+            // Built but never started: AddDmrpModule needs a WebApplicationBuilder, and starting the
+            // result would bind Kestrel to a port for a fixture that only resolves services.
             _host = builder.Build();
-
-            _host.StartAsync().GetAwaiter().GetResult();
             ServiceProvider = _host.Services;
 
             using var scope = ServiceProvider.CreateScope();
@@ -74,14 +76,7 @@ namespace IntegrationTests.DMRP
                 ctx.Database.EnsureDeleted();
             }
 
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            try
-            {
-                _host.StopAsync(cts.Token).GetAwaiter().GetResult();
-            }
-            catch (OperationCanceledException) { /* ignore - already stopped */ }
-
-            _host.Dispose();
+            _host.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
             if (File.Exists(_dbPath))
             {
