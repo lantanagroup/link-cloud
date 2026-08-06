@@ -190,4 +190,6 @@ internal class NullTenantApiService : ITenantApiService
     public Task<bool> CheckFacilityExists(string facilityId, CancellationToken cancellationToken = default) => Task.FromResult(true);
     public Task<FacilityModel> GetFacilityConfig(string facilityId, CancellationToken cancellationToken = default)
         => Task.FromResult(new FacilityModel { FacilityId = facilityId });
+    public Task<string?> GetVendorSigningKeySecretId(string facilityId, CancellationToken cancellationToken = default)
+        => Task.FromResult<string?>(null);
 }
