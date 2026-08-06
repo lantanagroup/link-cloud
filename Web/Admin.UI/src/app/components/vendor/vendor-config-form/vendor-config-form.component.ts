@@ -1,7 +1,7 @@
 import {Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges} from '@angular/core';
 
 import {MatSnackBar, MatSnackBarModule} from '@angular/material/snack-bar';
-import {FormBuilder, FormGroup, ReactiveFormsModule, Validators} from '@angular/forms';
+import {AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors, Validators} from '@angular/forms';
 import {MatButtonModule} from '@angular/material/button';
 import {MatSelectModule} from '@angular/material/select';
 import {MatChipsModule} from '@angular/material/chips';
@@ -61,6 +61,15 @@ export class VendorConfigFormComponent {
 
   vendorForm!: FormGroup;
 
+  private static readonly KeyVaultSecretName = /^[0-9a-zA-Z-]{1,127}$/;
+
+  static keyVaultSecretNameValidator(control: AbstractControl): ValidationErrors | null {
+    const value = (control.value ?? '').trim();
+    return value === '' || VendorConfigFormComponent.KeyVaultSecretName.test(value)
+      ? null
+      : {pattern: true};
+  }
+
   /**
    * Whether the JWT / Authentication panel starts open. Expanded when the vendor already has a
    * secret id so existing configuration is visible without hunting for it, collapsed otherwise
@@ -71,9 +80,7 @@ export class VendorConfigFormComponent {
   constructor(private snackBar: MatSnackBar, private vendorService: VendorService, private dialog: MatDialog, private fb: FormBuilder) {
     this.vendorForm = this.fb.group({
       name: ["", Validators.required],
-      // No validator: the secret id is optional, and checking that it resolves in Key Vault is
-      // LEGLINK-566. A format rule here would reject ids this UI has no way to verify.
-      secretId: [""]
+      secretId: ["", VendorConfigFormComponent.keyVaultSecretNameValidator]
     });
   }
 
@@ -105,8 +112,14 @@ export class VendorConfigFormComponent {
       return;
     }
 
+    const submitted: IVendorConfigModel = {
+      ...this.item,
+      name: this.name.value,
+      secretId: this.secretId.value?.trim() || null
+    };
+
     if (this.formMode == FormMode.Create) {
-      this.vendorService.createVendor(this.name.value).subscribe({
+      this.vendorService.createVendor(submitted).subscribe({
         next: (response) => {
           if (response) {
             this.submittedConfiguration.emit({success: true, message: ""});
@@ -119,17 +132,7 @@ export class VendorConfigFormComponent {
       return;
     }
 
-    // An empty box means "no key associated", sent as an explicit null rather than undefined:
-    // JSON.stringify omits undefined keys, and an absent field reads as "leave unchanged" to
-    // any endpoint with partial-update semantics, which would make clearing a key silently
-    // do nothing. Null says remove it.
-    const updated: IVendorConfigModel = {
-      ...this.item,
-      name: this.name.value,
-      secretId: this.secretId.value?.trim() || null
-    };
-
-    this.vendorService.updateVendor(updated).subscribe({
+    this.vendorService.updateVendor(submitted).subscribe({
       next: () => {
         this.submittedConfiguration.emit({success: true, message: ""});
       },
@@ -144,6 +147,11 @@ export class VendorConfigFormComponent {
    * snackbar while staying open so the admin's input is not thrown away.
    */
   private failureMessage(err: any): string {
+    const fieldMessages = Object.values(err?.error?.errors ?? {}).flat() as string[];
+    if (fieldMessages.length) {
+      return fieldMessages.join(' ');
+    }
+
     return err?.message ?? 'Failed to save the vendor configuration. Please try again.';
   }
 }

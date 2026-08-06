@@ -19,7 +19,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { FormMode } from 'src/app/models/FormMode.enum';
-import { Vendor } from 'src/app/interfaces/tenant/vendor.enum';
+import { IVendor } from 'src/app/interfaces/tenant/vendor-interface';
 import { IEntityCreatedResponse } from 'src/app/interfaces/entity-created-response.model';
 import { DataAcquisitionService } from 'src/app/services/gateway/data-acquisition/data-acquisition.service';
 import {
@@ -50,7 +50,7 @@ import { IQueryPlanModel } from '../../../interfaces/data-acquisition/query-plan
 export class ReportingOrganizationConfigFormComponent implements OnInit, OnChanges, OnDestroy {
   @Input() item!: IOrganizationLocationConfigurationModel;
 
-  @Input() vendor!: Vendor;
+  @Input() vendor?: IVendor;
 
   @Input() formMode!: FormMode;
 
@@ -538,11 +538,11 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
   }
 
   get isEpic(): boolean {
-    return this.vendor === Vendor.Epic;
+    return this.vendor?.name?.trim()?.toLowerCase() === 'epic';
   }
 
   get isCerner(): boolean {
-    return this.vendor === Vendor.Cerner;
+    return this.vendor?.name?.trim()?.toLowerCase() === 'cerner';
   }
 
   // ---- Condition group creation / parsing ----
@@ -608,7 +608,11 @@ export class ReportingOrganizationConfigFormComponent implements OnInit, OnChang
   }
 
   private defaultSetupMethod(): string {
-    return this.isCerner ? 'managingOrg' : 'identifier';
+    if (this.isCerner) {
+      return 'managingOrg';
+    }
+
+    return this.isEpic ? 'identifier' : 'manual';
   }
 
   /**

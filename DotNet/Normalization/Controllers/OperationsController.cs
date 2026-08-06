@@ -27,7 +27,6 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly IOperationManager _operationManager;
         private readonly IOperationQueries _operationQueries;
         private readonly IOperationSequenceQueries _operationSequenceQueries;
-        private readonly IVendorQueries _vendorQueries;
         private readonly ITenantApiService _tenantApiService;
         private readonly CopyPropertyOperationService _copyPropertyOperationService;
         private readonly CodeMapOperationService _codeMapOperationService;
@@ -36,12 +35,11 @@ namespace LantanaGroup.Link.Normalization.Controllers
         private readonly RemoveExtensionsOperationService _removeExtensionsOperationService;
         private readonly CopyLocationAliasToTypeIterativelyOperationService _copyLocationAliasToTypeIterativelyOperationService;
 
-        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, IVendorQueries vendorQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService, RemoveExtensionsOperationService removeExtensionsOperationService, CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService)
+        public OperationsController(IOperationManager operationManager, IOperationQueries operationQueries, IOperationSequenceQueries operationSequenceQueries, ITenantApiService tenantApiService, CopyPropertyOperationService copyPropertyService, CodeMapOperationService codeMapOperationService, ConditionalTransformOperationService conditionalTransformOperationService, CopyLocationOperationService copyLocationOperationService, RemoveExtensionsOperationService removeExtensionsOperationService, CopyLocationAliasToTypeIterativelyOperationService copyLocationAliasToTypeIterativelyOperationService)
         {
             _operationManager = operationManager;
             _operationQueries = operationQueries;
             _operationSequenceQueries = operationSequenceQueries;
-            _vendorQueries = vendorQueries;
             _tenantApiService = tenantApiService;
             _copyPropertyOperationService = copyPropertyService;
             _codeMapOperationService = codeMapOperationService;
@@ -56,7 +54,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<OperationModel>>> SearchOperations(string? facilityId, string? operationType, string? resourceType, Guid? operationId, bool includeDisabled = false, Guid? vendorId = null,
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> SearchOperations(string? facilityId, string? operationType, string? resourceType, Guid? operationId, bool includeDisabled = false, Guid? vendorVersionId = null,
             string sortBy = "CreateDate", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
         {
             try
@@ -83,7 +81,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
                     FacilityId = string.IsNullOrWhiteSpace(facilityId) ? null : facilityId,
-                    VendorId = vendorId,
+                    VendorVersionId = vendorVersionId,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
                     SortBy = sortBy,
@@ -105,7 +103,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string facilityId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false, Guid? vendorId = null,
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetOperations(string facilityId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false, Guid? vendorVersionId = null,
             string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
         {
             try
@@ -134,7 +132,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
                     FacilityId = string.IsNullOrEmpty(facilityId) ? null : facilityId,
-                    VendorId = vendorId,
+                    VendorVersionId = vendorVersionId,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
                     SortBy = sortBy,
@@ -151,36 +149,16 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
         }
 
-        [HttpGet("vendor/{vendor}")]
+        [HttpGet("vendor-version/{vendorVersionId:guid}")]
         [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(List<OperationModel>))]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetVendorOperations(string vendor, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
+        public async Task<ActionResult<PagedConfigModel<OperationModel>>> GetVendorVersionOperations(Guid vendorVersionId, string? operationType = null, string? resourceType = default, Guid? operationId = default, bool includeDisabled = false,
             string sortBy = "Id", SortOrder sortOrder = SortOrder.Descending, int pageSize = 10, int pageNumber = 1)
         {
             try
             {
-                if (string.IsNullOrEmpty(vendor))
-                {
-                    return BadRequest($"A vendor Name or Id must be provided");
-                }
-
-                VendorModel? foundVendor;
-                if (Guid.TryParse(vendor, out var vendorId))
-                {
-                    foundVendor = await _vendorQueries.GetVendor(vendorId);
-                }
-                else
-                {
-                    foundVendor = await _vendorQueries.GetVendor(vendor);
-
-                    if (foundVendor == null)
-                    {
-                        return base.BadRequest($"No vendor by the name {vendor.Sanitize()} found.");
-                    }
-                }
-
                 operationType = string.IsNullOrEmpty(operationType) ? null : operationType;
 
                 OperationType operation = OperationType.None;
@@ -194,7 +172,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                 {
                     OperationId = operationId,
                     OperationType = operation == OperationType.None ? null : operation,
-                    VendorId = foundVendor.Id,
+                    VendorVersionId = vendorVersionId,
                     FacilityId = null,
                     IncludeDisabled = includeDisabled,
                     ResourceType = resourceType,
@@ -256,7 +234,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     FacilityId = model.FacilityId ?? string.Empty,
                     Name = model.Operation.Name,
                     Description = model.Operation.Description,
-                    VendorIds = model.VendorIds
+                    VendorVersionIds = model.VendorVersionIds
                 });
 
                 if (!taskResult.IsSuccess)
@@ -359,7 +337,7 @@ namespace LantanaGroup.Link.Normalization.Controllers
                     Name = model.Operation.Name,
                     Description = model.Operation.Description,
                     IsDisabled = model.IsDisabled,
-                    VendorIds = model.VendorIds
+                    VendorVersionIds = model.VendorVersionIds
                 });
 
                 if (!taskResult.IsSuccess)
@@ -514,33 +492,18 @@ namespace LantanaGroup.Link.Normalization.Controllers
             }
         }
 
-        [HttpDelete("vendor/{vendor}")]
+        [HttpDelete("vendor-version/{vendorVersionId:guid}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> DeleteVendorOperations(string vendor, Guid? operationId = null, string? resourceType = null)
+        public async Task<IActionResult> DeleteVendorVersionOperations(Guid vendorVersionId, Guid? operationId = null, string? resourceType = null)
         {
             try
             {
-                VendorModel? foundVendor;
-                if (Guid.TryParse(vendor, out var vendorId))
-                {
-                    foundVendor = await _vendorQueries.GetVendor(vendorId);
-                }
-                else
-                {
-                    foundVendor = await _vendorQueries.GetVendor(vendor);
-
-                    if (foundVendor == null)
-                    {
-                        return base.BadRequest($"No vendor by the name {vendor.Sanitize()} found.");
-                    }
-                }
-
                 var result = await _operationManager.DeleteOperation(new DeleteOperationModel()
                 {
-                    VendorId = foundVendor.Id,
+                    VendorVersionId = vendorVersionId,
                     OperationId = operationId,
                     ResourceType = resourceType
                 });

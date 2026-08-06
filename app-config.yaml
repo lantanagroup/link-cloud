@@ -283,11 +283,16 @@ global:
     description: "The connection string for the internal Azure Blob Storage (or Azurite)."
     required: true
     sensitive: true
-    consumers: ["Report", "Submission"]
+    consumers: ["Report", "Submission", "AutomationUI"]
   - key: "InternalBlobStorage:BlobContainerName"
     description: "The name of the blob container used for internal storage."
     required: true
-    consumers: ["Report", "Submission"]
+    consumers: ["Report", "Submission", "AutomationUI"]
+  - key: "InternalBlobStorage:BlobRoot"
+    description: "Optional blob-path prefix used by services writing internal artifacts to Azure Blob Storage. Automation.UI imported bundles default to automation/imported-bundles when this is unset."
+    required: false
+    defaultValue: "automation/imported-bundles"
+    consumers: ["Report", "Submission", "AutomationUI"]
   - key: "ServiceRegistry:TenantService:TenantServiceUrl"
     description: "The base URL for the Tenant Service."
     required: true
@@ -469,12 +474,25 @@ services:
     - key: "ApiHealth:EnableAdminBffAuthSuite"
       description: "Boolean flag to enable the Admin BFF authentication API Health suite in Automation.UI."
       required: false
+    - key: "Loki:Url"
+      description: "The Loki endpoint URL Automation.UI uses for run diagnostics scraping."
+      required: true
+    - key: "Loki:App"
+      description: "The Loki application label Automation.UI uses to scope diagnostics queries."
+      required: true
+    - key: "Authentication:UseBearerForServiceCalls"
+      description: "Whether Automation.UI uses Link bearer auth for service-to-service LinkSdk calls."
+      required: false
+      defaultValue: "true"
     - key: "Automation:SlackWebhookUrl"
       description: "The Slack webhook the Automation.UI test pipeline posts consolidated results to. Consumed by Tests/AutomationUI.Pipeline/azure-pipelines.yml at runtime, not by any service, which is why it does not appear in the code-derived inventory."
       required: true
       sensitive: true
     - key: "DataProtection:ApplicationName"
       description: "The Data Protection application name isolating Automation.UI's key ring from other services sharing the store. Falls back to 'Link.Automation.UI:{Environment}' when unset (Automation.UI/Program.cs:208), so it is only provisioned where that default is not wanted - currently dev alone."
+      required: false
+    - key: "DataProtection:KeyCollectionName"
+      description: "Mongo collection name used by Automation.UI to store Data Protection keys. Defaults to 'automation_data_protection_keys' when unset."
       required: false
   DataAcquisition:
     - key: "AcquisitionJobSettings:CronSchedule"
@@ -684,6 +702,10 @@ services:
   Tenant:
     - key: "FacilityIdSettings:NumericOnlyFacilityId"
       description: "Boolean flag to restrict facility IDs to numeric values only."
+      required: false
+      defaultValue: "false"
+    - key: "DMRP:Enabled"
+      description: "Boolean flag that enables the DMRP module hosted by the Tenant service. When enabled, facility reporting plans are sourced from the NHSN DMRP API and the DMRP controllers are served under api/dmrp. When disabled, the Tenant service performs facility dQM reporting on its own."
       required: false
       defaultValue: "false"
   Terminology:

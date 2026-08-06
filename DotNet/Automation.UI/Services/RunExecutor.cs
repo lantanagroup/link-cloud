@@ -1497,7 +1497,7 @@ internal sealed class RunExecutor
                 FacilityId = facilityId,
                 Operation = apiOp,
                 Description = opDef.Description ?? string.Empty,
-                VendorIds = []
+                VendorVersionIds = []
             }, cancellationToken);
 
             if (!createResp.IsSuccessStatusCode)

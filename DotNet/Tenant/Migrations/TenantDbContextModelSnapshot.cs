@@ -17,7 +17,7 @@ namespace LantanaGroup.Link.Tenant.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.25")
+                .HasAnnotation("ProductVersion", "8.0.27")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -518,6 +518,10 @@ namespace LantanaGroup.Link.Tenant.Migrations
                         .HasColumnType("smallint")
                         .HasColumnName("MISFIRE_INSTR");
 
+                    b.Property<long?>("MisfireOriginalFireTime")
+                        .HasColumnType("bigint")
+                        .HasColumnName("MISFIRE_ORIG_FIRE_TIME");
+
                     b.Property<long?>("NextFireTime")
                         .HasColumnType("bigint")
                         .HasColumnName("NEXT_FIRE_TIME");
@@ -564,6 +568,38 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.ToTable("QRTZ_TRIGGERS", "quartz");
                 });
 
+            modelBuilder.Entity("LantanaGroup.Link.DMRP.Data.Entities.FacilityReportingPlan", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("FacilityReportingPlans", (string)null);
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.DMRP.Data.Entities.MeasureMapping", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ModifyDate")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("MeasureMappings", (string)null);
+                });
+
             modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.Facility", b =>
                 {
                     b.Property<Guid>("Id")
@@ -590,15 +626,58 @@ namespace LantanaGroup.Link.Tenant.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Vendor")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                    b.Property<Guid?>("VendorVersionId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
                     SqlServerKeyBuilderExtensions.IsClustered(b.HasKey("Id"), false);
 
+                    b.HasIndex("VendorVersionId");
+
                     b.ToTable("Facilities", (string)null);
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.Vendor", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Authentication")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Vendor");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.VendorVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("VendorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VendorId");
+
+                    b.ToTable("VendorVersion");
                 });
 
             modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzBlobTrigger", b =>
@@ -658,6 +737,11 @@ namespace LantanaGroup.Link.Tenant.Migrations
 
             modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.Facility", b =>
                 {
+                    b.HasOne("LantanaGroup.Link.Tenant.Entities.VendorVersion", "VendorVersion")
+                        .WithMany()
+                        .HasForeignKey("VendorVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.OwnsOne("LantanaGroup.Link.Tenant.Data.Entities.ScheduledReportModel", "ScheduledReports", b1 =>
                         {
                             b1.Property<Guid>("FacilityId")
@@ -687,6 +771,19 @@ namespace LantanaGroup.Link.Tenant.Migrations
 
                     b.Navigation("ScheduledReports")
                         .IsRequired();
+
+                    b.Navigation("VendorVersion");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.VendorVersion", b =>
+                {
+                    b.HasOne("LantanaGroup.Link.Tenant.Entities.Vendor", "Vendor")
+                        .WithMany("VendorVersions")
+                        .HasForeignKey("VendorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Vendor");
                 });
 
             modelBuilder.Entity("AppAny.Quartz.EntityFrameworkCore.Migrations.QuartzJobDetail", b =>
@@ -703,6 +800,11 @@ namespace LantanaGroup.Link.Tenant.Migrations
                     b.Navigation("SimplePropertyTriggers");
 
                     b.Navigation("SimpleTriggers");
+                });
+
+            modelBuilder.Entity("LantanaGroup.Link.Tenant.Entities.Vendor", b =>
+                {
+                    b.Navigation("VendorVersions");
                 });
 #pragma warning restore 612, 618
         }
