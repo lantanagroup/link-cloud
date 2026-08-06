@@ -2719,14 +2719,6 @@
       "dmrp": {
         "type": "Project",
         "dependencies": {
-          "AspNetCore.HealthChecks.UI.Client": "[9.0.0, )",
-          "Microsoft.VisualStudio.Azure.Containers.Tools.Targets": "[1.23.0, )",
-          "Serilog.AspNetCore": "[8.0.3, )",
-          "Serilog.Enrichers.Span": "[3.1.0, )",
-          "Serilog.Exceptions": "[8.4.0, )",
-          "Serilog.Expressions": "[4.0.0, )",
-          "Serilog.Sinks.Grafana.Loki": "[8.3.2, )",
-          "Swashbuckle.AspNetCore": "[6.9.0, )",
           "com.lantanagroup.link.Shared": "[0.4.0, )"
         }
       },
@@ -2855,6 +2847,7 @@
           "CompareNETObjects": "[4.84.0, )",
           "Confluent.Kafka": "[2.14.2, )",
           "CronExpressionDescriptor": "[2.48.0, )",
+          "DMRP": "[0.1.0, )",
           "Grpc.AspNetCore": "[2.80.0, )",
           "Grpc.AspNetCore.Server.Reflection": "[2.80.0, )",
           "LinkSdk": "[1.0.0, )",

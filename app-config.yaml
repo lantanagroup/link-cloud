@@ -317,10 +317,6 @@ global:
     description: "The base URL for the Data Acquisition Service."
     required: true
     consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
-  - key: "ServiceRegistry:DmrpServiceUrl"
-    description: "The base URL for the DMRP Service."
-    required: true
-    consumers: ["Account", "AdminBFF", "Audit", "AutomationUI", "Census", "DataAcquisition", "DataAcquisitionWorker", "Normalization", "Notification", "QueryDispatch", "Report", "Submission", "Tenant"]
   - key: "ServiceRegistry:AdminBffServiceUrl"
     description: "The base URL for the Admin BFF service used by Automation.UI and LinkSdk Admin.BFF integration calls."
     required: true
@@ -706,6 +702,10 @@ services:
   Tenant:
     - key: "FacilityIdSettings:NumericOnlyFacilityId"
       description: "Boolean flag to restrict facility IDs to numeric values only."
+      required: false
+      defaultValue: "false"
+    - key: "DMRP:Enabled"
+      description: "Boolean flag that enables the DMRP module hosted by the Tenant service. When enabled, facility reporting plans are sourced from the NHSN DMRP API and the DMRP controllers are served under api/dmrp. When disabled, the Tenant service performs facility dQM reporting on its own."
       required: false
       defaultValue: "false"
   Terminology:

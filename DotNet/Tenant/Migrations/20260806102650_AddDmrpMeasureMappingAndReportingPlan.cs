@@ -1,12 +1,12 @@
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace LantanaGroup.Link.DMRP.Migrations
+namespace LantanaGroup.Link.Tenant.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class AddDmrpMeasureMappingAndReportingPlan : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

@@ -253,7 +253,6 @@ static void RegisterServices(WebApplicationBuilder builder)
             .AddCheck<AuditServiceHealthCheck>(nameof(HealthCheckType.Service))
             .AddCheck<CensusServiceHealthCheck>(nameof(HealthCheckType.Service))
             .AddCheck<DataAcquisitionHealthCheck>(nameof(HealthCheckType.Service))
-            .AddCheck<DmrpServiceHealthCheck>(nameof(HealthCheckType.Service))
             .AddCheck<MeasureEvaluationServiceHealthCheck>(nameof(HealthCheckType.Service))
             .AddCheck<NormalizationServiceHealthCheck>(nameof(HealthCheckType.Service))
             .AddCheck<NotificationServiceHealthCheck>(nameof(HealthCheckType.Service))
@@ -438,11 +437,6 @@ static void SetupMiddleware(WebApplication app)
             tasks.Add(ServiceInformation.GetServiceInformation(client, "Data Acquisition", serviceRegistry.DataAcquisitionServiceApiUrl,
                 serviceRegistry.PublicDataAcquisitionServiceUrl,
                 "/data/info", logger));
-
-        if (!string.IsNullOrEmpty(serviceRegistry.DmrpServiceApiUrl))
-            tasks.Add(ServiceInformation.GetServiceInformation(client, "DMRP", serviceRegistry.DmrpServiceApiUrl,
-                serviceRegistry.PublicDmrpServiceUrl,
-                "/dmrp/info", logger));
 
         if (!string.IsNullOrEmpty(serviceRegistry.MeasureServiceApiUrl))
             tasks.Add(ServiceInformation.GetServiceInformation(client, "Measure Evaluation", serviceRegistry.MeasureServiceApiUrl,

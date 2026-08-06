@@ -128,11 +128,6 @@ jobs:
         repoName: dataacquisition-worker
         containerName: data-worker
         healthUrl: https://$(env)-data.nhsnlink.org/health
-      dmrp:
-        serviceName: dmrp
-        repoName: dmrp
-        containerName: dmrp
-        healthUrl: https://$(env)-dmrp.nhsnlink.org/health
       measure-eval:
         serviceName: measure
         repoName: measureeval

@@ -2,18 +2,22 @@
 using LantanaGroup.Link.DMRP.Business.Queries;
 using LantanaGroup.Link.DMRP.Config;
 using LantanaGroup.Link.DMRP.Data.Entities;
-using LantanaGroup.Link.DMRP.Data.Repository;
 using LantanaGroup.Link.Shared.Application.Extensions;
+using LantanaGroup.Link.Shared.Domain.Repositories.Implementations;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
+using LantanaGroup.Link.Tenant.Repository.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System.Diagnostics;
 using System.Reflection;
 
 namespace IntegrationTests.DMRP
 {
+    /// <summary>
+    /// DMRP persists through the Tenant service's context, so the fixture stands up a
+    /// <see cref="TenantDbContext"/> and resolves the module's services against it.
+    /// </summary>
     public class DmrpIntegrationTestFixture : IDisposable
     {
         public IServiceProvider ServiceProvider { get; private set; }
@@ -27,7 +31,7 @@ namespace IntegrationTests.DMRP
             var assemblyVersion = Assembly.GetExecutingAssembly()
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
 
-            builder.SetupServiceInformation(DmrpConstants.ServiceName, assemblyVersion);
+            builder.SetupServiceInformation("DMRP", assemblyVersion);
 
             builder.Services.AddSingleton<UpdateBaseEntityInterceptor>();
 
@@ -35,15 +39,15 @@ namespace IntegrationTests.DMRP
             _dbPath = Path.Combine(Path.GetTempPath(), dbName);
             var sqliteConnectionString = $"Data Source={_dbPath};";
 
-            builder.Services.AddDbContext<DmrpDbContext>((sp, options) =>
+            builder.Services.AddDbContext<TenantDbContext>((sp, options) =>
             {
                 var updateBaseEntityInterceptor = sp.GetRequiredService<UpdateBaseEntityInterceptor>();
                 options.UseSqlite(sqliteConnectionString);
                 options.AddInterceptors(updateBaseEntityInterceptor);
             });
 
-            builder.Services.AddScoped<IEntityRepository<MeasureMapping>, MeasureMappingRepository>();
-            builder.Services.AddScoped<IEntityRepository<FacilityReportingPlan>, FacilityReportingPlanRepository>();
+            builder.Services.AddScoped<IEntityRepository<MeasureMapping>, EntityRepository<MeasureMapping, TenantDbContext>>();
+            builder.Services.AddScoped<IEntityRepository<FacilityReportingPlan>, EntityRepository<FacilityReportingPlan, TenantDbContext>>();
 
             builder.Services.AddScoped<IMeasureMappingManager, MeasureMappingManager>();
             builder.Services.AddScoped<IMeasureMappingQueries, MeasureMappingQueries>();
@@ -58,7 +62,7 @@ namespace IntegrationTests.DMRP
             ServiceProvider = _host.Services;
 
             using var scope = ServiceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<DmrpDbContext>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
             dbContext.Database.EnsureCreated();
         }
 
@@ -66,7 +70,7 @@ namespace IntegrationTests.DMRP
         {
             using (var disposeScope = ServiceProvider.CreateScope())
             {
-                var ctx = disposeScope.ServiceProvider.GetRequiredService<DmrpDbContext>();
+                var ctx = disposeScope.ServiceProvider.GetRequiredService<TenantDbContext>();
                 ctx.Database.EnsureDeleted();
             }
 

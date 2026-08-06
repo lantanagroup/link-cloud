@@ -20,7 +20,6 @@
 ## census: 8064
 ## dataacq: 8065
 ## dataacq-worker: 8078
-## dmrp: 8077
 ## admin-ui: 8066
 ## automation-ui: 5256
 ## measureeval: 8067
@@ -678,34 +677,6 @@ services:
        start_period: 3s
        interval: 3s
        retries: 10
-
-  dmrp:
-    image: link-dmrp
-    container_name: link-dmrp
-    environment:
-      ASPNETCORE_ENVIRONMENT: Docker
-      ConnectionStrings__DatabaseConnection: Server=tcp:mssql,1433;Initial Catalog=link-dmrp;Persist Security Info=False;User ID=sa;Password=${LINK_DB_PASS};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;
-    ports:
-      - "8077:8077"
-    build:
-      context: .
-      dockerfile: DotNet/DMRP/Dockerfile
-      args:
-        BUILD_CONFIGURATION: Debug
-    networks:
-      - link-nw
-    depends_on:
-      mssql_init:
-        condition: service_completed_successfully
-      otel-collector:
-        condition: service_started
-      loki:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8077/health"]
-      start_period: 5s
-      interval: 5s
-      retries: 10
 
   admin-ui:
     image: link-admin-ui

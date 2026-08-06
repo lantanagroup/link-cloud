@@ -1992,15 +1992,6 @@
 			}
 		},
 		{
-			"key": "ServiceRegistry:DmrpServiceUrl",
-			"value": "https://dev-dmrp.nhsnlink.org",
-			"label": null,
-			"content_type": "",
-			"tags": {
-				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
-			}
-		},
-		{
 			"key": "ServiceRegistry:MeasureServiceUrl",
 			"value": "https://dev-measure.nhsnlink.org",
 			"label": null,
@@ -2066,15 +2057,6 @@
 		{
 			"key": "ServiceRegistry:PublicDataAcquisitionServiceUrl",
 			"value": "https://dev-data.nhsnlink.org",
-			"label": null,
-			"content_type": "",
-			"tags": {
-				"link:consumers": "Account,AdminBFF,Audit,AutomationUI,Census,DataAcquisition,DataAcquisitionWorker,Normalization,Notification,QueryDispatch,Report,Submission,Tenant"
-			}
-		},
-		{
-			"key": "ServiceRegistry:PublicDmrpServiceUrl",
-			"value": "https://dev-dmrp.nhsnlink.org",
 			"label": null,
 			"content_type": "",
 			"tags": {

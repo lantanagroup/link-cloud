@@ -16,9 +16,11 @@ public class DmrpServiceClient : LinkApiClientBase, IDmrpServiceClient
         IOptions<BackendAuthenticationServiceExtension.LinkBearerServiceOptions> bearerOptions,
         IOptions<LinkTokenServiceSettings> tokenServiceSettings,
         ICreateSystemToken tokenService)
+        // DMRP is a module hosted by the Tenant service rather than a service of its own, so its
+        // endpoints are served from the Tenant service's base address.
         : base(
-            serviceRegistry.Value.DmrpServiceApiUrl
-                ?? throw new InvalidOperationException("DMRP service URL is not configured in ServiceRegistry."),
+            serviceRegistry.Value.TenantServiceApiUrl
+                ?? throw new InvalidOperationException("Tenant service URL is not configured in ServiceRegistry."),
             bearerOptions, tokenServiceSettings, tokenService)
     {
     }

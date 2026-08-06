@@ -2,6 +2,8 @@
 #nullable disable
 using AppAny.Quartz.EntityFrameworkCore.Migrations;
 using AppAny.Quartz.EntityFrameworkCore.Migrations.SqlServer;
+using LantanaGroup.Link.DMRP.Data.Entities;
+using LantanaGroup.Link.DMRP.Data.Repository.Mappings;
 using LantanaGroup.Link.Tenant.Data.Repository.Mappings;
 using LantanaGroup.Link.Tenant.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +21,10 @@ public partial class TenantDbContext : DbContext
     public virtual DbSet<Vendor> Vendors { get; set; }
     public virtual DbSet<VendorVersion> VendorVersions { get; set; }
 
+    // The DMRP module is hosted in-process by this service and persists here. The tables are always
+    // created; the module's behavior is what the DMRP:Enabled flag turns on and off.
+    public virtual DbSet<MeasureMapping> MeasureMappings { get; set; }
+    public virtual DbSet<FacilityReportingPlan> FacilityReportingPlans { get; set; }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -28,6 +34,8 @@ public partial class TenantDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new FacilityConfigMap());
+        modelBuilder.ApplyConfiguration(new MeasureMappingConfigMap());
+        modelBuilder.ApplyConfiguration(new FacilityReportingPlanConfigMap());
 
         modelBuilder.Entity<Facility>(entity =>
         {

@@ -15,6 +15,7 @@ using LantanaGroup.Link.Shared.Application.Models.Kafka;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interceptors;
 using LantanaGroup.Link.Shared.Domain.Repositories.Interfaces;
 using LantanaGroup.Link.Shared.Settings;
+using LantanaGroup.Link.DMRP.DependencyInjection;
 using LantanaGroup.Link.Sdk.DependencyInjection;
 using LantanaGroup.Link.Tenant.Business.Managers;
 using LantanaGroup.Link.Tenant.Business.Queries;
@@ -142,7 +143,11 @@ namespace Tenant
 
             builder.Services.AddHttpClient();
 
-            builder.Services.AddControllers();
+            var mvcBuilder = builder.Services.AddControllers();
+
+            // DMRP is not deployed separately; it layers NHSN measure enrollment onto this service when
+            // enabled, and is inert otherwise. Its entities live in TenantDbContext.
+            builder.AddDmrpModule<TenantDbContext>(mvcBuilder);
 
             //Add problem details
             builder.Services.AddProblemDetails(options =>
@@ -181,6 +186,13 @@ namespace Tenant
                 var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
                 var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
                 c.IncludeXmlComments(xmlPath);
+
+                // Document the DMRP module's controllers alongside this service's own.
+                var dmrpXmlPath = Path.Combine(AppContext.BaseDirectory,
+                    $"{typeof(DmrpModuleExtensions).Assembly.GetName().Name}.xml");
+                if (File.Exists(dmrpXmlPath))
+                    c.IncludeXmlComments(dmrpXmlPath);
+
                 c.DocumentFilter<HealthChecksFilter>();
             });
 

@@ -1,13 +1,10 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
-		<UserSecretsId>4f6e9b1a-3c3b-4c9e-9a2b-7b5b6a1e2d4f</UserSecretsId>
-		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 		<RootNamespace>LantanaGroup.Link.DMRP</RootNamespace>
-		<DockerComposeProjectPath>..\docker-compose.dcproj</DockerComposeProjectPath>
 		<Configurations>Debug;Release;Debug IIS</Configurations>
 		<PredefinedCulturesOnly>false</PredefinedCulturesOnly>
 		<Version>0.1.0</Version>
@@ -19,25 +16,22 @@
 		<NoWarn>$(NoWarn);1591</NoWarn>
 	</PropertyGroup>
 
+	<!-- DMRP is hosted in-process by the Tenant service rather than deployed on its own, so it
+	     builds as a class library. These usings mirror the ones Microsoft.NET.Sdk.Web supplies
+	     implicitly. -->
 	<ItemGroup>
-		<PackageReference Include="AspNetCore.HealthChecks.UI.Client" />
-		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
-		<PackageReference Include="Serilog.AspNetCore" />
-		<PackageReference Include="Serilog.Enrichers.Span" />
-		<PackageReference Include="Serilog.Exceptions" />
-		<PackageReference Include="Serilog.Expressions" />
-		<PackageReference Include="Serilog.Sinks.Grafana.Loki" />
-		<PackageReference Include="Swashbuckle.AspNetCore" />
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+		<Using Include="Microsoft.AspNetCore.Builder" />
+		<Using Include="Microsoft.AspNetCore.Http" />
+		<Using Include="Microsoft.AspNetCore.Routing" />
+		<Using Include="Microsoft.Extensions.Configuration" />
+		<Using Include="Microsoft.Extensions.DependencyInjection" />
+		<Using Include="Microsoft.Extensions.Hosting" />
+		<Using Include="Microsoft.Extensions.Logging" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\Shared\Shared.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Content Update="appsettings.json">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</Content>
 	</ItemGroup>
 
 </Project>
